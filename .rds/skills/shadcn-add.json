@@ -1,0 +1,13 @@
+{
+  "slug": "shadcn-add",
+  "name": "shadcn add",
+  "path": "skills/built-in/shadcn-add/rds-skill.yaml",
+  "status": "ready",
+  "install": {
+    "mode": "imperative",
+    "command": "skills/built-in/shadcn-add/install.sh"
+  },
+  "verify": {
+    "command": "skills/built-in/shadcn-add/verify.sh"
+  }
+}

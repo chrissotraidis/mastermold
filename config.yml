@@ -1,0 +1,158 @@
+# config.yml — Build verification and hook configuration
+# Generated from recipe: Next.js Full-Stack
+# Single source of truth for empirical validation commands
+#
+# post_merge_hooks: run after each task commit (trigger_paths matched against changed files)
+# verification_checks: run before marking a task done (required=true blocks completion)
+
+---
+detected_stacks:
+- node
+workflow_capabilities:
+  browser_ui: true
+  http_routes: true
+  server_actions: true
+  client_state: true
+  accessibility: true
+  native_tests: true
+  seed_data: true
+coverage_policy:
+  early_mode: informational
+  progress_compact: true
+  progress_example_limit: 3
+  final_fail_under: 90
+  enforce_on_titles:
+  - UAT Walkthrough
+  - Final Hygiene Check
+verification_adapters:
+  http:
+    base_url_shell: "${APP_BASE_URL:-http://127.0.0.1:${APP_PORT:-3000}}"
+  seed_commands:
+    node: npm run seed --if-present
+  test_runners:
+    node:
+  readiness_commands:
+    background_processing_ready:
+      node: 'ruby -e ''require "json"; package = File.exist?("package.json") ? JSON.parse(File.read("package.json",
+        encoding: "UTF-8")) : {}; scripts = package["scripts"] || {}; ready = scripts.keys.any?
+        { |name| name.match?(/worker|queue|jobs?|dev/i) } || Dir.glob("Procfile*").any?
+        { |path| File.read(path, encoding: "UTF-8").match?(/worker|queue|job/i) };
+        abort("Background processing is not proven ready in development") unless ready'''
+  ui_affordance:
+    globs_key: ui_template_globs
+    ignored_terms:
+    - page
+    - screen
+    - flow
+    - user
+    - click
+    - tap
+  accessibility:
+    globs_key: ui_template_globs
+    commands:
+      generic: 'ruby -e ''patterns = ["src/**/*.{js,jsx,ts,tsx,vue,svelte}", "app/**/*.{js,jsx,ts,tsx,vue,svelte}",
+        "public/**/*.html"]; files = patterns.flat_map { |pattern| Dir.glob(pattern)
+        }.uniq.select { |path| File.file?(path) }; offenders = []; files.each do |path|
+        text = File.read(path, encoding: "UTF-8") rescue next; offenders << path if
+        text.match?(/<button\b(?![^>]*aria-label=)[^>]*>\s*[×✕✖]\s*<\/button>/i);
+        end; abort("Icon-only buttons missing aria-label: #{offenders.join(", ")}")
+        unless offenders.empty?'''
+  entity_contract:
+    globs_key: schema_globs
+  native_launch:
+    prefer_test_runner: true
+  authz_wiring:
+    commands:
+      node: 'ruby -e ''patterns = ["src/**/*.{js,jsx,ts,tsx}", "app/**/*.{js,jsx,ts,tsx}"];
+        files = patterns.flat_map { |pattern| Dir.glob(pattern) }.uniq.select { |path|
+        File.file?(path) }; defs = []; files.each do |path| text = File.read(path,
+        encoding: "UTF-8") rescue next; defs.concat(text.scan(/\b(?:function|const)\s+(authorize[A-Z]\w+|require[A-Z]\w+)/).flatten);
+        end; defs.uniq!; unused = defs.select do |name| references = files.sum do
+        |path| text = File.read(path, encoding: "UTF-8") rescue ""; text.scan(/\b#{Regexp.escape(name)}\b/).size;
+        end; references < 2; end; abort("Authorization helpers defined but not used:
+        #{unused.join(", ")}") unless unused.empty?'''
+  audit_text:
+    commands:
+      generic: rg -ni 'audit|activity log|security log' app lib src config >/dev/null
+        2>&1
+  turbo_navigation:
+    commands: {}
+task_test_globs:
+- test/**/*
+- tests/**/*
+- __tests__/**/*
+- cypress/e2e/**/*
+- playwright/**/*
+browser_test_globs:
+- playwright/**/*
+- cypress/e2e/**/*
+- tests/e2e/**/*
+native_test_globs: []
+ui_template_globs:
+- src/**/*.{js,jsx,ts,tsx,vue,svelte}
+- app/**/*.{js,jsx,ts,tsx,vue,svelte}
+- public/**/*.html
+schema_globs:
+- schema.prisma
+- prisma/**/*
+- src/models/**/*
+- src/db/**/*
+code_globs:
+- src/**/*.{js,jsx,ts,tsx}
+- app/**/*.{js,jsx,ts,tsx}
+gitignore_patterns:
+- ".DS_Store"
+- "*.swp"
+- "*.swo"
+- "*~"
+- ".scaffold/task-details/"
+- ".scaffold/review/"
+- node_modules/
+- ".next/"
+- dist/
+- ".env.local"
+post_merge_hooks:
+- name: NPM install
+  trigger_paths:
+  - package.json
+  command: npm install --silent
+  commit_paths:
+  - package-lock.json
+  commit_message: Update package-lock.json after merge
+verification_checks:
+- name: NPM install
+  command: npm install --silent
+  type: custom
+  required: true
+- name: TypeScript check
+  command: npx tsc --noEmit 2>/dev/null || true
+  type: compilation
+  required: false
+- name: Route smoke test
+  command: bin/smoke_test
+  type: smoke_test
+  required: true
+  conditional: app/controllers/**/*.rb
+- name: Spec coverage audit
+  command: bin/spec_coverage
+  type: coverage_audit
+  required: false
+- name: Test suite
+  command: bun run build
+  type: test_suite
+  required: false
+mcp_capabilities:
+- docs_lookup
+mcp_hints:
+  docs_lookup:
+    frameworks:
+    - node
+    - express
+boot_command: bunx next dev --hostname 0.0.0.0 --port 3000
+health_checks:
+- url: http://localhost:3000/api/health
+  expected_status: 200
+- url: http://localhost:3000/
+  expected_status: 200
+wiki_bridge:
+  wiki_dir: "/home/workspace/Programs/Artifact-RDS/builds/rds-product-type-game-20260530-161808/wiki"

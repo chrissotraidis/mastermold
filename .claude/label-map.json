@@ -1,0 +1,11 @@
+{
+  "android": "android-specialist",
+  "auth": "auth-specialist",
+  "backend": "backend-specialist",
+  "database": "database-specialist",
+  "frontend": "frontend-specialist",
+  "integration": "integration-specialist",
+  "ios": "ios-specialist",
+  "setup": "setup-specialist",
+  "testing": "testing-specialist"
+}

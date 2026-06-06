@@ -1,0 +1,12 @@
+{
+  "slug": "playwright-mcp",
+  "name": "Playwright MCP",
+  "path": "skills/built-in/playwright-mcp/rds-skill.yaml",
+  "status": "ready",
+  "install": {
+    "command": "bin/rds-skill-materialize playwright-mcp"
+  },
+  "verify": {
+    "command": "bin/rds-skill-verify playwright-mcp"
+  }
+}

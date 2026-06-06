@@ -1,0 +1,806 @@
+{
+  "schema_version": 2,
+  "hydration_mode": "lazy",
+  "metadata_version": 2,
+  "last_synced_spec_sha": "baseline",
+  "spec_metadata": {
+    "entity_contracts": {},
+    "action_catalog": [
+      {
+        "text": "> view, a decision journal with a published track record, a gamified paper-trading",
+        "labels": []
+      },
+      {
+        "text": "- **Portfolio** (derived view): consolidated holdings, total_value, concentration",
+        "labels": []
+      },
+      {
+        "text": "- **PriceBar**: id, asset_id → Asset, ts (event_time), open/high/low/close/volume,",
+        "labels": []
+      },
+      {
+        "text": "| Route | View → purpose |",
+        "labels": []
+      },
+      {
+        "text": "| `/alerts` | **Alert Feed** → priority-queued T0/T1/T2, success-filtered, one-tap \"see rationale\", snooze/feedback |",
+        "labels": [
+          "see rationale",
+          "/alerts"
+        ]
+      },
+      {
+        "text": "- [ ] Portfolio view shows consolidated holdings + DeFi positions + a concentration",
+        "labels": []
+      },
+      {
+        "text": "- **What is stubbed or credential-gated:** Coinbase CDP (view-only key), Robinhood via",
+        "labels": []
+      },
+      {
+        "text": "- Open `/executor` → editing guardrails or pressing kill-switch performs no network",
+        "labels": [
+          "/executor"
+        ]
+      },
+      {
+        "text": "- Make the first 10 seconds clear without explanatory copy that reads like documentation.",
+        "labels": []
+      },
+      {
+        "text": "- A user can complete the primary workflow without guessing.",
+        "labels": []
+      },
+      {
+        "text": "### Complete the primary workflow",
+        "labels": []
+      },
+      {
+        "text": "- click: Submit order|Create order|New order",
+        "labels": []
+      },
+      {
+        "text": "### Exercise search/filter/settings/export-style controls",
+        "labels": []
+      },
+      {
+        "text": "- click: Search",
+        "labels": []
+      },
+      {
+        "text": "- click: Filter|Settings",
+        "labels": []
+      }
+    ],
+    "operational_prerequisites": {
+      "local_http_server": "A local HTTP server or entry point must run for user-visible flows.",
+      "seed_data_loaded": "Seed or fixture data must load before user-journey verification.",
+      "background_processing_ready": "Async jobs, workers, queues, or in-process fallbacks must execute locally before dependent features pass.",
+      "scheduler_ready": "Recurring tasks need a local scheduler or deterministic fallback.",
+      "authenticated_seed_account": "At least one seeded credentialed account must exist for protected-flow verification."
+    },
+    "requirement_audit": {
+      "active_requirement_refs": [],
+      "covered_requirement_refs": []
+    }
+  },
+  "wiki_metadata": {
+    "wiki_dir": "/home/workspace/Programs/Artifact-RDS/builds/rds-product-type-game-20260530-161808/wiki",
+    "entities_discovered": [],
+    "routes_discovered": 0,
+    "risks_discovered": 0,
+    "triage_present": false
+  },
+  "tasks": [
+    {
+      "title": "Bootstrap Next.js project with data layer and full seed",
+      "position": 0,
+      "depends_on": [],
+      "labels": [
+        "setup",
+        "backend",
+        "database"
+      ],
+      "section_ref": "Overview",
+      "user_story": "As a developer, I run bun install and boot the dev server to get a working Next.js App Router app with all entity schemas, bitemporal seeded demo data, dark theme, persistent nav, and /api/health returning 200.",
+      "done_when": "bun install succeeds; bunx next dev starts without error; GET /api/health returns 200 JSON {status:'ok'}; GET / returns 200 with a dark-themed shell showing persistent nav links for Briefing, Alerts, Portfolio, Paper, Chat, Executor, and Review; a first-run banner is visible linking to /review; all entity schemas (Account, Asset, Holding, PriceBar, NewsItem, BriefingCard, Driver, Alert, DecisionJournalEntry, OutcomeScore, PaperTradingRound, PaperPrediction, RoundScore, ExecutorStrategy, GuardrailConfig, IntegrationStatus, StrategyBelief, ReflectionUpdate, FundingObservation) are defined in a data layer (SQLite via better-sqlite3 or JSON fixture files) pre-seeded with realistic demo data including bitemporal event_time and knowledge_time fields spanning varied timestamps; TypeScript compiles without errors.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "http_routes",
+        "seed_data",
+        "browser_ui",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "Account",
+        "Asset",
+        "Holding",
+        "PriceBar",
+        "NewsItem",
+        "BriefingCard",
+        "Driver",
+        "Alert",
+        "DecisionJournalEntry",
+        "OutcomeScore",
+        "PaperTradingRound",
+        "PaperPrediction",
+        "RoundScore",
+        "ExecutorStrategy",
+        "GuardrailConfig",
+        "IntegrationStatus",
+        "StrategyBelief",
+        "ReflectionUpdate",
+        "FundingObservation",
+        "User"
+      ],
+      "ui_actions": [
+        "open home page",
+        "view nav links",
+        "view first-run banner",
+        "promised not yet",
+        "coinbase",
+        "robinhood",
+        "onchain_wallet"
+      ],
+      "sensitive_events": [
+        "account_change"
+      ],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded",
+        "scheduler_ready"
+      ],
+      "priority": 0,
+      "status": "done"
+    },
+    {
+      "title": "Daily briefing home with ranked cards and empty state",
+      "position": 1,
+      "depends_on": [
+        0
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open / and see 3–5 ranked briefing cards each showing headline, why-now, relevance, bull case, bear case, conviction score, and horizon, plus a designed 'nothing actionable today' empty state.",
+      "done_when": "GET / returns 200 and renders 3–5 BriefingCard rows from seeded data each showing headline, why-now note, relevance note, bull case, bear case, a 1–10 conviction badge, and a time horizon label; GET /api/briefing returns 200 with a typed JSON array of cards; a 'nothing actionable today' state is rendered as a designed empty-state component (distinct layout, not an error page) when a card has status=nothing_actionable or the briefing list is empty; every card shows a 'Demo data' disclosure chip; cards are clickable and navigate to /briefing/[id].",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "BriefingCard"
+      ],
+      "ui_actions": [
+        "view briefing cards",
+        "click card to open detail",
+        "view nothing-actionable empty state",
+        "api briefing",
+        "briefing",
+        "not error",
+        "card"
+      ],
+      "sensitive_events": [],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded",
+        "scheduler_ready"
+      ],
+      "priority": 1,
+      "status": "done"
+    },
+    {
+      "title": "Briefing card detail with ranked color-coded drivers",
+      "position": 2,
+      "depends_on": [
+        1
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open a briefing card detail and see ranked, color-coded bull/bear drivers with cited data sources and a link to the associated decision journal entry.",
+      "done_when": "GET /briefing/[id] returns 200 for a seeded card id; page renders a ranked Driver list each showing label, direction (bullish rendered in green, bearish in red), weight, and source_citation; a DataProvenance chip shows source label and as_of timestamp; a 'View journal entry' link navigates to /journal for the associated DecisionJournalEntry; GET /api/briefing/[id] returns 200 with a typed JSON object including a drivers array; navigating back to / works via breadcrumb or back nav.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "BriefingCard",
+        "Driver"
+      ],
+      "ui_actions": [
+        "view ranked drivers",
+        "expand source citation",
+        "navigate to linked journal entry",
+        "briefing card",
+        "briefing",
+        "journal",
+        "api briefing"
+      ],
+      "sensitive_events": [],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded"
+      ],
+      "priority": 2,
+      "status": "done"
+    },
+    {
+      "title": "Alert feed with priority tiers and acknowledgement",
+      "position": 3,
+      "depends_on": [
+        0
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open /alerts and see a priority-sorted alert feed with tier badges, can expand rationale, acknowledge alerts, and leave useful/not-useful feedback that persists within the session.",
+      "done_when": "GET /alerts returns 200 and renders seeded alerts sorted T0 → T1 → T2; each alert shows a colored tier badge, z_score, and message text; clicking 'See rationale' expands the rationale panel inline; an acknowledge button marks the alert as acknowledged and visually dims or removes it from the active feed; a useful/not-useful radio saves useful_feedback and is reflected in the UI without page reload; tier filter controls (All / T0 / T1 / T2) change the visible set; GET /api/alerts returns 200 with typed JSON; a 'Demo data' chip is present.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "authn",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "Alert",
+        "User"
+      ],
+      "ui_actions": [
+        "expand alert rationale",
+        "acknowledge alert",
+        "submit feedback",
+        "filter by tier",
+        "alert",
+        "not useful",
+        "api alert",
+        "reflected without"
+      ],
+      "sensitive_events": [
+        "authentication"
+      ],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded",
+        "authenticated_seed_account"
+      ],
+      "priority": 3,
+      "status": "done"
+    },
+    {
+      "title": "Portfolio consolidation with TradingView charts",
+      "position": 4,
+      "depends_on": [
+        0
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open /portfolio and see consolidated cross-account holdings with DeFi positions, a concentration score panel, per-class allocation, TradingView price charts, and integration status badges for each account.",
+      "done_when": "GET /portfolio returns 200 and renders: a consolidated holdings table (symbol, quantity, cost_basis, market_value, weight%) from seeded Holding rows across all Accounts; a DeFi/on-chain positions section for asset_class=defi holdings; a concentration panel showing HHI and top-position %; a per-class allocation breakdown (equity / crypto / defi) as a chart; a TradingView Lightweight Charts candlestick for at least one seeded Asset using seeded PriceBar rows; each Account row shows an integration_status badge (stubbed / connected / credential_gated); GET /api/portfolio returns 200 with typed JSON; a 'Demo data' chip is present.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "Account",
+        "Asset",
+        "Holding",
+        "PriceBar",
+        "User"
+      ],
+      "ui_actions": [
+        "view holdings table",
+        "view concentration score",
+        "view price chart",
+        "select asset for chart",
+        "portfolio",
+        "chain",
+        "api portfolio",
+        "open portfolio see consolidated"
+      ],
+      "sensitive_events": [
+        "account_change"
+      ],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded"
+      ],
+      "priority": 4,
+      "status": "done"
+    },
+    {
+      "title": "Decision journal with track record by confidence tier",
+      "position": 5,
+      "depends_on": [
+        0
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open /journal, see all logged decisions with thesis, falsification condition, logged_at, and outcome scores, and review a track record grouped by confidence tier; I can log a new decision.",
+      "done_when": "GET /journal returns 200 and renders seeded DecisionJournalEntry rows each showing thesis, falsification_condition, logged_at timestamp, conviction tier label, and linked OutcomeScore (process_score, outcome_score, thesis_played_out, resolved_at) where resolved; a track-record section groups entries by confidence tier (e.g. 1–3 / 4–6 / 7–10) and shows win-rate and mean outcome_score per tier; a StrategyBelief list shows current beliefs with confidence and ReflectionUpdate history (significance_passed flag visible); a 'Log decision' form accepts thesis, signals, conviction, horizon, and falsification_condition and persists the entry with logged_at=now; GET /api/journal returns 200 with typed JSON.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "DecisionJournalEntry",
+        "OutcomeScore",
+        "StrategyBelief",
+        "ReflectionUpdate"
+      ],
+      "ui_actions": [
+        "log new decision",
+        "view track record by confidence tier",
+        "view strategy beliefs",
+        "view reflection updates",
+        "journal",
+        "api journal",
+        "open journal"
+      ],
+      "sensitive_events": [],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded"
+      ],
+      "priority": 5,
+      "status": "done"
+    },
+    {
+      "title": "Bitemporal as-of replay on portfolio and journal APIs",
+      "position": 6,
+      "depends_on": [
+        4,
+        5
+      ],
+      "labels": [
+        "backend",
+        "frontend"
+      ],
+      "section_ref": "Acceptance Criteria",
+      "user_story": "As the operator, I select a past timestamp in the portfolio or journal UI and the data re-renders using only facts whose knowledge_time is on or before that timestamp with no look-ahead.",
+      "done_when": "GET /api/portfolio?as_of=<past-ts> returns holdings and price bars where knowledge_time ≤ past-ts only; GET /api/journal?as_of=<past-ts> excludes entries with knowledge_time > past-ts; seeded data includes at least two PriceBar rows for the same asset with different knowledge_times so the filter is demonstrably effective; portfolio page has a date/time picker that submits as_of and re-renders with filtered results and an 'As of [timestamp]' label; a fact seeded with a future knowledge_time relative to the chosen timestamp is absent from the filtered response.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "PriceBar",
+        "Holding",
+        "DecisionJournalEntry"
+      ],
+      "ui_actions": [
+        "select as-of timestamp",
+        "view historical data snapshot",
+        "clear as-of filter",
+        "api portfolio",
+        "api journal",
+        "time",
+        "portfolio"
+      ],
+      "sensitive_events": [],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded"
+      ],
+      "priority": 6,
+      "status": "done"
+    },
+    {
+      "title": "Paper-trading sandbox with process-based scoring",
+      "position": 7,
+      "depends_on": [
+        0
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open /paper, submit predictions for the active round, and see a RoundScore showing calibration, patience, and diversification metrics with no confetti and no real-trade celebration.",
+      "done_when": "GET /paper returns 200 and renders the active PaperTradingRound (week_label, opens_at, closes_at) with a prediction submission form (asset selector, direction toggle, conviction 1–10 slider, rationale textarea); a submitted PaperPrediction is saved and appears in the predictions list for that round; a completed seeded round shows its RoundScore (calibration, patience, diversification, total) in a neutral metrics panel — no confetti animation, no celebratory copy; round history lists past rounds with scores; GET /api/paper returns 200 with typed JSON including rounds, predictions, and scores.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "PaperTradingRound",
+        "PaperPrediction",
+        "RoundScore"
+      ],
+      "ui_actions": [
+        "submit prediction",
+        "view round score",
+        "view round history",
+        "paper",
+        "api paper",
+        "prediction submission",
+        "open paper"
+      ],
+      "sensitive_events": [],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded"
+      ],
+      "priority": 7,
+      "status": "done"
+    },
+    {
+      "title": "Agent chat shell with scaffolded prompts and BYOK",
+      "position": 8,
+      "depends_on": [
+        0
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open /chat, select a scaffolded prompt or type a message, and receive a canned advisory response — or a live LLM response if a BYOK API key is set in .env.local.",
+      "done_when": "GET /chat returns 200 and renders a chat interface with at least four scaffolded suggested-prompt chips referencing dashboard elements (e.g. 'What is my highest-conviction holding?', 'Explain today's top alert', 'Review my recent decision accuracy'); clicking a chip or sending a free-text message displays a user bubble and a response bubble; without a BYOK key the POST /api/chat route returns a canned advisory response referencing seeded data; with ANTHROPIC_API_KEY or OPENAI_API_KEY set in .env.local the route forwards the message to the LLM with holdings abstracted to ratios; chat history persists within the browser session; a persistent 'Advisory only — no trade authority' banner is visible.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "authn",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "User"
+      ],
+      "ui_actions": [
+        "select scaffolded prompt",
+        "send message",
+        "view advisory response",
+        "chat",
+        "api chat",
+        "open chat",
+        "select scaffolded prompt type"
+      ],
+      "sensitive_events": [
+        "authentication"
+      ],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded",
+        "authenticated_seed_account"
+      ],
+      "priority": 8,
+      "status": "done"
+    },
+    {
+      "title": "Web3 executor monitor with display-only guardrail controls",
+      "position": 9,
+      "depends_on": [
+        0
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open /executor and see strategy status, funding/net-delta/margin panels, a guardrail config editor, and a kill-switch button — none of which sign a transaction or call any chain.",
+      "done_when": "GET /executor returns 200 and renders seeded ExecutorStrategy rows with status badge (paused/safe_mode/running_demo), net_delta, margin_ratio, funding_rate, and basis values; a FundingObservation panel shows funding rate trend from seeded rows; GuardrailConfig section renders per_tx_cap, daily_cap, contract_allowlist, session_key_expiry as editable fields that update local React state only with no network call on save; kill-switch button sets strategy status to paused in local state only; no HTTP call to any chain RPC, signing endpoint, or execution API is triggered by any interaction; a 'Display only — signs nothing' banner is prominent; GET /api/executor returns 200 with typed JSON.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "ExecutorStrategy",
+        "GuardrailConfig",
+        "FundingObservation",
+        "User"
+      ],
+      "ui_actions": [
+        "view strategy status",
+        "edit guardrail config",
+        "press kill-switch",
+        "executor",
+        "safe mode running",
+        "api executor",
+        "open executor see strategy"
+      ],
+      "sensitive_events": [],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded",
+        "scheduler_ready"
+      ],
+      "priority": 9,
+      "status": "done"
+    },
+    {
+      "title": "Integrations settings with stubbed and credential-gated states",
+      "position": 10,
+      "depends_on": [
+        0
+      ],
+      "labels": [
+        "frontend",
+        "backend"
+      ],
+      "section_ref": "Routes / Views",
+      "user_story": "As the operator, I open /settings/integrations and see all external services with their stubbed or credential_gated status and an optional key entry form that never commits credentials.",
+      "done_when": "GET /settings/integrations returns 200 and renders IntegrationStatus rows for Coinbase CDP (stubbed), Robinhood via SnapTrade (stubbed), Zerion on-chain (stubbed), and LLM (credential_gated) each with a status badge and detail text; an optional API key input field is present per service and stores the value in localStorage only — never sent to a server route, never committed; a 'Demo data' disclosure chip appears for all stubbed services; GET /api/status returns 200 with integration status JSON; the page is reachable from the persistent nav.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [
+        "IntegrationStatus"
+      ],
+      "ui_actions": [
+        "view integration status badges",
+        "enter optional API key",
+        "view credential-gated status",
+        "setting integration",
+        "api statu",
+        "reachable persistent nav",
+        "open setting integration see"
+      ],
+      "sensitive_events": [
+        "account_change"
+      ],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded"
+      ],
+      "priority": 10,
+      "status": "done"
+    },
+    {
+      "title": "Review readiness page with truthful disclosure and reviewer persona",
+      "position": 11,
+      "depends_on": [
+        1,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        10
+      ],
+      "labels": [
+        "frontend"
+      ],
+      "section_ref": "Review Readiness / Truthfulness (in-app surface — required)",
+      "user_story": "As a reviewer, I open /review from the first-run banner and see a structured truthful disclosure of what works, what is seeded, what is stubbed or credential-gated, and which PRD promises are not yet live in V0.",
+      "done_when": "GET /review returns 200 and renders four clearly labeled sections: 'What works in V0' (Daily Briefing, card detail with drivers, Alert Feed, Portfolio + concentration, Decision Journal + track record, Paper Trading sandbox, Agent Chat shell, Executor monitor, Integrations, Review page, bitemporal as-of replay); 'Seeded / demo data' (all holdings, prices, news, funding, briefing cards, alerts, journal outcomes, paper rounds, executor metrics are fabricated with a 'no real money' disclaimer); 'Stubbed or credential-gated' (Coinbase CDP, Robinhood, Zerion, LLM with .env.local key instructions); 'Not yet live in V0' (always-on ingestion pipeline, live eval harness DSR/PBO/MinTRL, bounded-autonomy Web3 executor as live actor, CPA tax sign-off); a reviewer@demo.local persona section with a note that no credentials are required; the first-run banner on / links to /review.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "http_routes",
+        "seed_data",
+        "accessibility",
+        "native_tests"
+      ],
+      "entities_touched": [],
+      "ui_actions": [
+        "view what-works list",
+        "view seeded-data disclaimer",
+        "view stubbed integrations",
+        "view missing PRD promises",
+        "view reviewer persona",
+        "review readiness",
+        "review",
+        "pbo mintrl",
+        "open review first run"
+      ],
+      "sensitive_events": [],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded",
+        "scheduler_ready"
+      ],
+      "priority": 11,
+      "status": "done"
+    },
+    {
+      "title": "Read-only enforcement automated verification",
+      "position": 12,
+      "depends_on": [
+        11
+      ],
+      "labels": [
+        "backend",
+        "testing"
+      ],
+      "section_ref": "Acceptance Criteria",
+      "user_story": "As the operator and reviewer, I run the test suite and a dedicated check confirms that no trade, order, execute, or write API endpoint or external account mutation exists anywhere in the codebase.",
+      "done_when": "A test file in the project (e.g. tests/read-only-enforcement.test.ts) uses grep or AST inspection against src/app/api to assert: zero route handler files are named or contain handlers matching trade, order, execute, transfer, or withdraw; zero files import or invoke any brokerage SDK write method; bun test exits 0 and prints a passing assertion 'No execution endpoints found'; the test is included in bun run test.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "native_tests",
+        "http_routes",
+        "background_work"
+      ],
+      "entities_touched": [
+        "User"
+      ],
+      "ui_actions": [
+        "read only enforcement",
+        "api"
+      ],
+      "sensitive_events": [
+        "account_change"
+      ],
+      "operational_prerequisites": [
+        "local_http_server",
+        "background_processing_ready"
+      ],
+      "priority": 12,
+      "status": "done"
+    },
+    {
+      "title": "Global UI polish, loading states, and responsive layout",
+      "position": 13,
+      "depends_on": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "labels": [
+        "frontend"
+      ],
+      "section_ref": "RDS Taste Brief",
+      "user_story": "As the operator, every surface has consistent dark theme, visible loading skeletons, graceful error and empty states, demo disclosure chips, and a mobile-responsive layout with no horizontal overflow on any route.",
+      "done_when": "All routes (/, /briefing/[id], /alerts, /portfolio, /journal, /paper, /chat, /executor, /review, /settings/integrations) show a loading skeleton during server data fetch; every route is wrapped in an error boundary that renders a non-crashing fallback with a retry option; 'Demo data' disclosure chips appear on all surfaces backed by seeded data; the persistent nav highlights the active route; at 375px viewport width the nav collapses to a mobile-friendly bottom-nav or hamburger menu with no horizontal overflow and no clipped elements; the TradingView chart resizes correctly; typography, spacing, and color hierarchy are consistent across all pages in dark mode; there are no console hydration warnings in production build mode.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "browser_ui",
+        "accessibility",
+        "http_routes",
+        "seed_data",
+        "native_tests"
+      ],
+      "entities_touched": [],
+      "ui_actions": [
+        "view mobile nav",
+        "view loading skeleton",
+        "view error boundary fallback",
+        "view empty state",
+        "briefing",
+        "alert",
+        "portfolio",
+        "journal"
+      ],
+      "sensitive_events": [
+        "account_change"
+      ],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded"
+      ],
+      "priority": 13,
+      "status": "done"
+    },
+    {
+      "title": "Build verification and final smoke check",
+      "position": 14,
+      "depends_on": [
+        12,
+        13
+      ],
+      "labels": [
+        "testing",
+        "setup"
+      ],
+      "section_ref": "Verification",
+      "user_story": "As a developer, I run bun run build and all boot, health, and route checks pass with zero TypeScript errors, no console errors, and no hydration warnings.",
+      "done_when": "bun run build exits 0 with no TypeScript compilation errors; bunx next start serves the production build; GET /api/health returns HTTP 200 with JSON {status:'ok'}; GET / returns HTTP 200; GET /portfolio, /alerts, /journal, /paper, /chat, /executor, /review, /settings/integrations all return HTTP 200; bun test exits 0 including the read-only enforcement check; no React hydration mismatch warnings appear when viewing any route; the first-run banner and /review link are present on the home page; bun run typecheck exits 0.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "http_routes",
+        "native_tests",
+        "browser_ui",
+        "seed_data",
+        "accessibility"
+      ],
+      "entities_touched": [],
+      "ui_actions": [
+        "api health",
+        "portfolio",
+        "alert",
+        "journal"
+      ],
+      "sensitive_events": [
+        "account_change"
+      ],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded"
+      ],
+      "priority": 14,
+      "status": "done"
+    },
+    {
+      "title": "UAT Walkthrough",
+      "position": 15,
+      "depends_on": [
+        14
+      ],
+      "labels": [
+        "testing",
+        "integration"
+      ],
+      "section_ref": "User Journeys",
+      "user_story": "As a user, I can complete the primary flows described in the spec.",
+      "done_when": "The primary user journeys from the spec work end-to-end with seeded data and required validation passes: the app boots fully usable with zero credentials and zero capital, every primary surface renders seeded demo content, and the dashboard has enough density and specificity to avoid feeling like a toy.",
+      "requirement_refs": [],
+      "capabilities_required": [
+        "native_tests",
+        "seed_data"
+      ],
+      "entities_touched": [],
+      "ui_actions": [
+        "complete primary flows"
+      ],
+      "sensitive_events": [],
+      "operational_prerequisites": [
+        "local_http_server",
+        "seed_data_loaded",
+        "authenticated_seed_account"
+      ],
+      "priority": 15,
+      "status": "done"
+    }
+  ]
+}

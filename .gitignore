@@ -1,0 +1,13 @@
+.DS_Store
+*.swp
+*.swo
+*~
+.scaffold/task-details/
+.scaffold/review/
+.scaffold/build.lock/
+.scaffold/telemetry/
+node_modules/
+.next/
+dist/
+.env.local
+tsconfig.tsbuildinfo

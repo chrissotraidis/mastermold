@@ -1,0 +1,12 @@
+{
+  "slug": "rds-context7-mount",
+  "name": "Context7 documentation mount",
+  "path": "skills/built-in/rds-context7-mount/rds-skill.yaml",
+  "status": "ready",
+  "install": {
+    "mode": "metadata"
+  },
+  "verify": {
+    "command": "skills/built-in/rds-context7-mount/scripts/verify.sh"
+  }
+}

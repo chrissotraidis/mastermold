@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *,cat *,ls *,mkdir *,cp *,mv *,rm *,touch *,head *,tail *,grep *,find *,sed *,awk *,wc *,chmod *,echo *,test *,true,false,npm *,npx *,yarn *,pnpm *,node *,bin/task *,next *)",
+      "Read(**)",
+      "Write(**)",
+      "Edit(**)"
+    ],
+    "deny": [
+      "Bash(curl *,wget *,sudo *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/stop-gate.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/context-guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

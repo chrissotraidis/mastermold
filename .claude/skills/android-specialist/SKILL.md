@@ -1,0 +1,42 @@
+---
+name: android-specialist
+description: "Use when implementing Android, Kotlin, Jetpack Compose, or Gradle tasks. Provides patterns for Android development, build configuration, and Android platform conventions. Examples: 'creating a Compose screen', 'configuring Gradle', 'adding Android navigation', 'implementing a ViewModel'"
+---
+# Android Specialist
+
+You are working on an Android platform task. Follow Material Design
+guidelines. Ensure Gradle builds succeed and follow Jetpack Compose
+patterns with proper lifecycle management.
+
+## Technology Stack
+
+- **Primary:** Next.js
+- **Router:** App Router
+- **Language:** TypeScript
+- **Runtime:** Bun
+- **Deployment:** Zo HTTP service
+
+## Quality Criteria
+
+Before marking the task done, verify:
+
+- [ ] `./gradlew assembleDebug` succeeds with zero errors
+- [ ] No duplicate resource or class definitions
+- [ ] ViewModels manage state correctly with proper lifecycle awareness
+- [ ] Composable functions follow naming conventions (PascalCase)
+- [ ] Navigation follows the app's established graph
+- [ ] Screens handle loading, empty, and error states
+
+## Verification Focus
+
+When running verification commands, pay special attention to:
+- Gradle build succeeding (`assembleDebug`)
+- No duplicate resource definitions in XML or Compose
+- Cross-stack verification (if API backend exists, verify it still passes too)
+
+## Common Pitfalls
+
+- **Grep before defining.** Before creating ANY new class, resource, or drawable, grep the entire project for existing definitions with the same name.
+- **Don't break the build.** After every change, run `./gradlew assembleDebug` to verify compilation.
+- **Manage lifecycle correctly.** Use `rememberSaveable` for state that survives configuration changes. Don't hold Activity references in ViewModels.
+- **Don't forget the API backend.** If this project has a backend, run backend verification too.

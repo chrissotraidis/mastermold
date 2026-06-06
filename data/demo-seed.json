@@ -1,0 +1,830 @@
+{
+  "schemas": {
+    "User": [
+      "id",
+      "email",
+      "display_name",
+      "role",
+      "created_at"
+    ],
+    "Account": [
+      "id",
+      "kind",
+      "label",
+      "integration_status",
+      "scope",
+      "event_time",
+      "knowledge_time"
+    ],
+    "Asset": [
+      "id",
+      "symbol",
+      "name",
+      "asset_class",
+      "venue",
+      "event_time",
+      "knowledge_time"
+    ],
+    "Holding": [
+      "id",
+      "account_id",
+      "asset_id",
+      "quantity",
+      "cost_basis",
+      "market_value",
+      "as_of",
+      "weight",
+      "event_time",
+      "knowledge_time"
+    ],
+    "PriceBar": [
+      "id",
+      "asset_id",
+      "ts",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "knowledge_time"
+    ],
+    "NewsItem": [
+      "id",
+      "asset_id",
+      "headline",
+      "source",
+      "url",
+      "sentiment",
+      "event_time",
+      "knowledge_time"
+    ],
+    "FundingObservation": [
+      "id",
+      "asset_id",
+      "period_ts",
+      "funding_rate",
+      "open_interest",
+      "knowledge_time"
+    ],
+    "BriefingCard": [
+      "id",
+      "date",
+      "rank",
+      "headline",
+      "why_now",
+      "relevance_note",
+      "bull_case",
+      "bear_case",
+      "conviction",
+      "horizon",
+      "status",
+      "asset_ids",
+      "event_time",
+      "knowledge_time"
+    ],
+    "Driver": [
+      "id",
+      "briefing_card_id",
+      "label",
+      "direction",
+      "weight",
+      "color",
+      "source_citation",
+      "event_time",
+      "knowledge_time"
+    ],
+    "Alert": [
+      "id",
+      "asset_id",
+      "tier",
+      "z_score",
+      "message",
+      "rationale",
+      "created_at",
+      "acknowledged",
+      "useful_feedback",
+      "event_time",
+      "knowledge_time"
+    ],
+    "DecisionJournalEntry": [
+      "id",
+      "briefing_card_id",
+      "thesis",
+      "signals",
+      "conviction",
+      "horizon",
+      "falsification_condition",
+      "logged_at",
+      "event_time",
+      "knowledge_time"
+    ],
+    "OutcomeScore": [
+      "id",
+      "journal_entry_id",
+      "resolved_at",
+      "pnl_note",
+      "thesis_played_out",
+      "process_score",
+      "outcome_score",
+      "event_time",
+      "knowledge_time"
+    ],
+    "PaperTradingRound": [
+      "id",
+      "week_label",
+      "opens_at",
+      "closes_at",
+      "status",
+      "event_time",
+      "knowledge_time"
+    ],
+    "PaperPrediction": [
+      "id",
+      "round_id",
+      "asset_id",
+      "direction",
+      "conviction",
+      "rationale",
+      "submitted_at",
+      "event_time",
+      "knowledge_time"
+    ],
+    "RoundScore": [
+      "id",
+      "round_id",
+      "calibration",
+      "patience",
+      "diversification",
+      "total",
+      "event_time",
+      "knowledge_time"
+    ],
+    "ExecutorStrategy": [
+      "id",
+      "name",
+      "status",
+      "venue",
+      "net_delta",
+      "margin_ratio",
+      "funding_rate",
+      "basis",
+      "event_time",
+      "knowledge_time"
+    ],
+    "GuardrailConfig": [
+      "id",
+      "per_tx_cap",
+      "daily_cap",
+      "contract_allowlist",
+      "recipient_allowlist",
+      "session_key_expiry",
+      "event_time",
+      "knowledge_time"
+    ],
+    "IntegrationStatus": [
+      "id",
+      "service",
+      "status",
+      "detail",
+      "event_time",
+      "knowledge_time"
+    ],
+    "StrategyBelief": [
+      "id",
+      "name",
+      "statement",
+      "confidence",
+      "updated_at",
+      "event_time",
+      "knowledge_time"
+    ],
+    "ReflectionUpdate": [
+      "id",
+      "strategy_belief_id",
+      "evidence_summary",
+      "significance_passed",
+      "applied",
+      "created_at",
+      "event_time",
+      "knowledge_time"
+    ]
+  },
+  "data": {
+    "users": [
+      {
+        "id": "user_reviewer",
+        "email": "reviewer@demo.local",
+        "display_name": "RDS Reviewer",
+        "role": "reviewer",
+        "created_at": "2026-05-01T09:00:00Z"
+      },
+      {
+        "id": "user_operator",
+        "email": "chris@demo.local",
+        "display_name": "Chris Operator",
+        "role": "operator",
+        "created_at": "2026-05-01T09:05:00Z"
+      }
+    ],
+    "accounts": [
+      {
+        "id": "acct_coinbase",
+        "kind": "coinbase",
+        "label": "Coinbase view-only demo",
+        "integration_status": "stubbed",
+        "scope": "read_only",
+        "event_time": "2026-05-24T14:00:00Z",
+        "knowledge_time": "2026-05-24T14:03:00Z"
+      },
+      {
+        "id": "acct_robinhood",
+        "kind": "robinhood",
+        "label": "Robinhood SnapTrade demo",
+        "integration_status": "stubbed",
+        "scope": "read_only",
+        "event_time": "2026-05-25T13:30:00Z",
+        "knowledge_time": "2026-05-25T13:41:00Z"
+      },
+      {
+        "id": "acct_wallet",
+        "kind": "onchain_wallet",
+        "label": "onchain_wallet Zerion demo",
+        "integration_status": "stubbed",
+        "scope": "read_only",
+        "event_time": "2026-05-26T16:20:00Z",
+        "knowledge_time": "2026-05-26T16:25:00Z"
+      }
+    ],
+    "assets": [
+      {
+        "id": "asset_nvda",
+        "symbol": "NVDA",
+        "name": "NVIDIA",
+        "asset_class": "equity",
+        "venue": "NASDAQ",
+        "event_time": "2026-05-20T13:30:00Z",
+        "knowledge_time": "2026-05-20T13:31:00Z"
+      },
+      {
+        "id": "asset_hood",
+        "symbol": "HOOD",
+        "name": "Robinhood Markets",
+        "asset_class": "equity",
+        "venue": "NASDAQ",
+        "event_time": "2026-05-20T13:30:00Z",
+        "knowledge_time": "2026-05-20T13:31:00Z"
+      },
+      {
+        "id": "asset_btc",
+        "symbol": "BTC",
+        "name": "Bitcoin",
+        "asset_class": "crypto",
+        "venue": "Coinbase",
+        "event_time": "2026-05-20T00:00:00Z",
+        "knowledge_time": "2026-05-20T00:02:00Z"
+      },
+      {
+        "id": "asset_eth",
+        "symbol": "ETH",
+        "name": "Ethereum",
+        "asset_class": "crypto",
+        "venue": "Coinbase",
+        "event_time": "2026-05-20T00:00:00Z",
+        "knowledge_time": "2026-05-20T00:02:00Z"
+      },
+      {
+        "id": "asset_usdc_aave",
+        "symbol": "aUSDC",
+        "name": "Aave USDC Supply",
+        "asset_class": "defi",
+        "venue": "Base",
+        "event_time": "2026-05-20T00:00:00Z",
+        "knowledge_time": "2026-05-20T00:04:00Z"
+      }
+    ],
+    "holdings": [
+      {
+        "id": "hold_nvda",
+        "account_id": "acct_robinhood",
+        "asset_id": "asset_nvda",
+        "quantity": 18,
+        "cost_basis": 15320,
+        "market_value": 18144,
+        "as_of": "2026-05-29T20:00:00Z",
+        "weight": 0.27,
+        "event_time": "2026-05-29T20:00:00Z",
+        "knowledge_time": "2026-05-29T20:02:00Z"
+      },
+      {
+        "id": "hold_hood",
+        "account_id": "acct_robinhood",
+        "asset_id": "asset_hood",
+        "quantity": 220,
+        "cost_basis": 11880,
+        "market_value": 13640,
+        "as_of": "2026-05-29T20:00:00Z",
+        "weight": 0.2,
+        "event_time": "2026-05-29T20:00:00Z",
+        "knowledge_time": "2026-05-29T20:02:00Z"
+      },
+      {
+        "id": "hold_btc",
+        "account_id": "acct_coinbase",
+        "asset_id": "asset_btc",
+        "quantity": 0.31,
+        "cost_basis": 28740,
+        "market_value": 32915,
+        "as_of": "2026-05-30T00:10:00Z",
+        "weight": 0.49,
+        "event_time": "2026-05-30T00:10:00Z",
+        "knowledge_time": "2026-05-30T00:12:00Z"
+      },
+      {
+        "id": "hold_usdc",
+        "account_id": "acct_wallet",
+        "asset_id": "asset_usdc_aave",
+        "quantity": 2500,
+        "cost_basis": 2500,
+        "market_value": 2507,
+        "as_of": "2026-05-30T00:20:00Z",
+        "weight": 0.04,
+        "event_time": "2026-05-30T00:20:00Z",
+        "knowledge_time": "2026-05-30T00:27:00Z"
+      }
+    ],
+    "priceBars": [
+      {
+        "id": "bar_btc_1",
+        "asset_id": "asset_btc",
+        "ts": "2026-05-28T00:00:00Z",
+        "open": 103200,
+        "high": 106100,
+        "low": 102440,
+        "close": 105850,
+        "volume": 38210,
+        "knowledge_time": "2026-05-28T00:03:00Z"
+      },
+      {
+        "id": "bar_btc_2",
+        "asset_id": "asset_btc",
+        "ts": "2026-05-29T00:00:00Z",
+        "open": 105850,
+        "high": 108300,
+        "low": 104900,
+        "close": 106178,
+        "volume": 39750,
+        "knowledge_time": "2026-05-29T00:03:00Z"
+      },
+      {
+        "id": "bar_btc_3_future_knowledge",
+        "asset_id": "asset_btc",
+        "ts": "2026-05-30T00:00:00Z",
+        "open": 106178,
+        "high": 109420,
+        "low": 105980,
+        "close": 108760,
+        "volume": 42190,
+        "knowledge_time": "2026-05-30T03:03:00Z"
+      },
+      {
+        "id": "bar_nvda_1",
+        "asset_id": "asset_nvda",
+        "ts": "2026-05-28T20:00:00Z",
+        "open": 990.1,
+        "high": 1014.4,
+        "low": 981.6,
+        "close": 1008,
+        "volume": 51022000,
+        "knowledge_time": "2026-05-28T20:05:00Z"
+      },
+      {
+        "id": "bar_hood_1",
+        "asset_id": "asset_hood",
+        "ts": "2026-05-29T20:00:00Z",
+        "open": 60.2,
+        "high": 63.1,
+        "low": 59.4,
+        "close": 62,
+        "volume": 15200000,
+        "knowledge_time": "2026-05-29T20:07:00Z"
+      }
+    ],
+    "newsItems": [
+      {
+        "id": "news_ai_capex",
+        "asset_id": "asset_nvda",
+        "headline": "Cloud capex revisions keep AI accelerator demand in focus",
+        "source": "Demo Market Wire",
+        "url": "https://example.com/demo/ai-capex",
+        "sentiment": "positive",
+        "event_time": "2026-05-29T12:15:00Z",
+        "knowledge_time": "2026-05-29T12:19:00Z"
+      },
+      {
+        "id": "news_crypto_flows",
+        "asset_id": "asset_btc",
+        "headline": "ETF flow streak slows while derivatives basis remains firm",
+        "source": "Demo Crypto Desk",
+        "url": "https://example.com/demo/crypto-flows",
+        "sentiment": "neutral",
+        "event_time": "2026-05-29T22:10:00Z",
+        "knowledge_time": "2026-05-29T22:18:00Z"
+      },
+      {
+        "id": "news_policy",
+        "asset_id": null,
+        "headline": "Macro calendar leaves risk assets sensitive to Monday liquidity",
+        "source": "Demo Macro Notes",
+        "url": "https://example.com/demo/macro",
+        "sentiment": "neutral",
+        "event_time": "2026-05-30T05:40:00Z",
+        "knowledge_time": "2026-05-30T05:50:00Z"
+      }
+    ],
+    "fundingObservations": [
+      {
+        "id": "fund_btc_1",
+        "asset_id": "asset_btc",
+        "period_ts": "2026-05-29T08:00:00Z",
+        "funding_rate": 0.00014,
+        "open_interest": 18400000000,
+        "knowledge_time": "2026-05-29T08:02:00Z"
+      },
+      {
+        "id": "fund_eth_1",
+        "asset_id": "asset_eth",
+        "period_ts": "2026-05-29T16:00:00Z",
+        "funding_rate": 0.00009,
+        "open_interest": 8700000000,
+        "knowledge_time": "2026-05-29T16:04:00Z"
+      }
+    ],
+    "briefingCards": [
+      {
+        "id": "brief_ai_supply",
+        "date": "2026-05-29",
+        "rank": 1,
+        "headline": "AI supply chain remains the highest-conviction briefing item",
+        "why_now": "Price, news, and portfolio concentration all updated after Friday close.",
+        "relevance_note": "NVDA is the largest equity position and drives portfolio beta.",
+        "bull_case": "Cloud capex revisions and backlog commentary support continued demand.",
+        "bear_case": "Position size is already high and any capex disappointment would hit concentration.",
+        "conviction": 7,
+        "horizon": "2-4 weeks",
+        "status": "actionable",
+        "asset_ids": [
+          "asset_nvda"
+        ],
+        "event_time": "2026-05-30T06:05:00Z",
+        "knowledge_time": "2026-05-30T06:08:00Z"
+      },
+      {
+        "id": "brief_crypto_basis",
+        "date": "2026-05-29",
+        "rank": 2,
+        "headline": "Crypto basis is attractive, but only as display-only monitoring",
+        "why_now": "Funding observations stayed positive while ETF flow momentum cooled.",
+        "relevance_note": "BTC and on-chain_wallet exposure are seeded demo data; no capital is deployed.",
+        "bull_case": "Positive funding and controlled net delta would suit a monitored carry thesis.",
+        "bear_case": "Open interest is crowded and V0 has no live executor or transaction signing.",
+        "conviction": 5,
+        "horizon": "1 week",
+        "status": "actionable",
+        "asset_ids": [
+          "asset_btc",
+          "asset_eth"
+        ],
+        "event_time": "2026-05-30T06:12:00Z",
+        "knowledge_time": "2026-05-30T06:17:00Z"
+      },
+      {
+        "id": "brief_nothing",
+        "date": "2026-05-29",
+        "rank": 3,
+        "headline": "Nothing actionable today in small broker balances",
+        "why_now": "Robinhood and Coinbase stubs show no threshold breach outside tracked alerts.",
+        "relevance_note": "This is a designed empty state proving the app can say no.",
+        "bull_case": "Waiting preserves optionality and avoids over-trading demo signals.",
+        "bear_case": "Missed breakouts are possible if live integrations remain credential-gated.",
+        "conviction": 4,
+        "horizon": "Today",
+        "status": "nothing_actionable",
+        "asset_ids": [
+          "asset_hood"
+        ],
+        "event_time": "2026-05-30T06:20:00Z",
+        "knowledge_time": "2026-05-30T06:22:00Z"
+      }
+    ],
+    "drivers": [
+      {
+        "id": "driver_capex",
+        "briefing_card_id": "brief_ai_supply",
+        "label": "Cloud capex revisions",
+        "direction": "bullish",
+        "weight": 0.42,
+        "color": "green",
+        "source_citation": "Demo Market Wire, 2026-05-29",
+        "event_time": "2026-05-29T12:15:00Z",
+        "knowledge_time": "2026-05-29T12:19:00Z"
+      },
+      {
+        "id": "driver_concentration",
+        "briefing_card_id": "brief_ai_supply",
+        "label": "Portfolio concentration",
+        "direction": "bearish",
+        "weight": 0.3,
+        "color": "amber",
+        "source_citation": "Seeded portfolio snapshot, 2026-05-29",
+        "event_time": "2026-05-29T20:00:00Z",
+        "knowledge_time": "2026-05-29T20:02:00Z"
+      },
+      {
+        "id": "driver_funding",
+        "briefing_card_id": "brief_crypto_basis",
+        "label": "Positive funding carry",
+        "direction": "bullish",
+        "weight": 0.36,
+        "color": "green",
+        "source_citation": "Demo Crypto Desk funding, 2026-05-29",
+        "event_time": "2026-05-29T16:00:00Z",
+        "knowledge_time": "2026-05-29T16:04:00Z"
+      },
+      {
+        "id": "driver_crowding",
+        "briefing_card_id": "brief_crypto_basis",
+        "label": "Crowded open interest",
+        "direction": "bearish",
+        "weight": 0.28,
+        "color": "red",
+        "source_citation": "Demo Crypto Desk OI, 2026-05-29",
+        "event_time": "2026-05-29T16:00:00Z",
+        "knowledge_time": "2026-05-29T16:04:00Z"
+      }
+    ],
+    "alerts": [
+      {
+        "id": "alert_concentration",
+        "asset_id": "asset_btc",
+        "tier": "T1",
+        "z_score": 2.2,
+        "message": "BTC demo weight is above target band",
+        "rationale": "Top-position concentration plus elevated open interest warrants review.",
+        "created_at": "2026-05-30T00:30:00Z",
+        "acknowledged": false,
+        "useful_feedback": null,
+        "event_time": "2026-05-30T00:30:00Z",
+        "knowledge_time": "2026-05-30T00:31:00Z"
+      },
+      {
+        "id": "alert_account_change",
+        "asset_id": "asset_usdc_aave",
+        "tier": "T0",
+        "z_score": 3.1,
+        "message": "Sensitive account_change detected on onchain_wallet stub",
+        "rationale": "Seeded guardrail event confirms account changes are visible and inert.",
+        "created_at": "2026-05-29T18:45:00Z",
+        "acknowledged": false,
+        "useful_feedback": null,
+        "event_time": "2026-05-29T18:45:00Z",
+        "knowledge_time": "2026-05-29T18:46:00Z"
+      },
+      {
+        "id": "alert_hood",
+        "asset_id": "asset_hood",
+        "tier": "T2",
+        "z_score": 1.4,
+        "message": "Robinhood demo position moved but stayed below action threshold",
+        "rationale": "Useful as context only; no trade route exists.",
+        "created_at": "2026-05-29T20:10:00Z",
+        "acknowledged": true,
+        "useful_feedback": true,
+        "event_time": "2026-05-29T20:10:00Z",
+        "knowledge_time": "2026-05-29T20:11:00Z"
+      }
+    ],
+    "decisionJournalEntries": [
+      {
+        "id": "journal_ai",
+        "briefing_card_id": "brief_ai_supply",
+        "thesis": "Hold AI exposure unless capex revisions break below trend.",
+        "signals": [
+          "capex revisions",
+          "relative strength",
+          "position concentration"
+        ],
+        "conviction": 7,
+        "horizon": "2-4 weeks",
+        "falsification_condition": "Two consecutive negative capex guide revisions or a close below the 20-day trend.",
+        "logged_at": "2026-05-30T06:30:00Z",
+        "event_time": "2026-05-30T06:30:00Z",
+        "knowledge_time": "2026-05-30T06:30:30Z"
+      },
+      {
+        "id": "journal_crypto",
+        "briefing_card_id": "brief_crypto_basis",
+        "thesis": "Observe basis carry only; do not execute in V0.",
+        "signals": [
+          "funding rate",
+          "open interest",
+          "ETF flows"
+        ],
+        "conviction": 5,
+        "horizon": "1 week",
+        "falsification_condition": "Funding flips negative or margin ratio falls below guardrail.",
+        "logged_at": "2026-05-30T06:35:00Z",
+        "event_time": "2026-05-30T06:35:00Z",
+        "knowledge_time": "2026-05-30T06:35:30Z"
+      }
+    ],
+    "outcomeScores": [
+      {
+        "id": "outcome_prev_ai",
+        "journal_entry_id": "journal_ai",
+        "resolved_at": "2026-05-30T07:00:00Z",
+        "pnl_note": "Demo replay only: thesis not resolved yet, scored for process completeness.",
+        "thesis_played_out": false,
+        "process_score": 8,
+        "outcome_score": 0,
+        "event_time": "2026-05-30T07:00:00Z",
+        "knowledge_time": "2026-05-30T07:01:00Z"
+      },
+      {
+        "id": "outcome_prev_crypto",
+        "journal_entry_id": "journal_crypto",
+        "resolved_at": "2026-05-30T07:05:00Z",
+        "pnl_note": "No real P&L; display-only monitoring preserved guardrails.",
+        "thesis_played_out": true,
+        "process_score": 7,
+        "outcome_score": 6,
+        "event_time": "2026-05-30T07:05:00Z",
+        "knowledge_time": "2026-05-30T07:06:00Z"
+      }
+    ],
+    "paperTradingRounds": [
+      {
+        "id": "round_2026w22",
+        "week_label": "2026-W22",
+        "opens_at": "2026-05-25T13:30:00Z",
+        "closes_at": "2026-05-29T20:00:00Z",
+        "status": "closed",
+        "event_time": "2026-05-25T13:30:00Z",
+        "knowledge_time": "2026-05-25T13:31:00Z"
+      },
+      {
+        "id": "round_2026w23",
+        "week_label": "2026-W23",
+        "opens_at": "2026-06-01T13:30:00Z",
+        "closes_at": "2026-06-05T20:00:00Z",
+        "status": "open",
+        "event_time": "2026-05-30T08:00:00Z",
+        "knowledge_time": "2026-05-30T08:01:00Z"
+      }
+    ],
+    "paperPredictions": [
+      {
+        "id": "pred_nvda",
+        "round_id": "round_2026w22",
+        "asset_id": "asset_nvda",
+        "direction": "long",
+        "conviction": 7,
+        "rationale": "Momentum and capex revisions remained aligned.",
+        "submitted_at": "2026-05-25T14:00:00Z",
+        "event_time": "2026-05-25T14:00:00Z",
+        "knowledge_time": "2026-05-25T14:00:30Z"
+      },
+      {
+        "id": "pred_btc",
+        "round_id": "round_2026w22",
+        "asset_id": "asset_btc",
+        "direction": "flat",
+        "conviction": 4,
+        "rationale": "Basis attractive but crowding made patience more valuable.",
+        "submitted_at": "2026-05-25T14:05:00Z",
+        "event_time": "2026-05-25T14:05:00Z",
+        "knowledge_time": "2026-05-25T14:05:30Z"
+      }
+    ],
+    "roundScores": [
+      {
+        "id": "score_2026w22",
+        "round_id": "round_2026w22",
+        "calibration": 7.2,
+        "patience": 8.1,
+        "diversification": 6.4,
+        "total": 21.7,
+        "event_time": "2026-05-30T01:00:00Z",
+        "knowledge_time": "2026-05-30T01:02:00Z"
+      }
+    ],
+    "executorStrategies": [
+      {
+        "id": "exec_stablecoin",
+        "name": "stablecoin_lending",
+        "status": "paused",
+        "venue": "Aave/Base demo",
+        "net_delta": 0,
+        "margin_ratio": 1,
+        "funding_rate": 0.036,
+        "basis": 0,
+        "event_time": "2026-05-30T06:00:00Z",
+        "knowledge_time": "2026-05-30T06:02:00Z"
+      },
+      {
+        "id": "exec_delta",
+        "name": "delta_neutral_funding_carry",
+        "status": "running_demo",
+        "venue": "Perp demo venue",
+        "net_delta": 0.02,
+        "margin_ratio": 0.64,
+        "funding_rate": 0.00014,
+        "basis": 0.018,
+        "event_time": "2026-05-30T06:00:00Z",
+        "knowledge_time": "2026-05-30T06:02:00Z"
+      }
+    ],
+    "guardrailConfigs": [
+      {
+        "id": "guard_default",
+        "per_tx_cap": 0,
+        "daily_cap": 0,
+        "contract_allowlist": [
+          "0xDemoAavePool",
+          "0xDemoPermit2"
+        ],
+        "recipient_allowlist": [
+          "0xDemoVault"
+        ],
+        "session_key_expiry": "2026-06-30T00:00:00Z",
+        "event_time": "2026-05-28T10:00:00Z",
+        "knowledge_time": "2026-05-28T10:02:00Z"
+      }
+    ],
+    "integrationStatuses": [
+      {
+        "id": "int_coinbase",
+        "service": "coinbase",
+        "status": "stubbed",
+        "detail": "Coinbase CDP is represented by seeded read-only balances; no live CDP call is made.",
+        "event_time": "2026-05-24T14:00:00Z",
+        "knowledge_time": "2026-05-24T14:03:00Z"
+      },
+      {
+        "id": "int_robinhood",
+        "service": "robinhood",
+        "status": "stubbed",
+        "detail": "Robinhood through SnapTrade is represented with read-only seeded balances.",
+        "event_time": "2026-05-25T13:30:00Z",
+        "knowledge_time": "2026-05-25T13:41:00Z"
+      },
+      {
+        "id": "int_wallet",
+        "service": "onchain_wallet",
+        "status": "stubbed",
+        "detail": "onchain_wallet data is demo-only; no chain transactions or signing exist.",
+        "event_time": "2026-05-26T16:20:00Z",
+        "knowledge_time": "2026-05-26T16:25:00Z"
+      },
+      {
+        "id": "int_llm",
+        "service": "llm",
+        "status": "credential_gated",
+        "detail": "Chat reasoning is canned unless an optional LLM key is provided.",
+        "event_time": "2026-05-27T10:00:00Z",
+        "knowledge_time": "2026-05-27T10:01:00Z"
+      }
+    ],
+    "strategyBeliefs": [
+      {
+        "id": "belief_patience",
+        "name": "Patience over churn",
+        "statement": "Signals need repeated evidence before changing exposure.",
+        "confidence": 0.72,
+        "updated_at": "2026-05-29T21:00:00Z",
+        "event_time": "2026-05-29T21:00:00Z",
+        "knowledge_time": "2026-05-29T21:03:00Z"
+      },
+      {
+        "id": "belief_basis",
+        "name": "Basis is fragile",
+        "statement": "Funding carry should be monitored but not trusted without stress checks.",
+        "confidence": 0.58,
+        "updated_at": "2026-05-29T22:00:00Z",
+        "event_time": "2026-05-29T22:00:00Z",
+        "knowledge_time": "2026-05-29T22:04:00Z"
+      }
+    ],
+    "reflectionUpdates": [
+      {
+        "id": "reflect_patience",
+        "strategy_belief_id": "belief_patience",
+        "evidence_summary": "One closed paper round supported patience, but significance was not sufficient to update policy.",
+        "significance_passed": false,
+        "applied": false,
+        "created_at": "2026-05-30T01:10:00Z",
+        "event_time": "2026-05-30T01:10:00Z",
+        "knowledge_time": "2026-05-30T01:11:00Z"
+      }
+    ]
+  }
+}

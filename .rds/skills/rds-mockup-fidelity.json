@@ -1,0 +1,12 @@
+{
+  "slug": "rds-mockup-fidelity",
+  "name": "RDS mockup fidelity",
+  "path": "skills/built-in/rds-mockup-fidelity/rds-skill.yaml",
+  "status": "ready",
+  "install": {
+    "mode": "metadata"
+  },
+  "verify": {
+    "command": "skills/built-in/rds-mockup-fidelity/scripts/verify.sh"
+  }
+}

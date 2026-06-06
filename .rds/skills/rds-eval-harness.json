@@ -1,0 +1,12 @@
+{
+  "slug": "rds-eval-harness",
+  "name": "RDS eval harness",
+  "path": "skills/built-in/rds-eval-harness/rds-skill.yaml",
+  "status": "ready",
+  "install": {
+    "mode": "metadata"
+  },
+  "verify": {
+    "command": "skills/built-in/rds-eval-harness/scripts/verify.sh"
+  }
+}
