@@ -54,7 +54,7 @@ def _calm(last_ret=0.004, last_vol=100.0, last_news=1.0):
     }
 
 
-def build_active(run_date="2026-06-08"):
+def build_active(run_date="2026-06-05"):
     et = f"{run_date}T13:30:00.000Z"
     kt = f"{run_date}T13:42:11.000Z"
     signals = {
@@ -144,7 +144,7 @@ def build_active(run_date="2026-06-08"):
     )
 
 
-def build_quiet(run_date="2026-06-07"):
+def build_quiet(run_date="2026-06-04"):
     et = f"{run_date}T13:30:00.000Z"
     kt = f"{run_date}T13:41:02.000Z"
     signals = {e["symbol"]: _calm() for e in CONFIG["watchlist"]}

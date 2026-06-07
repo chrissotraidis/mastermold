@@ -19,10 +19,12 @@ import {
 import { AppShell, FirstRunBanner } from "@/components/app-shell";
 import { DailyBriefingCard } from "@/components/briefing-card";
 import { OperatorWorkflowPanel } from "@/components/operator-workflow-panel";
+import { ProvenanceChip } from "@/components/provenance-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getBriefingCardById, getBriefingCards } from "@/src/db/briefing";
 import { getAlerts } from "@/src/db/alerts";
+import { getDataMode } from "@/src/db/engine-data";
 import { getExecutor } from "@/src/db/executor";
 import { getPortfolio } from "@/src/db/portfolio";
 
@@ -31,6 +33,8 @@ export default function HomePage() {
   const alerts = getAlerts();
   const portfolio = getPortfolio();
   const executor = getExecutor();
+  const dataMode = getDataMode();
+  const isEngine = dataMode.label === "Engine output";
   const nothingActionableCards = briefingCards.filter(
     (card) => card.status === "nothing_actionable",
   );
@@ -46,7 +50,7 @@ export default function HomePage() {
   const linkedJournalEntry = topCardDetail?.decision_journal_entry ?? null;
 
   return (
-    <AppShell>
+    <AppShell dataMode={dataMode.label}>
       <FirstRunBanner />
       <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-5 sm:py-6">
         <header className="grid gap-4 rounded-lg border border-white/10 bg-[#101722] p-4 shadow-xl shadow-black/20 lg:grid-cols-[1fr_22rem] lg:p-5">
@@ -139,8 +143,10 @@ export default function HomePage() {
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-300">
               Latest review run loaded {briefingCards.length} briefing cards, {alerts.length} alerts,
-              {portfolio.holdings.length} holdings, and {executor.strategies.length} executor status panels
-              from seeded demo data. The remaining step is operator feedback in the workflow below.
+              {portfolio.holdings.length} holdings, and {executor.strategies.length} executor status panels.
+              Briefing and alerts are {isEngine ? "live engine output" : "seeded demo data"}
+              {isEngine ? ` (${dataMode.source})` : ""}; portfolio and executor remain seeded.
+              The remaining step is operator feedback in the workflow below.
             </p>
             <ol className="mt-3 grid gap-2 text-sm text-slate-300 sm:grid-cols-3">
               <li className="rounded-md border border-white/10 bg-slate-950/45 p-3">
@@ -204,7 +210,7 @@ export default function HomePage() {
         </section>
 
         {showOnlyEmptyState ? (
-          <NothingActionable />
+          <NothingActionable dataMode={dataMode.label} />
         ) : (
           <section aria-labelledby="briefing-cards-title" className="space-y-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
@@ -217,9 +223,7 @@ export default function HomePage() {
                   citations, status, and linked journal context.
                 </p>
               </div>
-              <Badge variant="outline" className="border-white/15 text-slate-200">
-                Demo data
-              </Badge>
+              <ProvenanceChip label={dataMode.label} title={dataMode.source} />
             </div>
             <div className="grid gap-4">
               {briefingCards.map((card) => (
@@ -229,7 +233,9 @@ export default function HomePage() {
           </section>
         )}
 
-        {nothingActionableCards.length > 0 && !showOnlyEmptyState ? <NothingActionable /> : null}
+        {nothingActionableCards.length > 0 && !showOnlyEmptyState ? (
+          <NothingActionable dataMode={dataMode.label} />
+        ) : null}
 
         <details className="rounded-lg border border-white/10 bg-slate-950/58 p-5">
           <summary className="cursor-pointer text-lg font-semibold text-white">
@@ -513,7 +519,12 @@ function formatShortDate(value: string) {
   }).format(new Date(value));
 }
 
-function NothingActionable() {
+function NothingActionable({
+  dataMode = "Demo data",
+}: {
+  dataMode?: "Engine output" | "Demo data";
+}) {
+  const isEngine = dataMode === "Engine output";
   return (
     <section
       aria-labelledby="nothing-actionable-title"
@@ -530,18 +541,17 @@ function NothingActionable() {
             <Badge className="bg-amber-300 text-slate-950 hover:bg-amber-300">
               Nothing actionable today
             </Badge>
-            <Badge variant="outline" className="border-white/15 text-slate-200">
-              Demo data
-            </Badge>
+            <ProvenanceChip label={dataMode} />
           </div>
           <div>
             <h2 id="nothing-actionable-title" className="text-2xl font-semibold text-white">
               No forced trade when the signal is weak
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-              The briefing can render a designed nothing-actionable empty state instead of an
-              error page. Today&apos;s seeded data includes a no-action card, so the operator can
-              see that waiting is an explicit outcome.
+              The briefing renders a designed nothing-actionable empty state instead of an
+              error page. {isEngine
+                ? "The engine screened the watchlist and nothing cleared the trigger — a zero-cost quiet day, with no agent runs."
+                : "Today's seeded data includes a no-action card, so the operator can see that waiting is an explicit outcome."}
             </p>
           </div>
           <div className="grid gap-3 text-sm sm:grid-cols-3">
@@ -555,7 +565,7 @@ function NothingActionable() {
             </div>
             <div className="rounded-md border border-white/10 bg-slate-950/40 p-3">
               <p className="font-semibold text-slate-100">Review</p>
-              <p className="mt-1 text-slate-400">Demo provenance stays visible.</p>
+              <p className="mt-1 text-slate-400">{isEngine ? "Engine" : "Demo"} provenance stays visible.</p>
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs font-medium uppercase text-amber-100">

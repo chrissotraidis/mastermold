@@ -1,18 +1,22 @@
 import { demoDatabase } from "./seed-data";
 import type { Alert } from "./schema";
+import { engineAlerts, engineProvenance, engineRunSummary, getEngineStatus } from "./engine-data";
 
 export type AlertTier = Alert["tier"];
 export type UsefulFeedback = Alert["useful_feedback"];
+
+export type AlertProvenance = {
+  label: "Demo data" | "Engine output";
+  source: string;
+  as_of: string;
+};
 
 export type AlertJson = Pick<
   Alert,
   "id" | "tier" | "z_score" | "message" | "rationale" | "acknowledged" | "useful_feedback"
 > & {
-  provenance: {
-    label: "Demo data";
-    source: "Seeded alert feed";
-    as_of: string;
-  };
+  asset_id: string;
+  provenance: AlertProvenance;
 };
 
 const tierRank: Record<AlertTier, number> = {
@@ -21,26 +25,56 @@ const tierRank: Record<AlertTier, number> = {
   T2: 2,
 };
 
-const alertState = new Map(
-  demoDatabase.alerts.map((alert) => [
-    alert.id,
-    {
-      acknowledged: alert.acknowledged,
-      useful_feedback: alert.useful_feedback,
-    },
-  ]),
-);
+type AlertState = { acknowledged: boolean; useful_feedback: UsefulFeedback };
+
+// Ack/feedback state is held per alert id, independent of the data source so it
+// survives a seed<->engine switch within a process. Persistence lands in Phase 1.5.
+const alertState = new Map<string, AlertState>();
+
+function ensureState(alert: Alert): AlertState {
+  let state = alertState.get(alert.id);
+  if (!state) {
+    state = { acknowledged: alert.acknowledged, useful_feedback: alert.useful_feedback };
+    alertState.set(alert.id, state);
+  }
+  return state;
+}
+
+/** The raw alert rows from whichever source is live, plus the matching provenance. */
+function activeAlerts(): { alerts: Alert[]; provenance: (alert: Alert) => AlertProvenance } {
+  const status = getEngineStatus();
+  if (status.state === "live") {
+    const engineProv = engineProvenance(status.bundle, engineRunSummary(status.bundle));
+    const prov: AlertProvenance = {
+      label: "Engine output",
+      source: engineProv.source,
+      as_of: engineProv.as_of,
+    };
+    return { alerts: engineAlerts(status.bundle), provenance: () => prov };
+  }
+  return {
+    alerts: demoDatabase.alerts,
+    provenance: (alert) => ({
+      label: "Demo data",
+      source: "Seeded alert feed",
+      as_of: alert.knowledge_time,
+    }),
+  };
+}
 
 export function getAlerts(): AlertJson[] {
-  return demoDatabase.alerts
+  const { alerts, provenance } = activeAlerts();
+  return alerts
     .map((alert) => {
-      const state = alertState.get(alert.id);
-
-      return toAlertJson({
-        ...alert,
-        acknowledged: state?.acknowledged ?? alert.acknowledged,
-        useful_feedback: state?.useful_feedback ?? alert.useful_feedback,
-      });
+      const state = ensureState(alert);
+      return toAlertJson(
+        {
+          ...alert,
+          acknowledged: state.acknowledged,
+          useful_feedback: state.useful_feedback,
+        },
+        provenance(alert),
+      );
     })
     .sort(
       (a, b) =>
@@ -53,33 +87,21 @@ export function getAlerts(): AlertJson[] {
 
 export function acknowledgeAlert(id: string): AlertJson | null {
   const alert = findAlert(id);
-
   if (!alert) {
     return null;
   }
-
-  const current = alertState.get(alert.id);
-  alertState.set(alert.id, {
-    acknowledged: true,
-    useful_feedback: current?.useful_feedback ?? alert.useful_feedback,
-  });
-
+  const state = ensureState(alert);
+  state.acknowledged = true;
   return getAlertById(alert.id);
 }
 
 export function saveAlertFeedback(id: string, useful_feedback: UsefulFeedback): AlertJson | null {
   const alert = findAlert(id);
-
   if (!alert) {
     return null;
   }
-
-  const current = alertState.get(alert.id);
-  alertState.set(alert.id, {
-    acknowledged: current?.acknowledged ?? alert.acknowledged,
-    useful_feedback,
-  });
-
+  const state = ensureState(alert);
+  state.useful_feedback = useful_feedback;
   return getAlertById(alert.id);
 }
 
@@ -87,25 +109,22 @@ function getAlertById(id: string): AlertJson | null {
   return getAlerts().find((alert) => alert.id === id) ?? null;
 }
 
-function findAlert(id: string) {
+function findAlert(id: string): Alert | null {
   const decodedId = safelyDecodeId(id);
-  return demoDatabase.alerts.find((alert) => alert.id === decodedId) ?? null;
+  return activeAlerts().alerts.find((alert) => alert.id === decodedId) ?? null;
 }
 
-function toAlertJson(alert: Alert): AlertJson {
+function toAlertJson(alert: Alert, provenance: AlertProvenance): AlertJson {
   return {
     id: alert.id,
+    asset_id: alert.asset_id,
     tier: alert.tier,
     z_score: alert.z_score,
     message: alert.message,
     rationale: alert.rationale,
     acknowledged: alert.acknowledged,
     useful_feedback: alert.useful_feedback,
-    provenance: {
-      label: "Demo data",
-      source: "Seeded alert feed",
-      as_of: alert.knowledge_time,
-    },
+    provenance,
   };
 }
 

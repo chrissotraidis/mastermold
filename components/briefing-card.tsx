@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ProvenanceChip } from "@/components/provenance-chip";
 import type { BriefingCardJson } from "@/src/db/briefing";
 import { cn } from "@/lib/utils";
 
@@ -31,9 +32,7 @@ export function DailyBriefingCard({ card }: DailyBriefingCardProps) {
             <Badge variant="outline" className="border-white/15 bg-slate-950/60 text-slate-200">
               Rank {card.rank}
             </Badge>
-            <Badge className="bg-cyan-300 text-slate-950 hover:bg-cyan-300">
-              {card.provenance.label}
-            </Badge>
+            <ProvenanceChip label={card.provenance.label} title={card.provenance.source} />
             <Badge
               variant="outline"
               className={cn(

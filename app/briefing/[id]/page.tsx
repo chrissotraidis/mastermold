@@ -9,6 +9,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { ProvenanceChip } from "@/components/provenance-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +42,7 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
   }
 
   return (
-    <AppShell>
+    <AppShell dataMode={card.provenance.label}>
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-5 sm:py-8">
         <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm">
           <Link
@@ -62,9 +63,7 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
             <Badge variant="outline" className="border-white/15 bg-slate-950/60 text-slate-200">
               Rank {card.rank}
             </Badge>
-            <Badge variant="outline" className="border-white/15 bg-slate-950/60 text-slate-200">
-              Demo data
-            </Badge>
+            <ProvenanceChip label={card.provenance.label} title={card.provenance.source} />
             <DataProvenanceChip source={card.provenance.source} asOf={card.provenance.as_of} />
             <Badge variant="outline" className="gap-1 border-white/15 bg-slate-950/60 text-slate-100">
               <CalendarClock aria-hidden="true" className="size-3.5" />
@@ -167,9 +166,9 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
 
 function DataProvenanceChip({ source, asOf }: { source: string; asOf: string }) {
   return (
-    <Badge className="gap-1 bg-cyan-300 text-slate-950 hover:bg-cyan-300">
+    <Badge variant="outline" className="gap-1 border-white/15 bg-slate-950/60 text-slate-200">
       <Database aria-hidden="true" className="size-3.5" />
-      Data provenance: {source} as of {formatTimestamp(asOf)}
+      {source} as of {formatTimestamp(asOf)}
     </Badge>
   );
 }

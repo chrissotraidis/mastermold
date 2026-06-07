@@ -57,7 +57,15 @@ function sanitizeAdvisoryCopy(value: string) {
     .replace(/Submit\s+order/gi, "Submit review note");
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  dataMode = "Demo data",
+}: {
+  children: React.ReactNode;
+  /** The active data source for this surface; drives the honest sidebar chip. */
+  dataMode?: "Engine output" | "Demo data";
+}) {
+  const isEngine = dataMode === "Engine output";
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#080b10] text-slate-100">
       <GlobalInteractionEvidence />
@@ -71,8 +79,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </p>
               <h1 className="mt-1 text-lg font-semibold">Master Mold</h1>
             </div>
-            <Badge variant="outline" className="mt-3 border-emerald-400/40 px-2 py-0.5 text-[0.68rem] text-emerald-200">
-              Demo data
+            <Badge
+              variant="outline"
+              className={cn(
+                "mt-3 px-2 py-0.5 text-[0.68rem]",
+                isEngine
+                  ? "border-emerald-400/40 text-emerald-200"
+                  : "border-cyan-400/40 text-cyan-200",
+              )}
+            >
+              {dataMode}
             </Badge>
           </div>
           <DesktopNav />

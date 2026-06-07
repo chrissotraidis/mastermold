@@ -1,11 +1,13 @@
 import {
   CheckCircle2,
   CircleAlert,
+  Cpu,
   Database,
   LockKeyhole,
   UserRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ProvenanceChip } from "@/components/provenance-chip";
 import { ReviewerEvidencePanel } from "@/components/reviewer-evidence-panel";
 import {
   Card,
@@ -14,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getDataMode, getEngineStatus } from "@/src/db/engine-data";
 
 type ReviewReadinessProps = {
   surface: "public" | "authenticated";
@@ -40,15 +43,31 @@ const disclosureSections = [
     ],
   },
   {
+    title: "Engine: live vs seeded vs stubbed",
+    icon: Cpu,
+    tone: "text-emerald-200",
+    summary:
+      "A Python sidecar (TradingAgents, screener-gated funnel) writes a dated JSON bundle the dashboard ingests. When a bundle is present and valid, the briefing and alert feed are computed, not fabricated; everything else still falls back to seeds.",
+    items: [
+      "LIVE when a run is ingested: Daily Briefing cards (PM rating → conviction + drivers) and the Alert Feed (deterministic z-score screener, no LLM).",
+      "Per-card and per-alert provenance reads 'Engine output' (emerald) vs 'Demo data' (cyan); a quiet day renders 'nothing actionable' at zero LLM cost.",
+      "STILL SEEDED in this phase: portfolio, journal track record, paper rounds, chat context, executor metrics.",
+      "STILL STUBBED: the reflection significance gate and outcome-resolution loop (Phase 2) — beliefs are shown, not yet computed from resolved engine outcomes.",
+      "Bitemporal honesty preserved: every engine artifact carries event_time + knowledge_time, stamped at write time, never backdated; future-stamped bundles are rejected as look-ahead.",
+      "The engine never touches a brokerage — it reads data and writes JSON, so advisory-only / read-only is unchanged.",
+    ],
+  },
+  {
     title: "What is seeded / sample / demo",
     icon: Database,
     tone: "text-cyan-200",
     summary:
-      "All holdings, prices, news, funding, briefing cards, alerts, journal outcomes, paper rounds, and executor metrics are fabricated demo data.",
+      "Holdings, prices, funding, paper rounds, journal outcomes, and executor metrics are fabricated demo data. Briefing cards and alerts are seeded only when no engine run has been ingested.",
     items: [
       "No real money, positions, or P&L are represented in this V0.",
       "Fake monetary figures and portfolio values are for review only.",
       "Seed data includes event_time and knowledge_time so as-of replay can be inspected.",
+      "Seeds are the permanent zero-config fallback: the app boots fully with no credentials and no engine output.",
     ],
   },
   {
@@ -94,7 +113,7 @@ const disclosureSections = [
     tone: "text-rose-200",
     summary: "These PRD promises remain missing from the live V0 surface.",
     items: [
-      "Always-on ingestion pipeline",
+      "Always-on ingestion: the engine runs on demand (bin/engine-briefing), not yet as a scheduled always-on service (Phase 4).",
       "Live eval harness DSR/PBO/MinTRL, Alpaca paper live-shadow, and post-cutoff validation",
       "Bounded-autonomy Web3 executor as a live actor with custody, spend caps, fail-closed gates, and a real kill switch",
       "CPA tax sign-off for straddle and funding-income treatment before any real capital",
@@ -103,6 +122,7 @@ const disclosureSections = [
 ] as const;
 
 export function ReviewReadiness({ surface }: ReviewReadinessProps) {
+  const dataMode = getDataMode();
   return (
     <section className="space-y-5" aria-labelledby="review-readiness-title">
       <div className="rounded-lg border border-white/10 bg-slate-950/70 p-5 shadow-sm sm:p-6">
@@ -110,9 +130,7 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
           <Badge className="bg-cyan-300 text-slate-950 hover:bg-cyan-300">
             Review readiness
           </Badge>
-          <Badge variant="outline" className="border-white/15 text-slate-200">
-            Demo data
-          </Badge>
+          <ProvenanceChip label={dataMode.label} title={dataMode.source} />
           <Badge variant="outline" className="border-white/15 text-slate-200">
             Truthfulness surface
           </Badge>
@@ -129,6 +147,8 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
           and missing PRD promises.
         </p>
       </div>
+
+      <EngineStatusCard />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {disclosureSections.map((section) => {
@@ -188,5 +208,78 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
           : "Operator disclosure: keep this review readiness panel current as seeded, stubbed, credential-gated, or missing workflows change."}
       </p>
     </section>
+  );
+}
+
+/** Live disclosure of the most recent engine run (or its absence). */
+function EngineStatusCard() {
+  const status = getEngineStatus();
+
+  if (status.state === "live") {
+    const run = status.bundle.run;
+    const models = Object.entries(run.models)
+      .map(([tier, id]) => `${tier}: ${id}`)
+      .join(", ");
+    const facts: Array<[string, string]> = [
+      ["Run date", run.run_date],
+      ["Provider", run.provider],
+      ["Models", models || "—"],
+      ["Triggered tickers", run.triggered_tickers.length ? run.triggered_tickers.join(", ") : "none (quiet day)"],
+      ["LLM cost", run.cost.usd > 0 ? `$${run.cost.usd.toFixed(2)} · ${run.cost.llm_calls} calls` : "$0 (no agent runs)"],
+      ["Knowledge time", run.knowledge_time],
+    ];
+    return (
+      <Card className="border-emerald-300/25 bg-emerald-300/[0.06]">
+        <CardHeader className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
+          <div className="flex size-11 items-center justify-center rounded-md border border-emerald-200/25 bg-slate-950/50 text-emerald-100">
+            <Cpu aria-hidden="true" className="size-5" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-xl text-white">Engine output is live</CardTitle>
+              <ProvenanceChip label="Engine output" />
+            </div>
+            <CardDescription className="mt-2 text-sm leading-6 text-slate-300">
+              Briefing cards and alerts on this build are computed by the latest ingested
+              TradingAgents run. Cost figures below are per-run actuals.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="p-5 pt-0">
+          <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {facts.map(([label, value]) => (
+              <div key={label} className="rounded-md border border-white/10 bg-slate-950/45 p-3">
+                <dt className="text-xs font-semibold uppercase text-slate-400">{label}</dt>
+                <dd className="mt-1 break-words text-slate-100">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const invalid = status.state === "invalid";
+  return (
+    <Card className={invalid ? "border-amber-300/25 bg-amber-300/[0.06]" : "border-cyan-300/20 bg-cyan-300/[0.06]"}>
+      <CardHeader className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
+        <div className={`flex size-11 items-center justify-center rounded-md border bg-slate-950/50 ${invalid ? "border-amber-200/25 text-amber-100" : "border-cyan-200/25 text-cyan-100"}`}>
+          {invalid ? <CircleAlert aria-hidden="true" className="size-5" /> : <Database aria-hidden="true" className="size-5" />}
+        </div>
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-xl text-white">
+              {invalid ? "Engine output present but unusable" : "No engine output ingested"}
+            </CardTitle>
+            <ProvenanceChip label="Demo data" />
+          </div>
+          <CardDescription className="mt-2 text-sm leading-6 text-slate-300">
+            {invalid
+              ? `The newest bundle was rejected (${status.reason}). The briefing and alerts fall back to seeded demo data until a valid run lands.`
+              : "Briefing and alerts render from seeded demo data — the permanent zero-config fallback. Run bin/engine-briefing to ingest a live run."}
+          </CardDescription>
+        </div>
+      </CardHeader>
+    </Card>
   );
 }
