@@ -1,7 +1,8 @@
 import { getAlerts } from "./alerts";
+import { getBriefingCards } from "./briefing";
 import { getJournal } from "./journal";
 import { getPortfolio } from "./portfolio";
-import { demoDatabase } from "./seed-data";
+import { getDataMode } from "./engine-data";
 
 export type ChatPrompt = {
   id: string;
@@ -28,9 +29,10 @@ export function getChatContext(): ChatContext {
   const portfolio = getPortfolio();
   const alerts = getAlerts();
   const journal = getJournal();
+  const briefingCards = getBriefingCards();
   const topHolding = portfolio.holdings[0] ?? null;
   const topAlert = alerts[0] ?? null;
-  const topBriefing = [...demoDatabase.briefingCards].sort((a, b) => a.rank - b.rank)[0] ?? null;
+  const topBriefing = briefingCards[0] ?? null;
   const resolvedScores = journal.outcome_scores.filter((score) => score.thesis_played_out);
   const processAverage =
     journal.outcome_scores.length > 0
@@ -98,20 +100,29 @@ function buildLlmContext() {
   const portfolio = getPortfolio();
   const alerts = getAlerts();
   const journal = getJournal();
-  const briefingCards = [...demoDatabase.briefingCards]
-    .sort((a, b) => a.rank - b.rank)
-    .map((card) => ({
-      rank: card.rank,
-      headline: card.headline,
-      conviction: card.conviction,
-      horizon: card.horizon,
-      status: card.status,
-      bull_case: card.bull_case,
-      bear_case: card.bear_case,
-    }));
+  const dataMode = getDataMode();
+  const briefingCards = getBriefingCards().map((card) => ({
+    rank: card.rank,
+    headline: card.headline,
+    conviction: card.conviction,
+    horizon: card.horizon,
+    status: card.status,
+    bull_case: card.bull_case,
+    bear_case: card.bear_case,
+    why_now: card.why_now,
+    provenance: card.provenance.label,
+  }));
 
   return JSON.stringify({
     advisory_boundary: "No trading, order placement, custody, or fund movement authority.",
+    data_source: {
+      label: dataMode.label,
+      detail: dataMode.source,
+      note:
+        dataMode.label === "Engine output"
+          ? "Briefing and alerts below are this morning's TradingAgents engine output; interrogate them directly."
+          : "No engine run ingested; briefing and alerts below are seeded demo data.",
+    },
     holdings: portfolio.holdings.map((holding) => ({
       symbol: holding.symbol,
       asset_class: holding.asset_class,

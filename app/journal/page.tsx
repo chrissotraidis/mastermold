@@ -6,7 +6,7 @@ import { JournalWorkspace } from "@/components/journal-workspace";
 import { ProvenanceChip } from "@/components/provenance-chip";
 import { Badge } from "@/components/ui/badge";
 import { parseAsOf } from "@/src/db/bitemporal";
-import { getJournal } from "@/src/db/journal";
+import { getJournal, type CalibrationBucketJson } from "@/src/db/journal";
 
 type JournalPageProps = {
   searchParams?: Promise<{
@@ -80,8 +80,73 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
 
         <AsOfReplayControl activeAsOf={journal.provenance.replay_as_of} apiPath="/api/journal" />
 
+        <CalibrationCurve buckets={journal.calibration} isEngine={isEngine} />
+
         <JournalWorkspace initialJournal={journal} />
       </div>
     </AppShell>
+  );
+}
+
+function CalibrationCurve({
+  buckets,
+  isEngine,
+}: {
+  buckets: CalibrationBucketJson[];
+  isEngine: boolean;
+}) {
+  const resolved = buckets.reduce((sum, b) => sum + b.resolved_count, 0);
+
+  return (
+    <section
+      aria-labelledby="calibration-title"
+      className="rounded-lg border border-white/10 bg-[#101722] p-4 sm:p-5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 id="calibration-title" className="text-lg font-semibold text-white">
+            Calibration curve
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+            Realized hit rate at each conviction level. The honest test of whether a higher
+            conviction actually wins more often — {isEngine
+              ? "computed from resolved engine decisions"
+              : "seeded sample, replaced by engine outcomes once a resolved run lands"}.
+          </p>
+        </div>
+        <Badge variant="outline" className="border-white/15 text-slate-200">
+          {resolved} resolved
+        </Badge>
+      </div>
+
+      {buckets.length === 0 ? (
+        <p className="mt-4 rounded-md border border-white/10 bg-slate-950/45 p-3 text-sm text-slate-300">
+          No resolved decisions yet — the curve appears once outcomes are scored.
+        </p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {buckets.map((bucket) => {
+            const pct = bucket.hit_rate === null ? 0 : Math.round(bucket.hit_rate * 100);
+            return (
+              <li key={bucket.conviction} className="flex items-center gap-3">
+                <span className="w-20 shrink-0 text-xs font-semibold uppercase text-slate-400">
+                  Conv {bucket.conviction}
+                </span>
+                <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-950">
+                  <div
+                    className="h-full rounded-full bg-emerald-300"
+                    style={{ width: `${pct}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+                <span className="w-28 shrink-0 text-right text-xs text-slate-300">
+                  {pct}% · {bucket.wins}/{bucket.resolved_count}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

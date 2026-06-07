@@ -41,10 +41,18 @@ export type StrategyBeliefJson = StrategyBelief & {
   reflection_updates: ReflectionUpdate[];
 };
 
+export type CalibrationBucketJson = {
+  conviction: number; // 1-10
+  resolved_count: number;
+  wins: number;
+  hit_rate: number | null; // wins / resolved_count
+};
+
 export type JournalJson = {
   entries: JournalEntryJson[];
   outcome_scores: OutcomeScore[];
   track_record: TrackRecordTierJson[];
+  calibration: CalibrationBucketJson[];
   strategy_beliefs: StrategyBeliefJson[];
   reflection_updates: ReflectionUpdate[];
   provenance: {
@@ -114,6 +122,7 @@ export function getJournal(asOf: AsOfFilter | null = null): JournalJson {
     entries,
     outcome_scores: outcomeScores,
     track_record: getTrackRecord(entries),
+    calibration: getCalibration(entries),
     strategy_beliefs: strategyBeliefs,
     reflection_updates: reflectionUpdates,
     provenance: {
@@ -218,6 +227,30 @@ function getTrackRecord(entries: JournalEntryJson[]): TrackRecordTierJson[] {
         resolvedEntries.length > 0 ? outcomeTotal / resolvedEntries.length : null,
     };
   });
+}
+
+/**
+ * Calibration curve: realized hit rate at each conviction level (1-10), over resolved
+ * decisions. The honest core of the anti-self-deception promise — it shows whether an
+ * 8/10 conviction actually wins more often than a 5/10. Only buckets with at least one
+ * resolved decision are returned; at small sample sizes this is suggestive, not proof.
+ */
+function getCalibration(entries: JournalEntryJson[]): CalibrationBucketJson[] {
+  const buckets: CalibrationBucketJson[] = [];
+  for (let conviction = 1; conviction <= 10; conviction += 1) {
+    const resolved = entries.filter(
+      (entry) => entry.conviction === conviction && entry.outcome_score,
+    );
+    if (resolved.length === 0) continue;
+    const wins = resolved.filter((entry) => entry.outcome_score?.thesis_played_out).length;
+    buckets.push({
+      conviction,
+      resolved_count: resolved.length,
+      wins,
+      hit_rate: resolved.length > 0 ? wins / resolved.length : null,
+    });
+  }
+  return buckets;
 }
 
 export function getConvictionTier(conviction: number) {

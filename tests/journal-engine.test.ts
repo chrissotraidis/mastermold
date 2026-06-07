@@ -67,6 +67,19 @@ describe("journal computed from engine output (Phase 2)", () => {
     expect(crypto!.reflection_updates.every((r) => !r.significance_passed)).toBe(true);
   });
 
+  test("calibration curve is computed from resolved engine outcomes (conviction vs hit rate)", () => {
+    const journal = getJournal();
+    expect(journal.calibration.length).toBeGreaterThan(0);
+    const totalResolved = journal.calibration.reduce((sum, b) => sum + b.resolved_count, 0);
+    expect(totalResolved).toBe(6);
+    for (const bucket of journal.calibration) {
+      expect(bucket.conviction).toBeGreaterThanOrEqual(1);
+      expect(bucket.conviction).toBeLessThanOrEqual(10);
+      expect(bucket.wins).toBeLessThanOrEqual(bucket.resolved_count);
+      expect(bucket.hit_rate).not.toBeNull();
+    }
+  });
+
   test("as-of replay before the run falls back to the seeded journal", () => {
     const asOf = { iso: "2026-06-01T00:00:00.000Z", time: Date.parse("2026-06-01T00:00:00.000Z") };
     const journal = getJournal(asOf);
