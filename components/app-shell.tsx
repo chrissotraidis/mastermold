@@ -9,17 +9,13 @@ import {
   Bot,
   BookOpenText,
   ClipboardCheck,
-  FastForward,
   Gamepad2,
   Hexagon,
-  History,
   Info,
   LineChart,
-  Pause,
-  Rewind,
+  Power,
   Settings,
   ShieldAlert,
-  ShieldCheck,
   Terminal,
   Wallet,
   X,
@@ -72,11 +68,10 @@ export function AppShell({
     <div className="relative min-h-screen scanline-bg">
       <TopBar dataMode={dataMode} faceState={faceState} onKill={() => setKillOpen(true)} killEngaged={killEngaged} />
       <SideRail />
-      <main className="mx-auto w-full max-w-deck px-margin-mobile pb-28 pt-20 md:pl-24 md:pr-margin-desktop md:pb-24">
+      <main className="mx-auto w-full max-w-deck px-margin-mobile pb-24 pt-20 md:pl-24 md:pr-margin-desktop md:pb-12">
         {children}
       </main>
       <MobileNav />
-      <Scrubber />
       {killOpen ? (
         <KillSwitchDialog
           engaged={killEngaged}
@@ -141,37 +136,37 @@ function TopBar({
             router.push(query ? `/chat?q=${encodeURIComponent(query)}` : "/chat");
           }}
         >
-          <div className="flex items-center gap-2 border-b border-violet/40 bg-void/60 px-3 py-1.5 chamfer-sm focus-within:border-violet">
-            <Terminal aria-hidden="true" className="size-4 text-violet" />
+          <div className="flex items-center gap-2 border-b border-outline-variant/50 bg-void/60 px-3 py-1.5 chamfer-sm transition-colors focus-within:border-violet">
+            <Terminal aria-hidden="true" className="size-4 text-outline" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Ask Master Mold…"
               aria-label="Ask Master Mold"
-              className="w-48 bg-transparent font-mono text-sm text-on-surface placeholder:text-outline focus:outline-none"
+              className="w-52 bg-transparent text-sm text-on-surface placeholder:text-outline focus:outline-none"
             />
           </div>
         </form>
-        <Link
-          href="/review"
-          aria-label="Review and truthfulness"
-          className="p-2 text-on-surface-variant transition-colors hover:text-violet"
-        >
-          <ShieldCheck className="size-5" />
-        </Link>
-        <button
-          type="button"
-          onClick={onKill}
-          className={cn(
-            "flex items-center gap-2 px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-telemetry chamfer-sm transition-all active:scale-95",
-            killEngaged
-              ? "bg-critical text-void"
-              : "border border-critical/60 bg-critical/10 text-critical hover:bg-critical/20",
-          )}
-        >
-          <ShieldAlert className="size-4" />
-          {killEngaged ? "Halted" : "Kill Switch"}
-        </button>
+        {killEngaged ? (
+          <button
+            type="button"
+            onClick={onKill}
+            className="flex items-center gap-1.5 bg-critical px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-telemetry text-void chamfer-sm active:scale-95"
+          >
+            <Power className="size-4" />
+            Halted
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onKill}
+            title="Kill switch — halt the Web3 executor"
+            aria-label="Kill switch"
+            className="p-2 text-outline transition-colors hover:text-critical"
+          >
+            <Power className="size-5" />
+          </button>
+        )}
       </div>
     </header>
   );
@@ -265,31 +260,6 @@ function MobileNav() {
   );
 }
 
-/** Bitemporal timeline scrubber (desktop) — links into as-of replay. */
-function Scrubber() {
-  return (
-    <div className="fixed bottom-0 left-20 right-0 z-30 hidden h-14 items-center justify-between border-t border-outline-variant/40 bg-surface-dim/90 px-8 backdrop-blur-xl md:flex">
-      <div className="flex items-center gap-2 text-on-surface-variant">
-        <History className="size-4" />
-        <span className="font-mono text-[11px] uppercase tracking-telemetry">Timeline</span>
-      </div>
-      <div className="relative mx-8 flex flex-1 items-center">
-        <div className="relative h-1 w-full rounded-full bg-surface-container">
-          <div className="absolute left-0 top-0 h-full w-[88%] rounded-full bg-violet/50" />
-          <div className="absolute left-[88%] top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 bg-violet chamfer-sm shadow-[0_0_10px_rgba(208,188,255,0.5)]" />
-        </div>
-        <span className="absolute left-0 top-3 font-mono text-[10px] text-outline">T-24H</span>
-        <span className="absolute right-0 top-3 font-mono text-[10px] text-outline">LIVE</span>
-      </div>
-      <div className="flex items-center gap-1 text-outline">
-        <Rewind className="size-4" />
-        <Pause className="size-4 text-violet" />
-        <FastForward className="size-4" />
-      </div>
-    </div>
-  );
-}
-
 function KillSwitchDialog({
   engaged,
   onClose,
@@ -315,8 +285,8 @@ function KillSwitchDialog({
         </h2>
         <p className="mt-2 text-sm leading-6 text-on-surface-variant">
           {engaged
-            ? "All autonomous processes are paused and session keys are revoked (simulated — the Executor signs nothing in this version). Advisory surfaces remain read-only."
-            : "This instantly halts all autonomous processes and revokes the Executor's session key. The Copilot is advisory only and is unaffected. In this version the Executor signs nothing, so this is a drill."}
+            ? "I've stopped every live strategy and revoked my keys. Your briefing and the rest of the app keep working. (Right now I run nothing live, so this was a drill.)"
+            : "This stops every live strategy I'm running and revokes my keys instantly. Your briefing is unaffected. Right now I run nothing live — so this is a drill."}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 font-mono text-[12px] uppercase tracking-telemetry text-on-surface-variant hover:text-on-surface">

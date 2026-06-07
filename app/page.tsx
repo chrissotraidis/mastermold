@@ -38,7 +38,7 @@ export default function DeckPage() {
       </section>
 
       {/* Today's briefing */}
-      <section id="briefing" className="mt-12 scroll-mt-24" aria-labelledby="today-title">
+      <section id="briefing" className="mx-auto mt-12 w-full max-w-4xl scroll-mt-24" aria-labelledby="today-title">
         <div className="mb-4 flex items-baseline justify-between gap-3">
           <h2 id="today-title" className="font-display text-lg font-semibold tracking-tight text-on-surface">
             Today
@@ -64,7 +64,7 @@ export default function DeckPage() {
       </section>
 
       {/* Quiet footer: where else to go, stated plainly */}
-      <section className="mt-12 grid gap-3 sm:grid-cols-3" aria-label="Elsewhere">
+      <section className="mx-auto mt-12 grid w-full max-w-4xl gap-3 sm:grid-cols-3" aria-label="Elsewhere">
         <FooterLink href="/journal" icon={BookOpenText} label="Track record" note={system.memoryNote} />
         <FooterLink href="/executor" icon={Wallet} label="Web3 strategies" note={system.executorNote} />
         <FooterLink

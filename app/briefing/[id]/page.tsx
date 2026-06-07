@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   BookOpenText,
   CalendarClock,
-  Database,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -43,28 +42,21 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
 
   return (
     <AppShell dataMode={card.provenance.label}>
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-5 sm:py-8">
-        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-sm">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-md text-on-surface-variant underline-offset-4 hover:text-on-surface hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet focus-visible:ring-offset-2 focus-visible:ring-offset-void"
-          >
-            <ArrowLeft aria-hidden="true" className="size-4" />
-            Back to briefing
-          </Link>
-          <span className="text-outline-variant" aria-hidden="true">
-            /
-          </span>
-          <span className="text-outline">Card detail</span>
-        </nav>
+      <div className="mx-auto max-w-5xl space-y-6">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-sm text-outline transition-colors hover:text-violet"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Today
+        </Link>
 
-        <header className="space-y-5 rounded-lg border border-outline-variant/40 bg-surface-high/30 p-5 sm:p-6">
+        <header className="space-y-5 border border-outline-variant/40 bg-surface-high/30 p-5 chamfer sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="border-outline-variant/50 bg-surface-dim/60 text-on-surface-variant">
               Rank {card.rank}
             </Badge>
             <ProvenanceChip label={card.provenance.label} title={card.provenance.source} />
-            <DataProvenanceChip source={card.provenance.source} asOf={card.provenance.as_of} />
             <Badge variant="outline" className="gap-1 border-outline-variant/50 bg-surface-dim/60 text-on-surface">
               <CalendarClock aria-hidden="true" className="size-3.5" />
               {card.horizon}
@@ -90,15 +82,9 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
 
         <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
           <section aria-labelledby="ranked-drivers-title" className="space-y-4">
-            <div>
-              <h2 id="ranked-drivers-title" className="text-xl font-semibold text-on-surface">
-                Ranked drivers
-              </h2>
-              <p className="mt-1 text-sm text-outline">
-                View ranked drivers, expand source citation details, and compare bull and bear
-                pressure before navigating to the linked journal entry.
-              </p>
-            </div>
+            <h2 id="ranked-drivers-title" className="font-display text-lg font-semibold text-on-surface">
+              What's driving this
+            </h2>
 
             <div className="grid gap-3">
               {card.drivers.length > 0 ? (
@@ -132,9 +118,9 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
 
             <Card className="border-outline-variant/40 bg-surface-high/30">
               <CardHeader className="p-5">
-                <CardDescription className="text-outline">Linked journal</CardDescription>
+                <CardDescription className="text-outline">My thesis</CardDescription>
                 <CardTitle className="text-lg text-on-surface">
-                  {card.decision_journal_entry ? "Linked journal entry" : "No journal entry"}
+                  {card.decision_journal_entry ? "Logged before the outcome" : "Not logged yet"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 p-5 pt-0">
@@ -146,13 +132,13 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
                     <Button asChild className="w-full bg-violet text-void hover:bg-violet">
                       <Link href={`/journal?entry=${card.decision_journal_entry.id}`}>
                         <BookOpenText aria-hidden="true" />
-                        View journal entry
+                        See it in track record
                       </Link>
                     </Button>
                   </>
                 ) : (
                   <p className="text-sm leading-6 text-on-surface-variant">
-                    This seeded card does not have an associated journal entry yet.
+                    No thesis logged for this one yet.
                   </p>
                 )}
               </CardContent>
@@ -164,15 +150,6 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
   );
 }
 
-function DataProvenanceChip({ source, asOf }: { source: string; asOf: string }) {
-  return (
-    <Badge variant="outline" className="gap-1 border-outline-variant/50 bg-surface-dim/60 text-on-surface-variant">
-      <Database aria-hidden="true" className="size-3.5" />
-      {source} as of {formatTimestamp(asOf)}
-    </Badge>
-  );
-}
-
 function DriverRow({ driver, position }: { driver: Driver; position: number }) {
   const isBullish = driver.direction === "bullish";
   const Icon = isBullish ? TrendingUp : TrendingDown;
@@ -181,7 +158,7 @@ function DriverRow({ driver, position }: { driver: Driver; position: number }) {
     <Card
       className={cn(
         "border-outline-variant/40 bg-surface-high/30",
-        isBullish ? "border-l-4 border-l-emerald-300" : "border-l-4 border-l-rose-300",
+        isBullish ? "border-l-4 border-l-engine" : "border-l-4 border-l-critical",
       )}
     >
       <CardHeader className="p-5">

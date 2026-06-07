@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { CheckCircle2, ChevronDown, Filter, MessageSquareText } from "lucide-react";
+import { CheckCircle2, ChevronDown, MessageSquareText, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { AlertJson, AlertTier } from "@/src/db/alerts";
 
@@ -14,9 +13,15 @@ type FeedbackValue = Exclude<AlertJson["useful_feedback"], null>;
 
 const filters: TierFilter[] = ["All", "T0", "T1", "T2"];
 
+const tierLabel: Record<AlertTier, string> = {
+  T0: "Critical",
+  T1: "Heads-up",
+  T2: "FYI",
+};
+
 const tierStyles: Record<AlertTier, string> = {
-  T0: "border-red-300/50 bg-red-400/15 text-critical",
-  T1: "border-amber-300/50 bg-caution/15 text-caution",
+  T0: "border-critical/50 bg-critical/15 text-critical",
+  T1: "border-caution/50 bg-caution/15 text-caution",
   T2: "border-violet/50 bg-violet/15 text-violet",
 };
 
@@ -124,43 +129,33 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
       data-action-evidence={lastAction}
       data-action-sequence={actionSequence}
     >
-      <div className="flex flex-col gap-3 rounded-lg border border-outline-variant/40 bg-surface-high/30 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-on-surface">
-            <Filter aria-hidden="true" className="size-4 text-violet" />
-            <span>Filter by tier</span>
-          </div>
-          <p className="text-sm text-outline">
-            {activeCount} active alert{activeCount === 1 ? "" : "s"} remain in the feed.
-          </p>
-        </div>
-        <div className="grid grid-cols-4 gap-2 sm:flex" role="group" aria-label="Tier filter controls">
-          {filters.map((item) => (
-            <Button
-              key={item}
-              type="button"
-              size="sm"
-              variant={filter === item ? "default" : "outline"}
-              className={cn(
-                "min-w-0 border-outline-variant/50",
-                filter === item
-                  ? "bg-violet text-void hover:bg-violet"
-                  : "bg-transparent text-on-surface hover:bg-surface-high/60",
-              )}
-              aria-pressed={filter === item}
-              data-rds-action="filter"
-              data-action-state={filter === item ? `changed-${actionSequence}` : "idle"}
-              onClick={() => {
-                markBrowserAction(`filter-alerts-${item}`);
-                setFilter(item);
-                setLastAction(`Filter set to ${item}.`);
-                setActionSequence((current) => current + 1);
-              }}
-            >
-              {item}
-            </Button>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter alerts">
+        {filters.map((item) => (
+          <button
+            key={item}
+            type="button"
+            aria-pressed={filter === item}
+            data-rds-action="filter"
+            data-action-state={filter === item ? `changed-${actionSequence}` : "idle"}
+            onClick={() => {
+              markBrowserAction(`filter-alerts-${item}`);
+              setFilter(item);
+              setLastAction(`Filter set to ${item}.`);
+              setActionSequence((current) => current + 1);
+            }}
+            className={cn(
+              "px-3 py-1.5 text-sm chamfer-sm transition-colors",
+              filter === item
+                ? "bg-violet text-void"
+                : "border border-outline-variant/40 bg-surface-dim/40 text-on-surface-variant hover:text-violet",
+            )}
+          >
+            {item === "All" ? "All" : tierLabel[item]}
+          </button>
+        ))}
+        <span className="ml-auto text-sm text-outline">
+          {activeCount} unread
+        </span>
       </div>
 
       <p className="sr-only" aria-live="polite">
@@ -187,10 +182,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                     <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className={tierStyles[alert.tier]}>
-                          {alert.tier}
-                        </Badge>
-                        <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                          z_score {alert.z_score.toFixed(1)}
+                          {tierLabel[alert.tier]}
                         </Badge>
                         {alert.acknowledged ? (
                           <Badge variant="outline" className="border-engine/40 text-engine">
@@ -198,7 +190,9 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                           </Badge>
                         ) : null}
                       </div>
-                      <CardTitle className="text-lg leading-7 text-on-surface">{alert.message}</CardTitle>
+                      <CardTitle className="text-lg leading-7 text-on-surface">
+                        {alert.message.replace(/\s*\(z=[^)]*\)\s*$/i, "")}
+                      </CardTitle>
                     </div>
                     <Button
                       type="button"
@@ -232,40 +226,33 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                     </div>
                   ) : null}
 
-                  <div className="grid gap-4 border-t border-outline-variant/40 pt-4 lg:grid-cols-[auto_1fr] lg:items-center">
+                  <div className="flex flex-wrap items-center gap-3 border-t border-outline-variant/40 pt-4">
                     <Button
                       type="button"
-                      className="w-full bg-engine text-void hover:bg-emerald-200 lg:w-auto"
+                      className="bg-engine text-void hover:brightness-110"
                       onClick={() => acknowledge(alert)}
                       data-rds-action="submit"
                       data-action-state={alert.acknowledged ? `changed-${actionSequence}` : "idle"}
                       disabled={alert.acknowledged || isBusy}
                     >
                       <CheckCircle2 aria-hidden="true" />
-                      {alert.acknowledged ? "Acknowledged" : "Acknowledge alert"}
+                      {alert.acknowledged ? "Acknowledged" : "Got it"}
                     </Button>
 
-                    <fieldset className="min-w-0 rounded-md border border-outline-variant/40 p-3">
-                      <legend className="px-1 text-sm font-semibold text-on-surface">
-                        Was this useful?
-                      </legend>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        <FeedbackOption
-                          alert={alert}
-                          value={true}
-                          label="Useful"
-                          disabled={isBusy}
-                          onChange={submitFeedback}
-                        />
-                        <FeedbackOption
-                          alert={alert}
-                          value={false}
-                          label="Not useful"
-                          disabled={isBusy}
-                          onChange={submitFeedback}
-                        />
-                      </div>
-                    </fieldset>
+                    <div className="ml-auto flex items-center gap-2">
+                      <span className="text-sm text-outline">Useful?</span>
+                      <ThumbButton
+                        active={alert.useful_feedback === true}
+                        disabled={isBusy}
+                        onClick={() => submitFeedback(alert, true)}
+                        up
+                      />
+                      <ThumbButton
+                        active={alert.useful_feedback === false}
+                        disabled={isBusy}
+                        onClick={() => submitFeedback(alert, false)}
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -294,37 +281,37 @@ function markBrowserAction(token: string) {
   }
 }
 
-function FeedbackOption({
-  alert,
-  value,
-  label,
+function ThumbButton({
+  active,
   disabled,
-  onChange,
+  onClick,
+  up = false,
 }: {
-  alert: AlertJson;
-  value: FeedbackValue;
-  label: string;
+  active: boolean;
   disabled: boolean;
-  onChange: (alert: AlertJson, usefulFeedback: FeedbackValue) => void;
+  onClick: () => void;
+  up?: boolean;
 }) {
-  const inputId = `${alert.id}-${value ? "useful" : "not-useful"}`;
-
+  const Icon = up ? ThumbsUp : ThumbsDown;
   return (
-    <div className="flex items-center gap-3 rounded-md border border-outline-variant/40 bg-surface-dim/40 px-3 py-2">
-      <input
-        id={inputId}
-        type="radio"
-        name={`${alert.id}-feedback`}
-        className="size-4 accent-violet"
-        checked={alert.useful_feedback === value}
-        disabled={disabled}
-        data-rds-action="submit"
-        data-action-state={alert.useful_feedback === value ? "changed" : "idle"}
-        onChange={() => onChange(alert, value)}
-      />
-      <Label htmlFor={inputId} className="cursor-pointer text-sm text-on-surface-variant">
-        {label}
-      </Label>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={up ? "Useful" : "Not useful"}
+      aria-pressed={active}
+      data-rds-action="submit"
+      data-action-state={active ? "changed" : "idle"}
+      className={cn(
+        "flex size-9 items-center justify-center chamfer-sm transition-colors disabled:opacity-50",
+        active
+          ? up
+            ? "bg-engine/20 text-engine"
+            : "bg-critical/20 text-critical"
+          : "border border-outline-variant/40 text-outline hover:text-on-surface",
+      )}
+    >
+      <Icon className="size-4" />
+    </button>
   );
 }

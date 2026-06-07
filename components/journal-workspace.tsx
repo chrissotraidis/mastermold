@@ -116,10 +116,10 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
           <CardHeader className="p-5">
             <div className="flex items-center gap-2">
               <BookPlus aria-hidden="true" className="size-5 text-violet" />
-              <CardTitle className="text-xl text-on-surface">Log decision</CardTitle>
+              <CardTitle className="text-xl text-on-surface">Record a call</CardTitle>
             </div>
             <p className="text-sm leading-6 text-outline">
-              Add a thesis, signals, conviction, horizon, and falsification condition.
+              Write it down before the outcome — including what would prove you wrong.
             </p>
           </CardHeader>
           <CardContent className="p-5 pt-0">
@@ -174,7 +174,7 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
 
               <FieldBlock
                 id="journal-falsification"
-                label="Falsification condition"
+                label="What would prove this wrong?"
                 error={errors.falsification_condition}
               >
                 <textarea
@@ -189,7 +189,7 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
 
               {Object.keys(errors).length > 0 ? (
                 <div className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm leading-6 text-critical">
-                  Status: missing required decision details. The decision has not been saved.
+                  Fill in the missing fields to save.
                 </div>
               ) : null}
 
@@ -204,7 +204,7 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
                 className="w-full bg-violet text-void hover:bg-violet"
               >
                 <SendHorizonal aria-hidden="true" />
-                {isPending ? "Logging decision" : "Log decision"}
+                {isPending ? "Saving…" : "Log it"}
               </Button>
             </form>
           </CardContent>
@@ -241,10 +241,10 @@ function TrackRecordSection({ tiers }: { tiers: TrackRecordTierJson[] }) {
     <section aria-labelledby="track-record-title" className="space-y-4">
       <div>
         <h2 id="track-record-title" className="text-xl font-semibold text-on-surface">
-          View track record by confidence tier
+          Track record
         </h2>
         <p className="mt-1 text-sm text-outline">
-          Win-rate and mean outcome score are computed only from resolved entries.
+          How often calls play out, grouped by how sure you were.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
@@ -283,8 +283,7 @@ function EntryList({
           Journal entries
         </h2>
         <p className="mt-1 text-sm text-outline">
-          Each row stores thesis, falsification condition, logged time, conviction tier, and linked
-          outcome scoring when resolved.
+          Your calls, newest first.
         </p>
       </div>
 
@@ -321,7 +320,7 @@ function EntryList({
               </CardHeader>
               <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
                 <div className="grid gap-3 text-sm leading-6 lg:grid-cols-2">
-                  <InfoPanel label="Falsification condition" value={entry.falsification_condition} />
+                  <InfoPanel label="What would prove this wrong?" value={entry.falsification_condition} />
                   <InfoPanel label="Signals" value={entry.signals.join(", ")} />
                 </div>
                 {entry.outcome_score ? (
@@ -366,7 +365,7 @@ function StrategyBeliefSection({ journal }: { journal: JournalJson }) {
           View strategy beliefs
         </h2>
         <p className="mt-1 text-sm text-outline">
-          View reflection updates and the significance gate before a belief changes.
+          What I have learned — beliefs only move after several consistent outcomes.
         </p>
       </div>
       <div className="grid gap-4">
@@ -400,7 +399,7 @@ function StrategyBeliefSection({ journal }: { journal: JournalJson }) {
                             : "border-amber-300/40 text-caution"
                         }
                       >
-                        Significance passed: {update.significance_passed ? "yes" : "no"}
+                        {update.significance_passed ? "Moved a belief" : "Not enough yet"}
                       </Badge>
                       <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                         Applied: {update.applied ? "yes" : "no"}
