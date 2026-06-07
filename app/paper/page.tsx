@@ -1,15 +1,16 @@
 import Link from "next/link";
-import { ArrowLeft, Gamepad2 } from "lucide-react";
+import { ArrowLeft, Cpu, Gamepad2, TrendingDown, TrendingUp } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PaperWorkspace } from "@/components/paper-workspace";
+import { ProvenanceChip } from "@/components/provenance-chip";
 import { Badge } from "@/components/ui/badge";
-import { getPaperPageData } from "@/src/db/paper";
+import { getPaperPageData, type PaperPredictionJson } from "@/src/db/paper";
 
 export default function PaperPage() {
   const paper = getPaperPageData();
 
   return (
-    <AppShell>
+    <AppShell dataMode={paper.provenance.label}>
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-5 sm:py-8">
         <Link
           href="/"
@@ -25,15 +26,19 @@ export default function PaperPage() {
               <Gamepad2 aria-hidden="true" className="size-3.5" />
               Paper
             </Badge>
-            <Badge variant="outline" className="border-white/15 text-slate-200">
-              Demo data
-            </Badge>
+            <ProvenanceChip label={paper.provenance.label} title={paper.provenance.source} />
             <Badge variant="outline" className="border-white/15 text-slate-200">
               Open paper round
             </Badge>
             <Badge variant="outline" className="border-white/15 text-slate-200">
               {paper.predictions.length} predictions
             </Badge>
+            {paper.enginePredictions.length > 0 ? (
+              <Badge variant="outline" className="gap-1 border-emerald-400/40 text-emerald-200">
+                <Cpu aria-hidden="true" className="size-3.5" />
+                {paper.enginePredictions.length} engine entries
+              </Badge>
+            ) : null}
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
@@ -54,8 +59,72 @@ export default function PaperPage() {
           </div>
         </header>
 
+        {paper.enginePredictions.length > 0 && paper.activeRound ? (
+          <EngineArena predictions={paper.enginePredictions} weekLabel={paper.activeRound.week_label} />
+        ) : null}
+
         <PaperWorkspace paper={paper} />
       </div>
     </AppShell>
+  );
+}
+
+function EngineArena({
+  predictions,
+  weekLabel,
+}: {
+  predictions: PaperPredictionJson[];
+  weekLabel: string;
+}) {
+  return (
+    <section
+      aria-labelledby="engine-arena-title"
+      className="rounded-lg border border-emerald-300/25 bg-emerald-300/[0.06] p-4 sm:p-5"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex size-9 items-center justify-center rounded-md border border-emerald-200/25 bg-slate-950/50 text-emerald-100">
+          <Cpu aria-hidden="true" className="size-4" />
+        </span>
+        <div>
+          <h2 id="engine-arena-title" className="text-lg font-semibold text-white">
+            Engine vs you — {weekLabel}
+          </h2>
+          <p className="text-sm leading-6 text-slate-300">
+            The engine auto-entered a view per actionable card. Submit yours below; the same
+            outcome data scores both. Where you disagree and win is prime evidence for the beliefs gate.
+          </p>
+        </div>
+      </div>
+      <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {predictions.map((prediction) => {
+          const isLong = prediction.direction === "long";
+          const Icon = isLong ? TrendingUp : TrendingDown;
+          return (
+            <li
+              key={prediction.id}
+              className="rounded-md border border-white/10 bg-slate-950/45 p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-white">{prediction.asset.symbol}</span>
+                <Badge
+                  variant="outline"
+                  className={
+                    isLong
+                      ? "gap-1 border-emerald-300/35 text-emerald-100"
+                      : "gap-1 border-rose-300/35 text-rose-100"
+                  }
+                >
+                  <Icon aria-hidden="true" className="size-3.5" />
+                  {prediction.direction} · {prediction.conviction}/10
+                </Badge>
+              </div>
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">
+                {prediction.rationale}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
