@@ -78,11 +78,27 @@ LLM spend**, and writes a bundle whose single card is `nothing_actionable`.
 ## Offline tests
 
 The deterministic mapping (conviction, screener, adapter, beliefs, journal bridge) is
-covered without keys or network:
+covered without keys or network, on a plain Python:
 
 ```bash
-cd engine && python -m pytest -q          # or: python tests/run_offline.py
+cd engine && python tests/test_deterministic.py     # 16 tests, no deps
 ```
+
+The **integration** test proves the fork delta against the *real* TradingAgents
+pydantic schemas — the additive fields apply to the actual `ResearchPlan` /
+`PortfolioDecision`, a DriverList validates, and real structured-agent output flows
+through the adapter into a bundle where every artifact carries non-backdated
+`event_time` / `knowledge_time`. It needs pydantic (the engine venv) but no keys, and
+writes a fixture that the dashboard's `tests/engine-integration-contract.test.ts`
+validates against the zod contract (a cross-language round-trip):
+
+```bash
+python -m venv .venv && .venv/bin/pip install pydantic
+.venv/bin/python tests/test_integration.py
+```
+
+The only thing these cannot cover is live LLM inference — that needs provider keys
+and the full graph; the seam itself is proven without them.
 
 ## Cost & safety
 

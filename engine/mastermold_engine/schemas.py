@@ -25,6 +25,7 @@ dashboard or the deterministic screener/conviction paths.
 
 from __future__ import annotations
 
+import sys
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -70,46 +71,74 @@ DRIVER_EXTRACTOR_INSTRUCTION = (
 )
 
 
-# --- Additions 2 & 3 (fork delta documentation) -----------------------------
+# --- Additions 2 & 3: extend the real fork schemas at runtime -----------------
 #
-# These two are FIELD additions to existing fork schemas, not new models. They are
-# documented here as the exact diff to apply to the fork; defining parallel models
-# would fork the schema in two places. The render helpers in the fork already ignore
-# unknown-to-them fields, so adding these is non-breaking.
+# These two are FIELD additions to existing fork schemas, not new models. Rather than
+# fork the schema in two places, we *subclass* the real TradingAgents schemas and add
+# the fields — additive, so the original fields and the fork's markdown renderers keep
+# working unchanged. The fork pins ``tradingagents``; until then ``load_fork_schemas``
+# raises ImportError and the engine tests load the real schemas by path to prove the
+# extension integrates. (See engine/tests/test_integration.py.)
 
-RESEARCH_PLAN_ADDED_FIELDS = {
-    "bull_case_summary": Field(
-        description=(
-            "2-3 sentence summary of the strongest bull argument from the debate, "
-            "written for a dashboard card. Plain, specific, no hedging."
-        ),
-    ),
-    "bear_case_summary": Field(
-        description=(
-            "2-3 sentence summary of the strongest bear argument from the debate, "
-            "written for a dashboard card. Plain, specific, no hedging."
-        ),
-    ),
-}
+_BULL_SUMMARY_DESC = (
+    "2-3 sentence summary of the strongest bull argument from the debate, written for "
+    "a dashboard card. Plain, specific, no hedging."
+)
+_BEAR_SUMMARY_DESC = (
+    "2-3 sentence summary of the strongest bear argument from the debate, written for "
+    "a dashboard card. Plain, specific, no hedging."
+)
+_FALSIFICATION_DESC = (
+    "A single, concrete, observable condition that would prove this thesis wrong within "
+    "the stated horizon — the journal's falsification test, logged before the outcome. "
+    "State a measurable trigger, e.g. 'data-center revenue grows <10% QoQ next print' — "
+    "not a vague 'if it falls'."
+)
 
-PORTFOLIO_DECISION_ADDED_FIELDS = {
-    "falsification_condition": Field(
-        description=(
-            "A single, concrete, observable condition that would prove this thesis "
-            "wrong within the stated horizon — the journal's falsification test, "
-            "logged before the outcome. State a measurable trigger, e.g. "
-            "'data-center revenue grows <10% QoQ next print' — not a vague 'if it falls'."
-        ),
-    ),
-}
 
-# Fork patch (apply to tradingagents/agents/schemas.py):
-#
-#   class ResearchPlan(BaseModel):
-#       ...
-#       bull_case_summary: str = Field(description=RESEARCH_PLAN_ADDED_FIELDS["bull_case_summary"]...)
-#       bear_case_summary: str = Field(description=RESEARCH_PLAN_ADDED_FIELDS["bear_case_summary"]...)
-#
-#   class PortfolioDecision(BaseModel):
-#       ...
-#       falsification_condition: str = Field(description=PORTFOLIO_DECISION_ADDED_FIELDS[...]...)
+def _rebuild_with_base_namespace(cls: type[BaseModel], base: type[BaseModel]) -> None:
+    """Resolve inherited forward-ref annotations (the fork uses PEP 563) against the
+    base class's own module namespace so the extended model is fully defined."""
+    ns = dict(vars(sys.modules[base.__module__]))
+    cls.model_rebuild(force=True, _types_namespace=ns)
+
+
+def extend_research_plan(base: type[BaseModel]) -> type[BaseModel]:
+    """Return a subclass of the fork's ResearchPlan with the two card-summary fields."""
+
+    class ResearchPlanExt(base):  # type: ignore[valid-type, misc]
+        bull_case_summary: str = Field(description=_BULL_SUMMARY_DESC)
+        bear_case_summary: str = Field(description=_BEAR_SUMMARY_DESC)
+
+    ResearchPlanExt.__name__ = "ResearchPlan"
+    _rebuild_with_base_namespace(ResearchPlanExt, base)
+    return ResearchPlanExt
+
+
+def extend_portfolio_decision(base: type[BaseModel]) -> type[BaseModel]:
+    """Return a subclass of the fork's PortfolioDecision with the falsification field."""
+
+    class PortfolioDecisionExt(base):  # type: ignore[valid-type, misc]
+        falsification_condition: str = Field(description=_FALSIFICATION_DESC)
+
+    PortfolioDecisionExt.__name__ = "PortfolioDecision"
+    _rebuild_with_base_namespace(PortfolioDecisionExt, base)
+    return PortfolioDecisionExt
+
+
+def load_fork_schemas() -> dict:
+    """Import the installed fork's schemas and return the delta-extended versions.
+
+    Raises ImportError when ``tradingagents`` is not installed (i.e. outside the engine
+    venv). The graph registers these extended schemas in place of the originals.
+    """
+    from tradingagents.agents.schemas import (  # type: ignore  # noqa: F401
+        PortfolioDecision,
+        ResearchPlan,
+    )
+
+    return {
+        "ResearchPlan": extend_research_plan(ResearchPlan),
+        "PortfolioDecision": extend_portfolio_decision(PortfolioDecision),
+        "DriverList": DriverList,
+    }
