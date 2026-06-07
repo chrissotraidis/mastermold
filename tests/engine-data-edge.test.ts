@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { __resetStoreForTests, store } from "@/src/db/store";
 import {
   getDataMode,
+  getEngineRunHistory,
   getEngineStatus,
   ingestNewestEngineRun,
 } from "@/src/db/engine-data";
@@ -72,5 +73,22 @@ describe("engine-data helpers (edge cases)", () => {
     process.env.ENGINE_OUT_DIR = empty;
     expect(ingestNewestEngineRun()).toBe(false);
     expect(store().ingestedRunDates()).toEqual([]);
+  });
+
+  test("getEngineRunHistory ingests-then-projects per-run cost, idempotently", () => {
+    process.env.ENGINE_OUT_DIR = FIXTURES;
+    const first = getEngineRunHistory();
+    expect(first.length).toBe(1);
+    expect(first[0].run_date).toBe("2026-06-05");
+    expect(first[0].triggered).toBe(3);
+    expect(first[0].usd).toBeGreaterThan(0);
+    // calling again does not duplicate the run
+    expect(getEngineRunHistory().length).toBe(1);
+  });
+
+  test("getEngineRunHistory is empty when no run has been ingested", () => {
+    const empty = mkdtempSync(join(tmpdir(), "mm-empty3-"));
+    process.env.ENGINE_OUT_DIR = empty;
+    expect(getEngineRunHistory()).toEqual([]);
   });
 });

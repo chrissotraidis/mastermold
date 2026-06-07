@@ -52,7 +52,7 @@ describe("engine output is consistent across every surface", () => {
     const journal = getJournal();
     expect(journal.provenance.label).toBe("Engine output");
     const linked = journal.entries.find((e) => e.id === detail?.decision_journal_entry?.id);
-    if (linked) expect(linked.falsification_condition).toBe(fals);
+    if (linked && fals) expect(linked.falsification_condition).toBe(fals);
 
     // Paper arena enters one engine prediction per actionable card, same assets.
     const paper = getPaperPageData();

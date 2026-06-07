@@ -25,6 +25,13 @@ import type { DecisionJournalEntry, PaperPrediction } from "./schema";
 
 export type AlertStateRow = { acknowledged: boolean; useful_feedback: boolean | null };
 
+export type IngestedRunRow = {
+  run_date: string;
+  knowledge_time: string;
+  ingested_at: string;
+  data: unknown; // the run-meta payload (provider, models, cost, ...)
+};
+
 export interface PersistAdapter {
   readonly backend: "sqlite" | "memory";
   loggedJournalEntries(): DecisionJournalEntry[];
@@ -37,6 +44,8 @@ export interface PersistAdapter {
   markRunIngested(runDate: string, knowledgeTime: string, payload: unknown): boolean;
   isRunIngested(runDate: string): boolean;
   ingestedRunDates(): string[];
+  /** Full ingested-run rows (newest first) for run history / cost retention. */
+  ingestedRuns(): IngestedRunRow[];
 }
 
 // --- bun:sqlite adapter -----------------------------------------------------
@@ -183,6 +192,29 @@ class SqliteAdapter implements PersistAdapter {
       .all()
       .map((row) => (row as { run_date: string }).run_date);
   }
+
+  ingestedRuns(): IngestedRunRow[] {
+    return this.db
+      .query("SELECT run_date, knowledge_time, ingested_at, data FROM engine_runs ORDER BY run_date DESC")
+      .all()
+      .map((row) => {
+        const r = row as { run_date: string; knowledge_time: string; ingested_at: string; data: string };
+        return {
+          run_date: r.run_date,
+          knowledge_time: r.knowledge_time,
+          ingested_at: r.ingested_at,
+          data: safeParse(r.data),
+        };
+      });
+  }
+}
+
+function safeParse(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
 }
 
 // --- in-memory fallback (old behaviour) ------------------------------------
@@ -192,7 +224,7 @@ class MemoryAdapter implements PersistAdapter {
   private journal: DecisionJournalEntry[] = [];
   private predictions: PaperPrediction[] = [];
   private alerts = new Map<string, AlertStateRow>();
-  private runs = new Map<string, { knowledge_time: string; data: unknown }>();
+  private runs = new Map<string, { knowledge_time: string; ingested_at: string; data: unknown }>();
 
   loggedJournalEntries() {
     return [...this.journal];
@@ -219,11 +251,25 @@ class MemoryAdapter implements PersistAdapter {
   }
   markRunIngested(runDate: string, knowledgeTime: string, payload: unknown) {
     if (this.runs.has(runDate)) return false;
-    this.runs.set(runDate, { knowledge_time: knowledgeTime, data: payload });
+    this.runs.set(runDate, {
+      knowledge_time: knowledgeTime,
+      ingested_at: new Date().toISOString(),
+      data: payload,
+    });
     return true;
   }
   ingestedRunDates() {
     return [...this.runs.keys()].sort((a, b) => b.localeCompare(a));
+  }
+  ingestedRuns(): IngestedRunRow[] {
+    return [...this.runs.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([run_date, v]) => ({
+        run_date,
+        knowledge_time: v.knowledge_time,
+        ingested_at: v.ingested_at,
+        data: v.data,
+      }));
   }
 }
 

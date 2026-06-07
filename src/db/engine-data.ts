@@ -276,6 +276,37 @@ export function ingestNewestEngineRun(opts: LoadOptions = {}): boolean {
   return ingestEngineRun(status.bundle);
 }
 
+export type EngineRunHistoryEntry = {
+  run_date: string;
+  knowledge_time: string;
+  ingested_at: string;
+  provider: string;
+  triggered: number;
+  usd: number;
+};
+
+/**
+ * Engine run history (newest first) from the durable store. Ingests the newest bundle
+ * first (idempotent) so a freshly-dropped run shows up, then projects the persisted
+ * run-meta rows down to the fields the /review history surface needs.
+ */
+export function getEngineRunHistory(opts: LoadOptions = {}): EngineRunHistoryEntry[] {
+  ingestNewestEngineRun(opts);
+  return store()
+    .ingestedRuns()
+    .map((row) => {
+      const data = (row.data ?? {}) as Partial<EngineRunMeta>;
+      return {
+        run_date: row.run_date,
+        knowledge_time: row.knowledge_time,
+        ingested_at: row.ingested_at,
+        provider: data.provider ?? "—",
+        triggered: data.triggered_tickers?.length ?? 0,
+        usd: data.cost?.usd ?? 0,
+      };
+    });
+}
+
 function parseBundle(
   file: string,
 ): { ok: true; bundle: EngineBundle } | { ok: false; reason: string } {

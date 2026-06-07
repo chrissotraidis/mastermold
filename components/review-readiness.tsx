@@ -16,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getDataMode, getEngineStatus } from "@/src/db/engine-data";
+import { getDataMode, getEngineRunHistory, getEngineStatus } from "@/src/db/engine-data";
 import { getScreenerFeedback } from "@/src/db/screener-feedback";
 
 type ReviewReadinessProps = {
@@ -216,6 +216,33 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
   );
 }
 
+/** Ingested-run history (per-run cost) from the durable store. */
+function EngineRunHistory() {
+  const history = getEngineRunHistory();
+  if (history.length === 0) return null;
+
+  return (
+    <div className="rounded-md border border-white/10 bg-slate-950/45 p-3">
+      <p className="text-xs font-semibold uppercase text-slate-400">
+        Ingested run history ({history.length})
+      </p>
+      <ul className="mt-2 space-y-1 text-sm text-slate-200">
+        {history.slice(0, 8).map((run) => (
+          <li key={run.run_date} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-mono text-slate-100">{run.run_date}</span>
+            <span className="text-xs text-slate-400">
+              {run.triggered} triggered · {run.usd > 0 ? `$${run.usd.toFixed(2)}` : "$0"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        Ingestion is idempotent by run date; re-importing a day adds no duplicate.
+      </p>
+    </div>
+  );
+}
+
 /** Alert-feedback → screener-threshold tuning loop, surfaced for the operator. */
 function ScreenerTuningCard() {
   const feedback = getScreenerFeedback();
@@ -300,7 +327,7 @@ function EngineStatusCard() {
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent className="p-5 pt-0">
+        <CardContent className="space-y-4 p-5 pt-0">
           <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {facts.map(([label, value]) => (
               <div key={label} className="rounded-md border border-white/10 bg-slate-950/45 p-3">
@@ -309,6 +336,7 @@ function EngineStatusCard() {
               </div>
             ))}
           </dl>
+          <EngineRunHistory />
         </CardContent>
       </Card>
     );
