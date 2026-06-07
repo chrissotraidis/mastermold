@@ -50,9 +50,10 @@ const disclosureSections = [
       "A Python sidecar (TradingAgents, screener-gated funnel) writes a dated JSON bundle the dashboard ingests. When a bundle is present and valid, the briefing and alert feed are computed, not fabricated; everything else still falls back to seeds.",
     items: [
       "LIVE when a run is ingested: Daily Briefing cards (PM rating → conviction + drivers) and the Alert Feed (deterministic z-score screener, no LLM).",
+      "LIVE when a run carries resolved decisions: the Decision Journal's track-record-by-tier and the reflection significance gate — belief confidence moves only after N consistent same-direction outcomes; a single outcome cannot flip a belief.",
       "Per-card and per-alert provenance reads 'Engine output' (emerald) vs 'Demo data' (cyan); a quiet day renders 'nothing actionable' at zero LLM cost.",
-      "STILL SEEDED in this phase: portfolio, journal track record, paper rounds, chat context, executor metrics.",
-      "STILL STUBBED: the reflection significance gate and outcome-resolution loop (Phase 2) — beliefs are shown, not yet computed from resolved engine outcomes.",
+      "STILL SEEDED in this phase: portfolio, paper rounds, chat context, executor metrics.",
+      "STILL STUBBED: the calibration curve and paper-vs-engine arena (Phase 3), and live cron scheduling (Phase 4).",
       "Bitemporal honesty preserved: every engine artifact carries event_time + knowledge_time, stamped at write time, never backdated; future-stamped bundles are rejected as look-ahead.",
       "The engine never touches a brokerage — it reads data and writes JSON, so advisory-only / read-only is unchanged.",
     ],

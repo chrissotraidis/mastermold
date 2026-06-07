@@ -3,6 +3,7 @@ import { ArrowLeft, BookOpenText, Database } from "lucide-react";
 import { AsOfReplayControl } from "@/components/as-of-replay-control";
 import { AppShell } from "@/components/app-shell";
 import { JournalWorkspace } from "@/components/journal-workspace";
+import { ProvenanceChip } from "@/components/provenance-chip";
 import { Badge } from "@/components/ui/badge";
 import { parseAsOf } from "@/src/db/bitemporal";
 import { getJournal } from "@/src/db/journal";
@@ -24,8 +25,10 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
     ? journal.entries.find((entry) => entry.id === selectedEntryId)
     : null;
 
+  const isEngine = journal.provenance.label === "Engine output";
+
   return (
-    <AppShell>
+    <AppShell dataMode={journal.provenance.label}>
       <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-5 sm:py-6">
         <Link
           href="/"
@@ -42,9 +45,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
               <BookOpenText aria-hidden="true" className="size-3.5" />
               Journal
             </Badge>
-            <Badge variant="outline" className="border-white/15 text-slate-200">
-              Demo data
-            </Badge>
+            <ProvenanceChip label={journal.provenance.label} title={journal.provenance.source} />
             <Badge variant="outline" className="border-white/15 text-slate-200">
               {journal.entries.length} entries
             </Badge>
@@ -67,9 +68,9 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
                 Data provenance
               </summary>
               <p className="mt-3">
-                Journal facts are seeded demo data. The JSON endpoint remains available for
-                automated checks, but the operator view shows provenance here instead of linking
-                to raw API output.
+                {isEngine
+                  ? `Track record and beliefs are computed from resolved engine decisions (${journal.provenance.source}). Belief confidence moves only after the significance gate clears — a single outcome cannot flip a belief.`
+                  : "Journal facts are seeded demo data. The JSON endpoint remains available for automated checks, but the operator view shows provenance here instead of linking to raw API output."}
               </p>
               <p className="mt-2 text-slate-400">
                 As of: {journal.provenance.replay_as_of ?? journal.provenance.as_of}

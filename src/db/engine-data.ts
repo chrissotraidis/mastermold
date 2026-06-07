@@ -29,6 +29,8 @@ import type {
   DecisionJournalEntry,
   Driver,
   OutcomeScore,
+  ReflectionUpdate,
+  StrategyBelief,
 } from "./schema";
 
 // --- zod schemas mirroring engine/CONTRACT.md -----------------------------
@@ -103,6 +105,25 @@ const outcomeSchema = z.object({
   ...bitemporal,
 });
 
+const reflectionSchema = z.object({
+  id: z.string(),
+  strategy_belief_id: z.string(),
+  evidence_summary: z.string(),
+  significance_passed: z.boolean(),
+  applied: z.boolean(),
+  created_at: z.string(),
+  ...bitemporal,
+});
+
+const strategyBeliefSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  statement: z.string(),
+  confidence: z.number(),
+  updated_at: z.string(),
+  ...bitemporal,
+});
+
 const runMetaSchema = z.object({
   run_date: z.string(),
   event_time: z.string(),
@@ -129,10 +150,18 @@ const bundleSchema = z.object({
   journal_sync: z
     .object({
       pending_entries: z.array(journalPendingSchema).default([]),
+      resolved_entries: z.array(journalPendingSchema).default([]),
       outcomes: z.array(outcomeSchema).default([]),
-      reflections: z.array(z.unknown()).default([]),
+      reflections: z.array(reflectionSchema).default([]),
+      beliefs: z.array(strategyBeliefSchema).default([]),
     })
-    .default({ pending_entries: [], outcomes: [], reflections: [] }),
+    .default({
+      pending_entries: [],
+      resolved_entries: [],
+      outcomes: [],
+      reflections: [],
+      beliefs: [],
+    }),
 });
 
 export type EngineBundle = z.infer<typeof bundleSchema>;
@@ -358,10 +387,16 @@ export function engineAlerts(bundle: EngineBundle): Alert[] {
   return bundle.alerts.filter((a): a is Alert => a.asset_id !== null);
 }
 
+/** Logged-before-outcome entries from this run (used to link a card to its journal). */
 export function engineJournalEntries(bundle: EngineBundle): DecisionJournalEntry[] {
-  return bundle.journal_sync.pending_entries.map((entry) => ({
-    ...entry,
-  }));
+  return bundle.journal_sync.pending_entries.map((entry) => ({ ...entry }));
+}
+
+/** All engine decisions (pending + resolved) — the basis for the track record. */
+export function engineAllJournalEntries(bundle: EngineBundle): DecisionJournalEntry[] {
+  return [...bundle.journal_sync.pending_entries, ...bundle.journal_sync.resolved_entries].map(
+    (entry) => ({ ...entry }),
+  );
 }
 
 export function engineOutcomeScores(bundle: EngineBundle): OutcomeScore[] {
@@ -370,6 +405,19 @@ export function engineOutcomeScores(bundle: EngineBundle): OutcomeScore[] {
     // process_score is operator-scored; default to 0 until the operator grades it.
     process_score: o.process_score ?? 0,
   }));
+}
+
+export function engineReflections(bundle: EngineBundle): ReflectionUpdate[] {
+  return bundle.journal_sync.reflections.map((r) => ({ ...r }));
+}
+
+export function engineBeliefs(bundle: EngineBundle): StrategyBelief[] {
+  return bundle.journal_sync.beliefs.map((b) => ({ ...b }));
+}
+
+/** True when the engine bundle carries resolved decisions to compute a track record from. */
+export function engineHasResolvedJournal(bundle: EngineBundle): boolean {
+  return bundle.journal_sync.outcomes.length > 0;
 }
 
 function stripDrivers(card: EngineBundle["briefing_cards"][number]): BriefingCard {

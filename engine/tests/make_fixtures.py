@@ -20,6 +20,7 @@ from mastermold_engine import adapter  # noqa: E402
 from mastermold_engine.cost import RunCost  # noqa: E402
 from mastermold_engine.journal_bridge import card_to_pending_entry  # noqa: E402
 from mastermold_engine.run_briefing import assemble_run, run_screener_stage  # noqa: E402
+from journal_fixture import build_journal_sync  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent.parent
 FIX = REPO / "tests" / "fixtures" / "engine"
@@ -126,16 +127,15 @@ def build_active(run_date="2026-06-05"):
     from mastermold_engine.cost import estimate_usd
     cost.usd = estimate_usd(cost.prompt_tokens, cost.completion_tokens, "claude-sonnet-4-6")
 
-    journal_sync = {
-        "pending_entries": [
-            card_to_pending_entry(
-                nvda_card,
-                falsification_condition="Data-center revenue grows <10% QoQ at the next print, or NVDA closes below the 50-day moving average for three consecutive sessions.",
-            )
-        ],
-        "outcomes": [],
-        "reflections": [],
-    }
+    pending_entries = [
+        card_to_pending_entry(
+            nvda_card,
+            falsification_condition="Data-center revenue grows <10% QoQ at the next print, or NVDA closes below the 50-day moving average for three consecutive sessions.",
+        )
+    ]
+    journal_sync = build_journal_sync(
+        pending_entries, resolved_at=kt, knowledge_time=kt, event_time=et
+    )
 
     return assemble_run(
         run_date=run_date, event_time=et, knowledge_time=kt, config=CONFIG,

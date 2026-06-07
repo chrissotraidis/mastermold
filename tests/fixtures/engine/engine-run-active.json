@@ -268,7 +268,201 @@
         "knowledge_time": "2026-06-05T13:42:11.000Z"
       }
     ],
-    "outcomes": [],
-    "reflections": []
+    "resolved_entries": [
+      {
+        "id": "engine_journal_2026-05-12_NVDA",
+        "briefing_card_id": null,
+        "thesis": "Megacap AI momentum into capex season",
+        "signals": [
+          "Capex guide raised",
+          "HBM tight"
+        ],
+        "conviction": 9,
+        "horizon": "4-8 weeks",
+        "falsification_condition": "Alpha vs benchmark turns against the thesis over the horizon.",
+        "logged_at": "2026-05-12T13:30:00.000Z",
+        "event_time": "2026-05-12T13:30:00.000Z",
+        "knowledge_time": "2026-05-12T13:30:00.000Z"
+      },
+      {
+        "id": "engine_journal_2026-05-14_MSFT",
+        "briefing_card_id": null,
+        "thesis": "Cloud reacceleration underappreciated",
+        "signals": [
+          "Azure bookings",
+          "Copilot attach"
+        ],
+        "conviction": 8,
+        "horizon": "4-8 weeks",
+        "falsification_condition": "Alpha vs benchmark turns against the thesis over the horizon.",
+        "logged_at": "2026-05-14T13:30:00.000Z",
+        "event_time": "2026-05-14T13:30:00.000Z",
+        "knowledge_time": "2026-05-14T13:30:00.000Z"
+      },
+      {
+        "id": "engine_journal_2026-05-15_TSLA",
+        "briefing_card_id": null,
+        "thesis": "Delivery miss thesis on demand softening",
+        "signals": [
+          "Inventory days up",
+          "Price cuts"
+        ],
+        "conviction": 8,
+        "horizon": "4-8 weeks",
+        "falsification_condition": "Alpha vs benchmark turns against the thesis over the horizon.",
+        "logged_at": "2026-05-15T13:30:00.000Z",
+        "event_time": "2026-05-15T13:30:00.000Z",
+        "knowledge_time": "2026-05-15T13:30:00.000Z"
+      },
+      {
+        "id": "engine_journal_2026-05-18_HOOD",
+        "briefing_card_id": null,
+        "thesis": "PFOF overhang priced too lightly",
+        "signals": [
+          "Reg headline",
+          "Estimate cuts"
+        ],
+        "conviction": 5,
+        "horizon": "4-8 weeks",
+        "falsification_condition": "Alpha vs benchmark turns against the thesis over the horizon.",
+        "logged_at": "2026-05-18T13:30:00.000Z",
+        "event_time": "2026-05-18T13:30:00.000Z",
+        "knowledge_time": "2026-05-18T13:30:00.000Z"
+      },
+      {
+        "id": "engine_journal_2026-05-20_BTC",
+        "briefing_card_id": null,
+        "thesis": "ETF inflows resume after washout",
+        "signals": [
+          "Net inflows",
+          "Funding neutral"
+        ],
+        "conviction": 6,
+        "horizon": "4-8 weeks",
+        "falsification_condition": "Alpha vs benchmark turns against the thesis over the horizon.",
+        "logged_at": "2026-05-20T13:30:00.000Z",
+        "event_time": "2026-05-20T13:30:00.000Z",
+        "knowledge_time": "2026-05-20T13:30:00.000Z"
+      },
+      {
+        "id": "engine_journal_2026-05-22_ETH",
+        "briefing_card_id": null,
+        "thesis": "Exploratory L2 fee-burn tilt",
+        "signals": [
+          "Fee burn",
+          "Restaking"
+        ],
+        "conviction": 2,
+        "horizon": "4-8 weeks",
+        "falsification_condition": "Alpha vs benchmark turns against the thesis over the horizon.",
+        "logged_at": "2026-05-22T13:30:00.000Z",
+        "event_time": "2026-05-22T13:30:00.000Z",
+        "knowledge_time": "2026-05-22T13:30:00.000Z"
+      }
+    ],
+    "outcomes": [
+      {
+        "id": "score_engine_journal_2026-05-12_NVDA",
+        "journal_entry_id": "engine_journal_2026-05-12_NVDA",
+        "resolved_at": "2026-06-05T13:42:11.000Z",
+        "pnl_note": "+4.1% vs benchmark over the window",
+        "thesis_played_out": true,
+        "outcome_score": 7.1,
+        "event_time": "2026-06-05T13:30:00.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      },
+      {
+        "id": "score_engine_journal_2026-05-14_MSFT",
+        "journal_entry_id": "engine_journal_2026-05-14_MSFT",
+        "resolved_at": "2026-06-05T13:42:11.000Z",
+        "pnl_note": "+2.2% vs benchmark over the window",
+        "thesis_played_out": true,
+        "outcome_score": 6.1,
+        "event_time": "2026-06-05T13:30:00.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      },
+      {
+        "id": "score_engine_journal_2026-05-15_TSLA",
+        "journal_entry_id": "engine_journal_2026-05-15_TSLA",
+        "resolved_at": "2026-06-05T13:42:11.000Z",
+        "pnl_note": "+1.2% vs benchmark over the window",
+        "thesis_played_out": false,
+        "outcome_score": 4.4,
+        "event_time": "2026-06-05T13:30:00.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      },
+      {
+        "id": "score_engine_journal_2026-05-18_HOOD",
+        "journal_entry_id": "engine_journal_2026-05-18_HOOD",
+        "resolved_at": "2026-06-05T13:42:11.000Z",
+        "pnl_note": "-1.9% vs benchmark over the window",
+        "thesis_played_out": false,
+        "outcome_score": 4.0,
+        "event_time": "2026-06-05T13:30:00.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      },
+      {
+        "id": "score_engine_journal_2026-05-20_BTC",
+        "journal_entry_id": "engine_journal_2026-05-20_BTC",
+        "resolved_at": "2026-06-05T13:42:11.000Z",
+        "pnl_note": "+1.6% vs benchmark over the window",
+        "thesis_played_out": true,
+        "outcome_score": 5.8,
+        "event_time": "2026-06-05T13:30:00.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      },
+      {
+        "id": "score_engine_journal_2026-05-22_ETH",
+        "journal_entry_id": "engine_journal_2026-05-22_ETH",
+        "resolved_at": "2026-06-05T13:42:11.000Z",
+        "pnl_note": "+0.6% vs benchmark over the window",
+        "thesis_played_out": true,
+        "outcome_score": 5.3,
+        "event_time": "2026-06-05T13:30:00.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      }
+    ],
+    "reflections": [
+      {
+        "id": "refl_ai_momentum",
+        "strategy_belief_id": "belief_ai_momentum",
+        "evidence_summary": "Five consecutive megacap AI decisions resolved with positive alpha; the same-direction streak cleared the gate, nudging confidence up by one step.",
+        "significance_passed": true,
+        "applied": true,
+        "created_at": "2026-06-05T13:42:11.000Z",
+        "event_time": "2026-06-05T13:42:11.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      },
+      {
+        "id": "refl_crypto_meanrevert",
+        "strategy_belief_id": "belief_crypto_meanrevert",
+        "evidence_summary": "Recent crypto funding decisions resolved with mixed alpha; the gate blocked any confidence move \u2014 a single outcome cannot flip the belief.",
+        "significance_passed": false,
+        "applied": false,
+        "created_at": "2026-06-05T13:42:11.000Z",
+        "event_time": "2026-06-05T13:42:11.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      }
+    ],
+    "beliefs": [
+      {
+        "id": "belief_ai_momentum",
+        "name": "Megacap AI momentum persists through capex cycles",
+        "statement": "Capex-driven demand keeps megacap AI names trending until guidance rolls over.",
+        "confidence": 0.6,
+        "updated_at": "2026-06-05T13:42:11.000Z",
+        "event_time": "2026-06-05T13:42:11.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      },
+      {
+        "id": "belief_crypto_meanrevert",
+        "name": "Crypto funding spikes mean-revert within weeks",
+        "statement": "Elevated perp funding tends to normalize, fading leverage-led moves.",
+        "confidence": 0.5,
+        "updated_at": "2026-06-05T13:42:11.000Z",
+        "event_time": "2026-06-05T13:42:11.000Z",
+        "knowledge_time": "2026-06-05T13:42:11.000Z"
+      }
+    ]
   }
 }

@@ -1,5 +1,14 @@
 import { demoDatabase } from "./seed-data";
 import { store } from "./store";
+import {
+  engineAllJournalEntries,
+  engineBeliefs,
+  engineHasResolvedJournal,
+  engineOutcomeScores,
+  engineReflections,
+  engineRunSummary,
+  getEngineStatus,
+} from "./engine-data";
 import { isKnownBy, latestKnowledgeTime as getLatestKnowledgeTime, type AsOfFilter } from "./bitemporal";
 import type {
   DecisionJournalEntry,
@@ -39,8 +48,8 @@ export type JournalJson = {
   strategy_beliefs: StrategyBeliefJson[];
   reflection_updates: ReflectionUpdate[];
   provenance: {
-    label: "Demo data";
-    source: "Seeded decision journal";
+    label: "Demo data" | "Engine output";
+    source: string;
     as_of: string;
     replay_as_of: string | null;
   };
@@ -66,20 +75,51 @@ const tierDefinitions: Array<{
 ];
 
 export function getJournal(asOf: AsOfFilter | null = null): JournalJson {
-  const outcomeScores = getOutcomeScores(asOf);
-  const entries = getJournalEntries(asOf, outcomeScores);
-  const reflectionUpdates = getReflectionUpdates(asOf);
+  const status = getEngineStatus(asOf);
+  // Use engine data only once it carries resolved decisions (a track record);
+  // before then, the journal stays on seeds even if a briefing run exists.
+  const engineLive = status.state === "live" && engineHasResolvedJournal(status.bundle);
+  const bundle = engineLive ? status.bundle : null;
+
+  const outcomeScores = bundle
+    ? engineOutcomeScores(bundle)
+        .filter((score) => isKnownBy(score.knowledge_time, asOf))
+        .sort((a, b) => Date.parse(b.resolved_at) - Date.parse(a.resolved_at))
+    : getOutcomeScores(asOf);
+
+  // Engine decisions (when live) replace seeded decisions; operator-logged entries
+  // from the durable store are always included on top.
+  const baseEntries = bundle ? engineAllJournalEntries(bundle) : demoDatabase.decisionJournalEntries;
+  const entries = buildEntries(baseEntries, asOf, outcomeScores);
+
+  const reflectionUpdates = bundle
+    ? engineReflections(bundle)
+        .filter((update) => isKnownBy(update.knowledge_time, asOf))
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+    : getReflectionUpdates(asOf);
+
+  const strategyBeliefs = bundle
+    ? engineBeliefs(bundle)
+        .filter((belief) => isKnownBy(belief.knowledge_time, asOf))
+        .sort((a, b) => b.confidence - a.confidence || a.name.localeCompare(b.name))
+        .map((belief) => ({
+          ...belief,
+          reflection_updates: reflectionUpdates.filter(
+            (update) => update.strategy_belief_id === belief.id,
+          ),
+        }))
+    : getStrategyBeliefs(reflectionUpdates, asOf);
 
   return {
     entries,
     outcome_scores: outcomeScores,
     track_record: getTrackRecord(entries),
-    strategy_beliefs: getStrategyBeliefs(reflectionUpdates, asOf),
+    strategy_beliefs: strategyBeliefs,
     reflection_updates: reflectionUpdates,
     provenance: {
-      label: "Demo data",
-      source: "Seeded decision journal",
-      as_of: asOf?.iso ?? latestKnowledgeTime(asOf),
+      label: engineLive ? "Engine output" : "Demo data",
+      source: engineLive ? engineRunSummary(bundle!) : "Seeded decision journal",
+      as_of: asOf?.iso ?? (bundle ? bundle.run.knowledge_time : latestKnowledgeTime(asOf)),
       replay_as_of: asOf?.iso ?? null,
     },
   };
@@ -104,11 +144,12 @@ export function createDecisionJournalEntry(input: CreateDecisionInput): JournalE
   return toJournalEntryJson(entry);
 }
 
-function getJournalEntries(
+function buildEntries(
+  baseEntries: DecisionJournalEntry[],
   asOf: AsOfFilter | null,
   outcomeScores: OutcomeScore[],
 ): JournalEntryJson[] {
-  return [...demoDatabase.decisionJournalEntries, ...store().loggedJournalEntries()]
+  return [...baseEntries, ...store().loggedJournalEntries()]
     .filter((entry) => isKnownBy(entry.knowledge_time, asOf))
     .map((entry) => toJournalEntryJson(entry, outcomeScores))
     .sort((a, b) => Date.parse(b.logged_at) - Date.parse(a.logged_at));

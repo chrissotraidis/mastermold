@@ -107,14 +107,25 @@ correctly invisible. A bundle whose `run.knowledge_time` is in the future relati
   "journal_sync": {
     "pending_entries": [
       // DecisionJournalEntry-shaped: thesis, signals[], conviction, horizon,
-      // falsification_condition (PM-generated), logged_at, briefing_card_id
+      // falsification_condition (PM-generated), logged_at, briefing_card_id.
+      // Logged BEFORE the outcome window — today's new decisions.
+    ],
+    "resolved_entries": [
+      // DecisionJournalEntry-shaped: decisions logged on earlier runs that this run
+      // resolved. Carried so the dashboard's track-record-by-tier is self-contained.
     ],
     "outcomes": [
       // OutcomeScore-shaped: journal_entry_id, resolved_at, pnl_note,
-      // thesis_played_out, outcome_score (process_score stays operator-scored)
+      // thesis_played_out (sign(alpha) matches direction), outcome_score (alpha-scaled).
+      // process_score stays operator-scored — the engine never emits it.
     ],
     "reflections": [
-      // ReflectionUpdate-shaped, feeding the beliefs significance gate
+      // ReflectionUpdate-shaped: strategy_belief_id, evidence_summary,
+      // significance_passed, applied. Output of the significance gate.
+    ],
+    "beliefs": [
+      // StrategyBelief-shaped: confidence moved ONLY by beliefs.evaluate_gate
+      // (N consistent same-direction outcomes). A single outcome cannot flip a belief.
     ]
   }
 }

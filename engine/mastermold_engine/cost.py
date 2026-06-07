@@ -12,11 +12,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # USD per 1M tokens (input, output). Keep in sync with the chosen provider/models.
-# Anthropic list prices used as the default tier estimate; actuals still depend on
-# prompt caching (Phase 4), which only lowers the input figure.
+# Anthropic list prices are the default-tier estimate; actuals still depend on
+# prompt caching (Phase 4), which only lowers the input figure. OpenRouter/deepseek
+# is the likely cheap production tier — roughly an order of magnitude less.
 _PRICE_PER_MTOK = {
     "claude-haiku-4-5": (1.0, 5.0),
     "claude-sonnet-4-6": (3.0, 15.0),
+    "deepseek/deepseek-chat": (0.28, 0.88),
+    "deepseek/deepseek-reasoner": (0.55, 2.19),
 }
 
 

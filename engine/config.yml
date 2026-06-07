@@ -23,13 +23,22 @@ always_run:
   - NVDA
 
 # --- Provider & models -----------------------------------------------------
-# One provider for both tiers initially, to keep cost tracking simple
-# (open question 4). Anthropic: the fork supports it natively, the prompt-cache
-# optimization (Phase 4) is Anthropic-specific, and BYOK already targets it.
-provider: anthropic
+# One provider for both tiers initially, to keep cost tracking simple (open
+# question 4). Anthropic is the placeholder default. The likely production choice
+# is OpenRouter fronting a cheap strong model (e.g. deepseek), which the fork's
+# OpenAI-compatible client reaches via base_url — a config flip, not a rewrite.
+# To switch: set provider: openrouter, point models at the OpenRouter ids, and put
+# OPENROUTER_API_KEY in engine/.env. Note: the Phase-4 Anthropic prompt-cache
+# optimization only applies on the anthropic provider.
+provider: anthropic                    # anthropic | openrouter | openai
+openrouter_base_url: https://openrouter.ai/api/v1
 models:
   quick_think: claude-haiku-4-5       # analysts, debaters, reflection
   deep_think: claude-sonnet-4-6       # the two judges (Research Manager, PM) only
+# Example OpenRouter (cheap) tier — uncomment and set provider: openrouter
+# models:
+#   quick_think: deepseek/deepseek-chat
+#   deep_think: deepseek/deepseek-chat
 temperature: 0.2                       # run-to-run consistency (Risks: judge quality)
 
 # --- Debate / risk rounds --------------------------------------------------
