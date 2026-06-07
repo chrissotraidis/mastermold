@@ -1,4 +1,5 @@
 import { demoDatabase } from "./seed-data";
+import { store } from "./store";
 import { isKnownBy, latestKnowledgeTime as getLatestKnowledgeTime, type AsOfFilter } from "./bitemporal";
 import type { Asset, PaperPrediction, PaperTradingRound, RoundScore } from "./schema";
 
@@ -38,8 +39,6 @@ export type CreatePaperPredictionInput = {
   conviction: number;
   rationale: string;
 };
-
-const submittedPredictions: PaperPrediction[] = [];
 
 export function getPaper(asOf: AsOfFilter | null = null): PaperJson {
   const scores = getScores(asOf);
@@ -114,7 +113,7 @@ export function createPaperPrediction(
     knowledge_time: now,
   };
 
-  submittedPredictions.push(prediction);
+  store().addPrediction(prediction);
   return toPredictionJson(prediction) as PaperPredictionJson;
 }
 
@@ -138,7 +137,7 @@ function getRounds(
 }
 
 function getPredictions(asOf: AsOfFilter | null): PaperPredictionJson[] {
-  return [...demoDatabase.paperPredictions, ...submittedPredictions]
+  return [...demoDatabase.paperPredictions, ...store().submittedPredictions()]
     .filter((prediction) => isKnownBy(prediction.knowledge_time, asOf))
     .map(toPredictionJson)
     .filter((prediction): prediction is PaperPredictionJson => prediction !== null)
@@ -178,7 +177,8 @@ function latestKnowledgeTime(asOf: AsOfFilter | null) {
     ...demoDatabase.paperPredictions
       .filter((prediction) => isKnownBy(prediction.knowledge_time, asOf))
       .map((prediction) => prediction.knowledge_time),
-    ...submittedPredictions
+    ...store()
+      .submittedPredictions()
       .filter((prediction) => isKnownBy(prediction.knowledge_time, asOf))
       .map((prediction) => prediction.knowledge_time),
     ...demoDatabase.roundScores

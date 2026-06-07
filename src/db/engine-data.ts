@@ -22,6 +22,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { isKnownBy, type AsOfFilter } from "./bitemporal";
+import { store } from "./store";
 import type {
   Alert,
   BriefingCard,
@@ -222,6 +223,27 @@ export function getEngineStatus(
     reason: lastInvalid?.reason ?? "no usable engine bundle",
     file: lastInvalid?.file,
   };
+}
+
+/**
+ * Record a run in the durable store, idempotent by `run_date` (Phase 1.5). Re-running
+ * a day's import is a no-op: returns false if the run was already ingested. The
+ * dashboard still renders cards/alerts live from the file; this gives history
+ * retention and a place for the Phase-2 journal/outcome rows to land durably.
+ */
+export function ingestEngineRun(bundle: EngineBundle): boolean {
+  return store().markRunIngested(
+    bundle.run.run_date,
+    bundle.run.knowledge_time,
+    bundle.run,
+  );
+}
+
+/** Ingest the newest valid bundle if one exists and has not been ingested yet. */
+export function ingestNewestEngineRun(opts: LoadOptions = {}): boolean {
+  const status = getEngineStatus(null, opts);
+  if (status.state !== "live") return false;
+  return ingestEngineRun(status.bundle);
 }
 
 function parseBundle(

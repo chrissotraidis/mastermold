@@ -1,4 +1,5 @@
 import { demoDatabase } from "./seed-data";
+import { store } from "./store";
 import { isKnownBy, latestKnowledgeTime as getLatestKnowledgeTime, type AsOfFilter } from "./bitemporal";
 import type {
   DecisionJournalEntry,
@@ -53,8 +54,6 @@ export type CreateDecisionInput = {
   falsification_condition: string;
 };
 
-const loggedDecisions: DecisionJournalEntry[] = [];
-
 const tierDefinitions: Array<{
   key: ConfidenceTierKey;
   label: string;
@@ -101,7 +100,7 @@ export function createDecisionJournalEntry(input: CreateDecisionInput): JournalE
     knowledge_time: now,
   };
 
-  loggedDecisions.push(entry);
+  store().addJournalEntry(entry);
   return toJournalEntryJson(entry);
 }
 
@@ -109,7 +108,7 @@ function getJournalEntries(
   asOf: AsOfFilter | null,
   outcomeScores: OutcomeScore[],
 ): JournalEntryJson[] {
-  return [...demoDatabase.decisionJournalEntries, ...loggedDecisions]
+  return [...demoDatabase.decisionJournalEntries, ...store().loggedJournalEntries()]
     .filter((entry) => isKnownBy(entry.knowledge_time, asOf))
     .map((entry) => toJournalEntryJson(entry, outcomeScores))
     .sort((a, b) => Date.parse(b.logged_at) - Date.parse(a.logged_at));
@@ -196,7 +195,8 @@ function latestKnowledgeTime(asOf: AsOfFilter | null) {
     ...demoDatabase.decisionJournalEntries
       .filter((entry) => isKnownBy(entry.knowledge_time, asOf))
       .map((entry) => entry.knowledge_time),
-    ...loggedDecisions
+    ...store()
+      .loggedJournalEntries()
       .filter((entry) => isKnownBy(entry.knowledge_time, asOf))
       .map((entry) => entry.knowledge_time),
     ...demoDatabase.outcomeScores

@@ -1,6 +1,7 @@
 import { demoDatabase } from "./seed-data";
 import type { Alert } from "./schema";
 import { engineAlerts, engineProvenance, engineRunSummary, getEngineStatus } from "./engine-data";
+import { store, type AlertStateRow } from "./store";
 
 export type AlertTier = Alert["tier"];
 export type UsefulFeedback = Alert["useful_feedback"];
@@ -25,19 +26,16 @@ const tierRank: Record<AlertTier, number> = {
   T2: 2,
 };
 
-type AlertState = { acknowledged: boolean; useful_feedback: UsefulFeedback };
-
-// Ack/feedback state is held per alert id, independent of the data source so it
-// survives a seed<->engine switch within a process. Persistence lands in Phase 1.5.
-const alertState = new Map<string, AlertState>();
-
-function ensureState(alert: Alert): AlertState {
-  let state = alertState.get(alert.id);
-  if (!state) {
-    state = { acknowledged: alert.acknowledged, useful_feedback: alert.useful_feedback };
-    alertState.set(alert.id, state);
-  }
-  return state;
+// Ack/feedback state is persisted (Phase 1.5) so it survives restart, independent of
+// the data source so it also survives a seed<->engine switch. Reads fall back to the
+// alert's own defaults when nothing has been persisted yet (no write on read).
+function currentState(alert: Alert): AlertStateRow {
+  return (
+    store().getAlertState(alert.id) ?? {
+      acknowledged: alert.acknowledged,
+      useful_feedback: alert.useful_feedback,
+    }
+  );
 }
 
 /** The raw alert rows from whichever source is live, plus the matching provenance. */
@@ -66,7 +64,7 @@ export function getAlerts(): AlertJson[] {
   const { alerts, provenance } = activeAlerts();
   return alerts
     .map((alert) => {
-      const state = ensureState(alert);
+      const state = currentState(alert);
       return toAlertJson(
         {
           ...alert,
@@ -90,8 +88,8 @@ export function acknowledgeAlert(id: string): AlertJson | null {
   if (!alert) {
     return null;
   }
-  const state = ensureState(alert);
-  state.acknowledged = true;
+  const state = currentState(alert);
+  store().setAlertState(alert.id, { acknowledged: true, useful_feedback: state.useful_feedback });
   return getAlertById(alert.id);
 }
 
@@ -100,8 +98,8 @@ export function saveAlertFeedback(id: string, useful_feedback: UsefulFeedback): 
   if (!alert) {
     return null;
   }
-  const state = ensureState(alert);
-  state.useful_feedback = useful_feedback;
+  const state = currentState(alert);
+  store().setAlertState(alert.id, { acknowledged: state.acknowledged, useful_feedback });
   return getAlertById(alert.id);
 }
 
