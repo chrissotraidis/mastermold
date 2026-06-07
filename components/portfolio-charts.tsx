@@ -32,30 +32,30 @@ function AllocationChart({ allocation }: { allocation: AllocationJson[] }) {
   return (
     <section
       aria-labelledby="allocation-title"
-      className="rounded-lg border border-white/10 bg-white/[0.035] p-4 sm:p-5"
+      className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet">
             Allocation chart
           </p>
-          <h2 id="allocation-title" className="mt-2 text-xl font-semibold text-white">
+          <h2 id="allocation-title" className="mt-2 text-xl font-semibold text-on-surface">
             Per-class allocation
           </h2>
         </div>
-        <p className="text-sm text-slate-400">Equity / crypto / defi</p>
+        <p className="text-sm text-outline">Equity / crypto / defi</p>
       </div>
 
       <div className="mt-6 space-y-4">
         {allocation.map((item) => (
           <div key={item.asset_class} className="space-y-2">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium capitalize text-slate-100">{item.asset_class}</span>
-              <span className="tabular-nums text-slate-300">
+              <span className="font-medium capitalize text-on-surface">{item.asset_class}</span>
+              <span className="tabular-nums text-on-surface-variant">
                 {formatCurrency(item.market_value)} · {item.weight_pct.toFixed(1)}%
               </span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-slate-800" aria-hidden="true">
+            <div className="h-3 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
               <div
                 className={allocationColor(item.asset_class)}
                 style={{ width: `${Math.max((item.weight_pct / maxWeight) * 100, 2)}%` }}
@@ -160,29 +160,29 @@ function TradingViewCandlestick({ chartAssets }: { chartAssets: PriceChartAssetJ
   return (
     <section
       aria-labelledby="price-chart-title"
-      className="rounded-lg border border-white/10 bg-white/[0.035] p-4 sm:p-5"
+      className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-4 sm:p-5"
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet">
             TradingView Lightweight Charts
           </p>
-          <h2 id="price-chart-title" className="mt-2 text-xl font-semibold text-white">
+          <h2 id="price-chart-title" className="mt-2 text-xl font-semibold text-on-surface">
             Price chart
           </h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-outline">
             Select asset for seeded candlestick bars.
           </p>
         </div>
         <div className="grid gap-2 sm:min-w-56">
-          <Label htmlFor="asset-chart-select" className="text-slate-200">
+          <Label htmlFor="asset-chart-select" className="text-on-surface-variant">
             Asset
           </Label>
           <select
             id="asset-chart-select"
             value={selectedAsset?.asset.id ?? ""}
             onChange={(event) => setSelectedAssetId(event.target.value)}
-            className="h-10 rounded-md border border-white/15 bg-slate-950 px-3 text-sm text-white outline-none ring-cyan-300/40 focus:ring-2"
+            className="h-10 rounded-md border border-outline-variant/50 bg-surface-dim px-3 text-sm text-on-surface outline-none ring-violet/40 focus:ring-2"
           >
             {chartAssets.map((item) => (
               <option key={item.asset.id} value={item.asset.id}>
@@ -194,11 +194,11 @@ function TradingViewCandlestick({ chartAssets }: { chartAssets: PriceChartAssetJ
       </div>
 
       {selectedAsset ? (
-        <div className="mt-5 overflow-hidden rounded-md border border-white/10 bg-slate-950">
+        <div className="mt-5 overflow-hidden rounded-md border border-outline-variant/40 bg-surface-dim">
           <div ref={chartRef} className="h-64 w-full sm:h-80" aria-label={`${selectedAsset.asset.symbol} candlestick chart`} />
         </div>
       ) : (
-        <div className="mt-5 rounded-md border border-white/10 bg-slate-950 p-6 text-sm text-slate-300">
+        <div className="mt-5 rounded-md border border-outline-variant/40 bg-surface-dim p-6 text-sm text-on-surface-variant">
           No seeded PriceBar rows are available for the price chart.
         </div>
       )}
@@ -213,11 +213,11 @@ function chartHeight(container: HTMLDivElement) {
 function allocationColor(assetClass: AllocationJson["asset_class"]) {
   switch (assetClass) {
     case "equity":
-      return "h-full rounded-full bg-cyan-300";
+      return "h-full rounded-full bg-violet";
     case "crypto":
-      return "h-full rounded-full bg-emerald-300";
+      return "h-full rounded-full bg-engine";
     case "defi":
-      return "h-full rounded-full bg-amber-300";
+      return "h-full rounded-full bg-caution";
   }
 }
 

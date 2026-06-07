@@ -24,7 +24,7 @@ export function RouteLoadingSkeleton() {
               <SkeletonBlock className="h-4 w-10/12 max-w-2xl rounded" />
             </div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+          <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-5">
             <SkeletonBlock className="h-4 w-32 rounded" />
             <SkeletonBlock className="mt-4 h-10 w-24 rounded" />
             <SkeletonBlock className="mt-4 h-4 w-full rounded" />
@@ -32,7 +32,7 @@ export function RouteLoadingSkeleton() {
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }, (_, index) => (
-            <div key={index} className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+            <div key={index} className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-5">
               <SkeletonBlock className="h-5 w-32 rounded" />
               <SkeletonBlock className="mt-4 h-16 w-full rounded" />
               <SkeletonBlock className="mt-4 h-4 w-10/12 rounded" />
@@ -57,31 +57,31 @@ export function RouteErrorFallback({
       <div className="mx-auto flex min-h-[70vh] max-w-3xl items-center px-4 py-10 sm:px-5">
         <section
           aria-labelledby="route-error-title"
-          className="w-full rounded-lg border border-rose-300/25 bg-rose-300/[0.06] p-5 sm:p-6"
+          className="w-full rounded-lg border border-critical/30 bg-critical/10 p-5 sm:p-6"
         >
           <p className="sr-only">View error boundary fallback with retry option.</p>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-rose-200/25 bg-slate-950/60 text-rose-100">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-md border border-rose-200/25 bg-surface-dim/60 text-critical">
               <TriangleAlert aria-hidden="true" className="size-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-100">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-critical">
                 Error boundary
               </p>
-              <h2 id="route-error-title" className="mt-2 text-2xl font-semibold text-white">
+              <h2 id="route-error-title" className="mt-2 text-2xl font-semibold text-on-surface">
                 This surface did not load
               </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
+              <p className="mt-3 text-sm leading-6 text-on-surface-variant">
                 The app caught the route failure without crashing. Retry the server data fetch,
                 or use the persistent nav to switch sections.
               </p>
-              <p className="mt-3 break-words rounded-md border border-white/10 bg-slate-950/50 p-3 text-xs text-slate-400">
+              <p className="mt-3 break-words rounded-md border border-outline-variant/40 bg-surface-dim/50 p-3 text-xs text-outline">
                 {error.message || "Unknown route error"}
               </p>
               <Button
                 type="button"
                 onClick={reset}
-                className="mt-5 bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+                className="mt-5 bg-violet text-void hover:bg-violet"
               >
                 <RefreshCw aria-hidden="true" />
                 Retry
@@ -95,5 +95,5 @@ export function RouteErrorFallback({
 }
 
 function SkeletonBlock({ className }: { className: string }) {
-  return <div className={`animate-pulse bg-slate-800/80 ${className}`} />;
+  return <div className={`animate-pulse bg-surface-high/80 ${className}`} />;
 }

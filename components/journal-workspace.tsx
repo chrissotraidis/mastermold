@@ -112,13 +112,13 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
       </div>
 
       <aside className="order-1 space-y-4 xl:sticky xl:top-6 xl:order-2">
-        <Card className="border-white/10 bg-white/[0.045]">
+        <Card className="border-outline-variant/40 bg-surface-high/40">
           <CardHeader className="p-5">
             <div className="flex items-center gap-2">
-              <BookPlus aria-hidden="true" className="size-5 text-cyan-200" />
-              <CardTitle className="text-xl text-white">Log decision</CardTitle>
+              <BookPlus aria-hidden="true" className="size-5 text-violet" />
+              <CardTitle className="text-xl text-on-surface">Log decision</CardTitle>
             </div>
-            <p className="text-sm leading-6 text-slate-400">
+            <p className="text-sm leading-6 text-outline">
               Add a thesis, signals, conviction, horizon, and falsification condition.
             </p>
           </CardHeader>
@@ -129,7 +129,7 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
                   id="journal-thesis"
                   value={form.thesis}
                   onChange={(event) => updateForm("thesis", event.target.value)}
-                  className="min-h-24 w-full resize-y rounded-md border border-white/15 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                  className="min-h-24 w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                   placeholder="What needs to be true?"
                   aria-invalid={Boolean(errors.thesis)}
                 />
@@ -140,11 +140,11 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
                   id="journal-signals"
                   value={form.signals}
                   onChange={(event) => updateForm("signals", event.target.value)}
-                  className="border-white/15 bg-slate-950/70 text-slate-100 placeholder:text-slate-500"
+                  className="border-outline-variant/50 bg-surface-dim/70 text-on-surface placeholder:text-outline"
                   placeholder="funding, flows, trend"
                   aria-invalid={Boolean(errors.signals)}
                 />
-                <p className="text-xs text-slate-500">Separate signals with commas.</p>
+                <p className="text-xs text-outline">Separate signals with commas.</p>
               </FieldBlock>
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
@@ -156,7 +156,7 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
                     max={10}
                     value={form.conviction}
                     onChange={(event) => updateForm("conviction", event.target.value)}
-                    className="border-white/15 bg-slate-950/70 text-slate-100"
+                    className="border-outline-variant/50 bg-surface-dim/70 text-on-surface"
                     aria-invalid={Boolean(errors.conviction)}
                   />
                 </FieldBlock>
@@ -165,7 +165,7 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
                     id="journal-horizon"
                     value={form.horizon}
                     onChange={(event) => updateForm("horizon", event.target.value)}
-                    className="border-white/15 bg-slate-950/70 text-slate-100 placeholder:text-slate-500"
+                    className="border-outline-variant/50 bg-surface-dim/70 text-on-surface placeholder:text-outline"
                     placeholder="2-4 weeks"
                     aria-invalid={Boolean(errors.horizon)}
                   />
@@ -181,14 +181,14 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
                   id="journal-falsification"
                   value={form.falsification_condition}
                   onChange={(event) => updateForm("falsification_condition", event.target.value)}
-                  className="min-h-24 w-full resize-y rounded-md border border-white/15 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                  className="min-h-24 w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                   placeholder="What would prove this wrong?"
                   aria-invalid={Boolean(errors.falsification_condition)}
                 />
               </FieldBlock>
 
               {Object.keys(errors).length > 0 ? (
-                <div className="rounded-md border border-red-300/30 bg-red-400/10 p-3 text-sm leading-6 text-red-100">
+                <div className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm leading-6 text-critical">
                   Status: missing required decision details. The decision has not been saved.
                 </div>
               ) : null}
@@ -196,12 +196,12 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
               <p className="sr-only" aria-live="polite">
                 {isPending ? "Logging decision." : message}
               </p>
-              <p className="text-sm leading-6 text-slate-400">{message}</p>
+              <p className="text-sm leading-6 text-outline">{message}</p>
 
               <Button
                 type="submit"
                 disabled={isPending}
-                className="w-full bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+                className="w-full bg-violet text-void hover:bg-violet"
               >
                 <SendHorizonal aria-hidden="true" />
                 {isPending ? "Logging decision" : "Log decision"}
@@ -227,11 +227,11 @@ function FieldBlock({
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="text-sm font-semibold text-slate-100">
+      <Label htmlFor={id} className="text-sm font-semibold text-on-surface">
         {label}
       </Label>
       {children}
-      {error ? <p className="text-xs font-medium text-red-200">{error}</p> : null}
+      {error ? <p className="text-xs font-medium text-critical">{error}</p> : null}
     </div>
   );
 }
@@ -240,21 +240,21 @@ function TrackRecordSection({ tiers }: { tiers: TrackRecordTierJson[] }) {
   return (
     <section aria-labelledby="track-record-title" className="space-y-4">
       <div>
-        <h2 id="track-record-title" className="text-xl font-semibold text-white">
+        <h2 id="track-record-title" className="text-xl font-semibold text-on-surface">
           View track record by confidence tier
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-outline">
           Win-rate and mean outcome score are computed only from resolved entries.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {tiers.map((tier) => (
-          <Card key={tier.key} className="border-white/10 bg-white/[0.04]">
+          <Card key={tier.key} className="border-outline-variant/40 bg-surface-high/30">
             <CardHeader className="p-4">
-              <Badge variant="outline" className="w-fit border-cyan-300/30 text-cyan-100">
+              <Badge variant="outline" className="w-fit border-violet/40 text-violet">
                 {tier.label}
               </Badge>
-              <CardTitle className="text-2xl text-white">
+              <CardTitle className="text-2xl text-on-surface">
                 {formatPercent(tier.win_rate)}
               </CardTitle>
             </CardHeader>
@@ -279,10 +279,10 @@ function EntryList({
   return (
     <section aria-labelledby="journal-entries-title" className="space-y-4">
       <div>
-        <h2 id="journal-entries-title" className="text-xl font-semibold text-white">
+        <h2 id="journal-entries-title" className="text-xl font-semibold text-on-surface">
           Journal entries
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-outline">
           Each row stores thesis, falsification condition, logged time, conviction tier, and linked
           outcome scoring when resolved.
         </p>
@@ -295,29 +295,29 @@ function EntryList({
               key={entry.id}
               id={entry.id}
               className={cn(
-                "scroll-mb-36 border-white/10 bg-white/[0.045]",
-                entry.id === lastLoggedId && "border-cyan-300/50 bg-cyan-300/[0.06]",
+                "scroll-mb-36 border-outline-variant/40 bg-surface-high/40",
+                entry.id === lastLoggedId && "border-violet/50 bg-violet/10",
               )}
             >
               <CardHeader className="space-y-3 p-4 sm:p-5">
                 <div className="flex flex-wrap items-center gap-2">
                   {entry.id === lastLoggedId ? (
-                    <Badge className="bg-cyan-300 text-slate-950 hover:bg-cyan-300">
+                    <Badge className="bg-violet text-void hover:bg-violet">
                       Just logged
                     </Badge>
                   ) : null}
                   <Badge variant="outline" className={tierBadgeClass(entry.conviction_tier.key)}>
                     {entry.conviction_tier.label}
                   </Badge>
-                  <Badge variant="outline" className="border-white/15 text-slate-200">
+                  <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                     Conviction {entry.conviction}/10
                   </Badge>
-                  <Badge variant="outline" className="border-white/15 text-slate-200">
+                  <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                     {entry.horizon}
                   </Badge>
                 </div>
-                <CardTitle className="text-xl leading-7 text-white">{entry.thesis}</CardTitle>
-                <p className="text-sm text-slate-400">Logged {formatTimestamp(entry.logged_at)}</p>
+                <CardTitle className="text-xl leading-7 text-on-surface">{entry.thesis}</CardTitle>
+                <p className="text-sm text-outline">Logged {formatTimestamp(entry.logged_at)}</p>
               </CardHeader>
               <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
                 <div className="grid gap-3 text-sm leading-6 lg:grid-cols-2">
@@ -325,11 +325,11 @@ function EntryList({
                   <InfoPanel label="Signals" value={entry.signals.join(", ")} />
                 </div>
                 {entry.outcome_score ? (
-                  <div className="rounded-md border border-emerald-300/20 bg-emerald-300/[0.07] p-4">
+                  <div className="rounded-md border border-engine/20 bg-engine/[0.07] p-4">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <CheckCircle2 aria-hidden="true" className="size-4 text-emerald-200" />
-                      <p className="text-sm font-semibold text-emerald-50">Linked outcome score</p>
-                      <Badge variant="outline" className="border-emerald-300/40 text-emerald-100">
+                      <CheckCircle2 aria-hidden="true" className="size-4 text-engine" />
+                      <p className="text-sm font-semibold text-engine">Linked outcome score</p>
+                      <Badge variant="outline" className="border-engine/40 text-engine">
                         Thesis played out: {entry.outcome_score.thesis_played_out ? "yes" : "no"}
                       </Badge>
                     </div>
@@ -341,7 +341,7 @@ function EntryList({
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-md border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
+                  <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
                     No outcome score yet. This decision is logged before the outcome window.
                   </div>
                 )}
@@ -350,7 +350,7 @@ function EntryList({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-6 text-sm text-slate-300">
+        <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm text-on-surface-variant">
           No decision journal entries have been logged.
         </div>
       )}
@@ -362,56 +362,56 @@ function StrategyBeliefSection({ journal }: { journal: JournalJson }) {
   return (
     <section aria-labelledby="strategy-beliefs-title" className="space-y-4">
       <div>
-        <h2 id="strategy-beliefs-title" className="text-xl font-semibold text-white">
+        <h2 id="strategy-beliefs-title" className="text-xl font-semibold text-on-surface">
           View strategy beliefs
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-outline">
           View reflection updates and the significance gate before a belief changes.
         </p>
       </div>
       <div className="grid gap-4">
         {journal.strategy_beliefs.map((belief) => (
-          <Card key={belief.id} className="border-white/10 bg-white/[0.04]">
+          <Card key={belief.id} className="border-outline-variant/40 bg-surface-high/30">
             <CardHeader className="p-4 sm:p-5">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="border-cyan-300/30 text-cyan-100">
+                <Badge variant="outline" className="border-violet/40 text-violet">
                   Confidence {(belief.confidence * 100).toFixed(0)}%
                 </Badge>
-                <Badge variant="outline" className="border-white/15 text-slate-200">
+                <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                   Updated {formatTimestamp(belief.updated_at)}
                 </Badge>
               </div>
-              <CardTitle className="text-xl text-white">{belief.name}</CardTitle>
-              <p className="text-sm leading-6 text-slate-300">{belief.statement}</p>
+              <CardTitle className="text-xl text-on-surface">{belief.name}</CardTitle>
+              <p className="text-sm leading-6 text-on-surface-variant">{belief.statement}</p>
             </CardHeader>
             <CardContent className="space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
               {belief.reflection_updates.length > 0 ? (
                 belief.reflection_updates.map((update) => (
                   <div
                     key={update.id}
-                    className="rounded-md border border-white/10 bg-slate-950/40 p-4 text-sm leading-6 text-slate-300"
+                    className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm leading-6 text-on-surface-variant"
                   >
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <Badge
                         variant="outline"
                         className={
                           update.significance_passed
-                            ? "border-emerald-300/40 text-emerald-100"
-                            : "border-amber-300/40 text-amber-100"
+                            ? "border-engine/40 text-engine"
+                            : "border-amber-300/40 text-caution"
                         }
                       >
                         Significance passed: {update.significance_passed ? "yes" : "no"}
                       </Badge>
-                      <Badge variant="outline" className="border-white/15 text-slate-200">
+                      <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                         Applied: {update.applied ? "yes" : "no"}
                       </Badge>
-                      <span className="text-slate-500">{formatTimestamp(update.created_at)}</span>
+                      <span className="text-outline">{formatTimestamp(update.created_at)}</span>
                     </div>
                     {update.evidence_summary}
                   </div>
                 ))
               ) : (
-                <div className="rounded-md border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
+                <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
                   No reflection updates recorded for this belief.
                 </div>
               )}
@@ -425,9 +425,9 @@ function StrategyBeliefSection({ journal }: { journal: JournalJson }) {
 
 function InfoPanel({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/10 bg-slate-950/40 p-3">
-      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 text-slate-200">{value}</p>
+    <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-3">
+      <p className="text-xs font-semibold uppercase text-outline">{label}</p>
+      <p className="mt-1 text-on-surface-variant">{value}</p>
     </div>
   );
 }
@@ -435,8 +435,8 @@ function InfoPanel({ label, value }: { label: string; value: string }) {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 break-words text-sm font-semibold text-slate-100">{value}</p>
+      <p className="text-xs font-semibold uppercase text-outline">{label}</p>
+      <p className="mt-1 break-words text-sm font-semibold text-on-surface">{value}</p>
     </div>
   );
 }
@@ -510,9 +510,9 @@ function emptyTier(key: TrackRecordTierJson["key"], label: string): TrackRecordT
 
 function tierBadgeClass(key: JournalEntryJson["conviction_tier"]["key"]) {
   return cn(
-    key === "1-3" && "border-slate-300/30 text-slate-200",
-    key === "4-6" && "border-amber-300/40 text-amber-100",
-    key === "7-10" && "border-emerald-300/40 text-emerald-100",
+    key === "1-3" && "border-outline-variant/40 text-on-surface-variant",
+    key === "4-6" && "border-amber-300/40 text-caution",
+    key === "7-10" && "border-engine/40 text-engine",
   );
 }
 

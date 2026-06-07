@@ -1,13 +1,34 @@
-// RDS prescaffold: shadcn-add root layout.
-// Builders: keep `import "./globals.css"` and the design-token classes on body.
-// You can extend metadata, fonts, and providers, but do not remove the imports.
+// Root layout — MasterMold "Sentinel" theme.
+// Keep `import "./globals.css"` and the design-token classes on body.
 import type { Metadata } from "next";
+import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Financial Copilot",
-  description: "Seeded advisory financial copilot dashboard",
+  title: "MasterMold — Sentinel",
+  description: "A personal financial agent. Advisory by construction; bounded where it acts.",
 };
 
 export default function RootLayout({
@@ -16,12 +37,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <body
-        className={cn(
-          "min-h-screen bg-background text-foreground antialiased",
-        )}
-      >
+    <html
+      lang="en"
+      className={cn("dark", spaceGrotesk.variable, inter.variable, jetbrainsMono.variable)}
+      suppressHydrationWarning
+    >
+      <body className="min-h-screen bg-background font-body text-foreground antialiased">
         {children}
       </body>
     </html>

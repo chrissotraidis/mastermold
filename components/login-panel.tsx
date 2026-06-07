@@ -63,21 +63,21 @@ export function LoginPanel({ returnUrl }: LoginPanelProps) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
+    <main className="min-h-screen bg-surface-dim px-4 py-8 text-on-surface">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md items-center">
-        <Card className="w-full border-white/10 bg-white/[0.045]">
+        <Card className="w-full border-outline-variant/40 bg-surface-high/40">
           <CardHeader className="space-y-4 p-6">
             <div className="flex items-center justify-between gap-3">
-              <Badge className="bg-cyan-300 text-slate-950 hover:bg-cyan-300">
+              <Badge className="bg-violet text-void hover:bg-violet">
                 Review mode
               </Badge>
-              <Badge variant="outline" className="border-emerald-300/40 text-emerald-100">
+              <Badge variant="outline" className="border-engine/40 text-engine">
                 Seeded persona
               </Badge>
             </div>
             <div>
-              <CardTitle className="text-2xl text-white">Sign in as reviewer</CardTitle>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <CardTitle className="text-2xl text-on-surface">Sign in as reviewer</CardTitle>
+              <p className="mt-2 text-sm leading-6 text-outline">
                 Use reviewer@demo.local or chris@demo.local with password review-demo.
                 This local session only unlocks the demo operator path; integrations remain inert.
               </p>
@@ -86,7 +86,7 @@ export function LoginPanel({ returnUrl }: LoginPanelProps) {
           <CardContent className="p-6 pt-0">
             <form className="space-y-4" onSubmit={submitLogin}>
               <div className="space-y-2">
-                <Label htmlFor="review-email" className="text-slate-100">
+                <Label htmlFor="review-email" className="text-on-surface">
                   Email
                 </Label>
                 <Input
@@ -95,19 +95,19 @@ export function LoginPanel({ returnUrl }: LoginPanelProps) {
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="border-white/15 bg-slate-950/70 text-slate-100"
+                  className="border-outline-variant/50 bg-surface-dim/70 text-on-surface"
                   autoComplete="username"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="review-password" className="text-slate-100">
+                <Label htmlFor="review-password" className="text-on-surface">
                   Password
                 </Label>
                 <div className="relative">
                   <KeyRound
                     aria-hidden="true"
-                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-outline"
                   />
                   <Input
                     id="review-password"
@@ -115,7 +115,7 @@ export function LoginPanel({ returnUrl }: LoginPanelProps) {
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    className="border-white/15 bg-slate-950/70 pl-9 text-slate-100"
+                    className="border-outline-variant/50 bg-surface-dim/70 pl-9 text-on-surface"
                     autoComplete="current-password"
                     required
                   />
@@ -125,24 +125,24 @@ export function LoginPanel({ returnUrl }: LoginPanelProps) {
                 {message}
               </p>
               <div
-                className="rounded-md border border-cyan-300/20 bg-cyan-300/[0.06] p-3 text-sm leading-6 text-slate-300"
+                className="rounded-md border border-violet/30 bg-violet/10 p-3 text-sm leading-6 text-on-surface-variant"
                 data-login-status={loginComplete ? "complete" : "ready"}
                 data-route-family="/dashboard"
                 data-persona="operator reviewer"
               >
                 <div className="flex items-start gap-2">
                   {loginComplete ? (
-                    <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-emerald-200" />
+                    <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-engine" />
                   ) : (
-                    <LogIn aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-cyan-200" />
+                    <LogIn aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet" />
                   )}
                   <p>{message}</p>
                 </div>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-outline">
                   Success opens /dashboard for the authenticated operator and reviewer persona.
                 </p>
               </div>
-              <Button type="submit" className="w-full bg-cyan-300 text-slate-950 hover:bg-cyan-200">
+              <Button type="submit" className="w-full bg-violet text-void hover:bg-violet">
                 <LogIn aria-hidden="true" />
                 Sign in
               </Button>
@@ -157,7 +157,7 @@ export function LoginPanel({ returnUrl }: LoginPanelProps) {
                 data-authenticated-control="true"
                 data-rds-action="submit"
                 data-persona="reviewer operator"
-                className="w-full border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+                className="w-full border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
               >
                 Continue as seeded reviewer
               </Button>

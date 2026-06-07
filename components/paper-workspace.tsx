@@ -57,10 +57,10 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
       </div>
 
       <aside className="xl:sticky xl:top-6">
-        <Card className="border-white/10 bg-white/[0.045]">
+        <Card className="border-outline-variant/40 bg-surface-high/40">
           <CardHeader className="p-5">
-            <CardTitle className="text-xl text-white">Prediction submission</CardTitle>
-            <p className="text-sm leading-6 text-slate-400">
+            <CardTitle className="text-xl text-on-surface">Prediction submission</CardTitle>
+            <p className="text-sm leading-6 text-outline">
               Submit prediction inputs for the active paper round. These entries do not place
               trades or move capital.
             </p>
@@ -74,7 +74,7 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                   <select
                     id="paper-asset"
                     name="asset_id"
-                    className="h-10 w-full rounded-md border border-white/15 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                    className="h-10 w-full rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                     required
                   >
                     {paper.assets.map((asset) => (
@@ -86,16 +86,16 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                 </FieldBlock>
 
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-slate-100">Direction toggle</legend>
+                  <legend className="text-sm font-semibold text-on-surface">Direction toggle</legend>
                   <div className="grid grid-cols-3 gap-2">
                     {directions.map((item) => (
                       <label
                         key={item.value}
                         className={cn(
-                          "flex cursor-pointer items-center justify-center rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-cyan-300",
+                          "flex cursor-pointer items-center justify-center rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-violet",
                           direction === item.value
-                            ? "border-cyan-300 bg-cyan-300 text-slate-950"
-                            : "border-white/15 bg-slate-950/70 text-slate-200 hover:bg-white/10",
+                            ? "border-violet bg-violet text-void"
+                            : "border-outline-variant/50 bg-surface-dim/70 text-on-surface-variant hover:bg-surface-high/60",
                         )}
                       >
                         <input
@@ -128,12 +128,12 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                     step={1}
                     value={conviction}
                     onChange={(event) => setConviction(Number(event.target.value))}
-                    className="w-full accent-cyan-300"
+                    className="w-full accent-violet"
                     aria-describedby="paper-conviction-help"
                   />
                   <div
                     id="paper-conviction-help"
-                    className="flex justify-between text-xs text-slate-500"
+                    className="flex justify-between text-xs text-outline"
                   >
                     <span>1 low</span>
                     <span>10 high</span>
@@ -144,14 +144,14 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                   <textarea
                     id="paper-rationale"
                     name="rationale"
-                    className="min-h-28 w-full resize-y rounded-md border border-white/15 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                    className="min-h-28 w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                     placeholder="What process evidence supports this prediction?"
                     required
                   />
                 </FieldBlock>
 
                 {state.errors.length > 0 ? (
-                  <div className="rounded-md border border-red-300/30 bg-red-400/10 p-3 text-sm leading-6 text-red-100">
+                  <div className="rounded-md border border-critical/40 bg-critical/10 p-3 text-sm leading-6 text-critical">
                     {state.errors.join(" ")}
                   </div>
                 ) : null}
@@ -162,7 +162,7 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                 <p
                   className={cn(
                     "text-sm leading-6",
-                    state.status === "error" ? "text-red-100" : "text-slate-400",
+                    state.status === "error" ? "text-critical" : "text-outline",
                   )}
                 >
                   {state.message}
@@ -173,14 +173,14 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                   disabled={isPending}
                   data-rds-action="submit"
                   data-action-state={state.status === "success" ? `changed-${actionSequence}` : "idle"}
-                  className="w-full bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+                  className="w-full bg-violet text-void hover:bg-violet"
                 >
                   <SendHorizonal aria-hidden="true" />
                   {isPending ? "Submitting prediction" : "Submit prediction"}
                 </Button>
               </form>
             ) : (
-              <div className="rounded-md border border-white/10 bg-slate-950/50 p-4 text-sm leading-6 text-slate-300">
+              <div className="rounded-md border border-outline-variant/40 bg-surface-dim/50 p-4 text-sm leading-6 text-on-surface-variant">
                 No open paper round is available for prediction submission.
               </div>
             )}
@@ -203,26 +203,26 @@ function ActiveRoundPanel({
   return (
     <section aria-labelledby="active-paper-round-title" className="space-y-4">
       <div>
-        <h2 id="active-paper-round-title" className="text-xl font-semibold text-white">
+        <h2 id="active-paper-round-title" className="text-xl font-semibold text-on-surface">
           Active PaperTradingRound
         </h2>
-        <p className="mt-1 text-sm leading-6 text-slate-400">
+        <p className="mt-1 text-sm leading-6 text-outline">
           Open paper round details and prediction list for process-based scoring.
         </p>
       </div>
 
       {activeRound ? (
-        <Card className="border-cyan-300/20 bg-cyan-300/[0.055]">
+        <Card className="border-violet/30 bg-violet/[0.055]">
           <CardHeader className="space-y-3 p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="bg-cyan-300 text-slate-950 hover:bg-cyan-300">
+              <Badge className="bg-violet text-void hover:bg-violet">
                 {activeRound.status}
               </Badge>
-              <Badge variant="outline" className="border-white/15 text-slate-200">
+              <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                 {activePredictions.length} predictions
               </Badge>
             </div>
-            <CardTitle className="text-2xl text-white">{activeRound.week_label}</CardTitle>
+            <CardTitle className="text-2xl text-on-surface">{activeRound.week_label}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5 p-5 pt-0">
             <div className="grid gap-3 text-sm sm:grid-cols-2">
@@ -233,7 +233,7 @@ function ActiveRoundPanel({
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-6 text-sm text-slate-300">
+        <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm text-on-surface-variant">
           No active paper round is seeded.
         </div>
       )}
@@ -245,18 +245,18 @@ function RoundScorePanel({ round }: { round: PaperPageData["rounds"][number] }) 
   return (
     <section aria-labelledby="round-score-title" className="space-y-4">
       <div>
-        <h2 id="round-score-title" className="text-xl font-semibold text-white">
+        <h2 id="round-score-title" className="text-xl font-semibold text-on-surface">
           View round score
         </h2>
-        <p className="mt-1 text-sm leading-6 text-slate-400">
+        <p className="mt-1 text-sm leading-6 text-outline">
           Completed round score uses calibration, patience, diversification, and total.
         </p>
       </div>
-      <Card className="border-white/10 bg-white/[0.04]">
+      <Card className="border-outline-variant/40 bg-surface-high/30">
         <CardHeader className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-xl text-white">{round.week_label}</CardTitle>
-            <Badge variant="outline" className="border-white/15 text-slate-200">
+            <CardTitle className="text-xl text-on-surface">{round.week_label}</CardTitle>
+            <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
               RoundScore
             </Badge>
           </div>
@@ -270,7 +270,7 @@ function RoundScorePanel({ round }: { round: PaperPageData["rounds"][number] }) 
               <Metric label="total" value={round.score.total.toFixed(1)} />
             </div>
           ) : (
-            <div className="rounded-md border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
+            <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
               No RoundScore has been published for this completed round.
             </div>
           )}
@@ -284,10 +284,10 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
   return (
     <section aria-labelledby="round-history-title" className="space-y-4">
       <div>
-        <h2 id="round-history-title" className="text-xl font-semibold text-white">
+        <h2 id="round-history-title" className="text-xl font-semibold text-on-surface">
           View round history
         </h2>
-        <p className="mt-1 text-sm leading-6 text-slate-400">
+        <p className="mt-1 text-sm leading-6 text-outline">
           Past paper rounds list submitted predictions and neutral process scores.
         </p>
       </div>
@@ -295,17 +295,17 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
       {rounds.length > 0 ? (
         <div className="grid gap-4">
           {rounds.map((round) => (
-            <Card key={round.id} className="border-white/10 bg-white/[0.035]">
+            <Card key={round.id} className="border-outline-variant/40 bg-surface-high/30">
               <CardHeader className="space-y-3 p-5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="border-white/15 text-slate-200">
+                  <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                     {round.status}
                   </Badge>
-                  <Badge variant="outline" className="border-white/15 text-slate-200">
+                  <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                     {round.predictions.length} predictions
                   </Badge>
                 </div>
-                <CardTitle className="text-xl text-white">{round.week_label}</CardTitle>
+                <CardTitle className="text-xl text-on-surface">{round.week_label}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 p-5 pt-0">
                 <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -320,7 +320,7 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-6 text-sm text-slate-300">
+        <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm text-on-surface-variant">
           No past paper rounds are seeded.
         </div>
       )}
@@ -337,34 +337,34 @@ function PredictionList({
 }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-base font-semibold text-white">{title}</h3>
+      <h3 className="text-base font-semibold text-on-surface">{title}</h3>
       {predictions.length > 0 ? (
         <div className="grid gap-3">
           {predictions.map((prediction) => (
             <div
               key={prediction.id}
-              className="rounded-md border border-white/10 bg-slate-950/45 p-4"
+              className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="border-cyan-300/30 text-cyan-100">
+                <Badge variant="outline" className="border-violet/40 text-violet">
                   {prediction.asset.symbol}
                 </Badge>
-                <Badge variant="outline" className="border-white/15 text-slate-200">
+                <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                   {prediction.direction}
                 </Badge>
-                <Badge variant="outline" className="border-white/15 text-slate-200">
+                <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                   Conviction {prediction.conviction}/10
                 </Badge>
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-300">{prediction.rationale}</p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-3 text-sm leading-6 text-on-surface-variant">{prediction.rationale}</p>
+              <p className="mt-2 text-xs text-outline">
                 submitted_at {formatTimestamp(prediction.submitted_at)}
               </p>
             </div>
           ))}
         </div>
       ) : (
-        <div className="rounded-md border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
+        <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
           No predictions have been submitted for this round.
         </div>
       )}
@@ -383,7 +383,7 @@ function FieldBlock({
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="text-sm font-semibold text-slate-100">
+      <Label htmlFor={id} className="text-sm font-semibold text-on-surface">
         {label}
       </Label>
       {children}
@@ -393,9 +393,9 @@ function FieldBlock({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/10 bg-slate-950/45 p-3">
-      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-      <p className="mt-1 break-words text-lg font-semibold text-white">{value}</p>
+    <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+      <p className="text-xs font-medium uppercase text-outline">{label}</p>
+      <p className="mt-1 break-words text-lg font-semibold text-on-surface">{value}</p>
     </div>
   );
 }

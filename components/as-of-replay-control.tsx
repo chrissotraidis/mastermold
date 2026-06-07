@@ -56,28 +56,28 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
   return (
     <section
       aria-labelledby={`${apiPath.slice(5)}-as-of-title`}
-      className="rounded-lg border border-cyan-300/20 bg-cyan-300/[0.06] p-4 sm:p-5"
+      className="rounded-lg border border-violet/30 bg-violet/10 p-4 sm:p-5"
     >
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet">
             Historical data replay
           </p>
-          <h2 id={`${apiPath.slice(5)}-as-of-title`} className="text-xl font-semibold text-white">
+          <h2 id={`${apiPath.slice(5)}-as-of-title`} className="text-xl font-semibold text-on-surface">
             Select as-of timestamp
           </h2>
-          <p className="text-sm leading-6 text-slate-300">
+          <p className="text-sm leading-6 text-on-surface-variant">
             View historical data by time. The page and {apiPath} apply the same
             knowledge_time filter, then clear filter to restore the current seeded view.
           </p>
           {activeLabel ? (
-            <p className="text-sm font-semibold text-cyan-50">As of {activeLabel}</p>
+            <p className="text-sm font-semibold text-on-surface">As of {activeLabel}</p>
           ) : null}
         </div>
 
         <form className="grid gap-3 sm:grid-cols-[minmax(14rem,18rem)_auto_auto]" onSubmit={submitReplay}>
           <div className="space-y-2">
-            <Label htmlFor={`${apiPath.slice(5)}-as-of`} className="text-slate-100">
+            <Label htmlFor={`${apiPath.slice(5)}-as-of`} className="text-on-surface">
               Timestamp
             </Label>
             <Input
@@ -85,13 +85,13 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
               type="datetime-local"
               value={value}
               onChange={(event) => setValue(event.target.value)}
-              className="border-white/15 bg-slate-950/80 text-slate-100"
+              className="border-outline-variant/50 bg-surface-dim/80 text-on-surface"
             />
           </div>
           <Button
             type="submit"
             disabled={!value || isPending}
-            className="self-end bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+            className="self-end bg-violet text-void hover:bg-violet"
           >
             View snapshot
           </Button>
@@ -100,7 +100,7 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
             variant="outline"
             disabled={!activeAsOf || isPending}
             onClick={clearReplay}
-            className="self-end border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="self-end border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <RotateCcw aria-hidden="true" />
             Clear filter

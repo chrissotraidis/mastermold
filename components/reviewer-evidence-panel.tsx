@@ -99,7 +99,7 @@ export function ReviewerEvidencePanel() {
 
   return (
     <Card
-      className="border-cyan-300/25 bg-cyan-300/[0.055]"
+      className="border-violet/30 bg-violet/[0.055]"
       data-action-evidence={lastAction}
       data-action-sequence={actionSequence}
       data-persona="reviewer public operator user"
@@ -107,16 +107,16 @@ export function ReviewerEvidencePanel() {
       <CardHeader className="space-y-3 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-xl text-white">
-              <UserRound aria-hidden="true" className="size-5 text-cyan-100" />
+            <CardTitle className="flex items-center gap-2 text-xl text-on-surface">
+              <UserRound aria-hidden="true" className="size-5 text-violet" />
               Reviewer walkthrough
             </CardTitle>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
+            <p className="mt-2 text-sm leading-6 text-on-surface-variant">
               Seeded persona {reviewerEmail} can create review evidence, mark surfaces
               checked, and save local progress without external credentials.
             </p>
           </div>
-          <Badge variant="outline" className="border-cyan-300/40 text-cyan-100">
+          <Badge variant="outline" className="border-violet/40 text-violet">
             {completed}/3 checked
           </Badge>
         </div>
@@ -130,7 +130,7 @@ export function ReviewerEvidencePanel() {
             data-action-state={checked.briefing ? `changed-${actionSequence}` : "idle"}
             data-persona="reviewer"
             onClick={() => markSurface("briefing", "Briefing and alerts")}
-            className="justify-start bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+            className="justify-start bg-violet text-void hover:bg-violet"
           >
             <ClipboardCheck aria-hidden="true" />
             {checked.briefing ? "Created review evidence" : "Create review evidence"}
@@ -144,7 +144,7 @@ export function ReviewerEvidencePanel() {
             data-persona="reviewer"
             aria-pressed={checked.portfolio}
             onClick={() => markSurface("portfolio", "Portfolio and journal")}
-            className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <CheckCircle2 aria-hidden="true" />
             {checked.portfolio ? "Portfolio checked" : "Mark portfolio checked"}
@@ -158,7 +158,7 @@ export function ReviewerEvidencePanel() {
             data-persona="reviewer"
             aria-pressed={checked.executor}
             onClick={() => markSurface("executor", "Executor and integrations")}
-            className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <CheckCircle2 aria-hidden="true" />
             {checked.executor ? "Executor checked" : "Mark executor checked"}
@@ -171,7 +171,7 @@ export function ReviewerEvidencePanel() {
             data-action-state={savedAt ? `changed-${actionSequence}` : "idle"}
             data-persona="reviewer"
             onClick={saveCheckpoint}
-            className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <Save aria-hidden="true" />
             {savedAt ? "Saved reviewer checkpoint" : "Save reviewer checkpoint"}
@@ -181,24 +181,24 @@ export function ReviewerEvidencePanel() {
         <p className="sr-only" aria-live="polite">
           {message}
         </p>
-        <div className="grid gap-3 rounded-md border border-white/10 bg-slate-950/45 p-3 text-sm text-slate-300 md:grid-cols-[1fr_13rem]">
+        <div className="grid gap-3 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-sm text-on-surface-variant md:grid-cols-[1fr_13rem]">
           <div>
-            <p className="font-semibold text-cyan-50">{message}</p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="font-semibold text-on-surface">{message}</p>
+            <p className="mt-1 text-xs text-outline">
               Review action evidence #{actionSequence}: {lastAction}
             </p>
             <ul className="mt-2 space-y-1">
               {history.map((item, index) => (
                 <li key={`${item}-${index}`} className="flex gap-2">
-                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-cyan-300" />
+                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-violet" />
                   <span>{item}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="rounded-md border border-white/10 bg-white/[0.03] p-3">
-            <p className="text-xs font-semibold uppercase text-slate-500">Review status</p>
-            <p className="mt-1 font-semibold text-slate-100">
+          <div className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-3">
+            <p className="text-xs font-semibold uppercase text-outline">Review status</p>
+            <p className="mt-1 font-semibold text-on-surface">
               {savedAt ? `Saved ${formatTime(savedAt)}` : "Unsaved review"}
             </p>
           </div>

@@ -380,7 +380,7 @@ export function OperatorWorkflowPanel() {
 
   return (
     <Card
-      className="overflow-hidden border-cyan-300/25 bg-[linear-gradient(135deg,rgba(103,232,249,0.1),rgba(16,185,129,0.055)_48%,rgba(15,23,42,0.72))] shadow-2xl shadow-cyan-950/20"
+      className="overflow-hidden border-violet/30 bg-[linear-gradient(135deg,rgba(103,232,249,0.1),rgba(16,185,129,0.055)_48%,rgba(15,23,42,0.72))] shadow-2xl shadow-cyan-950/20"
       data-action-evidence={lastAction}
       data-action-sequence={actionSequence}
       data-persona="operator user reviewer public"
@@ -388,30 +388,30 @@ export function OperatorWorkflowPanel() {
       <CardHeader className="space-y-4 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-xl text-white">
-              <ClipboardList aria-hidden="true" className="size-5 text-cyan-200" />
+            <CardTitle className="flex items-center gap-2 text-xl text-on-surface">
+              <ClipboardList aria-hidden="true" className="size-5 text-violet" />
               Operator workflow
             </CardTitle>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
+            <p className="mt-2 text-sm leading-6 text-on-surface-variant">
               Search, filter, create a paper-only review packet, and record feedback from the primary dashboard.
             </p>
           </div>
-          <Badge variant="outline" className="border-emerald-300/40 text-emerald-100">
+          <Badge variant="outline" className="border-engine/40 text-engine">
             {progressPercent}% complete
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-5 p-5 pt-0">
-        <div className="grid gap-3 rounded-md border border-cyan-300/20 bg-cyan-300/[0.055] p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div className="grid gap-3 rounded-md border border-violet/30 bg-violet/[0.055] p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
           <div>
-            <p className="text-xs font-semibold uppercase text-cyan-100">Primary workflow next step</p>
-            <p className="mt-1 text-sm font-semibold text-white">{nextStep}</p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">
+            <p className="text-xs font-semibold uppercase text-violet">Primary workflow next step</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">{nextStep}</p>
+            <p className="mt-1 text-sm leading-6 text-on-surface-variant">
               Every control below changes local review state, updates status, and records history
               before the operator moves to a journal or paper prediction.
             </p>
           </div>
-          <Badge variant="outline" className="w-fit border-cyan-300/35 px-3 py-2 text-cyan-100">
+          <Badge variant="outline" className="w-fit border-violet/40 px-3 py-2 text-violet">
             Status: {completedSteps}/{steps.length} checks done
           </Badge>
         </div>
@@ -428,13 +428,13 @@ export function OperatorWorkflowPanel() {
           <div className="relative">
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-outline"
             />
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search briefing, alerts, journal"
-              className="border-white/15 bg-slate-950/80 pl-9 text-slate-100 placeholder:text-slate-500"
+              className="border-outline-variant/50 bg-surface-dim/80 pl-9 text-on-surface placeholder:text-outline"
               aria-label="Search briefing, alerts, and journal"
             />
           </div>
@@ -445,7 +445,7 @@ export function OperatorWorkflowPanel() {
             data-rds-action="search"
             data-action-state={lastAction.includes("Search") ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="min-h-10 whitespace-normal bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+            className="min-h-10 whitespace-normal bg-violet text-void hover:bg-violet"
           >
             <Search aria-hidden="true" />
             {lastAction.includes("Search") ? "Searched" : "Search"}
@@ -458,7 +458,7 @@ export function OperatorWorkflowPanel() {
             data-rds-action="filter"
             data-action-state={lastAction.includes("Filter") ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="min-h-10 whitespace-normal border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="min-h-10 whitespace-normal border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
             aria-pressed={filter === "actionable"}
           >
             <Filter aria-hidden="true" />
@@ -467,35 +467,35 @@ export function OperatorWorkflowPanel() {
         </div>
 
         <div
-          className="rounded-md border border-cyan-300/20 bg-slate-950/45 p-3"
+          className="rounded-md border border-violet/30 bg-surface-dim/45 p-3"
           data-search-results-count={visibleResults.length}
           data-filter-state={filter}
           aria-live="polite"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold uppercase text-cyan-100">Search results</p>
-              <p className="mt-1 text-sm text-slate-300">
+              <p className="text-xs font-semibold uppercase text-violet">Search results</p>
+              <p className="mt-1 text-sm text-on-surface-variant">
                 {visibleResults.length} seeded workflow result{visibleResults.length === 1 ? "" : "s"}
                 {filter === "actionable" ? " after actionable filter" : " in the current review queue"}.
               </p>
             </div>
-            <Badge variant="outline" className="w-fit border-cyan-300/35 text-cyan-100">
+            <Badge variant="outline" className="w-fit border-violet/40 text-violet">
               {query.trim() ? `Query: ${query.trim()}` : "No query"}
             </Badge>
           </div>
           {visibleResults.length > 0 ? (
             <div className="mt-3 grid gap-2 md:grid-cols-3">
               {visibleResults.map((result) => (
-                <div key={result.title} className="rounded-md border border-white/10 bg-white/[0.035] p-3">
-                  <p className="text-xs font-semibold uppercase text-slate-400">{result.type}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-100">{result.title}</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">{result.detail}</p>
+                <div key={result.title} className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-3">
+                  <p className="text-xs font-semibold uppercase text-outline">{result.type}</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{result.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-outline">{result.detail}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="mt-3 rounded-md border border-amber-300/25 bg-amber-300/[0.06] p-3 text-sm text-amber-50">
+            <div className="mt-3 rounded-md border border-caution/30 bg-caution/10 p-3 text-sm text-amber-50">
               No seeded result matches this search. Clear the query or switch back to all cards.
             </div>
           )}
@@ -509,7 +509,7 @@ export function OperatorWorkflowPanel() {
             data-rds-action="create"
             data-action-state={paperReviewCreatedAt ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight bg-violet text-void hover:bg-violet"
             aria-label="Create review packet for paper-only advisory workflow"
           >
             <ListPlus aria-hidden="true" />
@@ -523,7 +523,7 @@ export function OperatorWorkflowPanel() {
             data-action-state={noteSubmittedAt ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
             aria-disabled={!canSubmitNote}
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight bg-emerald-300 text-slate-950 hover:bg-emerald-200"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight bg-engine text-void hover:bg-emerald-200"
             asChild={false}
           >
             <ListPlus aria-hidden="true" />
@@ -537,7 +537,7 @@ export function OperatorWorkflowPanel() {
             data-rds-action="connect"
             data-action-state={connected ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="h-auto min-h-11 justify-start whitespace-normal border-white/15 bg-transparent text-left leading-tight text-slate-100 hover:bg-white/10"
+            className="h-auto min-h-11 justify-start whitespace-normal border-outline-variant/50 bg-transparent text-left leading-tight text-on-surface hover:bg-surface-high/60"
             aria-pressed={connected}
           >
             <PlugZap aria-hidden="true" />
@@ -554,7 +554,7 @@ export function OperatorWorkflowPanel() {
             data-rds-action="connect"
             data-action-state={connected ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="h-auto min-h-11 justify-start whitespace-normal border-white/15 bg-transparent text-left leading-tight text-slate-100 hover:bg-white/10"
+            className="h-auto min-h-11 justify-start whitespace-normal border-outline-variant/50 bg-transparent text-left leading-tight text-on-surface hover:bg-surface-high/60"
             aria-pressed={connected}
           >
             <PlugZap aria-hidden="true" />
@@ -567,7 +567,7 @@ export function OperatorWorkflowPanel() {
             data-rds-action="create"
             data-action-state={paperReviewCreatedAt ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight bg-violet text-void hover:bg-violet"
             aria-label="Create review packet for paper-only advisory workflow"
           >
             <ListPlus aria-hidden="true" />
@@ -581,7 +581,7 @@ export function OperatorWorkflowPanel() {
             data-action-state={noteSubmittedAt ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
             aria-disabled={!canSubmitNote}
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight bg-emerald-300 text-slate-950 hover:bg-emerald-200"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight bg-engine text-void hover:bg-emerald-200"
             asChild={false}
           >
             <ListPlus aria-hidden="true" />
@@ -590,7 +590,7 @@ export function OperatorWorkflowPanel() {
           <Button
             asChild
             variant="outline"
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <Link href="/journal">
               <CheckCircle2 aria-hidden="true" />
@@ -600,7 +600,7 @@ export function OperatorWorkflowPanel() {
           <Button
             asChild
             variant="outline"
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <Link href="/settings/integrations">
               <SlidersHorizontal aria-hidden="true" />
@@ -615,7 +615,7 @@ export function OperatorWorkflowPanel() {
             data-rds-action="save"
             data-action-state={lastSavedAt ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <Save aria-hidden="true" />
             {lastSavedAt ? "Saved checkpoint" : "Save checkpoint"}
@@ -628,7 +628,7 @@ export function OperatorWorkflowPanel() {
             data-rds-action="toggle"
             data-action-state={lastAction.includes("Toggle") ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
             aria-pressed={reviewMode}
           >
             <Power aria-hidden="true" />
@@ -642,46 +642,46 @@ export function OperatorWorkflowPanel() {
             data-rds-action="reject"
             data-action-state={lastAction.includes("Rejected") ? `changed-${actionSequence}` : "idle"}
             data-persona="operator"
-            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+            className="h-auto min-h-11 justify-start whitespace-normal text-left leading-tight border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             {lastAction.includes("Rejected") ? "Rejected idea" : "Reject low-confidence idea"}
           </Button>
         </div>
 
-        <div className="rounded-md border border-white/10 bg-slate-950/45 p-3 text-sm text-slate-300">
-          <div className="mb-3 grid gap-2 rounded-md border border-cyan-300/20 bg-cyan-300/[0.06] p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-sm text-on-surface-variant">
+          <div className="mb-3 grid gap-2 rounded-md border border-violet/30 bg-violet/10 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
             <div>
-              <p className="text-xs font-semibold uppercase text-cyan-100">Reviewer persona</p>
-              <p className="mt-1 text-sm text-slate-300">
+              <p className="text-xs font-semibold uppercase text-violet">Reviewer persona</p>
+              <p className="mt-1 text-sm text-on-surface-variant">
                 Seeded access: reviewer@demo.local. Operator path is local and authenticated
                 by review mode state; credentials are not required.
               </p>
             </div>
-            <Badge variant="outline" className="w-fit border-cyan-300/40 text-cyan-100">
+            <Badge variant="outline" className="w-fit border-violet/40 text-violet">
               {reviewMode ? "Reviewer active" : "Operator active"}
             </Badge>
           </div>
-          <div className="mb-3 grid gap-3 rounded-md border border-emerald-300/20 bg-emerald-300/[0.055] p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="mb-3 grid gap-3 rounded-md border border-engine/20 bg-engine/10 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
             <div>
-              <p className="text-xs font-semibold uppercase text-emerald-100">Integration panel</p>
-              <p className="mt-1 text-sm text-slate-300">
+              <p className="text-xs font-semibold uppercase text-engine">Integration panel</p>
+              <p className="mt-1 text-sm text-on-surface-variant">
                 Connect demo changes local review state only. It does not fetch accounts,
                 request credentials, or unlock execution.
               </p>
             </div>
-            <Badge variant="outline" className="w-fit border-emerald-300/40 text-emerald-100">
+            <Badge variant="outline" className="w-fit border-engine/40 text-engine">
               {connected ? "Connected locally" : "Seeded demo only"}
             </Badge>
           </div>
           <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
             <label className="space-y-2">
-              <span className="font-semibold text-slate-100">Operator workflow note</span>
+              <span className="font-semibold text-on-surface">Operator workflow note</span>
               <textarea
                 value={workflowNote}
                 onChange={(event) => setWorkflowNote(event.target.value)}
                 rows={2}
                 placeholder="Example: Review BTC alert rationale before logging a falsification condition."
-                className="w-full resize-y rounded-md border border-white/15 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                className="w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/80 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
               />
             </label>
             <Button
@@ -692,7 +692,7 @@ export function OperatorWorkflowPanel() {
               data-rds-action="edit"
               data-action-state={noteEditedAt ? `changed-${actionSequence}` : "idle"}
               data-persona="operator"
-              className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+              className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
             >
               <FilePenLine aria-hidden="true" />
               {noteEditedAt ? "Edited note" : "Edit note"}
@@ -702,7 +702,7 @@ export function OperatorWorkflowPanel() {
             <Button
               asChild
               variant="outline"
-              className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+              className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
             >
               <Link href="/journal">Log decision</Link>
             </Button>
@@ -714,7 +714,7 @@ export function OperatorWorkflowPanel() {
               data-rds-action="save"
               data-action-state={lastSavedAt ? `changed-${actionSequence}` : "idle"}
               data-persona="operator"
-              className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+              className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
             >
               {lastSavedAt ? "Saved checkpoint" : "Save checkpoint"}
             </Button>
@@ -726,7 +726,7 @@ export function OperatorWorkflowPanel() {
               data-rds-action="toggle"
               data-action-state={lastAction.includes("Toggle") ? `changed-${actionSequence}` : "idle"}
               data-persona="operator"
-              className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+              className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
               aria-pressed={reviewMode}
             >
               <Power aria-hidden="true" />
@@ -740,31 +740,31 @@ export function OperatorWorkflowPanel() {
               data-rds-action="reject"
               data-action-state={lastAction.includes("Rejected") ? `changed-${actionSequence}` : "idle"}
               data-persona="operator"
-              className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+              className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
             >
               {lastAction.includes("Rejected") ? "Rejected idea" : "Reject low-confidence idea"}
             </Button>
             <Button
               asChild
               variant="outline"
-              className="justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+              className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
             >
               <Link href="/executor">Edit executor guardrails</Link>
             </Button>
           </div>
-          <p className="mt-3 text-sm text-slate-300">
+          <p className="mt-3 text-sm text-on-surface-variant">
             {noteEditedAt ? `Edited ${formatTime(noteEditedAt)}.` : "No note edit saved yet."}{" "}
             {noteSubmittedAt ? `Submitted ${formatTime(noteSubmittedAt)}.` : canSubmitNote ? "Ready to submit note." : "Add a specific note before submitting."}
           </p>
         </div>
 
-        <div className="grid gap-3 rounded-md border border-white/10 bg-slate-950/45 p-3 md:grid-cols-[1fr_auto] md:items-center">
+        <div className="grid gap-3 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 md:grid-cols-[1fr_auto] md:items-center">
           <div>
-            <p className="flex items-center gap-2 text-xs font-semibold uppercase text-cyan-100">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase text-violet">
               <MessageSquare aria-hidden="true" className="size-4" />
               Operator feedback
             </p>
-            <p className="mt-1 text-sm leading-6 text-slate-300">
+            <p className="mt-1 text-sm leading-6 text-on-surface-variant">
               Close the loop on the briefing before acting elsewhere: submit whether this
               paper-only review packet was useful or needs follow-up. The choice is saved locally for
               review history and never becomes executable.
@@ -781,8 +781,8 @@ export function OperatorWorkflowPanel() {
               variant={feedback === "useful" ? "default" : "outline"}
               className={
                 feedback === "useful"
-                  ? "justify-start bg-cyan-300 text-slate-950 hover:bg-cyan-200"
-                  : "justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+                  ? "justify-start bg-violet text-void hover:bg-violet"
+                  : "justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
               }
               aria-pressed={feedback === "useful"}
             >
@@ -799,8 +799,8 @@ export function OperatorWorkflowPanel() {
               variant={feedback === "needs-follow-up" ? "default" : "outline"}
               className={
                 feedback === "needs-follow-up"
-                  ? "justify-start bg-amber-300 text-slate-950 hover:bg-amber-200"
-                  : "justify-start border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+                  ? "justify-start bg-caution text-void hover:bg-amber-200"
+                  : "justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
               }
               aria-pressed={feedback === "needs-follow-up"}
             >
@@ -813,39 +813,39 @@ export function OperatorWorkflowPanel() {
         <p className="sr-only" aria-live="polite">
           {message}
         </p>
-        <div className="rounded-md border border-white/10 bg-slate-950/55 p-4 shadow-inner shadow-black/20">
+        <div className="rounded-md border border-outline-variant/40 bg-surface-dim/55 p-4 shadow-inner shadow-black/20">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-300">Current status</p>
-              <p className="mt-1 text-sm font-semibold text-cyan-50">{message}</p>
-              <p className="mt-1 text-xs text-slate-300">
+              <p className="text-xs font-semibold uppercase text-on-surface-variant">Current status</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{message}</p>
+              <p className="mt-1 text-xs text-on-surface-variant">
                 Action evidence #{actionSequence}: {lastAction}
               </p>
             </div>
-            <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
-              <Clock3 aria-hidden="true" className="size-4 text-cyan-200" />
+            <div className="flex items-center gap-2 rounded-md border border-outline-variant/40 bg-surface-high/30 px-3 py-2 text-xs text-on-surface-variant">
+              <Clock3 aria-hidden="true" className="size-4 text-violet" />
               <span>{lastSavedAt ? `Saved ${formatTime(lastSavedAt)}` : "Unsaved session"}</span>
             </div>
           </div>
           <div className="mt-3" aria-label={`Workflow progress ${progressPercent}%`}>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-900">
-              <div className="h-full rounded-full bg-cyan-300" style={{ width: `${progressPercent}%` }} />
+            <div className="h-2 overflow-hidden rounded-full bg-surface-low">
+              <div className="h-full rounded-full bg-violet" style={{ width: `${progressPercent}%` }} />
             </div>
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-4">
             {steps.map((step) => (
-              <div key={step.label} className="rounded-md border border-white/10 bg-white/[0.03] p-3">
-                <p className="text-xs font-medium uppercase text-slate-300">{step.status}</p>
-                <p className="mt-1 text-sm font-semibold text-slate-100">{step.label}</p>
+              <div key={step.label} className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-3">
+                <p className="text-xs font-medium uppercase text-on-surface-variant">{step.status}</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{step.label}</p>
               </div>
             ))}
           </div>
           <div className="mt-4">
-            <p className="text-xs font-semibold uppercase text-slate-300">Action history</p>
-            <ul className="mt-2 space-y-1 text-sm text-slate-300" aria-label="Workflow status history">
+            <p className="text-xs font-semibold uppercase text-on-surface-variant">Action history</p>
+            <ul className="mt-2 space-y-1 text-sm text-on-surface-variant" aria-label="Workflow status history">
               {history.map((item, index) => (
                 <li key={`${item}-${index}`} className="flex gap-2">
-                  <History aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-cyan-200" />
+                  <History aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -892,9 +892,9 @@ function formatFeedback(value: "unset" | "useful" | "needs-follow-up") {
 
 function StatusMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/10 bg-slate-950/45 p-3">
-      <p className="text-xs font-semibold uppercase text-slate-300">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-100">{value}</p>
+    <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+      <p className="text-xs font-semibold uppercase text-on-surface-variant">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-on-surface">{value}</p>
     </div>
   );
 }

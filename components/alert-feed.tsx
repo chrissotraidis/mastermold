@@ -15,9 +15,9 @@ type FeedbackValue = Exclude<AlertJson["useful_feedback"], null>;
 const filters: TierFilter[] = ["All", "T0", "T1", "T2"];
 
 const tierStyles: Record<AlertTier, string> = {
-  T0: "border-red-300/50 bg-red-400/15 text-red-100",
-  T1: "border-amber-300/50 bg-amber-300/15 text-amber-100",
-  T2: "border-cyan-300/50 bg-cyan-300/15 text-cyan-100",
+  T0: "border-red-300/50 bg-red-400/15 text-critical",
+  T1: "border-amber-300/50 bg-caution/15 text-caution",
+  T2: "border-violet/50 bg-violet/15 text-violet",
 };
 
 export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
@@ -124,13 +124,13 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
       data-action-evidence={lastAction}
       data-action-sequence={actionSequence}
     >
-      <div className="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg border border-outline-variant/40 bg-surface-high/30 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-            <Filter aria-hidden="true" className="size-4 text-cyan-200" />
+          <div className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+            <Filter aria-hidden="true" className="size-4 text-violet" />
             <span>Filter by tier</span>
           </div>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-outline">
             {activeCount} active alert{activeCount === 1 ? "" : "s"} remain in the feed.
           </p>
         </div>
@@ -142,10 +142,10 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
               size="sm"
               variant={filter === item ? "default" : "outline"}
               className={cn(
-                "min-w-0 border-white/15",
+                "min-w-0 border-outline-variant/50",
                 filter === item
-                  ? "bg-cyan-300 text-slate-950 hover:bg-cyan-200"
-                  : "bg-transparent text-slate-100 hover:bg-white/10",
+                  ? "bg-violet text-void hover:bg-violet"
+                  : "bg-transparent text-on-surface hover:bg-surface-high/60",
               )}
               aria-pressed={filter === item}
               data-rds-action="filter"
@@ -166,7 +166,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
       <p className="sr-only" aria-live="polite">
         {isPending ? "Saving alert update." : message}
       </p>
-      <p className="text-sm text-slate-400">{message}</p>
+      <p className="text-sm text-outline">{message}</p>
 
       {visibleAlerts.length > 0 ? (
         <div className="grid gap-4">
@@ -178,7 +178,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
               <Card
                 key={alert.id}
                 className={cn(
-                  "border-white/10 bg-white/[0.045] transition-opacity",
+                  "border-outline-variant/40 bg-surface-high/40 transition-opacity",
                   alert.acknowledged && "opacity-55",
                 )}
               >
@@ -189,21 +189,21 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                         <Badge variant="outline" className={tierStyles[alert.tier]}>
                           {alert.tier}
                         </Badge>
-                        <Badge variant="outline" className="border-white/15 text-slate-200">
+                        <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                           z_score {alert.z_score.toFixed(1)}
                         </Badge>
                         {alert.acknowledged ? (
-                          <Badge variant="outline" className="border-emerald-300/40 text-emerald-100">
+                          <Badge variant="outline" className="border-engine/40 text-engine">
                             Acknowledged
                           </Badge>
                         ) : null}
                       </div>
-                      <CardTitle className="text-lg leading-7 text-white">{alert.message}</CardTitle>
+                      <CardTitle className="text-lg leading-7 text-on-surface">{alert.message}</CardTitle>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full shrink-0 border-white/15 bg-transparent text-slate-100 hover:bg-white/10 sm:w-auto"
+                      className="w-full shrink-0 border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60 sm:w-auto"
                       onClick={() => toggleRationale(alert.id)}
                       data-rds-action="toggle"
                       data-action-state={isExpanded ? `changed-${actionSequence}` : "idle"}
@@ -222,7 +222,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                   {isExpanded ? (
                     <div
                       id={`${alert.id}-rationale`}
-                      className="rounded-md border border-cyan-300/20 bg-cyan-300/[0.07] p-4 text-sm leading-6 text-cyan-50"
+                      className="rounded-md border border-violet/30 bg-violet/[0.07] p-4 text-sm leading-6 text-on-surface"
                     >
                       <div className="mb-2 flex items-center gap-2 font-semibold">
                         <MessageSquareText aria-hidden="true" className="size-4" />
@@ -232,10 +232,10 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                     </div>
                   ) : null}
 
-                  <div className="grid gap-4 border-t border-white/10 pt-4 lg:grid-cols-[auto_1fr] lg:items-center">
+                  <div className="grid gap-4 border-t border-outline-variant/40 pt-4 lg:grid-cols-[auto_1fr] lg:items-center">
                     <Button
                       type="button"
-                      className="w-full bg-emerald-300 text-slate-950 hover:bg-emerald-200 lg:w-auto"
+                      className="w-full bg-engine text-void hover:bg-emerald-200 lg:w-auto"
                       onClick={() => acknowledge(alert)}
                       data-rds-action="submit"
                       data-action-state={alert.acknowledged ? `changed-${actionSequence}` : "idle"}
@@ -245,8 +245,8 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                       {alert.acknowledged ? "Acknowledged" : "Acknowledge alert"}
                     </Button>
 
-                    <fieldset className="min-w-0 rounded-md border border-white/10 p-3">
-                      <legend className="px-1 text-sm font-semibold text-slate-100">
+                    <fieldset className="min-w-0 rounded-md border border-outline-variant/40 p-3">
+                      <legend className="px-1 text-sm font-semibold text-on-surface">
                         Submit feedback
                       </legend>
                       <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -273,7 +273,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
           })}
         </div>
       ) : (
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-6 text-sm leading-6 text-slate-300">
+        <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm leading-6 text-on-surface-variant">
           No alerts match the selected tier filter.
         </div>
       )}
@@ -310,19 +310,19 @@ function FeedbackOption({
   const inputId = `${alert.id}-${value ? "useful" : "not-useful"}`;
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-white/10 bg-slate-950/40 px-3 py-2">
+    <div className="flex items-center gap-3 rounded-md border border-outline-variant/40 bg-surface-dim/40 px-3 py-2">
       <input
         id={inputId}
         type="radio"
         name={`${alert.id}-feedback`}
-        className="size-4 accent-cyan-300"
+        className="size-4 accent-violet"
         checked={alert.useful_feedback === value}
         disabled={disabled}
         data-rds-action="submit"
         data-action-state={alert.useful_feedback === value ? "changed" : "idle"}
         onChange={() => onChange(alert, value)}
       />
-      <Label htmlFor={inputId} className="cursor-pointer text-sm text-slate-200">
+      <Label htmlFor={inputId} className="cursor-pointer text-sm text-on-surface-variant">
         {label}
       </Label>
     </div>

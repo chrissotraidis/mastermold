@@ -14,20 +14,20 @@ export default function AlertsPage() {
     <AppShell dataMode={dataMode.label}>
       <FirstRunBanner />
       <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-5 sm:py-6">
-        <header className="rounded-lg border border-white/10 bg-[#101722] p-4">
+        <header className="rounded-lg border border-outline-variant/40 bg-panel p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="bg-red-400/10 text-red-100">
+            <Badge variant="secondary" className="bg-critical/10 text-critical">
               Alert Feed
             </Badge>
             <ProvenanceChip label={dataMode.label} title={dataMode.source} />
-            <Badge variant="outline" className="border-white/15 text-slate-200">
+            <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
               {activeAlerts.length} active
             </Badge>
           </div>
-          <h2 className="mt-4 text-2xl font-semibold leading-tight text-white sm:text-3xl">
+          <h2 className="mt-4 text-2xl font-semibold leading-tight text-on-surface sm:text-3xl">
             Triage what changed.
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
             Expand rationale, acknowledge noise, and mark whether the alert helped.
           </p>
         </header>

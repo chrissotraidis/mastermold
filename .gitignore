@@ -17,3 +17,6 @@ tsconfig.tsbuildinfo
 *.db
 *.db-journal
 *.db-wal
+
+# Local preview launch config (machine-specific paths)
+.claude/launch.json

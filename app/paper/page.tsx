@@ -14,7 +14,7 @@ export default function PaperPage() {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-5 sm:py-8">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 rounded-md text-sm text-slate-300 underline-offset-4 hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          className="inline-flex items-center gap-2 rounded-md text-sm text-on-surface-variant underline-offset-4 hover:text-on-surface hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet focus-visible:ring-offset-2 focus-visible:ring-offset-void"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           Back to briefing
@@ -22,19 +22,19 @@ export default function PaperPage() {
 
         <header className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="gap-1 bg-cyan-300 text-slate-950 hover:bg-cyan-300">
+            <Badge className="gap-1 bg-violet text-void hover:bg-violet">
               <Gamepad2 aria-hidden="true" className="size-3.5" />
               Paper
             </Badge>
             <ProvenanceChip label={paper.provenance.label} title={paper.provenance.source} />
-            <Badge variant="outline" className="border-white/15 text-slate-200">
+            <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
               Open paper round
             </Badge>
-            <Badge variant="outline" className="border-white/15 text-slate-200">
+            <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
               {paper.predictions.length} predictions
             </Badge>
             {paper.enginePredictions.length > 0 ? (
-              <Badge variant="outline" className="gap-1 border-emerald-400/40 text-emerald-200">
+              <Badge variant="outline" className="gap-1 border-engine/40 text-engine">
                 <Cpu aria-hidden="true" className="size-3.5" />
                 {paper.enginePredictions.length} engine entries
               </Badge>
@@ -42,19 +42,19 @@ export default function PaperPage() {
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
-              <h2 className="text-3xl font-semibold text-white sm:text-4xl">
+              <h2 className="text-3xl font-semibold text-on-surface sm:text-4xl">
                 Paper-trading sandbox with process-based scoring
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant">
                 Open paper predictions, view round score metrics, and view round history.
                 Scores emphasize calibration, patience, and diversification with zero capital.
               </p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-outline">
                 Data source: {paper.provenance.source}; as_of {paper.provenance.as_of}.
               </p>
             </div>
-            <div className="rounded-md border border-white/10 bg-white/[0.035] px-4 py-3 text-sm leading-6 text-slate-300">
-              API route available at <span className="font-mono text-slate-100">/api/paper</span> for automated checks.
+            <div className="rounded-md border border-outline-variant/40 bg-surface-high/30 px-4 py-3 text-sm leading-6 text-on-surface-variant">
+              API route available at <span className="font-mono text-on-surface">/api/paper</span> for automated checks.
             </div>
           </div>
         </header>
@@ -79,17 +79,17 @@ function EngineArena({
   return (
     <section
       aria-labelledby="engine-arena-title"
-      className="rounded-lg border border-emerald-300/25 bg-emerald-300/[0.06] p-4 sm:p-5"
+      className="rounded-lg border border-engine/30 bg-engine/[0.06] p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="flex size-9 items-center justify-center rounded-md border border-emerald-200/25 bg-slate-950/50 text-emerald-100">
+        <span className="flex size-9 items-center justify-center rounded-md border border-engine/30 bg-surface-dim/50 text-engine">
           <Cpu aria-hidden="true" className="size-4" />
         </span>
         <div>
-          <h2 id="engine-arena-title" className="text-lg font-semibold text-white">
+          <h2 id="engine-arena-title" className="text-lg font-semibold text-on-surface">
             Engine vs you — {weekLabel}
           </h2>
-          <p className="text-sm leading-6 text-slate-300">
+          <p className="text-sm leading-6 text-on-surface-variant">
             The engine auto-entered a view per actionable card. Submit yours below; the same
             outcome data scores both. Where you disagree and win is prime evidence for the beliefs gate.
           </p>
@@ -102,23 +102,23 @@ function EngineArena({
           return (
             <li
               key={prediction.id}
-              className="rounded-md border border-white/10 bg-slate-950/45 p-3"
+              className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-white">{prediction.asset.symbol}</span>
+                <span className="font-semibold text-on-surface">{prediction.asset.symbol}</span>
                 <Badge
                   variant="outline"
                   className={
                     isLong
-                      ? "gap-1 border-emerald-300/35 text-emerald-100"
-                      : "gap-1 border-rose-300/35 text-rose-100"
+                      ? "gap-1 border-engine/40 text-engine"
+                      : "gap-1 border-critical/40 text-critical"
                   }
                 >
                   <Icon aria-hidden="true" className="size-3.5" />
                   {prediction.direction} · {prediction.conviction}/10
                 </Badge>
               </div>
-              <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">
                 {prediction.rationale}
               </p>
             </li>

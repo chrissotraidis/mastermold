@@ -1,40 +1,46 @@
 import { AppShell, FirstRunBanner } from "@/components/app-shell";
 import { ChatWorkspace } from "@/components/chat-workspace";
-import { Badge } from "@/components/ui/badge";
+import { ProvenanceChip } from "@/components/provenance-chip";
+import { AuthorityBadge, Chip } from "@/components/sentinel";
 import { getChatContext } from "@/src/db/chat";
+import { getDataMode } from "@/src/db/engine-data";
 
-export default function ChatPage() {
+type ChatPageProps = {
+  searchParams?: Promise<{ q?: string }>;
+};
+
+export default async function ChatPage({ searchParams }: ChatPageProps) {
+  const params = await searchParams;
+  const initialQuery = typeof params?.q === "string" ? params.q : undefined;
   const context = getChatContext();
+  const dataMode = getDataMode();
 
   return (
-    <AppShell>
+    <AppShell dataMode={dataMode.label}>
       <FirstRunBanner />
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-5 sm:py-8">
+      <div className="mx-auto max-w-6xl space-y-6 py-2">
         <header className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="bg-cyan-300/10 text-cyan-100">
-              Agent Chat
-            </Badge>
-            <Badge variant="outline" className="border-white/15 text-slate-200">
-              Demo data
-            </Badge>
-            <Badge variant="outline" className="border-white/15 text-slate-200">
-              BYOK optional
-            </Badge>
+            <Chip tone="violet">Interrogate</Chip>
+            <AuthorityBadge zone="advise" />
+            <ProvenanceChip label={dataMode.label} title={dataMode.source} />
+            <Chip tone="neutral">BYOK optional</Chip>
           </div>
           <div className="max-w-3xl space-y-2">
-            <h2 className="text-3xl font-semibold leading-tight text-white sm:text-4xl">
-              Chat with seeded portfolio, alert, and journal context
+            <h2 className="font-display text-3xl font-semibold leading-tight tracking-tight text-on-surface sm:text-4xl">
+              Interrogate today&apos;s briefing
             </h2>
-            <p className="text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
-              The /api/chat route returns a deterministic advisory response with no key. With an
-              optional provider key in .env.local, it forwards only abstracted holding ratios to
-              the selected LLM.
+            <p className="text-sm leading-6 text-on-surface-variant sm:text-base sm:leading-7">
+              Talk to MasterMold directly. The chat is grounded in the live engine context —
+              today&apos;s briefing, alerts, portfolio, and decision track record. Without a provider
+              key it returns a deterministic advisory response; with a key in{" "}
+              <code className="font-mono text-violet">.env.local</code> it forwards only abstracted
+              holding ratios to the model.
             </p>
           </div>
         </header>
 
-        <ChatWorkspace prompts={context.prompts} />
+        <ChatWorkspace prompts={context.prompts} initialQuery={initialQuery} />
       </div>
     </AppShell>
   );

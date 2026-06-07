@@ -57,11 +57,11 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Label htmlFor={inputId} className="text-slate-100">
+        <Label htmlFor={inputId} className="text-on-surface">
           {label}
         </Label>
         {connected ? (
-          <Badge variant="outline" className="border-emerald-300/40 text-emerald-100">
+          <Badge variant="outline" className="border-engine/40 text-engine">
             <CheckCircle2 aria-hidden="true" className="mr-1 size-3" />
             Connected locally
           </Badge>
@@ -70,7 +70,7 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
       <div className="relative">
         <KeyRound
           aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500"
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-outline"
         />
         <Input
           id={inputId}
@@ -80,7 +80,7 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
           value={value}
           onChange={(event) => updateValue(event.target.value)}
           placeholder="Enter optional API key"
-          className="border-white/15 bg-slate-950/70 pl-9 text-slate-100 placeholder:text-slate-500"
+          className="border-outline-variant/50 bg-surface-dim/70 pl-9 text-on-surface placeholder:text-outline"
           aria-describedby={`${inputId}-hint`}
         />
       </div>
@@ -92,7 +92,7 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
           data-rds-action="save"
           data-action-state={saved ? "changed" : "idle"}
           data-persona="operator reviewer user"
-          className="border-white/15 bg-transparent text-slate-100 hover:bg-white/10"
+          className="border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
         >
           <Save aria-hidden="true" />
           {saved ? "Saved key" : "Save key"}
@@ -103,7 +103,7 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
           data-rds-action="connect"
           data-action-state={connected ? "changed" : "idle"}
           data-persona="operator reviewer user"
-          className="bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+          className="bg-violet text-void hover:bg-violet"
         >
           <Wifi aria-hidden="true" />
           {connected ? "Disconnect" : "Connect"}
@@ -112,7 +112,7 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
       <p className="sr-only" aria-live="polite">
         {message}
       </p>
-      <p id={`${inputId}-hint`} className="text-xs leading-5 text-slate-500" data-action-evidence={message}>
+      <p id={`${inputId}-hint`} className="text-xs leading-5 text-outline" data-action-evidence={message}>
         {loaded && (value || saved || connected) ? message : "Optional key stays in localStorage only."}
       </p>
     </div>

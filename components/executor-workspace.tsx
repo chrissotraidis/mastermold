@@ -87,10 +87,10 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
       <div className="space-y-6">
         <section aria-labelledby="executor-strategy-status-title" className="space-y-4">
           <div>
-            <h2 id="executor-strategy-status-title" className="text-xl font-semibold text-white">
+            <h2 id="executor-strategy-status-title" className="text-xl font-semibold text-on-surface">
               View strategy status
             </h2>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
+            <p className="mt-1 text-sm leading-6 text-outline">
               Open executor to see strategy rows, net_delta, margin_ratio, funding_rate,
               and basis values from seeded ExecutorStrategy data.
             </p>
@@ -104,19 +104,19 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                   type="button"
                   onClick={() => setSelectedStrategyId(strategy.id)}
                   className={cn(
-                    "block w-full rounded-lg text-left outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
-                    selectedStrategyId === strategy.id && "ring-2 ring-cyan-300/80",
+                    "block w-full rounded-lg text-left outline-none transition focus-visible:ring-2 focus-visible:ring-violet focus-visible:ring-offset-2 focus-visible:ring-offset-void",
+                    selectedStrategyId === strategy.id && "ring-2 ring-violet/80",
                   )}
                   aria-pressed={selectedStrategyId === strategy.id}
                 >
-                  <Card className="h-full border-white/10 bg-white/[0.04]">
+                  <Card className="h-full border-outline-variant/40 bg-surface-high/30">
                     <CardHeader className="space-y-3 p-5">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="text-xs font-semibold uppercase text-slate-500">
+                          <p className="text-xs font-semibold uppercase text-outline">
                             {strategy.venue}
                           </p>
-                          <CardTitle className="mt-1 text-xl text-white">
+                          <CardTitle className="mt-1 text-xl text-on-surface">
                             {formatStrategyName(strategy.name)}
                           </CardTitle>
                         </div>
@@ -140,40 +140,40 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
 
         <section aria-labelledby="funding-observation-title" className="space-y-4">
           <div>
-            <h2 id="funding-observation-title" className="text-xl font-semibold text-white">
+            <h2 id="funding-observation-title" className="text-xl font-semibold text-on-surface">
               FundingObservation trend
             </h2>
-            <p className="mt-1 text-sm leading-6 text-slate-400">
+            <p className="mt-1 text-sm leading-6 text-outline">
               Funding rate trend and open interest from seeded rows. Safe mode running is
               still a display-only state in this monitor.
             </p>
           </div>
 
-          <Card className="border-white/10 bg-white/[0.035]">
+          <Card className="border-outline-variant/40 bg-surface-high/30">
             <CardContent className="space-y-4 p-5">
               {executor.funding_observations.length > 0 ? (
                 executor.funding_observations.map((observation) => (
                   <div key={observation.id} className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <div>
-                        <p className="font-semibold text-slate-100">
+                        <p className="font-semibold text-on-surface">
                           {observation.asset.symbol} funding_rate
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-outline">
                           {formatTimestamp(observation.period_ts)} · OI{" "}
                           {formatCompactCurrency(observation.open_interest)}
                         </p>
                       </div>
-                      <span className="font-mono text-cyan-100">
+                      <span className="font-mono text-violet">
                         {formatFunding(observation.funding_rate)}
                       </span>
                     </div>
                     <div
-                      className="h-3 overflow-hidden rounded-full bg-slate-900"
+                      className="h-3 overflow-hidden rounded-full bg-surface-low"
                       aria-hidden="true"
                     >
                       <div
-                        className="h-full rounded-full bg-cyan-300"
+                        className="h-full rounded-full bg-violet"
                         style={{
                           width: `${Math.max(
                             8,
@@ -193,15 +193,15 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
       </div>
 
       <aside className="space-y-4 xl:sticky xl:top-6">
-        <Card className="border-cyan-300/25 bg-cyan-300/[0.055]">
+        <Card className="border-violet/30 bg-violet/[0.055]">
           <CardHeader className="p-5">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-md border border-cyan-300/30 bg-cyan-300/10 text-cyan-100">
+              <div className="flex size-10 items-center justify-center rounded-md border border-violet/40 bg-violet/10 text-violet">
                 <ShieldCheck aria-hidden="true" className="size-5" />
               </div>
               <div>
-                <CardTitle className="text-xl text-white">Edit guardrail config</CardTitle>
-                <p className="mt-1 text-sm leading-6 text-cyan-50/80">
+                <CardTitle className="text-xl text-on-surface">Edit guardrail config</CardTitle>
+                <p className="mt-1 text-sm leading-6 text-on-surface/80">
                   Controlled inputs update React state only.
                 </p>
               </div>
@@ -220,7 +220,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                   onChange={(event) =>
                     updateGuardrailDraft("per_tx_cap", Number(event.target.value))
                   }
-                  className="border-white/15 bg-slate-950/70 text-slate-100"
+                  className="border-outline-variant/50 bg-surface-dim/70 text-on-surface"
                 />
               </FieldBlock>
 
@@ -235,7 +235,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                   onChange={(event) =>
                     updateGuardrailDraft("daily_cap", Number(event.target.value))
                   }
-                  className="border-white/15 bg-slate-950/70 text-slate-100"
+                  className="border-outline-variant/50 bg-surface-dim/70 text-on-surface"
                 />
               </FieldBlock>
 
@@ -253,7 +253,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                     )
                   }
                   rows={4}
-                  className="w-full resize-y rounded-md border border-white/15 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                  className="w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                 />
               </FieldBlock>
 
@@ -264,12 +264,12 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                   onChange={(event) =>
                     updateGuardrailDraft("session_key_expiry", event.target.value)
                   }
-                  className="border-white/15 bg-slate-950/70 text-slate-100"
+                  className="border-outline-variant/50 bg-surface-dim/70 text-on-surface"
                 />
               </FieldBlock>
             </div>
 
-            <p className="rounded-md border border-white/10 bg-slate-950/50 p-3 text-sm leading-6 text-slate-300">
+            <p className="rounded-md border border-outline-variant/40 bg-surface-dim/50 p-3 text-sm leading-6 text-on-surface-variant">
               {localNotice}
             </p>
 
@@ -277,7 +277,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
               <Button
                 type="button"
                 onClick={saveLocalDraft}
-                className="bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+                className="bg-violet text-void hover:bg-violet"
               >
                 <Save aria-hidden="true" />
                 Save local draft
@@ -287,7 +287,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 onClick={pauseSelectedStrategy}
                 disabled={!selectedStrategy}
                 variant="destructive"
-                className="bg-red-500 text-white hover:bg-red-400"
+                className="bg-red-500 text-on-surface hover:bg-red-400"
               >
                 <Power aria-hidden="true" />
                 Press kill-switch
@@ -315,10 +315,10 @@ function StatusBadge({ status }: { status: ExecutorStrategy["status"] }) {
     <Badge
       className={cn(
         "border text-xs",
-        status === "paused" && "border-amber-300/30 bg-amber-300/10 text-amber-100",
-        status === "safe_mode" && "border-cyan-300/30 bg-cyan-300/10 text-cyan-100",
+        status === "paused" && "border-caution/40 bg-caution/10 text-caution",
+        status === "safe_mode" && "border-violet/40 bg-violet/10 text-violet",
         status === "running_demo" &&
-          "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+          "border-emerald-300/30 bg-engine/10 text-engine",
       )}
       variant="outline"
     >
@@ -339,7 +339,7 @@ function FieldBlock({
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="text-slate-100">
+      <Label htmlFor={id} className="text-on-surface">
         {label}
       </Label>
       {children}
@@ -349,17 +349,17 @@ function FieldBlock({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/10 bg-slate-950/50 p-3">
-      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 font-mono text-lg text-slate-100">{value}</p>
+    <div className="rounded-md border border-outline-variant/40 bg-surface-dim/50 p-3">
+      <p className="text-xs font-semibold uppercase text-outline">{label}</p>
+      <p className="mt-1 font-mono text-lg text-on-surface">{value}</p>
     </div>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-white/10 bg-slate-950/50 p-4 text-sm leading-6 text-slate-300">
-      <Ban aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-slate-500" />
+    <div className="flex items-start gap-3 rounded-lg border border-outline-variant/40 bg-surface-dim/50 p-4 text-sm leading-6 text-on-surface-variant">
+      <Ban aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-outline" />
       {message}
     </div>
   );

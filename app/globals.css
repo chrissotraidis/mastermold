@@ -2,50 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-  }
+/*
+ * MasterMold "Sentinel" design system — Industrial Glassmorphism.
+ * Void background, violet cognition, chamfered armored panels, inner glows.
+ */
 
+@layer base {
+  :root,
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: 260 50% 5%; /* Void #0A0612 */
+    --foreground: 270 94% 93%; /* on-surface #eddcfe */
+    --card: 265 50% 9%; /* panel #160C24 */
+    --card-foreground: 270 94% 93%;
+    --popover: 265 46% 10%; /* surface #180e26 */
+    --popover-foreground: 270 94% 93%;
+    --primary: 258 100% 87%; /* brand violet #d0bcff */
+    --primary-foreground: 265 100% 28%; /* #3c0091 */
+    --secondary: 266 25% 19%; /* surface-container-high */
+    --secondary-foreground: 270 94% 93%;
+    --muted: 265 31% 15%; /* surface-container */
+    --muted-foreground: 264 20% 80%; /* on-surface-variant */
+    --accent: 266 25% 19%;
+    --accent-foreground: 270 94% 93%;
+    --destructive: 351 95% 71%; /* critical rose */
+    --destructive-foreground: 265 100% 12%;
+    --border: 259 11% 30%; /* outline-variant */
+    --input: 259 11% 30%;
+    --ring: 258 100% 87%;
+    --radius: 0.25rem;
   }
 }
 
@@ -53,19 +37,121 @@
   * {
     @apply border-border;
   }
+  html {
+    color-scheme: dark;
+    scroll-padding-bottom: 8rem;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% -10%, hsl(262 60% 14% / 0.55), transparent 70%),
+      radial-gradient(ellipse 50% 40% at 100% 100%, hsl(290 60% 16% / 0.25), transparent 70%);
+    background-attachment: fixed;
   }
-
-  html {
-    scroll-padding-bottom: 12rem;
-  }
-
   section,
   article,
   form,
   [data-scroll-safe] {
-    scroll-margin-bottom: 12rem;
+    scroll-margin-bottom: 8rem;
+  }
+  ::selection {
+    background: hsl(266 60% 30%);
+    color: hsl(270 94% 93%);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(265 57% 8%);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(266 25% 22%);
+    border-radius: 9999px;
+    border: 2px solid hsl(265 57% 8%);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(258 40% 40%);
+  }
+}
+
+@layer utilities {
+  /* 16px diagonal chamfers on top-right + bottom-left (sentinel framing) */
+  .chamfer {
+    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  }
+  .chamfer-sm {
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  .hex-clip {
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  }
+  .brushed-metal {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.02) 2px,
+      rgba(255, 255, 255, 0.02) 4px
+    );
+  }
+  /* Backlit-console inner border instead of drop shadow */
+  .inner-glow {
+    box-shadow: inset 0 0 0 1px rgba(208, 188, 255, 0.14);
+  }
+  .inner-glow-strong {
+    box-shadow: inset 0 0 0 1px rgba(208, 188, 255, 0.3), inset 0 0 24px rgba(160, 120, 255, 0.12);
+  }
+  .scanline-bg {
+    background-image: linear-gradient(
+      to bottom,
+      transparent 50%,
+      rgba(208, 188, 255, 0.04) 51%,
+      transparent 51%
+    );
+    background-size: 100% 4px;
+  }
+  .glow-pulse {
+    animation: mm-pulse-glow 4s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes mm-pulse-glow {
+  0% {
+    box-shadow: inset 0 0 0 1px rgba(208, 188, 255, 0.2), 0 0 30px rgba(160, 120, 255, 0.08);
+  }
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(208, 188, 255, 0.4), 0 0 60px rgba(160, 120, 255, 0.18);
+  }
+}
+
+/* Sentinel face animations (the eyes are the primary state channel) */
+@keyframes mm-eye-idle {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+@keyframes mm-eye-think {
+  0%, 100% { opacity: 1; }
+  20% { opacity: 0.45; }
+  40% { opacity: 1; }
+  65% { opacity: 0.55; }
+}
+@keyframes mm-eye-alert {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes mm-scan {
+  0% { transform: translateY(-110%); }
+  100% { transform: translateY(110%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-pulse,
+  .animate-pulse,
+  .animate-spin,
+  [style*="mm-eye"],
+  [style*="mm-scan"] {
+    animation: none !important;
   }
 }

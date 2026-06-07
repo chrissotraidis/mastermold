@@ -27,7 +27,7 @@ const disclosureSections = [
   {
     title: "What works (real in V0)",
     icon: CheckCircle2,
-    tone: "text-emerald-200",
+    tone: "text-engine",
     summary: "These surfaces are wired and reviewable with seeded data.",
     items: [
       "Daily Briefing",
@@ -46,7 +46,7 @@ const disclosureSections = [
   {
     title: "Engine: live vs seeded vs stubbed",
     icon: Cpu,
-    tone: "text-emerald-200",
+    tone: "text-engine",
     summary:
       "A Python sidecar (TradingAgents, screener-gated funnel) writes a dated JSON bundle the dashboard ingests. When a bundle is present and valid, the briefing and alert feed are computed, not fabricated; everything else still falls back to seeds.",
     items: [
@@ -63,7 +63,7 @@ const disclosureSections = [
   {
     title: "What is seeded / sample / demo",
     icon: Database,
-    tone: "text-cyan-200",
+    tone: "text-violet",
     summary:
       "Holdings, prices, funding, paper rounds, journal outcomes, and executor metrics are fabricated demo data. Briefing cards and alerts are seeded only when no engine run has been ingested.",
     items: [
@@ -76,7 +76,7 @@ const disclosureSections = [
   {
     title: "Fake costs and monetary figures",
     icon: Database,
-    tone: "text-cyan-200",
+    tone: "text-violet",
     summary:
       "Every dollar value, cost basis, portfolio value, and P&L-style outcome is sample/demo money.",
     items: [
@@ -88,7 +88,7 @@ const disclosureSections = [
   {
     title: "What is stubbed or credential-gated",
     icon: LockKeyhole,
-    tone: "text-amber-200",
+    tone: "text-caution",
     summary:
       "External services are inert unless a reviewer chooses to provide local credentials.",
     items: [
@@ -101,7 +101,7 @@ const disclosureSections = [
   {
     title: "Placeholder workflows",
     icon: CircleAlert,
-    tone: "text-amber-200",
+    tone: "text-caution",
     summary:
       "Workflow controls prove local state changes for review, but they do not perform production work.",
     items: [
@@ -113,7 +113,7 @@ const disclosureSections = [
   {
     title: "What PRD promises remain missing in V0",
     icon: CircleAlert,
-    tone: "text-rose-200",
+    tone: "text-critical",
     summary: "These PRD promises remain missing from the live V0 surface.",
     items: [
       "Always-on ingestion: the engine runs on demand (bin/engine-briefing), not yet as a scheduled always-on service (Phase 4).",
@@ -128,23 +128,23 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
   const dataMode = getDataMode();
   return (
     <section className="space-y-5" aria-labelledby="review-readiness-title">
-      <div className="rounded-lg border border-white/10 bg-slate-950/70 p-5 shadow-sm sm:p-6">
+      <div className="rounded-lg border border-outline-variant/40 bg-surface-dim/70 p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="bg-cyan-300 text-slate-950 hover:bg-cyan-300">
+          <Badge className="bg-violet text-void hover:bg-violet">
             Review readiness
           </Badge>
           <ProvenanceChip label={dataMode.label} title={dataMode.source} />
-          <Badge variant="outline" className="border-white/15 text-slate-200">
+          <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
             Truthfulness surface
           </Badge>
         </div>
         <h2
           id="review-readiness-title"
-          className="mt-4 text-2xl font-semibold text-white sm:text-3xl"
+          className="mt-4 text-2xl font-semibold text-on-surface sm:text-3xl"
         >
           What is real right now
         </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant sm:text-base">
           This page is the in-app disclosure for review mode. It separates working V0
           surfaces from seeded data, stubbed integrations, credential-gated services,
           and missing PRD promises.
@@ -160,25 +160,25 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
           const Icon = section.icon;
 
           return (
-            <Card key={section.title} className="border-white/10 bg-white/[0.035]">
+            <Card key={section.title} className="border-outline-variant/40 bg-surface-high/30">
               <CardHeader className="space-y-3 p-5">
                 <div
-                  className={`flex size-10 items-center justify-center rounded-md border border-white/10 bg-slate-950/50 ${section.tone}`}
+                  className={`flex size-10 items-center justify-center rounded-md border border-outline-variant/40 bg-surface-dim/50 ${section.tone}`}
                 >
                   <Icon aria-hidden="true" className="size-5" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl text-white">{section.title}</CardTitle>
-                  <CardDescription className="mt-2 text-sm leading-6 text-slate-300">
+                  <CardTitle className="text-xl text-on-surface">{section.title}</CardTitle>
+                  <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
                     {section.summary}
                   </CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="p-5 pt-0">
-                <ul className="space-y-2 text-sm leading-6 text-slate-300">
+                <ul className="space-y-2 text-sm leading-6 text-on-surface-variant">
                   {section.items.map((item) => (
                     <li key={item} className="flex gap-2">
-                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-cyan-300" />
+                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-violet" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -189,14 +189,14 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
         })}
       </div>
 
-      <Card className="border-cyan-300/20 bg-cyan-300/[0.06]">
+      <Card className="border-violet/30 bg-violet/10">
         <CardHeader className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
-          <div className="flex size-11 items-center justify-center rounded-md border border-cyan-200/25 bg-slate-950/50 text-cyan-100">
+          <div className="flex size-11 items-center justify-center rounded-md border border-violet/30 bg-surface-dim/50 text-violet">
             <UserRound aria-hidden="true" className="size-5" />
           </div>
           <div>
-            <CardTitle className="text-xl text-white">Review-mode access</CardTitle>
-            <CardDescription className="mt-2 text-sm leading-6 text-slate-300">
+            <CardTitle className="text-xl text-on-surface">Review-mode access</CardTitle>
+            <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
               Use reviewer@demo.local as the seeded review persona. No credentials are
               required to evaluate the app; entering real keys is optional, local, and
               isolated to the reviewer&apos;s environment.
@@ -207,7 +207,7 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
 
       <ReviewerEvidencePanel />
 
-      <p className="text-sm leading-6 text-slate-400">
+      <p className="text-sm leading-6 text-outline">
         {surface === "public"
           ? "Public preview disclosure: this build remains advisory-only and is not production-ready until RDS evidence passes."
           : "Operator disclosure: keep this review readiness panel current as seeded, stubbed, credential-gated, or missing workflows change."}
@@ -222,21 +222,21 @@ function EngineRunHistory() {
   if (history.length === 0) return null;
 
   return (
-    <div className="rounded-md border border-white/10 bg-slate-950/45 p-3">
-      <p className="text-xs font-semibold uppercase text-slate-400">
+    <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+      <p className="text-xs font-semibold uppercase text-outline">
         Ingested run history ({history.length})
       </p>
-      <ul className="mt-2 space-y-1 text-sm text-slate-200">
+      <ul className="mt-2 space-y-1 text-sm text-on-surface-variant">
         {history.slice(0, 8).map((run) => (
           <li key={run.run_date} className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-mono text-slate-100">{run.run_date}</span>
-            <span className="text-xs text-slate-400">
+            <span className="font-mono text-on-surface">{run.run_date}</span>
+            <span className="text-xs text-outline">
               {run.triggered} triggered · {run.usd > 0 ? `$${run.usd.toFixed(2)}` : "$0"}
             </span>
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs leading-5 text-slate-500">
+      <p className="mt-2 text-xs leading-5 text-outline">
         Ingestion is idempotent by run date; re-importing a day adds no duplicate.
       </p>
     </div>
@@ -249,20 +249,20 @@ function ScreenerTuningCard() {
   if (feedback.signals.length === 0) return null;
 
   const tone: Record<string, string> = {
-    demote: "border-rose-300/35 text-rose-100",
-    loosen: "border-emerald-300/35 text-emerald-100",
-    hold: "border-amber-300/35 text-amber-100",
-    insufficient: "border-white/15 text-slate-300",
+    demote: "border-critical/40 text-critical",
+    loosen: "border-engine/40 text-engine",
+    hold: "border-amber-300/35 text-caution",
+    insufficient: "border-outline-variant/50 text-on-surface-variant",
   };
 
   return (
-    <Card className="border-white/10 bg-white/[0.035]">
+    <Card className="border-outline-variant/40 bg-surface-high/30">
       <CardHeader className="space-y-3 p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-xl text-white">Screener tuning</CardTitle>
+          <CardTitle className="text-xl text-on-surface">Screener tuning</CardTitle>
           <ProvenanceChip label={feedback.provenance.label} />
         </div>
-        <CardDescription className="text-sm leading-6 text-slate-300">
+        <CardDescription className="text-sm leading-6 text-on-surface-variant">
           The alert-feedback loop, no LLM: alerts you mark useful/not-useful tune the
           deterministic screener. Suggestions below are advisory — the threshold change in
           engine/config.yml stays manual. {feedback.total_rated} alert(s) rated so far.
@@ -273,14 +273,14 @@ function ScreenerTuningCard() {
           {feedback.signals.map((s) => (
             <li
               key={s.signal}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-slate-950/45 p-3"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3"
             >
               <div className="min-w-0">
-                <span className="font-mono text-slate-100">{s.signal}</span>
-                <span className="ml-2 text-xs text-slate-400">
+                <span className="font-mono text-on-surface">{s.signal}</span>
+                <span className="ml-2 text-xs text-outline">
                   {s.useful}👍 · {s.not_useful}👎 · {s.pending} pending
                 </span>
-                <p className="mt-1 text-xs leading-5 text-slate-400">{s.rationale}</p>
+                <p className="mt-1 text-xs leading-5 text-outline">{s.rationale}</p>
               </div>
               <Badge variant="outline" className={tone[s.suggestion] ?? tone.insufficient}>
                 {s.suggestion}
@@ -311,17 +311,17 @@ function EngineStatusCard() {
       ["Knowledge time", run.knowledge_time],
     ];
     return (
-      <Card className="border-emerald-300/25 bg-emerald-300/[0.06]">
+      <Card className="border-engine/30 bg-engine/[0.06]">
         <CardHeader className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
-          <div className="flex size-11 items-center justify-center rounded-md border border-emerald-200/25 bg-slate-950/50 text-emerald-100">
+          <div className="flex size-11 items-center justify-center rounded-md border border-engine/30 bg-surface-dim/50 text-engine">
             <Cpu aria-hidden="true" className="size-5" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-xl text-white">Engine output is live</CardTitle>
+              <CardTitle className="text-xl text-on-surface">Engine output is live</CardTitle>
               <ProvenanceChip label="Engine output" />
             </div>
-            <CardDescription className="mt-2 text-sm leading-6 text-slate-300">
+            <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
               Briefing cards and alerts on this build are computed by the latest ingested
               TradingAgents run. Cost figures below are per-run actuals.
             </CardDescription>
@@ -330,9 +330,9 @@ function EngineStatusCard() {
         <CardContent className="space-y-4 p-5 pt-0">
           <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {facts.map(([label, value]) => (
-              <div key={label} className="rounded-md border border-white/10 bg-slate-950/45 p-3">
-                <dt className="text-xs font-semibold uppercase text-slate-400">{label}</dt>
-                <dd className="mt-1 break-words text-slate-100">{value}</dd>
+              <div key={label} className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+                <dt className="text-xs font-semibold uppercase text-outline">{label}</dt>
+                <dd className="mt-1 break-words text-on-surface">{value}</dd>
               </div>
             ))}
           </dl>
@@ -344,19 +344,19 @@ function EngineStatusCard() {
 
   const invalid = status.state === "invalid";
   return (
-    <Card className={invalid ? "border-amber-300/25 bg-amber-300/[0.06]" : "border-cyan-300/20 bg-cyan-300/[0.06]"}>
+    <Card className={invalid ? "border-caution/30 bg-caution/10" : "border-violet/30 bg-violet/10"}>
       <CardHeader className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
-        <div className={`flex size-11 items-center justify-center rounded-md border bg-slate-950/50 ${invalid ? "border-amber-200/25 text-amber-100" : "border-cyan-200/25 text-cyan-100"}`}>
+        <div className={`flex size-11 items-center justify-center rounded-md border bg-surface-dim/50 ${invalid ? "border-caution/30 text-caution" : "border-violet/30 text-violet"}`}>
           {invalid ? <CircleAlert aria-hidden="true" className="size-5" /> : <Database aria-hidden="true" className="size-5" />}
         </div>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-xl text-white">
+            <CardTitle className="text-xl text-on-surface">
               {invalid ? "Engine output present but unusable" : "No engine output ingested"}
             </CardTitle>
             <ProvenanceChip label="Demo data" />
           </div>
-          <CardDescription className="mt-2 text-sm leading-6 text-slate-300">
+          <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
             {invalid
               ? `The newest bundle was rejected (${status.reason}). The briefing and alerts fall back to seeded demo data until a valid run lands.`
               : "Briefing and alerts render from seeded demo data — the permanent zero-config fallback. Run bin/engine-briefing to ingest a live run."}
