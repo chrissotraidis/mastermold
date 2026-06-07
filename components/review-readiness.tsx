@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getDataMode, getEngineStatus } from "@/src/db/engine-data";
+import { getScreenerFeedback } from "@/src/db/screener-feedback";
 
 type ReviewReadinessProps = {
   surface: "public" | "authenticated";
@@ -50,10 +51,11 @@ const disclosureSections = [
       "A Python sidecar (TradingAgents, screener-gated funnel) writes a dated JSON bundle the dashboard ingests. When a bundle is present and valid, the briefing and alert feed are computed, not fabricated; everything else still falls back to seeds.",
     items: [
       "LIVE when a run is ingested: Daily Briefing cards (PM rating → conviction + drivers) and the Alert Feed (deterministic z-score screener, no LLM).",
-      "LIVE when a run carries resolved decisions: the Decision Journal's track-record-by-tier and the reflection significance gate — belief confidence moves only after N consistent same-direction outcomes; a single outcome cannot flip a belief.",
+      "LIVE when a run carries resolved decisions: the Decision Journal's track-record-by-tier, the calibration curve, and the reflection significance gate — belief confidence moves only after N consistent same-direction outcomes; a single outcome cannot flip a belief.",
+      "LIVE: chat interrogates today's engine briefing; the paper game auto-enters an engine prediction per card (human-vs-engine arena); the alert-feedback loop turns useful/not-useful marks into screener-threshold tuning suggestions (see Screener tuning above).",
       "Per-card and per-alert provenance reads 'Engine output' (emerald) vs 'Demo data' (cyan); a quiet day renders 'nothing actionable' at zero LLM cost.",
-      "STILL SEEDED in this phase: portfolio, paper rounds, chat context, executor metrics.",
-      "STILL STUBBED: the calibration curve and paper-vs-engine arena (Phase 3), and live cron scheduling (Phase 4).",
+      "STILL SEEDED: portfolio, paper round scoring, executor metrics.",
+      "STILL STUBBED (Phase 4, needs keys/ops): live cron scheduling, Anthropic prompt caching, batch-API reflections, and the live LLM run itself.",
       "Bitemporal honesty preserved: every engine artifact carries event_time + knowledge_time, stamped at write time, never backdated; future-stamped bundles are rejected as look-ahead.",
       "The engine never touches a brokerage — it reads data and writes JSON, so advisory-only / read-only is unchanged.",
     ],
@@ -151,6 +153,8 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
 
       <EngineStatusCard />
 
+      <ScreenerTuningCard />
+
       <div className="grid gap-4 lg:grid-cols-2">
         {disclosureSections.map((section) => {
           const Icon = section.icon;
@@ -209,6 +213,56 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
           : "Operator disclosure: keep this review readiness panel current as seeded, stubbed, credential-gated, or missing workflows change."}
       </p>
     </section>
+  );
+}
+
+/** Alert-feedback → screener-threshold tuning loop, surfaced for the operator. */
+function ScreenerTuningCard() {
+  const feedback = getScreenerFeedback();
+  if (feedback.signals.length === 0) return null;
+
+  const tone: Record<string, string> = {
+    demote: "border-rose-300/35 text-rose-100",
+    loosen: "border-emerald-300/35 text-emerald-100",
+    hold: "border-amber-300/35 text-amber-100",
+    insufficient: "border-white/15 text-slate-300",
+  };
+
+  return (
+    <Card className="border-white/10 bg-white/[0.035]">
+      <CardHeader className="space-y-3 p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <CardTitle className="text-xl text-white">Screener tuning</CardTitle>
+          <ProvenanceChip label={feedback.provenance.label} />
+        </div>
+        <CardDescription className="text-sm leading-6 text-slate-300">
+          The alert-feedback loop, no LLM: alerts you mark useful/not-useful tune the
+          deterministic screener. Suggestions below are advisory — the threshold change in
+          engine/config.yml stays manual. {feedback.total_rated} alert(s) rated so far.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-5 pt-0">
+        <ul className="space-y-2 text-sm">
+          {feedback.signals.map((s) => (
+            <li
+              key={s.signal}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-slate-950/45 p-3"
+            >
+              <div className="min-w-0">
+                <span className="font-mono text-slate-100">{s.signal}</span>
+                <span className="ml-2 text-xs text-slate-400">
+                  {s.useful}👍 · {s.not_useful}👎 · {s.pending} pending
+                </span>
+                <p className="mt-1 text-xs leading-5 text-slate-400">{s.rationale}</p>
+              </div>
+              <Badge variant="outline" className={tone[s.suggestion] ?? tone.insufficient}>
+                {s.suggestion}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }
 

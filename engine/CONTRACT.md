@@ -98,6 +98,8 @@ correctly invisible. A bundle whose `run.knowledge_time` is in the future relati
       "created_at": "2026-06-08T13:42:11.000Z",
       "acknowledged": false,
       "useful_feedback": null,
+      "signal": "return_z",                   // which screener signal fired; feeds the tuning loop
+
       "event_time": "2026-06-08T13:30:00.000Z",
       "knowledge_time": "2026-06-08T13:42:11.000Z"
     }

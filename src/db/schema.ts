@@ -103,6 +103,9 @@ export type Alert = BitemporalFields & {
   created_at: string;
   acknowledged: boolean;
   useful_feedback: boolean | null;
+  // Which screener signal triggered this alert (engine alerts only). Feeds the
+  // alert-feedback -> screener-threshold tuning loop. Absent on seeded alerts.
+  signal?: "return_z" | "volume_z" | "news_count_z" | string;
 };
 
 export type DecisionJournalEntry = BitemporalFields & {

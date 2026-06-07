@@ -17,6 +17,7 @@ export type AlertJson = Pick<
   "id" | "tier" | "z_score" | "message" | "rationale" | "acknowledged" | "useful_feedback"
 > & {
   asset_id: string;
+  signal?: string;
   provenance: AlertProvenance;
 };
 
@@ -122,6 +123,7 @@ function toAlertJson(alert: Alert, provenance: AlertProvenance): AlertJson {
     rationale: alert.rationale,
     acknowledged: alert.acknowledged,
     useful_feedback: alert.useful_feedback,
+    signal: alert.signal,
     provenance,
   };
 }

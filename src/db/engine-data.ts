@@ -78,6 +78,7 @@ const alertSchema = z.object({
   created_at: z.string(),
   acknowledged: z.boolean(),
   useful_feedback: z.boolean().nullable(),
+  signal: z.string().optional(),
   ...bitemporal,
 });
 

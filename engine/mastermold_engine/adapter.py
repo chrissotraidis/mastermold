@@ -164,6 +164,7 @@ def build_alert(
         "created_at": knowledge_time,
         "acknowledged": False,
         "useful_feedback": None,
+        "signal": reading.name,
         "event_time": event_time,
         "knowledge_time": knowledge_time,
     }
