@@ -1,0 +1,49 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { ProvenanceChip, type ProvenanceLabel } from "@/components/provenance-chip";
+
+/**
+ * One terse, consistent page header. Title + optional one-line subtitle + provenance.
+ * Replaces the verbose per-page headers (long paragraphs, API notes, raw field names).
+ */
+export function PageHeader({
+  title,
+  subtitle,
+  provenance,
+  right,
+  back = true,
+}: {
+  title: string;
+  subtitle?: string;
+  provenance?: ProvenanceLabel;
+  right?: React.ReactNode;
+  back?: boolean;
+}) {
+  return (
+    <div className="mb-6">
+      {back ? (
+        <Link
+          href="/"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-outline transition-colors hover:text-violet"
+        >
+          <ArrowLeft className="size-4" />
+          Today
+        </Link>
+      ) : null}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-on-surface sm:text-3xl">
+              {title}
+            </h1>
+            {provenance ? <ProvenanceChip label={provenance} /> : null}
+          </div>
+          {subtitle ? (
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">{subtitle}</p>
+          ) : null}
+        </div>
+        {right ? <div className="shrink-0">{right}</div> : null}
+      </div>
+    </div>
+  );
+}

@@ -26,7 +26,7 @@ export function ChatWorkspace({
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>(sessionMessages);
   const [draft, setDraft] = useState("");
-  const [status, setStatus] = useState("Open chat and select a scaffolded prompt or type a message.");
+  const [status, setStatus] = useState("Tap a question or type your own.");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
   const threadRef = useRef<HTMLDivElement>(null);
@@ -138,11 +138,10 @@ export function ChatWorkspace({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <CardTitle id="chat-thread-title" className="text-xl text-on-surface">
-                  Agent chat
+                  Conversation
                 </CardTitle>
                 <p className="mt-1 text-sm leading-6 text-outline">
-                  Select scaffolded prompt chips or send message text to view advisory response
-                  from /api/chat.
+                  Tap a question, or type your own below.
                 </p>
               </div>
               <Badge variant="outline" className="border-violet/40 text-violet">
@@ -163,8 +162,7 @@ export function ChatWorkspace({
                       <Bot aria-hidden="true" className="size-6" />
                     </div>
                     <p className="text-sm leading-6 text-on-surface-variant">
-                      Open chat with a seeded dashboard question. History persists during this
-                      browser session and resets on hard reload.
+                      Ask me about today. I keep context for this session.
                     </p>
                   </div>
                 </div>
@@ -223,7 +221,7 @@ export function ChatWorkspace({
               <CardTitle className="text-lg text-on-surface">Suggested prompts</CardTitle>
             </div>
             <p className="text-sm leading-6 text-outline">
-              Select scaffolded prompt type chips tied to seeded dashboard entities.
+              Tap one to ask, or use the box on the left.
             </p>
           </CardHeader>
           <CardContent className="grid gap-3 p-5 pt-0">
@@ -233,7 +231,7 @@ export function ChatWorkspace({
                 type="button"
                 onClick={() => sendMessage(prompt.prompt)}
                 disabled={isPending}
-                aria-label={`Select scaffolded prompt: ${prompt.prompt}`}
+                aria-label={`Ask: ${prompt.prompt}`}
                 className="rounded-md border border-outline-variant/40 bg-surface-dim/60 p-3 text-left transition hover:border-violet/40 hover:bg-violet/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="block text-sm font-semibold text-on-surface">{prompt.prompt}</span>

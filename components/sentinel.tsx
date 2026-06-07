@@ -3,7 +3,7 @@ import { Eye, Brain, Zap, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * MasterMold "Sentinel" component kit — chamfered armored panels, telemetry chips,
+ * Master Mold "Sentinel" component kit — chamfered armored panels, telemetry chips,
  * and the OBSERVE / ADVISE / ACT authority language, shared across every surface.
  */
 
@@ -107,7 +107,7 @@ const ZONE_META: Record<AuthorityZone, { label: string; icon: LucideIcon; cls: s
   act: { label: "Act · Bounded", icon: Zap, cls: "border-caution/40 text-caution" },
 };
 
-/** Authority-zone badge: is this something MasterMold tells me, or can do? */
+/** Authority-zone badge: is this something Master Mold tells me, or can do? */
 export function AuthorityBadge({ zone, className }: { zone: AuthorityZone; className?: string }) {
   const meta = ZONE_META[zone];
   const Icon = meta.icon;

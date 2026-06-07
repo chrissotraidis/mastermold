@@ -25,7 +25,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
   const [filter, setFilter] = useState<TierFilter>("All");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingAlertId, setPendingAlertId] = useState<string | null>(null);
-  const [message, setMessage] = useState("Feedback is reflected without a page reload.");
+  const [message, setMessage] = useState("");
   const [actionSequence, setActionSequence] = useState(0);
   const [lastAction, setLastAction] = useState("alerts-loaded");
   const [isPending, startTransition] = useTransition();
@@ -91,7 +91,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
   function submitFeedback(alert: AlertJson, usefulFeedback: FeedbackValue) {
     markBrowserAction(`submit-feedback-${alert.id}-${usefulFeedback ? "useful" : "not-useful"}`);
     updateAlert(alert.id, { useful_feedback: usefulFeedback });
-    setLastAction(`Submit feedback ${usefulFeedback ? "useful" : "not useful"} for ${alert.tier}.`);
+    setLastAction(`Was this useful? ${usefulFeedback ? "useful" : "not useful"} for ${alert.tier}.`);
     setActionSequence((current) => current + 1);
     setPendingAlertId(alert.id);
     startTransition(async () => {
@@ -110,7 +110,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
         setMessage(`Feedback saved as ${usefulFeedback ? "useful" : "not useful"}.`);
       } catch {
         updateAlert(alert.id, { useful_feedback: alert.useful_feedback });
-        setMessage("Submit feedback request failed. Try again.");
+        setMessage("Was this useful? request failed. Try again.");
       } finally {
         setPendingAlertId(null);
       }
@@ -247,7 +247,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
 
                     <fieldset className="min-w-0 rounded-md border border-outline-variant/40 p-3">
                       <legend className="px-1 text-sm font-semibold text-on-surface">
-                        Submit feedback
+                        Was this useful?
                       </legend>
                       <div className="mt-2 grid gap-2 sm:grid-cols-2">
                         <FeedbackOption

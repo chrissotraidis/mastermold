@@ -1,101 +1,34 @@
-import Link from "next/link";
 import { Database, LockKeyhole, PlugZap } from "lucide-react";
-import { AppShell, FirstRunBanner } from "@/components/app-shell";
+import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { IntegrationKeyInput } from "@/components/integration-key-input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/integrations";
 
 const statusLabels: Record<IntegrationStatusJson["status"], string> = {
-  connected: "Connected",
-  stubbed: "Stubbed",
-  credential_gated: "Credential gated",
+  connected: "Linked",
+  stubbed: "Demo",
+  credential_gated: "Needs key",
 };
 
 export default function IntegrationsSettingsPage() {
   const integrations = getIntegrationStatuses();
-  const stubbedCount = integrations.filter((integration) => integration.status === "stubbed").length;
-  const credentialGatedCount = integrations.filter(
-    (integration) => integration.status === "credential_gated",
-  ).length;
 
   return (
-    <AppShell>
-      <FirstRunBanner />
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-5 sm:py-8">
-        <header className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-violet text-void hover:bg-violet">
-              Setting integrations
-            </Badge>
-            <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-              Demo data
-            </Badge>
-            <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-              Reachable persistent nav
-            </Badge>
-            <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-              Read-only API status
-            </Badge>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-[1fr_22rem] lg:items-end">
-            <div className="space-y-3">
-              <h2 className="max-w-4xl text-3xl font-semibold leading-tight text-on-surface sm:text-4xl">
-                Open setting integration to see external service readiness
-              </h2>
-              <p className="max-w-3xl text-base leading-7 text-on-surface-variant">
-                View integration status badges for Coinbase CDP, Robinhood via SnapTrade,
-                Zerion on-chain, and LLM. Enter optional API keys locally when reviewing
-                credential-gated paths; this page has no submit action.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  asChild
-                  variant="outline"
-                  className="border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
-                >
-                  <Link href="/review">Review disclosures</Link>
-                </Button>
-                <Badge variant="outline" className="border-outline-variant/50 px-3 py-2 text-on-surface-variant">
-                  API: /api/status
-                </Badge>
-              </div>
-            </div>
-
-            <Card className="border-outline-variant/40 bg-surface-high/30">
-              <CardHeader className="p-5">
-                <CardDescription className="text-outline">IntegrationStatus rows</CardDescription>
-                <CardTitle className="text-3xl text-on-surface">{integrations.length}</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-3 p-5 pt-0 text-sm">
-                <Metric label="Stubbed" value={stubbedCount.toString()} />
-                <Metric
-                  label="Credential gated"
-                  value={credentialGatedCount.toString()}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </header>
+    <AppShell dataMode="Demo data">
+      <div className="mx-auto max-w-4xl">
+        <PageHeader
+          title="Connections"
+          subtitle="Link your read-only accounts and choose your model. Keys live in this browser only — nothing here can place a trade."
+          provenance="Demo data"
+        />
 
         <section aria-labelledby="integration-status-title" className="space-y-4">
-          <div>
-            <h2 id="integration-status-title" className="text-xl font-semibold text-on-surface">
-              View integration status
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-outline">
-              Status and detail text come from seeded IntegrationStatus rows.
-            </p>
-          </div>
+          <h2 id="integration-status-title" className="sr-only">
+            Connection status
+          </h2>
 
           <div className="grid gap-4 md:grid-cols-2">
             {integrations.map((integration) => (
@@ -123,16 +56,6 @@ export default function IntegrationsSettingsPage() {
                     </div>
                     <StatusBadge status={integration.status} />
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {integration.status === "stubbed" ? (
-                      <Badge variant="outline" className="border-caution/40 text-caution">
-                        Demo data
-                      </Badge>
-                    ) : null}
-                    <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                      {statusLabels[integration.status]}
-                    </Badge>
-                  </div>
                 </CardHeader>
                 <CardContent className="space-y-5 p-5 pt-0">
                   <p className="text-sm leading-6 text-on-surface-variant">{integration.detail}</p>
@@ -149,10 +72,7 @@ export default function IntegrationsSettingsPage() {
         <Card className="border-violet/30 bg-violet/[0.055]">
           <CardContent className="flex gap-3 p-5 text-sm leading-6 text-on-surface">
             <Database aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-            <p>
-              Optional key entries are stored with localStorage in this browser only and
-              are never sent to a server route by this settings page.
-            </p>
+            <p>Keys are saved in this browser only — never sent anywhere.</p>
           </CardContent>
         </Card>
       </div>
@@ -172,8 +92,7 @@ function StatusBadge({ status }: { status: IntegrationStatusJson["status"] }) {
       )}
       variant="outline"
     >
-      <span className="sr-only">{statusLabels[status]} status: </span>
-      {status}
+      {statusLabels[status]}
     </Badge>
   );
 }

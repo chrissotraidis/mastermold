@@ -25,7 +25,7 @@ const directions: Array<{
 
 const initialFormState: PaperPredictionFormState = {
   status: "idle",
-  message: "Prediction submission is for process scoring only.",
+  message: "Your call is for process scoring only.",
   errors: [],
 };
 
@@ -59,9 +59,9 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
       <aside className="xl:sticky xl:top-6">
         <Card className="border-outline-variant/40 bg-surface-high/40">
           <CardHeader className="p-5">
-            <CardTitle className="text-xl text-on-surface">Prediction submission</CardTitle>
+            <CardTitle className="text-xl text-on-surface">Your call</CardTitle>
             <p className="text-sm leading-6 text-outline">
-              Submit prediction inputs for the active paper round. These entries do not place
+              Pick a direction and how sure you are. These entries do not place
               trades or move capital.
             </p>
           </CardHeader>
@@ -70,7 +70,7 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
               <form action={formAction} className="space-y-4">
                 <input type="hidden" name="round_id" value={paper.activeRound.id} />
 
-                <FieldBlock id="paper-asset" label="Asset selector">
+                <FieldBlock id="paper-asset" label="Asset">
                   <select
                     id="paper-asset"
                     name="asset_id"
@@ -86,7 +86,7 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                 </FieldBlock>
 
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-on-surface">Direction toggle</legend>
+                  <legend className="text-sm font-semibold text-on-surface">Direction</legend>
                   <div className="grid grid-cols-3 gap-2">
                     {directions.map((item) => (
                       <label
@@ -204,10 +204,10 @@ function ActiveRoundPanel({
     <section aria-labelledby="active-paper-round-title" className="space-y-4">
       <div>
         <h2 id="active-paper-round-title" className="text-xl font-semibold text-on-surface">
-          Active PaperTradingRound
+          This week's round
         </h2>
         <p className="mt-1 text-sm leading-6 text-outline">
-          Open paper round details and prediction list for process-based scoring.
+          Make your calls — scored on judgment, not P&L.
         </p>
       </div>
 
@@ -226,8 +226,8 @@ function ActiveRoundPanel({
           </CardHeader>
           <CardContent className="space-y-5 p-5 pt-0">
             <div className="grid gap-3 text-sm sm:grid-cols-2">
-              <Metric label="opens_at" value={formatTimestamp(activeRound.opens_at)} />
-              <Metric label="closes_at" value={formatTimestamp(activeRound.closes_at)} />
+              <Metric label="Opens" value={formatTimestamp(activeRound.opens_at)} />
+              <Metric label="Closes" value={formatTimestamp(activeRound.closes_at)} />
             </div>
             <PredictionList predictions={activePredictions} title="Predictions for active round" />
           </CardContent>
@@ -285,7 +285,7 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
     <section aria-labelledby="round-history-title" className="space-y-4">
       <div>
         <h2 id="round-history-title" className="text-xl font-semibold text-on-surface">
-          View round history
+          Past rounds
         </h2>
         <p className="mt-1 text-sm leading-6 text-outline">
           Past paper rounds list submitted predictions and neutral process scores.
@@ -309,8 +309,8 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
               </CardHeader>
               <CardContent className="space-y-4 p-5 pt-0">
                 <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                  <Metric label="opens_at" value={formatTimestamp(round.opens_at)} />
-                  <Metric label="closes_at" value={formatTimestamp(round.closes_at)} />
+                  <Metric label="Opens" value={formatTimestamp(round.opens_at)} />
+                  <Metric label="Closes" value={formatTimestamp(round.closes_at)} />
                   <Metric label="score total" value={round.score ? round.score.total.toFixed(1) : "Pending"} />
                   <Metric label="diversification" value={round.score ? round.score.diversification.toFixed(1) : "Pending"} />
                 </div>

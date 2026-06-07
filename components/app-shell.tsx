@@ -33,14 +33,14 @@ type Zone = "observe" | "advise" | "act" | "system";
 type NavItem = { href: string; label: string; icon: LucideIcon; zone: Zone };
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Command Deck", icon: Hexagon, zone: "advise" },
+  { href: "/", label: "Today", icon: Hexagon, zone: "advise" },
+  { href: "/chat", label: "Ask Master Mold", icon: Bot, zone: "advise" },
   { href: "/alerts", label: "Alerts", icon: AlertTriangle, zone: "advise" },
-  { href: "/journal", label: "Brain · Journal", icon: BookOpenText, zone: "advise" },
-  { href: "/paper", label: "Paper Arena", icon: Gamepad2, zone: "advise" },
-  { href: "/chat", label: "Interrogate", icon: Bot, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", icon: LineChart, zone: "observe" },
-  { href: "/executor", label: "Executor", icon: Wallet, zone: "act" },
-  { href: "/review", label: "Review · Truth", icon: ClipboardCheck, zone: "system" },
+  { href: "/journal", label: "Track record", icon: BookOpenText, zone: "advise" },
+  { href: "/paper", label: "Practice", icon: Gamepad2, zone: "advise" },
+  { href: "/executor", label: "Web3 strategies", icon: Wallet, zone: "act" },
+  { href: "/review", label: "What's real", icon: ClipboardCheck, zone: "system" },
   { href: "/settings/integrations", label: "Settings", icon: Settings, zone: "system" },
 ];
 
@@ -114,12 +114,12 @@ function TopBar({
   return (
     <header className="fixed top-0 left-0 z-50 flex h-16 w-full items-center justify-between border-b border-outline-variant/60 bg-surface-dim/80 px-margin-mobile backdrop-blur-xl md:px-margin-desktop">
       <div className="flex min-w-0 items-center gap-3">
-        <Link href="/chat" aria-label="Summon MasterMold" className="group relative size-9 shrink-0">
+        <Link href="/chat" aria-label="Summon Master Mold" className="group relative size-9 shrink-0">
           <SentinelFace state={killEngaged ? "kill" : faceState} />
           <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30 transition group-hover:ring-violet/70" aria-hidden="true" />
         </Link>
         <Link href="/" className="font-display text-2xl font-bold tracking-tighter text-violet">
-          MasterMold
+          Master Mold
         </Link>
         <span
           className={cn(
@@ -146,8 +146,8 @@ function TopBar({
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Ask MasterMold…"
-              aria-label="Ask MasterMold"
+              placeholder="Ask Master Mold…"
+              aria-label="Ask Master Mold"
               className="w-48 bg-transparent font-mono text-sm text-on-surface placeholder:text-outline focus:outline-none"
             />
           </div>
@@ -256,7 +256,7 @@ function MobileNav() {
       <Link
         href="/chat"
         className="flex min-h-12 flex-col items-center justify-center gap-1 px-3 py-1 text-on-surface-variant chamfer-sm"
-        aria-label="Interrogate MasterMold"
+        aria-label="Interrogate Master Mold"
       >
         <Bot className="size-5" />
         <span className="font-mono text-[10px] uppercase tracking-telemetry">Ask</span>
@@ -355,7 +355,7 @@ export function FirstRunBanner() {
     <div className="mb-gutter flex items-start gap-3 border border-outline-variant/40 bg-surface-dim/50 p-4 chamfer-sm backdrop-blur-sm inner-glow">
       <Info className="mt-0.5 size-4 shrink-0 text-violet" />
       <p className="text-sm leading-6 text-on-surface-variant">
-        <strong className="text-on-surface">Advisory only</strong> — MasterMold cannot move your
+        <strong className="text-on-surface">Advisory only</strong> — Master Mold cannot move your
         equity or crypto. Its Web3 Executor acts only within the on-chain caps you set, and in this
         version it signs nothing.
       </p>

@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The face of MasterMold — a monumental armored sentinel head whose glowing eyes are
+ * The face of Master Mold — a monumental armored sentinel head whose glowing eyes are
  * the primary state channel. Pure inline SVG (offline-safe, themeable, no remote
  * image), CSS-animated, reduced-motion aware. Read the system's posture from the eyes
  * before any text.
@@ -52,7 +52,7 @@ export function SentinelFace({
       viewBox="0 0 400 440"
       className={cn("h-full w-full", className)}
       role="img"
-      aria-label={`MasterMold — ${eye.label}`}
+      aria-label={`Master Mold — ${eye.label}`}
     >
       <defs>
         <linearGradient id="mm-plate" x1="0" y1="0" x2="0.3" y2="1">

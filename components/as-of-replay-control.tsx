@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
-import { RotateCcw } from "lucide-react";
+import { History, RotateCcw } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,60 +54,44 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
   }
 
   return (
-    <section
-      aria-labelledby={`${apiPath.slice(5)}-as-of-title`}
-      className="rounded-lg border border-violet/30 bg-violet/10 p-4 sm:p-5"
-    >
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet">
-            Historical data replay
-          </p>
-          <h2 id={`${apiPath.slice(5)}-as-of-title`} className="text-xl font-semibold text-on-surface">
-            Select as-of timestamp
-          </h2>
-          <p className="text-sm leading-6 text-on-surface-variant">
-            View historical data by time. The page and {apiPath} apply the same
-            knowledge_time filter, then clear filter to restore the current seeded view.
-          </p>
-          {activeLabel ? (
-            <p className="text-sm font-semibold text-on-surface">As of {activeLabel}</p>
-          ) : null}
+    <details className="group border border-outline-variant/30 bg-surface-dim/40 chamfer-sm" open={Boolean(activeAsOf)}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant transition-colors hover:text-violet">
+        <History aria-hidden="true" className="size-4 text-violet" />
+        <span>Rewind</span>
+        {activeLabel ? (
+          <span className="font-mono text-xs text-violet">· viewing {activeLabel}</span>
+        ) : (
+          <span className="text-xs text-outline">— see this page as of an earlier time</span>
+        )}
+      </summary>
+      <form className="flex flex-wrap items-end gap-2 border-t border-outline-variant/30 p-4" onSubmit={submitReplay}>
+        <div className="space-y-1">
+          <Label htmlFor={`${apiPath.slice(5)}-as-of`} className="text-xs text-outline">
+            Point in time
+          </Label>
+          <Input
+            id={`${apiPath.slice(5)}-as-of`}
+            type="datetime-local"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            className="border-outline-variant/50 bg-surface-dim/80 text-on-surface"
+          />
         </div>
-
-        <form className="grid gap-3 sm:grid-cols-[minmax(14rem,18rem)_auto_auto]" onSubmit={submitReplay}>
-          <div className="space-y-2">
-            <Label htmlFor={`${apiPath.slice(5)}-as-of`} className="text-on-surface">
-              Timestamp
-            </Label>
-            <Input
-              id={`${apiPath.slice(5)}-as-of`}
-              type="datetime-local"
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              className="border-outline-variant/50 bg-surface-dim/80 text-on-surface"
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={!value || isPending}
-            className="self-end bg-violet text-void hover:bg-violet"
-          >
-            View snapshot
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!activeAsOf || isPending}
-            onClick={clearReplay}
-            className="self-end border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
-          >
-            <RotateCcw aria-hidden="true" />
-            Clear filter
-          </Button>
-        </form>
-      </div>
-    </section>
+        <Button type="submit" disabled={!value || isPending} className="bg-violet text-void hover:bg-violet">
+          Go
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!activeAsOf || isPending}
+          onClick={clearReplay}
+          className="border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
+        >
+          <RotateCcw aria-hidden="true" />
+          Now
+        </Button>
+      </form>
+    </details>
   );
 }
 

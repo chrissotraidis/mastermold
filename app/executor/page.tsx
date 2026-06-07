@@ -1,9 +1,8 @@
-import Link from "next/link";
-import { ArrowLeft, ListChecks, type LucideIcon, ScanLine, ShieldCheck, SquareStack, TestTube } from "lucide-react";
+import { ListChecks, type LucideIcon, ScanLine, ShieldCheck, SquareStack, TestTube } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ExecutorWorkspace } from "@/components/executor-workspace";
-import { ProvenanceChip } from "@/components/provenance-chip";
-import { AuthorityBadge, Chip, Panel, PanelHeader } from "@/components/sentinel";
+import { PageHeader } from "@/components/page-header";
+import { Chip, Panel, PanelHeader } from "@/components/sentinel";
 import { getExecutor } from "@/src/db/executor";
 
 const GATE: Array<{ icon: LucideIcon; label: string; detail: string }> = [
@@ -18,44 +17,23 @@ export default function ExecutorPage() {
 
   return (
     <AppShell dataMode={executor.provenance.label}>
-      <Link
-        href="/"
-        className="mb-4 inline-flex items-center gap-2 text-sm text-on-surface-variant underline-offset-4 hover:text-on-surface hover:underline"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Back to deck
-      </Link>
+      <div className="mx-auto max-w-5xl">
+      <PageHeader
+        title="Web3 strategies"
+        subtitle="The one place I can act for you — running structural yield (lending, funding carry) inside caps you set. Right now it's a preview: nothing here signs a transaction or moves a cent."
+        provenance={executor.provenance.label}
+        right={<Chip tone="critical">Signs nothing yet</Chip>}
+      />
 
-      <header className="mb-gutter space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Chip tone="caution">Executor</Chip>
-          <AuthorityBadge zone="act" />
-          <ProvenanceChip label={executor.provenance.label} title={executor.provenance.source} />
-          <Chip tone="critical">Signs nothing in this version</Chip>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[1fr_22rem] lg:items-end">
-          <div>
-            <h2 className="font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">
-              Web3 bounded autonomy
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant">
-              The one place MasterMold can act — and only within an on-chain envelope you set.
-              Monitor strategy status, the bounded envelope, and the fail-closed pre-sign gate. In
-              this version the Executor is display-only: every control stays in local React state
-              and signs nothing.
-            </p>
-          </div>
-          <Panel className="p-4" tint="act">
-            <p className="relative z-10 font-mono text-[11px] uppercase tracking-telemetry text-caution">
-              Maximum loss = the bounded float
-            </p>
-            <p className="relative z-10 mt-1 text-sm leading-6 text-on-surface-variant">
-              On-chain spend caps survive a fully-compromised agent: it can only ever lose the small
-              working tranche, never your custody.
-            </p>
-          </Panel>
-        </div>
-      </header>
+      <Panel className="mb-6 p-4" tint="act">
+        <p className="relative z-10 font-mono text-[11px] uppercase tracking-telemetry text-caution">
+          Most you could ever lose = the small float I'm given
+        </p>
+        <p className="relative z-10 mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+          The spend cap lives on-chain, so even if I were fully hijacked I could only touch that tiny
+          working tranche — never your custody.
+        </p>
+      </Panel>
 
       {/* Pre-Sign Safety Gate Stack */}
       <Panel tint="act" className="mb-gutter p-5 sm:p-6">
@@ -76,12 +54,13 @@ export default function ExecutorPage() {
           })}
         </div>
         <p className="relative z-10 mt-4 text-xs leading-5 text-outline">
-          Any simulation or scan error rejects the transaction — the gate never auto-approves. The
-          agent proposes; cryptographically-enforced, agent-external policy disposes.
+          If any check errors, the transaction is rejected — the gate never waves something through.
+          I can only propose; the rules I can't override decide.
         </p>
       </Panel>
 
       <ExecutorWorkspace executor={executor} />
+      </div>
     </AppShell>
   );
 }

@@ -1,4 +1,4 @@
-// Root layout — MasterMold "Sentinel" theme.
+// Root layout — Master Mold "Sentinel" theme.
 // Keep `import "./globals.css"` and the design-token classes on body.
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
@@ -27,7 +27,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MasterMold — Sentinel",
+  title: "Master Mold — Sentinel",
   description: "A personal financial agent. Advisory by construction; bounded where it acts.",
 };
 

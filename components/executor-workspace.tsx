@@ -39,7 +39,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
     session_key_expiry: activeGuardrail?.session_key_expiry ?? "",
   }));
   const [localNotice, setLocalNotice] = useState(
-    "Edit guardrail config locally, then press Save local draft. No request is sent.",
+    "Guardrails locally, then press Save local draft. No request is sent.",
   );
   const selectedStrategy = strategies.find((strategy) => strategy.id === selectedStrategyId);
   const maxFundingRate = useMemo(
@@ -88,11 +88,10 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
         <section aria-labelledby="executor-strategy-status-title" className="space-y-4">
           <div>
             <h2 id="executor-strategy-status-title" className="text-xl font-semibold text-on-surface">
-              View strategy status
+              Strategies
             </h2>
             <p className="mt-1 text-sm leading-6 text-outline">
-              Open executor to see strategy rows, net_delta, margin_ratio, funding_rate,
-              and basis values from seeded ExecutorStrategy data.
+              Live status.
             </p>
           </div>
 
@@ -124,24 +123,24 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                       </div>
                     </CardHeader>
                     <CardContent className="grid gap-3 p-5 pt-0 text-sm sm:grid-cols-2">
-                      <Metric label="net_delta" value={formatSignedRatio(strategy.net_delta)} />
-                      <Metric label="margin_ratio" value={formatPercent(strategy.margin_ratio)} />
-                      <Metric label="funding_rate" value={formatFunding(strategy.funding_rate)} />
-                      <Metric label="basis" value={formatPercent(strategy.basis)} />
+                      <Metric label="Net delta" value={formatSignedRatio(strategy.net_delta)} />
+                      <Metric label="Margin" value={formatPercent(strategy.margin_ratio)} />
+                      <Metric label="Funding" value={formatFunding(strategy.funding_rate)} />
+                      <Metric label="Basis" value={formatPercent(strategy.basis)} />
                     </CardContent>
                   </Card>
                 </button>
               ))}
             </div>
           ) : (
-            <EmptyState message="No ExecutorStrategy rows are visible for this replay window." />
+            <EmptyState message="No strategies to show right now." />
           )}
         </section>
 
         <section aria-labelledby="funding-observation-title" className="space-y-4">
           <div>
             <h2 id="funding-observation-title" className="text-xl font-semibold text-on-surface">
-              FundingObservation trend
+              Funding rate
             </h2>
             <p className="mt-1 text-sm leading-6 text-outline">
               Funding rate trend and open interest from seeded rows. Safe mode running is
@@ -200,9 +199,9 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 <ShieldCheck aria-hidden="true" className="size-5" />
               </div>
               <div>
-                <CardTitle className="text-xl text-on-surface">Edit guardrail config</CardTitle>
+                <CardTitle className="text-xl text-on-surface">Guardrails</CardTitle>
                 <p className="mt-1 text-sm leading-6 text-on-surface/80">
-                  Controlled inputs update React state only.
+                  Set the caps and allowlists. Nothing here signs anything.
                 </p>
               </div>
             </div>
