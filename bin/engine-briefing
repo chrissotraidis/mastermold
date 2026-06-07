@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# bin/engine-briefing — run the MasterMold engine's daily briefing funnel.
+#
+# Thin wrapper around `python -m mastermold_engine.run_briefing`. The engine is a
+# self-contained Python package under engine/ with its own venv and keys (engine/.env).
+# It writes JSON bundles to engine/out/, which the dashboard ingests automatically.
+#
+# Usage:
+#   bin/engine-briefing [--date YYYY-MM-DD]      # defaults to today
+#   bin/engine-briefing --resolve [--date ...]   # Phase B outcome resolution
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENGINE="$ROOT/engine"
+
+MODULE="mastermold_engine.run_briefing"
+if [[ "${1:-}" == "--resolve" ]]; then
+  MODULE="mastermold_engine.resolve_outcomes"
+  shift
+fi
+
+cd "$ENGINE"
+
+if command -v uv >/dev/null 2>&1; then
+  exec uv run python -m "$MODULE" "$@"
+elif [[ -x "$ENGINE/.venv/bin/python" ]]; then
+  exec "$ENGINE/.venv/bin/python" -m "$MODULE" "$@"
+else
+  echo "engine venv not found. Set it up first:" >&2
+  echo "  cd engine && uv venv && uv pip install -e .   # then add ANTHROPIC_API_KEY to engine/.env" >&2
+  echo "(See engine/README.md. The dashboard still boots on seeds with no engine output.)" >&2
+  exit 1
+fi

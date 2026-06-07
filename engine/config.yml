@@ -1,0 +1,63 @@
+# engine/config.yml — MasterMold engine run configuration.
+#
+# This is the engine's own config, separate from the dashboard's root config.yml.
+# LLM keys do NOT live here — they live in engine/.env (gitignored). See README.
+
+schema_version: 1
+
+# --- Watchlist -------------------------------------------------------------
+# Phase 1 default: a static list spanning equity + crypto + defi so both
+# pipelines get exercised, aligned with the dashboard's seeded asset ids so
+# engine output can reference the same assets. (Open question 1: deriving the
+# watchlist from portfolio holdings is the Phase 3+ "make it personal" upgrade.)
+watchlist:
+  - { symbol: NVDA,  asset_id: asset_nvda,      asset_class: equity }
+  - { symbol: HOOD,  asset_id: asset_hood,      asset_class: equity }
+  - { symbol: BTC,   asset_id: asset_btc,       asset_class: crypto, yf_symbol: "BTC-USD" }
+  - { symbol: ETH,   asset_id: asset_eth,       asset_class: crypto, yf_symbol: "ETH-USD" }
+  - { symbol: aUSDC, asset_id: asset_usdc_aave, asset_class: defi }   # thin crypto/defi coverage; disclosed on /review
+
+# Tickers that always earn a full agent run regardless of the screener, e.g.
+# the top holding so the briefing is never silent on what you own most of.
+always_run:
+  - NVDA
+
+# --- Provider & models -----------------------------------------------------
+# One provider for both tiers initially, to keep cost tracking simple
+# (open question 4). Anthropic: the fork supports it natively, the prompt-cache
+# optimization (Phase 4) is Anthropic-specific, and BYOK already targets it.
+provider: anthropic
+models:
+  quick_think: claude-haiku-4-5       # analysts, debaters, reflection
+  deep_think: claude-sonnet-4-6       # the two judges (Research Manager, PM) only
+temperature: 0.2                       # run-to-run consistency (Risks: judge quality)
+
+# --- Debate / risk rounds --------------------------------------------------
+max_debate_rounds: 1
+max_risk_discuss_rounds: 1
+checkpoint_enabled: true               # per-ticker resume on a crashed watchlist run
+
+# --- Screener thresholds (Stage 1, deterministic, no LLM) ------------------
+# Open question 1a: start loose (trigger often), tighten with cost-log data.
+# z is computed over a trailing window of daily values per signal.
+screener:
+  lookback_sessions: 30
+  trigger_z: 1.5                       # |z| >= this on any signal earns a full agent run
+  tiers:                               # alert tier by |z| (the screener IS the alert feed)
+    T0: 3.0                            # |z| >= 3.0
+    T1: 2.0                            # 2.0 <= |z| < 3.0
+    T2: 1.5                            # 1.5 <= |z| < 2.0  (below T2 -> no alert)
+  signals:                            # per-signal enable + weight (Phase 3 feedback loop tunes these)
+    return_z: { enabled: true }
+    volume_z: { enabled: true }
+    news_count_z: { enabled: true }
+
+# --- Budget ----------------------------------------------------------------
+budget:
+  usd_per_run_cap: 5.0                 # hard cap; run aborts before exceeding
+  log_actuals: true                    # write run.cost from the stats handler
+
+# --- Memory / beliefs ------------------------------------------------------
+memory_log_max_entries: 400            # rotate to keep get_past_context() O(n) cheap
+beliefs:
+  significance_n: 5                    # N consistent same-direction outcomes to move a belief

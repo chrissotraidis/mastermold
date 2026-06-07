@@ -1,0 +1,274 @@
+{
+  "schema_version": 1,
+  "run": {
+    "run_date": "2026-06-08",
+    "event_time": "2026-06-08T13:30:00.000Z",
+    "knowledge_time": "2026-06-08T13:42:11.000Z",
+    "provider": "anthropic",
+    "models": {
+      "quick_think": "claude-haiku-4-5",
+      "deep_think": "claude-sonnet-4-6"
+    },
+    "watchlist": [
+      "NVDA",
+      "HOOD",
+      "BTC",
+      "ETH",
+      "aUSDC"
+    ],
+    "triggered_tickers": [
+      "NVDA",
+      "HOOD",
+      "BTC"
+    ],
+    "cost": {
+      "llm_calls": 34,
+      "tool_calls": 12,
+      "prompt_tokens": 121000,
+      "completion_tokens": 8200,
+      "usd": 0.486
+    },
+    "stages": {
+      "data_refresh": "ok",
+      "screener": "ok",
+      "agent_runs": 3,
+      "outcome_resolution": "skipped"
+    }
+  },
+  "briefing_cards": [
+    {
+      "id": "engine_card_2026-06-08_NVDA",
+      "date": "2026-06-08",
+      "rank": 1,
+      "headline": "NVIDIA: data-center demand reaccelerates into the print",
+      "why_now": "Two hyperscalers raised FY capex guidance this week and a supplier flagged tight HBM supply, lifting near-term revenue visibility ahead of earnings.",
+      "relevance_note": "Largest equity weight in the watchlist; an always-run floor ticker.",
+      "bull_case": "Capex upgrades from the top cloud buyers point to another beat-and-raise, and supply tightness supports pricing power through the next two quarters.",
+      "bear_case": "The setup is crowded and the multiple already prices acceleration; any guide that merely meets expectations could trigger a sharp unwind.",
+      "conviction": 10,
+      "horizon": "3-6 months",
+      "status": "actionable",
+      "asset_ids": [
+        "asset_nvda"
+      ],
+      "event_time": "2026-06-08T13:30:00.000Z",
+      "knowledge_time": "2026-06-08T13:42:11.000Z",
+      "drivers": [
+        {
+          "id": "engine_card_2026-06-08_NVDA_d1",
+          "briefing_card_id": "engine_card_2026-06-08_NVDA",
+          "label": "Hyperscaler capex guide raised",
+          "direction": "bullish",
+          "weight": 0.85,
+          "color": "#34d399",
+          "source_citation": "News Analyst \u2014 2026-06-07 capex roundup",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        },
+        {
+          "id": "engine_card_2026-06-08_NVDA_d2",
+          "briefing_card_id": "engine_card_2026-06-08_NVDA",
+          "label": "HBM supply tightening",
+          "direction": "bullish",
+          "weight": 0.62,
+          "color": "#34d399",
+          "source_citation": "Fundamentals Analyst \u2014 supplier channel checks",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        },
+        {
+          "id": "engine_card_2026-06-08_NVDA_d3",
+          "briefing_card_id": "engine_card_2026-06-08_NVDA",
+          "label": "Crowded positioning into print",
+          "direction": "bearish",
+          "weight": 0.55,
+          "color": "#fb7185",
+          "source_citation": "Sentiment Analyst \u2014 options skew",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        },
+        {
+          "id": "engine_card_2026-06-08_NVDA_d4",
+          "briefing_card_id": "engine_card_2026-06-08_NVDA",
+          "label": "Multiple prices in acceleration",
+          "direction": "bearish",
+          "weight": 0.41,
+          "color": "#fb7185",
+          "source_citation": "Fundamentals Analyst \u2014 forward EV/S",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        }
+      ]
+    },
+    {
+      "id": "engine_card_2026-06-08_BTC",
+      "date": "2026-06-08",
+      "rank": 2,
+      "headline": "Bitcoin: ETF inflows resume as funding stays contained",
+      "why_now": "Spot-ETF net inflows turned positive for a fifth straight session while perp funding held near neutral, a constructive combination after three weeks of outflows.",
+      "relevance_note": "Core crypto holding; funding-rate context is thin on the free data tier (see /review).",
+      "bull_case": "Persistent ETF demand against flat issuance tightens float, and contained funding means the move is spot-led rather than leverage-driven.",
+      "bear_case": "A macro risk-off or a single large unlock could erase a week of inflows quickly; crypto data depth here is limited.",
+      "conviction": 6,
+      "horizon": "4-8 weeks",
+      "status": "actionable",
+      "asset_ids": [
+        "asset_btc"
+      ],
+      "event_time": "2026-06-08T13:30:00.000Z",
+      "knowledge_time": "2026-06-08T13:42:11.000Z",
+      "drivers": [
+        {
+          "id": "engine_card_2026-06-08_BTC_d1",
+          "briefing_card_id": "engine_card_2026-06-08_BTC",
+          "label": "ETF net inflows resume",
+          "direction": "bullish",
+          "weight": 0.7,
+          "color": "#34d399",
+          "source_citation": "News Analyst \u2014 2026-06-07 flows",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        },
+        {
+          "id": "engine_card_2026-06-08_BTC_d2",
+          "briefing_card_id": "engine_card_2026-06-08_BTC",
+          "label": "Funding near neutral",
+          "direction": "bullish",
+          "weight": 0.5,
+          "color": "#34d399",
+          "source_citation": "Market Analyst \u2014 perp funding",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        },
+        {
+          "id": "engine_card_2026-06-08_BTC_d3",
+          "briefing_card_id": "engine_card_2026-06-08_BTC",
+          "label": "Macro risk-off tail",
+          "direction": "bearish",
+          "weight": 0.45,
+          "color": "#fb7185",
+          "source_citation": "Sentiment Analyst \u2014 cross-asset",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        }
+      ]
+    },
+    {
+      "id": "engine_card_2026-06-08_HOOD",
+      "date": "2026-06-08",
+      "rank": 3,
+      "headline": "Robinhood: payment-for-order-flow scrutiny weighs on the print",
+      "why_now": "A regulatory headline revived PFOF-ban speculation and the stock gapped down on heavy volume, with sell-side notes trimming transaction-revenue estimates.",
+      "relevance_note": "Smaller equity weight; included because the down move cleared the screener.",
+      "bull_case": "Rate-sensitive net-interest revenue and a growing funded-account base partly offset transaction-revenue risk.",
+      "bear_case": "A PFOF ban would hit the highest-margin revenue line directly, and the volume spike suggests institutions are de-risking ahead of clarity.",
+      "conviction": 6,
+      "horizon": "1-3 months",
+      "status": "actionable",
+      "asset_ids": [
+        "asset_hood"
+      ],
+      "event_time": "2026-06-08T13:30:00.000Z",
+      "knowledge_time": "2026-06-08T13:42:11.000Z",
+      "drivers": [
+        {
+          "id": "engine_card_2026-06-08_HOOD_d1",
+          "briefing_card_id": "engine_card_2026-06-08_HOOD",
+          "label": "PFOF-ban headline risk",
+          "direction": "bearish",
+          "weight": 0.8,
+          "color": "#fb7185",
+          "source_citation": "News Analyst \u2014 2026-06-08 regulatory wire",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        },
+        {
+          "id": "engine_card_2026-06-08_HOOD_d2",
+          "briefing_card_id": "engine_card_2026-06-08_HOOD",
+          "label": "Estimate cuts to transaction revenue",
+          "direction": "bearish",
+          "weight": 0.6,
+          "color": "#fb7185",
+          "source_citation": "Fundamentals Analyst \u2014 sell-side revisions",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        },
+        {
+          "id": "engine_card_2026-06-08_HOOD_d3",
+          "briefing_card_id": "engine_card_2026-06-08_HOOD",
+          "label": "Net-interest revenue cushion",
+          "direction": "bullish",
+          "weight": 0.4,
+          "color": "#34d399",
+          "source_citation": "Fundamentals Analyst \u2014 NIR mix",
+          "event_time": "2026-06-08T13:30:00.000Z",
+          "knowledge_time": "2026-06-08T13:42:11.000Z"
+        }
+      ]
+    }
+  ],
+  "alerts": [
+    {
+      "id": "engine_alert_2026-06-08_NVDA_return_z",
+      "asset_id": "asset_nvda",
+      "tier": "T0",
+      "z_score": 3.21,
+      "message": "NVDA 1-day return +7.1% (z=+3.2)",
+      "rationale": "1-day return is 3.2\u03c3 above its trailing mean (0.0004); deterministic screener trigger, no model involved.",
+      "created_at": "2026-06-08T13:42:11.000Z",
+      "acknowledged": false,
+      "useful_feedback": null,
+      "event_time": "2026-06-08T13:30:00.000Z",
+      "knowledge_time": "2026-06-08T13:42:11.000Z"
+    },
+    {
+      "id": "engine_alert_2026-06-08_HOOD_volume_z",
+      "asset_id": "asset_hood",
+      "tier": "T1",
+      "z_score": 2.79,
+      "message": "HOOD volume 1.2x avg (z=+2.8)",
+      "rationale": "Volume is 2.8\u03c3 above its trailing mean (99.65); deterministic screener trigger, no model involved.",
+      "created_at": "2026-06-08T13:42:11.000Z",
+      "acknowledged": false,
+      "useful_feedback": null,
+      "event_time": "2026-06-08T13:30:00.000Z",
+      "knowledge_time": "2026-06-08T13:42:11.000Z"
+    },
+    {
+      "id": "engine_alert_2026-06-08_BTC_return_z",
+      "asset_id": "asset_btc",
+      "tier": "T1",
+      "z_score": 2.25,
+      "message": "BTC 1-day return +5.0% (z=+2.3)",
+      "rationale": "1-day return is 2.3\u03c3 above its trailing mean (0.0004); deterministic screener trigger, no model involved.",
+      "created_at": "2026-06-08T13:42:11.000Z",
+      "acknowledged": false,
+      "useful_feedback": null,
+      "event_time": "2026-06-08T13:30:00.000Z",
+      "knowledge_time": "2026-06-08T13:42:11.000Z"
+    }
+  ],
+  "journal_sync": {
+    "pending_entries": [
+      {
+        "id": "engine_journal_2026-06-08_NVDA",
+        "briefing_card_id": "engine_card_2026-06-08_NVDA",
+        "thesis": "Capex upgrades from the top cloud buyers point to another beat-and-raise, and supply tightness supports pricing power through the next two quarters.",
+        "signals": [
+          "Hyperscaler capex guide raised",
+          "HBM supply tightening",
+          "Crowded positioning into print",
+          "Multiple prices in acceleration"
+        ],
+        "conviction": 10,
+        "horizon": "3-6 months",
+        "falsification_condition": "Data-center revenue grows <10% QoQ at the next print, or NVDA closes below the 50-day moving average for three consecutive sessions.",
+        "logged_at": "2026-06-08T13:42:11.000Z",
+        "event_time": "2026-06-08T13:30:00.000Z",
+        "knowledge_time": "2026-06-08T13:42:11.000Z"
+      }
+    ],
+    "outcomes": [],
+    "reflections": []
+  }
+}
