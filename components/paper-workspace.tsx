@@ -234,7 +234,7 @@ function ActiveRoundPanel({
         </Card>
       ) : (
         <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm text-on-surface-variant">
-          No active paper round is seeded.
+          No round open right now — check back next week.
         </div>
       )}
     </section>
@@ -321,7 +321,7 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
         </div>
       ) : (
         <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm text-on-surface-variant">
-          No past paper rounds are seeded.
+          No past rounds yet.
         </div>
       )}
     </section>
