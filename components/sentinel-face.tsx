@@ -100,7 +100,7 @@ export function SentinelFace({
         }}
       />
 
-      {/* eye + laser layer (nudged by the cursor) */}
+      {/* eye glow layer (nudged by the cursor) */}
       <div
         ref={eyesRef}
         className="pointer-events-none absolute inset-0"

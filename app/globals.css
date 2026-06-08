@@ -128,7 +128,7 @@
 
 /*
  * Master Mold's face. The eyes pulse + blink in one opacity track (mm-eye-live), the head
- * breathes, the mouth flickers when he talks, and lasers zap once when you click.
+ * breathes, and the mouth flickers when he talks.
  */
 @keyframes mm-eye-live {
   0%, 100% { opacity: 0.78; }
