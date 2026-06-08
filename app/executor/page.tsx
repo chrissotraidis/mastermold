@@ -37,7 +37,7 @@ export default function ExecutorPage() {
 
       {/* Pre-Sign Safety Gate Stack */}
       <Panel tint="act" className="mb-gutter p-5 sm:p-6">
-        <PanelHeader icon={SquareStack} iconClassName="text-caution" title="Pre-sign safety gate · fail-closed" />
+        <PanelHeader icon={SquareStack} iconClassName="text-caution" title="Every transaction clears four checks first" />
         <div className="relative z-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {GATE.map((step, i) => {
             const Icon = step.icon;

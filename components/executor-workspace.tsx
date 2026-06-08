@@ -89,7 +89,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
               Strategies
             </h2>
             <p className="mt-1 text-sm leading-6 text-outline">
-              Live status.
+              What's running right now — all in preview, none of it live.
             </p>
           </div>
 
