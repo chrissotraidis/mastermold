@@ -218,7 +218,7 @@ describe("UAT user journeys over seeded data", () => {
       expect(context.prompts).toHaveLength(4);
       expect(text).toContain("Advisory only");
       expect(text).toContain(context.facts.top_alert);
-      expect(text).toContain("not an instruction to trade or move funds");
+      expect(text).toContain("I never trade or move funds");
     } finally {
       if (originalOpenAiKey === undefined) {
         delete process.env.OPENAI_API_KEY;

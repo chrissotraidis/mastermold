@@ -25,7 +25,7 @@ const directions: Array<{
 
 const initialFormState: PaperPredictionFormState = {
   status: "idle",
-  message: "Your call is for process scoring only.",
+  message: "Scored on process, not P&L.",
   errors: [],
 };
 
@@ -61,8 +61,7 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
           <CardHeader className="p-5">
             <CardTitle className="text-xl text-on-surface">Your call</CardTitle>
             <p className="text-sm leading-6 text-outline">
-              Pick a direction and how sure you are. These entries do not place
-              trades or move capital.
+              Pick a direction and how sure you are. Nothing here places a trade.
             </p>
           </CardHeader>
           <CardContent className="p-5 pt-0">
@@ -145,7 +144,7 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                     id="paper-rationale"
                     name="rationale"
                     className="min-h-28 w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
-                    placeholder="What process evidence supports this prediction?"
+                    placeholder="What's the evidence behind this call?"
                     required
                   />
                 </FieldBlock>
@@ -176,12 +175,12 @@ export function PaperWorkspace({ paper }: PaperWorkspaceProps) {
                   className="w-full bg-violet text-void hover:bg-violet"
                 >
                   <SendHorizonal aria-hidden="true" />
-                  {isPending ? "Submitting prediction" : "Submit prediction"}
+                  {isPending ? "Submitting…" : "Submit call"}
                 </Button>
               </form>
             ) : (
               <div className="rounded-md border border-outline-variant/40 bg-surface-dim/50 p-4 text-sm leading-6 text-on-surface-variant">
-                No open paper round is available for prediction submission.
+                No round is open for calls right now.
               </div>
             )}
           </CardContent>
@@ -216,7 +215,7 @@ function ActiveRoundPanel({
           <CardHeader className="space-y-3 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-violet text-void hover:bg-violet">
-                {activeRound.status}
+                {titleCase(activeRound.status)}
               </Badge>
               <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                 {activePredictions.length} predictions
@@ -246,32 +245,27 @@ function RoundScorePanel({ round }: { round: PaperPageData["rounds"][number] }) 
     <section aria-labelledby="round-score-title" className="space-y-4">
       <div>
         <h2 id="round-score-title" className="text-xl font-semibold text-on-surface">
-          View round score
+          Round score
         </h2>
         <p className="mt-1 text-sm leading-6 text-outline">
-          Completed round score uses calibration, patience, diversification, and total.
+          Calibration, patience, and diversification — combined into a total.
         </p>
       </div>
       <Card className="border-outline-variant/40 bg-surface-high/30">
         <CardHeader className="p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-xl text-on-surface">{round.week_label}</CardTitle>
-            <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-              RoundScore
-            </Badge>
-          </div>
+          <CardTitle className="text-xl text-on-surface">{round.week_label}</CardTitle>
         </CardHeader>
         <CardContent className="p-5 pt-0">
           {round.score ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Metric label="calibration" value={round.score.calibration.toFixed(1)} />
-              <Metric label="patience" value={round.score.patience.toFixed(1)} />
-              <Metric label="diversification" value={round.score.diversification.toFixed(1)} />
-              <Metric label="total" value={round.score.total.toFixed(1)} />
+              <Metric label="Calibration" value={round.score.calibration.toFixed(1)} />
+              <Metric label="Patience" value={round.score.patience.toFixed(1)} />
+              <Metric label="Diversification" value={round.score.diversification.toFixed(1)} />
+              <Metric label="Total" value={round.score.total.toFixed(1)} />
             </div>
           ) : (
             <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
-              No RoundScore has been published for this completed round.
+              Not scored yet.
             </div>
           )}
         </CardContent>
@@ -288,7 +282,7 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
           Past rounds
         </h2>
         <p className="mt-1 text-sm leading-6 text-outline">
-          Past paper rounds list submitted predictions and neutral process scores.
+          Earlier rounds, with their calls and scores.
         </p>
       </div>
 
@@ -299,7 +293,7 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
               <CardHeader className="space-y-3 p-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                    {round.status}
+                    {titleCase(round.status)}
                   </Badge>
                   <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                     {round.predictions.length} predictions
@@ -311,8 +305,8 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
                 <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   <Metric label="Opens" value={formatTimestamp(round.opens_at)} />
                   <Metric label="Closes" value={formatTimestamp(round.closes_at)} />
-                  <Metric label="score total" value={round.score ? round.score.total.toFixed(1) : "Pending"} />
-                  <Metric label="diversification" value={round.score ? round.score.diversification.toFixed(1) : "Pending"} />
+                  <Metric label="Total score" value={round.score ? round.score.total.toFixed(1) : "Pending"} />
+                  <Metric label="Diversification" value={round.score ? round.score.diversification.toFixed(1) : "Pending"} />
                 </div>
                 <PredictionList predictions={round.predictions} title={`Predictions for ${round.week_label}`} />
               </CardContent>
@@ -358,14 +352,14 @@ function PredictionList({
               </div>
               <p className="mt-3 text-sm leading-6 text-on-surface-variant">{prediction.rationale}</p>
               <p className="mt-2 text-xs text-outline">
-                submitted_at {formatTimestamp(prediction.submitted_at)}
+                Submitted {formatTimestamp(prediction.submitted_at)}
               </p>
             </div>
           ))}
         </div>
       ) : (
         <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
-          No predictions have been submitted for this round.
+          No calls submitted for this round.
         </div>
       )}
     </div>
@@ -398,6 +392,10 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 break-words text-lg font-semibold text-on-surface">{value}</p>
     </div>
   );
+}
+
+function titleCase(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function formatTimestamp(value: string) {

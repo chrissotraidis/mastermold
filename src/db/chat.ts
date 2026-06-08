@@ -88,11 +88,10 @@ export function getChatContext(): ChatContext {
 
 function buildCannedResponse(facts: ChatContext["facts"]) {
   return [
-    "Advisory only - no trade authority.",
-    `Seeded context says ${facts.top_holding} is the largest portfolio exposure at ${facts.top_holding_weight_pct.toFixed(1)}% weight.`,
-    `Today's highest-priority alert is ${facts.top_alert_tier}: ${facts.top_alert}.`,
-    `Recent decision accuracy: ${facts.decision_accuracy}.`,
-    "Treat this as a review prompt, not an instruction to trade or move funds.",
+    `${facts.top_holding} is your largest exposure, ${facts.top_holding_weight_pct.toFixed(1)}% of the book.`,
+    `Top alert right now — ${facts.top_alert_tier}: ${facts.top_alert}.`,
+    `Recent record: ${facts.decision_accuracy}.`,
+    "No model key is connected, so this is a fixed read. Advisory only — I never trade or move funds.",
   ].join(" ");
 }
 

@@ -290,8 +290,8 @@ function KillSwitchDialog({
         </h2>
         <p className="mt-2 text-sm leading-6 text-on-surface-variant">
           {engaged
-            ? "I've stopped every live strategy and revoked my keys. Your briefing and the rest of the app keep working. (Right now I run nothing live, so this was a drill.)"
-            : "This stops every live strategy I'm running and revokes my keys instantly. Your briefing is unaffected. Right now I run nothing live — so this is a drill."}
+            ? "Done. Every live strategy halted, my keys revoked. Your briefing keeps working. Nothing ran live, so this was a drill."
+            : "Halts every live strategy and revokes my keys, immediately. Your briefing is untouched. Nothing runs live yet, so this is a drill."}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 font-mono text-[12px] uppercase tracking-telemetry text-on-surface-variant hover:text-on-surface">
@@ -330,9 +330,9 @@ export function FirstRunBanner() {
     <div className="mb-gutter flex items-start gap-3 border border-outline-variant/40 bg-surface-dim/50 p-4 chamfer-sm backdrop-blur-sm inner-glow">
       <Info className="mt-0.5 size-4 shrink-0 text-violet" />
       <p className="text-sm leading-6 text-on-surface-variant">
-        <strong className="text-on-surface">Advisory only</strong> — Master Mold cannot move your
-        equity or crypto. Its Web3 Executor acts only within the on-chain caps you set, and in this
-        version it signs nothing.
+        <strong className="text-on-surface">Advisory only.</strong> Master Mold can't move your
+        equity or crypto. The Web3 executor stays inside the on-chain caps you set, and signs
+        nothing in this version.
       </p>
       <Link
         href="/review"

@@ -13,7 +13,7 @@ export default function PaperPage() {
       <div className="mx-auto max-w-5xl">
         <PageHeader
           title="Practice"
-          subtitle="Call it before it happens, then see if you beat me. Scored on judgment — calibration, patience, diversification — not P&L. No real money."
+          subtitle="Make the call before the week plays out, then see how it scored. On judgment — calibration, patience, diversification — not P&L. No real money."
           provenance={paper.provenance.label}
         />
 
@@ -50,7 +50,7 @@ function EngineArena({
             My calls this round
           </h2>
           <p className="text-sm leading-6 text-on-surface-variant">
-            Here's where I landed on each idea. Make your own calls below — we're scored the same way.
+            Where I landed on each idea. Make yours below — same scoring.
           </p>
         </div>
       </div>

@@ -19,7 +19,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
       <div className="mx-auto max-w-5xl">
         <PageHeader
           title="Your portfolio"
-          subtitle="Everything you hold, in one place. Read-only — I can see it, I can't touch it."
+          subtitle="Everything you hold, read-only. I see it; I don't touch it."
           provenance="Demo data"
         />
 

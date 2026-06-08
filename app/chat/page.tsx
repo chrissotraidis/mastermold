@@ -19,7 +19,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       <div className="mx-auto max-w-4xl">
         <PageHeader
           title="Ask Master Mold"
-          subtitle="I know today's briefing, your alerts, holdings, and track record. Ask me anything — I'll answer, but I can't trade for you."
+          subtitle="Today's briefing, your alerts, holdings, and record are in context. I answer; I don't execute."
           provenance={dataMode.label}
         />
         <ChatWorkspace prompts={context.prompts} initialQuery={initialQuery} />

@@ -20,18 +20,18 @@ export default function ExecutorPage() {
       <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Web3 strategies"
-        subtitle="The one place I can act for you — running structural yield (lending, funding carry) inside caps you set. Right now it's a preview: nothing here signs a transaction or moves a cent."
+        subtitle="The one surface where I'd act — structural yield (lending, funding carry) inside caps you set. Right now it's a preview: nothing here signs or moves funds."
         provenance={executor.provenance.label}
         right={<Chip tone="critical">Signs nothing yet</Chip>}
       />
 
       <Panel className="mb-6 p-4" tint="act">
         <p className="relative z-10 font-mono text-[11px] uppercase tracking-telemetry text-caution">
-          Most you could ever lose = the small float I'm given
+          Worst case is the float I'm given — nothing more
         </p>
         <p className="relative z-10 mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
-          The spend cap lives on-chain, so even if I were fully hijacked I could only touch that tiny
-          working tranche — never your custody.
+          The spend cap lives on-chain. Even fully hijacked, I could only reach that small working
+          tranche — never your custody.
         </p>
       </Panel>
 

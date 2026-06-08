@@ -83,10 +83,10 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
           throw new Error("Acknowledge request failed");
         }
         replaceAlert((await response.json()) as AlertJson);
-        setMessage(`${alert.tier} alert acknowledged.`);
+        setMessage("Acknowledged.");
       } catch {
         updateAlert(alert.id, { acknowledged: alert.acknowledged });
-        setMessage("Acknowledge alert request failed. Try again.");
+        setMessage("Couldn't acknowledge. Try again.");
       } finally {
         setPendingAlertId(null);
       }
@@ -112,10 +112,10 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
           throw new Error("Feedback request failed");
         }
         replaceAlert((await response.json()) as AlertJson);
-        setMessage(`Feedback saved as ${usefulFeedback ? "useful" : "not useful"}.`);
+        setMessage(usefulFeedback ? "Noted — useful." : "Noted — not useful.");
       } catch {
         updateAlert(alert.id, { useful_feedback: alert.useful_feedback });
-        setMessage("Was this useful? request failed. Try again.");
+        setMessage("Couldn't save that. Try again.");
       } finally {
         setPendingAlertId(null);
       }
@@ -220,7 +220,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                     >
                       <div className="mb-2 flex items-center gap-2 font-semibold">
                         <MessageSquareText aria-hidden="true" className="size-4" />
-                        Alert rationale
+                        Why I flagged it
                       </div>
                       {alert.rationale}
                     </div>
@@ -261,7 +261,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
         </div>
       ) : (
         <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm leading-6 text-on-surface-variant">
-          No alerts match the selected tier filter.
+          Nothing in this tier.
         </div>
       )}
     </section>

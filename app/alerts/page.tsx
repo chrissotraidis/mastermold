@@ -16,7 +16,7 @@ export default function AlertsPage() {
           title="What changed"
           subtitle={
             active > 0
-              ? `${active} thing${active > 1 ? "s" : ""} worth a glance. Acknowledge what's noise; tell me what helped.`
+              ? `${active} flagged. Clear what's noise; tell me what was useful so I tune the rest.`
               : "All clear — nothing flagged right now."
           }
           provenance={dataMode.label}

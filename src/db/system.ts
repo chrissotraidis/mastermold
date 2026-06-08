@@ -65,16 +65,14 @@ function buildGreeting(o: {
   openAlerts: number;
 }): string {
   if (!o.engineLive) {
-    return "Here's a sample read. Connect the engine and I'll make this live.";
+    return "Running on sample data. Connect the engine to go live.";
   }
+  const alerts = o.openAlerts > 0 ? `${o.openAlerts} alert${o.openAlerts > 1 ? "s" : ""} flagged` : "";
   if (o.actionable === 0) {
-    return "Nothing worth acting on right now — I'm watching the rest for you.";
+    return alerts ? `Nothing clears the bar today. ${cap(alerts)}.` : "Nothing clears the bar today. I'll flag anything that does.";
   }
-  const ideas = `${o.actionable} idea${o.actionable > 1 ? "s" : ""} worth a look`;
-  if (o.t0Open) {
-    return `${cap(ideas)} today — and ${o.openAlerts} alert${o.openAlerts > 1 ? "s" : ""} need${o.openAlerts > 1 ? "" : "s"} your attention.`;
-  }
-  return `${cap(ideas)} today. Nothing urgent — ask me anything below.`;
+  const ideas = `${o.actionable} idea${o.actionable > 1 ? "s" : ""}`;
+  return alerts ? `${cap(ideas)} on the board today, ${alerts}.` : `${cap(ideas)} on the board today. Nothing flagged.`;
 }
 
 function cap(s: string): string {

@@ -102,7 +102,7 @@ export function ChatWorkspace({
               ? {
                   ...item,
                   content:
-                    "I couldn't reach my reasoning engine just then. Nothing was traded or moved — try again in a moment.",
+                    "Couldn't reach my reasoning engine. Nothing was traded or moved. Try again in a moment.",
                 }
               : item,
           ),
@@ -132,7 +132,7 @@ export function ChatWorkspace({
               <Bot aria-hidden="true" className="size-6" />
             </div>
             <p className="max-w-sm text-sm leading-6 text-on-surface-variant">
-              Ask me anything about today. I keep the thread for this session.
+              Ask anything about today. The thread holds for this session.
             </p>
             <div className="flex max-w-lg flex-wrap justify-center gap-2">
               {prompts.slice(0, 4).map((prompt) => (

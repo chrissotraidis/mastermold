@@ -21,7 +21,7 @@ export default function IntegrationsSettingsPage() {
       <div className="mx-auto max-w-4xl">
         <PageHeader
           title="Connections"
-          subtitle="Link your read-only accounts and choose your model. Keys live in this browser only — nothing here can place a trade."
+          subtitle="Link read-only accounts and pick a model. Keys stay in this browser. Nothing here can place a trade."
           provenance="Demo data"
         />
 

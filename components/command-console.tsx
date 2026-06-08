@@ -6,9 +6,9 @@ import { Send } from "lucide-react";
 
 const SUGGESTED = [
   "What should I look at first?",
-  "Make the bear case against the top idea",
+  "Argue the bear case on the top idea",
   "What changed overnight?",
-  "Am I getting better at this?",
+  "How's my recent hit-rate?",
 ];
 
 /**

@@ -71,7 +71,7 @@ export default function DeckPage() {
           href="/review"
           icon={ShieldCheck}
           label="What's real"
-          note="Advisory only — I can't move your money"
+          note="Advisory only. I never move funds."
         />
       </section>
     </AppShell>
@@ -110,11 +110,11 @@ function NothingActionable({ isEngine }: { isEngine: boolean }) {
       <div className="flex size-14 items-center justify-center rounded-full border border-caution/25 bg-caution/10 text-caution">
         <CircleSlash2 className="size-7" />
       </div>
-      <h3 className="font-display text-xl font-semibold text-on-surface">Nothing to act on today</h3>
+      <h3 className="font-display text-xl font-semibold text-on-surface">Nothing clears the bar</h3>
       <p className="max-w-md text-sm leading-6 text-on-surface-variant">
         {isEngine
-          ? "I screened your watchlist and nothing cleared the bar. Waiting is a real answer — I'll ping you when something matters."
-          : "This is sample data. Connect the engine and I'll show you what actually needs you."}
+          ? "Screened your watchlist — nothing crossed the line today. I'll surface the next thing that does."
+          : "Sample data. Connect the engine to see live calls."}
       </p>
     </div>
   );

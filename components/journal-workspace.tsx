@@ -31,7 +31,7 @@ const initialFormState: FormState = {
 export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJson }) {
   const [entries, setEntries] = useState(initialJournal.entries);
   const [form, setForm] = useState<FormState>(initialFormState);
-  const [message, setMessage] = useState("Log new decision entries before the outcome window.");
+  const [message, setMessage] = useState("Log a call before the outcome lands.");
   const [errors, setErrors] = useState<FormErrors>({});
   const [lastLoggedId, setLastLoggedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -58,7 +58,7 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
     if (Object.keys(clientErrors).length > 0) {
       setErrors(clientErrors);
       setLastLoggedId(null);
-      setMessage("Status: decision not logged. Complete the required fields highlighted below.");
+      setMessage("Not logged — fill the highlighted fields.");
       return;
     }
 
@@ -87,7 +87,7 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
               ? body.errors
               : ["error" in body && body.error ? body.error : "Decision could not be logged."];
           setErrors({ thesis: nextErrors.join(" ") });
-          setMessage("Status: log decision failed. Review the highlighted fields.");
+          setMessage("Couldn't log — check the highlighted fields.");
           return;
         }
 
@@ -95,10 +95,10 @@ export function JournalWorkspace({ initialJournal }: { initialJournal: JournalJs
         setEntries((current) => [entry, ...current]);
         setForm(initialFormState);
         setLastLoggedId(entry.id);
-        setMessage(`Status: decision logged at ${formatTimestamp(entry.logged_at)} and added to journal history.`);
+        setMessage(`Logged at ${formatTimestamp(entry.logged_at)}.`);
       } catch {
         setErrors({ thesis: "Network request failed. Try again." });
-        setMessage("Status: log decision request failed.");
+        setMessage("Request failed. Try again.");
       }
     });
   }
@@ -327,7 +327,7 @@ function EntryList({
                   <div className="rounded-md border border-engine/20 bg-engine/[0.07] p-4">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                       <CheckCircle2 aria-hidden="true" className="size-4 text-engine" />
-                      <p className="text-sm font-semibold text-engine">Linked outcome score</p>
+                      <p className="text-sm font-semibold text-engine">Outcome scored</p>
                       <Badge variant="outline" className="border-engine/40 text-engine">
                         Thesis played out: {entry.outcome_score.thesis_played_out ? "yes" : "no"}
                       </Badge>
@@ -341,7 +341,7 @@ function EntryList({
                   </div>
                 ) : (
                   <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
-                    No outcome score yet. This decision is logged before the outcome window.
+                    No outcome yet — this call is logged ahead of the result.
                   </div>
                 )}
               </CardContent>
@@ -350,7 +350,7 @@ function EntryList({
         </div>
       ) : (
         <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm text-on-surface-variant">
-          No decision journal entries have been logged.
+          No calls logged yet.
         </div>
       )}
     </section>
@@ -362,10 +362,10 @@ function StrategyBeliefSection({ journal }: { journal: JournalJson }) {
     <section aria-labelledby="strategy-beliefs-title" className="space-y-4">
       <div>
         <h2 id="strategy-beliefs-title" className="text-xl font-semibold text-on-surface">
-          View strategy beliefs
+          What I've learned
         </h2>
         <p className="mt-1 text-sm text-outline">
-          What I have learned — beliefs only move after several consistent outcomes.
+          Beliefs only move after several consistent outcomes — never on one.
         </p>
       </div>
       <div className="grid gap-4">
@@ -411,7 +411,7 @@ function StrategyBeliefSection({ journal }: { journal: JournalJson }) {
                 ))
               ) : (
                 <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
-                  No reflection updates recorded for this belief.
+                  No updates to this belief yet.
                 </div>
               )}
             </CardContent>

@@ -25,101 +25,94 @@ type ReviewReadinessProps = {
 
 const disclosureSections = [
   {
-    title: "What works now",
+    title: "Working now",
     icon: CheckCircle2,
     tone: "text-engine",
-    summary: "These screens are fully wired and reviewable with sample data.",
+    summary: "Fully wired and reviewable on sample data.",
     items: [
-      "Daily Briefing",
-      "Card detail with drivers",
-      "Alert Feed",
-      "Portfolio + concentration",
-      "Decision Journal + track record",
-      "Paper Trading sandbox",
-      "Agent Chat shell",
-      "Executor monitor",
-      "Integrations",
-      "Review page",
-      "Bitemporal as-of replay over seeded data",
+      "Daily briefing, and card detail with ranked drivers",
+      "Alert feed",
+      "Portfolio and concentration",
+      "Decision journal and track record",
+      "Practice rounds",
+      "Chat",
+      "Web3 strategy monitor",
+      "Connections",
+      "Time-travel: replay any page as of an earlier moment",
     ],
   },
   {
-    title: "What the engine computes vs fills in",
+    title: "What the engine computes",
     icon: Cpu,
     tone: "text-engine",
     summary:
-      "A Python sidecar (TradingAgents, screener-gated funnel) writes a dated JSON bundle the dashboard ingests. When a bundle is present and valid, the briefing and alert feed are computed, not fabricated; everything else still falls back to seeds.",
+      "When a run is loaded, these come straight from it. Everything else falls back to sample data.",
     items: [
-      "LIVE when a run is ingested: Daily Briefing cards (PM rating → conviction + drivers) and the Alert Feed (deterministic z-score screener, no LLM).",
-      "LIVE when a run carries resolved decisions: the Decision Journal's track-record-by-tier, the calibration curve, and the reflection significance gate — belief confidence moves only after N consistent same-direction outcomes; a single outcome cannot flip a belief.",
-      "LIVE: chat interrogates today's engine briefing; the paper game auto-enters an engine prediction per card (human-vs-engine arena); the alert-feedback loop turns useful/not-useful marks into screener-threshold tuning suggestions (see Screener tuning above).",
-      "Per-card and per-alert provenance reads 'Engine output' (emerald) vs 'Demo data' (cyan); a quiet day renders 'nothing actionable' at zero LLM cost.",
-      "STILL SEEDED: portfolio, paper round scoring, executor metrics.",
-      "STILL STUBBED (Phase 4, needs keys/ops): live cron scheduling, Anthropic prompt caching, batch-API reflections, and the live LLM run itself.",
-      "Bitemporal honesty preserved: every engine artifact carries event_time + knowledge_time, stamped at write time, never backdated; future-stamped bundles are rejected as look-ahead.",
-      "The engine never touches a brokerage — it reads data and writes JSON, so advisory-only / read-only is unchanged.",
+      "Briefing cards — conviction and drivers — and the alert feed, which is a z-score screener with no model in the loop.",
+      "When a run carries resolved calls: the track record, the calibration curve, and the belief-update gate. A belief only moves after several consistent outcomes — never on a single one.",
+      "Chat reasons over today's briefing. Practice auto-enters my call on each idea to score against. Marking alerts useful or not tunes the screener.",
+      "Every card and alert is labeled Engine output or Demo data. A quiet day costs nothing — no model runs.",
+      "Still on sample data: portfolio, practice scoring, strategy metrics.",
+      "Each engine fact carries when it happened and when it became known — stamped on write, never backdated.",
+      "The engine reads data and writes results. It never touches a brokerage, so the advisory-only line holds.",
     ],
   },
   {
-    title: "What's sample data",
+    title: "Sample data",
     icon: Database,
     tone: "text-violet",
     summary:
-      "Holdings, prices, funding, paper rounds, journal outcomes, and executor metrics are fabricated demo data. Briefing cards and alerts are seeded only when no engine run has been ingested.",
+      "Holdings, prices, funding, practice rounds, and outcomes are sample data. Briefing and alerts use it only when no engine run is loaded.",
     items: [
-      "No real money, positions, or P&L are represented in this V0.",
-      "Fake monetary figures and portfolio values are for review only.",
-      "Seed data includes event_time and knowledge_time so as-of replay can be inspected.",
-      "Seeds are the permanent zero-config fallback: the app boots fully with no credentials and no engine output.",
+      "No real positions, balances, or P&L are connected.",
+      "Sample figures exist so concentration, calibration, and scoring are reviewable.",
+      "Sample data carries timestamps too, so time-travel works against it.",
+      "It's the always-available fallback — the app runs fully with no keys and no engine.",
     ],
   },
   {
-    title: "Every dollar figure is fake",
+    title: "The money isn't real",
     icon: Database,
     tone: "text-violet",
-    summary:
-      "Every dollar value, cost basis, portfolio value, and P&L-style outcome is sample/demo money.",
+    summary: "Every dollar amount, cost basis, and P&L line is sample money.",
     items: [
-      "No real money, positions, tax lots, realized P&L, or account balances are connected.",
-      "Fake costs exist only to make portfolio concentration and journal review testable.",
-      "The app never turns sample values into trade instructions.",
+      "No real balances, tax lots, or realized P&L are connected.",
+      "Sample amounts only exist to make the portfolio and journal reviewable.",
+      "Nothing here turns a sample figure into a trade.",
     ],
   },
   {
-    title: "Services that are off until you add keys",
+    title: "Dormant connections",
     icon: LockKeyhole,
     tone: "text-caution",
-    summary:
-      "External services are inert unless a reviewer chooses to provide local credentials.",
+    summary: "External services stay inert until you add your own keys, locally.",
     items: [
-      "Coinbase CDP is stubbed and only modeled as a view-only integration.",
-      "Robinhood via SnapTrade is stubbed and modeled as read-only OAuth.",
-      "Zerion on-chain data is stubbed.",
-      "LLM chat and reasoning are credential-gated; add keys in .env.local for live output.",
+      "Coinbase — read-only, modeled with sample balances.",
+      "Robinhood, via SnapTrade — read-only, modeled with sample balances.",
+      "On-chain wallet, via Zerion — sample data.",
+      "Reasoning model — chat runs from a fixed script until you add a model key in .env.local.",
     ],
   },
   {
-    title: "Buttons that only change local state",
+    title: "Local-only actions",
     icon: CircleAlert,
     tone: "text-caution",
-    summary:
-      "Workflow controls prove local state changes for review, but they do not perform production work.",
+    summary: "Controls here change state in your browser to prove the flow. None reach production.",
     items: [
-      "Create review packet builds a paper-only advisory packet in browser state.",
-      "Guardrail edits, kill-switch actions, saves, toggles, and feedback are local review actions.",
-      "No workflow signs a transaction, submits an order, moves funds, or contacts a chain RPC.",
+      "Saving a guardrail draft, pressing a kill switch, toggling a connection, and rating an alert all stay local.",
+      "Nothing signs a transaction, places an order, moves funds, or calls a chain.",
     ],
   },
   {
     title: "Not built yet",
     icon: CircleAlert,
     tone: "text-critical",
-    summary: "On the roadmap, but not live in this version.",
+    summary: "On the roadmap, not in this build.",
     items: [
-      "Always-on ingestion: the engine runs on demand (bin/engine-briefing), not yet as a scheduled always-on service (Phase 4).",
-      "Live eval harness DSR/PBO/MinTRL, Alpaca paper live-shadow, and post-cutoff validation",
-      "Bounded-autonomy Web3 executor as a live actor with custody, spend caps, fail-closed gates, and a real kill switch",
-      "CPA tax sign-off for straddle and funding-income treatment before any real capital",
+      "An always-on engine on a schedule — today it runs on demand.",
+      "A live evaluation harness and post-cutoff validation.",
+      "A real Web3 executor that signs, with custody limits and a working kill switch.",
+      "Tax sign-off before any real capital goes in.",
     ],
   },
 ] as const;
@@ -142,9 +135,9 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
           What is real right now
         </h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant sm:text-base">
-          My honesty page. It lays out plainly what's live, what's sample data, which
-          services are off until you add keys, and what isn't built yet — so you always
-          know what you're looking at.
+          Nothing here pretends to be more than it is. Below: what's computed from a live
+          engine run, what's sample data, which connections are dormant, and what's still
+          being built. Labeled, so you're never guessing.
         </p>
       </div>
 
@@ -192,11 +185,10 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
             <UserRound aria-hidden="true" className="size-5" />
           </div>
           <div>
-            <CardTitle className="text-xl text-on-surface">Review-mode access</CardTitle>
+            <CardTitle className="text-xl text-on-surface">No setup required</CardTitle>
             <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Use reviewer@demo.local as the seeded review persona. No credentials are
-              required to evaluate the app; entering real keys is optional, local, and
-              isolated to the reviewer&apos;s environment.
+              No login or credentials needed to look around. Any keys you add are optional
+              and stay in this browser.
             </CardDescription>
           </div>
         </CardHeader>
@@ -274,9 +266,9 @@ function ScreenerTuningCard() {
           <ProvenanceChip label={feedback.provenance.label} />
         </div>
         <CardDescription className="text-sm leading-6 text-on-surface-variant">
-          The alert-feedback loop, no LLM: alerts you mark useful/not-useful tune the
-          deterministic screener. Suggestions below are advisory — the threshold change in
-          engine/config.yml stays manual. {feedback.total_rated} alert(s) rated so far.
+          Marking alerts useful or not tunes the screener thresholds — no model involved.
+          These are suggestions; I don't change the config myself. {feedback.total_rated} rated
+          so far.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-5 pt-0">
@@ -334,8 +326,8 @@ function EngineStatusCard() {
               <ProvenanceChip label="Engine output" />
             </div>
             <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Today's briefing and alerts come from a real engine run, not sample data.
-              Here's exactly what produced them.
+              Today's briefing and alerts are computed from a live run. The exact run
+              behind them:
             </CardDescription>
           </div>
         </CardHeader>
@@ -364,14 +356,14 @@ function EngineStatusCard() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <CardTitle className="text-xl text-on-surface">
-              {invalid ? "Engine output present but unusable" : "No engine output ingested"}
+              {invalid ? "Latest run couldn't be used" : "No engine run loaded"}
             </CardTitle>
             <ProvenanceChip label="Demo data" />
           </div>
           <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
             {invalid
-              ? `The newest bundle was rejected (${status.reason}). The briefing and alerts fall back to seeded demo data until a valid run lands.`
-              : "Briefing and alerts render from seeded demo data — the permanent zero-config fallback. Run bin/engine-briefing to ingest a live run."}
+              ? `The newest run was rejected (${status.reason}), so briefing and alerts fall back to sample data until a clean run lands.`
+              : "Briefing and alerts are showing sample data — the always-available fallback. Run the engine briefing to load live output."}
           </CardDescription>
         </div>
       </CardHeader>

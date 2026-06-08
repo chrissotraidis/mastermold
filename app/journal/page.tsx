@@ -20,7 +20,7 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       <div className="mx-auto max-w-4xl">
         <PageHeader
           title="Track record"
-          subtitle="Am I getting better at this? Every call is logged before the outcome, then scored — so I can't fool myself."
+          subtitle="Every call is logged before the outcome, then scored against what actually happened."
           provenance={journal.provenance.label}
         />
 
@@ -48,8 +48,7 @@ function CalibrationCurve({ buckets, isEngine }: { buckets: CalibrationBucketJso
             Calibration
           </h2>
           <p className="mt-1 max-w-xl text-sm leading-6 text-outline">
-            Does my confidence mean anything? This shows how often calls at each conviction level
-            actually played out.
+            How often calls at each conviction level actually played out.
           </p>
         </div>
         <span className="font-mono text-xs uppercase tracking-telemetry text-outline">{resolved} resolved</span>
