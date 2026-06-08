@@ -36,7 +36,7 @@ const NAV: NavItem[] = [
   { href: "/journal", label: "Track record", icon: BookOpenText, zone: "advise" },
   { href: "/paper", label: "Practice", icon: Gamepad2, zone: "advise" },
   { href: "/executor", label: "Web3 strategies", icon: Wallet, zone: "act" },
-  { href: "/review", label: "What's real", icon: ClipboardCheck, zone: "system" },
+  { href: "/review", label: "Transparency", icon: ClipboardCheck, zone: "system" },
   { href: "/settings/integrations", label: "Settings", icon: Settings, zone: "system" },
 ];
 
@@ -338,7 +338,7 @@ export function FirstRunBanner() {
         href="/review"
         className="ml-auto hidden shrink-0 items-center gap-1 font-mono text-[11px] uppercase tracking-telemetry text-violet hover:text-tertiary sm:flex"
       >
-        <ArrowLeft className="size-3.5 rotate-180" /> Review
+        <ArrowLeft className="size-3.5 rotate-180" /> Transparency
       </Link>
     </div>
   );

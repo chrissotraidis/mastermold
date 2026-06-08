@@ -124,7 +124,7 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
       <div className="rounded-lg border border-outline-variant/40 bg-surface-dim/70 p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-violet text-void hover:bg-violet">
-            What's real
+            Transparency
           </Badge>
           <ProvenanceChip label={dataMode.label} title={dataMode.source} />
         </div>
@@ -132,7 +132,7 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
           id="review-readiness-title"
           className="mt-4 text-2xl font-semibold text-on-surface sm:text-3xl"
         >
-          What is real right now
+          What's live, what's not
         </h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant sm:text-base">
           Nothing here pretends to be more than it is. Below: what's computed from a live

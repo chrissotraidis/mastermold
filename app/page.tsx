@@ -70,8 +70,8 @@ export default function DeckPage() {
         <FooterLink
           href="/review"
           icon={ShieldCheck}
-          label="What's real"
-          note="Advisory only. I never move funds."
+          label="Transparency"
+          note="What's live, what's sample, what I can't do"
         />
       </section>
     </AppShell>
