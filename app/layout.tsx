@@ -43,7 +43,10 @@ export default function RootLayout({
       className={cn("dark", spaceGrotesk.variable, inter.variable, jetbrainsMono.variable)}
       suppressHydrationWarning
     >
-      <body className="min-h-screen bg-background font-body text-foreground antialiased">
+      <body
+        className="min-h-screen bg-background font-body text-foreground antialiased"
+        suppressHydrationWarning
+      >
         <ProfileProvider>{children}</ProfileProvider>
       </body>
     </html>
