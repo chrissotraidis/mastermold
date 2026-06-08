@@ -165,10 +165,10 @@ export const demoDatabase: DemoDatabase = {
     { id: "guard_default", per_tx_cap: 0, daily_cap: 0, contract_allowlist: ["0xDemoAavePool", "0xDemoPermit2"], recipient_allowlist: ["0xDemoVault"], session_key_expiry: "2026-06-30T00:00:00Z", event_time: "2026-05-28T10:00:00Z", knowledge_time: "2026-05-28T10:02:00Z" },
   ],
   integrationStatuses: [
-    { id: "int_coinbase", service: "coinbase", status: "stubbed", detail: "Coinbase CDP is represented by seeded read-only balances; no live CDP call is made.", event_time: "2026-05-24T14:00:00Z", knowledge_time: "2026-05-24T14:03:00Z" },
-    { id: "int_robinhood", service: "robinhood", status: "stubbed", detail: "Robinhood through SnapTrade is represented with read-only seeded balances.", event_time: "2026-05-25T13:30:00Z", knowledge_time: "2026-05-25T13:41:00Z" },
-    { id: "int_wallet", service: "onchain_wallet", status: "stubbed", detail: "onchain_wallet data is demo-only; no chain transactions or signing exist.", event_time: "2026-05-26T16:20:00Z", knowledge_time: "2026-05-26T16:25:00Z" },
-    { id: "int_llm", service: "llm", status: "credential_gated", detail: "Chat reasoning is canned unless an optional LLM key is provided.", event_time: "2026-05-27T10:00:00Z", knowledge_time: "2026-05-27T10:01:00Z" },
+    { id: "int_coinbase", service: "coinbase", status: "stubbed", detail: "Showing seeded crypto balances. Add a read-only key and I'll pull your live Coinbase holdings.", event_time: "2026-05-24T14:00:00Z", knowledge_time: "2026-05-24T14:03:00Z" },
+    { id: "int_robinhood", service: "robinhood", status: "stubbed", detail: "Showing seeded equity balances. Add a SnapTrade key and I'll pull your live Robinhood holdings.", event_time: "2026-05-25T13:30:00Z", knowledge_time: "2026-05-25T13:41:00Z" },
+    { id: "int_wallet", service: "onchain_wallet", status: "stubbed", detail: "Showing a sample on-chain wallet. Add a Zerion key and I'll track your real one.", event_time: "2026-05-26T16:20:00Z", knowledge_time: "2026-05-26T16:25:00Z" },
+    { id: "int_llm", service: "llm", status: "credential_gated", detail: "I'm answering from a script right now. Add a model key and I'll reason live.", event_time: "2026-05-27T10:00:00Z", knowledge_time: "2026-05-27T10:01:00Z" },
   ],
   strategyBeliefs: [
     { id: "belief_patience", name: "Patience over churn", statement: "Signals need repeated evidence before changing exposure.", confidence: 0.72, updated_at: "2026-05-29T21:00:00Z", event_time: "2026-05-29T21:00:00Z", knowledge_time: "2026-05-29T21:03:00Z" },

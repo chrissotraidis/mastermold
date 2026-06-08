@@ -20,7 +20,7 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
   const [loaded, setLoaded] = useState(false);
   const [connected, setConnected] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [message, setMessage] = useState("Optional key stays in localStorage only.");
+  const [message, setMessage] = useState("Optional — leave blank to stay on demo data.");
 
   useEffect(() => {
     setValue(window.localStorage.getItem(storageKey) ?? "");
@@ -32,14 +32,14 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
     setValue(nextValue);
     setSaved(false);
     window.localStorage.setItem(storageKey, nextValue);
-    setMessage("Unsaved edit staged in this browser.");
+    setMessage("Unsaved change.");
   }
 
   function saveKey() {
     markBrowserAction(`save-${service}`);
     window.localStorage.setItem(storageKey, value);
     setSaved(true);
-    setMessage(value ? "Saved in this browser only." : "Saved empty local key state.");
+    setMessage(value ? "Saved to this browser." : "Cleared.");
   }
 
   function connectDemo() {
@@ -49,8 +49,8 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
     window.localStorage.setItem(connectionKey, String(nextConnected));
     setMessage(
       nextConnected
-        ? "Connected locally for review mode; no external service was contacted."
-        : "Disconnected local review state.",
+        ? "Connected for review. Nothing live was contacted."
+        : "Disconnected.",
     );
   }
 
@@ -113,7 +113,7 @@ export function IntegrationKeyInput({ service, label }: IntegrationKeyInputProps
         {message}
       </p>
       <p id={`${inputId}-hint`} className="text-xs leading-5 text-outline" data-action-evidence={message}>
-        {loaded && (value || saved || connected) ? message : "Optional key stays in localStorage only."}
+        {loaded && (value || saved || connected) ? message : "Optional — leave blank to stay on demo data."}
       </p>
     </div>
   );

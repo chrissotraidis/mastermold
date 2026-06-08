@@ -248,7 +248,7 @@ describe("UAT user journeys over seeded data", () => {
         (integration) =>
           integration.detail.length > 0 &&
           integration.display_name.length > 0 &&
-          integration.credential_hint.startsWith("Optional"),
+          integration.credential_hint.length > 0,
       ),
     ).toBe(true);
   });

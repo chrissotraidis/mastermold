@@ -8,20 +8,20 @@ export type IntegrationStatusJson = IntegrationStatus & {
 
 const serviceDisplay: Record<IntegrationStatus["service"], Pick<IntegrationStatusJson, "display_name" | "credential_hint">> = {
   coinbase: {
-    display_name: "Coinbase CDP",
-    credential_hint: "Optional Coinbase CDP API key",
+    display_name: "Coinbase",
+    credential_hint: "Coinbase API key (read-only)",
   },
   robinhood: {
-    display_name: "Robinhood via SnapTrade",
-    credential_hint: "Optional SnapTrade client key",
+    display_name: "Robinhood",
+    credential_hint: "SnapTrade client key",
   },
   onchain_wallet: {
-    display_name: "Zerion on-chain",
-    credential_hint: "Optional Zerion API key",
+    display_name: "On-chain wallet",
+    credential_hint: "Zerion API key",
   },
   llm: {
-    display_name: "LLM",
-    credential_hint: "Optional LLM API key",
+    display_name: "Reasoning model",
+    credential_hint: "Model API key",
   },
 };
 

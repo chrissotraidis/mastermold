@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { IntegrationKeyInput } from "@/components/integration-key-input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/integrations";
 
@@ -44,14 +44,9 @@ export default function IntegrationsSettingsPage() {
                             <PlugZap aria-hidden="true" className="size-5" />
                           )}
                         </div>
-                        <div>
-                          <CardTitle className="text-xl text-on-surface">
-                            {integration.display_name}
-                          </CardTitle>
-                          <CardDescription className="mt-1 text-outline">
-                            {integration.service}
-                          </CardDescription>
-                        </div>
+                        <CardTitle className="text-xl text-on-surface">
+                          {integration.display_name}
+                        </CardTitle>
                       </div>
                     </div>
                     <StatusBadge status={integration.status} />
@@ -85,7 +80,7 @@ function StatusBadge({ status }: { status: IntegrationStatusJson["status"] }) {
     <Badge
       className={cn(
         "border text-xs",
-        status === "connected" && "border-emerald-300/30 bg-engine/10 text-engine",
+        status === "connected" && "border-engine/30 bg-engine/10 text-engine",
         status === "stubbed" && "border-caution/40 bg-caution/10 text-caution",
         status === "credential_gated" &&
           "border-violet/40 bg-violet/10 text-violet",
@@ -94,14 +89,5 @@ function StatusBadge({ status }: { status: IntegrationStatusJson["status"] }) {
     >
       {statusLabels[status]}
     </Badge>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-outline-variant/40 bg-surface-dim/50 p-3">
-      <p className="text-xs font-semibold uppercase text-outline">{label}</p>
-      <p className="mt-1 font-mono text-lg text-on-surface">{value}</p>
-    </div>
   );
 }
