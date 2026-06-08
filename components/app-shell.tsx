@@ -30,12 +30,12 @@ type NavItem = { href: string; label: string; icon: LucideIcon; zone: Zone };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Today", icon: Hexagon, zone: "advise" },
-  { href: "/chat", label: "Ask Master Mold", icon: Bot, zone: "advise" },
+  { href: "/chat", label: "Chat", icon: Bot, zone: "advise" },
   { href: "/alerts", label: "Alerts", icon: AlertTriangle, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", icon: LineChart, zone: "observe" },
   { href: "/journal", label: "Track record", icon: BookOpenText, zone: "advise" },
   { href: "/paper", label: "Practice", icon: Gamepad2, zone: "advise" },
-  { href: "/executor", label: "Web3 strategies", icon: Wallet, zone: "act" },
+  { href: "/executor", label: "Web3", icon: Wallet, zone: "act" },
   { href: "/review", label: "Transparency", icon: ClipboardCheck, zone: "system" },
   { href: "/settings/integrations", label: "Settings", icon: Settings, zone: "system" },
 ];
