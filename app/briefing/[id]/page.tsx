@@ -194,7 +194,7 @@ function DriverRow({ driver, position }: { driver: Driver; position: number }) {
         </p>
         <details className="group rounded-md border border-outline-variant/40 bg-surface-dim/40 p-3">
           <summary className="cursor-pointer text-sm font-medium text-violet marker:text-violet">
-            Expand source citation
+            When this was known
           </summary>
           <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <div>
