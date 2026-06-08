@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -17,11 +17,13 @@ import {
   Settings,
   ShieldAlert,
   Terminal,
+  UserRound,
   Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { SentinelFace, type SystemState } from "@/components/sentinel-face";
+import { useProfile } from "@/components/profile-provider";
 import { cn } from "@/lib/utils";
 
 type Zone = "observe" | "advise" | "act" | "system";
@@ -63,6 +65,19 @@ export function AppShell({
 }) {
   const [killOpen, setKillOpen] = useState(false);
   const [killEngaged, setKillEngaged] = useState(false);
+  const { ready, hasProfile, welcomeSeen } = useProfile();
+  const router = useRouter();
+  // First run: a fresh clone with no profile and no "skip" yet lands on the getting-started page.
+  const needsSetup = ready && !hasProfile && !welcomeSeen;
+
+  useEffect(() => {
+    if (needsSetup) router.replace("/welcome");
+  }, [needsSetup, router]);
+
+  // Hold a quiet veil while the redirect to /welcome happens, so the app never flashes first.
+  if (needsSetup) {
+    return <div className="min-h-screen scanline-bg" aria-hidden="true" />;
+  }
 
   return (
     <div className="relative min-h-screen scanline-bg">
@@ -104,8 +119,10 @@ function TopBar({
 }) {
   const router = useRouter();
   const pathname = usePathname() || "/";
+  const { ready, profile } = useProfile();
   const [q, setQ] = useState("");
   const isEngine = dataMode === "Engine output";
+  const firstName = profile?.name.trim().split(/\s+/)[0] ?? "";
   // The command bar duplicates the hero console on the deck and the chat page itself.
   const showCommandBar = pathname !== "/" && pathname !== "/chat";
 
@@ -151,6 +168,18 @@ function TopBar({
               />
             </div>
           </form>
+        ) : null}
+        {ready ? (
+          <Link
+            href="/settings/integrations"
+            title={profile ? "Profile & settings" : "Set up your profile"}
+            className="hidden items-center gap-2 border border-outline-variant/50 bg-void/50 px-2.5 py-1.5 text-sm chamfer-sm transition-colors hover:border-violet/50 hover:text-violet sm:flex"
+          >
+            <UserRound aria-hidden="true" className="size-4 text-outline" />
+            <span className="max-w-28 truncate text-on-surface-variant">
+              {profile ? firstName || "Profile" : "Set up"}
+            </span>
+          </Link>
         ) : null}
         {killEngaged ? (
           <button

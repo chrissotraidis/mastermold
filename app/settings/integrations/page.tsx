@@ -2,6 +2,7 @@ import { Database, LockKeyhole, PlugZap } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { IntegrationKeyInput } from "@/components/integration-key-input";
+import { ProfileSettings } from "@/components/profile-settings";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -20,15 +21,24 @@ export default function IntegrationsSettingsPage() {
     <AppShell dataMode="Demo data">
       <div className="mx-auto max-w-4xl">
         <PageHeader
-          title="Connections"
-          subtitle="Link read-only accounts and pick a model. Keys stay in this browser. Nothing here can place a trade."
+          title="Settings"
+          subtitle="Your profile, your connected accounts, and your backups — all kept in this browser."
           provenance="Demo data"
         />
 
+        <div className="mb-8">
+          <ProfileSettings />
+        </div>
+
         <section aria-labelledby="integration-status-title" className="space-y-4">
-          <h2 id="integration-status-title" className="sr-only">
-            Connection status
-          </h2>
+          <div>
+            <h2 id="integration-status-title" className="text-xl font-semibold text-on-surface">
+              Connections
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-outline">
+              Link read-only accounts and pick a model. Keys stay in this browser. Nothing here can place a trade.
+            </p>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             {integrations.map((integration) => (

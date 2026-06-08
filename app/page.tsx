@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { CommandConsole } from "@/components/command-console";
 import { DailyBriefingCard } from "@/components/briefing-card";
 import { SentinelFace } from "@/components/sentinel-face";
+import { ProfileGreeting } from "@/components/profile-greeting";
 import { ProvenanceChip } from "@/components/provenance-chip";
 import { getBriefingCards } from "@/src/db/briefing";
 import { getDataMode } from "@/src/db/engine-data";
@@ -24,6 +25,7 @@ export default function DeckPage() {
           <SentinelFace state={system.state} className="scale-110" />
         </div>
 
+        <ProfileGreeting />
         <h1 className="max-w-2xl text-balance font-display text-2xl font-semibold leading-snug tracking-tight text-on-surface sm:text-[28px]">
           {system.greeting}
         </h1>

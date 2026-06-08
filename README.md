@@ -15,14 +15,46 @@ that output through a thin, schema-validated layer — falling back to seeded de
 whenever the engine has not run. The original product reference documents are preserved
 in `docs/ref`.
 
+## Getting started
+
+Master Mold is built to **clone and run with zero setup** — no credentials, no engine, no
+external accounts required. It boots on seeded sample data so you can explore the whole app
+immediately.
+
+```bash
+bun install
+bun dev            # then open the printed http://localhost:<port> URL
+```
+
+The first time you open it, a **getting-started screen** (`/welcome`) walks you through an
+optional profile. You can fill it in — or click **Skip** and explore the demo right away.
+Nothing here can move money; the app is advisory-only by construction.
+
+### Your profile (backup & restore)
+
+Everything personal — your name, preferences, and which accounts you connect — lives in
+**your browser only** (localStorage). There is no account and no server-side user data.
+
+- **Set it up:** name + risk posture + asset focus on `/welcome`, or later in **Settings → Profile**.
+- **Connect accounts (optional):** add read-only API keys under **Settings → Connections**.
+  Keys never leave your browser and never gain trade authority.
+- **Export:** **Settings → Profile → Export** downloads a single `mastermold-profile-*.json`
+  bundling your preferences *and* connected accounts.
+- **Import:** drop that file into **Import profile** (or **Restore from a backup** on the
+  welcome screen) on any machine to pick up exactly where you left off.
+- **Start from scratch:** wipes all local state and returns you to the getting-started screen.
+
+This makes the project portable and personal at once: anyone can clone it and start fresh,
+and you can back up and move your own setup between machines with one file.
+
 ## Current State
 
 The dashboard boots fully with **zero credentials and zero engine output**, rendering
 from local seeded data. When the engine has written a run, the briefing, alerts, journal
 track record, calibration curve, paper arena, and chat context are **computed from real
 engine output** instead, each labelled honestly with an "Engine output" provenance chip
-(versus "Demo data" for seeds). The `/review` truthfulness surface separates, live, what
-is engine-computed vs. seeded vs. stubbed, including per-run cost.
+(versus "Demo data" for seeds). The **Transparency** page (`/review`) separates, live, what
+is engine-computed vs. sample vs. dormant, including per-run cost.
 
 Implemented so far (branch `engine-integration`):
 
