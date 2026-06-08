@@ -218,7 +218,7 @@ function ActiveRoundPanel({
                 {titleCase(activeRound.status)}
               </Badge>
               <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                {activePredictions.length} predictions
+                {activePredictions.length} {activePredictions.length === 1 ? "call" : "calls"}
               </Badge>
             </div>
             <CardTitle className="text-2xl text-on-surface">{activeRound.week_label}</CardTitle>
@@ -228,7 +228,7 @@ function ActiveRoundPanel({
               <Metric label="Opens" value={formatTimestamp(activeRound.opens_at)} />
               <Metric label="Closes" value={formatTimestamp(activeRound.closes_at)} />
             </div>
-            <PredictionList predictions={activePredictions} title="Predictions for active round" />
+            <PredictionList predictions={activePredictions} title="Calls this round" />
           </CardContent>
         </Card>
       ) : (
@@ -296,7 +296,7 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
                     {titleCase(round.status)}
                   </Badge>
                   <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                    {round.predictions.length} predictions
+                    {round.predictions.length} {round.predictions.length === 1 ? "call" : "calls"}
                   </Badge>
                 </div>
                 <CardTitle className="text-xl text-on-surface">{round.week_label}</CardTitle>
@@ -308,7 +308,7 @@ function RoundHistory({ rounds }: { rounds: PaperPageData["completedRounds"] }) 
                   <Metric label="Total score" value={round.score ? round.score.total.toFixed(1) : "Pending"} />
                   <Metric label="Diversification" value={round.score ? round.score.diversification.toFixed(1) : "Pending"} />
                 </div>
-                <PredictionList predictions={round.predictions} title={`Predictions for ${round.week_label}`} />
+                <PredictionList predictions={round.predictions} title={`Calls — ${round.week_label}`} />
               </CardContent>
             </Card>
           ))}
