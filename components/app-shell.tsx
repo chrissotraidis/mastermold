@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { SentinelFace, type SystemState } from "@/components/sentinel-face";
 import { useProfile } from "@/components/profile-provider";
+import { useFaceActivity } from "@/components/face-activity";
 import { cn } from "@/lib/utils";
 
 type Zone = "observe" | "advise" | "act" | "system";
@@ -120,6 +121,7 @@ function TopBar({
   const router = useRouter();
   const pathname = usePathname() || "/";
   const { ready, profile } = useProfile();
+  const { speaking } = useFaceActivity();
   const [q, setQ] = useState("");
   const isEngine = dataMode === "Engine output";
   const firstName = profile?.name.trim().split(/\s+/)[0] ?? "";
@@ -130,7 +132,7 @@ function TopBar({
     <header className="fixed top-0 left-0 z-50 flex h-16 w-full items-center justify-between border-b border-outline-variant/60 bg-surface-dim/80 px-margin-mobile backdrop-blur-xl md:px-margin-desktop">
       <div className="flex min-w-0 items-center gap-3">
         <Link href="/chat" aria-label="Summon Master Mold" className="group relative size-9 shrink-0">
-          <SentinelFace state={killEngaged ? "kill" : faceState} />
+          <SentinelFace state={killEngaged ? "kill" : faceState} speaking={speaking} />
           <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30 transition group-hover:ring-violet/70" aria-hidden="true" />
         </Link>
         <Link href="/" className="font-display text-2xl font-bold tracking-tighter text-violet">

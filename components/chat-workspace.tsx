@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useRef, useState, useTransition } from "react";
 import { Bot, SendHorizonal, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SentinelFace } from "@/components/sentinel-face";
+import { useFaceActivity } from "@/components/face-activity";
 import { cn } from "@/lib/utils";
 import type { ChatPrompt } from "@/src/db/chat";
 
@@ -25,8 +27,16 @@ export function ChatWorkspace({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+  const { setSpeaking } = useFaceActivity();
   const threadRef = useRef<HTMLDivElement>(null);
   const sentInitialRef = useRef(false);
+  const stopSpeakingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Stop "speaking" when the component unmounts.
+  useEffect(() => () => {
+    if (stopSpeakingTimer.current) clearTimeout(stopSpeakingTimer.current);
+    setSpeaking(false);
+  }, [setSpeaking]);
 
   useEffect(() => {
     sessionMessages = messages;
@@ -72,6 +82,8 @@ export function ChatWorkspace({
     ]);
 
     startTransition(async () => {
+      if (stopSpeakingTimer.current) clearTimeout(stopSpeakingTimer.current);
+      setSpeaking(true);
       try {
         const response = await fetch("/api/chat", {
           method: "POST",
@@ -107,6 +119,9 @@ export function ChatWorkspace({
               : item,
           ),
         );
+      } finally {
+        // Keep him visibly mouthing for a beat so even instant replies read as "spoken".
+        stopSpeakingTimer.current = setTimeout(() => setSpeaking(false), 700);
       }
     });
   }
@@ -128,8 +143,8 @@ export function ChatWorkspace({
       >
         {isEmpty ? (
           <div className="flex min-h-[20rem] flex-col items-center justify-center gap-5 text-center">
-            <div className="flex size-12 items-center justify-center rounded-md border border-violet/30 bg-violet/10 text-violet">
-              <Bot aria-hidden="true" className="size-6" />
+            <div className="size-20">
+              <SentinelFace state="idle" speaking={isPending} />
             </div>
             <p className="max-w-sm text-sm leading-6 text-on-surface-variant">
               Ask anything about today. The thread holds for this session.

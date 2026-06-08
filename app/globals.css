@@ -146,12 +146,47 @@
   100% { transform: translateY(110%); }
 }
 
+/* Master Mold, alive: blink, charging-laser eyes, talking grille, breathing. */
+@keyframes mm-blink {
+  0%, 93%, 100% { transform: scaleY(1); }
+  95.5% { transform: scaleY(0.08); }
+  97.5% { transform: scaleY(1); }
+}
+@keyframes mm-laser-core {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.5); opacity: 1; }
+}
+@keyframes mm-laser-fire {
+  0%, 70%, 100% { opacity: 0; stroke-width: 1; }
+  6% { opacity: 0.85; stroke-width: 4.5; }
+  16% { opacity: 0.12; stroke-width: 1.5; }
+}
+@keyframes mm-talk-a {
+  0%, 100% { transform: scaleX(0.6); opacity: 0.45; }
+  50% { transform: scaleX(1); opacity: 0.9; }
+}
+@keyframes mm-talk-b {
+  0%, 100% { transform: scaleX(1); opacity: 0.85; }
+  50% { transform: scaleX(0.45); opacity: 0.45; }
+}
+@keyframes mm-talk-c {
+  0%, 100% { transform: scaleX(0.7); opacity: 0.5; }
+  40% { transform: scaleX(1); opacity: 1; }
+}
+@keyframes mm-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.012); }
+}
+
+/*
+ * Master Mold's face is the product's signature living element, so it keeps breathing,
+ * blinking, and tracking even under reduced-motion (callers can still pass reduceMotion to
+ * force it off). The rest of the UI's ambient motion does yield to the preference.
+ */
 @media (prefers-reduced-motion: reduce) {
   .glow-pulse,
   .animate-pulse,
-  .animate-spin,
-  [style*="mm-eye"],
-  [style*="mm-scan"] {
+  .animate-spin {
     animation: none !important;
   }
 }

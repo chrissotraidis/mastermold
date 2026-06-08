@@ -5,6 +5,7 @@ import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ProfileProvider } from "@/components/profile-provider";
+import { FaceActivityProvider } from "@/components/face-activity";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -47,7 +48,9 @@ export default function RootLayout({
         className="min-h-screen bg-background font-body text-foreground antialiased"
         suppressHydrationWarning
       >
-        <ProfileProvider>{children}</ProfileProvider>
+        <ProfileProvider>
+          <FaceActivityProvider>{children}</FaceActivityProvider>
+        </ProfileProvider>
       </body>
     </html>
   );
