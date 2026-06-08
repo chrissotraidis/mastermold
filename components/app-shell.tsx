@@ -103,8 +103,11 @@ function TopBar({
   killEngaged: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname() || "/";
   const [q, setQ] = useState("");
   const isEngine = dataMode === "Engine output";
+  // The command bar duplicates the hero console on the deck and the chat page itself.
+  const showCommandBar = pathname !== "/" && pathname !== "/chat";
 
   return (
     <header className="fixed top-0 left-0 z-50 flex h-16 w-full items-center justify-between border-b border-outline-variant/60 bg-surface-dim/80 px-margin-mobile backdrop-blur-xl md:px-margin-desktop">
@@ -128,25 +131,27 @@ function TopBar({
       </div>
 
       <div className="flex items-center gap-2">
-        <form
-          className="hidden lg:flex"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const query = q.trim();
-            router.push(query ? `/chat?q=${encodeURIComponent(query)}` : "/chat");
-          }}
-        >
-          <div className="flex items-center gap-2 border-b border-outline-variant/50 bg-void/60 px-3 py-1.5 chamfer-sm transition-colors focus-within:border-violet">
-            <Terminal aria-hidden="true" className="size-4 text-outline" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Ask Master Mold…"
-              aria-label="Ask Master Mold"
-              className="w-52 bg-transparent text-sm text-on-surface placeholder:text-outline focus:outline-none"
-            />
-          </div>
-        </form>
+        {showCommandBar ? (
+          <form
+            className="hidden lg:flex"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const query = q.trim();
+              router.push(query ? `/chat?q=${encodeURIComponent(query)}` : "/chat");
+            }}
+          >
+            <div className="flex items-center gap-2 border-b border-outline-variant/50 bg-void/60 px-3 py-1.5 chamfer-sm transition-colors focus-within:border-violet">
+              <Terminal aria-hidden="true" className="size-4 text-outline" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Ask Master Mold…"
+                aria-label="Ask Master Mold"
+                className="w-52 bg-transparent text-sm text-on-surface placeholder:text-outline focus:outline-none"
+              />
+            </div>
+          </form>
+        ) : null}
         {killEngaged ? (
           <button
             type="button"
