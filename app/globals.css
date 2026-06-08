@@ -142,12 +142,6 @@
   0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scaleX(0.7); }
   50% { opacity: 0.9; transform: translate(-50%, -50%) scaleX(1); }
 }
-@keyframes mm-laser-zap {
-  0% { opacity: 0; stroke-width: 0.4; }
-  18% { opacity: 0.95; stroke-width: 2.4; }
-  45% { opacity: 0.5; stroke-width: 1; }
-  100% { opacity: 0; stroke-width: 0.4; }
-}
 @keyframes mm-breathe {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.012); }

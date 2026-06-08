@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 /**
  * The face of Master Mold — a rendered, armored sentinel head (public/master-mold.png)
  * with state-driven light painted over it: his eyes glow and pulse in the system's color,
- * track your cursor, blink, and his mouth flickers when he speaks. Lasers fire from his
- * eyes only when you click. Offline-safe (local asset), reduced-motion aware via prop.
+ * track your cursor, blink, and his mouth flickers when he speaks. Offline-safe (local
+ * asset), reduced-motion aware via prop.
  */
 export type SystemState =
   | "idle"
@@ -55,7 +55,6 @@ export function SentinelFace({
   const st = STATE[state];
   const rootRef = useRef<HTMLDivElement>(null);
   const eyesRef = useRef<HTMLDivElement>(null);
-  const [firing, setFiring] = useState(false);
   const alive = state !== "kill";
   const animate = !reduceMotion && alive;
 
@@ -75,22 +74,6 @@ export function SentinelFace({
     window.addEventListener("pointermove", onMove, { passive: true });
     return () => window.removeEventListener("pointermove", onMove);
   }, [track, reduceMotion, alive]);
-
-  // Lasers fire only on a click/tap — a brief burst, not a constant stream.
-  useEffect(() => {
-    if (reduceMotion || !alive) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const onDown = () => {
-      setFiring(true);
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => setFiring(false), 420);
-    };
-    window.addEventListener("pointerdown", onDown);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      if (timer) clearTimeout(timer);
-    };
-  }, [reduceMotion, alive]);
 
   const eyeLive = animate ? st.live : "none";
 
@@ -125,8 +108,6 @@ export function SentinelFace({
       >
         <EyeGlow point={LEFT_EYE} color={st.glow} intensity={st.intensity} live={eyeLive} />
         <EyeGlow point={RIGHT_EYE} color={st.glow} intensity={st.intensity} live={eyeLive} />
-
-        {firing ? <Lasers color={st.glow} /> : null}
       </div>
 
       {/* mouth flicker while speaking */}
@@ -186,32 +167,5 @@ function EyeGlow({
         }}
       />
     </span>
-  );
-}
-
-function Lasers({ color }: { color: string }) {
-  return (
-    <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden="true">
-      <line
-        x1={LEFT_EYE.x}
-        y1={LEFT_EYE.y}
-        x2="4"
-        y2="78"
-        stroke={color}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        style={{ animation: "mm-laser-zap 0.42s ease-out", filter: `drop-shadow(0 0 2px ${color})` }}
-      />
-      <line
-        x1={RIGHT_EYE.x}
-        y1={RIGHT_EYE.y}
-        x2="96"
-        y2="78"
-        stroke={color}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        style={{ animation: "mm-laser-zap 0.42s ease-out", filter: `drop-shadow(0 0 2px ${color})` }}
-      />
-    </svg>
   );
 }
