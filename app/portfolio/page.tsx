@@ -37,9 +37,9 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             note={`${portfolio.concentration.top_symbol ?? "—"} is your biggest position`}
           />
           <Stat
-            label="On-chain"
-            value={`${portfolio.defi_positions.length} position${portfolio.defi_positions.length === 1 ? "" : "s"}`}
-            note={`${portfolio.holdings.length} holdings across ${uniqueAccountCount(portfolio.holdings)} accounts`}
+            label="Holdings"
+            value={`${portfolio.holdings.length}`}
+            note={`Across ${uniqueAccountCount(portfolio.holdings)} accounts · ${portfolio.defi_positions.length} on-chain`}
           />
         </div>
 

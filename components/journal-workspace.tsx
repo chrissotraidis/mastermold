@@ -241,7 +241,7 @@ function TrackRecordSection({ tiers }: { tiers: TrackRecordTierJson[] }) {
     <section aria-labelledby="track-record-title" className="space-y-4">
       <div>
         <h2 id="track-record-title" className="text-xl font-semibold text-on-surface">
-          Track record
+          Win-rate by conviction
         </h2>
         <p className="mt-1 text-sm text-outline">
           How often calls play out, grouped by how sure you were.

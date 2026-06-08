@@ -25,10 +25,10 @@ type ReviewReadinessProps = {
 
 const disclosureSections = [
   {
-    title: "What works (real in V0)",
+    title: "What works now",
     icon: CheckCircle2,
     tone: "text-engine",
-    summary: "These surfaces are wired and reviewable with seeded data.",
+    summary: "These screens are fully wired and reviewable with sample data.",
     items: [
       "Daily Briefing",
       "Card detail with drivers",
@@ -44,7 +44,7 @@ const disclosureSections = [
     ],
   },
   {
-    title: "Engine: live vs seeded vs stubbed",
+    title: "What the engine computes vs fills in",
     icon: Cpu,
     tone: "text-engine",
     summary:
@@ -61,7 +61,7 @@ const disclosureSections = [
     ],
   },
   {
-    title: "What is seeded / sample / demo",
+    title: "What's sample data",
     icon: Database,
     tone: "text-violet",
     summary:
@@ -74,7 +74,7 @@ const disclosureSections = [
     ],
   },
   {
-    title: "Fake costs and monetary figures",
+    title: "Every dollar figure is fake",
     icon: Database,
     tone: "text-violet",
     summary:
@@ -86,7 +86,7 @@ const disclosureSections = [
     ],
   },
   {
-    title: "What is stubbed or credential-gated",
+    title: "Services that are off until you add keys",
     icon: LockKeyhole,
     tone: "text-caution",
     summary:
@@ -99,7 +99,7 @@ const disclosureSections = [
     ],
   },
   {
-    title: "Placeholder workflows",
+    title: "Buttons that only change local state",
     icon: CircleAlert,
     tone: "text-caution",
     summary:
@@ -111,10 +111,10 @@ const disclosureSections = [
     ],
   },
   {
-    title: "What PRD promises remain missing in V0",
+    title: "Not built yet",
     icon: CircleAlert,
     tone: "text-critical",
-    summary: "These PRD promises remain missing from the live V0 surface.",
+    summary: "On the roadmap, but not live in this version.",
     items: [
       "Always-on ingestion: the engine runs on demand (bin/engine-briefing), not yet as a scheduled always-on service (Phase 4).",
       "Live eval harness DSR/PBO/MinTRL, Alpaca paper live-shadow, and post-cutoff validation",
@@ -131,12 +131,9 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
       <div className="rounded-lg border border-outline-variant/40 bg-surface-dim/70 p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <Badge className="bg-violet text-void hover:bg-violet">
-            Review readiness
+            What's real
           </Badge>
           <ProvenanceChip label={dataMode.label} title={dataMode.source} />
-          <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-            Truthfulness surface
-          </Badge>
         </div>
         <h2
           id="review-readiness-title"
@@ -145,9 +142,9 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
           What is real right now
         </h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-on-surface-variant sm:text-base">
-          This page is the in-app disclosure for review mode. It separates working V0
-          surfaces from seeded data, stubbed integrations, credential-gated services,
-          and missing PRD promises.
+          My honesty page. It lays out plainly what's live, what's sample data, which
+          services are off until you add keys, and what isn't built yet — so you always
+          know what you're looking at.
         </p>
       </div>
 
@@ -209,11 +206,25 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
 
       <p className="text-sm leading-6 text-outline">
         {surface === "public"
-          ? "Public preview disclosure: this build remains advisory-only and is not production-ready until RDS evidence passes."
-          : "Operator disclosure: keep this review readiness panel current as seeded, stubbed, credential-gated, or missing workflows change."}
+          ? "Preview build — advisory-only, and not production-ready yet."
+          : "Keep this page current as sample, gated, or unbuilt features change."}
       </p>
     </section>
   );
+}
+
+function titleCase(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatReviewTimestamp(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(parsed) + " UTC";
 }
 
 /** Ingested-run history (per-run cost) from the durable store. */
@@ -299,16 +310,17 @@ function EngineStatusCard() {
 
   if (status.state === "live") {
     const run = status.bundle.run;
+    const tierNames: Record<string, string> = { quick_think: "Fast", deep_think: "Deep" };
     const models = Object.entries(run.models)
-      .map(([tier, id]) => `${tier}: ${id}`)
+      .map(([tier, id]) => `${tierNames[tier] ?? tier}: ${id}`)
       .join(", ");
     const facts: Array<[string, string]> = [
       ["Run date", run.run_date],
-      ["Provider", run.provider],
+      ["Provider", titleCase(run.provider)],
       ["Models", models || "—"],
-      ["Triggered tickers", run.triggered_tickers.length ? run.triggered_tickers.join(", ") : "none (quiet day)"],
-      ["LLM cost", run.cost.usd > 0 ? `$${run.cost.usd.toFixed(2)} · ${run.cost.llm_calls} calls` : "$0 (no agent runs)"],
-      ["Knowledge time", run.knowledge_time],
+      ["Tickers flagged", run.triggered_tickers.length ? run.triggered_tickers.join(", ") : "none (quiet day)"],
+      ["Cost", run.cost.usd > 0 ? `$${run.cost.usd.toFixed(2)} · ${run.cost.llm_calls} calls` : "$0 (no agent runs)"],
+      ["Known as of", formatReviewTimestamp(run.knowledge_time)],
     ];
     return (
       <Card className="border-engine/30 bg-engine/[0.06]">
@@ -322,8 +334,8 @@ function EngineStatusCard() {
               <ProvenanceChip label="Engine output" />
             </div>
             <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Briefing cards and alerts on this build are computed by the latest ingested
-              TradingAgents run. Cost figures below are per-run actuals.
+              Today's briefing and alerts come from a real engine run, not sample data.
+              Here's exactly what produced them.
             </CardDescription>
           </div>
         </CardHeader>

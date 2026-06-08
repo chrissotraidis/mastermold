@@ -35,15 +35,10 @@ function AllocationChart({ allocation }: { allocation: AllocationJson[] }) {
       className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet">
-            Allocation chart
-          </p>
-          <h2 id="allocation-title" className="mt-2 text-xl font-semibold text-on-surface">
-            Per-class allocation
-          </h2>
-        </div>
-        <p className="text-sm text-outline">Equity / crypto / defi</p>
+        <h2 id="allocation-title" className="text-xl font-semibold text-on-surface">
+          Per-class allocation
+        </h2>
+        <p className="text-sm text-outline">Equity · crypto · DeFi</p>
       </div>
 
       <div className="mt-6 space-y-4">
@@ -164,14 +159,11 @@ function TradingViewCandlestick({ chartAssets }: { chartAssets: PriceChartAssetJ
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet">
-            TradingView Lightweight Charts
-          </p>
-          <h2 id="price-chart-title" className="mt-2 text-xl font-semibold text-on-surface">
+          <h2 id="price-chart-title" className="text-xl font-semibold text-on-surface">
             Price chart
           </h2>
           <p className="mt-1 text-sm text-outline">
-            Select asset for seeded candlestick bars.
+            Pick an asset to see its price.
           </p>
         </div>
         <div className="grid gap-2 sm:min-w-56">
