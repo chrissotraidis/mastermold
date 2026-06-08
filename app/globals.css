@@ -126,52 +126,27 @@
   }
 }
 
-/* Sentinel face animations (the eyes are the primary state channel) */
-@keyframes mm-eye-idle {
-  0%, 100% { opacity: 0.85; }
-  50% { opacity: 1; }
+/*
+ * Master Mold's face. The eyes pulse + blink in one opacity track (mm-eye-live), the head
+ * breathes, the mouth flickers when he talks, and lasers zap once when you click.
+ */
+@keyframes mm-eye-live {
+  0%, 100% { opacity: 0.78; }
+  25% { opacity: 1; }
+  55% { opacity: 0.85; }
+  90% { opacity: 0.95; }
+  93% { opacity: 0.1; }   /* blink */
+  96% { opacity: 0.95; }
 }
-@keyframes mm-eye-think {
-  0%, 100% { opacity: 1; }
-  20% { opacity: 0.45; }
-  40% { opacity: 1; }
-  65% { opacity: 0.55; }
+@keyframes mm-mouth {
+  0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scaleX(0.7); }
+  50% { opacity: 0.9; transform: translate(-50%, -50%) scaleX(1); }
 }
-@keyframes mm-eye-alert {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-@keyframes mm-scan {
-  0% { transform: translateY(-110%); }
-  100% { transform: translateY(110%); }
-}
-
-/* Master Mold, alive: blink, charging-laser eyes, talking grille, breathing. */
-@keyframes mm-blink {
-  0%, 93%, 100% { transform: scaleY(1); }
-  95.5% { transform: scaleY(0.08); }
-  97.5% { transform: scaleY(1); }
-}
-@keyframes mm-laser-core {
-  0%, 100% { transform: scale(1); opacity: 0.9; }
-  50% { transform: scale(1.5); opacity: 1; }
-}
-@keyframes mm-laser-fire {
-  0%, 70%, 100% { opacity: 0; stroke-width: 1; }
-  6% { opacity: 0.85; stroke-width: 4.5; }
-  16% { opacity: 0.12; stroke-width: 1.5; }
-}
-@keyframes mm-talk-a {
-  0%, 100% { transform: scaleX(0.6); opacity: 0.45; }
-  50% { transform: scaleX(1); opacity: 0.9; }
-}
-@keyframes mm-talk-b {
-  0%, 100% { transform: scaleX(1); opacity: 0.85; }
-  50% { transform: scaleX(0.45); opacity: 0.45; }
-}
-@keyframes mm-talk-c {
-  0%, 100% { transform: scaleX(0.7); opacity: 0.5; }
-  40% { transform: scaleX(1); opacity: 1; }
+@keyframes mm-laser-zap {
+  0% { opacity: 0; stroke-width: 0.4; }
+  18% { opacity: 0.95; stroke-width: 2.4; }
+  45% { opacity: 0.5; stroke-width: 1; }
+  100% { opacity: 0; stroke-width: 0.4; }
 }
 @keyframes mm-breathe {
   0%, 100% { transform: scale(1); }
