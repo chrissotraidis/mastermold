@@ -20,3 +20,6 @@ tsconfig.tsbuildinfo
 
 # Local preview launch config (machine-specific paths)
 .claude/launch.json
+
+# Local reference material (design mockups, integration plan, upstream clones)
+ref/

@@ -3,7 +3,7 @@
 /**
  * Durable system of record (Phase 1.5).
  *
- * MasterMold V0 held operator-created journal entries, paper predictions, and alert
+ * Master Mold V0 held operator-created journal entries, paper predictions, and alert
  * ack/feedback in module-level arrays that vanished on restart — fatal for the memory
  * loop, where a decision logged today must still exist when Phase B resolves it next
  * week. This module persists those facts behind the existing `src/db/` interfaces so
