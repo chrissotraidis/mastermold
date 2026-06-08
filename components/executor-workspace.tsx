@@ -23,7 +23,7 @@ type GuardrailDraft = Pick<
 const statusLabels: Record<ExecutorStrategy["status"], string> = {
   paused: "Paused",
   safe_mode: "Safe mode",
-  running_demo: "Running demo",
+  running_demo: "Running (demo)",
 };
 
 export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
@@ -39,7 +39,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
     session_key_expiry: activeGuardrail?.session_key_expiry ?? "",
   }));
   const [localNotice, setLocalNotice] = useState(
-    "Guardrails locally, then press Save local draft. No request is sent.",
+    "Edit the caps, then Save draft. Nothing is sent.",
   );
   const selectedStrategy = strategies.find((strategy) => strategy.id === selectedStrategyId);
   const maxFundingRate = useMemo(
@@ -58,13 +58,11 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
     value: GuardrailDraft[Key],
   ) {
     setGuardrailDraft((current) => ({ ...current, [key]: value }));
-    setLocalNotice("Unsaved local guardrail draft. No network call has been made.");
+    setLocalNotice("Unsaved changes.");
   }
 
   function saveLocalDraft() {
-    setLocalNotice(
-      "Local guardrail draft saved in browser state only. Display only - signs nothing.",
-    );
+    setLocalNotice("Draft saved to this browser. Nothing was signed.");
   }
 
   function pauseSelectedStrategy() {
@@ -78,7 +76,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
       ),
     );
     setLocalNotice(
-      `${formatStrategyName(selectedStrategy.name)} kill-switch pressed; status changed to paused in local state only.`,
+      `${formatStrategyName(selectedStrategy.name)} paused. Preview only — nothing live changed.`,
     );
   }
 
@@ -143,8 +141,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
               Funding rate
             </h2>
             <p className="mt-1 text-sm leading-6 text-outline">
-              Funding rate trend and open interest from seeded rows. Safe mode running is
-              still a display-only state in this monitor.
+              Funding-rate trend and open interest. A preview — nothing here is live.
             </p>
           </div>
 
@@ -156,7 +153,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <div>
                         <p className="font-semibold text-on-surface">
-                          {observation.asset.symbol} funding_rate
+                          {observation.asset.symbol} funding
                         </p>
                         <p className="text-xs text-outline">
                           {formatTimestamp(observation.period_ts)} · OI{" "}
@@ -184,7 +181,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                   </div>
                 ))
               ) : (
-                <EmptyState message="No FundingObservation rows are visible for this replay window." />
+                <EmptyState message="No funding data for this window." />
               )}
             </CardContent>
           </Card>
@@ -208,7 +205,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
           </CardHeader>
           <CardContent className="space-y-4 p-5 pt-0">
             <div className="grid gap-4">
-              <FieldBlock id="per-tx-cap" label="per_tx_cap">
+              <FieldBlock id="per-tx-cap" label="Per-transaction cap (USD)">
                 <Input
                   id="per-tx-cap"
                   inputMode="decimal"
@@ -223,7 +220,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 />
               </FieldBlock>
 
-              <FieldBlock id="daily-cap" label="daily_cap">
+              <FieldBlock id="daily-cap" label="Daily cap (USD)">
                 <Input
                   id="daily-cap"
                   inputMode="decimal"
@@ -238,7 +235,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 />
               </FieldBlock>
 
-              <FieldBlock id="contract-allowlist" label="contract_allowlist">
+              <FieldBlock id="contract-allowlist" label="Allowed contracts">
                 <textarea
                   id="contract-allowlist"
                   value={guardrailDraft.contract_allowlist.join("\n")}
@@ -256,7 +253,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 />
               </FieldBlock>
 
-              <FieldBlock id="session-key-expiry" label="session_key_expiry">
+              <FieldBlock id="session-key-expiry" label="Session key expires">
                 <Input
                   id="session-key-expiry"
                   value={guardrailDraft.session_key_expiry}
@@ -279,28 +276,28 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 className="bg-violet text-void hover:bg-violet"
               >
                 <Save aria-hidden="true" />
-                Save local draft
+                Save draft
               </Button>
               <Button
                 type="button"
                 onClick={pauseSelectedStrategy}
                 disabled={!selectedStrategy}
                 variant="destructive"
-                className="bg-red-500 text-on-surface hover:bg-red-400"
+                className="bg-critical text-void hover:brightness-110"
               >
                 <Power aria-hidden="true" />
-                Press kill-switch
+                Pause this strategy
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-red-300/25 bg-red-400/[0.055]">
-          <CardContent className="flex gap-3 p-5 text-sm leading-6 text-red-50">
-            <ShieldAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+        <Card className="border-critical/25 bg-critical/[0.06]">
+          <CardContent className="flex gap-3 p-5 text-sm leading-6 text-on-surface">
+            <ShieldAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-critical" />
             <p>
-              No HTTP call to any chain RPC, signing endpoint, or execution API is wired to
-              these controls.
+              These controls aren't wired to any chain, signer, or execution API. Nothing
+              here can move your funds.
             </p>
           </CardContent>
         </Card>
@@ -317,12 +314,11 @@ function StatusBadge({ status }: { status: ExecutorStrategy["status"] }) {
         status === "paused" && "border-caution/40 bg-caution/10 text-caution",
         status === "safe_mode" && "border-violet/40 bg-violet/10 text-violet",
         status === "running_demo" &&
-          "border-emerald-300/30 bg-engine/10 text-engine",
+          "border-engine/30 bg-engine/10 text-engine",
       )}
       variant="outline"
     >
-      <span className="sr-only">{statusLabels[status]} status: </span>
-      {status}
+      {statusLabels[status]}
     </Badge>
   );
 }
