@@ -4,8 +4,8 @@ import { z } from "zod";
  * Profile core — pure, DOM-free, and unit-testable.
  *
  * A profile holds *who the operator is* and *how they want Master Mold to behave*: a name,
- * a few soft preferences, and (for portability) the set of accounts they connect. None of
- * this is required to run the app — Master Mold boots on seeded demo data with no profile —
+ * a few soft preferences, and (for portability) saved connection-test fields. None of
+ * this is required to run the app — Master Mold boots on seeded sample data with no profile —
  * but having one makes the experience personal and, crucially, lets a person back the whole
  * thing up and restore it on another machine.
  *
@@ -16,7 +16,7 @@ import { z } from "zod";
 export const BACKUP_SCHEMA = "mastermold.profile" as const;
 export const BACKUP_VERSION = 1 as const;
 
-/** The accounts a profile can connect. Mirrors the integration services in src/db/integrations.ts. */
+/** The connection test surfaces a profile can remember. Mirrors the integration services in src/db/integrations.ts. */
 export const INTEGRATION_SERVICES = ["coinbase", "robinhood", "onchain_wallet", "llm"] as const;
 export type IntegrationService = (typeof INTEGRATION_SERVICES)[number];
 
@@ -26,9 +26,13 @@ export type RiskPosture = (typeof RISK_POSTURES)[number];
 export const ASSET_FOCUSES = ["equities", "crypto", "both"] as const;
 export type AssetFocus = (typeof ASSET_FOCUSES)[number];
 
+export const ALERT_SENSITIVITIES = ["urgent_only", "balanced", "more_detail"] as const;
+export type AlertSensitivity = (typeof ALERT_SENSITIVITIES)[number];
+
 export const preferencesSchema = z.object({
   risk_posture: z.enum(RISK_POSTURES).catch("balanced"),
   asset_focus: z.enum(ASSET_FOCUSES).catch("both"),
+  alert_sensitivity: z.enum(ALERT_SENSITIVITIES).catch("balanced"),
 });
 export type ProfilePreferences = z.infer<typeof preferencesSchema>;
 
@@ -59,6 +63,7 @@ export type Backup = z.infer<typeof backupSchema>;
 export const DEFAULT_PREFERENCES: ProfilePreferences = {
   risk_posture: "balanced",
   asset_focus: "both",
+  alert_sensitivity: "balanced",
 };
 
 /** Create a fresh profile. `now` is injectable so callers (and tests) stay deterministic. */
@@ -88,7 +93,7 @@ export function normalizeProfile(raw: unknown, now: string = new Date().toISOStr
   return parsed.success ? parsed.data : null;
 }
 
-/** Build a backup envelope from a profile and its connected accounts. */
+/** Build a backup envelope from a profile and saved connection-test fields. */
 export function buildBackup(
   profile: Profile,
   integrations: IntegrationBackup[],
@@ -140,11 +145,9 @@ export function parseBackup(json: string): ParseResult {
   return { ok: true, backup: parsed.data };
 }
 
-/** Human summary of how many accounts a backup carries a key for — used in import confirmation copy. */
+/** Human summary of how many connection-test fields a backup carries — used in import confirmation copy. */
 export function summarizeBackup(backup: Backup): string {
-  const connected = backup.integrations.filter((i) => i.connected).length;
   const withKeys = backup.integrations.filter((i) => i.key.length > 0).length;
-  const parts = [`${connected} connected account${connected === 1 ? "" : "s"}`];
-  if (withKeys > 0) parts.push(`${withKeys} saved key${withKeys === 1 ? "" : "s"}`);
-  return parts.join(" · ");
+  if (withKeys === 0) return "no saved connection-test fields";
+  return `${withKeys} saved connection-test field${withKeys === 1 ? "" : "s"}`;
 }

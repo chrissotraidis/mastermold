@@ -142,6 +142,7 @@ export type PaperPrediction = BitemporalFields & {
   round_id: string;
   asset_id: string;
   direction: "long" | "short" | "flat";
+  fake_size_usd?: number;
   conviction: number;
   rationale: string;
   submitted_at: string;
@@ -200,6 +201,31 @@ export type ReflectionUpdate = BitemporalFields & {
   created_at: string;
 };
 
+export type BrainRun = BitemporalFields & {
+  id: string;
+  run_date: string;
+  status: "complete" | "failed";
+  started_at: string;
+  completed_at: string;
+  scope: "local_seed" | "portfolio_snapshot" | "live_scan";
+  source_count: number;
+  symbols: string[];
+  inference_model: string;
+  summary: string;
+};
+
+export type MarketMemoryFact = BitemporalFields & {
+  id: string;
+  symbol: string | null;
+  topic: "portfolio" | "news" | "funding" | "risk" | "market";
+  summary: string;
+  confidence: number;
+  source_count: number;
+  evidence_urls: string[];
+  created_at: string;
+  updated_at: string;
+};
+
 export type DemoDatabase = {
   users: User[];
   accounts: Account[];
@@ -221,6 +247,8 @@ export type DemoDatabase = {
   integrationStatuses: IntegrationStatus[];
   strategyBeliefs: StrategyBelief[];
   reflectionUpdates: ReflectionUpdate[];
+  brainRuns?: BrainRun[];
+  marketMemoryFacts?: MarketMemoryFact[];
 };
 
 export const entitySchemas = {
@@ -244,4 +272,6 @@ export const entitySchemas = {
   IntegrationStatus: ["id", "service", "status", "detail", "event_time", "knowledge_time"],
   StrategyBelief: ["id", "name", "statement", "confidence", "updated_at", "event_time", "knowledge_time"],
   ReflectionUpdate: ["id", "strategy_belief_id", "evidence_summary", "significance_passed", "applied", "created_at", "event_time", "knowledge_time"],
+  BrainRun: ["id", "run_date", "status", "started_at", "completed_at", "scope", "source_count", "symbols", "inference_model", "summary", "event_time", "knowledge_time"],
+  MarketMemoryFact: ["id", "symbol", "topic", "summary", "confidence", "source_count", "evidence_urls", "created_at", "updated_at", "event_time", "knowledge_time"],
 } as const;

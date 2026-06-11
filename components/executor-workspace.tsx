@@ -8,22 +8,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { ExecutorJson } from "@/src/db/executor";
-import type { ExecutorStrategy, GuardrailConfig } from "@/src/db/schema";
+import type { PublicExecutor } from "@/lib/public-api-copy";
 
 type ExecutorWorkspaceProps = {
-  executor: ExecutorJson;
+  executor: PublicExecutor;
 };
 
-type GuardrailDraft = Pick<
-  GuardrailConfig,
-  "per_tx_cap" | "daily_cap" | "contract_allowlist" | "session_key_expiry"
->;
+type ExecutorStrategy = PublicExecutor["strategies"][number];
+type ExecutorStatus = ExecutorStrategy["status"];
 
-const statusLabels: Record<ExecutorStrategy["status"], string> = {
-  paused: "Paused",
-  safe_mode: "Safe mode",
-  running_demo: "Running (demo)",
+type GuardrailDraft = {
+  perTransactionCap: number;
+  dailyCap: number;
+  approvedContracts: string[];
+  temporaryKeyExpires: string;
 };
 
 export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
@@ -31,26 +29,26 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
   const [selectedStrategyId, setSelectedStrategyId] = useState(
     executor.strategies[0]?.id ?? "",
   );
-  const activeGuardrail = executor.guardrail_configs[0] ?? null;
+  const activeGuardrail = executor.safety_drafts[0] ?? null;
   const [guardrailDraft, setGuardrailDraft] = useState<GuardrailDraft>(() => ({
-    per_tx_cap: activeGuardrail?.per_tx_cap ?? 0,
-    daily_cap: activeGuardrail?.daily_cap ?? 0,
-    contract_allowlist: activeGuardrail?.contract_allowlist ?? [],
-    session_key_expiry: activeGuardrail?.session_key_expiry ?? "",
+    perTransactionCap: activeGuardrail?.per_transaction_cap_usd ?? 0,
+    dailyCap: activeGuardrail?.daily_cap_usd ?? 0,
+    approvedContracts: activeGuardrail?.approved_contracts ?? [],
+    temporaryKeyExpires: activeGuardrail?.temporary_key_expires ?? "",
   }));
   const [localNotice, setLocalNotice] = useState(
-    "Edit the caps, then Save draft. Nothing is sent.",
+    "Edit the caps, then save the local safety draft. Nothing is sent.",
   );
   const selectedStrategy = strategies.find((strategy) => strategy.id === selectedStrategyId);
   const maxFundingRate = useMemo(
     () =>
       Math.max(
-        ...executor.funding_observations.map((observation) =>
-          Math.abs(observation.funding_rate),
+        ...executor.borrow_rate_preview.map((observation) =>
+          Math.abs(observation.borrow_rate),
         ),
         0.00001,
       ),
-    [executor.funding_observations],
+    [executor.borrow_rate_preview],
   );
 
   function updateGuardrailDraft<Key extends keyof GuardrailDraft>(
@@ -62,7 +60,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
   }
 
   function saveLocalDraft() {
-    setLocalNotice("Draft saved to this browser. Nothing was signed.");
+    setLocalNotice("Safety draft saved in this browser. Nothing was signed.");
   }
 
   function pauseSelectedStrategy() {
@@ -72,11 +70,11 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
 
     setStrategies((current) =>
       current.map((strategy) =>
-        strategy.id === selectedStrategy.id ? { ...strategy, status: "paused" } : strategy,
+        strategy.id === selectedStrategy.id ? { ...strategy, status: "Paused" } : strategy,
       ),
     );
     setLocalNotice(
-      `${formatStrategyName(selectedStrategy.name)} paused. Preview only — nothing live changed.`,
+      `${selectedStrategy.name} marked paused in this safety review. Nothing live changed.`,
     );
   }
 
@@ -89,7 +87,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
               Strategies
             </h2>
             <p className="mt-1 text-sm leading-6 text-outline">
-              What's running right now — all in preview, none of it live.
+              Review-only strategy examples. They are not connected to accounts or chains.
             </p>
           </div>
 
@@ -114,17 +112,17 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                             {strategy.venue}
                           </p>
                           <CardTitle className="mt-1 text-xl text-on-surface">
-                            {formatStrategyName(strategy.name)}
+                            {strategy.name}
                           </CardTitle>
                         </div>
                         <StatusBadge status={strategy.status} />
                       </div>
                     </CardHeader>
                     <CardContent className="grid gap-3 p-5 pt-0 text-sm sm:grid-cols-2">
-                      <Metric label="Net delta" value={formatSignedRatio(strategy.net_delta)} />
-                      <Metric label="Margin" value={formatPercent(strategy.margin_ratio)} />
-                      <Metric label="Funding" value={formatFunding(strategy.funding_rate)} />
-                      <Metric label="Basis" value={formatPercent(strategy.basis)} />
+                      <Metric label="Market exposure" value={formatSignedRatio(strategy.price_exposure)} />
+                      <Metric label="Safety cushion" value={formatPercent(strategy.borrow_cushion)} />
+                      <Metric label="Borrow cost" value={formatFunding(strategy.borrow_rate)} />
+                      <Metric label="Futures price gap" value={formatPercent(strategy.price_gap)} />
                     </CardContent>
                   </Card>
                 </button>
@@ -138,30 +136,30 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
         <section aria-labelledby="funding-observation-title" className="space-y-4">
           <div>
             <h2 id="funding-observation-title" className="text-xl font-semibold text-on-surface">
-              Funding rate
+              Borrow cost preview
             </h2>
             <p className="mt-1 text-sm leading-6 text-outline">
-              Funding-rate trend and open interest. A preview — nothing here is live.
+              Sample cost clues for review. No live feed is connected.
             </p>
           </div>
 
           <Card className="border-outline-variant/40 bg-surface-high/30">
             <CardContent className="space-y-4 p-5">
-              {executor.funding_observations.length > 0 ? (
-                executor.funding_observations.map((observation) => (
+              {executor.borrow_rate_preview.length > 0 ? (
+                executor.borrow_rate_preview.map((observation) => (
                   <div key={observation.id} className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <div>
                         <p className="font-semibold text-on-surface">
-                          {observation.asset.symbol} funding
+                          {observation.asset_symbol} borrow cost
                         </p>
                         <p className="text-xs text-outline">
-                          {formatTimestamp(observation.period_ts)} · OI{" "}
+                          {formatTimestamp(observation.period_time)} · Borrow-market activity{" "}
                           {formatCompactCurrency(observation.open_interest)}
                         </p>
                       </div>
                       <span className="font-mono text-violet">
-                        {formatFunding(observation.funding_rate)}
+                        {formatFunding(observation.borrow_rate)}
                       </span>
                     </div>
                     <div
@@ -173,7 +171,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                         style={{
                           width: `${Math.max(
                             8,
-                            (Math.abs(observation.funding_rate) / maxFundingRate) * 100,
+                            (Math.abs(observation.borrow_rate) / maxFundingRate) * 100,
                           )}%`,
                         }}
                       />
@@ -181,7 +179,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                   </div>
                 ))
               ) : (
-                <EmptyState message="No funding data for this window." />
+                <EmptyState message="No sample borrow-rate data for this window." />
               )}
             </CardContent>
           </Card>
@@ -196,9 +194,9 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 <ShieldCheck aria-hidden="true" className="size-5" />
               </div>
               <div>
-                <CardTitle className="text-xl text-on-surface">Guardrails</CardTitle>
+                <CardTitle className="text-xl text-on-surface">Safety draft</CardTitle>
                 <p className="mt-1 text-sm leading-6 text-on-surface/80">
-                  Set the caps and allowlists. Nothing here signs anything.
+                  Draft the limits a real executor would need. Nothing here signs anything.
                 </p>
               </div>
             </div>
@@ -212,9 +210,9 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                   type="number"
                   min={0}
                   step={100}
-                  value={guardrailDraft.per_tx_cap}
+                  value={guardrailDraft.perTransactionCap}
                   onChange={(event) =>
-                    updateGuardrailDraft("per_tx_cap", Number(event.target.value))
+                    updateGuardrailDraft("perTransactionCap", Number(event.target.value))
                   }
                   className="border-outline-variant/50 bg-surface-dim/70 text-on-surface"
                 />
@@ -227,21 +225,21 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                   type="number"
                   min={0}
                   step={100}
-                  value={guardrailDraft.daily_cap}
+                  value={guardrailDraft.dailyCap}
                   onChange={(event) =>
-                    updateGuardrailDraft("daily_cap", Number(event.target.value))
+                    updateGuardrailDraft("dailyCap", Number(event.target.value))
                   }
                   className="border-outline-variant/50 bg-surface-dim/70 text-on-surface"
                 />
               </FieldBlock>
 
-              <FieldBlock id="contract-allowlist" label="Allowed contracts">
+              <FieldBlock id="contract-allowlist" label="Approved contracts">
                 <textarea
                   id="contract-allowlist"
-                  value={guardrailDraft.contract_allowlist.join("\n")}
+                  value={guardrailDraft.approvedContracts.join("\n")}
                   onChange={(event) =>
                     updateGuardrailDraft(
-                      "contract_allowlist",
+                      "approvedContracts",
                       event.target.value
                         .split(/\n|,/)
                         .map((value) => value.trim())
@@ -253,12 +251,12 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 />
               </FieldBlock>
 
-              <FieldBlock id="session-key-expiry" label="Session key expires">
+              <FieldBlock id="session-key-expiry" label="Temporary access expiry">
                 <Input
                   id="session-key-expiry"
-                  value={guardrailDraft.session_key_expiry}
+                  value={guardrailDraft.temporaryKeyExpires}
                   onChange={(event) =>
-                    updateGuardrailDraft("session_key_expiry", event.target.value)
+                    updateGuardrailDraft("temporaryKeyExpires", event.target.value)
                   }
                   className="border-outline-variant/50 bg-surface-dim/70 text-on-surface"
                 />
@@ -286,7 +284,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                 className="bg-critical text-void hover:brightness-110"
               >
                 <Power aria-hidden="true" />
-                Pause this strategy
+                Pause in safety review
               </Button>
             </div>
           </CardContent>
@@ -296,8 +294,8 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
           <CardContent className="flex gap-3 p-5 text-sm leading-6 text-on-surface">
             <ShieldAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-critical" />
             <p>
-              These controls aren't wired to any chain, signer, or execution API. Nothing
-              here can move your funds.
+              This safety draft is not connected to any chain, signer, or execution API. It
+              cannot move funds.
             </p>
           </CardContent>
         </Card>
@@ -306,19 +304,18 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
   );
 }
 
-function StatusBadge({ status }: { status: ExecutorStrategy["status"] }) {
+function StatusBadge({ status }: { status: ExecutorStatus }) {
   return (
     <Badge
       className={cn(
         "border text-xs",
-        status === "paused" && "border-caution/40 bg-caution/10 text-caution",
-        status === "safe_mode" && "border-violet/40 bg-violet/10 text-violet",
-        status === "running_demo" &&
-          "border-engine/30 bg-engine/10 text-engine",
+        status === "Paused" && "border-caution/40 bg-caution/10 text-caution",
+        status === "Safe mode" && "border-violet/40 bg-violet/10 text-violet",
+        status === "Preview only" && "border-engine/30 bg-engine/10 text-engine",
       )}
       variant="outline"
     >
-      {statusLabels[status]}
+      {status}
     </Badge>
   );
 }
@@ -358,13 +355,6 @@ function EmptyState({ message }: { message: string }) {
       {message}
     </div>
   );
-}
-
-function formatStrategyName(name: ExecutorStrategy["name"]) {
-  return name
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function formatPercent(value: number) {

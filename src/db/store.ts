@@ -19,11 +19,42 @@
  * (`knowledge_time` for as-of replay, `round_id`, `run_date`), mirroring `schema.ts`.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { DecisionJournalEntry, PaperPrediction } from "./schema";
+import type { BrainRun, DecisionJournalEntry, MarketMemoryFact, OutcomeScore, PaperPrediction } from "./schema";
 
 export type AlertStateRow = { acknowledged: boolean; useful_feedback: boolean | null };
+
+export type ManualHoldingRow = {
+  id: string;
+  symbol: string;
+  asset_name: string;
+  asset_class: "equity" | "crypto" | "defi" | "cash";
+  venue: string;
+  quantity: number;
+  price: number;
+  cost_basis: number;
+  daily_change_pct: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ImportedHoldingRow = {
+  id: string;
+  service: "coinbase" | "robinhood" | "onchain_wallet";
+  account_id: string;
+  account_label: string;
+  symbol: string;
+  asset_name: string;
+  asset_class: "equity" | "crypto" | "defi" | "cash";
+  venue: string;
+  quantity: number;
+  price: number;
+  cost_basis: number;
+  daily_change_pct: number;
+  imported_at: string;
+  as_of: string;
+};
 
 export type IngestedRunRow = {
   run_date: string;
@@ -32,12 +63,29 @@ export type IngestedRunRow = {
   data: unknown; // the run-meta payload (provider, models, cost, ...)
 };
 
+export type ProductMetricEventRow = {
+  id: string;
+  event: string;
+  surface: string;
+  entity_id: string | null;
+  value: number | null;
+  metadata: unknown;
+  created_at: string;
+};
+
 export interface PersistAdapter {
   readonly backend: "sqlite" | "memory";
   loggedJournalEntries(): DecisionJournalEntry[];
   addJournalEntry(entry: DecisionJournalEntry): void;
+  outcomeScores(): OutcomeScore[];
+  addOutcomeScore(score: OutcomeScore): void;
   submittedPredictions(): PaperPrediction[];
   addPrediction(prediction: PaperPrediction): void;
+  manualHoldings(): ManualHoldingRow[];
+  upsertManualHolding(holding: ManualHoldingRow): void;
+  deleteManualHolding(id: string): void;
+  importedHoldings(): ImportedHoldingRow[];
+  replaceImportedHoldings(service: ImportedHoldingRow["service"], holdings: ImportedHoldingRow[]): void;
   getAlertState(id: string): AlertStateRow | undefined;
   setAlertState(id: string, state: AlertStateRow): void;
   /** Idempotent by run_date: returns false if this run was already ingested. */
@@ -46,7 +94,39 @@ export interface PersistAdapter {
   ingestedRunDates(): string[];
   /** Full ingested-run rows (newest first) for run history / cost retention. */
   ingestedRuns(): IngestedRunRow[];
+  recordProductEvent(event: ProductMetricEventRow): void;
+  productEvents(limit?: number): ProductMetricEventRow[];
+  brainRuns(limit?: number): BrainRun[];
+  upsertBrainRun(run: BrainRun): void;
+  marketMemoryFacts(limit?: number): MarketMemoryFact[];
+  upsertMarketMemoryFact(fact: MarketMemoryFact): void;
 }
+
+type StoreSnapshot = {
+  journal: DecisionJournalEntry[];
+  outcomes: OutcomeScore[];
+  predictions: PaperPrediction[];
+  manual_holdings: ManualHoldingRow[];
+  imported_holdings: ImportedHoldingRow[];
+  alerts: Record<string, AlertStateRow>;
+  runs: Record<string, { knowledge_time: string; ingested_at: string; data: unknown }>;
+  product_events: ProductMetricEventRow[];
+  brain_runs: BrainRun[];
+  market_memory: MarketMemoryFact[];
+};
+
+const emptySnapshot = (): StoreSnapshot => ({
+  journal: [],
+  outcomes: [],
+  predictions: [],
+  manual_holdings: [],
+  imported_holdings: [],
+  alerts: {},
+  runs: {},
+  product_events: [],
+  brain_runs: [],
+  market_memory: [],
+});
 
 // --- bun:sqlite adapter -----------------------------------------------------
 
@@ -92,6 +172,15 @@ class SqliteAdapter implements PersistAdapter {
         data TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_journal_knowledge_time ON journal_entries(knowledge_time);
+      CREATE TABLE IF NOT EXISTS outcome_scores (
+        id TEXT PRIMARY KEY,
+        journal_entry_id TEXT NOT NULL,
+        knowledge_time TEXT NOT NULL,
+        resolved_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_outcome_scores_entry ON outcome_scores(journal_entry_id);
+      CREATE INDEX IF NOT EXISTS idx_outcome_scores_knowledge_time ON outcome_scores(knowledge_time);
       CREATE TABLE IF NOT EXISTS paper_predictions (
         id TEXT PRIMARY KEY,
         knowledge_time TEXT NOT NULL,
@@ -105,12 +194,56 @@ class SqliteAdapter implements PersistAdapter {
         acknowledged INTEGER NOT NULL,
         useful_feedback INTEGER
       );
+      CREATE TABLE IF NOT EXISTS manual_holdings (
+        id TEXT PRIMARY KEY,
+        symbol TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS imported_holdings (
+        id TEXT PRIMARY KEY,
+        service TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        imported_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_imported_holdings_service ON imported_holdings(service);
       CREATE TABLE IF NOT EXISTS engine_runs (
         run_date TEXT PRIMARY KEY,
         knowledge_time TEXT NOT NULL,
         ingested_at TEXT NOT NULL,
         data TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS product_events (
+        id TEXT PRIMARY KEY,
+        event TEXT NOT NULL,
+        surface TEXT NOT NULL,
+        entity_id TEXT,
+        value REAL,
+        metadata TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_product_events_event ON product_events(event);
+      CREATE INDEX IF NOT EXISTS idx_product_events_created_at ON product_events(created_at);
+      CREATE TABLE IF NOT EXISTS brain_runs (
+        id TEXT PRIMARY KEY,
+        run_date TEXT NOT NULL,
+        knowledge_time TEXT NOT NULL,
+        completed_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_brain_runs_completed_at ON brain_runs(completed_at);
+      CREATE TABLE IF NOT EXISTS market_memory (
+        id TEXT PRIMARY KEY,
+        symbol TEXT,
+        topic TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        knowledge_time TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_market_memory_symbol ON market_memory(symbol);
+      CREATE INDEX IF NOT EXISTS idx_market_memory_updated_at ON market_memory(updated_at);
     `);
   }
 
@@ -127,6 +260,27 @@ class SqliteAdapter implements PersistAdapter {
         "INSERT OR REPLACE INTO journal_entries (id, knowledge_time, logged_at, data) VALUES (?, ?, ?, ?)",
       )
       .run(entry.id, entry.knowledge_time, entry.logged_at, JSON.stringify(entry));
+  }
+
+  outcomeScores(): OutcomeScore[] {
+    return this.db
+      .query("SELECT data FROM outcome_scores")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as OutcomeScore);
+  }
+
+  addOutcomeScore(score: OutcomeScore): void {
+    this.db
+      .query(
+        "INSERT OR REPLACE INTO outcome_scores (id, journal_entry_id, knowledge_time, resolved_at, data) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(
+        score.id,
+        score.journal_entry_id,
+        score.knowledge_time,
+        score.resolved_at,
+        JSON.stringify(score),
+      );
   }
 
   submittedPredictions(): PaperPrediction[] {
@@ -148,6 +302,47 @@ class SqliteAdapter implements PersistAdapter {
         prediction.submitted_at,
         JSON.stringify(prediction),
       );
+  }
+
+  manualHoldings(): ManualHoldingRow[] {
+    return this.db
+      .query("SELECT data FROM manual_holdings ORDER BY updated_at DESC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as ManualHoldingRow);
+  }
+
+  upsertManualHolding(holding: ManualHoldingRow): void {
+    this.db
+      .query("INSERT OR REPLACE INTO manual_holdings (id, symbol, updated_at, data) VALUES (?, ?, ?, ?)")
+      .run(holding.id, holding.symbol, holding.updated_at, JSON.stringify(holding));
+  }
+
+  deleteManualHolding(id: string): void {
+    this.db.query("DELETE FROM manual_holdings WHERE id = ?").run(id);
+  }
+
+  importedHoldings(): ImportedHoldingRow[] {
+    return this.db
+      .query("SELECT data FROM imported_holdings ORDER BY imported_at DESC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as ImportedHoldingRow);
+  }
+
+  replaceImportedHoldings(service: ImportedHoldingRow["service"], holdings: ImportedHoldingRow[]): void {
+    this.db.query("DELETE FROM imported_holdings WHERE service = ?").run(service);
+    const statement = this.db.query(
+      "INSERT OR REPLACE INTO imported_holdings (id, service, account_id, symbol, imported_at, data) VALUES (?, ?, ?, ?, ?, ?)",
+    );
+    for (const holding of holdings) {
+      statement.run(
+        holding.id,
+        holding.service,
+        holding.account_id,
+        holding.symbol,
+        holding.imported_at,
+        JSON.stringify(holding),
+      );
+    }
   }
 
   getAlertState(id: string): AlertStateRow | undefined {
@@ -207,6 +402,80 @@ class SqliteAdapter implements PersistAdapter {
         };
       });
   }
+
+  recordProductEvent(event: ProductMetricEventRow): void {
+    this.db
+      .query(
+        "INSERT OR REPLACE INTO product_events (id, event, surface, entity_id, value, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(
+        event.id,
+        event.event,
+        event.surface,
+        event.entity_id,
+        event.value,
+        JSON.stringify(event.metadata ?? {}),
+        event.created_at,
+      );
+  }
+
+  productEvents(limit = 500): ProductMetricEventRow[] {
+    return this.db
+      .query(
+        "SELECT id, event, surface, entity_id, value, metadata, created_at FROM product_events ORDER BY created_at DESC LIMIT ?",
+      )
+      .all(limit)
+      .map((row) => {
+        const r = row as {
+          id: string;
+          event: string;
+          surface: string;
+          entity_id: string | null;
+          value: number | null;
+          metadata: string;
+          created_at: string;
+        };
+        return {
+          id: r.id,
+          event: r.event,
+          surface: r.surface,
+          entity_id: r.entity_id,
+          value: r.value,
+          metadata: safeParse(r.metadata),
+          created_at: r.created_at,
+        };
+      });
+  }
+
+  brainRuns(limit = 25): BrainRun[] {
+    return this.db
+      .query("SELECT data FROM brain_runs ORDER BY completed_at DESC LIMIT ?")
+      .all(limit)
+      .map((row) => JSON.parse((row as { data: string }).data) as BrainRun);
+  }
+
+  upsertBrainRun(run: BrainRun): void {
+    this.db
+      .query(
+        "INSERT OR REPLACE INTO brain_runs (id, run_date, knowledge_time, completed_at, data) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(run.id, run.run_date, run.knowledge_time, run.completed_at, JSON.stringify(run));
+  }
+
+  marketMemoryFacts(limit = 100): MarketMemoryFact[] {
+    return this.db
+      .query("SELECT data FROM market_memory ORDER BY updated_at DESC LIMIT ?")
+      .all(limit)
+      .map((row) => JSON.parse((row as { data: string }).data) as MarketMemoryFact);
+  }
+
+  upsertMarketMemoryFact(fact: MarketMemoryFact): void {
+    this.db
+      .query(
+        "INSERT OR REPLACE INTO market_memory (id, symbol, topic, updated_at, knowledge_time, data) VALUES (?, ?, ?, ?, ?, ?)",
+      )
+      .run(fact.id, fact.symbol, fact.topic, fact.updated_at, fact.knowledge_time, JSON.stringify(fact));
+  }
 }
 
 function safeParse(value: string): unknown {
@@ -222,9 +491,15 @@ function safeParse(value: string): unknown {
 class MemoryAdapter implements PersistAdapter {
   readonly backend = "memory" as const;
   private journal: DecisionJournalEntry[] = [];
+  private outcomes: OutcomeScore[] = [];
   private predictions: PaperPrediction[] = [];
+  private manualHoldingRows: ManualHoldingRow[] = [];
+  private importedHoldingRows: ImportedHoldingRow[] = [];
   private alerts = new Map<string, AlertStateRow>();
   private runs = new Map<string, { knowledge_time: string; ingested_at: string; data: unknown }>();
+  private productEventRows: ProductMetricEventRow[] = [];
+  private brainRunRows: BrainRun[] = [];
+  private marketMemoryRows: MarketMemoryFact[] = [];
 
   loggedJournalEntries() {
     return [...this.journal];
@@ -233,12 +508,36 @@ class MemoryAdapter implements PersistAdapter {
     this.journal = this.journal.filter((e) => e.id !== entry.id);
     this.journal.push(entry);
   }
+  outcomeScores() {
+    return [...this.outcomes];
+  }
+  addOutcomeScore(score: OutcomeScore) {
+    this.outcomes = this.outcomes.filter((s) => s.id !== score.id);
+    this.outcomes.push(score);
+  }
   submittedPredictions() {
     return [...this.predictions];
   }
   addPrediction(prediction: PaperPrediction) {
     this.predictions = this.predictions.filter((p) => p.id !== prediction.id);
     this.predictions.push(prediction);
+  }
+  manualHoldings() {
+    return [...this.manualHoldingRows];
+  }
+  upsertManualHolding(holding: ManualHoldingRow) {
+    this.manualHoldingRows = this.manualHoldingRows.filter((item) => item.id !== holding.id);
+    this.manualHoldingRows.push(holding);
+  }
+  deleteManualHolding(id: string) {
+    this.manualHoldingRows = this.manualHoldingRows.filter((item) => item.id !== id);
+  }
+  importedHoldings() {
+    return [...this.importedHoldingRows];
+  }
+  replaceImportedHoldings(service: ImportedHoldingRow["service"], holdings: ImportedHoldingRow[]) {
+    this.importedHoldingRows = this.importedHoldingRows.filter((item) => item.service !== service);
+    this.importedHoldingRows.push(...holdings);
   }
   getAlertState(id: string) {
     return this.alerts.get(id);
@@ -271,6 +570,181 @@ class MemoryAdapter implements PersistAdapter {
         data: v.data,
       }));
   }
+  recordProductEvent(event: ProductMetricEventRow) {
+    this.productEventRows = this.productEventRows.filter((row) => row.id !== event.id);
+    this.productEventRows.push(event);
+  }
+  productEvents(limit = 500) {
+    return [...this.productEventRows]
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .slice(0, limit);
+  }
+  brainRuns(limit = 25) {
+    return [...this.brainRunRows]
+      .sort((a, b) => Date.parse(b.completed_at) - Date.parse(a.completed_at))
+      .slice(0, limit);
+  }
+  upsertBrainRun(run: BrainRun) {
+    this.brainRunRows = this.brainRunRows.filter((row) => row.id !== run.id);
+    this.brainRunRows.push(run);
+  }
+  marketMemoryFacts(limit = 100) {
+    return [...this.marketMemoryRows]
+      .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
+      .slice(0, limit);
+  }
+  upsertMarketMemoryFact(fact: MarketMemoryFact) {
+    this.marketMemoryRows = this.marketMemoryRows.filter((row) => row.id !== fact.id);
+    this.marketMemoryRows.push(fact);
+  }
+}
+
+// --- JSON-file fallback for Node runtimes without bun:sqlite ----------------
+
+class JsonFileAdapter implements PersistAdapter {
+  readonly backend = "memory" as const;
+
+  constructor(private path: string) {
+    const dir = dirname(path);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    if (!existsSync(path)) this.write(emptySnapshot());
+  }
+
+  loggedJournalEntries() {
+    return this.read().journal;
+  }
+  addJournalEntry(entry: DecisionJournalEntry) {
+    const snapshot = this.read();
+    snapshot.journal = snapshot.journal.filter((item) => item.id !== entry.id);
+    snapshot.journal.push(entry);
+    this.write(snapshot);
+  }
+  outcomeScores() {
+    return this.read().outcomes;
+  }
+  addOutcomeScore(score: OutcomeScore) {
+    const snapshot = this.read();
+    snapshot.outcomes = snapshot.outcomes.filter((item) => item.id !== score.id);
+    snapshot.outcomes.push(score);
+    this.write(snapshot);
+  }
+  submittedPredictions() {
+    return this.read().predictions;
+  }
+  addPrediction(prediction: PaperPrediction) {
+    const snapshot = this.read();
+    snapshot.predictions = snapshot.predictions.filter((item) => item.id !== prediction.id);
+    snapshot.predictions.push(prediction);
+    this.write(snapshot);
+  }
+  manualHoldings() {
+    return this.read().manual_holdings;
+  }
+  upsertManualHolding(holding: ManualHoldingRow) {
+    const snapshot = this.read();
+    snapshot.manual_holdings = snapshot.manual_holdings.filter((item) => item.id !== holding.id);
+    snapshot.manual_holdings.push(holding);
+    this.write(snapshot);
+  }
+  deleteManualHolding(id: string) {
+    const snapshot = this.read();
+    snapshot.manual_holdings = snapshot.manual_holdings.filter((item) => item.id !== id);
+    this.write(snapshot);
+  }
+  importedHoldings() {
+    return this.read().imported_holdings;
+  }
+  replaceImportedHoldings(service: ImportedHoldingRow["service"], holdings: ImportedHoldingRow[]) {
+    const snapshot = this.read();
+    snapshot.imported_holdings = snapshot.imported_holdings.filter((item) => item.service !== service);
+    snapshot.imported_holdings.push(...holdings);
+    this.write(snapshot);
+  }
+  getAlertState(id: string) {
+    return this.read().alerts[id];
+  }
+  setAlertState(id: string, state: AlertStateRow) {
+    const snapshot = this.read();
+    snapshot.alerts[id] = state;
+    this.write(snapshot);
+  }
+  isRunIngested(runDate: string) {
+    return Boolean(this.read().runs[runDate]);
+  }
+  markRunIngested(runDate: string, knowledgeTime: string, payload: unknown) {
+    const snapshot = this.read();
+    if (snapshot.runs[runDate]) return false;
+    snapshot.runs[runDate] = {
+      knowledge_time: knowledgeTime,
+      ingested_at: new Date().toISOString(),
+      data: payload,
+    };
+    this.write(snapshot);
+    return true;
+  }
+  ingestedRunDates() {
+    return Object.keys(this.read().runs).sort((a, b) => b.localeCompare(a));
+  }
+  ingestedRuns(): IngestedRunRow[] {
+    return Object.entries(this.read().runs)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([run_date, row]) => ({ run_date, ...row }));
+  }
+  recordProductEvent(event: ProductMetricEventRow) {
+    const snapshot = this.read();
+    snapshot.product_events = snapshot.product_events.filter((row) => row.id !== event.id);
+    snapshot.product_events.push(event);
+    this.write(snapshot);
+  }
+  productEvents(limit = 500) {
+    return this.read()
+      .product_events.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .slice(0, limit);
+  }
+  brainRuns(limit = 25) {
+    return this.read()
+      .brain_runs.sort((a, b) => Date.parse(b.completed_at) - Date.parse(a.completed_at))
+      .slice(0, limit);
+  }
+  upsertBrainRun(run: BrainRun) {
+    const snapshot = this.read();
+    snapshot.brain_runs = snapshot.brain_runs.filter((row) => row.id !== run.id);
+    snapshot.brain_runs.push(run);
+    this.write(snapshot);
+  }
+  marketMemoryFacts(limit = 100) {
+    return this.read()
+      .market_memory.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
+      .slice(0, limit);
+  }
+  upsertMarketMemoryFact(fact: MarketMemoryFact) {
+    const snapshot = this.read();
+    snapshot.market_memory = snapshot.market_memory.filter((row) => row.id !== fact.id);
+    snapshot.market_memory.push(fact);
+    this.write(snapshot);
+  }
+
+  private read(): StoreSnapshot {
+    try {
+      const parsed = JSON.parse(readFileSync(this.path, "utf8")) as Partial<StoreSnapshot>;
+      return {
+        ...emptySnapshot(),
+        ...parsed,
+        manual_holdings: Array.isArray(parsed.manual_holdings) ? parsed.manual_holdings : [],
+        imported_holdings: Array.isArray(parsed.imported_holdings) ? parsed.imported_holdings : [],
+        alerts: parsed.alerts && typeof parsed.alerts === "object" ? parsed.alerts : {},
+        runs: parsed.runs && typeof parsed.runs === "object" ? parsed.runs : {},
+        brain_runs: Array.isArray(parsed.brain_runs) ? parsed.brain_runs : [],
+        market_memory: Array.isArray(parsed.market_memory) ? parsed.market_memory : [],
+      };
+    } catch {
+      return emptySnapshot();
+    }
+  }
+
+  private write(snapshot: StoreSnapshot) {
+    writeFileSync(this.path, JSON.stringify(snapshot, null, 2));
+  }
 }
 
 // --- singleton resolution --------------------------------------------------
@@ -290,6 +764,9 @@ function build(): PersistAdapter {
     } catch {
       // fall through to memory if the db file can't be opened
     }
+  }
+  if (dbPath() !== ":memory:") {
+    return new JsonFileAdapter(`${dbPath()}.json`);
   }
   return new MemoryAdapter();
 }

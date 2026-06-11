@@ -1,15 +1,17 @@
-import { AppShell, FirstRunBanner } from "@/components/app-shell";
+import { AppShell } from "@/components/app-shell";
 import { ReviewReadiness } from "@/components/review-readiness";
+import { productProvenanceLabel } from "@/lib/provenance-copy";
+import { getDataMode } from "@/src/db/engine-data";
+
+export const dynamic = "force-dynamic";
 
 export default function ReviewPage() {
+  const dataMode = getDataMode();
+  const publicDataMode = productProvenanceLabel(dataMode.label);
+
   return (
-    <AppShell>
-      <FirstRunBanner />
+    <AppShell dataMode={publicDataMode}>
       <div className="mx-auto max-w-6xl px-5 py-8">
-        <p className="sr-only">
-          PBO MinTRL review readiness details are included in the Not yet live in V0
-          disclosure below.
-        </p>
         <ReviewReadiness surface="public" />
       </div>
     </AppShell>

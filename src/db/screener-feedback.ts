@@ -79,23 +79,23 @@ function suggest(
   if (rated < MIN_RATED) {
     return {
       suggestion: "insufficient",
-      rationale: `Only ${rated} rated alert(s); need ${MIN_RATED}+ before suggesting a change.`,
+      rationale: `Only ${rated} rated so far; rate ${MIN_RATED}+ before changing this alert type.`,
     };
   }
   if (notUseful / rated >= MAJORITY) {
     return {
       suggestion: "demote",
-      rationale: `${notUseful}/${rated} rated not useful — demote a tier or raise this signal's z-threshold.`,
+      rationale: `${notUseful}/${rated} rated not useful. Show fewer alerts like this unless the move is stronger.`,
     };
   }
   if (useful / rated >= MAJORITY) {
     return {
       suggestion: "loosen",
-      rationale: `${useful}/${rated} rated useful — safe to loosen this signal's threshold to trigger more often.`,
+      rationale: `${useful}/${rated} rated useful. It is safe to show a few more alerts like this.`,
     };
   }
   return {
     suggestion: "hold",
-    rationale: `${useful}/${rated} useful — mixed signal, hold the current threshold.`,
+    rationale: `${useful}/${rated} rated useful. Mixed feedback, so keep this alert type as-is.`,
   };
 }

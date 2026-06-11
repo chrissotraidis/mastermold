@@ -1,13 +1,18 @@
-import { Cpu, Database } from "lucide-react";
+import { Database, Download, PencilLine, ScanSearch } from "lucide-react";
+import type { ProductProvenanceLabel } from "@/lib/provenance-copy";
 import { cn } from "@/lib/utils";
 
-export type ProvenanceLabel = "Engine output" | "Demo data";
+export type ProvenanceLabel =
+  | "Engine output"
+  | "Demo data"
+  | "Saved scan"
+  | ProductProvenanceLabel
+  | "Manual portfolio"
+  | "Imported portfolio";
 
 /**
- * Honest provenance chip, sentinel-styled. "Engine output" (emerald, chip icon) means
- * the fact was computed by the engine; "Demo data" (cyan, database icon) means it came
- * from the seeded fallback. Deliberately distinct so a reviewer never confuses live for
- * demo. Mono/telemetry treatment signals "machine-level truth."
+ * Honest provenance chip, sentinel-styled. The internal data labels stay precise,
+ * while the visible copy uses product language: saved read, sample data, or manual portfolio.
  */
 export function ProvenanceChip({
   label,
@@ -18,21 +23,37 @@ export function ProvenanceChip({
   title?: string;
   className?: string;
 }) {
-  const isEngine = label === "Engine output";
-  const Icon = isEngine ? Cpu : Database;
+  const isEngine = label === "Engine output" || label === "Saved scan" || label === "Saved read";
+  const isManual = label === "Manual portfolio";
+  const isImported = label === "Imported portfolio";
+  const Icon = isEngine ? ScanSearch : isManual ? PencilLine : isImported ? Download : Database;
+  const displayLabel = isEngine ? "Saved read" : isManual ? "Manual portfolio" : isImported ? "Imported portfolio" : "Sample";
+  const titleText = cleanProvenanceTitle(label, title);
   return (
     <span
-      title={title}
+      title={titleText}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-telemetry chamfer-sm",
         isEngine
           ? "bg-engine/15 text-engine ring-1 ring-inset ring-engine/30"
+          : isManual || isImported
+            ? "bg-violet/15 text-violet ring-1 ring-inset ring-violet/30"
           : "bg-demo/15 text-demo ring-1 ring-inset ring-demo/30",
         className,
       )}
     >
       <Icon aria-hidden="true" className="size-3.5" />
-      {label}
+      {displayLabel}
     </span>
   );
+}
+
+function cleanProvenanceTitle(label: ProvenanceLabel, title?: string) {
+  if (label === "Engine output" || label === "Saved scan" || label === "Saved read") {
+    return "Saved market read";
+  }
+  if (label === "Demo data" || label === "Sample data") {
+    return "Sample data for review and testing";
+  }
+  return title;
 }

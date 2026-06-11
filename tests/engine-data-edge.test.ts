@@ -1,7 +1,7 @@
 /// <reference types="bun" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -90,5 +90,29 @@ describe("engine-data helpers (edge cases)", () => {
     const empty = mkdtempSync(join(tmpdir(), "mm-empty3-"));
     process.env.ENGINE_OUT_DIR = empty;
     expect(getEngineRunHistory()).toEqual([]);
+  });
+
+  test("engine bundles clamp knowledge time forward when a saved scan violates no-lookahead ordering", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mm-clamp-"));
+    const bundle = JSON.parse(readFileSync(join(FIXTURES, "engine-run-active.json"), "utf8"));
+    bundle.run.run_date = "2026-06-08";
+    bundle.run.event_time = "2026-06-08T13:30:00.000Z";
+    bundle.run.knowledge_time = "2026-06-08T13:29:28.513Z";
+    bundle.briefing_cards[0].event_time = bundle.run.event_time;
+    bundle.briefing_cards[0].knowledge_time = bundle.run.knowledge_time;
+    bundle.briefing_cards[0].drivers[0].event_time = bundle.run.event_time;
+    bundle.briefing_cards[0].drivers[0].knowledge_time = bundle.run.knowledge_time;
+    writeFileSync(join(dir, "engine-run-2026-06-08.json"), JSON.stringify(bundle));
+    process.env.ENGINE_OUT_DIR = dir;
+
+    const status = getEngineStatus(null, {
+      now: Date.parse("2026-06-08T13:31:00.000Z"),
+    });
+
+    expect(status.state).toBe("live");
+    if (status.state !== "live") return;
+    expect(status.bundle.run.knowledge_time).toBe("2026-06-08T13:30:00.000Z");
+    expect(status.bundle.briefing_cards[0].knowledge_time).toBe("2026-06-08T13:30:00.000Z");
+    expect(status.bundle.briefing_cards[0].drivers[0].knowledge_time).toBe("2026-06-08T13:30:00.000Z");
   });
 });

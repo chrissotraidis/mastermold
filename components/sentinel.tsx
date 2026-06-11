@@ -44,12 +44,14 @@ export function Panel({
 export function PanelHeader({
   icon: Icon,
   title,
+  as: Heading = "h3",
   iconClassName,
   right,
   className,
 }: {
   icon?: LucideIcon;
   title: React.ReactNode;
+  as?: "h2" | "h3" | "h4";
   iconClassName?: string;
   right?: React.ReactNode;
   className?: string;
@@ -61,10 +63,10 @@ export function PanelHeader({
         className,
       )}
     >
-      <h3 className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-on-surface">
+      <Heading className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-on-surface">
         {Icon ? <Icon aria-hidden="true" className={cn("size-5 text-violet", iconClassName)} /> : null}
         {title}
-      </h3>
+      </Heading>
       {right}
     </div>
   );

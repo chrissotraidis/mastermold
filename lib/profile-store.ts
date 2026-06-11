@@ -7,8 +7,7 @@
  * Storage layout (all under the existing `financial-copilot.` namespace):
  *   financial-copilot.profile                       — the JSON profile
  *   financial-copilot.welcome-seen                  — "true" once onboarding is dismissed
- *   financial-copilot.integration-key.{service}     — optional API key (already used elsewhere)
- *   financial-copilot.integration-connected.{service} — "true"/"false" connection flag
+ *   financial-copilot.integration-fields.{service}  — optional connection-test fields
  */
 
 import {
@@ -27,8 +26,7 @@ import {
 
 const PROFILE_KEY = "financial-copilot.profile";
 const WELCOME_SEEN_KEY = "financial-copilot.welcome-seen";
-const keyFor = (service: string) => `financial-copilot.integration-key.${service}`;
-const connectedFor = (service: string) => `financial-copilot.integration-connected.${service}`;
+const fieldsFor = (service: string) => `financial-copilot.integration-fields.${service}`;
 
 export function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -65,30 +63,29 @@ export function markWelcomeSeen(): void {
   if (isBrowser()) window.localStorage.setItem(WELCOME_SEEN_KEY, "true");
 }
 
-/** Read the connection flag + optional key for every known integration service. */
+/** Read saved local fields for every known integration service. */
 export function loadIntegrationsBackup(): IntegrationBackup[] {
   if (!isBrowser()) return [];
   return INTEGRATION_SERVICES.map((service) => ({
     service,
-    connected: window.localStorage.getItem(connectedFor(service)) === "true",
-    key: window.localStorage.getItem(keyFor(service)) ?? "",
+    connected: false,
+    key: window.localStorage.getItem(fieldsFor(service)) ?? "",
   }));
 }
 
 export function applyIntegrationsBackup(integrations: IntegrationBackup[]): void {
   if (!isBrowser()) return;
   for (const item of integrations) {
-    window.localStorage.setItem(keyFor(item.service), item.key);
-    window.localStorage.setItem(connectedFor(item.service), String(item.connected));
+    window.localStorage.setItem(fieldsFor(item.service), item.key);
   }
 }
 
-/** Snapshot the whole local setup (profile + connected accounts) into a backup envelope. */
+/** Snapshot the local setup (profile + saved test fields) into a backup envelope. */
 export function snapshotBackup(profile: Profile): Backup {
   return buildBackup(profile, loadIntegrationsBackup());
 }
 
-/** Restore profile + accounts from a validated backup, and mark onboarding complete. */
+/** Restore profile + saved test fields from a validated backup, and mark onboarding complete. */
 export function applyBackup(backup: Backup): Profile {
   applyIntegrationsBackup(backup.integrations);
   markWelcomeSeen();
@@ -117,13 +114,12 @@ export async function readBackupFile(file: File): Promise<ParseResult> {
   return parseBackup(text);
 }
 
-/** Wipe the profile and all connected accounts — a true "start from scratch". */
+/** Wipe the profile and saved connection-test fields — a true "start from scratch". */
 export function resetEverything(): void {
   if (!isBrowser()) return;
   window.localStorage.removeItem(PROFILE_KEY);
   window.localStorage.removeItem(WELCOME_SEEN_KEY);
   for (const service of INTEGRATION_SERVICES) {
-    window.localStorage.removeItem(keyFor(service));
-    window.localStorage.removeItem(connectedFor(service));
+    window.localStorage.removeItem(fieldsFor(service));
   }
 }

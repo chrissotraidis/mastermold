@@ -48,12 +48,20 @@ block (Optimization 3). Until the fork is published, the engine imports the delt
 
 ## Setup
 
-Requires Python 3.10+ (the deterministic unit tests also run on 3.9). Uses `uv`.
+Requires Python 3.10+ (the deterministic unit tests also run on 3.9). Uses `uv`, or
+the bundled Codex Python works locally:
 
 ```bash
 cd engine
 uv venv && uv pip install -e .            # add the fork to dependencies first
 cp .env.example .env                      # then put ANTHROPIC_API_KEY in .env
+```
+
+For a local TradingAgents graph smoke without touching system Python:
+
+```bash
+python3.12 -m venv engine/.venv
+engine/.venv/bin/python -m pip install -e ref/TradingAgents -e engine
 ```
 
 ## Run
@@ -74,6 +82,45 @@ A quiet day — nothing clears the screener — runs Stage 0 + Stage 1 only, cos
 LLM spend**, and writes a bundle whose single card is `nothing_actionable`.
 
 `bin/engine-briefing` (repo root) is a thin wrapper around the run entry point.
+
+## TradingAgents graph smoke
+
+The engine has two agent paths:
+
+- `MASTERMOLD_ENGINE_ADAPTER=auto` tries `TradingAgentsGraph.propagate` first, then
+  records a structured fallback reason and uses direct OpenRouter card synthesis.
+- `MASTERMOLD_ENGINE_ADAPTER=tradingagents` is strict: if graph propagation cannot
+  produce cards, the run fails instead of silently falling back.
+
+After installing `ref/TradingAgents` into `engine/.venv`, a one-symbol / one-analyst
+strict smoke has been verified with OpenRouter:
+
+```bash
+MASTERMOLD_ENGINE_ADAPTER=tradingagents engine/.venv/bin/python - <<'PY'
+from pathlib import Path
+from mastermold_engine.run_briefing import load_config, synthetic_signals, run_screener_stage, run_agent_stage
+cfg = load_config(Path("engine/config.yml"))
+cfg["watchlist"] = [next(item for item in cfg["watchlist"] if item["symbol"] == "NVDA")]
+cfg["always_run"] = ["NVDA"]
+cfg["selected_analysts"] = ["market"]
+signals = synthetic_signals(cfg["watchlist"])
+screens, triggered = run_screener_stage(cfg["watchlist"], signals, lookback=30, trigger_z=1.5, always_run={"NVDA"})
+cards, cost, status, detail = run_agent_stage(
+    config=cfg,
+    screens=screens,
+    triggered=triggered,
+    run_date="2026-06-08",
+    event_time="2026-06-08T13:30:00.000Z",
+    knowledge_time="2026-06-08T13:42:11.000Z",
+)
+print(status, detail, len(cards))
+PY
+```
+
+Current finding: graph initialization and one-symbol propagation work with OpenRouter
+config, but full multi-ticker / multi-analyst runs are too slow for an interactive
+morning page. Keep the graph on a scheduled/flagged-only path; Today should read the
+latest bundle rather than trigger graph work on page load.
 
 ## Offline tests
 

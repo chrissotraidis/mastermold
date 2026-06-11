@@ -56,8 +56,8 @@ def from_stats_handler(handler, *, quick_model: str, deep_model: str) -> RunCost
     cost = RunCost(
         llm_calls=getattr(handler, "llm_calls", 0),
         tool_calls=getattr(handler, "tool_calls", 0),
-        prompt_tokens=getattr(handler, "prompt_tokens", 0),
-        completion_tokens=getattr(handler, "completion_tokens", 0),
+        prompt_tokens=getattr(handler, "prompt_tokens", getattr(handler, "tokens_in", 0)),
+        completion_tokens=getattr(handler, "completion_tokens", getattr(handler, "tokens_out", 0)),
     )
     cost.usd = estimate_usd(cost.prompt_tokens, cost.completion_tokens, deep_model)
     return cost

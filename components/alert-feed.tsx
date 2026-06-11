@@ -1,53 +1,91 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { CheckCircle2, ChevronDown, MessageSquareText, ThumbsDown, ThumbsUp } from "lucide-react";
+import Link from "next/link";
+import {
+  BookPlus,
+  CheckCircle2,
+  ChevronDown,
+  MessageSquareText,
+  ThumbsDown,
+  ThumbsUp,
+  Wallet,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  buildAlertChatPrompt,
+  buildAlertIgnoreCondition,
+  buildAlertJournalInput,
+  buildAlertPageContext,
+  buildAlertPaperHref,
+  buildAlertSuggestedResponse,
+  cleanAlertMessage,
+  cleanAlertRationale,
+  explainAlertRelevance,
+} from "@/lib/alert-loop";
+import { openMasterMoldChat } from "@/components/master-mold-actions";
 import { cn } from "@/lib/utils";
-import type { AlertJson, AlertTier } from "@/src/db/alerts";
+import type { PublicAlert, PublicJournal } from "@/lib/public-api-copy";
+import type { ReactNode } from "react";
 
-type TierFilter = "All" | AlertTier;
-type FeedbackValue = Exclude<AlertJson["useful_feedback"], null>;
+type SavedJournalEntry = PublicJournal["entries"][number];
 
-const filters: TierFilter[] = ["All", "T0", "T1", "T2"];
+type SeverityFilter = "All" | PublicAlert["severity"];
+type FeedbackValue = Exclude<PublicAlert["useful_feedback"], null>;
 
-const tierLabel: Record<AlertTier, string> = {
-  T0: "Critical",
-  T1: "Heads-up",
-  T2: "FYI",
+const filters: SeverityFilter[] = ["All", "Urgent", "Worth checking", "FYI"];
+
+const severityStyles: Record<PublicAlert["severity"], string> = {
+  Urgent: "border-critical/50 bg-critical/15 text-critical",
+  "Worth checking": "border-caution/50 bg-caution/15 text-caution",
+  FYI: "border-violet/50 bg-violet/15 text-violet",
 };
 
-const tierStyles: Record<AlertTier, string> = {
-  T0: "border-critical/50 bg-critical/15 text-critical",
-  T1: "border-caution/50 bg-caution/15 text-caution",
-  T2: "border-violet/50 bg-violet/15 text-violet",
+type AlertFeedProps = {
+  initialAlerts: PublicAlert[];
+  replayAsOf?: string | null;
 };
 
-export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
+export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) {
   const [alerts, setAlerts] = useState(initialAlerts);
-  const [filter, setFilter] = useState<TierFilter>("All");
+  const [filter, setFilter] = useState<SeverityFilter>("All");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingAlertId, setPendingAlertId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [savedJournalId, setSavedJournalId] = useState<string | null>(null);
   const [actionSequence, setActionSequence] = useState(0);
   const [lastAction, setLastAction] = useState("alerts-loaded");
+  const [lastDismissedId, setLastDismissedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isReplay = Boolean(replayAsOf);
 
-  const visibleAlerts = useMemo(
-    () => alerts.filter((alert) => filter === "All" || alert.tier === filter),
+  const filteredAlerts = useMemo(
+    () => alerts.filter((alert) => filter === "All" || alert.severity === filter),
     [alerts, filter],
+  );
+  const visibleAlerts = useMemo(
+    () => filteredAlerts.filter((alert) => !alert.acknowledged),
+    [filteredAlerts],
+  );
+  const dismissedAlerts = useMemo(
+    () => filteredAlerts.filter((alert) => alert.acknowledged),
+    [filteredAlerts],
+  );
+  const lastDismissedAlert = useMemo(
+    () => (lastDismissedId ? alerts.find((alert) => alert.id === lastDismissedId && alert.acknowledged) ?? null : null),
+    [alerts, lastDismissedId],
   );
   const activeCount = alerts.filter((alert) => !alert.acknowledged).length;
 
-  function replaceAlert(nextAlert: AlertJson) {
+  function replaceAlert(nextAlert: PublicAlert) {
     setAlerts((currentAlerts) =>
       currentAlerts.map((alert) => (alert.id === nextAlert.id ? nextAlert : alert)),
     );
   }
 
-  function updateAlert(id: string, patch: Partial<AlertJson>) {
+  function updateAlert(id: string, patch: Partial<PublicAlert>) {
     setAlerts((currentAlerts) =>
       currentAlerts.map((alert) => (alert.id === id ? { ...alert, ...patch } : alert)),
     );
@@ -55,7 +93,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
 
   function toggleRationale(alertId: string) {
     markBrowserAction(`toggle-rationale-${alertId}`);
-    setLastAction(`Opened rationale for ${alertId}.`);
+    setLastAction(`Opened explanation for ${alertId}.`);
     setActionSequence((current) => current + 1);
     setExpanded((current) => {
       const next = new Set(current);
@@ -68,35 +106,73 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
     });
   }
 
-  function acknowledge(alert: AlertJson) {
-    markBrowserAction(`submit-acknowledge-${alert.id}`);
+  function dismiss(alert: PublicAlert) {
+    markBrowserAction(`dismiss-alert-${alert.id}`);
+    setSavedJournalId(null);
     updateAlert(alert.id, { acknowledged: true });
-    setLastAction(`Acknowledge submitted for ${alert.tier}.`);
+    setLastDismissedId(alert.id);
+    setMessage("Dismissed.");
+    setLastAction(`Dismissed ${alert.severity} alert.`);
     setActionSequence((current) => current + 1);
     setPendingAlertId(alert.id);
     startTransition(async () => {
       try {
         const response = await fetch(`/api/alerts/${encodeURIComponent(alert.id)}/acknowledge`, {
           method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ acknowledged: true }),
         });
         if (!response.ok) {
-          throw new Error("Acknowledge request failed");
+          throw new Error("Dismiss request failed");
         }
-        replaceAlert((await response.json()) as AlertJson);
-        setMessage("Acknowledged.");
+        replaceAlert((await response.json()) as PublicAlert);
       } catch {
         updateAlert(alert.id, { acknowledged: alert.acknowledged });
-        setMessage("Couldn't acknowledge. Try again.");
+        setLastDismissedId(null);
+        setMessage("Couldn't dismiss. Try again.");
       } finally {
         setPendingAlertId(null);
       }
     });
   }
 
-  function submitFeedback(alert: AlertJson, usefulFeedback: FeedbackValue) {
+  function restore(alert: PublicAlert) {
+    markBrowserAction(`restore-alert-${alert.id}`);
+    setSavedJournalId(null);
+    updateAlert(alert.id, { acknowledged: false });
+    if (lastDismissedId === alert.id) {
+      setLastDismissedId(null);
+    }
+    setMessage("Restored to active alerts.");
+    setLastAction(`Restored ${alert.severity} alert.`);
+    setActionSequence((current) => current + 1);
+    setPendingAlertId(alert.id);
+    startTransition(async () => {
+      try {
+        const response = await fetch(`/api/alerts/${encodeURIComponent(alert.id)}/acknowledge`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ acknowledged: false }),
+        });
+        if (!response.ok) {
+          throw new Error("Restore request failed");
+        }
+        replaceAlert((await response.json()) as PublicAlert);
+      } catch {
+        updateAlert(alert.id, { acknowledged: alert.acknowledged });
+        setLastDismissedId(alert.id);
+        setMessage("Couldn't restore. Try again.");
+      } finally {
+        setPendingAlertId(null);
+      }
+    });
+  }
+
+  function submitFeedback(alert: PublicAlert, usefulFeedback: FeedbackValue) {
     markBrowserAction(`submit-feedback-${alert.id}-${usefulFeedback ? "useful" : "not-useful"}`);
+    setSavedJournalId(null);
     updateAlert(alert.id, { useful_feedback: usefulFeedback });
-    setLastAction(`Was this useful? ${usefulFeedback ? "useful" : "not useful"} for ${alert.tier}.`);
+    setLastAction(`Was this useful? ${usefulFeedback ? "useful" : "not useful"} for ${alert.severity}.`);
     setActionSequence((current) => current + 1);
     setPendingAlertId(alert.id);
     startTransition(async () => {
@@ -111,11 +187,39 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
         if (!response.ok) {
           throw new Error("Feedback request failed");
         }
-        replaceAlert((await response.json()) as AlertJson);
+        replaceAlert((await response.json()) as PublicAlert);
         setMessage(usefulFeedback ? "Noted — useful." : "Noted — not useful.");
       } catch {
         updateAlert(alert.id, { useful_feedback: alert.useful_feedback });
         setMessage("Couldn't save that. Try again.");
+      } finally {
+        setPendingAlertId(null);
+      }
+    });
+  }
+
+  function saveAsDecision(alert: PublicAlert) {
+    markBrowserAction(`save-alert-decision-${alert.id}`);
+    setLastDismissedId(null);
+    setLastAction(`Saved ${alert.severity} alert as a decision draft.`);
+    setActionSequence((current) => current + 1);
+    setPendingAlertId(alert.id);
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/journal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildAlertJournalInput(alert)),
+        });
+        if (!response.ok) {
+          throw new Error("Decision request failed");
+        }
+        const entry = (await response.json()) as SavedJournalEntry;
+        setSavedJournalId(entry.id);
+        setMessage("Saved to Decision journal.");
+      } catch {
+        setSavedJournalId(null);
+        setMessage("Couldn't save that decision. Try again.");
       } finally {
         setPendingAlertId(null);
       }
@@ -129,6 +233,9 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
       data-action-evidence={lastAction}
       data-action-sequence={actionSequence}
     >
+      <h2 id="alert-feed-title" className="sr-only">
+        Alert list
+      </h2>
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter alerts">
         {filters.map((item) => (
           <button
@@ -144,13 +251,13 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
               setActionSequence((current) => current + 1);
             }}
             className={cn(
-              "px-3 py-1.5 text-sm chamfer-sm transition-colors",
+              "min-h-11 px-4 py-2 text-sm chamfer-sm transition-colors",
               filter === item
                 ? "bg-violet text-void"
                 : "border border-outline-variant/40 bg-surface-dim/40 text-on-surface-variant hover:text-violet",
             )}
           >
-            {item === "All" ? "All" : tierLabel[item]}
+            {item}
           </button>
         ))}
         <span className="ml-auto text-sm text-outline">
@@ -161,38 +268,61 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
       <p className="sr-only" aria-live="polite">
         {isPending ? "Saving alert update." : message}
       </p>
-      <p className="text-sm text-outline">{message}</p>
+      {message ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-outline-variant/35 bg-surface-dim/35 px-3 py-2 text-sm text-outline">
+          <span>{message}</span>
+          {savedJournalId ? (
+            <Link
+              href={`/journal?entry=${encodeURIComponent(savedJournalId)}#${encodeURIComponent(savedJournalId)}`}
+              className="ml-auto inline-flex min-h-11 items-center justify-center rounded-md border border-violet/35 px-3 font-semibold text-violet transition hover:bg-violet/10"
+            >
+              Open saved call
+            </Link>
+          ) : null}
+          {lastDismissedAlert && !isReplay ? (
+            <button
+              type="button"
+              onClick={() => restore(lastDismissedAlert)}
+              disabled={pendingAlertId === lastDismissedAlert.id}
+              className="ml-auto inline-flex min-h-11 items-center justify-center rounded-md border border-violet/35 px-3 font-semibold text-violet transition hover:bg-violet/10 disabled:opacity-50"
+            >
+              Undo
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {isReplay ? (
+        <div className="rounded-md border border-violet/35 bg-violet/[0.07] px-4 py-3 text-sm leading-6 text-on-surface-variant">
+          <span className="font-semibold text-on-surface">Replay view:</span>{" "}
+          showing alerts Master Mold knew at this time. Current-state actions are disabled here.
+        </div>
+      ) : null}
 
       {visibleAlerts.length > 0 ? (
         <div className="grid gap-4">
           {visibleAlerts.map((alert) => {
             const isExpanded = expanded.has(alert.id);
             const isBusy = pendingAlertId === alert.id;
-
             return (
-              <Card
-                key={alert.id}
-                className={cn(
-                  "border-outline-variant/40 bg-surface-high/40 transition-opacity",
-                  alert.acknowledged && "opacity-55",
-                )}
-              >
+              <Card key={alert.id} className="border-outline-variant/40 bg-surface-high/40">
                 <CardHeader className="space-y-4 p-4 sm:p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className={tierStyles[alert.tier]}>
-                          {tierLabel[alert.tier]}
+                        <Badge variant="outline" className={severityStyles[alert.severity]}>
+                          {alert.severity}
                         </Badge>
-                        {alert.acknowledged ? (
-                          <Badge variant="outline" className="border-engine/40 text-engine">
-                            Acknowledged
-                          </Badge>
-                        ) : null}
                       </div>
                       <CardTitle className="text-lg leading-7 text-on-surface">
-                        {alert.message.replace(/\s*\(z=[^)]*\)\s*$/i, "")}
+                        {cleanAlertMessage(alert.message)}
                       </CardTitle>
+                      <p className="max-w-2xl text-sm leading-6 text-on-surface-variant">
+                        {explainAlertRelevance(alert)}
+                      </p>
+                      <div className="max-w-2xl rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3 text-sm leading-6 text-on-surface">
+                        <span className="font-semibold text-on-surface">Suggested response: </span>
+                        <span className="text-on-surface-variant">{buildAlertSuggestedResponse(alert)}</span>
+                      </div>
                     </div>
                     <Button
                       type="button"
@@ -204,7 +334,7 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                       aria-expanded={isExpanded}
                       aria-controls={`${alert.id}-rationale`}
                     >
-                      See rationale
+                      Why it matters
                       <ChevronDown
                         aria-hidden="true"
                         className={cn("transition-transform", isExpanded && "rotate-180")}
@@ -218,41 +348,98 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
                       id={`${alert.id}-rationale`}
                       className="rounded-md border border-violet/30 bg-violet/[0.07] p-4 text-sm leading-6 text-on-surface"
                     >
-                      <div className="mb-2 flex items-center gap-2 font-semibold">
+                      <div className="mb-3 flex items-center gap-2 font-semibold">
                         <MessageSquareText aria-hidden="true" className="size-4" />
-                        Why I flagged it
+                        Why this matters
                       </div>
-                      {alert.rationale}
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <AlertExplanationPoint label="Why it matters" body={explainAlertRelevance(alert)} />
+                        <AlertExplanationPoint label="Reasonable response" body={buildAlertSuggestedResponse(alert)} />
+                        <AlertExplanationPoint label="Safe to ignore when" body={buildAlertIgnoreCondition(alert)} />
+                      </div>
+                      <details className="mt-3 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-outline">
+                        <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-on-surface">
+                          Show scan details
+                        </summary>
+                        <p className="mt-2">{cleanAlertRationale(alert.rationale)}</p>
+                      </details>
                     </div>
                   ) : null}
 
-                  <div className="flex flex-wrap items-center gap-3 border-t border-outline-variant/40 pt-4">
-                    <Button
+                  <div className="grid gap-3 rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3 sm:grid-cols-3">
+                    <button
                       type="button"
-                      className="bg-engine text-void hover:brightness-110"
-                      onClick={() => acknowledge(alert)}
-                      data-rds-action="submit"
-                      data-action-state={alert.acknowledged ? `changed-${actionSequence}` : "idle"}
-                      disabled={alert.acknowledged || isBusy}
+                      onClick={() => openMasterMoldChat(buildAlertChatPrompt(alert), buildAlertPageContext(alert))}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet/35 bg-violet/10 px-3 py-2 text-sm font-medium text-violet transition-colors hover:bg-violet/15"
                     >
-                      <CheckCircle2 aria-hidden="true" />
-                      {alert.acknowledged ? "Acknowledged" : "Got it"}
-                    </Button>
+                      <MessageSquareText aria-hidden="true" className="size-4" />
+                      Ask Master Mold
+                    </button>
+                    {isReplay ? (
+                      <>
+                        <ReplayDisabledAction icon={<BookPlus aria-hidden="true" className="size-4" />}>
+                          Save disabled
+                        </ReplayDisabledAction>
+                        <ReplayDisabledAction icon={<Wallet aria-hidden="true" className="size-4" />}>
+                          Paper trade disabled
+                        </ReplayDisabledAction>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => saveAsDecision(alert)}
+                          disabled={isBusy}
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-medium text-engine transition-colors hover:bg-engine/15 disabled:opacity-50"
+                        >
+                          <BookPlus aria-hidden="true" className="size-4" />
+                          Save as decision
+                        </button>
+                        <Link
+                          href={buildAlertPaperHref(alert)}
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-medium text-caution transition-colors hover:bg-caution/15"
+                        >
+                          <Wallet aria-hidden="true" className="size-4" />
+                          Paper trade
+                        </Link>
+                      </>
+                    )}
+                  </div>
 
-                    <div className="ml-auto flex items-center gap-2">
-                      <span className="text-sm text-outline">Useful?</span>
-                      <ThumbButton
-                        active={alert.useful_feedback === true}
-                        disabled={isBusy}
-                        onClick={() => submitFeedback(alert, true)}
-                        up
-                      />
-                      <ThumbButton
-                        active={alert.useful_feedback === false}
-                        disabled={isBusy}
-                        onClick={() => submitFeedback(alert, false)}
-                      />
-                    </div>
+                  <div className="flex flex-wrap items-center gap-3 border-t border-outline-variant/40 pt-4">
+                    {isReplay ? (
+                      <p className="text-sm leading-6 text-outline">
+                        Dismiss and feedback are disabled in replay so this snapshot stays unchanged.
+                      </p>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          className="bg-engine text-void hover:brightness-110"
+                          onClick={() => dismiss(alert)}
+                          data-rds-action="submit"
+                          data-action-state={alert.acknowledged ? `changed-${actionSequence}` : "idle"}
+                          disabled={isBusy}
+                        >
+                          <CheckCircle2 aria-hidden="true" />
+                          Dismiss
+                        </Button>
+
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                          <ThumbButton
+                            active={alert.useful_feedback === true}
+                            disabled={isBusy}
+                            onClick={() => submitFeedback(alert, true)}
+                            up
+                          />
+                          <ThumbButton
+                            active={alert.useful_feedback === false}
+                            disabled={isBusy}
+                            onClick={() => submitFeedback(alert, false)}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -261,10 +448,71 @@ export function AlertFeed({ initialAlerts }: { initialAlerts: AlertJson[] }) {
         </div>
       ) : (
         <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm leading-6 text-on-surface-variant">
-          Nothing in this tier.
+          {dismissedAlerts.length > 0 ? "Nothing active in this group." : "Nothing in this group."}
         </div>
       )}
+      {dismissedAlerts.length > 0 ? (
+        <details open className="rounded-md border border-outline-variant/40 bg-surface-dim/35 p-4">
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-on-surface">
+            {isReplay ? "Already dismissed in this replay" : "Dismissed"} ({dismissedAlerts.length})
+          </summary>
+          <div className="mt-3 grid gap-2">
+            {dismissedAlerts.map((alert) => {
+              const isBusy = pendingAlertId === alert.id;
+              return (
+                <div key={alert.id} className="flex flex-wrap items-center gap-2 rounded-md border border-outline-variant/35 bg-surface-high/30 p-3">
+                  <span className="min-w-0 flex-1 text-sm text-on-surface-variant">
+                    {cleanAlertMessage(alert.message)}
+                  </span>
+                  {isReplay ? (
+                    <span className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline-variant/35 px-3 text-sm font-semibold text-outline">
+                      Replay only
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => restore(alert)}
+                      disabled={isBusy}
+                      className="inline-flex min-h-11 items-center justify-center rounded-md border border-violet/35 px-3 text-sm font-semibold text-violet transition hover:bg-violet/10 disabled:opacity-50"
+                    >
+                      Restore
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      ) : null}
     </section>
+  );
+}
+
+function AlertExplanationPoint({ label, body }: { label: string; body: string }) {
+  return (
+    <div className="rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3">
+      <p className="font-mono text-[11px] uppercase tracking-telemetry text-outline">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-on-surface-variant">{body}</p>
+    </div>
+  );
+}
+
+function ReplayDisabledAction({
+  children,
+  icon,
+}: {
+  children: ReactNode;
+  icon: ReactNode;
+}) {
+  return (
+    <span
+      aria-disabled="true"
+      title="Disabled in replay"
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-outline-variant/35 bg-surface-dim/45 px-3 py-2 text-sm font-medium text-outline"
+    >
+      {icon}
+      {children}
+    </span>
   );
 }
 
@@ -293,17 +541,18 @@ function ThumbButton({
   up?: boolean;
 }) {
   const Icon = up ? ThumbsUp : ThumbsDown;
+  const label = up ? "Useful" : "Not useful";
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label={up ? "Useful" : "Not useful"}
+      aria-label={label}
       aria-pressed={active}
       data-rds-action="submit"
       data-action-state={active ? "changed" : "idle"}
       className={cn(
-        "flex size-9 items-center justify-center chamfer-sm transition-colors disabled:opacity-50",
+        "inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 text-sm font-semibold chamfer-sm transition-colors disabled:opacity-50",
         active
           ? up
             ? "bg-engine/20 text-engine"
@@ -312,6 +561,7 @@ function ThumbButton({
       )}
     >
       <Icon className="size-4" />
+      {label}
     </button>
   );
 }

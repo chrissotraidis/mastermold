@@ -1,6 +1,10 @@
 import { demoDatabase } from "./seed-data";
 import type { Alert } from "./schema";
+import { plainBriefingText } from "@/lib/plain-finance-copy";
+import { rawAlertIdFromPublic } from "@/lib/public-ids";
 import { engineAlerts, engineProvenance, engineRunSummary, getEngineStatus } from "./engine-data";
+import { isKnownBy, type AsOfFilter } from "./bitemporal";
+import { getPortfolio } from "./portfolio";
 import { store, type AlertStateRow } from "./store";
 
 export type AlertTier = Alert["tier"];
@@ -17,6 +21,9 @@ export type AlertJson = Pick<
   "id" | "tier" | "z_score" | "message" | "rationale" | "acknowledged" | "useful_feedback"
 > & {
   asset_id: string;
+  asset_symbol: string;
+  asset_name: string;
+  portfolio_weight_pct: number;
   signal?: string;
   provenance: AlertProvenance;
 };
@@ -40,8 +47,8 @@ function currentState(alert: Alert): AlertStateRow {
 }
 
 /** The raw alert rows from whichever source is live, plus the matching provenance. */
-function activeAlerts(): { alerts: Alert[]; provenance: (alert: Alert) => AlertProvenance } {
-  const status = getEngineStatus();
+function activeAlerts(asOf: AsOfFilter | null = null): { alerts: Alert[]; provenance: (alert: Alert) => AlertProvenance } {
+  const status = getEngineStatus(asOf);
   if (status.state === "live") {
     const engineProv = engineProvenance(status.bundle, engineRunSummary(status.bundle));
     const prov: AlertProvenance = {
@@ -52,7 +59,7 @@ function activeAlerts(): { alerts: Alert[]; provenance: (alert: Alert) => AlertP
     return { alerts: engineAlerts(status.bundle), provenance: () => prov };
   }
   return {
-    alerts: demoDatabase.alerts,
+    alerts: demoDatabase.alerts.filter((alert) => isKnownBy(alert.knowledge_time, asOf)),
     provenance: (alert) => ({
       label: "Demo data",
       source: "Seeded alert feed",
@@ -61,11 +68,16 @@ function activeAlerts(): { alerts: Alert[]; provenance: (alert: Alert) => AlertP
   };
 }
 
-export function getAlerts(): AlertJson[] {
-  const { alerts, provenance } = activeAlerts();
+export function getAlerts(asOf: AsOfFilter | null = null): AlertJson[] {
+  const { alerts, provenance } = activeAlerts(asOf);
+  const portfolio = getPortfolio(asOf);
   return alerts
     .map((alert) => {
-      const state = currentState(alert);
+      const state = asOf ? { acknowledged: alert.acknowledged, useful_feedback: alert.useful_feedback } : currentState(alert);
+      const asset = demoDatabase.assets.find((item) => item.id === alert.asset_id);
+      const portfolioWeight = portfolio.holdings
+        .filter((holding) => holding.symbol === asset?.symbol)
+        .reduce((sum, holding) => sum + holding.weight_pct, 0);
       return toAlertJson(
         {
           ...alert,
@@ -73,6 +85,11 @@ export function getAlerts(): AlertJson[] {
           useful_feedback: state.useful_feedback,
         },
         provenance(alert),
+        {
+          symbol: asset?.symbol ?? "Unknown",
+          name: asset?.name ?? "Unknown asset",
+          portfolio_weight_pct: Math.round(portfolioWeight * 10) / 10,
+        },
       );
     })
     .sort(
@@ -84,14 +101,18 @@ export function getAlerts(): AlertJson[] {
     );
 }
 
-export function acknowledgeAlert(id: string): AlertJson | null {
+export function setAlertAcknowledged(id: string, acknowledged: boolean): AlertJson | null {
   const alert = findAlert(id);
   if (!alert) {
     return null;
   }
   const state = currentState(alert);
-  store().setAlertState(alert.id, { acknowledged: true, useful_feedback: state.useful_feedback });
+  store().setAlertState(alert.id, { acknowledged, useful_feedback: state.useful_feedback });
   return getAlertById(alert.id);
+}
+
+export function acknowledgeAlert(id: string): AlertJson | null {
+  return setAlertAcknowledged(id, true);
 }
 
 export function saveAlertFeedback(id: string, useful_feedback: UsefulFeedback): AlertJson | null {
@@ -109,18 +130,25 @@ function getAlertById(id: string): AlertJson | null {
 }
 
 function findAlert(id: string): Alert | null {
-  const decodedId = safelyDecodeId(id);
+  const decodedId = rawAlertIdFromPublic(id);
   return activeAlerts().alerts.find((alert) => alert.id === decodedId) ?? null;
 }
 
-function toAlertJson(alert: Alert, provenance: AlertProvenance): AlertJson {
+function toAlertJson(
+  alert: Alert,
+  provenance: AlertProvenance,
+  asset: { symbol: string; name: string; portfolio_weight_pct: number },
+): AlertJson {
   return {
     id: alert.id,
     asset_id: alert.asset_id,
+    asset_symbol: asset.symbol,
+    asset_name: asset.name,
+    portfolio_weight_pct: asset.portfolio_weight_pct,
     tier: alert.tier,
     z_score: alert.z_score,
-    message: alert.message,
-    rationale: alert.rationale,
+    message: plainAlertText(alert.message),
+    rationale: plainAlertText(alert.rationale),
     acknowledged: alert.acknowledged,
     useful_feedback: alert.useful_feedback,
     signal: alert.signal,
@@ -128,10 +156,6 @@ function toAlertJson(alert: Alert, provenance: AlertProvenance): AlertJson {
   };
 }
 
-function safelyDecodeId(id: string) {
-  try {
-    return decodeURIComponent(id);
-  } catch {
-    return id;
-  }
+function plainAlertText(value: string) {
+  return plainBriefingText(value.replace(/\s*\(z=[^)]*\)\s*$/i, ""));
 }

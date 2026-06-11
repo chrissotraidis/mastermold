@@ -115,6 +115,20 @@
   .glow-pulse {
     animation: mm-pulse-glow 4s ease-in-out infinite alternate;
   }
+  .alert-count-badge {
+    min-width: 1.25rem;
+    border-radius: 9999px;
+    background: hsl(var(--destructive));
+    padding: 0 0.375rem;
+    color: hsl(var(--destructive-foreground));
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 1.25rem;
+    text-align: center;
+  }
+  .alert-count-badge::after {
+    content: attr(data-alert-count);
+  }
 }
 
 @keyframes mm-pulse-glow {
@@ -126,33 +140,16 @@
   }
 }
 
-/*
- * Master Mold's face. The eyes pulse + blink in one opacity track (mm-eye-live), the head
- * breathes, and the mouth flickers when he talks.
- */
-@keyframes mm-eye-live {
-  0%, 100% { opacity: 0.78; }
-  25% { opacity: 1; }
-  55% { opacity: 0.85; }
-  90% { opacity: 0.95; }
-  93% { opacity: 0.1; }   /* blink */
-  96% { opacity: 0.95; }
-}
-@keyframes mm-mouth {
-  0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scaleX(0.7); }
-  50% { opacity: 0.9; transform: translate(-50%, -50%) scaleX(1); }
-}
-@keyframes mm-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.012); }
-}
-
-/*
- * Master Mold's face is the product's signature living element, so it keeps breathing,
- * blinking, and tracking even under reduced-motion (callers can still pass reduceMotion to
- * force it off). The rest of the UI's ambient motion does yield to the preference.
- */
+/* Ambient motion yields to the user's reduced-motion preference. */
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+
   .glow-pulse,
   .animate-pulse,
   .animate-spin {

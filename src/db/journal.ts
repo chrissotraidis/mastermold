@@ -10,6 +10,7 @@ import {
   getEngineStatus,
 } from "./engine-data";
 import { isKnownBy, latestKnowledgeTime as getLatestKnowledgeTime, type AsOfFilter } from "./bitemporal";
+import { plainBriefingHeadline, plainBriefingText } from "@/lib/plain-finance-copy";
 import type {
   DecisionJournalEntry,
   OutcomeScore,
@@ -71,6 +72,13 @@ export type CreateDecisionInput = {
   falsification_condition: string;
 };
 
+export type CreateOutcomeInput = {
+  thesis_played_out: boolean;
+  process_score: number;
+  outcome_score: number;
+  pnl_note: string;
+};
+
 const tierDefinitions: Array<{
   key: ConfidenceTierKey;
   label: string;
@@ -78,8 +86,8 @@ const tierDefinitions: Array<{
   max: number;
 }> = [
   { key: "1-3", label: "1-3 exploratory", min: 1, max: 3 },
-  { key: "4-6", label: "4-6 watchlist", min: 4, max: 6 },
-  { key: "7-10", label: "7-10 high conviction", min: 7, max: 10 },
+  { key: "4-6", label: "4-6 cautious", min: 4, max: 6 },
+  { key: "7-10", label: "7-10 stronger calls", min: 7, max: 10 },
 ];
 
 export function getJournal(asOf: AsOfFilter | null = null): JournalJson {
@@ -89,11 +97,7 @@ export function getJournal(asOf: AsOfFilter | null = null): JournalJson {
   const engineLive = status.state === "live" && engineHasResolvedJournal(status.bundle);
   const bundle = engineLive ? status.bundle : null;
 
-  const outcomeScores = bundle
-    ? engineOutcomeScores(bundle)
-        .filter((score) => isKnownBy(score.knowledge_time, asOf))
-        .sort((a, b) => Date.parse(b.resolved_at) - Date.parse(a.resolved_at))
-    : getOutcomeScores(asOf);
+  const outcomeScores = getOutcomeScores(asOf, bundle ? engineOutcomeScores(bundle) : undefined);
 
   // Engine decisions (when live) replace seeded decisions; operator-logged entries
   // from the durable store are always included on top.
@@ -153,15 +157,42 @@ export function createDecisionJournalEntry(input: CreateDecisionInput): JournalE
   return toJournalEntryJson(entry);
 }
 
+export function createOutcomeScore(
+  journalEntryId: string,
+  input: CreateOutcomeInput,
+): JournalEntryJson | null {
+  const currentJournal = getJournal();
+  const entry = currentJournal.entries.find((item) => item.id === journalEntryId);
+  if (!entry || entry.outcome_score) return null;
+
+  const now = new Date().toISOString();
+  const score: OutcomeScore = {
+    id: `outcome_${journalEntryId}_${Date.now().toString(36)}`,
+    journal_entry_id: journalEntryId,
+    resolved_at: now,
+    pnl_note: input.pnl_note,
+    thesis_played_out: input.thesis_played_out,
+    process_score: input.process_score,
+    outcome_score: input.outcome_score,
+    event_time: now,
+    knowledge_time: now,
+  };
+
+  store().addOutcomeScore(score);
+  return getJournal().entries.find((item) => item.id === journalEntryId) ?? null;
+}
+
 function buildEntries(
   baseEntries: DecisionJournalEntry[],
   asOf: AsOfFilter | null,
   outcomeScores: OutcomeScore[],
 ): JournalEntryJson[] {
-  return [...baseEntries, ...store().loggedJournalEntries()]
+  const entries = [...baseEntries, ...store().loggedJournalEntries()]
     .filter((entry) => isKnownBy(entry.knowledge_time, asOf))
     .map((entry) => toJournalEntryJson(entry, outcomeScores))
     .sort((a, b) => Date.parse(b.logged_at) - Date.parse(a.logged_at));
+
+  return collapseRepeatedJournalEntries(entries);
 }
 
 function toJournalEntryJson(
@@ -175,8 +206,80 @@ function toJournalEntryJson(
   };
 }
 
-function getOutcomeScores(asOf: AsOfFilter | null) {
-  return [...demoDatabase.outcomeScores]
+function collapseRepeatedJournalEntries(entries: JournalEntryJson[]) {
+  const byKey = new Map<string, JournalEntryJson>();
+
+  for (const entry of entries) {
+    const key = journalDedupeKey(entry);
+    const existing = byKey.get(key);
+
+    if (!existing || Date.parse(entry.logged_at) > Date.parse(existing.logged_at)) {
+      byKey.set(key, entry);
+    }
+  }
+
+  return [...byKey.values()].sort((a, b) => Date.parse(b.logged_at) - Date.parse(a.logged_at));
+}
+
+function journalDedupeKey(entry: JournalEntryJson) {
+  const title = canonicalText(entry.thesis);
+  const horizon = canonicalText(entry.horizon);
+  const proof = canonicalText(entry.falsification_condition);
+  const clues = entry.signals.map(canonicalClue).filter(Boolean);
+  const clue = clues.sort().join("|");
+  const alertSymbol = alertSymbolFromTitle(title);
+
+  if (alertSymbol) {
+    const alertClue = clues
+      .filter((item) => item !== "portfolio" && item !== "watchlist")
+      .sort()
+      .join("|");
+    return `alert:${alertSymbol}:${alertClue}:${horizon}`;
+  }
+
+  return `${title}:${clue}:${horizon}:${proof}`;
+}
+
+function alertSymbolFromTitle(title: string) {
+  if (!title.startsWith("review alert")) return null;
+  const alertBody = title.replace(/^review alert\s*/, "");
+  return alertBody.match(/\b[a-z]{1,6}\b/i)?.[0]?.toUpperCase() ?? null;
+}
+
+function canonicalClue(value: string) {
+  const normalized = canonicalText(value);
+  if (/^z\s*\d/.test(normalized) || /^z$/.test(normalized)) return "";
+  if (
+    normalized === "saved market scan" ||
+    normalized === "engine output" ||
+    normalized.startsWith("market read") ||
+    normalized.startsWith("portfolio") ||
+    normalized.startsWith("memory")
+  ) {
+    return "";
+  }
+  if (normalized === "t0" || normalized.includes("urgent")) return "urgent";
+  if (normalized === "t1" || normalized.includes("worth checking")) return "worth-checking";
+  if (normalized === "t2" || normalized.includes("fyi")) return "fyi";
+  if (normalized.includes("volume")) return "volume";
+  if (normalized.includes("return") || normalized.includes("price")) return "price";
+  if (normalized.includes("news")) return "news";
+  if (normalized.includes("funding")) return "funding";
+  if (normalized.includes("portfolio")) return "portfolio";
+  if (normalized.includes("watchlist")) return "watchlist";
+  return normalized;
+}
+
+function canonicalText(value: string) {
+  return plainBriefingText(plainBriefingHeadline(value))
+    .toLowerCase()
+    .replace(/&#x27;/g, "'")
+    .replace(/[^a-z0-9%$]+/g, " ")
+    .trim();
+}
+
+function getOutcomeScores(asOf: AsOfFilter | null, baseScores = demoDatabase.outcomeScores) {
+  return [...baseScores, ...store().outcomeScores()]
     .filter((score) => isKnownBy(score.knowledge_time, asOf))
     .sort(
     (a, b) => Date.parse(b.resolved_at) - Date.parse(a.resolved_at),
@@ -273,6 +376,10 @@ function latestKnowledgeTime(asOf: AsOfFilter | null) {
       .loggedJournalEntries()
       .filter((entry) => isKnownBy(entry.knowledge_time, asOf))
       .map((entry) => entry.knowledge_time),
+    ...store()
+      .outcomeScores()
+      .filter((score) => isKnownBy(score.knowledge_time, asOf))
+      .map((score) => score.knowledge_time),
     ...demoDatabase.outcomeScores
       .filter((score) => isKnownBy(score.knowledge_time, asOf))
       .map((score) => score.knowledge_time),

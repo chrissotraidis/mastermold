@@ -30,18 +30,15 @@ always_run:
 # To switch: set provider: openrouter, point models at the OpenRouter ids, and put
 # OPENROUTER_API_KEY in engine/.env. Note: the Phase-4 Anthropic prompt-cache
 # optimization only applies on the anthropic provider.
-provider: anthropic                    # anthropic | openrouter | openai
+provider: openrouter                   # anthropic | openrouter | openai
 openrouter_base_url: https://openrouter.ai/api/v1
 models:
-  quick_think: claude-haiku-4-5       # analysts, debaters, reflection
-  deep_think: claude-sonnet-4-6       # the two judges (Research Manager, PM) only
-# Example OpenRouter (cheap) tier — uncomment and set provider: openrouter
-# models:
-#   quick_think: deepseek/deepseek-chat
-#   deep_think: deepseek/deepseek-chat
+  quick_think: deepseek/deepseek-chat  # analysts, debaters, reflection
+  deep_think: deepseek/deepseek-chat   # the two judges (Research Manager, PM) only
 temperature: 0.2                       # run-to-run consistency (Risks: judge quality)
 
 # --- Debate / risk rounds --------------------------------------------------
+selected_analysts: [market, social, news, fundamentals]  # trim for smoke runs; full set for production
 max_debate_rounds: 1
 max_risk_discuss_rounds: 1
 checkpoint_enabled: true               # per-ticker resume on a crashed watchlist run

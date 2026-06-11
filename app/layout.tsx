@@ -29,8 +29,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Master Mold — Sentinel",
-  description: "A personal financial agent. Advisory by construction; bounded where it acts.",
+  title: "Master Mold",
+  description: "A personal financial copilot for daily portfolio review. Advisory only in this build.",
 };
 
 export default function RootLayout({

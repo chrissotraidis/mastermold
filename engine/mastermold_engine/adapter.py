@@ -114,7 +114,7 @@ def nothing_actionable_card(*, run_date: str, event_time: str, knowledge_time: s
         "id": card_id,
         "date": run_date,
         "rank": 1,
-        "headline": "Nothing actionable today",
+        "headline": "Nothing urgent today",
         "why_now": "No watchlist ticker cleared the screener; no material change detected.",
         "relevance_note": "A quiet day is a first-class outcome — no agent runs, no LLM cost.",
         "bull_case": "",

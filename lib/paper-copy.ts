@@ -1,0 +1,25 @@
+export function plainPaperCopy(value: string) {
+  return value
+    .replace(/\bTesting whether the cleaned Paper flow makes the result easy to review\.?/gi, "Simulator example saved for later review.")
+    .replace(/\bBoundary check: confidence field submits from the mobile form\.?/gi, "Simulator example saved from the Paper form.")
+    .replace(/\bTesting the mobile paper flow after the account summary was compacted\.?/gi, "Simulator example saved to review the mobile Paper flow.")
+    .replace(/\bPaper trade saved to check the simulator review flow\.?/gi, "Simulator example saved for later review.")
+    .replace(/\bPaper trade saved from the mobile form; compare it after the close date\.?/gi, "Simulator example saved from the Paper form.")
+    .replace(/\bPaper trade saved from the mobile form\.?/gi, "Simulator example saved from the Paper form.")
+    .replace(/\bTesting the daily focus with paper trading only\.?/gi, "Simulator example saved from Today.")
+    .replace(/\bPersistence smoke prediction\b/gi, "Simulator example saved for persistence review.")
+    .replace(/\bmobile paper flow\b/gi, "mobile Paper flow")
+    .replace(/\baccount summary was compacted\b/gi, "Paper account summary was checked")
+    .replace(/\blocal store\b/gi, "local paper account")
+    .replace(/\bRaw screener shorthand\b/gi, "Saved market-scan reason")
+    .replace(/\bfake money only\b/gi, "paper trading only")
+    .replace(/\bfake money\b/gi, "paper trading")
+    .replace(/\bfake-money\b/gi, "paper")
+    .replace(/\bfake trades\b/gi, "paper trades")
+    .replace(/\bfake trade\b/gi, "paper trade")
+    .replace(/\bfake wallet\b/gi, "paper account")
+    .replace(/\bfake dollars\b/gi, "paper dollars")
+    .replace(/\bfake result\b/gi, "paper result")
+    .replace(/\bfake calls\b/gi, "simulated calls")
+    .replace(/\bfake call\b/gi, "simulated call");
+}

@@ -9,6 +9,7 @@ import {
   getEngineStatus,
   type EngineBundle,
 } from "./engine-data";
+import { isKnownBy, type AsOfFilter } from "./bitemporal";
 
 /**
  * Provenance carried on every briefing payload. `label` distinguishes live
@@ -38,15 +39,15 @@ function seededProvenance(source: string, asOf: string, notice?: string): Briefi
     : { label: "Demo data", source, as_of: asOf };
 }
 
-function fallbackNotice(): string | undefined {
-  const status = getEngineStatus();
+function fallbackNotice(asOf: AsOfFilter | null = null): string | undefined {
+  const status = getEngineStatus(asOf);
   return status.state === "invalid"
-    ? `Engine output present but unusable (${status.reason}); showing seeded demo data.`
+    ? `A saved scan was present but could not be used (${status.reason}); showing sample data.`
     : undefined;
 }
 
-export function getBriefingCards(): BriefingCardJson[] {
-  const status = getEngineStatus();
+export function getBriefingCards(asOf: AsOfFilter | null = null): BriefingCardJson[] {
+  const status = getEngineStatus(asOf);
 
   if (status.state === "live") {
     const provenance: BriefingProvenance = {
@@ -57,8 +58,9 @@ export function getBriefingCards(): BriefingCardJson[] {
       .sort((a, b) => a.rank - b.rank);
   }
 
-  const notice = fallbackNotice();
+  const notice = fallbackNotice(asOf);
   return demoDatabase.briefingCards
+    .filter((card) => isKnownBy(card.knowledge_time, asOf))
     .map((card) => ({
       ...card,
       provenance: seededProvenance("Seeded briefing", card.knowledge_time, notice),
@@ -72,9 +74,9 @@ export function getBriefingCardIds(): string[] {
   return [...engineIds, ...demoDatabase.briefingCards.map((card) => card.id), "[id]"];
 }
 
-export function getBriefingCardById(id: string): BriefingDetailJson | null {
+export function getBriefingCardById(id: string, asOf: AsOfFilter | null = null): BriefingDetailJson | null {
   const decodedId = safelyDecodeId(id);
-  const status = getEngineStatus();
+  const status = getEngineStatus(asOf);
 
   if (status.state === "live") {
     const detail = engineCardDetail(status.bundle, decodedId);
@@ -85,23 +87,25 @@ export function getBriefingCardById(id: string): BriefingDetailJson | null {
   const normalizedId = decodedId === "[id]" ? demoDatabase.briefingCards[0]?.id : decodedId;
   const card = demoDatabase.briefingCards.find((item) => item.id === normalizedId);
 
-  if (!card) {
+  if (!card || !isKnownBy(card.knowledge_time, asOf)) {
     return null;
   }
 
   const drivers = demoDatabase.drivers
-    .filter((driver) => driver.briefing_card_id === card.id)
+    .filter((driver) => driver.briefing_card_id === card.id && isKnownBy(driver.knowledge_time, asOf))
     .sort((a, b) => b.weight - a.weight || a.label.localeCompare(b.label));
 
   const decisionJournalEntry =
-    demoDatabase.decisionJournalEntries.find((entry) => entry.briefing_card_id === card.id) ??
+    demoDatabase.decisionJournalEntries.find(
+      (entry) => entry.briefing_card_id === card.id && isKnownBy(entry.knowledge_time, asOf),
+    ) ??
     null;
 
   return {
     ...card,
     drivers,
     decision_journal_entry: decisionJournalEntry,
-    provenance: seededProvenance("Seeded briefing detail", card.knowledge_time, fallbackNotice()),
+    provenance: seededProvenance("Seeded briefing detail", card.knowledge_time, fallbackNotice(asOf)),
   };
 }
 

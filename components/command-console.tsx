@@ -1,27 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Send } from "lucide-react";
+import { openMasterMoldChat } from "@/components/master-mold-actions";
 
 const SUGGESTED = [
   "What should I look at first?",
   "Argue the bear case on the top idea",
-  "What changed overnight?",
+  "What needs attention today?",
   "How's my recent hit-rate?",
 ];
 
 /**
- * The way you talk to Master Mold. Submitting routes to the chat surface with your
- * question; Master Mold answers grounded in today's briefing, alerts, and track record.
+ * The way you talk to Master Mold. Submitting opens the global chat with your
+ * question; Master Mold answers grounded in today's read, alerts, and performance.
  */
 export function CommandConsole() {
-  const router = useRouter();
   const [q, setQ] = useState("");
 
   function go(query: string) {
     const trimmed = query.trim();
-    router.push(trimmed ? `/chat?q=${encodeURIComponent(trimmed)}` : "/chat");
+    openMasterMoldChat(trimmed || undefined);
+    setQ("");
   }
 
   return (
@@ -43,7 +43,7 @@ export function CommandConsole() {
         <button
           type="submit"
           aria-label="Send"
-          className="bg-violet/20 p-2 text-violet chamfer-sm transition-colors hover:bg-violet/40 active:scale-95"
+          className="flex size-11 shrink-0 items-center justify-center bg-violet/20 text-violet chamfer-sm transition-colors hover:bg-violet/40 active:scale-95"
         >
           <Send className="size-4" />
         </button>
@@ -55,7 +55,7 @@ export function CommandConsole() {
             key={s}
             type="button"
             onClick={() => go(s)}
-            className="border border-outline-variant/40 bg-surface-dim/50 px-3 py-1.5 text-[13px] text-on-surface-variant chamfer-sm transition-colors hover:border-violet/50 hover:text-violet"
+            className="min-h-11 border border-outline-variant/40 bg-surface-dim/50 px-3 py-2 text-sm text-on-surface-variant chamfer-sm transition-colors hover:border-violet/50 hover:text-violet"
           >
             {s}
           </button>

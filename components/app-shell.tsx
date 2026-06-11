@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  AlertTriangle,
   ArrowLeft,
-  Bot,
-  BookOpenText,
   ClipboardCheck,
   Gamepad2,
   Hexagon,
@@ -16,16 +13,20 @@ import {
   Power,
   Settings,
   ShieldAlert,
-  Terminal,
   UserRound,
-  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { AlertInboxDrawer } from "@/components/alert-inbox-drawer";
+import { GlobalAssistant } from "@/components/global-assistant";
+import { openMasterMoldChat } from "@/components/master-mold-actions";
 import { SentinelFace, type SystemState } from "@/components/sentinel-face";
 import { useProfile } from "@/components/profile-provider";
 import { useFaceActivity } from "@/components/face-activity";
+import type { ProductProvenanceLabel } from "@/lib/provenance-copy";
 import { cn } from "@/lib/utils";
+
+type DataModeLabel = ProductProvenanceLabel;
 
 type Zone = "observe" | "advise" | "act" | "system";
 
@@ -33,13 +34,10 @@ type NavItem = { href: string; label: string; icon: LucideIcon; zone: Zone };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Today", icon: Hexagon, zone: "advise" },
-  { href: "/chat", label: "Chat", icon: Bot, zone: "advise" },
-  { href: "/alerts", label: "Alerts", icon: AlertTriangle, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", icon: LineChart, zone: "observe" },
-  { href: "/journal", label: "Track record", icon: BookOpenText, zone: "advise" },
-  { href: "/paper", label: "Practice", icon: Gamepad2, zone: "advise" },
-  { href: "/executor", label: "Web3", icon: Wallet, zone: "act" },
-  { href: "/review", label: "Transparency", icon: ClipboardCheck, zone: "system" },
+  { href: "/paper", label: "Paper", icon: Gamepad2, zone: "advise" },
+  { href: "/review", label: "Performance", icon: ClipboardCheck, zone: "system" },
+  { href: "/executor", label: "Executor", icon: Power, zone: "act" },
   { href: "/settings/integrations", label: "Settings", icon: Settings, zone: "system" },
 ];
 
@@ -57,11 +55,11 @@ function isActivePath(pathname: string, href: string) {
 
 export function AppShell({
   children,
-  dataMode = "Demo data",
+  dataMode = "Sample data",
   faceState = "idle",
 }: {
   children: React.ReactNode;
-  dataMode?: "Engine output" | "Demo data";
+  dataMode?: DataModeLabel;
   faceState?: SystemState;
 }) {
   const [killOpen, setKillOpen] = useState(false);
@@ -88,6 +86,7 @@ export function AppShell({
         {children}
       </main>
       <MobileNav />
+      <GlobalAssistant />
       {killOpen ? (
         <KillSwitchDialog
           engaged={killEngaged}
@@ -113,7 +112,7 @@ function TopBar({
   onKill,
   killEngaged,
 }: {
-  dataMode: "Engine output" | "Demo data";
+  dataMode: DataModeLabel;
   faceState: SystemState;
   onKill: () => void;
   killEngaged: boolean;
@@ -123,29 +122,46 @@ function TopBar({
   const { ready, profile } = useProfile();
   const { speaking } = useFaceActivity();
   const [q, setQ] = useState("");
-  const isEngine = dataMode === "Engine output";
+  const isEngine = dataMode === "Saved read";
+  const isManual = dataMode === "Manual portfolio";
+  const isImported = dataMode === "Imported portfolio";
+  const dataModeLabel = isEngine ? "Saved read" : isManual ? "Manual portfolio" : isImported ? "Imported" : "Sample";
   const firstName = profile?.name.trim().split(/\s+/)[0] ?? "";
   // The command bar duplicates the hero console on the deck and the chat page itself.
   const showCommandBar = pathname !== "/" && pathname !== "/chat";
+  const isChatPage = pathname.startsWith("/chat");
+  const showKillControl = pathname.startsWith("/executor") || killEngaged;
 
   return (
     <header className="fixed top-0 left-0 z-50 flex h-16 w-full items-center justify-between border-b border-outline-variant/60 bg-surface-dim/80 px-margin-mobile backdrop-blur-xl md:px-margin-desktop">
       <div className="flex min-w-0 items-center gap-3">
-        <Link href="/chat" aria-label="Summon Master Mold" className="group relative size-9 shrink-0">
-          <SentinelFace state={killEngaged ? "kill" : faceState} speaking={speaking} />
-          <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30 transition group-hover:ring-violet/70" aria-hidden="true" />
-        </Link>
-        <Link href="/" className="font-display text-2xl font-bold tracking-tighter text-violet">
+        {isChatPage ? (
+          <div className="relative size-11 shrink-0" aria-hidden="true">
+            <SentinelFace state={killEngaged ? "kill" : faceState} speaking={speaking} />
+            <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30" aria-hidden="true" />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => openMasterMoldChat()}
+            aria-label="Open Master Mold chat"
+            className="group relative size-11 shrink-0"
+          >
+            <SentinelFace state={killEngaged ? "kill" : faceState} speaking={speaking} />
+            <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30 transition group-hover:ring-violet/70" aria-hidden="true" />
+          </button>
+        )}
+        <Link href="/" className="flex min-h-11 items-center font-display text-2xl font-bold tracking-tighter text-violet">
           Master Mold
         </Link>
         <span
           className={cn(
             "ml-2 hidden items-center gap-1.5 font-mono text-[11px] uppercase tracking-telemetry sm:inline-flex",
-            isEngine ? "text-engine" : "text-demo",
+            isEngine ? "text-engine" : isManual || isImported ? "text-violet" : "text-demo",
           )}
-        >
-          <span className={cn("size-1.5 rounded-full", isEngine ? "bg-engine animate-pulse" : "bg-demo")} />
-          {dataMode}
+          >
+          <span className={cn("size-1.5 rounded-full", isEngine ? "bg-engine animate-pulse" : isManual || isImported ? "bg-violet" : "bg-demo")} />
+          {dataModeLabel}
         </span>
       </div>
 
@@ -156,11 +172,11 @@ function TopBar({
             onSubmit={(e) => {
               e.preventDefault();
               const query = q.trim();
-              router.push(query ? `/chat?q=${encodeURIComponent(query)}` : "/chat");
+              openMasterMoldChat(query || undefined);
+              setQ("");
             }}
           >
             <div className="flex items-center gap-2 border-b border-outline-variant/50 bg-void/60 px-3 py-1.5 chamfer-sm transition-colors focus-within:border-violet">
-              <Terminal aria-hidden="true" className="size-4 text-outline" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -171,6 +187,7 @@ function TopBar({
             </div>
           </form>
         ) : null}
+        <AlertInboxDrawer />
         {ready ? (
           <Link
             href="/settings/integrations"
@@ -183,26 +200,28 @@ function TopBar({
             </span>
           </Link>
         ) : null}
-        {killEngaged ? (
-          <button
-            type="button"
-            onClick={onKill}
-            className="flex items-center gap-1.5 bg-critical px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-telemetry text-void chamfer-sm active:scale-95"
-          >
-            <Power className="size-4" />
-            Halted
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onKill}
-            title="Kill switch — halt the Web3 executor"
-            aria-label="Kill switch"
-            className="p-2 text-outline transition-colors hover:text-critical"
-          >
-            <Power className="size-5" />
-          </button>
-        )}
+        {showKillControl ? (
+          killEngaged ? (
+            <button
+              type="button"
+              onClick={onKill}
+              className="flex items-center gap-1.5 bg-critical px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-telemetry text-void chamfer-sm active:scale-95"
+            >
+              <Power className="size-4" />
+              Halted
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onKill}
+              title="Kill-switch drill for the executor preview"
+              aria-label="Kill-switch drill"
+              className="flex size-11 items-center justify-center rounded-md text-outline transition-colors hover:bg-critical/10 hover:text-critical"
+            >
+              <Power className="size-5" />
+            </button>
+          )
+        ) : null}
       </div>
     </header>
   );
@@ -250,14 +269,20 @@ function SideRail() {
       </div>
       <div className="px-3 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
         <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">
-          Sentinel-1 · Advisory
+          Advisory only
         </p>
       </div>
     </nav>
   );
 }
 
-const MOBILE = NAV.filter((n) => ["/", "/alerts", "/portfolio", "/executor"].includes(n.href));
+const MOBILE: Array<NavItem & { shortLabel: string }> = [
+  { href: "/", label: "Today", shortLabel: "Today", icon: Hexagon, zone: "advise" },
+  { href: "/portfolio", label: "Portfolio", shortLabel: "Money", icon: LineChart, zone: "observe" },
+  { href: "/paper", label: "Paper", shortLabel: "Paper", icon: Gamepad2, zone: "advise" },
+  { href: "/review", label: "Performance", shortLabel: "Trust", icon: ClipboardCheck, zone: "system" },
+  { href: "/settings/integrations", label: "Settings", shortLabel: "Setup", icon: Settings, zone: "system" },
+];
 
 function MobileNav() {
   const pathname = usePathname() || "/";
@@ -280,18 +305,10 @@ function MobileNav() {
             )}
           >
             <Icon className="size-5" />
-            <span className="font-mono text-[10px] uppercase tracking-telemetry">{item.label.split(" ")[0]}</span>
+            <span className="font-mono text-[10px] uppercase tracking-telemetry">{item.shortLabel}</span>
           </Link>
         );
       })}
-      <Link
-        href="/chat"
-        className="flex min-h-12 flex-col items-center justify-center gap-1 px-3 py-1 text-on-surface-variant chamfer-sm"
-        aria-label="Interrogate Master Mold"
-      >
-        <Bot className="size-5" />
-        <span className="font-mono text-[10px] uppercase tracking-telemetry">Ask</span>
-      </Link>
     </nav>
   );
 }
@@ -310,31 +327,31 @@ function KillSwitchDialog({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-void/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
       <div className="relative w-full max-w-md bg-surface-dim p-6 chamfer inner-glow-strong">
-        <button onClick={onClose} aria-label="Close" className="absolute right-4 top-4 text-outline hover:text-on-surface">
+        <button onClick={onClose} aria-label="Close" className="absolute right-3 top-3 flex size-11 items-center justify-center rounded-md text-outline hover:bg-surface-high/60 hover:text-on-surface">
           <X className="size-5" />
         </button>
         <div className="mb-4 flex size-12 items-center justify-center bg-critical/15 chamfer-sm">
           <ShieldAlert className="size-6 text-critical" />
         </div>
         <h2 className="font-display text-xl font-semibold text-on-surface">
-          {engaged ? "System halted" : "Engage kill switch?"}
+          {engaged ? "Drill recorded" : "Run kill-switch drill?"}
         </h2>
         <p className="mt-2 text-sm leading-6 text-on-surface-variant">
           {engaged
-            ? "Done. Every live strategy halted, my keys revoked. Your briefing keeps working. Nothing ran live, so this was a drill."
-            : "Halts every live strategy and revokes my keys, immediately. Your briefing is untouched. Nothing runs live yet, so this is a drill."}
+            ? "Nothing live was running, and no keys or funds were touched. Today's read keeps working."
+            : "In a future automated-trading setup, this would pause strategies and revoke session keys. Here, it only records the drill."}
         </p>
         <div className="mt-6 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 font-mono text-[12px] uppercase tracking-telemetry text-on-surface-variant hover:text-on-surface">
+          <button onClick={onClose} className="min-h-11 px-4 py-2 font-mono text-[12px] uppercase tracking-telemetry text-on-surface-variant hover:text-on-surface">
             Cancel
           </button>
           {engaged ? (
-            <button onClick={onRearm} className="bg-engine px-4 py-2 font-mono text-[12px] font-bold uppercase tracking-telemetry text-void chamfer-sm hover:brightness-110">
+            <button onClick={onRearm} className="min-h-11 bg-engine px-4 py-2 font-mono text-[12px] font-bold uppercase tracking-telemetry text-void chamfer-sm hover:brightness-110">
               Re-arm system
             </button>
           ) : (
-            <button onClick={onConfirm} className="bg-critical px-4 py-2 font-mono text-[12px] font-bold uppercase tracking-telemetry text-void chamfer-sm hover:brightness-110">
-              Confirm halt
+            <button onClick={onConfirm} className="min-h-11 bg-critical px-4 py-2 font-mono text-[12px] font-bold uppercase tracking-telemetry text-void chamfer-sm hover:brightness-110">
+              Run drill
             </button>
           )}
         </div>
@@ -347,7 +364,7 @@ function KillBanner({ onRearm }: { onRearm: () => void }) {
   return (
     <div className="fixed left-1/2 top-20 z-[90] flex -translate-x-1/2 items-center gap-3 border border-critical/50 bg-critical/15 px-4 py-2 chamfer-sm backdrop-blur-md">
       <ShieldAlert className="size-4 text-critical" />
-      <span className="font-mono text-[11px] uppercase tracking-telemetry text-critical">System halted · signs nothing</span>
+      <span className="font-mono text-[11px] uppercase tracking-telemetry text-critical">Drill mode active · signs nothing</span>
       <button onClick={onRearm} className="font-mono text-[11px] uppercase tracking-telemetry text-on-surface underline-offset-2 hover:underline">
         Re-arm
       </button>
@@ -362,14 +379,13 @@ export function FirstRunBanner() {
       <Info className="mt-0.5 size-4 shrink-0 text-violet" />
       <p className="text-sm leading-6 text-on-surface-variant">
         <strong className="text-on-surface">Advisory only.</strong> Master Mold can't move your
-        equity or crypto. The Web3 executor stays inside the on-chain caps you set, and signs
-        nothing in this version.
+        equity or crypto. The executor is preview-only here and signs nothing.
       </p>
       <Link
         href="/review"
         className="ml-auto hidden shrink-0 items-center gap-1 font-mono text-[11px] uppercase tracking-telemetry text-violet hover:text-tertiary sm:flex"
       >
-        <ArrowLeft className="size-3.5 rotate-180" /> Transparency
+        <ArrowLeft className="size-3.5 rotate-180" /> Performance
       </Link>
     </div>
   );

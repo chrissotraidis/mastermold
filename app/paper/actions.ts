@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   createPaperPrediction,
   isPaperDirection,
+  resolvePaperAssetKey,
   type CreatePaperPredictionInput,
 } from "@/src/db/paper";
 
@@ -22,7 +23,7 @@ export async function submitPaperPrediction(
   if (normalized.errors.length > 0) {
     return {
       status: "error",
-      message: "Prediction could not be submitted. Review the form fields.",
+      message: "Paper trade could not be submitted. Review the form fields.",
       errors: normalized.errors,
     };
   }
@@ -33,7 +34,7 @@ export async function submitPaperPrediction(
 
     return {
       status: "success",
-      message: `Prediction submitted for ${prediction.asset.symbol} at ${formatTimestamp(
+      message: `Paper trade submitted for ${prediction.asset.symbol} at ${formatTimestamp(
         prediction.submitted_at,
       )}.`,
       errors: [],
@@ -41,7 +42,7 @@ export async function submitPaperPrediction(
   } catch (error) {
     return {
       status: "error",
-      message: "Prediction could not be submitted.",
+      message: "Paper trade could not be submitted.",
       errors: [error instanceof Error ? error.message : "Unexpected submission error"],
     };
   }
@@ -53,36 +54,45 @@ function normalizePredictionInput(formData: FormData): {
 } {
   const errors: string[] = [];
   const roundId = normalizeText(formData.get("round_id"));
-  const assetId = normalizeText(formData.get("asset_id"));
+  const assetKey = normalizeText(formData.get("asset_key")) || normalizeText(formData.get("asset_id"));
+  const assetId = assetKey ? resolvePaperAssetKey(assetKey) : null;
   const direction = normalizeText(formData.get("direction"));
-  const conviction = Number(normalizeText(formData.get("conviction")));
+  const paperSizeUsd = Number(
+    normalizeText(formData.get("paper_size_usd")) || normalizeText(formData.get("fake_size_usd")),
+  );
+  const conviction = Number(normalizeText(formData.get("confidence")) || normalizeText(formData.get("conviction")));
   const rationale = normalizeText(formData.get("rationale"));
 
   if (!roundId) {
-    errors.push("round_id is required");
+    errors.push("Choose a paper-test window.");
   }
 
-  if (!assetId) {
-    errors.push("asset is required");
+  if (!assetKey || !assetId) {
+    errors.push("Choose an asset.");
   }
 
   if (!isPaperDirection(direction)) {
-    errors.push("direction must be long, short, or flat");
+    errors.push("Choose Long, Short, or No position.");
+  }
+
+  if (!Number.isFinite(paperSizeUsd) || paperSizeUsd < 100 || paperSizeUsd > 100000) {
+    errors.push("Paper trade size must be between $100 and $100,000.");
   }
 
   if (!Number.isInteger(conviction) || conviction < 1 || conviction > 10) {
-    errors.push("conviction must be an integer from 1 to 10");
+    errors.push("Confidence must be a whole number from 1 to 10.");
   }
 
   if (!rationale) {
-    errors.push("rationale is required");
+    errors.push("Add why this paper trade makes sense.");
   }
 
   return {
     input: {
       round_id: roundId,
-      asset_id: assetId,
+      asset_id: assetId ?? "",
       direction: isPaperDirection(direction) ? direction : "flat",
+      fake_size_usd: Number.isFinite(paperSizeUsd) ? paperSizeUsd : 0,
       conviction,
       rationale,
     },
@@ -95,7 +105,7 @@ function normalizeText(value: FormDataEntryValue | null) {
 }
 
 function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",

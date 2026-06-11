@@ -12,8 +12,9 @@
  *
  * Files, not RPC: the engine writes JSON, the dashboard reads JSON. Nothing here
  * mutates anything external, so the advisory-only / read-only invariant holds.
- * `knowledge_time` is stamped by the engine at write time and never rewritten
- * here, so as-of replay stays honest.
+ * `knowledge_time` is stamped by the engine at write time. If an older saved
+ * file violates no-lookahead ordering, the dashboard clamps the visible
+ * knowledge time forward to the event time before surfacing it.
  *
  * See `engine/CONTRACT.md` for the bundle shape this mirrors.
  */
@@ -125,6 +126,19 @@ const strategyBeliefSchema = z.object({
   ...bitemporal,
 });
 
+const stageValueSchema: z.ZodType<
+  string | number | boolean | null | Array<unknown> | Record<string, unknown>
+> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(stageValueSchema),
+    z.record(z.string(), stageValueSchema),
+  ]),
+);
+
 const runMetaSchema = z.object({
   run_date: z.string(),
   event_time: z.string(),
@@ -140,7 +154,7 @@ const runMetaSchema = z.object({
     completion_tokens: z.number(),
     usd: z.number(),
   }),
-  stages: z.record(z.string(), z.union([z.string(), z.number()])),
+  stages: z.record(z.string(), stageValueSchema),
 });
 
 const bundleSchema = z.object({
@@ -326,7 +340,38 @@ function parseBundle(
   if (!result.success) {
     return { ok: false, reason: `schema validation failed: ${result.error.issues[0]?.message ?? "unknown"}` };
   }
-  return { ok: true, bundle: result.data };
+  return { ok: true, bundle: normalizeNoLookahead(result.data) };
+}
+
+type BitemporalRow = {
+  event_time: string;
+  knowledge_time: string;
+};
+
+function normalizeNoLookahead(bundle: EngineBundle): EngineBundle {
+  clampKnownTime(bundle.run);
+
+  for (const card of bundle.briefing_cards) {
+    clampKnownTime(card);
+    for (const driver of card.drivers) clampKnownTime(driver);
+  }
+  for (const alert of bundle.alerts) clampKnownTime(alert);
+  for (const entry of bundle.journal_sync.pending_entries) clampKnownTime(entry);
+  for (const entry of bundle.journal_sync.resolved_entries) clampKnownTime(entry);
+  for (const outcome of bundle.journal_sync.outcomes) clampKnownTime(outcome);
+  for (const reflection of bundle.journal_sync.reflections) clampKnownTime(reflection);
+  for (const belief of bundle.journal_sync.beliefs) clampKnownTime(belief);
+
+  return bundle;
+}
+
+function clampKnownTime(row: BitemporalRow) {
+  const eventTime = Date.parse(row.event_time);
+  const knowledgeTime = Date.parse(row.knowledge_time);
+  if (Number.isNaN(eventTime) || Number.isNaN(knowledgeTime)) return;
+  if (knowledgeTime < eventTime) {
+    row.knowledge_time = row.event_time;
+  }
 }
 
 // --- Provenance ------------------------------------------------------------
@@ -369,21 +414,22 @@ export type DataMode = {
 export function getDataMode(asOf: AsOfFilter | null = null): DataMode {
   const status = getEngineStatus(asOf);
   if (status.state === "live") {
+    const runKind = engineRunKind(status.bundle);
     return {
       label: "Engine output",
       source: engineRunSummary(status.bundle),
-      detail: `Live TradingAgents run · ${status.bundle.run.triggered_tickers.length} ticker(s) analyzed`,
+      detail: `Saved scan · ${runKind} · ${status.bundle.run.triggered_tickers.length} ticker(s) analyzed`,
       as_of: status.bundle.run.knowledge_time,
     };
   }
   const notice =
     status.state === "invalid"
-      ? `Engine output present but unusable (${status.reason}); showing seeded demo data.`
+      ? `A saved scan was present but could not be used (${status.reason}); showing sample data.`
       : undefined;
   return {
     label: "Demo data",
-    source: "Seeded demo data",
-    detail: "Permanent zero-config fallback; no engine run ingested",
+    source: "Seeded sample data",
+    detail: "Permanent zero-config fallback; no saved scan loaded",
     as_of: null,
     notice,
   };
@@ -394,7 +440,15 @@ export function engineRunSummary(bundle: EngineBundle): string {
   const models = Object.values(bundle.run.models).join(" + ");
   const cost =
     bundle.run.cost.usd > 0 ? `$${bundle.run.cost.usd.toFixed(2)}` : "$0 (quiet day)";
-  return `TradingAgents run ${bundle.run.run_date} · ${bundle.run.provider} (${models}) · ${cost}`;
+  return `${engineRunKind(bundle)} ${bundle.run.run_date} · ${bundle.run.provider} (${models}) · ${cost}`;
+}
+
+function engineRunKind(bundle: EngineBundle) {
+  return bundle.run.stages.agent_adapter === "openrouter_direct"
+    ? "OpenRouter direct run"
+    : bundle.run.stages.agent_adapter === "quiet_no_agent_runs"
+      ? "Quiet screener run"
+    : "TradingAgents run";
 }
 
 // --- Row extraction (bundle -> schema.ts types) ----------------------------

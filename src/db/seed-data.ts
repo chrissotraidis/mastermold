@@ -70,7 +70,7 @@ export const demoDatabase: DemoDatabase = {
   ],
   newsItems: [
     { id: "news_ai_capex", asset_id: "asset_nvda", headline: "Cloud capex revisions keep AI accelerator demand in focus", source: "Demo Market Wire", url: "https://example.com/demo/ai-capex", sentiment: "positive", event_time: "2026-05-29T12:15:00Z", knowledge_time: "2026-05-29T12:19:00Z" },
-    { id: "news_crypto_flows", asset_id: "asset_btc", headline: "ETF flow streak slows while derivatives basis remains firm", source: "Demo Crypto Desk", url: "https://example.com/demo/crypto-flows", sentiment: "neutral", event_time: "2026-05-29T22:10:00Z", knowledge_time: "2026-05-29T22:18:00Z" },
+    { id: "news_crypto_flows", asset_id: "asset_btc", headline: "ETF flow streak slows while the futures price gap stays firm", source: "Demo Crypto Desk", url: "https://example.com/demo/crypto-flows", sentiment: "neutral", event_time: "2026-05-29T22:10:00Z", knowledge_time: "2026-05-29T22:18:00Z" },
     { id: "news_policy", asset_id: null, headline: "Macro calendar leaves risk assets sensitive to Monday liquidity", source: "Demo Macro Notes", url: "https://example.com/demo/macro", sentiment: "neutral", event_time: "2026-05-30T05:40:00Z", knowledge_time: "2026-05-30T05:50:00Z" },
   ],
   fundingObservations: [
@@ -98,11 +98,11 @@ export const demoDatabase: DemoDatabase = {
       id: "brief_crypto_basis",
       date: eventDay,
       rank: 2,
-      headline: "Crypto basis looks attractive — worth watching, not trading yet",
-      why_now: "Funding observations stayed positive while ETF flow momentum cooled.",
+      headline: "Crypto futures price gap looks interesting — worth watching, not trading yet",
+      why_now: "Crypto borrow-payment observations stayed positive while ETF flow momentum cooled.",
       relevance_note: "BTC and wallet exposure here are sample data; no capital is deployed.",
-      bull_case: "Positive funding and controlled net delta would suit a monitored carry thesis.",
-      bear_case: "Open interest is crowded, and there's no live executor to act on it yet.",
+      bull_case: "Positive borrow payments and controlled exposure would suit a monitored carry idea.",
+      bear_case: "Open interest is crowded, and the executor is still preview-only.",
       conviction: 5,
       horizon: "1 week",
       status: "actionable",
@@ -114,10 +114,10 @@ export const demoDatabase: DemoDatabase = {
       id: "brief_nothing",
       date: eventDay,
       rank: 3,
-      headline: "Nothing actionable in the smaller broker balances today",
+      headline: "Nothing urgent in the smaller broker balances today",
       why_now: "Robinhood and Coinbase show no threshold breach beyond the alerts already tracked.",
-      relevance_note: "A real empty state — I'd rather say nothing than manufacture a call.",
-      bull_case: "Waiting preserves optionality and avoids over-trading thin signals.",
+      relevance_note: "A real quiet state — I'd rather say nothing than manufacture a call.",
+      bull_case: "Waiting preserves optionality and avoids over-trading thin evidence.",
       bear_case: "A breakout could be missed while these connections stay dormant.",
       conviction: 4,
       horizon: "Today",
@@ -130,7 +130,7 @@ export const demoDatabase: DemoDatabase = {
   drivers: [
     { id: "driver_capex", briefing_card_id: "brief_ai_supply", label: "Cloud capex revisions", direction: "bullish", weight: 0.42, color: "green", source_citation: "Demo Market Wire, 2026-05-29", event_time: "2026-05-29T12:15:00Z", knowledge_time: "2026-05-29T12:19:00Z" },
     { id: "driver_concentration", briefing_card_id: "brief_ai_supply", label: "Portfolio concentration", direction: "bearish", weight: 0.3, color: "amber", source_citation: "Seeded portfolio snapshot, 2026-05-29", event_time: "2026-05-29T20:00:00Z", knowledge_time: "2026-05-29T20:02:00Z" },
-    { id: "driver_funding", briefing_card_id: "brief_crypto_basis", label: "Positive funding carry", direction: "bullish", weight: 0.36, color: "green", source_citation: "Demo Crypto Desk funding, 2026-05-29", event_time: "2026-05-29T16:00:00Z", knowledge_time: "2026-05-29T16:04:00Z" },
+    { id: "driver_funding", briefing_card_id: "brief_crypto_basis", label: "Positive borrow payments", direction: "bullish", weight: 0.36, color: "green", source_citation: "Demo Crypto Desk borrow-payment read, 2026-05-29", event_time: "2026-05-29T16:00:00Z", knowledge_time: "2026-05-29T16:04:00Z" },
     { id: "driver_crowding", briefing_card_id: "brief_crypto_basis", label: "Crowded open interest", direction: "bearish", weight: 0.28, color: "red", source_citation: "Demo Crypto Desk OI, 2026-05-29", event_time: "2026-05-29T16:00:00Z", knowledge_time: "2026-05-29T16:04:00Z" },
   ],
   alerts: [
@@ -140,11 +140,11 @@ export const demoDatabase: DemoDatabase = {
   ],
   decisionJournalEntries: [
     { id: "journal_ai", briefing_card_id: "brief_ai_supply", thesis: "Hold AI exposure unless capex revisions break below trend.", signals: ["capex revisions", "relative strength", "position concentration"], conviction: 7, horizon: "2-4 weeks", falsification_condition: "Two consecutive negative capex guide revisions or a close below the 20-day trend.", logged_at: "2026-05-30T06:30:00Z", event_time: "2026-05-30T06:30:00Z", knowledge_time: "2026-05-30T06:30:30Z" },
-    { id: "journal_crypto", briefing_card_id: "brief_crypto_basis", thesis: "Watch the basis carry only — don't execute.", signals: ["funding rate", "open interest", "ETF flows"], conviction: 5, horizon: "1 week", falsification_condition: "Funding flips negative or margin ratio falls below guardrail.", logged_at: "2026-05-30T06:35:00Z", event_time: "2026-05-30T06:35:00Z", knowledge_time: "2026-05-30T06:35:30Z" },
+    { id: "journal_crypto", briefing_card_id: "brief_crypto_basis", thesis: "Watch the futures price gap only — don't execute.", signals: ["crypto borrow-payment rate", "open interest", "ETF flows"], conviction: 5, horizon: "1 week", falsification_condition: "Borrow payments turn against the trade or the safety buffer falls below guardrail.", logged_at: "2026-05-30T06:35:00Z", event_time: "2026-05-30T06:35:00Z", knowledge_time: "2026-05-30T06:35:30Z" },
   ],
   outcomeScores: [
     { id: "outcome_prev_ai", journal_entry_id: "journal_ai", resolved_at: "2026-05-30T07:00:00Z", pnl_note: "Not resolved yet — scored on process.", thesis_played_out: false, process_score: 8, outcome_score: 0, event_time: "2026-05-30T07:00:00Z", knowledge_time: "2026-05-30T07:01:00Z" },
-    { id: "outcome_prev_crypto", journal_entry_id: "journal_crypto", resolved_at: "2026-05-30T07:05:00Z", pnl_note: "No real P&L; monitoring stayed inside guardrails.", thesis_played_out: true, process_score: 7, outcome_score: 6, event_time: "2026-05-30T07:05:00Z", knowledge_time: "2026-05-30T07:06:00Z" },
+    { id: "outcome_prev_crypto", journal_entry_id: "journal_crypto", resolved_at: "2026-05-30T07:05:00Z", pnl_note: "No real gain or loss; monitoring stayed inside guardrails.", thesis_played_out: true, process_score: 7, outcome_score: 6, event_time: "2026-05-30T07:05:00Z", knowledge_time: "2026-05-30T07:06:00Z" },
   ],
   paperTradingRounds: [
     { id: "round_2026w22", week_label: "2026-W22", opens_at: "2026-05-25T13:30:00Z", closes_at: "2026-05-29T20:00:00Z", status: "closed", event_time: "2026-05-25T13:30:00Z", knowledge_time: "2026-05-25T13:31:00Z" },
@@ -152,27 +152,27 @@ export const demoDatabase: DemoDatabase = {
   ],
   paperPredictions: [
     { id: "pred_nvda", round_id: "round_2026w22", asset_id: "asset_nvda", direction: "long", conviction: 7, rationale: "Momentum and capex revisions remained aligned.", submitted_at: "2026-05-25T14:00:00Z", event_time: "2026-05-25T14:00:00Z", knowledge_time: "2026-05-25T14:00:30Z" },
-    { id: "pred_btc", round_id: "round_2026w22", asset_id: "asset_btc", direction: "flat", conviction: 4, rationale: "Basis attractive but crowding made patience more valuable.", submitted_at: "2026-05-25T14:05:00Z", event_time: "2026-05-25T14:05:00Z", knowledge_time: "2026-05-25T14:05:30Z" },
+    { id: "pred_btc", round_id: "round_2026w22", asset_id: "asset_btc", direction: "flat", conviction: 4, rationale: "The futures price gap looked interesting, but crowding made patience more valuable.", submitted_at: "2026-05-25T14:05:00Z", event_time: "2026-05-25T14:05:00Z", knowledge_time: "2026-05-25T14:05:30Z" },
   ],
   roundScores: [
     { id: "score_2026w22", round_id: "round_2026w22", calibration: 7.2, patience: 8.1, diversification: 6.4, total: 21.7, event_time: "2026-05-30T01:00:00Z", knowledge_time: "2026-05-30T01:02:00Z" },
   ],
   executorStrategies: [
-    { id: "exec_stablecoin", name: "stablecoin_lending", status: "paused", venue: "Aave/Base demo", net_delta: 0, margin_ratio: 1, funding_rate: 0.036, basis: 0, event_time: "2026-05-30T06:00:00Z", knowledge_time: "2026-05-30T06:02:00Z" },
-    { id: "exec_delta", name: "delta_neutral_funding_carry", status: "running_demo", venue: "Perp demo venue", net_delta: 0.02, margin_ratio: 0.64, funding_rate: 0.00014, basis: 0.018, event_time: "2026-05-30T06:00:00Z", knowledge_time: "2026-05-30T06:02:00Z" },
+    { id: "exec_stablecoin", name: "stablecoin_lending", status: "paused", venue: "Aave/Base sample", net_delta: 0, margin_ratio: 1, funding_rate: 0.036, basis: 0, event_time: "2026-05-30T06:00:00Z", knowledge_time: "2026-05-30T06:02:00Z" },
+    { id: "exec_delta", name: "delta_neutral_funding_carry", status: "running_demo", venue: "Perp sample venue", net_delta: 0.02, margin_ratio: 0.64, funding_rate: 0.00014, basis: 0.018, event_time: "2026-05-30T06:00:00Z", knowledge_time: "2026-05-30T06:02:00Z" },
   ],
   guardrailConfigs: [
-    { id: "guard_default", per_tx_cap: 0, daily_cap: 0, contract_allowlist: ["0xDemoAavePool", "0xDemoPermit2"], recipient_allowlist: ["0xDemoVault"], session_key_expiry: "2026-06-30T00:00:00Z", event_time: "2026-05-28T10:00:00Z", knowledge_time: "2026-05-28T10:02:00Z" },
+    { id: "guard_default", per_tx_cap: 0, daily_cap: 0, contract_allowlist: ["0xDemoAavePool", "0xDemoPermitModule"], recipient_allowlist: ["0xDemoVault"], session_key_expiry: "2026-06-30T00:00:00Z", event_time: "2026-05-28T10:00:00Z", knowledge_time: "2026-05-28T10:02:00Z" },
   ],
   integrationStatuses: [
-    { id: "int_coinbase", service: "coinbase", status: "stubbed", detail: "Showing seeded crypto balances. Add a read-only key and I'll pull your live Coinbase holdings.", event_time: "2026-05-24T14:00:00Z", knowledge_time: "2026-05-24T14:03:00Z" },
-    { id: "int_robinhood", service: "robinhood", status: "stubbed", detail: "Showing seeded equity balances. Add a SnapTrade key and I'll pull your live Robinhood holdings.", event_time: "2026-05-25T13:30:00Z", knowledge_time: "2026-05-25T13:41:00Z" },
-    { id: "int_wallet", service: "onchain_wallet", status: "stubbed", detail: "Showing a sample on-chain wallet. Add a Zerion key and I'll track your real one.", event_time: "2026-05-26T16:20:00Z", knowledge_time: "2026-05-26T16:25:00Z" },
-    { id: "int_llm", service: "llm", status: "credential_gated", detail: "I'm answering from a script right now. Add a model key and I'll reason live.", event_time: "2026-05-27T10:00:00Z", knowledge_time: "2026-05-27T10:01:00Z" },
+    { id: "int_coinbase", service: "coinbase", status: "stubbed", detail: "Portfolio starts with sample Coinbase holdings. You can test account access and import a holdings snapshot only when you press import.", event_time: "2026-05-24T14:00:00Z", knowledge_time: "2026-05-24T14:03:00Z" },
+    { id: "int_robinhood", service: "robinhood", status: "stubbed", detail: "Portfolio starts with sample equity holdings. You can test SnapTrade account access and import a holdings snapshot only when you press import.", event_time: "2026-05-25T13:30:00Z", knowledge_time: "2026-05-25T13:41:00Z" },
+    { id: "int_wallet", service: "onchain_wallet", status: "stubbed", detail: "Portfolio starts with a sample on-chain wallet. You can test a wallet read key and import wallet positions only when you press import.", event_time: "2026-05-26T16:20:00Z", knowledge_time: "2026-05-26T16:25:00Z" },
+    { id: "int_llm", service: "llm", status: "credential_gated", detail: "Live chat can use a saved server key or a one-time test key. Use Test live chat before relying on a daily read.", event_time: "2026-05-27T10:00:00Z", knowledge_time: "2026-05-27T10:01:00Z" },
   ],
   strategyBeliefs: [
-    { id: "belief_patience", name: "Patience over churn", statement: "Signals need repeated evidence before changing exposure.", confidence: 0.72, updated_at: "2026-05-29T21:00:00Z", event_time: "2026-05-29T21:00:00Z", knowledge_time: "2026-05-29T21:03:00Z" },
-    { id: "belief_basis", name: "Basis is fragile", statement: "Funding carry should be monitored but not trusted without stress checks.", confidence: 0.58, updated_at: "2026-05-29T22:00:00Z", event_time: "2026-05-29T22:00:00Z", knowledge_time: "2026-05-29T22:04:00Z" },
+    { id: "belief_patience", name: "Patience over churn", statement: "One reason to watch is not enough to change exposure.", confidence: 0.72, updated_at: "2026-05-29T21:00:00Z", event_time: "2026-05-29T21:00:00Z", knowledge_time: "2026-05-29T21:03:00Z" },
+    { id: "belief_basis", name: "Futures price gaps can vanish", statement: "Borrow-payment carry should be monitored but not trusted without stress checks.", confidence: 0.58, updated_at: "2026-05-29T22:00:00Z", event_time: "2026-05-29T22:00:00Z", knowledge_time: "2026-05-29T22:04:00Z" },
   ],
   reflectionUpdates: [
     { id: "reflect_patience", strategy_belief_id: "belief_patience", evidence_summary: "One closed paper round supported patience, but significance was not sufficient to update policy.", significance_passed: false, applied: false, created_at: "2026-05-30T01:10:00Z", event_time: "2026-05-30T01:10:00Z", knowledge_time: "2026-05-30T01:11:00Z" },

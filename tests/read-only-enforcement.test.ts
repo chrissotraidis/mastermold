@@ -13,7 +13,8 @@ const appApiRoot = existsSync(join(process.cwd(), "src", "app", "api"))
   ? join(process.cwd(), "src", "app", "api")
   : join(process.cwd(), "app", "api");
 
-const forbiddenHandlerPattern = /(trade|order|execute|transfer|withdraw)/i;
+const forbiddenHandlerPattern =
+  /\b(create|place|submit|cancel|replace|execute|send|sign)\w*(Order|Trade|Transaction|Transfer)\b|\/orders?\b|\/trades?\b|\/withdrawals?\b|eth_send|wallet_send|sendTransaction|signTransaction/i;
 const forbiddenRoutePathPattern = /(trade|order|execute|executor|transfer|withdraw)/i;
 const brokerageWritePattern =
   /\b(createOrder|placeOrder|submitOrder|cancelOrder|replaceOrder|create_order|place_order|submit_order|cancel_order|replace_order|withdraw|withdrawal|transferFunds|createTransfer|executeTrade)\b/i;

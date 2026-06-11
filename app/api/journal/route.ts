@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
+import { toPublicJournal, type PublicJournal } from "@/lib/public-api-copy";
 import { parseAsOf } from "@/src/db/bitemporal";
 import {
   createDecisionJournalEntry,
   getJournal,
   type CreateDecisionInput,
-  type JournalEntryJson,
-  type JournalJson,
 } from "@/src/db/journal";
+import { recordProductMetric } from "@/src/db/metrics";
 
 type JournalRequest = {
+  call?: unknown;
   thesis?: unknown;
+  reasons?: unknown;
   signals?: unknown;
+  confidence?: unknown;
   conviction?: unknown;
   horizon?: unknown;
   falsification_condition?: unknown;
@@ -18,19 +21,19 @@ type JournalRequest = {
 
 export function GET(
   request: Request,
-): NextResponse<JournalJson | { error: string }> {
+): NextResponse<PublicJournal | { error: string }> {
   const parsed = parseAsOf(new URL(request.url).searchParams.get("as_of"));
 
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 422 });
   }
 
-  return NextResponse.json(getJournal(parsed.asOf));
+  return NextResponse.json(toPublicJournal(getJournal(parsed.asOf)));
 }
 
 export async function POST(
   request: Request,
-): Promise<NextResponse<JournalEntryJson | { error: string } | { errors: string[] }>> {
+): Promise<NextResponse<PublicJournal["entries"][number] | { error: string } | { errors: string[] }>> {
   let body: JournalRequest;
 
   try {
@@ -45,7 +48,16 @@ export async function POST(
     return NextResponse.json({ errors: normalized.errors }, { status: 422 });
   }
 
-  return NextResponse.json(createDecisionJournalEntry(normalized.input), { status: 201 });
+  const entry = createDecisionJournalEntry(normalized.input);
+  recordProductMetric({
+    event: "decision_logged",
+    surface: "journal",
+    entity_id: entry.id,
+    value: entry.conviction,
+    metadata: { horizon: entry.horizon, signal_count: entry.signals.length },
+  });
+
+  return NextResponse.json(toPublicJournal({ ...getJournal(), entries: [entry] }).entries[0], { status: 201 });
 }
 
 function normalizeDecisionInput(body: JournalRequest): {
@@ -53,33 +65,34 @@ function normalizeDecisionInput(body: JournalRequest): {
   errors: string[];
 } {
   const errors: string[] = [];
-  const thesis = normalizeText(body.thesis);
+  const thesis = normalizeText(body.call) || normalizeText(body.thesis);
   const horizon = normalizeText(body.horizon);
   const falsificationCondition = normalizeText(body.falsification_condition);
+  const confidence = body.confidence ?? body.conviction;
   const conviction =
-    typeof body.conviction === "number" && Number.isInteger(body.conviction)
-      ? body.conviction
+    typeof confidence === "number" && Number.isInteger(confidence)
+      ? confidence
       : NaN;
-  const signals = normalizeSignals(body.signals);
+  const signals = normalizeSignals(body.reasons ?? body.signals);
 
   if (!thesis) {
-    errors.push("thesis is required");
+    errors.push("Call is required.");
   }
 
   if (signals.length === 0) {
-    errors.push("signals must include at least one item");
+    errors.push("Add at least one thing that changed.");
   }
 
   if (!Number.isInteger(conviction) || conviction < 1 || conviction > 10) {
-    errors.push("conviction must be an integer from 1 to 10");
+    errors.push("Confidence must be a whole number from 1 to 10.");
   }
 
   if (!horizon) {
-    errors.push("horizon is required");
+    errors.push("Time horizon is required.");
   }
 
   if (!falsificationCondition) {
-    errors.push("falsification_condition is required");
+    errors.push("Add what would prove this wrong.");
   }
 
   return {

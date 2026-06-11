@@ -13,7 +13,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from mastermold_engine import adapter, beliefs, conviction, journal_bridge, screener  # noqa: E402
-from mastermold_engine.run_briefing import assemble_run, run_screener_stage  # noqa: E402
+from mastermold_engine.cost import from_stats_handler  # noqa: E402
+from mastermold_engine.run_briefing import (  # noqa: E402
+    adapter_detail,
+    assemble_run,
+    build_tradingagents_config,
+    run_agent_stage,
+    run_screener_stage,
+)
 from mastermold_engine.cost import RunCost  # noqa: E402
 
 
@@ -121,8 +128,10 @@ def test_rank_cards_orders_by_conviction_and_strips_internal_key():
 # --- run_briefing: quiet day funnel ----------------------------------------
 
 _CONFIG = {
-    "provider": "anthropic",
-    "models": {"quick_think": "claude-haiku-4-5", "deep_think": "claude-sonnet-4-6"},
+    "provider": "openrouter",
+    "openrouter_base_url": "https://openrouter.ai/api/v1",
+    "models": {"quick_think": "deepseek/deepseek-chat", "deep_think": "deepseek/deepseek-chat"},
+    "selected_analysts": ["market", "social", "news", "fundamentals"],
     "watchlist": [{"symbol": "NVDA", "asset_id": "asset_nvda"}, {"symbol": "BTC", "asset_id": "asset_btc"}],
     "screener": {"tiers": {"T0": 3.0, "T1": 2.0, "T2": 1.5}},
 }
@@ -146,6 +155,70 @@ def test_quiet_day_zero_cost_nothing_actionable():
     cards = bundle["briefing_cards"]
     assert len(cards) == 1 and cards[0]["status"] == "nothing_actionable"
     assert bundle["run"]["triggered_tickers"] == []
+
+
+def test_quiet_agent_stage_skips_graph_and_records_metadata():
+    cards, cost, status, detail = run_agent_stage(
+        config=_CONFIG,
+        screens=[],
+        triggered=[],
+        run_date="2026-06-08",
+        event_time="2026-06-08T13:30:00.000Z",
+        knowledge_time="2026-06-08T13:42:11.000Z",
+    )
+    assert cards == []
+    assert cost.llm_calls == 0
+    assert status == "quiet_no_agent_runs"
+    assert detail["status"] == "skipped"
+    assert detail["attempted_graph"] is False
+    assert detail["provider"] == "openrouter"
+    assert detail["base_url"] == "https://openrouter.ai/api/v1"
+
+
+def test_tradingagents_config_receives_openrouter_backend_and_models():
+    defaults = {
+        "llm_provider": "anthropic",
+        "backend_url": "https://api.anthropic.com",
+        "quick_think_llm": "old-fast",
+        "deep_think_llm": "old-deep",
+    }
+    merged = build_tradingagents_config(defaults, _CONFIG)
+    assert merged["llm_provider"] == "openrouter"
+    assert merged["backend_url"] == "https://openrouter.ai/api/v1"
+    assert merged["quick_think_llm"] == "deepseek/deepseek-chat"
+    assert merged["deep_think_llm"] == "deepseek/deepseek-chat"
+    assert merged["temperature"] == 0.2
+
+
+def test_adapter_detail_records_selected_analysts():
+    detail = adapter_detail(
+        mode="auto",
+        status="attempting",
+        config=_CONFIG,
+        reason="test",
+        attempted_graph=True,
+        fallback=None,
+    )
+    assert detail["selected_analysts"] == ["market", "social", "news", "fundamentals"]
+
+
+def test_cost_conversion_reads_tradingagents_token_fields():
+    handler = type("Handler", (), {
+        "llm_calls": 3,
+        "tool_calls": 5,
+        "tokens_in": 1200,
+        "tokens_out": 340,
+    })()
+    cost = from_stats_handler(
+        handler,
+        quick_model="deepseek/deepseek-chat",
+        deep_model="deepseek/deepseek-chat",
+    )
+    assert cost.llm_calls == 3
+    assert cost.tool_calls == 5
+    assert cost.prompt_tokens == 1200
+    assert cost.completion_tokens == 340
+    assert cost.usd > 0
 
 
 def test_active_day_emits_alert_and_triggers():

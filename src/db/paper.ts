@@ -1,3 +1,4 @@
+import { plainPaperCopy } from "@/lib/paper-copy";
 import { demoDatabase } from "./seed-data";
 import { store } from "./store";
 import {
@@ -16,6 +17,7 @@ export type PaperSubmitter = "engine" | "operator";
 export type PaperPredictionJson = PaperPrediction & {
   asset: Pick<Asset, "id" | "symbol" | "name" | "asset_class" | "venue">;
   submitter: PaperSubmitter;
+  fake_size_usd: number;
 };
 
 export type PaperRoundJson = PaperTradingRound & {
@@ -33,8 +35,15 @@ export type PaperPageData = PaperJson & {
   assets: Array<Pick<Asset, "id" | "symbol" | "name" | "asset_class" | "venue">>;
   activeRound: PaperRoundJson | null;
   completedRounds: PaperRoundJson[];
-  /** The engine's auto-entered predictions for the open round — the human-vs-engine arena. */
+  /** The engine's auto-entered predictions for the open round. */
   enginePredictions: PaperPredictionJson[];
+  fake_wallet: {
+    starting_balance: number;
+    available_cash: number;
+    open_fake_value: number;
+    closed_result_value: number;
+    open_positions: number;
+  };
   provenance: {
     label: "Demo data" | "Engine output";
     source: string;
@@ -47,9 +56,12 @@ export type CreatePaperPredictionInput = {
   round_id: string;
   asset_id: string;
   direction: PaperPredictionDirection;
+  fake_size_usd?: number;
   conviction: number;
   rationale: string;
 };
+
+const fakeStartingBalance = 100_000;
 
 export function getPaper(asOf: AsOfFilter | null = null): PaperJson {
   const scores = getScores(asOf);
@@ -71,9 +83,8 @@ export function getPaperPageData(asOf: AsOfFilter | null = null): PaperPageData 
     null;
 
   // The engine auto-enters a prediction per actionable card into the open round.
-  // The engine auto-enters a prediction per actionable card into the open round.
   // Kept as a distinct list (not merged into the operator's predictions) so the
-  // human-vs-engine arena renders side by side, not blurred together.
+  // comparison panel renders side by side, not blurred together.
   const status = getEngineStatus(asOf);
   const engineLive = status.state === "live";
   const enginePredictions: PaperPredictionJson[] =
@@ -94,10 +105,11 @@ export function getPaperPageData(asOf: AsOfFilter | null = null): PaperPageData 
     activeRound,
     completedRounds: paper.rounds.filter((round) => round.status !== "open"),
     enginePredictions,
+    fake_wallet: buildFakeWallet(paper.predictions, activeRound),
     provenance: {
       label: engineLive ? "Engine output" : "Demo data",
       source: engineLive
-        ? `${engineRunSummary(status.bundle)} · operator predictions seeded/durable`
+        ? `${engineRunSummary(status.bundle)} · local paper trades`
         : "Seeded PaperTradingRound, PaperPrediction, and RoundScore rows",
       as_of: asOf?.iso ?? (engineLive ? status.bundle.run.knowledge_time : latestKnowledgeTime(asOf)),
       replay_as_of: asOf?.iso ?? null,
@@ -129,6 +141,7 @@ export function createPaperPrediction(
     round_id: input.round_id,
     asset_id: input.asset_id,
     direction: input.direction,
+    fake_size_usd: input.fake_size_usd ?? defaultFakeSize(input.conviction),
     conviction: input.conviction,
     rationale: input.rationale,
     submitted_at: now,
@@ -142,6 +155,15 @@ export function createPaperPrediction(
 
 export function isPaperDirection(value: string): value is PaperPredictionDirection {
   return value === "long" || value === "short" || value === "flat";
+}
+
+export function resolvePaperAssetKey(value: string): string | null {
+  const normalized = value.trim().toLowerCase();
+  const asset = demoDatabase.assets.find(
+    (item) => item.symbol.toLowerCase() === normalized || item.id.toLowerCase() === normalized,
+  );
+
+  return asset?.id ?? null;
 }
 
 function getRounds(
@@ -189,6 +211,8 @@ function toPredictionJson(prediction: PaperPrediction): PaperPredictionJson | nu
       asset_class: asset.asset_class,
       venue: asset.venue,
     },
+    fake_size_usd: prediction.fake_size_usd ?? defaultFakeSize(prediction.conviction),
+    rationale: plainPaperCopy(prediction.rationale),
     submitter: "operator",
   };
 }
@@ -197,7 +221,7 @@ function toPredictionJson(prediction: PaperPrediction): PaperPredictionJson | nu
  * The engine's auto-entered predictions for a round: one per actionable engine
  * briefing card. Direction is the card's net driver sign (bullish weight minus bearish
  * weight), conviction is the card's conviction, rationale is the headline. This is the
- * human-vs-engine arena — the engine commits a view, you submit yours, and the same
+ * paper-trade comparison panel — the engine commits a view, you submit yours, and the same
  * Stage-3 outcome data scores both.
  */
 function enginePredictionsForRound(
@@ -220,6 +244,7 @@ function enginePredictionsForRound(
         round_id: round.id,
         asset_id: asset.id,
         direction,
+        fake_size_usd: defaultFakeSize(card.conviction),
         conviction: card.conviction,
         rationale: card.headline,
         submitted_at: card.knowledge_time,
@@ -256,4 +281,37 @@ function latestKnowledgeTime(asOf: AsOfFilter | null) {
   ];
 
   return getLatestKnowledgeTime(knowledgeTimes);
+}
+
+function buildFakeWallet(predictions: PaperPredictionJson[], activeRound: PaperRoundJson | null) {
+  const operatorPredictions = predictions.filter((prediction) => prediction.submitter === "operator");
+  const openPredictions = activeRound
+    ? operatorPredictions.filter((prediction) => prediction.round_id === activeRound.id && prediction.direction !== "flat")
+    : [];
+  const closedPredictions = operatorPredictions.filter(
+    (prediction) => !activeRound || prediction.round_id !== activeRound.id,
+  );
+  const openFakeValue = roundMoney(openPredictions.reduce((sum, prediction) => sum + prediction.fake_size_usd, 0));
+  const closedResultValue = roundMoney(
+    closedPredictions.reduce((sum, prediction) => {
+      const directionSign = prediction.direction === "short" ? -1 : prediction.direction === "flat" ? 0 : 1;
+      return sum + prediction.fake_size_usd * directionSign * (prediction.conviction / 100);
+    }, 0),
+  );
+
+  return {
+    starting_balance: fakeStartingBalance,
+    available_cash: Math.max(roundMoney(fakeStartingBalance + closedResultValue - openFakeValue), 0),
+    open_fake_value: openFakeValue,
+    closed_result_value: closedResultValue,
+    open_positions: openPredictions.length,
+  };
+}
+
+function defaultFakeSize(conviction: number) {
+  return Math.min(Math.max(conviction, 1), 10) * 1_000;
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
 }

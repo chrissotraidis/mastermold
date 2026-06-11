@@ -27,6 +27,7 @@ describe("profile core", () => {
     expect(profile.name).toBe("Ada");
     expect(profile.preferences.risk_posture).toBe("balanced");
     expect(profile.preferences.asset_focus).toBe("both");
+    expect(profile.preferences.alert_sensitivity).toBe("balanced");
     expect(profile.created_at).toBe(NOW);
     expect(profile.updated_at).toBe(NOW);
   });
@@ -39,10 +40,14 @@ describe("profile core", () => {
     expect(profile.name.length).toBe(120);
     expect(profile.preferences.risk_posture).toBe("aggressive");
     expect(profile.preferences.asset_focus).toBe("both");
+    expect(profile.preferences.alert_sensitivity).toBe("balanced");
   });
 
   test("a backup round-trips through serialize and parse without loss", () => {
-    const profile = createDefaultProfile({ name: "Ada", preferences: { asset_focus: "crypto" } }, NOW);
+    const profile = createDefaultProfile(
+      { name: "Ada", preferences: { asset_focus: "crypto", alert_sensitivity: "urgent_only" } },
+      NOW,
+    );
     const backup = buildBackup(profile, sampleIntegrations, NOW);
     const json = serializeBackup(backup);
 
@@ -54,6 +59,7 @@ describe("profile core", () => {
     expect(result.backup.version).toBe(BACKUP_VERSION);
     expect(result.backup.profile.name).toBe("Ada");
     expect(result.backup.profile.preferences.asset_focus).toBe("crypto");
+    expect(result.backup.profile.preferences.alert_sensitivity).toBe("urgent_only");
     expect(result.backup.integrations).toHaveLength(3);
     expect(result.backup.integrations[0]).toEqual({ service: "coinbase", connected: true, key: "cb-key" });
   });
@@ -94,6 +100,7 @@ describe("profile core", () => {
     if (!result.ok) return;
     // defaults fill in for missing preference and integration fields
     expect(result.backup.profile.preferences.risk_posture).toBe("balanced");
+    expect(result.backup.profile.preferences.alert_sensitivity).toBe("balanced");
     expect(result.backup.integrations[0].connected).toBe(false);
     expect(result.backup.integrations[0].key).toBe("");
   });
@@ -102,13 +109,14 @@ describe("profile core", () => {
     const repaired = normalizeProfile({ name: "Lin" }, NOW);
     expect(repaired?.name).toBe("Lin");
     expect(repaired?.preferences.risk_posture).toBe("balanced");
+    expect(repaired?.preferences.alert_sensitivity).toBe("balanced");
     expect(normalizeProfile("nope", NOW)).toBeNull();
     expect(normalizeProfile(null, NOW)).toBeNull();
   });
 
-  test("summarizeBackup counts connected accounts and saved keys", () => {
+  test("summarizeBackup counts saved connection-test fields without implying imported accounts", () => {
     const profile = createDefaultProfile({ name: "Ada" }, NOW);
     const backup = buildBackup(profile, sampleIntegrations, NOW);
-    expect(summarizeBackup(backup)).toBe("1 connected account · 2 saved keys");
+    expect(summarizeBackup(backup)).toBe("2 saved connection-test fields");
   });
 });

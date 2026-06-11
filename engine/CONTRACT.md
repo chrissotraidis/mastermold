@@ -49,7 +49,21 @@ correctly invisible. A bundle whose `run.knowledge_time` is in the future relati
     },
     "stages": {                               // per-stage status, for /review
       "data_refresh": "ok", "screener": "ok",
-      "agent_runs": 1, "outcome_resolution": "ok"
+      "agent_runs": 1, "outcome_resolution": "ok",
+      "agent_adapter": "tradingagents_graph", // or openrouter_direct / quiet_no_agent_runs
+      "agent_adapter_detail": {
+        "mode": "auto",
+        "status": "succeeded",               // skipped / unavailable / failed / fallback / succeeded
+        "attempted_graph": true,
+        "fallback": null,
+        "provider": "openrouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "models": {
+          "quick_think": "deepseek/deepseek-chat",
+          "deep_think": "deepseek/deepseek-chat"
+        },
+        "reason": "TradingAgentsGraph.propagate returned 1 card(s)."
+      }
     }
   },
 

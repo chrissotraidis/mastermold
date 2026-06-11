@@ -6,25 +6,25 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const reviewerEmail = "reviewer@demo.local";
+const reviewAccountEmail = "reviewer@demo.local";
 const historyKey = "financial-copilot.reviewer-evidence-history";
 const checkpointKey = "financial-copilot.reviewer-evidence-checkpoint";
 const defaultHistory = [
-  "Reviewer persona seeded",
-  "Truthfulness sections visible",
-  "No credentials required for review",
+  "Sample review account ready",
+  "Reality check sections visible",
+  "No credentials required",
 ];
 
 export function ReviewerEvidencePanel() {
   const [history, setHistory] = useState(defaultHistory);
-  const [message, setMessage] = useState("Status: reviewer walkthrough ready.");
+  const [message, setMessage] = useState("Walkthrough checklist ready.");
   const [checked, setChecked] = useState<Record<string, boolean>>({
     briefing: false,
     portfolio: false,
     executor: false,
   });
   const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [lastAction, setLastAction] = useState("reviewer-ready");
+  const [lastAction, setLastAction] = useState("walkthrough-ready");
   const [actionSequence, setActionSequence] = useState(0);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function ReviewerEvidencePanel() {
       try {
         const parsed = JSON.parse(savedHistory);
         if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
-          setHistory(parsed.slice(0, 6));
+          setHistory(parsed.map(cleanHistoryItem).slice(0, 6));
         }
       } catch {
         setHistory(defaultHistory);
@@ -67,7 +67,7 @@ export function ReviewerEvidencePanel() {
 
   function pushHistory(nextMessage: string) {
     markBrowserAction(nextMessage);
-    setMessage(`Status: ${nextMessage}`);
+    setMessage(nextMessage);
     setLastAction(nextMessage);
     setActionSequence((current) => current + 1);
     setHistory((current) => {
@@ -82,9 +82,9 @@ export function ReviewerEvidencePanel() {
     setChecked(nextChecked);
     window.localStorage.setItem(
       checkpointKey,
-      JSON.stringify({ reviewer: reviewerEmail, checked: nextChecked, savedAt }),
+      JSON.stringify({ reviewer: reviewAccountEmail, checked: nextChecked, savedAt }),
     );
-    pushHistory(`${label} marked reviewed by ${reviewerEmail}.`);
+    pushHistory(`${label} checked by ${reviewAccountEmail}.`);
   }
 
   function saveCheckpoint() {
@@ -92,9 +92,9 @@ export function ReviewerEvidencePanel() {
     setSavedAt(nextSavedAt);
     window.localStorage.setItem(
       checkpointKey,
-      JSON.stringify({ reviewer: reviewerEmail, checked, savedAt: nextSavedAt }),
+      JSON.stringify({ reviewer: reviewAccountEmail, checked, savedAt: nextSavedAt }),
     );
-    pushHistory("Reviewer checkpoint saved with visible progress and local history.");
+    pushHistory("Checklist saved with visible progress and local history.");
   }
 
   return (
@@ -107,13 +107,13 @@ export function ReviewerEvidencePanel() {
       <CardHeader className="space-y-3 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2 text-xl text-on-surface">
+            <CardTitle as="h2" className="flex items-center gap-2 text-xl text-on-surface">
               <UserRound aria-hidden="true" className="size-5 text-violet" />
-              Reviewer walkthrough
+              Walkthrough checks
             </CardTitle>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Seeded persona {reviewerEmail} can create review evidence, mark surfaces
-              checked, and save local progress without external credentials.
+              Use {reviewAccountEmail} to mark areas checked and save progress in this local build.
+              It has no password or external login.
             </p>
           </div>
           <Badge variant="outline" className="border-violet/40 text-violet">
@@ -129,11 +129,11 @@ export function ReviewerEvidencePanel() {
             data-rds-action="create"
             data-action-state={checked.briefing ? `changed-${actionSequence}` : "idle"}
             data-persona="reviewer"
-            onClick={() => markSurface("briefing", "Briefing and alerts")}
+            onClick={() => markSurface("briefing", "Today and alerts")}
             className="justify-start bg-violet text-void hover:bg-violet"
           >
             <ClipboardCheck aria-hidden="true" />
-            {checked.briefing ? "Created review evidence" : "Create review evidence"}
+            {checked.briefing ? "Today checked" : "Check Today"}
           </Button>
           <Button
             type="button"
@@ -174,7 +174,7 @@ export function ReviewerEvidencePanel() {
             className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <Save aria-hidden="true" />
-            {savedAt ? "Saved reviewer checkpoint" : "Save reviewer checkpoint"}
+            {savedAt ? "Checklist saved" : "Save checklist"}
           </Button>
         </div>
 
@@ -185,7 +185,7 @@ export function ReviewerEvidencePanel() {
           <div>
             <p className="font-semibold text-on-surface">{message}</p>
             <p className="mt-1 text-xs text-outline">
-              Review action evidence #{actionSequence}: {lastAction}
+              Local action #{actionSequence}: {lastAction}
             </p>
             <ul className="mt-2 space-y-1">
               {history.map((item, index) => (
@@ -197,9 +197,9 @@ export function ReviewerEvidencePanel() {
             </ul>
           </div>
           <div className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-3">
-            <p className="text-xs font-semibold uppercase text-outline">Review status</p>
+            <p className="text-xs font-semibold uppercase text-outline">Checklist status</p>
             <p className="mt-1 font-semibold text-on-surface">
-              {savedAt ? `Saved ${formatTime(savedAt)}` : "Unsaved review"}
+              {savedAt ? `Saved ${formatTime(savedAt)}` : "Not saved yet"}
             </p>
           </div>
         </div>
@@ -217,13 +217,17 @@ function markBrowserAction(message: string) {
   document.documentElement.dataset.rdsAction = token;
   const evidence = document.getElementById("rds-live-action-evidence");
   if (evidence) {
-    evidence.textContent = `Action evidence: ${token} changed visible reviewer evidence state.`;
+    evidence.textContent = `Action evidence: ${token} changed visible walkthrough progress.`;
     evidence.dataset.rdsActionEvidence = token;
   }
 }
 
+function cleanHistoryItem(item: string) {
+  return item.replace(/\bDemo review account ready\b/gi, "Sample review account ready");
+}
+
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));

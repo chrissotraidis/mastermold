@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 
 type AsOfReplayControlProps = {
   activeAsOf: string | null;
-  apiPath: "/api/portfolio" | "/api/journal";
+  apiPath: "/api/briefing" | "/api/portfolio" | "/api/journal" | "/api/paper" | "/api/executor" | "/api/chat";
 };
 
 export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProps) {
@@ -55,7 +55,7 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
 
   return (
     <details className="group border border-outline-variant/30 bg-surface-dim/40 chamfer-sm" open={Boolean(activeAsOf)}>
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant transition-colors hover:text-violet">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant transition-colors hover:text-violet">
         <History aria-hidden="true" className="size-4 text-violet" />
         <span>Rewind</span>
         {activeLabel ? (
@@ -77,7 +77,7 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
             className="border-outline-variant/50 bg-surface-dim/80 text-on-surface"
           />
         </div>
-        <Button type="submit" disabled={!value || isPending} className="bg-violet text-void hover:bg-violet">
+        <Button type="submit" disabled={!value || isPending} className="min-h-11 bg-violet text-void hover:bg-violet">
           Go
         </Button>
         <Button
@@ -85,7 +85,7 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
           variant="outline"
           disabled={!activeAsOf || isPending}
           onClick={clearReplay}
-          className="border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
+          className="min-h-11 border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
         >
           <RotateCcw aria-hidden="true" />
           Now

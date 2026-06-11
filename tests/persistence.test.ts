@@ -55,6 +55,73 @@ describe("durable persistence (Phase 1.5)", () => {
     expect(found?.signals).toEqual(["signal-a", "signal-b"]);
   });
 
+  test("GIVEN the same alert is saved more than once WHEN the journal loads THEN only the newest alert call is shown", () => {
+    createDecisionJournalEntry({
+      thesis: "Review alert: NVDA volume 2.1x avg",
+      signals: ["T0", "volume_z", "z=56.0"],
+      conviction: 8,
+      horizon: "Today",
+      falsification_condition: "Volume is 55.9σ above its trailing mean.",
+    });
+    const latest = createDecisionJournalEntry({
+      thesis: "Review alert: NVDA is trading much more than usual",
+      signals: ["Urgent alert", "Unusual trading volume", "Portfolio-relevant"],
+      conviction: 8,
+      horizon: "Today",
+      falsification_condition:
+        "NVDA stops trading unusually heavily, no new source confirms the move, or the position impact stays too small to change today's decision.",
+    });
+
+    const alertEntries = getJournal().entries.filter((entry) =>
+      entry.thesis.toLowerCase().startsWith("review alert: nvda"),
+    );
+
+    expect(alertEntries).toHaveLength(1);
+    expect(alertEntries[0].id).toBe(latest.id);
+    expect(alertEntries[0].signals).toEqual([
+      "Urgent alert",
+      "Unusual trading volume",
+      "Portfolio-relevant",
+    ]);
+  });
+
+  test("GIVEN the same Today call is saved with different source notes WHEN the journal loads THEN only the newest call is shown", () => {
+    createDecisionJournalEntry({
+      thesis: "BTC is moving up, but the picture is mixed",
+      signals: [
+        "BTC is the largest visible holding, so a move matters more than a small watchlist item.",
+        "Engine output",
+        "Portfolio: BTC is 49.0% of visible holdings.",
+      ],
+      conviction: 6,
+      horizon: "2-4 weeks",
+      falsification_condition:
+        "The call is wrong if the next saved read removes this reason to watch or the bear case becomes stronger than the reason to watch.",
+    });
+    const latest = createDecisionJournalEntry({
+      thesis: "BTC is moving up, but the picture is mixed",
+      signals: [
+        "BTC is the largest visible holding, so a move matters more than a small watchlist item.",
+        "Saved market read",
+        "Market read: saved read known Jun 8, 8:30 AM.",
+        "Portfolio: BTC is 49.0% of visible holdings.",
+        "Memory: Saved today; BTC is the largest sample holding.",
+      ],
+      conviction: 6,
+      horizon: "2-4 weeks",
+      falsification_condition:
+        "The call is wrong if the next saved read removes this reason to watch or the bear case becomes stronger than the reason to watch.",
+    });
+
+    const todayEntries = getJournal().entries.filter((entry) =>
+      entry.thesis.toLowerCase().includes("btc is moving up"),
+    );
+
+    expect(todayEntries).toHaveLength(1);
+    expect(todayEntries[0].id).toBe(latest.id);
+    expect(todayEntries[0].signals).toContain("Saved market read");
+  });
+
   test("GIVEN a submitted paper prediction WHEN the server restarts THEN the prediction survives", () => {
     const active = getPaperPageData().activeRound;
     expect(active).toBeTruthy();
@@ -71,7 +138,7 @@ describe("durable persistence (Phase 1.5)", () => {
     const data = getPaperPageData();
     const found = data.predictions.find((p) => p.id === prediction.id);
     expect(found).toBeTruthy();
-    expect(found?.rationale).toBe("Persistence smoke prediction");
+    expect(found?.rationale).toBe("Saved simulator check");
   });
 
   test("GIVEN an acknowledged alert WHEN the server restarts THEN the ack survives", () => {

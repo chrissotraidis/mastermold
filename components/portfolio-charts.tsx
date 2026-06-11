@@ -1,33 +1,88 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  CandlestickSeries,
-  ColorType,
-  createChart,
-  type IChartApi,
-  type ISeriesApi,
-  type UTCTimestamp,
-} from "lightweight-charts";
-import { Label } from "@/components/ui/label";
-import type { AllocationJson, PriceChartAssetJson } from "@/src/db/portfolio";
+import type { AllocationJson, NetWorthPointJson } from "@/src/db/portfolio";
 
 type PortfolioChartsProps = {
   allocation: AllocationJson[];
-  chartAssets: PriceChartAssetJson[];
+  netWorthSeries: NetWorthPointJson[];
 };
 
-export function PortfolioCharts({ allocation, chartAssets }: PortfolioChartsProps) {
+export function PortfolioCharts({ allocation, netWorthSeries }: PortfolioChartsProps) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+    <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <NetWorthChart points={netWorthSeries} />
       <AllocationChart allocation={allocation} />
-      <TradingViewCandlestick chartAssets={chartAssets} />
     </div>
   );
 }
 
+function NetWorthChart({ points }: { points: NetWorthPointJson[] }) {
+  const values = points.map((point) => point.value);
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 1);
+  const range = Math.max(max - min, 1);
+  const coords = points.map((point, index) => {
+    const x = points.length <= 1 ? 0 : (index / (points.length - 1)) * 100;
+    const y = 88 - ((point.value - min) / range) * 76;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const latest = points.at(-1);
+  const first = points[0];
+  const change = latest && first ? latest.value - first.value : 0;
+
+  return (
+    <section
+      aria-labelledby="net-worth-chart-title"
+      className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-4 sm:p-5"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 id="net-worth-chart-title" className="text-xl font-semibold text-on-surface">
+            Net worth over time
+          </h2>
+          <p className="mt-1 text-sm leading-6 text-outline">
+            One view of the visible portfolio over time, not separate asset charts.
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold text-on-surface">{formatCurrency(latest?.value ?? 0)}</p>
+          <p className={change >= 0 ? "text-xs text-engine" : "text-xs text-critical"}>
+            {change >= 0 ? "+" : ""}
+            {formatCurrency(change)} this week
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 overflow-hidden rounded-md border border-outline-variant/40 bg-surface-dim/50 p-3">
+        <svg viewBox="0 0 100 100" role="img" aria-label="Seven day net worth line" className="h-56 w-full">
+          <defs>
+            <linearGradient id="net-worth-fill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="rgb(124 58 237)" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="rgb(124 58 237)" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+          {[20, 40, 60, 80].map((y) => (
+            <line key={y} x1="0" x2="100" y1={y} y2={y} stroke="rgba(148, 163, 184, 0.16)" strokeWidth="0.5" />
+          ))}
+          <polygon points={`0,96 ${coords.join(" ")} 100,96`} fill="url(#net-worth-fill)" />
+          <polyline points={coords.join(" ")} fill="none" stroke="rgb(167 139 250)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          {points.map((point, index) => {
+            const [x, y] = coords[index].split(",").map(Number);
+            return <circle key={point.date} cx={x} cy={y} r="1.8" fill="rgb(167 139 250)" />;
+          })}
+        </svg>
+        <div className="mt-2 flex justify-between text-xs text-outline">
+          <span>{points[0]?.date ?? "Start"}</span>
+          <span>{latest?.date ?? "Now"}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function AllocationChart({ allocation }: { allocation: AllocationJson[] }) {
-  const maxWeight = Math.max(...allocation.map((item) => item.weight_pct), 1);
+  const activeAllocation = allocation.filter((item) => item.market_value > 0);
+  const maxWeight = Math.max(...activeAllocation.map((item) => item.weight_pct), 1);
 
   return (
     <section
@@ -36,170 +91,43 @@ function AllocationChart({ allocation }: { allocation: AllocationJson[] }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="allocation-title" className="text-xl font-semibold text-on-surface">
-          Per-class allocation
+          Allocation
         </h2>
-        <p className="text-sm text-outline">Equity · crypto · DeFi</p>
+        <p className="text-sm text-outline">Stocks · crypto · on-chain · cash</p>
       </div>
 
       <div className="mt-6 space-y-4">
-        {allocation.map((item) => (
-          <div key={item.asset_class} className="space-y-2">
-            <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-medium capitalize text-on-surface">{item.asset_class}</span>
-              <span className="tabular-nums text-on-surface-variant">
-                {formatCurrency(item.market_value)} · {item.weight_pct.toFixed(1)}%
-              </span>
+        {activeAllocation.length > 0 ? (
+          activeAllocation.map((item) => (
+            <div key={item.asset_class} className="space-y-2">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium capitalize text-on-surface">{labelAssetClass(item.asset_class)}</span>
+                <span className="tabular-nums text-on-surface-variant">
+                  {formatCurrency(item.market_value)} · {item.weight_pct.toFixed(1)}%
+                </span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
+                <div
+                  className={allocationColor(item.asset_class)}
+                  style={{ width: `${Math.max((item.weight_pct / maxWeight) * 100, 2)}%` }}
+                />
+              </div>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
-              <div
-                className={allocationColor(item.asset_class)}
-                style={{ width: `${Math.max((item.weight_pct / maxWeight) * 100, 2)}%` }}
-              />
-            </div>
+          ))
+        ) : (
+          <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-4 text-sm text-outline">
+            No holdings loaded yet.
           </div>
-        ))}
+        )}
       </div>
     </section>
   );
 }
 
-function TradingViewCandlestick({ chartAssets }: { chartAssets: PriceChartAssetJson[] }) {
-  const [selectedAssetId, setSelectedAssetId] = useState(chartAssets[0]?.asset.id ?? "");
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartApiRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-
-  const selectedAsset = useMemo(
-    () => chartAssets.find((item) => item.asset.id === selectedAssetId) ?? chartAssets[0],
-    [chartAssets, selectedAssetId],
-  );
-
-  useEffect(() => {
-    const container = chartRef.current;
-
-    if (!container || !selectedAsset) {
-      return;
-    }
-
-    const chart = createChart(container, {
-      autoSize: false,
-      width: Math.max(Math.floor(container.clientWidth), 1),
-      height: chartHeight(container),
-      layout: {
-        background: { type: ColorType.Solid, color: "#020617" },
-        textColor: "#cbd5e1",
-      },
-      grid: {
-        vertLines: { color: "rgba(148, 163, 184, 0.12)" },
-        horzLines: { color: "rgba(148, 163, 184, 0.12)" },
-      },
-      rightPriceScale: {
-        borderColor: "rgba(148, 163, 184, 0.2)",
-      },
-      timeScale: {
-        borderColor: "rgba(148, 163, 184, 0.2)",
-        timeVisible: true,
-      },
-      crosshair: {
-        vertLine: { color: "rgba(103, 232, 249, 0.45)" },
-        horzLine: { color: "rgba(103, 232, 249, 0.45)" },
-      },
-    });
-
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#f43f5e",
-      borderUpColor: "#22c55e",
-      borderDownColor: "#f43f5e",
-      wickUpColor: "#86efac",
-      wickDownColor: "#fb7185",
-    });
-
-    chartApiRef.current = chart;
-    seriesRef.current = series;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      const width = Math.max(Math.floor(entry.contentRect.width), 1);
-
-      chart.resize(width, chartHeight(container));
-      chart.timeScale().fitContent();
-    });
-    resizeObserver.observe(container);
-
-    return () => {
-      resizeObserver.disconnect();
-      chart.remove();
-      chartApiRef.current = null;
-      seriesRef.current = null;
-    };
-  }, [selectedAsset]);
-
-  useEffect(() => {
-    if (!selectedAsset || !seriesRef.current || !chartApiRef.current) {
-      return;
-    }
-
-    seriesRef.current.setData(
-      selectedAsset.bars.map((bar) => ({
-        time: Math.floor(Date.parse(bar.ts) / 1000) as UTCTimestamp,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-      })),
-    );
-    chartApiRef.current.timeScale().fitContent();
-  }, [selectedAsset]);
-
-  return (
-    <section
-      aria-labelledby="price-chart-title"
-      className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-4 sm:p-5"
-    >
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 id="price-chart-title" className="text-xl font-semibold text-on-surface">
-            Price chart
-          </h2>
-          <p className="mt-1 text-sm text-outline">
-            Pick an asset to see its price.
-          </p>
-        </div>
-        <div className="grid gap-2 sm:min-w-56">
-          <Label htmlFor="asset-chart-select" className="text-on-surface-variant">
-            Asset
-          </Label>
-          <select
-            id="asset-chart-select"
-            value={selectedAsset?.asset.id ?? ""}
-            onChange={(event) => setSelectedAssetId(event.target.value)}
-            className="h-10 rounded-md border border-outline-variant/50 bg-surface-dim px-3 text-sm text-on-surface outline-none ring-violet/40 focus:ring-2"
-          >
-            {chartAssets.map((item) => (
-              <option key={item.asset.id} value={item.asset.id}>
-                {item.asset.symbol} · {item.asset.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {selectedAsset ? (
-        <div className="mt-5 overflow-hidden rounded-md border border-outline-variant/40 bg-surface-dim">
-          <div ref={chartRef} className="h-64 w-full sm:h-80" aria-label={`${selectedAsset.asset.symbol} candlestick chart`} />
-        </div>
-      ) : (
-        <div className="mt-5 rounded-md border border-outline-variant/40 bg-surface-dim p-6 text-sm text-on-surface-variant">
-          No seeded PriceBar rows are available for the price chart.
-        </div>
-      )}
-    </section>
-  );
-}
-
-function chartHeight(container: HTMLDivElement) {
-  return container.clientWidth < 520 ? 256 : 320;
+function labelAssetClass(assetClass: AllocationJson["asset_class"]) {
+  if (assetClass === "defi") return "On-chain";
+  if (assetClass === "cash") return "Cash";
+  return assetClass;
 }
 
 function allocationColor(assetClass: AllocationJson["asset_class"]) {
@@ -210,6 +138,8 @@ function allocationColor(assetClass: AllocationJson["asset_class"]) {
       return "h-full rounded-full bg-engine";
     case "defi":
       return "h-full rounded-full bg-caution";
+    case "cash":
+      return "h-full rounded-full bg-outline";
   }
 }
 

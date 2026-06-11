@@ -11,6 +11,7 @@ import { getChatContext } from "@/src/db/chat";
 import { getJournal } from "@/src/db/journal";
 import { getPaperPageData } from "@/src/db/paper";
 import { getScreenerFeedback } from "@/src/db/screener-feedback";
+import { plainBriefingHeadline } from "@/lib/plain-finance-copy";
 
 const FIXTURES = join(process.cwd(), "tests", "fixtures", "engine");
 
@@ -41,8 +42,8 @@ describe("engine output is consistent across every surface", () => {
 
     // Home/briefing and chat agree on the lead headline.
     const chat = getChatContext();
-    expect(chat.facts.briefing_headline).toBe(top.headline);
-    expect(JSON.parse(chat.llm_context).data_source.label).toBe("Engine output");
+    expect(chat.facts.briefing_headline).toBe(plainBriefingHeadline(top.headline));
+    expect(JSON.parse(chat.llm_context).data_state.market_scan_state).toBe("saved market read");
 
     // Briefing detail's linked journal entry carries the PM falsification condition,
     // and that same condition is what the journal surface shows for the entry.

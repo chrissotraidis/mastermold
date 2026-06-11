@@ -24,7 +24,7 @@ export function PageHeader({
       {back ? (
         <Link
           href="/"
-          className="mb-4 inline-flex items-center gap-1.5 text-sm text-outline transition-colors hover:text-violet"
+          className="mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-md pr-3 text-sm text-outline transition-colors hover:text-violet"
         >
           <ArrowLeft className="size-4" />
           Today

@@ -4,6 +4,7 @@ import { getBriefingCards } from "./briefing";
 import { getDataMode, getEngineStatus } from "./engine-data";
 import { getExecutor } from "./executor";
 import { getJournal } from "./journal";
+import type { AsOfFilter } from "./bitemporal";
 
 /**
  * Master Mold's live posture (the face/eye state) plus a plain-language summary of what
@@ -20,13 +21,13 @@ export type SystemTelemetry = {
   executorNote: string;
 };
 
-export function getSystemState(): SystemTelemetry {
-  const status = getEngineStatus();
-  const mode = getDataMode();
-  const alerts = getAlerts();
-  const cards = getBriefingCards();
-  const journal = getJournal();
-  const executor = getExecutor();
+export function getSystemState(asOf: AsOfFilter | null = null): SystemTelemetry {
+  const status = getEngineStatus(asOf);
+  const mode = getDataMode(asOf);
+  const alerts = getAlerts(asOf);
+  const cards = getBriefingCards(asOf);
+  const journal = getJournal(asOf);
+  const executor = getExecutor(asOf);
 
   const engineLive = status.state === "live";
   const actionable = cards.filter((c) => c.status === "actionable").length;
@@ -65,14 +66,14 @@ function buildGreeting(o: {
   openAlerts: number;
 }): string {
   if (!o.engineLive) {
-    return "Running on sample data. Connect the engine to go live.";
+    return "Using sample data. Add holdings or import a snapshot before treating Today as personal.";
   }
-  const alerts = o.openAlerts > 0 ? `${o.openAlerts} alert${o.openAlerts > 1 ? "s" : ""} flagged` : "";
+  const alerts = o.openAlerts > 0 ? `${o.openAlerts} alert${o.openAlerts > 1 ? "s" : ""} to review` : "";
   if (o.actionable === 0) {
-    return alerts ? `Nothing clears the bar today. ${cap(alerts)}.` : "Nothing clears the bar today. I'll flag anything that does.";
+    return alerts ? `No new idea needs action today. ${cap(alerts)}.` : "Nothing urgent today. I will say so if that changes.";
   }
   const ideas = `${o.actionable} idea${o.actionable > 1 ? "s" : ""}`;
-  return alerts ? `${cap(ideas)} on the board today, ${alerts}.` : `${cap(ideas)} on the board today. Nothing flagged.`;
+  return alerts ? `${cap(ideas)} on the board today, ${alerts}.` : `${cap(ideas)} on the board today. No alerts to review.`;
 }
 
 function cap(s: string): string {
