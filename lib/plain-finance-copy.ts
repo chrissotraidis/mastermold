@@ -24,11 +24,11 @@ export function plainBriefingText(value: string) {
     )
     .replace(
       /\b([A-Z]{1,6})\s+volume\s+([-+]?\d+(?:\.\d+)?)x\s+avg\b/gi,
-      "$1 is trading much more than usual",
+      "$1 is trading $2× its usual volume",
     )
     .replace(
       /\b([A-Z]{1,6})\s+volume\s+is\s+([-+]?\d+(?:\.\d+)?)x\s+(?:average|avg)\b/gi,
-      "$1 is trading much more than usual",
+      "$1 is trading $2× its usual volume",
     )
     .replace(
       /\b([A-Z]{1,6})\s+is moving up, but the picture is mixed\b/gi,
@@ -209,5 +209,27 @@ export function plainBriefingHeadline(value: string) {
     .replace(/\bvolume signals\b/gi, "trading activity")
     .replace(/\bsignals\b/gi, "reasons to watch")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .replace(/^.+$/, sentenceCaseHeadline);
+}
+
+/**
+ * Models return headlines in inconsistent Title Case ("NVDA Shows Strong
+ * Momentum"). Normalize to sentence case while preserving tickers/acronyms
+ * (all-caps tokens) and the first word.
+ */
+function sentenceCaseHeadline(headline: string): string {
+  const words = headline.split(" ");
+  if (words.length < 3) return headline;
+  const candidates = words.slice(1).filter((word) => /^[A-Za-z]/.test(word) && !/^[A-Z0-9.&-]+$/.test(word));
+  if (candidates.length === 0) return headline;
+  const capitalized = candidates.filter((word) => /^[A-Z]/.test(word)).length;
+  if (capitalized / candidates.length < 0.6) return headline;
+  return words
+    .map((word, index) => {
+      if (index === 0) return word;
+      if (/^[A-Z0-9.&-]+$/.test(word)) return word; // tickers, acronyms
+      return word.charAt(0).toLowerCase() + word.slice(1);
+    })
+    .join(" ");
 }

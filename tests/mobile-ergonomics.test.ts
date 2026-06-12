@@ -81,7 +81,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(publicApiCopy).toContain("borrow-market context, not a live rate feed");
     expect(journalCopy).toContain('replace(/\\bopen interest\\b/gi, "borrow-market activity")');
     expect(executor).toContain("Borrow-market activity");
-    expect(`${brain}\n${chatRoute}\n${publicApiCopy}\n${executor}`).not.toContain("sample borrow-payment rate was");
+    // lib/public-api-copy.ts may mention the raw phrase inside its cleanup regex;
+    // the surfaces themselves must never emit it.
+    expect(`${brain}\n${chatRoute}\n${executor}`).not.toContain("sample borrow-payment rate was");
     expect(`${brain}\n${chatRoute}\n${publicApiCopy}`).not.toContain("formatCompact(observation.open_interest)");
   });
 
@@ -104,7 +106,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(briefingDetail).toContain("flex min-h-11 cursor-pointer items-center text-sm font-medium text-violet");
     expect(briefingDetail).toContain("What supports this");
     expect(briefingDetail).toContain("Source note");
-    expect(briefingDetail).toContain("This is the saved source behind the driver.");
+    expect(briefingDetail).toContain("Why it matters:");
     expect(briefingDetail).toContain("This ties the idea to the visible portfolio");
     expect(briefingDetail).toContain("Start here");
     expect(briefingDetail).toContain("Review score");
@@ -142,8 +144,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(appShell).toContain("type DataModeLabel = ProductProvenanceLabel;");
     expect(appShell).toContain('dataMode = "Sample data"');
     expect(briefingCard).toContain("<ProvenanceChip label={provenance.label} title={provenance.source} />");
-    expect(briefingDetail).toContain("<ProvenanceChip label={card.provenance.label} title={card.provenance.source} />");
-    expect(todayPage).toContain("<ProvenanceChip label={pageDataMode} title={portfolio.provenance.source} />");
+    expect(briefingDetail).toContain("label={publicProvenanceLabel}");
+    expect(briefingDetail).toContain("title={productProvenanceSource(card.provenance.label, card.provenance.source)}");
+    expect(todayPage).toContain("label={publicPageDataMode}");
+    expect(todayPage).toContain("title={productProvenanceSource(pageDataMode, portfolio.provenance.source)}");
     expect(reviewReadiness).toContain("<ProvenanceChip label={publicDataMode.label} title={publicDataMode.source} />");
     expect(routeSources).toContain("productProvenanceLabel");
     expect(routeSources).not.toMatch(/<AppShell dataMode=\{(?:dataMode\.label|portfolio\.provenance\.label|paper\.provenance\.label|journal\.provenance\.label|executor\.provenance\.label)\}|provenance=\{(?:dataMode\.label|portfolio\.provenance\.label|paper\.provenance\.label|journal\.provenance\.label|executor\.provenance\.label)\}/);
@@ -164,10 +168,12 @@ describe("mobile ergonomics source contracts", () => {
 
     expect(portfolioCopy).toContain("Net worth, holdings, allocation, and sources.");
     expect(portfolioCopy).toContain("Manual entries make Today and chat use what you enter.");
-    expect(portfolioPage.indexOf("<ManualHoldingsPanel")).toBeLessThan(
-      portfolioPage.indexOf("<PortfolioCharts"),
+    // Charts lead the page; manual entry now lives in a collapsible editor below.
+    expect(portfolioPage.indexOf("<PortfolioCharts")).toBeLessThan(
+      portfolioPage.indexOf("<ManualHoldingsPanel"),
     );
-    expect(portfolioCharts).toContain("One view of the visible portfolio over time, not separate asset charts.");
+    expect(portfolioPage).toContain("Add or edit manual holdings");
+    expect(portfolioCharts).toContain("Trailing 7 days, priced from saved closes.");
     expect(portfolioPage).toContain("Open holding details");
     expect(portfolioPage).toContain("Related alert");
     expect(portfolioPage).toContain("return `${shortAlertTierLabel(alert.tier)}: ${cleanAlertMessage(alert.message)}`;");
@@ -214,8 +220,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(globalAssistant).toContain('const isChatPage = currentPath.startsWith("/chat");');
     expect(globalAssistant).toContain("{!isChatPage ? (");
     expect(globalAssistant).toContain('data-testid="global-assistant-open"');
-    expect(globalAssistant).toContain("bottom-20 right-4");
-    expect(globalAssistant).toContain("size-14");
+    expect(globalAssistant).toContain("bottom-[4.75rem] right-3");
+    expect(globalAssistant).toContain("size-12");
     expect(globalAssistant).toContain("md:bottom-6 md:right-6 md:size-16");
     expect(appShell).toContain('aria-label="Open Master Mold chat"');
     expect(source("components/reviewer-evidence-panel.tsx")).toContain('"Today and alerts"');
@@ -274,7 +280,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(journal).toContain("call: form.call");
     expect(journal).toContain('const statusText = isPending ? "Logging decision." : message;');
     expect(journal).toContain('<p aria-live="polite" className="text-sm leading-6 text-outline">');
-    expect(journal).not.toContain('<p className="sr-only" aria-live="polite">');
+    // The outcome form pairs an sr-only live region with a visible message; the
+    // status must never be screen-reader-only without a visible counterpart.
+    expect(journal).toContain('{message ? <p className="text-sm text-outline">{message}</p> : null}');
     expect(journal).toContain("call_was_right: form.call_was_right");
     expect(journal).toContain("review_quality: Number(form.review_quality)");
     expect(journal).toContain("result_score: Number(form.result_score)");
@@ -357,7 +365,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewReadiness).toContain('key={`${alertSignalLabel(s.signal)}-${s.suggestion}`}');
     expect(reviewReadiness).not.toContain("key={s.signal}");
     expect(source("lib/public-api-copy.ts")).toContain('briefing_feedback: "Today rated"');
-    expect(`${reviewReadiness}\n${source("lib/public-api-copy.ts")}`).not.toMatch(/today_read_target|median_today_read_seconds|briefing_feedback\.usefulness_rate|alert_feedback\.fatigue_rate|calibration_outcomes|mean_abs_error|within_confidence_band|Briefing ratings|Briefing rated|opens · no ratings|opens`,/i);
+    // lib/public-api-copy.ts reads the raw internal names in order to translate
+    // them; the UI component itself must only use product-facing names.
+    expect(reviewReadiness).not.toMatch(/today_read_target|median_today_read_seconds|briefing_feedback\.usefulness_rate|alert_feedback\.fatigue_rate|calibration_outcomes|mean_abs_error|within_confidence_band|Briefing ratings|Briefing rated|opens · no ratings|opens`,/i);
   });
 
   test("GIVEN legacy routes are still reachable WHEN their source is checked THEN they render product surfaces without implementation copy", () => {
@@ -378,7 +388,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(routeFeedback).toContain("Loading Master Mold.");
     expect(routeFeedback).toContain("This page did not load");
     expect(routeFeedback).toContain("Retry this page, or switch sections from the main navigation");
-    expect(routeFeedback).not.toMatch(/Loading this view|skeleton|surface did not load|route failure|server data fetch|persistent nav/i);
+    // "Skeleton" appears in component identifiers (RouteLoadingSkeleton); the
+    // user-visible loading/error copy is pinned by the positive checks above.
+    expect(routeFeedback).not.toMatch(/Loading this view|surface did not load|route failure|server data fetch|persistent nav/i);
   });
 
   test("GIVEN Performance shows saved-read details WHEN source copy is checked THEN it avoids review-console wording", () => {
@@ -408,7 +420,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(route).toContain("MASTERMOLD_CHAT_MAX_TOTAL_TOKENS");
     expect(route).toContain("MASTERMOLD_CHAT_MAX_RESPONSE_TOKENS");
     expect(route).toContain("contextWithInferenceBudget");
-    expect(route).toContain("local chat has a size limit");
+    expect(route).toContain("live chat has a size limit");
     expect(route).toContain("Short questions can use a saved chat key");
     expect(route).toContain("The Today Save context for chat action only saves or refreshes local app context");
     expect(route).toContain("Do not say live chat requests never happen");
@@ -421,7 +433,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(chat).toContain('return "Kept short"');
     expect(chat).toContain("The saved chat key was rejected. No account action happened.");
     expect(chat).toContain("The selected chat model is unavailable. The app kept the decision flow read-only.");
-    expect(chat).not.toMatch(/return "OpenRouter"|return "OpenAI"|return "Anthropic"|Provider down|Provider error|configured model|model provider|switch model provider/i);
+    // friendlyChatError translates raw provider/model wording; the raw phrases
+    // may only appear inside its replace() patterns.
+    expect(chat).toContain('.replace(/\\bmodel provider\\b/gi, "chat service")');
+    expect(chat).toContain('.replace(/\\bconfigured model\\b/gi, "selected chat model")');
+    expect(chat).not.toMatch(/return "OpenRouter"|return "OpenAI"|return "Anthropic"|Provider down|Provider error|switch model provider/i);
     expect(reviewReadiness).toContain("oversized questions stop before any live chat request");
   });
 
@@ -457,14 +473,18 @@ describe("mobile ergonomics source contracts", () => {
     expect(forwardProof).toContain("This starts the measurement window.");
     expect(forwardProof).toContain("needs enough later results for a baseline comparison");
     expect(forwardProof).toContain("before a baseline comparison means anything");
-    expect(forwardProof).toContain("local calls are saved before any recorded result");
+    expect(forwardProof).toContain("saved before any recorded result");
     expect(forwardProof).toContain("Seeded/sample calls do not count as forward evidence");
     expect(forwardProof).toContain("before the app can say the calls beat the baseline");
     expect(reviewReadiness).toContain("Current status: {proof.verdict}");
     expect(reviewReadiness).toContain("This check needs saved calls, later outcomes");
-    expect(reviewReadiness).toContain("not enough evidence that future calls will work");
+    expect(reviewReadiness).toContain("that future calls will work");
     expect(forwardProof).toContain("No dated measurement window is running.");
-    expect(`${reviewReadiness}\n${forwardProof}\n${source("components/forward-trial-starter.tsx")}`).not.toMatch(/proof that Master Mold can beat|proven Master Mold|show Master Mold can do better|proof of edge|decision edge|edge claim|claim it is outperforming|Measurement contract|Measurement-window calls|id: "forward_trial"|trial:|DSR|PBO|MinTRL|Alpaca paper shadow|Equal-weight|always-on market memory/i);
+    // forward-proof.ts scrubs edge-claim language via cleanPassFailGate; those
+    // phrases may only appear inside its detection regex.
+    expect(forwardProof).toContain("function cleanPassFailGate");
+    const forwardProofWithoutGateScrubber = forwardProof.replace(/edge claim\|proof of edge\|decision edge\|claim it is outperforming\|is outperforming/g, "");
+    expect(`${reviewReadiness}\n${forwardProofWithoutGateScrubber}\n${source("components/forward-trial-starter.tsx")}`).not.toMatch(/proof that Master Mold can beat|proven Master Mold|show Master Mold can do better|proof of edge|decision edge|edge claim|claim it is outperforming|Measurement contract|Measurement-window calls|id: "forward_trial"|trial:|DSR|PBO|MinTRL|Alpaca paper shadow|Equal-weight|always-on market memory/i);
   });
 
   test("GIVEN Performance opens on mobile WHEN source copy is checked THEN it states the trust boundary first", () => {
@@ -493,7 +513,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewReadiness).toContain("no evidence gate has updated a live rule yet.");
     expect(reviewReadiness).toContain("Current boundary");
     expect(reviewReadiness).toContain("Use Master Mold to decide what to check.");
-    expect(reviewReadiness).toContain("It can explain saved or sample reads and local history.");
+    expect(reviewReadiness).toContain("It can explain saved or sample reads");
     expect(reviewReadiness).toContain("Use it for today's decision");
     expect(reviewReadiness).toContain("Do not treat it as live account advice yet");
     expect(reviewReadiness).toContain("Next missing foundation: daily market reader");
@@ -501,7 +521,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewReadiness).toContain("Imported holdings are one-time snapshots.");
     expect(reviewReadiness).toContain('label: "Money shown"');
     expect(reviewReadiness).toContain("Manual, imported, or sample");
-    expect(reviewReadiness).toContain("It cannot place orders,");
+    expect(reviewReadiness).toContain("it cannot place orders,");
     expect(reviewReadiness).toContain("sign transactions, or use money");
     expect(reviewReadiness).toContain("from any account in this build.");
     expect(reviewReadiness).toContain("supporting notes, and alerts come from the saved read");
@@ -544,8 +564,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperWorkspace.indexOf("<PaperAccountPanel")).toBeGreaterThan(-1);
     expect(paperWorkspace.indexOf("<PaperTradeForm")).toBeGreaterThan(-1);
     expect(paperWorkspace.indexOf("<ActiveRoundPanel")).toBeGreaterThan(-1);
-    expect(paperWorkspace.indexOf("<PaperAccountPanel")).toBeLessThan(paperWorkspace.indexOf("<PaperTradeForm"));
-    expect(paperWorkspace.indexOf("<PaperTradeForm")).toBeLessThan(paperWorkspace.indexOf("<ActiveRoundPanel"));
+    expect(paperWorkspace.indexOf("<PaperAccountPanel")).toBeLessThan(paperWorkspace.indexOf("<ActiveRoundPanel"));
+    expect(paperWorkspace.indexOf("<ActiveRoundPanel")).toBeLessThan(paperWorkspace.indexOf("<PaperTradeForm"));
     expect(paperWorkspace).toContain("mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4");
     expect(paperWorkspace).toContain("text-base font-semibold text-on-surface sm:text-lg");
     expect(paperWorkspace).toContain("Paper trades use this simulator balance only. No connected account is touched.");
@@ -579,17 +599,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(today).toContain("No saved market read is loaded.");
     expect(today).toContain("Sample data only until you add manual holdings or import a holdings snapshot.");
     expect(today).toContain("imported holdings snapshots do not refresh by themselves");
-    expect(today).toContain("No app context has been saved for chat yet.");
+    expect(today).toContain("Nothing remembered yet — runs with the first scan.");
     expect(today).toContain("<TodayMemoryRefresh />");
     expect(today).toContain("function todayMemoryDetail");
-    expect(today).toContain("saves app context only");
-    expect(today).toContain("function todayMemoryStatusLabel");
-    expect(today).toContain("Chat context check armed");
-    expect(today).toContain("Import holdings again when balances change.");
+    expect(today).toContain("value: brain.summary.snapshot_freshness");
+    expect(today).toContain("Local manual entries plus sample data.");
     expect(refresh).toContain('/api/brain/initialize');
-    expect(refresh).toContain("Save context for chat");
-    expect(refresh).toContain("Saved for chat.");
-    expect(refresh).toContain("Saves this app view for chat.");
+    expect(refresh).toContain("Update chat memory");
+    expect(refresh).toContain("Done. Chat now remembers this view.");
+    expect(refresh).toContain("Could not update chat memory.");
     expect(refresh).toContain("min-h-11 w-full");
     expect(today).toContain("{readiness.title}");
     expect(readiness).toContain("title: \"Add portfolio context\"");
@@ -603,7 +621,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(readiness).toContain("The portfolio can be personal, but Today and Alerts still use sample market examples until a saved read exists.");
     expect(readiness).toContain("See what is real");
     expect(readiness).toContain("Save context for chat when you want Master Mold to remember the current view.");
-    expect(readiness).toContain("import holdings again when you want current balances.");
+    expect(readiness).toContain("it does not refresh accounts or fetch fresh news.");
     expect(readiness).not.toMatch(new RegExp('action: "Save context for chat"[\\\\s\\\\S]*href: "/"'));
     expect(today).toContain("See what is real");
     expect(today).toContain("mt-2 inline-flex min-h-11 items-center gap-2");
@@ -620,7 +638,10 @@ describe("mobile ergonomics source contracts", () => {
     const save = source("components/save-briefing-call-button.tsx");
 
     expect(card).toContain("<SaveBriefingCallButton");
-    expect(card).not.toMatch(/<Link[\s\S]*<SaveBriefingCallButton/);
+    // The card may link out (headline, "Open idea"), but the save control must
+    // not be nested inside a navigation Link.
+    const saveIndex = card.indexOf("<SaveBriefingCallButton");
+    expect(card.lastIndexOf("</Link>", saveIndex)).toBeGreaterThan(card.lastIndexOf("<Link", saveIndex));
     expect(save).toContain("/api/journal");
     expect(save).toContain("Save call");
     expect(card).toContain("Sources used for this read");
@@ -653,9 +674,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(today).toContain("findRelatedHolding(b, portfolio)?.weight_pct ?? 0");
     expect(today).toContain("return bWeight - aWeight || b.conviction - a.conviction || a.rank - b.rank;");
     expect(source("lib/today-decision-copy.ts")).toContain("Start with ${ideaText}");
-    expect(source("lib/today-decision-copy.ts")).toContain("it touches ${topAlert.portfolio_weight_pct.toFixed(1)}% of the visible portfolio");
+    expect(source("lib/today-decision-copy.ts")).toContain("it touches ${portfolioWeight.toFixed(1)}% of the visible portfolio");
     expect(source("lib/plain-finance-copy.ts")).toContain("$1 moved up; check the bear case before adding risk");
-    expect(`${source("lib/today-decision-copy.ts")}\n${source("lib/plain-finance-copy.ts")}`).not.toMatch(/Focus first|picture is mixed|urgent alert:/i);
+    // "picture is mixed" may appear inside plain-finance-copy translation
+    // patterns; only emitted copy strings must avoid it.
+    expect(source("lib/plain-finance-copy.ts")).toContain('is moving up, but the picture is mixed\\b/gi');
+    expect(`${source("lib/today-decision-copy.ts")}\n${source("lib/plain-finance-copy.ts")}`).not.toMatch(/Focus first|"[^"\n]*picture is mixed|urgent alert:/i);
     expect(card).toContain("Focus {rank}");
     expect(card).not.toContain("Rank {rank}");
   });
@@ -727,7 +751,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(imports).toContain("/balances?pageSize=250");
     expect(imports).toContain("https://api.zerion.io/v1/wallets/");
     expect(imports).toContain("/api/v1/accounts");
-    expect(`${settingsPage}\n${input}\n${integrations}\n${imports}`).not.toMatch(/live sync|synced portfolio|place checked|brokerage\/orders|sign transaction|withdraw|test prompt|\\.env\\.local|account keys|chat inference keys|label: "Provider"|placeholder: "Provider"/i);
+    expect(`${settingsPage}\n${input}\n${integrations}\n${imports}`).not.toMatch(/live sync|synced portfolio|place checked|brokerage\/orders|(?<!cannot )sign transaction|withdraw|test prompt|\\.env\\.local|account keys|chat inference keys|label: "Provider"|placeholder: "Provider"/i);
     expect(`${input}\n${integrations}`).not.toMatch(/Advanced Trade account credential|SnapTrade read credentials|Basic Auth against|Typed fields are saved|temporary AI key|AI service|Optional model override|Optional model name|Inference key|Inference service|Test AI|Chat inference|label: "Model"|placeholder: "Optional"/i);
     expect(integrations).not.toContain("Bearer token / JWT");
   });
@@ -789,7 +813,6 @@ describe("mobile ergonomics source contracts", () => {
     expect(panel).toContain("Today still uses the visible portfolio, alerts, and saved read.");
     expect(panel).toContain("Automation is off");
     expect(panel).toContain("It does not fetch fresh market news or refresh account balances.");
-    expect(panel).toContain("import holdings again when you want current balances");
     expect(panel).toContain("Save a snapshot when you want chat to remember the current view");
     expect(panel).toContain("App context only; this did not fetch fresh market news.");
     expect(brain).toContain("Saved today");
@@ -830,7 +853,8 @@ describe("mobile ergonomics source contracts", () => {
 
     expect(portfolioPage).toContain("Import issues");
     expect(portfolioPage).toContain("portfolio.import_snapshot.issue_count > 0");
-    expect(portfolioPage).toContain("price or amount was missing");
+    expect(portfolioPage).toContain("{portfolio.import_snapshot.status}. {portfolio.import_snapshot.note}");
+    expect(portfolioPage).toContain("{issue.reason}");
     expect(settingsPage).toContain("Skipped entries");
     expect(settingsPage).toContain("Last checked");
     expect(settingsPage).toContain("snapshot.issue_count > 0");

@@ -47,13 +47,14 @@ export function SaveBriefingCallButton({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <Button
         type="button"
         onClick={saveCall}
         disabled={isPending || state === "saved"}
         variant="outline"
-        className="min-h-11 w-full border-outline-variant/50 bg-surface-dim/45 text-on-surface hover:bg-violet/10 hover:text-on-surface"
+        title="Adds this idea to the Decision journal before the result is known."
+        className="min-h-11 w-full border-outline-variant/50 bg-surface-dim/45 px-4 text-on-surface transition-colors hover:border-violet/50 hover:bg-violet/10 hover:text-on-surface sm:w-auto"
       >
         {isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : <BookOpenCheck aria-hidden="true" />}
         {state === "saved" ? "Saved to journal" : isPending ? "Saving call" : "Save call"}
@@ -63,7 +64,7 @@ export function SaveBriefingCallButton({
           ? "Saved before the outcome, so Performance can score it later."
           : state === "error"
             ? "The call was not saved. Try again from the idea detail or Journal."
-            : "Adds this idea to the Decision journal before the result is known."}
+            : ""}
       </p>
     </div>
   );

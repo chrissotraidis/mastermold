@@ -59,7 +59,7 @@ export function GlobalAssistant() {
             setEventPageContext(undefined);
             setOpen(true);
           }}
-          className="fixed bottom-20 right-4 z-[70] flex size-14 items-center justify-center rounded-full border border-violet/40 bg-surface-high/95 p-2 shadow-2xl shadow-void/50 ring-1 ring-violet/20 transition hover:border-violet hover:bg-surface-highest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet md:bottom-6 md:right-6 md:size-16"
+          className="fixed bottom-[4.75rem] right-3 z-[70] flex size-12 items-center justify-center rounded-full border border-violet/40 bg-surface-high/95 p-1.5 shadow-2xl shadow-void/50 ring-1 ring-violet/20 transition hover:scale-105 hover:border-violet hover:bg-surface-highest active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet md:bottom-6 md:right-6 md:size-16 md:p-2"
           aria-label="Open Master Mold chat"
           data-testid="global-assistant-open"
         >

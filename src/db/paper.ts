@@ -2,6 +2,13 @@ import { plainPaperCopy } from "@/lib/paper-copy";
 import { demoDatabase } from "./seed-data";
 import { store } from "./store";
 import {
+  allRounds,
+  allRoundScores,
+  deriveRoundStatus,
+  ensureOpenRound,
+  resolveDueRounds,
+} from "./paper-lifecycle";
+import {
   engineBriefingCards,
   engineDriversFor,
   engineRunSummary,
@@ -64,6 +71,12 @@ export type CreatePaperPredictionInput = {
 const fakeStartingBalance = 100_000;
 
 export function getPaper(asOf: AsOfFilter | null = null): PaperJson {
+  // Current view only (never a replay): settle anything due, then make sure a
+  // round is open for this trading week.
+  if (!asOf) {
+    resolveDueRounds();
+    ensureOpenRound();
+  }
   const scores = getScores(asOf);
   const predictions = getPredictions(asOf);
   const rounds = getRounds(asOf, predictions, scores);
@@ -120,15 +133,19 @@ export function getPaperPageData(asOf: AsOfFilter | null = null): PaperPageData 
 export function createPaperPrediction(
   input: CreatePaperPredictionInput,
 ): PaperPredictionJson {
-  const round = demoDatabase.paperTradingRounds.find((item) => item.id === input.round_id);
+  const round = allRounds().find((item) => item.id === input.round_id);
   const asset = demoDatabase.assets.find((item) => item.id === input.asset_id);
 
   if (!round) {
     throw new Error("round_id does not match a paper trading round");
   }
 
-  if (round.status !== "open") {
-    throw new Error("predictions can only be submitted for the active open round");
+  const nowMs = Date.now();
+  const hasScore = allRoundScores().some((s) => s.round_id === round.id);
+  if (deriveRoundStatus(round, hasScore, nowMs) !== "open") {
+    throw new Error(
+      `this round closed on ${round.closes_at.slice(0, 10)}; submit into the current open round instead`,
+    );
   }
 
   if (!asset) {
@@ -171,13 +188,21 @@ function getRounds(
   predictions: PaperPredictionJson[],
   scores: RoundScore[],
 ): PaperRoundJson[] {
-  return [...demoDatabase.paperTradingRounds]
+  // Status is always derived from closes_at + scores at the viewer's clock (or
+  // the replayed moment) — the stored column is never trusted, so a round can
+  // no longer sit "Open" weeks after its close date.
+  const viewedAt = asOf ? asOf.time : Date.now();
+  return allRounds()
     .filter((round) => isKnownBy(round.knowledge_time, asOf))
-    .map((round) => ({
-      ...round,
-      predictions: predictions.filter((prediction) => prediction.round_id === round.id),
-      score: scores.find((score) => score.round_id === round.id) ?? null,
-    }))
+    .map((round) => {
+      const score = scores.find((s) => s.round_id === round.id) ?? null;
+      return {
+        ...round,
+        status: deriveRoundStatus(round, score !== null, viewedAt),
+        predictions: predictions.filter((prediction) => prediction.round_id === round.id),
+        score,
+      };
+    })
     .sort((a, b) => Date.parse(b.opens_at) - Date.parse(a.opens_at));
 }
 
@@ -190,7 +215,7 @@ function getPredictions(asOf: AsOfFilter | null): PaperPredictionJson[] {
 }
 
 function getScores(asOf: AsOfFilter | null): RoundScore[] {
-  return [...demoDatabase.roundScores]
+  return allRoundScores()
     .filter((score) => isKnownBy(score.knowledge_time, asOf))
     .sort((a, b) => Date.parse(b.event_time) - Date.parse(a.event_time));
 }
@@ -265,7 +290,7 @@ function enginePredictionsForRound(
 
 function latestKnowledgeTime(asOf: AsOfFilter | null) {
   const knowledgeTimes = [
-    ...demoDatabase.paperTradingRounds
+    ...allRounds()
       .filter((round) => isKnownBy(round.knowledge_time, asOf))
       .map((round) => round.knowledge_time),
     ...demoDatabase.paperPredictions

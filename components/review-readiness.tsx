@@ -27,6 +27,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getDataMode, getEngineRunHistory, getEngineStatus } from "@/src/db/engine-data";
+import { getScanAttempts } from "@/src/db/scan";
 import { getForwardProofStatus, type ForwardProofGate } from "@/src/db/forward-proof";
 import { getBrainState } from "@/src/db/brain";
 import { getJournal } from "@/src/db/journal";
@@ -621,29 +622,64 @@ function forwardGateTone(gate: ForwardProofGate) {
   return "text-critical";
 }
 
-/** Saved-read history from the durable store. */
+/** Saved-read history plus recent scan attempts (failures stay visible). */
 function EngineRunHistory() {
   const history = getEngineRunHistory();
-  if (history.length === 0) return null;
+  const attempts = getScanAttempts(6);
+  if (history.length === 0 && attempts.length === 0) return null;
 
   return (
-    <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
-      <p className="text-xs font-semibold uppercase text-outline">
-        Runs saved locally ({history.length})
-      </p>
-      <ul className="mt-2 space-y-1 text-sm text-on-surface-variant">
-        {history.slice(0, 8).map((run) => (
-          <li key={run.run_date} className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-mono text-on-surface">{run.run_date}</span>
-            <span className="text-xs text-outline">
-              {run.triggered} worth checking · {run.usd > 0 ? `$${run.usd.toFixed(2)}` : "$0"}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-2 text-xs leading-5 text-outline">
-        Re-importing the same day will not create a duplicate read.
-      </p>
+    <div className="space-y-3">
+      {history.length > 0 ? (
+        <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+          <p className="text-xs font-semibold uppercase text-outline">
+            Runs saved locally ({history.length})
+          </p>
+          <ul className="mt-2 space-y-1 text-sm text-on-surface-variant">
+            {history.slice(0, 8).map((run) => (
+              <li key={run.run_date} className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-mono text-on-surface">{run.run_date}</span>
+                <span className="text-xs text-outline">
+                  {run.triggered} worth checking · {run.usd > 0 ? `$${run.usd.toFixed(2)}` : "$0"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {attempts.length > 0 ? (
+        <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+          <p className="text-xs font-semibold uppercase text-outline">Scan attempts</p>
+          <ul className="mt-2 space-y-1.5 text-sm text-on-surface-variant">
+            {attempts.map((attempt) => (
+              <li key={attempt.id} className="flex flex-wrap items-start justify-between gap-2">
+                <span className="font-mono text-xs text-on-surface">
+                  {formatReviewTimestamp(attempt.started_at)}
+                </span>
+                <span
+                  className={
+                    attempt.status === "ok"
+                      ? "text-xs text-engine"
+                      : attempt.status === "failed"
+                        ? "text-xs text-critical"
+                        : "text-xs text-outline"
+                  }
+                >
+                  {attempt.status === "ok" ? "Completed" : attempt.status === "failed" ? "Failed" : "Running"}
+                  {attempt.usd !== null && attempt.usd > 0 ? ` · $${attempt.usd.toFixed(4)}` : ""}
+                </span>
+                {attempt.status === "failed" ? (
+                  <span className="w-full text-xs leading-5 text-outline">{attempt.detail}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs leading-5 text-outline">
+            Failed scans never change recommendations; the last good read stays in place.
+            Re-running the same day will not create a duplicate read.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

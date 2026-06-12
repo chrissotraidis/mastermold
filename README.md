@@ -287,6 +287,28 @@ uv run python -m mastermold_engine.run_briefing --date 2026-06-05
 `bin/engine-briefing` (repo root) is a thin wrapper around the run entry point. The
 app ingests the newest `engine-run-*.json` from `engine/out/` automatically.
 
+### Scheduling the daily scan
+
+Three ways to keep the read fresh, all writing the same run history (every attempt —
+including failures — is recorded and shown in the app):
+
+1. **In-app:** the **Run today's scan** button on Today calls `POST /api/scan`,
+   which spawns the engine, ingests the bundle, settles due paper rounds, and
+   refreshes chat context. Use this when running interactively.
+2. **Local schedule (cron/launchd):** hit the same endpoint on a cadence while the
+   app is running, e.g. `30 13 * * 1-5 curl -s -X POST http://localhost:3000/api/scan
+   -H 'Content-Type: application/json' -d '{"trigger":"cron"}'` — or run
+   `bin/engine-briefing` directly; the app ingests the newest bundle on the next
+   page load.
+3. **Zo:** register the app as a Service and add an Automation that runs
+   `bin/engine-briefing` (or curls `/api/scan`) each weekday before the market
+   opens. Zo restarts are safe: runs are idempotent by date and the app falls
+   back to the last saved read.
+
+Interactive scans default to the engine's direct synthesis path
+(`MASTERMOLD_ENGINE_ADAPTER=direct`); set `MASTERMOLD_ENGINE_ADAPTER=auto` to let
+scheduled runs attempt the full TradingAgents graph first.
+
 ## Documentation
 
 - `engine/CONTRACT.md` — the engine ⇄ app JSON contract.

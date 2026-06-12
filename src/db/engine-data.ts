@@ -184,10 +184,39 @@ export type EngineRunMeta = EngineBundle["run"];
 
 // --- Loading & validation --------------------------------------------------
 
+export type EngineFreshness = "fresh" | "aging" | "stale";
+
 export type EngineStatus =
-  | { state: "live"; bundle: EngineBundle; file: string }
+  | { state: "live"; bundle: EngineBundle; file: string; freshness: EngineFreshness; ageHours: number }
   | { state: "absent" } // no engine output at all -> seeds, no notice needed
   | { state: "invalid"; reason: string; file?: string }; // present but unusable -> seeds + notice
+
+const AGING_AFTER_HOURS = 24;
+const STALE_AFTER_HOURS = 72;
+
+/** Age of a run relative to the viewer's clock (or the as-of replay timestamp). */
+export function runFreshness(knowledgeTimeIso: string, viewedAtMs: number): {
+  freshness: EngineFreshness;
+  ageHours: number;
+} {
+  const knownAt = Date.parse(knowledgeTimeIso);
+  const ageHours = Number.isNaN(knownAt) ? 0 : Math.max(0, (viewedAtMs - knownAt) / 3_600_000);
+  const freshness: EngineFreshness =
+    ageHours >= STALE_AFTER_HOURS ? "stale" : ageHours >= AGING_AFTER_HOURS ? "aging" : "fresh";
+  return { freshness, ageHours };
+}
+
+/** Short human age, e.g. "2 hours ago", "yesterday", "4 days ago". */
+export function ageLabel(ageHours: number): string {
+  if (ageHours < 1) return "just now";
+  if (ageHours < 24) {
+    const h = Math.round(ageHours);
+    return `${h} hour${h === 1 ? "" : "s"} ago`;
+  }
+  const days = Math.floor(ageHours / 24);
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
 
 type LoadOptions = {
   dir?: string;
@@ -253,7 +282,11 @@ export function getEngineStatus(
   // Respect as-of replay: only surface a bundle the operator would already know.
   const visible = candidates.find((c) => isKnownBy(c.bundle.run.knowledge_time, asOf));
   if (visible) {
-    return { state: "live", bundle: visible.bundle, file: visible.file };
+    // Age is measured against the viewer's clock — or, in a replay, against the
+    // replayed moment, so historical views report the age they had at the time.
+    const viewedAt = asOf ? asOf.time : now;
+    const { freshness, ageHours } = runFreshness(visible.bundle.run.knowledge_time, viewedAt);
+    return { state: "live", bundle: visible.bundle, file: visible.file, freshness, ageHours };
   }
 
   if (candidates.length > 0) {
@@ -408,6 +441,9 @@ export type DataMode = {
   source: string;
   detail: string;
   as_of: string | null;
+  /** Set when a saved scan backs this surface: how old that scan is for the viewer. */
+  freshness?: EngineFreshness;
+  age_label?: string;
   notice?: string;
 };
 
@@ -420,6 +456,12 @@ export function getDataMode(asOf: AsOfFilter | null = null): DataMode {
       source: engineRunSummary(status.bundle),
       detail: `Saved scan · ${runKind} · ${status.bundle.run.triggered_tickers.length} ticker(s) analyzed`,
       as_of: status.bundle.run.knowledge_time,
+      freshness: status.freshness,
+      age_label: ageLabel(status.ageHours),
+      notice:
+        status.freshness === "stale"
+          ? `This read is from ${ageLabel(status.ageHours)}. Run a new scan before acting on it.`
+          : undefined,
     };
   }
   const notice =

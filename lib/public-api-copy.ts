@@ -465,6 +465,9 @@ export function toPublicBriefingDetail(detail: BriefingDetailJson): PublicBriefi
           ...decision_journal_entry,
           conviction_tier: { key: "4-6", label: "4-6 cautious" },
           outcome_score: null,
+          review_due: false,
+          past_horizon: false,
+          review_note: null,
         })
       : null,
     provenance: publicProvenance(provenance),

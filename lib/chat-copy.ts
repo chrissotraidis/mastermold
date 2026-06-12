@@ -336,7 +336,8 @@ export function cleanChatText(
     .replace(/\bnot imported or manual holdings\b/gi, "not a manual or imported holdings snapshot")
     .replace(/\bnot manual or imported holdings\b/gi, "not a manual or imported holdings snapshot")
     .replace(/\bimport a real portfolio snapshot\b/gi, "import a holdings snapshot")
-    .replace(/\bimporting the sample holdings\b/gi, "importing a holdings snapshot")
+    .replace(/\bImporting the sample holdings\b/g, "Importing a holdings snapshot")
+    .replace(/\bimporting the sample holdings\b/g, "importing a holdings snapshot")
     .replace(/\bsnapshot of holdings snapshots\b/gi, "holdings snapshot")
     .replace(/\bholdings snapshots snapshots\b/gi, "holdings snapshots")
     .replace(

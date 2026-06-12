@@ -170,7 +170,7 @@ describe("chat copy cleanup", () => {
     expect(curlyApostropheCopy).toContain("fits a real strategy");
     expect(curlyApostropheCopy).toContain("the visible on-chain cash exposure");
     expect(curlyApostropheCopy).toContain("the visible aUSDC position");
-    expect(curlyApostropheCopy).toContain("the visible BTC position");
+    expect(curlyApostropheCopy).toContain("the sample portfolio's BTC position");
     expect(curlyApostropheCopy).not.toMatch(/you’re supplying|you’re using|you’re actively borrowing|you’re not actively|you’ve already adjusted your position|your borrowing costs|your expected returns|your yields|your position|your strategy|your on-chain cash exposure|your aUSDC position|your BTC position/i);
 
     const duplicateSnapshotCopy = cleanChatText(
@@ -270,7 +270,7 @@ describe("chat copy cleanup", () => {
     expect(prompt).toContain("Begin with `Chat context:`");
     expect(prompt).toContain("does not check news, the market, or connected accounts");
     expect(cleaned).toStartWith("Chat context:");
-    expect(cleaned).toContain("save context for chat or import holdings again for current balances");
+    expect(cleaned).toContain("use the chat context check when it is available or save context for chat");
     expect(cleaned).not.toContain("Here is context");
     expect(cleaned).not.toContain("enable scheduled scans");
     expect(cleaned).not.toContain("manually trigger a new scan");

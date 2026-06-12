@@ -102,7 +102,7 @@ describe("UAT user journeys over seeded data", () => {
     expect(todayPortfolioScopePhrase(portfolio.holdings[0])).toBe("the sample portfolio");
     expect(buildTodayPrompt(null, null, portfolio.holdings[0])).toContain("sample portfolio");
     expect(portfolioPageSubtitle()).toContain("Net worth, holdings, allocation");
-    expect(portfolioPageSubtitle()).toContain("where each number came from");
+    expect(portfolioPageSubtitle()).toContain("Manual entries make Today and chat use what you enter.");
     expect(portfolioPageSubtitle()).not.toMatch(/visible money picture|your visible money picture/i);
     expect(portfolioConcentrationNote(portfolio.holdings[0].symbol)).toContain("biggest visible position");
     expect(portfolioConcentrationNote(null)).toBe("No visible position yet");
@@ -355,7 +355,9 @@ describe("UAT user journeys over seeded data", () => {
     expect(brain.schedule.note).toContain("No chat context snapshot had been saved");
     expect(todayState.actionableCount).toBe(0);
     expect(todayState.alertCount).toBe(0);
-    expect(todayState.greeting).toBe("Nothing urgent today. I will say so if that changes.");
+    expect(todayState.greeting).toBe(
+      "Using sample data. Add holdings or import a snapshot before treating Today as personal.",
+    );
     expect(todayState.greeting).not.toMatch(/surface|actionable|signal/i);
     expect(morningCopy).toContain("Nothing needs action right now");
     expect(morningCopy).not.toMatch(/BTC is moving up|NVDA is trading|saved scan/i);
@@ -452,7 +454,7 @@ describe("UAT user journeys over seeded data", () => {
       const beforeAlerts = await responseJson<Array<{ asset_symbol: string; portfolio_weight_pct: number }>>(
         getAlertsRoute(new Request("http://localhost/api/alerts")),
       );
-      const beforeNvdaAlert = beforeAlerts.find((alert) => alert.asset_symbol === "NVDA");
+      const beforeBtcAlert = beforeAlerts.find((alert) => alert.asset_symbol === "BTC");
 
       const portfolioAfterAddApi = await responseJson<{
         holdings: Array<{
@@ -477,12 +479,12 @@ describe("UAT user journeys over seeded data", () => {
           new Request("http://localhost/api/portfolio", {
             method: "POST",
             body: JSON.stringify({
-              symbol: "NVDA",
-              asset_name: "NVIDIA manual test",
-              asset_class: "equity",
+              symbol: "BTC",
+              asset_name: "Bitcoin manual test",
+              asset_class: "crypto",
               venue: "Manual UAT",
-              quantity: "1000",
-              price: "1000",
+              quantity: "10",
+              price: "100000",
               daily_change_pct: "1",
             }),
           }),
@@ -490,22 +492,22 @@ describe("UAT user journeys over seeded data", () => {
       );
       const portfolioAfterAdd = getInternalPortfolio();
 
-      const manualHolding = portfolioAfterAddApi.manual_entries.find((holding) => holding.symbol === "NVDA");
+      const manualHolding = portfolioAfterAddApi.manual_entries.find((holding) => holding.symbol === "BTC");
       expect(portfolioAfterAddApi.provenance.label).toBe("Manual portfolio");
       expect(manualHolding?.source_label).toBe("Manual entry");
-      expect(portfolioAfterAddApi.holdings[0].symbol).toBe("NVDA");
+      expect(portfolioAfterAddApi.holdings[0].symbol).toBe("BTC");
       expect(portfolioAfterAddApi.holdings[0].source_label).toBe("Manual entry");
-      expect(portfolioAfterAdd.holdings[0].symbol).toBe("NVDA");
+      expect(portfolioAfterAdd.holdings[0].symbol).toBe("BTC");
       expect(portfolioAfterAdd.holdings[0].source).toBe("manual");
 
       const afterAlerts = getInternalAlerts();
-      const afterNvdaAlert = afterAlerts.find((alert) => alert.asset_symbol === "NVDA");
-      expect(afterNvdaAlert?.portfolio_weight_pct ?? 0).toBeGreaterThan(beforeNvdaAlert?.portfolio_weight_pct ?? 0);
+      const afterBtcAlert = afterAlerts.find((alert) => alert.asset_symbol === "BTC");
+      expect(afterBtcAlert?.portfolio_weight_pct ?? 0).toBeGreaterThan(beforeBtcAlert?.portfolio_weight_pct ?? 0);
 
       const briefing = getInternalBriefingCards();
       const topCard = briefing.find((card) => card.status === "actionable") ?? briefing[0] ?? null;
       const topHolding = portfolioAfterAdd.holdings[0];
-      const todayPrompt = buildTodayPrompt(topCard, afterNvdaAlert ?? null, {
+      const todayPrompt = buildTodayPrompt(topCard, afterBtcAlert ?? null, {
         symbol: topHolding.symbol,
         weight_pct: topHolding.weight_pct,
         asset_name: topHolding.asset_name,
@@ -523,10 +525,10 @@ describe("UAT user journeys over seeded data", () => {
         briefing.filter((card) => card.status === "actionable").length,
         afterAlerts.length,
         topCard,
-        afterNvdaAlert ?? null,
+        afterBtcAlert ?? null,
       );
 
-      expect(todayPrompt).toContain(`Its largest visible holding is NVDA at ${topHolding.weight_pct.toFixed(1)}%`);
+      expect(todayPrompt).toContain(`Its largest visible holding is BTC at ${topHolding.weight_pct.toFixed(1)}%`);
       expect(todayPrompt).toContain("The visible portfolio includes local manual entries plus sample data");
       expect(todayPrompt).toContain("local manual entry");
       expect(todayPrompt).toContain("including local manual entries plus sample data");
@@ -537,15 +539,15 @@ describe("UAT user journeys over seeded data", () => {
       expect(todayPrompt).toContain("why each matters to the visible portfolio");
       expect(todayPrompt).toContain("Focus 1 first, then urgent alerts or smaller checks.");
       expect(todayPrompt).not.toMatch(/z-score|sigma|σ|trailing mean|_z/i);
-      expect(todayPaperHref).toContain("symbol=NVDA");
-      expect(decodeURIComponent(todayPaperHref)).toContain("paper trade");
-      expect(todayHoldingDetail(topHolding)).toBe("NVIDIA manual test · manual entry");
+      expect(todayPaperHref).toContain("symbol=BTC");
+      expect(new URL(`http://localhost${todayPaperHref}`).searchParams.get("rationale")).toContain("paper trade");
+      expect(todayHoldingDetail(topHolding)).toBe("Bitcoin manual test · manual entry");
       expect(todayHoldingPromptDetail(topHolding)).toContain("local manual entry");
       expect(todayPortfolioScopePhrase(topHolding)).toContain("local manual entries plus sample data");
-      expect(todayRiskNote).toContain("NVDA is concentrated");
+      expect(todayRiskNote).toContain("BTC is concentrated");
       expect(todayRiskNote).toContain("risk decision");
       expect(morningCopy).toMatch(/^Start with /);
-      expect(morningCopy).toContain("NVDA is trading much more than usual");
+      expect(morningCopy).toContain("alerts to review");
       expect(morningCopy).not.toMatch(/^\d+ alerts? to check/i);
       expect(morningCopy).not.toMatch(/dashboard|engine output|actionable signals|z-score|sigma/i);
 
@@ -555,11 +557,11 @@ describe("UAT user journeys over seeded data", () => {
         portfolio: { manual_holding_count: number };
         holdings: Array<{ symbol: string; data_state: string; portfolio_weight_pct: number }>;
       };
-      expect(chatContext.facts.top_holding).toBe("NVDA");
+      expect(chatContext.facts.top_holding).toBe("BTC");
       expect(parsedChatContext.data_state.portfolio_state).toBe("Manual portfolio");
       expect(parsedChatContext.data_state.note).toContain("local manual holdings");
       expect(parsedChatContext.portfolio.manual_holding_count).toBe(1);
-      expect(parsedChatContext.holdings.some((holding) => holding.symbol === "NVDA" && holding.data_state === "manual")).toBe(true);
+      expect(parsedChatContext.holdings.some((holding) => holding.symbol === "BTC" && holding.data_state === "manual")).toBe(true);
 
       if (manualHolding) {
         const portfolioAfterDelete = await responseJson<{
@@ -589,7 +591,7 @@ describe("UAT user journeys over seeded data", () => {
     );
 
     expect(morningCopy).toBe(
-      "Start with BTC moved up; check the bear case before adding risk. Also check why NVDA is trading much more than usual; it touches 27.0% of the visible portfolio. 4 alerts to review.",
+      "Start with BTC moved up; check the bear case before adding risk. Also check why NVDA is trading 2.1× its usual volume; it touches 27.0% of the visible portfolio. 4 alerts to review.",
     );
     expect(morningCopy).not.toMatch(/^4 alerts? to check/i);
     expect(morningCopy).not.toMatch(/Focus first|picture is mixed|urgent alert|\d+(\.\d+)?x\s+avg|z-score|sigma|σ/i);
@@ -606,7 +608,7 @@ describe("UAT user journeys over seeded data", () => {
 
     const rawVolume = "Review alert: NVDA volume 2.1x avg";
     const translatedVolume = plainBriefingText(rawVolume);
-    expect(translatedVolume).toBe("Review alert: NVDA is trading much more than usual");
+    expect(translatedVolume).toBe("Review alert: NVDA is trading 2.1× its usual volume");
     expect(translatedVolume).not.toMatch(/\d+(\.\d+)?x\s+avg/i);
 
     const rawReturnAlert = "ETH 1-day return +0.7% (z=+2.1)";
@@ -664,7 +666,7 @@ describe("UAT user journeys over seeded data", () => {
       asset_symbol: "NVDA",
       portfolio_weight_pct: 27,
     });
-    expect(rawAlertActions.askPrompt).toContain("NVDA is trading much more than usual");
+    expect(rawAlertActions.askPrompt).toContain("NVDA is trading 2.1× its usual volume");
     expect(rawAlertActions.askPrompt).toContain("27.0% of the visible portfolio");
     expect(rawAlertActions.askPrompt).toContain("why it matters to the visible portfolio");
     expect(rawAlertActions.askPrompt).not.toMatch(/your visible portfolio|my portfolio/i);
@@ -698,8 +700,13 @@ describe("UAT user journeys over seeded data", () => {
       borrow_rate_preview: Array<{ asset_key: string; borrow_rate: number; asset_symbol: string }>;
     }>(getExecutorRoute(new Request("http://localhost/api/executor")));
 
-    const scoredRound = paper.rounds.find((round) => round.result);
+    // Rolling weekly rounds: past-due rounds auto-score on read (possibly with a
+    // zero variety score), so pick a round with a full positive score breakdown.
+    const scoredRound = paper.rounds.find(
+      (round) => round.result && round.result.variety_score > 0,
+    );
     expect(paper.rounds.some((round) => round.status === "open")).toBe(true);
+    expect(paper.rounds.filter((round) => round.status === "closed").every((round) => round.result)).toBe(true);
     expect(scoredRound?.result?.was_it_right_score).toBeGreaterThan(0);
     expect(scoredRound?.result?.patience_score).toBeGreaterThan(0);
     expect(scoredRound?.result?.variety_score).toBeGreaterThan(0);

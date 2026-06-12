@@ -52,8 +52,8 @@ export function BriefingUsefulnessFeedback() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-outline-variant/35 bg-surface-dim/35 px-3 py-2">
-      <span className="mr-1 text-xs font-medium text-outline">Rate today</span>
+    <div className="flex items-center gap-1.5">
+      <span className="mr-1 whitespace-nowrap text-xs font-medium text-outline">Rate today</span>
       <FeedbackButton
         label="Useful"
         active={choice === "useful"}

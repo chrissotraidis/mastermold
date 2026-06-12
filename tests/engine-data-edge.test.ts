@@ -39,7 +39,11 @@ describe("engine-data helpers (edge cases)", () => {
     const mode = getDataMode();
     expect(mode.label).toBe("Engine output");
     expect(mode.source).toContain("TradingAgents run");
-    expect(mode.notice).toBeUndefined();
+    // The fixture run is dated 2026-06-05, so for any real "now" it reads as a
+    // stale saved scan: freshness metadata and a re-run notice are expected.
+    expect(mode.freshness).toBe("stale");
+    expect(mode.age_label).toBeTruthy();
+    expect(mode.notice).toContain("Run a new scan");
   });
 
   test("getDataMode surfaces a notice when an engine bundle is present but unusable", () => {

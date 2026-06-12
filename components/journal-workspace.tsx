@@ -134,7 +134,9 @@ export function JournalWorkspace({
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_23rem] xl:items-start">
-      <aside className="space-y-4 xl:sticky xl:top-6 xl:order-2">
+      {/* DOM order puts the record-a-call form after the entries so phones see
+          the journal itself first; on xl it becomes the sticky right column. */}
+      <aside className="order-2 space-y-4 xl:sticky xl:top-6">
         <Card className="border-outline-variant/40 bg-surface-high/40">
           <CardHeader className="p-5">
             <div className="flex items-center gap-2">
@@ -233,7 +235,7 @@ export function JournalWorkspace({
         </Card>
       </aside>
 
-      <div className="space-y-6 xl:order-1">
+      <div className="order-1 space-y-6">
         <TrackRecordSection tiers={trackRecord} provenance={initialJournal.provenance} />
         <EntryList
           entries={entries}
@@ -372,6 +374,11 @@ function EntryList({
                     <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
                       {entry.horizon}
                     </Badge>
+                    {entry.past_horizon ? (
+                      <Badge variant="outline" className="border-caution/50 text-caution">
+                        Past horizon — score it
+                      </Badge>
+                    ) : null}
                   </div>
                   <CardTitle className="text-xl leading-7 text-on-surface">{plainJournalText(entry.call)}</CardTitle>
                   <p className="text-sm text-outline">Logged {formatTimestamp(entry.logged_at)}</p>
@@ -399,11 +406,29 @@ function EntryList({
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4 rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4">
-                      <p className="text-sm text-outline">
-                        No result yet. This call is saved before the market has answered.
+                    <div
+                      className={
+                        entry.past_horizon
+                          ? "space-y-4 rounded-md border border-caution/40 bg-caution/[0.06] p-4"
+                          : "space-y-4 rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4"
+                      }
+                    >
+                      <p className={entry.past_horizon ? "text-sm font-medium text-caution" : "text-sm text-outline"}>
+                        {entry.review_note ??
+                          "No result yet. This call is saved before the market has answered."}
                       </p>
-                      <ResolveOutcomeForm entry={entry} onResolved={onResolved} />
+                      {entry.past_horizon ? (
+                        <ResolveOutcomeForm entry={entry} onResolved={onResolved} />
+                      ) : (
+                        <details>
+                          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-violet transition-colors hover:text-on-surface">
+                            Score this call now
+                          </summary>
+                          <div className="pt-3">
+                            <ResolveOutcomeForm entry={entry} onResolved={onResolved} />
+                          </div>
+                        </details>
+                      )}
                     </div>
                   )}
                 </CardContent>

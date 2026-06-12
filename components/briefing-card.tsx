@@ -81,14 +81,18 @@ export function DailyBriefingCard({
             </p>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
               <span className="font-mono text-[11px] uppercase tracking-telemetry text-caution">What to do</span>{" "}
-              {briefingNextStep({ confidence, nothing })}
+              {briefingNextStep({ confidence, nothing, headline, horizon })}
             </p>
             {sourceNotes.length > 0 ? (
-              <details className="mt-3 rounded-md border border-outline-variant/35 bg-surface-dim/35 px-3">
-                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-on-surface">
+              <details className="mt-2 group/sources">
+                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-on-surface list-none gap-1 opacity-60 transition-opacity hover:opacity-100 [&::-webkit-details-marker]:hidden">
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="size-3 transition-transform group-open/sources:rotate-90"
+                  />
                   Sources used for this read
                 </summary>
-                <ul className="space-y-2 pb-3 text-xs leading-5 text-on-surface-variant">
+                <ul className="ml-4 space-y-1.5 border-l border-outline-variant/35 pb-2 pl-3 pt-1 text-xs leading-5 text-on-surface-variant">
                   {sourceNotes.slice(0, 3).map((note) => (
                     <SourceNoteLine key={note} note={note} />
                   ))}
@@ -96,7 +100,17 @@ export function DailyBriefingCard({
               </details>
             ) : null}
 
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-outline-variant/25 pt-4">
+              {!nothing ? (
+                <SaveBriefingCallButton
+                  headline={headline}
+                  reason={relevance}
+                  confidence={confidence}
+                  horizon={horizon}
+                  source={provenance.label}
+                  sourceNotes={sourceNotes}
+                />
+              ) : null}
               <Chip tone="neutral">
                 <CalendarClock aria-hidden="true" className="size-3" />
                 {horizon}
@@ -110,19 +124,6 @@ export function DailyBriefingCard({
                 <ArrowRight aria-hidden="true" className="size-3.5 transition-transform group-hover/open:translate-x-0.5" />
               </Link>
             </div>
-
-            {!nothing ? (
-              <div className="mt-4 max-w-sm">
-                <SaveBriefingCallButton
-                  headline={headline}
-                  reason={relevance}
-                  confidence={confidence}
-                  horizon={horizon}
-                  source={provenance.label}
-                  sourceNotes={sourceNotes}
-                />
-              </div>
-            ) : null}
           </div>
 
           {/* Confidence readout */}
@@ -163,14 +164,30 @@ function SourceNoteLine({ note }: { note: string }) {
   );
 }
 
-function briefingNextStep({ confidence, nothing }: { confidence: number; nothing: boolean }) {
+function briefingNextStep({
+  confidence,
+  nothing,
+  headline,
+  horizon,
+}: {
+  confidence: number;
+  nothing: boolean;
+  headline: string;
+  horizon: string;
+}) {
   if (nothing) {
-    return "No action. Keep it on the watchlist unless the next saved read changes.";
+    return "No action needed. It stays on the watchlist.";
   }
 
+  const symbol = headline.match(/\b[A-Z]{2,6}\b/)?.[0] ?? "this one";
+  if (confidence >= 8) {
+    return `Strong call. Read the bull and bear case before changing ${symbol} exposure.`;
+  }
   if (confidence >= 7) {
-    return "Review before changing exposure, then check the detail page for the bull and bear case.";
+    return `Review ${symbol} before adding or trimming — the detail page has both sides.`;
   }
-
-  return "Watch first. Use Paper if you want to test the idea without real money.";
+  if (confidence >= 5) {
+    return `No rush. Recheck within ${horizon.toLowerCase()}, or test it in Paper first.`;
+  }
+  return `Weak signal so far. Leave ${symbol} alone unless the next scan strengthens it.`;
 }

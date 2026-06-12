@@ -14,6 +14,7 @@ export type ProductMetricEvent =
   | "calibration_outcome"
   | "brain_schedule_config"
   | "brain_schedule_check"
+  | "scan_attempt"
   | "forward_measurement_started"
   | "forward_trial_started"
   | "portfolio_import";
@@ -70,6 +71,7 @@ const knownEvents: ProductMetricEvent[] = [
   "calibration_outcome",
   "brain_schedule_config",
   "brain_schedule_check",
+  "scan_attempt",
   "forward_measurement_started",
   "forward_trial_started",
   "portfolio_import",
@@ -219,10 +221,19 @@ function sanitizeMetadata(value: ProductMetricInput["metadata"]) {
   );
 }
 
-function sanitizeValue(value: unknown): unknown {
+function sanitizeValue(value: unknown, depth = 0): unknown {
   if (typeof value === "string") return value.slice(0, 240);
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "boolean" || value === null) return value;
-  if (Array.isArray(value)) return value.slice(0, 12).map(sanitizeValue);
+  if (depth >= 3) return null;
+  if (Array.isArray(value)) return value.slice(0, 12).map((item) => sanitizeValue(item, depth + 1));
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, item]) => item !== undefined)
+        .slice(0, 20)
+        .map(([key, item]) => [key.slice(0, 60), sanitizeValue(item, depth + 1)]),
+    );
+  }
   return String(value).slice(0, 240);
 }

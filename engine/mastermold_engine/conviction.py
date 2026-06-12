@@ -83,8 +83,12 @@ def map_conviction(
         raise ValueError(f"unknown PM rating: {rating!r}")
 
     base = _BASE_MAGNITUDE[key]
-    nudge = round((_clamp01(debate_confidence) - 0.5) * 2)  # -1, 0, or +1
-    magnitude = _clamp(base + nudge, lo=1, hi=10)
+    # Debate confidence sways the magnitude by up to +/-2 so a lopsided debate
+    # (0.9) and a coin flip (0.5) produce visibly different scores instead of
+    # everything collapsing to the rating's base. Broad driver support adds one.
+    nudge = round((_clamp01(debate_confidence) - 0.5) * 4)  # -2..+2
+    support = 1 if strong_driver_count >= 3 else 0
+    magnitude = _clamp(base + nudge + support, lo=1, hi=10)
 
     direction = _DIRECTION[key]
 

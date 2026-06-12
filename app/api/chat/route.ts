@@ -514,6 +514,12 @@ function streamServerSentEvents(
   const encoder = new TextEncoder();
   let buffer = "";
   let output = "";
+  // Tokens are relayed as they arrive so the answer reads progressively instead
+  // of landing as one blob after the full model latency. Copy cleanup runs over
+  // the accumulated text each flush; the trailing holdback keeps phrase-level
+  // replacements stable across chunk boundaries before their region is emitted.
+  const CLEANUP_HOLDBACK = 160;
+  let sentLength = 0;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -531,11 +537,22 @@ function streamServerSentEvents(
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
 
+          let grew = false;
           for (const line of lines) {
             const text = parseProviderLine(line, provider);
 
             if (text) {
               output += text;
+              grew = true;
+            }
+          }
+
+          if (grew) {
+            const cleaned = cleanProviderChatText(output, responseMode);
+            const safeLength = Math.max(0, cleaned.length - CLEANUP_HOLDBACK);
+            if (safeLength > sentLength) {
+              controller.enqueue(encoder.encode(cleaned.slice(sentLength, safeLength)));
+              sentLength = safeLength;
             }
           }
         }
@@ -544,7 +561,10 @@ function streamServerSentEvents(
         return;
       }
 
-      controller.enqueue(encoder.encode(cleanProviderChatText(output, responseMode)));
+      const cleaned = cleanProviderChatText(output, responseMode);
+      if (cleaned.length > sentLength) {
+        controller.enqueue(encoder.encode(cleaned.slice(sentLength)));
+      }
       controller.close();
     },
   });

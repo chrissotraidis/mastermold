@@ -276,12 +276,13 @@ function SideRail() {
   );
 }
 
+// Same vocabulary as the desktop rail — one name per destination everywhere.
 const MOBILE: Array<NavItem & { shortLabel: string }> = [
   { href: "/", label: "Today", shortLabel: "Today", icon: Hexagon, zone: "advise" },
-  { href: "/portfolio", label: "Portfolio", shortLabel: "Money", icon: LineChart, zone: "observe" },
+  { href: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: LineChart, zone: "observe" },
   { href: "/paper", label: "Paper", shortLabel: "Paper", icon: Gamepad2, zone: "advise" },
-  { href: "/review", label: "Performance", shortLabel: "Trust", icon: ClipboardCheck, zone: "system" },
-  { href: "/settings/integrations", label: "Settings", shortLabel: "Setup", icon: Settings, zone: "system" },
+  { href: "/review", label: "Performance", shortLabel: "Performance", icon: ClipboardCheck, zone: "system" },
+  { href: "/settings/integrations", label: "Settings", shortLabel: "Settings", icon: Settings, zone: "system" },
 ];
 
 function MobileNav() {
@@ -300,12 +301,12 @@ function MobileNav() {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex min-h-12 flex-col items-center justify-center gap-1 px-3 py-1 chamfer-sm",
-              active ? "bg-violet/15 text-violet" : "text-on-surface-variant",
+              "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-1 chamfer-sm transition-colors",
+              active ? "bg-violet/15 text-violet" : "text-on-surface-variant active:bg-surface-high/60",
             )}
           >
             <Icon className="size-5" />
-            <span className="font-mono text-[10px] uppercase tracking-telemetry">{item.shortLabel}</span>
+            <span className="max-w-full truncate font-mono text-[9px] uppercase tracking-wide">{item.shortLabel}</span>
           </Link>
         );
       })}

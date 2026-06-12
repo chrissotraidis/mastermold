@@ -21,7 +21,15 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { BrainRun, DecisionJournalEntry, MarketMemoryFact, OutcomeScore, PaperPrediction } from "./schema";
+import type {
+  BrainRun,
+  DecisionJournalEntry,
+  MarketMemoryFact,
+  OutcomeScore,
+  PaperPrediction,
+  PaperTradingRound,
+  RoundScore,
+} from "./schema";
 
 export type AlertStateRow = { acknowledged: boolean; useful_feedback: boolean | null };
 
@@ -81,6 +89,12 @@ export interface PersistAdapter {
   addOutcomeScore(score: OutcomeScore): void;
   submittedPredictions(): PaperPrediction[];
   addPrediction(prediction: PaperPrediction): void;
+  /** Rolling rounds the app opened locally (beyond the seeded ones). */
+  paperRounds(): PaperTradingRound[];
+  upsertPaperRound(round: PaperTradingRound): void;
+  /** Locally computed round scores (price-based resolution). */
+  roundScores(): RoundScore[];
+  upsertRoundScore(score: RoundScore): void;
   manualHoldings(): ManualHoldingRow[];
   upsertManualHolding(holding: ManualHoldingRow): void;
   deleteManualHolding(id: string): void;
@@ -106,6 +120,8 @@ type StoreSnapshot = {
   journal: DecisionJournalEntry[];
   outcomes: OutcomeScore[];
   predictions: PaperPrediction[];
+  paper_rounds: PaperTradingRound[];
+  round_scores: RoundScore[];
   manual_holdings: ManualHoldingRow[];
   imported_holdings: ImportedHoldingRow[];
   alerts: Record<string, AlertStateRow>;
@@ -119,6 +135,8 @@ const emptySnapshot = (): StoreSnapshot => ({
   journal: [],
   outcomes: [],
   predictions: [],
+  paper_rounds: [],
+  round_scores: [],
   manual_holdings: [],
   imported_holdings: [],
   alerts: {},
@@ -189,6 +207,18 @@ class SqliteAdapter implements PersistAdapter {
         data TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_paper_round ON paper_predictions(round_id);
+      CREATE TABLE IF NOT EXISTS paper_rounds (
+        id TEXT PRIMARY KEY,
+        opens_at TEXT NOT NULL,
+        closes_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS round_scores (
+        id TEXT PRIMARY KEY,
+        round_id TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_round_scores_round ON round_scores(round_id);
       CREATE TABLE IF NOT EXISTS alert_state (
         id TEXT PRIMARY KEY,
         acknowledged INTEGER NOT NULL,
@@ -302,6 +332,32 @@ class SqliteAdapter implements PersistAdapter {
         prediction.submitted_at,
         JSON.stringify(prediction),
       );
+  }
+
+  paperRounds(): PaperTradingRound[] {
+    return this.db
+      .query("SELECT data FROM paper_rounds ORDER BY opens_at DESC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as PaperTradingRound);
+  }
+
+  upsertPaperRound(round: PaperTradingRound): void {
+    this.db
+      .query("INSERT OR REPLACE INTO paper_rounds (id, opens_at, closes_at, data) VALUES (?, ?, ?, ?)")
+      .run(round.id, round.opens_at, round.closes_at, JSON.stringify(round));
+  }
+
+  roundScores(): RoundScore[] {
+    return this.db
+      .query("SELECT data FROM round_scores")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as RoundScore);
+  }
+
+  upsertRoundScore(score: RoundScore): void {
+    this.db
+      .query("INSERT OR REPLACE INTO round_scores (id, round_id, data) VALUES (?, ?, ?)")
+      .run(score.id, score.round_id, JSON.stringify(score));
   }
 
   manualHoldings(): ManualHoldingRow[] {
@@ -493,6 +549,8 @@ class MemoryAdapter implements PersistAdapter {
   private journal: DecisionJournalEntry[] = [];
   private outcomes: OutcomeScore[] = [];
   private predictions: PaperPrediction[] = [];
+  private paperRoundRows: PaperTradingRound[] = [];
+  private roundScoreRows: RoundScore[] = [];
   private manualHoldingRows: ManualHoldingRow[] = [];
   private importedHoldingRows: ImportedHoldingRow[] = [];
   private alerts = new Map<string, AlertStateRow>();
@@ -521,6 +579,20 @@ class MemoryAdapter implements PersistAdapter {
   addPrediction(prediction: PaperPrediction) {
     this.predictions = this.predictions.filter((p) => p.id !== prediction.id);
     this.predictions.push(prediction);
+  }
+  paperRounds() {
+    return [...this.paperRoundRows];
+  }
+  upsertPaperRound(round: PaperTradingRound) {
+    this.paperRoundRows = this.paperRoundRows.filter((r) => r.id !== round.id);
+    this.paperRoundRows.push(round);
+  }
+  roundScores() {
+    return [...this.roundScoreRows];
+  }
+  upsertRoundScore(score: RoundScore) {
+    this.roundScoreRows = this.roundScoreRows.filter((s) => s.id !== score.id);
+    this.roundScoreRows.push(score);
   }
   manualHoldings() {
     return [...this.manualHoldingRows];
@@ -637,6 +709,24 @@ class JsonFileAdapter implements PersistAdapter {
     snapshot.predictions.push(prediction);
     this.write(snapshot);
   }
+  paperRounds() {
+    return this.read().paper_rounds;
+  }
+  upsertPaperRound(round: PaperTradingRound) {
+    const snapshot = this.read();
+    snapshot.paper_rounds = snapshot.paper_rounds.filter((item) => item.id !== round.id);
+    snapshot.paper_rounds.push(round);
+    this.write(snapshot);
+  }
+  roundScores() {
+    return this.read().round_scores;
+  }
+  upsertRoundScore(score: RoundScore) {
+    const snapshot = this.read();
+    snapshot.round_scores = snapshot.round_scores.filter((item) => item.id !== score.id);
+    snapshot.round_scores.push(score);
+    this.write(snapshot);
+  }
   manualHoldings() {
     return this.read().manual_holdings;
   }
@@ -730,6 +820,8 @@ class JsonFileAdapter implements PersistAdapter {
       return {
         ...emptySnapshot(),
         ...parsed,
+        paper_rounds: Array.isArray(parsed.paper_rounds) ? parsed.paper_rounds : [],
+        round_scores: Array.isArray(parsed.round_scores) ? parsed.round_scores : [],
         manual_holdings: Array.isArray(parsed.manual_holdings) ? parsed.manual_holdings : [],
         imported_holdings: Array.isArray(parsed.imported_holdings) ? parsed.imported_holdings : [],
         alerts: parsed.alerts && typeof parsed.alerts === "object" ? parsed.alerts : {},

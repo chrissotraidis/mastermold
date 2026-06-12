@@ -177,14 +177,30 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
             </Card>
 
             {matchingAlert ? (
-              <Card className="border-caution/25 bg-caution/[0.07]">
+              <Card
+                className={
+                  matchingAlert.tier === "T0"
+                    ? "border-critical/30 bg-critical/[0.07]"
+                    : matchingAlert.tier === "T1"
+                      ? "border-caution/25 bg-caution/[0.07]"
+                      : "border-outline-variant/40 bg-surface-high/30"
+                }
+              >
                 <CardHeader className="p-5">
-                  <CardDescription className="flex items-center gap-2 text-caution">
+                  <CardDescription
+                    className={
+                      matchingAlert.tier === "T0"
+                        ? "flex items-center gap-2 text-critical"
+                        : matchingAlert.tier === "T1"
+                          ? "flex items-center gap-2 text-caution"
+                          : "flex items-center gap-2 text-outline"
+                    }
+                  >
                     <MessageSquareWarning aria-hidden="true" className="size-4" />
-                    Needs attention
+                    {shortAlertTierLabel(matchingAlert.tier)} alert
                   </CardDescription>
                   <CardTitle className="text-lg leading-6 text-on-surface">
-                    {shortAlertTierLabel(matchingAlert.tier)}: {cleanAlertMessage(matchingAlert.message)}
+                    {cleanAlertMessage(matchingAlert.message)}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 p-5 pt-0">
@@ -316,21 +332,33 @@ function DriverRow({ driver, position }: { driver: Driver; position: number }) {
 
 function driverWhyItMatters(driver: Driver, label: string) {
   const source = plainBriefingText(driver.source_citation);
-  if (/^Market summary$/i.test(source)) {
-    return driver.direction === "bearish"
-      ? "This is the counterpoint to the idea. Use it to decide whether to wait, reduce size, or skip the trade outside the app."
-      : "This is the saved market read behind the idea. Treat it as context, not proof.";
-  }
+  const main = driver.weight >= 0.4;
+
   if (/quiet news flow/i.test(label)) {
     return "There may not be enough fresh news to explain the move, so avoid treating price action alone as confirmation.";
   }
   if (/portfolio snapshot/i.test(source)) {
     return "This ties the idea to the visible portfolio, so it matters for sizing and risk rather than just a watchlist.";
   }
-  if (/market note|crypto note|macro note|analyst|news/i.test(source)) {
-    return "This is the saved source behind the driver. Use it to check the idea, not as proof.";
+  if (/price|momentum|strength|return/i.test(label)) {
+    return driver.direction === "bearish"
+      ? "Price is moving against the idea — if it keeps fading, the setup weakens before anything else does."
+      : `Price has moved beyond its recent range. ${main ? "That move is the main reason this idea is on the board." : "It backs the idea, but on its own it is not proof."}`;
   }
-  return source;
+  if (/volume|trading/i.test(label)) {
+    return "Trading is well above normal. Moves on heavy volume are more likely to carry through than quiet drifts.";
+  }
+  if (/headline|news|coverage/i.test(label)) {
+    return driver.direction === "bearish"
+      ? "Recent coverage leans negative — headlines like this can cap a bounce even when price looks strong."
+      : "Recent coverage supports the move, which makes follow-through more plausible.";
+  }
+  if (/uncertain|counter|risk/i.test(label)) {
+    return "This is the strongest argument against the idea. If it grows, the call is wrong — that is the line to watch.";
+  }
+  return driver.direction === "bearish"
+    ? "This argues against the idea. Weigh it before acting on the bullish case."
+    : `This supports the idea${main ? " and carries most of its weight" : ""}.`;
 }
 
 function driverEvidenceLabel(driver: Driver) {

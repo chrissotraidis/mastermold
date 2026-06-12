@@ -1,7 +1,7 @@
 import type { SystemState } from "@/components/sentinel-face";
 import { getAlerts } from "./alerts";
 import { getBriefingCards } from "./briefing";
-import { getDataMode, getEngineStatus } from "./engine-data";
+import { ageLabel, getDataMode, getEngineStatus } from "./engine-data";
 import { getExecutor } from "./executor";
 import { getJournal } from "./journal";
 import type { AsOfFilter } from "./bitemporal";
@@ -36,21 +36,23 @@ export function getSystemState(asOf: AsOfFilter | null = null): SystemTelemetry 
   const safeMode = executor.strategies.some((s) => s.status === "safe_mode");
   const beliefsShifted = journal.reflection_updates.filter((r) => r.significance_passed).length;
 
+  const staleRead = engineLive && status.freshness === "stale";
+
   let state: SystemState = "idle";
   if (t0Open) state = "alert";
-  else if (status.state === "invalid") state = "degraded";
+  else if (status.state === "invalid" || staleRead) state = "degraded";
   else if (safeMode) state = "caution";
   else if (engineLive && actionable > 0) state = "suggestion";
 
   const run = engineLive ? status.bundle.run : null;
   const updatedLabel = run
-    ? `updated ${timeOf(run.knowledge_time)}${run.cost.usd > 0 ? ` · $${run.cost.usd.toFixed(2)}` : " · $0"}`
+    ? `scanned ${ageLabel(status.state === "live" ? status.ageHours : 0)}${costLabel(run.cost.usd)}`
     : "sample data";
 
   return {
     state,
     provenance: mode.label,
-    greeting: buildGreeting({ engineLive, actionable, t0Open, openAlerts }),
+    greeting: buildGreeting({ engineLive, actionable, t0Open, openAlerts, staleRead, staleAge: engineLive ? ageLabel(status.ageHours) : "" }),
     updatedLabel,
     alertCount: openAlerts,
     actionableCount: actionable,
@@ -64,9 +66,14 @@ function buildGreeting(o: {
   actionable: number;
   t0Open: boolean;
   openAlerts: number;
+  staleRead: boolean;
+  staleAge: string;
 }): string {
   if (!o.engineLive) {
     return "Using sample data. Add holdings or import a snapshot before treating Today as personal.";
+  }
+  if (o.staleRead) {
+    return `My last market read is from ${o.staleAge}. Run a new scan before acting on it.`;
   }
   const alerts = o.openAlerts > 0 ? `${o.openAlerts} alert${o.openAlerts > 1 ? "s" : ""} to review` : "";
   if (o.actionable === 0) {
@@ -80,8 +87,8 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function timeOf(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(11, 16);
+function costLabel(usd: number): string {
+  if (usd <= 0) return " · free scan";
+  if (usd < 0.01) return " · under 1¢";
+  return ` · $${usd.toFixed(2)}`;
 }

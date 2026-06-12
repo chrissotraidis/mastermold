@@ -409,7 +409,7 @@ def card_from_tradingagents_decision(
         relevance_note="Generated through TradingAgentsGraph.propagate with the configured watchlist context.",
         bull_case=extract_section(text, "bull") or "See TradingAgents synthesis.",
         bear_case=extract_section(text, "bear") or "See TradingAgents synthesis.",
-        time_horizon=extract_section(text, "horizon") or "2-4 weeks",
+        time_horizon=extract_section(text, "horizon") or default_horizon(entry.get("asset_class")),
         drivers=drivers_from_screen(screen),
         debate_confidence=0.65,
     )
@@ -423,6 +423,15 @@ def stringify_decision(decision: Any) -> str:
     if isinstance(decision, dict):
         return json.dumps(decision)
     return str(decision).strip()
+
+
+def default_horizon(asset_class: str | None) -> str:
+    """Horizon fallback when the model omits one — varies by how fast the asset moves."""
+    if asset_class == "crypto":
+        return "1-2 weeks"
+    if asset_class == "defi":
+        return "2-4 weeks"
+    return "1-2 months"
 
 
 def extract_rating(text: str) -> str:
@@ -560,7 +569,7 @@ def infer_card(
             relevance_note=str(parsed.get("relevance_note") or "Mapped from the configured watchlist."),
             bull_case=str(parsed.get("bull_case") or ""),
             bear_case=str(parsed.get("bear_case") or ""),
-            time_horizon=str(parsed.get("time_horizon") or "2-4 weeks"),
+            time_horizon=str(parsed.get("time_horizon") or default_horizon(entry.get("asset_class"))),
             drivers=clean_drivers(parsed.get("drivers")),
             debate_confidence=float(parsed.get("debate_confidence") or 0.6),
         ),
@@ -611,8 +620,8 @@ def build_card_prompt(entry: dict[str, Any], screen: screener.TickerScreen | Non
             "relevance_note": "why it matters to holdings/watchlist",
             "bull_case": "concise bull case",
             "bear_case": "concise bear case",
-            "time_horizon": "e.g. 2-4 weeks",
-            "debate_confidence": "number from 0 to 1",
+            "time_horizon": "pick what genuinely fits this idea: '3-10 days' for a fast-moving setup, '2-4 weeks' for a swing view, '1-3 months' for a slower thesis",
+            "debate_confidence": "number from 0 to 1; 0.5 means the bull/bear evidence is a coin flip, 0.85+ means it is lopsided — spread your answers, do not default to the middle",
             "drivers": [
                 {
                     "label": "2-8 word driver",

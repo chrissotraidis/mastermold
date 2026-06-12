@@ -26,7 +26,25 @@ export type JournalEntryJson = DecisionJournalEntry & {
     label: string;
   };
   outcome_score: OutcomeScore | null;
+  /** True once the call's stated horizon window has opened (time to check it). */
+  review_due: boolean;
+  /** True once the horizon's upper bound has fully passed with no result saved. */
+  past_horizon: boolean;
+  review_note: string | null;
 };
+
+/** Parse horizons like "2-4 weeks", "1-3 months", "1 week", "10 days" into day bounds. */
+export function parseHorizonDays(horizon: string): { minDays: number; maxDays: number } | null {
+  const match = horizon
+    .toLowerCase()
+    .match(/(\d+)\s*(?:-|to)?\s*(\d+)?\s*(day|week|month)s?/);
+  if (!match) return null;
+  const unit = match[3] === "month" ? 30 : match[3] === "week" ? 7 : 1;
+  const min = Number.parseInt(match[1], 10);
+  const max = match[2] ? Number.parseInt(match[2], 10) : min;
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  return { minDays: min * unit, maxDays: Math.max(min, max) * unit };
+}
 
 export type TrackRecordTierJson = {
   key: ConfidenceTierKey;
@@ -187,9 +205,10 @@ function buildEntries(
   asOf: AsOfFilter | null,
   outcomeScores: OutcomeScore[],
 ): JournalEntryJson[] {
+  const viewedAt = asOf ? asOf.time : Date.now();
   const entries = [...baseEntries, ...store().loggedJournalEntries()]
     .filter((entry) => isKnownBy(entry.knowledge_time, asOf))
-    .map((entry) => toJournalEntryJson(entry, outcomeScores))
+    .map((entry) => toJournalEntryJson(entry, outcomeScores, viewedAt))
     .sort((a, b) => Date.parse(b.logged_at) - Date.parse(a.logged_at));
 
   return collapseRepeatedJournalEntries(entries);
@@ -198,11 +217,40 @@ function buildEntries(
 function toJournalEntryJson(
   entry: DecisionJournalEntry,
   outcomeScores = demoDatabase.outcomeScores,
+  viewedAt = Date.now(),
 ): JournalEntryJson {
+  const outcome = outcomeScores.find((score) => score.journal_entry_id === entry.id) ?? null;
+  const horizonDue = horizonState(entry, outcome, viewedAt);
   return {
     ...entry,
     conviction_tier: getConvictionTier(entry.conviction),
-    outcome_score: outcomeScores.find((score) => score.journal_entry_id === entry.id) ?? null,
+    outcome_score: outcome,
+    ...horizonDue,
+  };
+}
+
+function horizonState(
+  entry: DecisionJournalEntry,
+  outcome: OutcomeScore | null,
+  viewedAt: number,
+): Pick<JournalEntryJson, "review_due" | "past_horizon" | "review_note"> {
+  if (outcome) return { review_due: false, past_horizon: false, review_note: null };
+  const bounds = parseHorizonDays(entry.horizon);
+  const logged = Date.parse(entry.logged_at);
+  if (!bounds || Number.isNaN(logged)) {
+    return { review_due: false, past_horizon: false, review_note: null };
+  }
+  const ageDays = (viewedAt - logged) / 86_400_000;
+  const pastHorizon = ageDays >= bounds.maxDays;
+  const reviewDue = ageDays >= bounds.minDays;
+  return {
+    review_due: reviewDue,
+    past_horizon: pastHorizon,
+    review_note: pastHorizon
+      ? `Past its ${entry.horizon} horizon — record what happened.`
+      : reviewDue
+        ? `Inside its ${entry.horizon} review window.`
+        : null,
   };
 }
 
@@ -251,6 +299,7 @@ function canonicalClue(value: string) {
   if (/^z\s*\d/.test(normalized) || /^z$/.test(normalized)) return "";
   if (
     normalized === "saved market scan" ||
+    normalized === "saved market read" ||
     normalized === "engine output" ||
     normalized.startsWith("market read") ||
     normalized.startsWith("portfolio") ||

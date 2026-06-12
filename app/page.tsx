@@ -15,8 +15,8 @@ import { AskMasterMoldButton } from "@/components/master-mold-actions";
 import { DailyBriefingCard } from "@/components/briefing-card";
 import { AlertQueueButton, AlertStatButton } from "@/components/open-alerts-action";
 import { ProfileGreeting } from "@/components/profile-greeting";
+import { RunScanButton } from "@/components/run-scan-button";
 import { ProvenanceChip } from "@/components/provenance-chip";
-import { SentinelFace } from "@/components/sentinel-face";
 import { TodayMemoryRefresh } from "@/components/today-memory-refresh";
 import { BriefingUsefulnessFeedback, TodayReadTimer } from "@/components/today-metrics";
 import { Badge } from "@/components/ui/badge";
@@ -107,46 +107,42 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-on-surface-variant">
                     {todayMorningSummary(actionableCards.length, openAlerts.length, topCard, topAlert)}
                   </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="hidden text-right sm:block">
-                    <p className="font-mono text-[11px] uppercase tracking-telemetry text-outline">
-                      Master Mold
+                  {dataMode.notice ? (
+                    <p className="mt-3 inline-flex max-w-3xl items-center gap-2 rounded-md border border-caution/40 bg-caution/10 px-3 py-2 text-sm leading-5 text-caution">
+                      {dataMode.notice}
                     </p>
-                    <p className="text-sm text-on-surface-variant">Advisory only</p>
-                  </div>
-                  <div className="hidden size-16 shrink-0 sm:block">
-                    <SentinelFace state={system.state} />
-                  </div>
+                  ) : null}
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <AskMasterMoldButton prompt={dailyPrompt} variant="primary" className="w-full sm:w-auto">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <RunScanButton className="w-full whitespace-nowrap sm:w-auto" />
+                <AskMasterMoldButton
+                  prompt={dailyPrompt}
+                  variant="outline"
+                  className="w-full whitespace-nowrap sm:w-auto"
+                >
                   Ask for today's read
                 </AskMasterMoldButton>
                 <Link
                   href={buildTodayPaperHref(topHolding, topCard)}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15 sm:w-auto"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15 sm:w-auto"
                 >
                   <Wallet aria-hidden="true" className="size-4" />
                   Test as paper trade
                 </Link>
-                <BriefingUsefulnessFeedback />
+                <div className="sm:ml-auto">
+                  <BriefingUsefulnessFeedback />
+                </div>
               </div>
 
             </div>
 
             <section id="briefing" className="scroll-mt-24" aria-labelledby="briefing-title">
               <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2 id="briefing-title" className="font-display text-lg font-semibold tracking-tight text-on-surface">
-                    Daily rundown
-                  </h2>
-                  <p className="mt-1 text-sm text-outline">
-                    Review the few items that could change a decision.
-                  </p>
-                </div>
+                <h2 id="briefing-title" className="font-display text-lg font-semibold tracking-tight text-on-surface">
+                  Daily rundown
+                </h2>
               </div>
 
               {actionableCards.length > 0 ? (
@@ -235,7 +231,7 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
                 value: dataMode.label === "Engine output" ? "Saved read" : "Sample market data",
                 detail:
                   dataMode.label === "Engine output"
-                    ? `Known ${formatTodaySourceTime(dataMode.as_of)}.`
+                    ? `Known ${formatTodaySourceTime(dataMode.as_of)}${dataMode.age_label ? ` (${dataMode.age_label})` : ""}.`
                     : "No saved market read is loaded.",
               }}
               portfolio={{
@@ -341,27 +337,16 @@ function todayPortfolioSourceLabel(label: ReturnType<typeof getPortfolio>["prove
 function todayMemoryDetail(brain: ReturnType<typeof getBrainState>, replayAsOf: string | null = null) {
   if (!brain.initialized) {
     if (replayAsOf) {
-      return "No chat context snapshot had been saved by this rewind point.";
+      return "Nothing had been remembered by this rewind point.";
     }
-    return "No app context has been saved for chat yet.";
+    return "Nothing remembered yet — runs with the first scan.";
   }
 
   if (replayAsOf) {
-    return `${brain.summary.memory_count} saved context notes were known by this rewind point. Current chat context is hidden while rewound.`;
+    return `${brain.summary.memory_count} notes were known by this rewind point.`;
   }
 
-  const boundary = brain.schedule.enabled
-    ? `${todayMemoryStatusLabel(brain.schedule.status)}; saves app context only. Import holdings again when balances change.`
-    : `${todayMemoryStatusLabel(brain.schedule.status)}. Use Save context for chat when you want Master Mold to remember this view.`;
-
-  return `${brain.summary.memory_count} saved context notes. ${boundary}`;
-}
-
-function todayMemoryStatusLabel(status: string) {
-  if (/local memory check armed/i.test(status)) return "Chat context check armed";
-  if (/ready for local memory check/i.test(status)) return "Ready to save chat context";
-  if (/manual only/i.test(status)) return "Manual save only";
-  return status.replace(/\blocal memory\b/gi, "chat context");
+  return `${brain.summary.memory_count} notes about your holdings and the market, used by chat.`;
 }
 
 function todayRecommendationSourceNotes(

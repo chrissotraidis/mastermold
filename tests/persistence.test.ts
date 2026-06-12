@@ -138,7 +138,7 @@ describe("durable persistence (Phase 1.5)", () => {
     const data = getPaperPageData();
     const found = data.predictions.find((p) => p.id === prediction.id);
     expect(found).toBeTruthy();
-    expect(found?.rationale).toBe("Saved simulator check");
+    expect(found?.rationale).toBe("Simulator example saved for persistence review.");
   });
 
   test("GIVEN an acknowledged alert WHEN the server restarts THEN the ack survives", () => {

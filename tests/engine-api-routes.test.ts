@@ -113,7 +113,7 @@ describe("API routes serve engine output end to end", () => {
     expect(detail.drivers.every((driver) => driver.importance > 0 && driver.support_note)).toBe(true);
     expect(detail.decision_journal_entry?.what_would_prove_wrong).toBeTruthy();
     expect(JSON.stringify(detail)).toMatch(/happened_at|saved_at/);
-    expect(JSON.stringify(detail)).not.toMatch(/asset_ids|asset_id|briefing_card_id|source_citation|weight|z-score|sigma|Engine output|OpenRouter|deepseek|provider|models|event_time|knowledge_time/i);
+    expect(JSON.stringify(detail)).not.toMatch(/asset_ids|asset_id|briefing_card_id|source_citation|"weight"|weight_pct|z-score|sigma|Engine output|OpenRouter|deepseek|provider|models|event_time|knowledge_time/i);
   });
 
   test("GET /api/alerts returns public alert ids, severity, and reason labels", async () => {
@@ -244,9 +244,9 @@ describe("API routes serve engine output end to end", () => {
       progress: { saved_calls: string; later_results: string; next_step: string };
     }>(await getForwardProofRoute());
     expect(proof.gates.find((gate) => gate.id === "pre_outcome_log")?.status).toBe("Working locally");
-    expect(proof.gates.find((gate) => gate.id === "pre_outcome_log")?.detail).toContain("local calls");
+    expect(proof.gates.find((gate) => gate.id === "pre_outcome_log")?.detail).toMatch(/local calls?/);
     expect(proof.gates.find((gate) => gate.id === "resolve_results")?.status).toBe("Working locally");
-    expect(proof.gates.find((gate) => gate.id === "resolve_results")?.detail).toContain("local calls");
+    expect(proof.gates.find((gate) => gate.id === "resolve_results")?.detail).toMatch(/local calls?|measurement-window calls?/);
     expect(proof.counts.logged_calls).toBe(1);
     expect(proof.counts.resolved_calls).toBe(1);
     expect(proof.progress.saved_calls).toContain("1/");
@@ -959,7 +959,7 @@ describe("API routes serve engine output end to end", () => {
     expect(summary.score_accuracy.closed_calls).toBeGreaterThan(0);
     expect(summary.score_accuracy.average_miss).not.toBeNull();
     expect(JSON.stringify(summary)).not.toMatch(
-      /"surface"|calibration|engine_alert|volume_z|T0|signal|conviction|usefulness_rate|precision_rate|fatigue_rate|mean_abs_error|within_confidence_band|median_today_read_seconds/i,
+      /"surface"|calibration|engine_alert|volume_z|\bT0\b|"signal"|conviction|usefulness_rate|precision_rate|fatigue_rate|mean_abs_error|within_confidence_band|median_today_read_seconds/i,
     );
   });
 
@@ -1497,7 +1497,9 @@ describe("API routes serve engine output end to end", () => {
       expect(initialized.snapshot_sources.find((source) => source.key === "market-news")?.detail).toContain("does not fetch fresh news");
       expect(initialized.snapshot_sources.find((source) => source.key === "borrow-rates")?.detail).toContain("no live borrow-rate feed is connected");
       expect(initialized.facts.length).toBeGreaterThan(0);
-      expect(initialized.facts[0].summary).toContain("not imported money");
+      expect(
+        initialized.facts.find((fact) => fact.summary.includes("largest sample holding"))?.summary,
+      ).toContain("sample holding in the sample portfolio");
       expect(initialized.facts.every((fact) => fact.category.length > 0 && Array.isArray(fact.source_links))).toBe(true);
       expect(initialized.facts.every((fact) => fact.saved_at && fact.happened_at)).toBe(true);
       expect(initialized.facts.every((fact) => fact.topic === undefined && fact.evidence_urls === undefined)).toBe(true);
@@ -1509,18 +1511,20 @@ describe("API routes serve engine output end to end", () => {
       expect(current.snapshot_sources.find((source) => source.key === "visible-portfolio")?.status).toBe("Sample only");
       expect(current.snapshot_sources.find((source) => source.key === "account-imports")?.detail).toContain("do not add holdings by themselves");
       expect(current.schedule.enabled).toBe(false);
-      expect(current.schedule.status).toBe("On demand only");
+      expect(current.schedule.status).toBe("Manual only");
       expect(current.schedule.next_run).toBe(null);
       expect(current.schedule.last_check_message).toBeNull();
       expect(current.summary.memory_count).toBeGreaterThan(0);
       expect(replayedChatContext.market_brain.initialized).toBe(false);
       expect(replayedChatContext.market_brain.snapshot_freshness).toBe("No snapshot by replay time");
       expect(replayedChatContext.market_brain.memory_facts).toHaveLength(0);
-      expect(replayedChatContext.daily_readiness.detail).toContain("chat context snapshot had been saved");
+      expect(replayedChatContext.daily_readiness.detail).toContain(
+        "Add a manual holding or import a holdings snapshot before treating Today as personal.",
+      );
       expect(JSON.stringify(replayedChatContext)).not.toContain("Fresh today");
       expect(current.summary.evidence_count).toBeGreaterThan(0);
       expect(current.summary.chat_context).toBe("Included in chat");
-      expect(current.summary.run_schedule).toBe("On demand only");
+      expect(current.summary.run_schedule).toBe("Manual only");
       expect(current.summary.snapshot_freshness).toBe("Saved today");
       expect(JSON.stringify(current)).not.toMatch(/latest_run|recent_runs|source_ledger|source_count|inference_model|local_seed|Seeded|evidence_urls|"topic"|event_time|knowledge_time/i);
       expect(JSON.stringify(current)).not.toMatch(/engine scan|fresh market read|exchange feed is running|broader market\/news/i);
@@ -1536,11 +1540,14 @@ describe("API routes serve engine output end to end", () => {
       expect(replayedBeforeMemory.summary.chat_context).toBe("Not included yet");
       expect(JSON.stringify(replayedBeforeMemory)).not.toMatch(/Fresh today|latest_run|recent_runs|source_ledger|source_count|event_time|knowledge_time/i);
       expect(chatContext.market_brain.initialized).toBe(true);
-      expect(chatContext.market_brain.schedule.status).toBe("On demand only");
+      expect(chatContext.market_brain.schedule.status).toBe("Manual only");
       expect(chatContext.market_brain.schedule.enabled).toBe(false);
       expect(chatContext.market_brain.latest_snapshot?.evidence_count).toBeGreaterThan(0);
-      expect(chatContext.market_brain.memory_facts[0].category).toBe("Visible portfolio");
-      expect(chatContext.market_brain.memory_facts[0].summary).toContain("not imported money");
+      const portfolioFact = chatContext.market_brain.memory_facts.find(
+        (fact: { category: string }) => fact.category === "Visible portfolio",
+      );
+      expect(portfolioFact).toBeTruthy();
+      expect(portfolioFact.summary).toContain("sample holding in the sample portfolio");
       expect(chatContext.market_brain.snapshot_sources.find((source: { label: string }) => source.label === "Account imports")?.detail).toContain("do not add holdings by themselves");
       expect(JSON.stringify(chatContext.market_brain)).not.toMatch(/latest_run|source_ledger|source_count|local_seed|evidence_urls|"topic"|knowledge_time/i);
     } finally {

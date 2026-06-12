@@ -94,10 +94,6 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
         ) : null}
 
         <div className="mt-6">
-          <ManualHoldingsPanel holdings={portfolio.manual_holdings} />
-        </div>
-
-        <div className="mt-6">
           <PortfolioCharts allocation={portfolio.allocation} netWorthSeries={portfolio.net_worth_series} />
         </div>
 
@@ -126,6 +122,15 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             <HoldingsTable holdings={portfolio.defi_positions} alerts={alerts} compact />
           </section>
         ) : null}
+
+        <details className="mt-8 rounded-lg border border-outline-variant/40 bg-surface-high/25 px-4 pb-1" id="add-holdings">
+          <summary className="flex min-h-12 cursor-pointer items-center gap-2 text-base font-semibold text-on-surface">
+            Add or edit manual holdings
+          </summary>
+          <div className="pb-4">
+            <ManualHoldingsPanel holdings={portfolio.manual_holdings} />
+          </div>
+        </details>
       </div>
     </AppShell>
   );
@@ -196,29 +201,42 @@ function HoldingsTable({
           </thead>
           <tbody className="divide-y divide-outline-variant/40">
             {holdings.map((holding) => (
-              <tr key={holding.id} className="align-top">
-                <th scope="row" className="px-4 py-4 font-semibold text-on-surface">
+              <tr
+                key={holding.id}
+                className="align-middle transition-colors hover:bg-surface-high/40"
+                title={holdingDetailSummary(holding, relatedAlertForHolding(holding, alerts))}
+              >
+                <th scope="row" className="px-4 py-3 font-semibold text-on-surface">
                   <span>{holding.symbol}</span>
-                  <span className="mt-1 block text-xs font-normal text-outline">
+                  <span className="mt-0.5 block max-w-44 truncate text-xs font-normal text-outline">
                     {holdingTableAssetMeta(holding, compact)}
                   </span>
                 </th>
                 {!compact ? (
-                  <td className="px-4 py-4 text-on-surface-variant">{holding.account.label}</td>
+                  <td className="px-4 py-3 text-on-surface-variant">{holding.account.label}</td>
                 ) : null}
-                <td className="px-4 py-4 tabular-nums text-on-surface-variant">{formatQuantity(holding.quantity)}</td>
-                <td className="px-4 py-4 tabular-nums text-on-surface-variant">{formatCurrency(holding.cost_basis)}</td>
-                <td className="px-4 py-4 tabular-nums text-on-surface-variant">{formatCurrency(holding.market_value)}</td>
-                <td className={holding.daily_change_value >= 0 ? "px-4 py-4 tabular-nums text-engine" : "px-4 py-4 tabular-nums text-critical"}>
+                <td className="px-4 py-3 tabular-nums text-on-surface-variant">{formatQuantity(holding.quantity)}</td>
+                <td className="px-4 py-3 tabular-nums text-on-surface-variant">{formatCurrency(holding.cost_basis)}</td>
+                <td className="px-4 py-3 tabular-nums font-medium text-on-surface">{formatCurrency(holding.market_value)}</td>
+                <td className={holding.daily_change_value >= 0 ? "px-4 py-3 tabular-nums text-engine" : "px-4 py-3 tabular-nums text-critical"}>
                   {holding.daily_change_value >= 0 ? "+" : ""}
                   {formatCurrency(holding.daily_change_value)}
                 </td>
-                <td className="px-4 py-4 tabular-nums text-on-surface-variant">{holding.weight_pct.toFixed(1)}%</td>
-                <td className="px-4 py-4">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-12 shrink-0 tabular-nums text-on-surface-variant">
+                      {holding.weight_pct.toFixed(1)}%
+                    </span>
+                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
+                      <span
+                        className="block h-full rounded-full bg-violet/70"
+                        style={{ width: `${Math.min(holding.weight_pct, 100)}%` }}
+                      />
+                    </span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
                   <IntegrationBadge holding={holding} />
-                  <p className="mt-2 max-w-44 text-xs leading-5 text-outline">
-                    {holdingDetailSummary(holding, relatedAlertForHolding(holding, alerts))}
-                  </p>
                 </td>
               </tr>
             ))}

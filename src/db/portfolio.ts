@@ -199,7 +199,14 @@ export function getPortfolio(asOf: AsOfFilter | null = null): PortfolioJson {
     holdings,
     defi_positions: holdings.filter((holding) => holding.asset_class === "defi"),
     allocation,
-    net_worth_series: buildNetWorthSeries(totalMarketValue, dailyChangeValue, provenanceAsOf),
+    net_worth_series: buildNetWorthSeries(
+      holdings,
+      visiblePriceBars,
+      totalMarketValue,
+      // The trailing window ends at the viewer's "now" (or the replayed moment),
+      // not at the last snapshot — days without bar coverage hold the last close.
+      asOf?.iso ?? new Date().toISOString(),
+    ),
     manual_holdings: manualHoldingsJson,
     imported_holdings: importedHoldingsJson,
     import_snapshot: importSnapshot,
@@ -459,20 +466,58 @@ function dailyChangePctForAsset(assetId: string, priceBars: PriceBar[]) {
   return roundPct(((latest.close - previous.close) / previous.close) * 100);
 }
 
-function buildNetWorthSeries(total: number, dailyChange: number, asOf: string): NetWorthPointJson[] {
+/**
+ * Net worth over the trailing 7 days, valued from actual price-bar history:
+ * each day's point reprices every holding at its last known close on or before
+ * that day (holdings without bar coverage hold their snapshot value). The
+ * final point is anchored to the live total. With no bar history the line is
+ * honestly flat — it grows as daily scans accumulate real closes.
+ */
+function buildNetWorthSeries(
+  holdings: PortfolioHoldingJson[],
+  priceBars: PriceBar[],
+  total: number,
+  asOf: string,
+): NetWorthPointJson[] {
   const end = new Date(asOf);
-  const baseline = total - dailyChange;
-  const drift = dailyChange || total * 0.004;
+  if (Number.isNaN(end.getTime())) return [];
+
+  const assetIdBySymbol = new Map(demoDatabase.assets.map((asset) => [asset.symbol, asset.id]));
+  const barsByAsset = new Map<string, PriceBar[]>();
+  for (const bar of [...priceBars].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))) {
+    const list = barsByAsset.get(bar.asset_id) ?? [];
+    list.push(bar);
+    barsByAsset.set(bar.asset_id, list);
+  }
+
   return Array.from({ length: 7 }, (_, index) => {
     const daysBack = 6 - index;
-    const date = new Date(end);
-    date.setUTCDate(end.getUTCDate() - daysBack);
-    const value = roundMoney(baseline - drift * (daysBack / 6) + drift * Math.sin(index / 2) * 0.18);
-    return {
-      date: date.toISOString().slice(0, 10),
-      value: Math.max(value, 0),
-    };
+    const day = new Date(end);
+    day.setUTCDate(end.getUTCDate() - daysBack);
+    day.setUTCHours(23, 59, 59, 999);
+
+    if (daysBack === 0) {
+      return { date: day.toISOString().slice(0, 10), value: roundMoney(total) };
+    }
+
+    const value = holdings.reduce((sum, holding) => {
+      const assetId = assetIdBySymbol.get(holding.symbol);
+      const bars = assetId ? barsByAsset.get(assetId) : undefined;
+      const bar = bars ? lastBarAtOrBefore(bars, day.getTime()) : null;
+      return sum + (bar ? holding.quantity * bar.close : holding.market_value);
+    }, 0);
+
+    return { date: day.toISOString().slice(0, 10), value: Math.max(roundMoney(value), 0) };
   });
+}
+
+function lastBarAtOrBefore(bars: PriceBar[], ts: number): PriceBar | null {
+  let found: PriceBar | null = null;
+  for (const bar of bars) {
+    if (Date.parse(bar.ts) <= ts) found = bar;
+    else break;
+  }
+  return found;
 }
 
 function normalizeSymbol(value: string) {
