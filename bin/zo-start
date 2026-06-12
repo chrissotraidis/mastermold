@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# bin/zo-start — the one command a Zo Service (or any VPS supervisor) runs.
+#
+# Builds once if no build exists, then serves. Safe across Zo's periodic
+# restarts: the build is reused, the durable store lives in .data/, and the
+# app falls back to the last saved read if the engine has not run yet.
+#
+#   Service command:  bin/zo-start          (PORT defaults to 3000)
+#   Daily Automation: bin/engine-briefing   (writes engine/out; app ingests it)
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+PORT="${PORT:-3000}"
+
+# Prefer bun (the intended runtime); fall back to npm so a bare box still serves.
+if command -v bun >/dev/null 2>&1; then
+  RUN="bun run"
+  [ -d node_modules ] || bun install --frozen-lockfile || bun install
+else
+  RUN="npm run"
+  [ -d node_modules ] || npm install
+fi
+
+[ -d .next ] || $RUN build
+
+exec $RUN start -- -p "$PORT" --hostname 0.0.0.0

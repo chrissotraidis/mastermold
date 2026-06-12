@@ -300,10 +300,11 @@ including failures — is recorded and shown in the app):
    -H 'Content-Type: application/json' -d '{"trigger":"cron"}'` — or run
    `bin/engine-briefing` directly; the app ingests the newest bundle on the next
    page load.
-3. **Zo:** register the app as a Service and add an Automation that runs
-   `bin/engine-briefing` (or curls `/api/scan`) each weekday before the market
-   opens. Zo restarts are safe: runs are idempotent by date and the app falls
-   back to the last saved read.
+3. **Zo (the primary deployment):** register `bin/zo-start` as a Service and an
+   Automation that runs `bin/engine-briefing` (or curls `/api/scan`) each
+   weekday before the market opens — see [docs/deploy-zo.md](docs/deploy-zo.md)
+   for the full recipe. Zo restarts are safe: runs are idempotent by date and
+   the app falls back to the last saved read.
 
 Interactive scans default to the engine's direct synthesis path
 (`MASTERMOLD_ENGINE_ADAPTER=direct`); set `MASTERMOLD_ENGINE_ADAPTER=auto` to let
