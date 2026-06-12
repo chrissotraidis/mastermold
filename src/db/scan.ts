@@ -51,13 +51,21 @@ export type ScanRunResult =
 
 let inFlight: Promise<ScanRunResult> | null = null;
 
+// Paths are resolved through env-overridable strings (split at runtime) so the
+// bundler's static tracer never follows the venv symlink tree at build time.
+function enginePythonPath(): string {
+  const rel = process.env.MASTERMOLD_ENGINE_PYTHON ?? "engine/.venv/bin/python";
+  return join(process.cwd(), ...rel.split("/"));
+}
+
+function engineWrapperPath(): string {
+  const rel = process.env.MASTERMOLD_ENGINE_WRAPPER ?? "bin/engine-briefing";
+  return join(process.cwd(), ...rel.split("/"));
+}
+
 /** True when this machine can run the engine at all (venv or uv present). */
 export function scanRunnerAvailable(): boolean {
-  const root = process.cwd();
-  return (
-    existsSync(join(root, "engine", ".venv", "bin", "python")) ||
-    existsSync(join(root, "bin", "engine-briefing"))
-  );
+  return existsSync(enginePythonPath()) || existsSync(engineWrapperPath());
 }
 
 export function isScanRunning(): boolean {
@@ -138,9 +146,9 @@ async function executeScan(trigger: string): Promise<ScanRunResult> {
 
 function spawnEngine(runDate: string): Promise<{ ok: true } | { ok: false; detail: string }> {
   const root = process.cwd();
-  const venvPython = join(root, "engine", ".venv", "bin", "python");
+  const venvPython = enginePythonPath();
   const useVenv = existsSync(venvPython);
-  const command = useVenv ? venvPython : join(root, "bin", "engine-briefing");
+  const command = useVenv ? venvPython : engineWrapperPath();
   const args = useVenv
     ? ["-m", "mastermold_engine.run_briefing", "--date", runDate]
     : ["--date", runDate];

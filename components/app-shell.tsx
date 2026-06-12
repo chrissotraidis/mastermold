@@ -163,6 +163,7 @@ function TopBar({
           <span className={cn("size-1.5 rounded-full", isEngine ? "bg-engine animate-pulse" : isManual || isImported ? "bg-violet" : "bg-demo")} />
           {dataModeLabel}
         </span>
+        <ScanStatusLine />
       </div>
 
       <div className="flex items-center gap-2">
@@ -224,6 +225,29 @@ function TopBar({
         ) : null}
       </div>
     </header>
+  );
+}
+
+/** Telemetry strip: how old the market read is, straight from the scan API. */
+function ScanStatusLine() {
+  const [line, setLine] = useState<string | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/scan")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { status_line?: string } | null) => {
+        if (mounted && body?.status_line) setLine(body.status_line);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  if (!line) return null;
+  return (
+    <span className="ml-3 hidden font-mono text-[11px] tracking-telemetry text-outline lg:inline">
+      {line}
+    </span>
   );
 }
 
