@@ -223,7 +223,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(globalAssistant).toContain("bottom-[4.75rem] right-3");
     expect(globalAssistant).toContain("size-12");
     expect(globalAssistant).toContain("md:bottom-6 md:right-6 md:size-16");
-    expect(appShell).toContain('aria-label="Open Master Mold chat"');
+    // The top-left Master Mold icon navigates home (Today); chat is reachable
+    // from the floating launcher and the /chat route, not the brand mark.
+    expect(appShell).toContain('aria-label="Go to Today (home)"');
     expect(source("components/reviewer-evidence-panel.tsx")).toContain('"Today and alerts"');
     expect(chatPage).not.toMatch(/your alerts, holdings, and record/i);
   });

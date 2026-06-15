@@ -19,7 +19,7 @@
  * See `engine/CONTRACT.md` for the bundle shape this mirrors.
  */
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { isKnownBy, type AsOfFilter } from "./bitemporal";
@@ -354,9 +354,34 @@ export function getEngineRunHistory(opts: LoadOptions = {}): EngineRunHistoryEnt
     });
 }
 
-function parseBundle(
-  file: string,
-): { ok: true; bundle: EngineBundle } | { ok: false; reason: string } {
+type ParseResult = { ok: true; bundle: EngineBundle } | { ok: false; reason: string };
+
+// Read+parse+validate is the heaviest per-request work, and the same bundle is
+// parsed several times per page render (system state, data mode, briefing,
+// alerts) and on every navigation. Cache the parsed result keyed by file mtime
+// so it is computed once and reused until the engine writes a newer file.
+const bundleParseCache = new Map<string, { mtimeMs: number; result: ParseResult }>();
+
+function parseBundle(file: string): ParseResult {
+  let mtimeMs: number | null = null;
+  try {
+    mtimeMs = statSync(file).mtimeMs;
+    const cached = bundleParseCache.get(file);
+    if (cached && cached.mtimeMs === mtimeMs) {
+      return cached.result;
+    }
+  } catch {
+    // stat failed — fall through to a live read so a real error is reported.
+  }
+
+  const result = parseBundleUncached(file);
+  if (mtimeMs !== null) {
+    bundleParseCache.set(file, { mtimeMs, result });
+  }
+  return result;
+}
+
+function parseBundleUncached(file: string): ParseResult {
   let raw: string;
   try {
     raw = readFileSync(file, "utf8");

@@ -18,6 +18,7 @@ import {
   explainAlertRelevance,
 } from "@/lib/alert-loop";
 import { openMasterMoldChat } from "@/components/master-mold-actions";
+import { cachedGetJson, peekCachedJson, setCachedJson } from "@/lib/client-fetch-cache";
 import { cn } from "@/lib/utils";
 import type { PublicAlert, PublicJournal } from "@/lib/public-api-copy";
 
@@ -37,8 +38,12 @@ const severityStyles: Record<PublicAlert["severity"], string> = {
 
 export function AlertInboxDrawer() {
   const [open, setOpen] = useState(false);
-  const [alerts, setAlerts] = useState<PublicAlert[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  // Paint instantly from the shared cache when a warm copy exists (avoids a
+  // blank bell flicker on every navigation), then refresh in the effect.
+  const [alerts, setAlerts] = useState<PublicAlert[]>(
+    () => peekCachedJson<PublicAlert[]>("/api/alerts") ?? [],
+  );
+  const [loaded, setLoaded] = useState(() => peekCachedJson<PublicAlert[]>("/api/alerts") !== undefined);
   const [message, setMessage] = useState("");
   const [savedJournalId, setSavedJournalId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -67,9 +72,7 @@ export function AlertInboxDrawer() {
     let cancelled = false;
     async function loadAlerts() {
       try {
-        const response = await fetch("/api/alerts", { cache: "no-store" });
-        if (!response.ok) throw new Error("Could not load alerts");
-        const nextAlerts = (await response.json()) as PublicAlert[];
+        const nextAlerts = await cachedGetJson<PublicAlert[]>("/api/alerts");
         if (!cancelled) {
           setAlerts(nextAlerts);
           setLoaded(true);
@@ -88,6 +91,12 @@ export function AlertInboxDrawer() {
       window.removeEventListener(MASTER_MOLD_ALERTS_EVENT, onOpenAlerts);
     };
   }, []);
+
+  // Mirror confirmed/optimistic alert state into the shared cache so the next
+  // navigation paints the correct unread badge instantly instead of a stale one.
+  useEffect(() => {
+    if (loaded) setCachedJson("/api/alerts", alerts);
+  }, [alerts, loaded]);
 
   function replaceAlert(nextAlert: PublicAlert) {
     setAlerts((current) => current.map((alert) => (alert.id === nextAlert.id ? nextAlert : alert)));

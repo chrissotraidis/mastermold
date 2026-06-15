@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RefreshCw } from "lucide-react";
+import { cachedGetJson, invalidateCachedJson } from "@/lib/client-fetch-cache";
 import { cn } from "@/lib/utils";
 
 type ScanState = "idle" | "running" | "done" | "failed";
@@ -29,9 +30,10 @@ export function RunScanButton({
 
   useEffect(() => {
     mounted.current = true;
-    fetch("/api/scan")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((body: { runner_available?: boolean; running?: boolean } | null) => {
+    // Shares the cached /api/scan read with the top-bar status line so the two
+    // don't double-fetch the same endpoint on the Today page.
+    cachedGetJson<{ runner_available?: boolean; running?: boolean }>("/api/scan")
+      .then((body) => {
         if (!mounted.current || !body) return;
         setAvailable(body.runner_available ?? false);
         if (body.running) setState("running");
@@ -56,6 +58,10 @@ export function RunScanButton({
       if (body.ok) {
         setState("done");
         setMessage(body.detail ?? "Scan finished.");
+        // A fresh scan changes the read age and alert feed — drop the cached
+        // copies so the top-bar status and bell reflect it on the next render.
+        invalidateCachedJson("/api/scan");
+        invalidateCachedJson("/api/alerts");
         router.refresh();
       } else {
         setState("failed");

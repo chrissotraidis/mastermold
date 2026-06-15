@@ -10,6 +10,7 @@ import {
   Hexagon,
   Info,
   LineChart,
+  Loader2,
   Power,
   Settings,
   ShieldAlert,
@@ -20,6 +21,8 @@ import {
 import { AlertInboxDrawer } from "@/components/alert-inbox-drawer";
 import { GlobalAssistant } from "@/components/global-assistant";
 import { openMasterMoldChat } from "@/components/master-mold-actions";
+import { NavPendingBar, NavPendingState } from "@/components/nav-pending";
+import { cachedGetJson, peekCachedJson } from "@/lib/client-fetch-cache";
 import { SentinelFace, type SystemState } from "@/components/sentinel-face";
 import { useProfile } from "@/components/profile-provider";
 import { useFaceActivity } from "@/components/face-activity";
@@ -141,15 +144,14 @@ function TopBar({
             <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30" aria-hidden="true" />
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => openMasterMoldChat()}
-            aria-label="Open Master Mold chat"
+          <Link
+            href="/"
+            aria-label="Go to Today (home)"
             className="group relative size-11 shrink-0"
           >
             <SentinelFace state={killEngaged ? "kill" : faceState} speaking={speaking} />
             <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30 transition group-hover:ring-violet/70" aria-hidden="true" />
-          </button>
+          </Link>
         )}
         <Link href="/" className="flex min-h-11 items-center font-display text-2xl font-bold tracking-tighter text-violet">
           Master Mold
@@ -230,12 +232,16 @@ function TopBar({
 
 /** Telemetry strip: how old the market read is, straight from the scan API. */
 function ScanStatusLine() {
-  const [line, setLine] = useState<string | null>(null);
+  // Seed from the shared cache so this paints instantly on every navigation
+  // instead of re-fetching /api/scan and flashing empty each time the shell
+  // re-mounts.
+  const [line, setLine] = useState<string | null>(
+    () => peekCachedJson<{ status_line?: string }>("/api/scan")?.status_line ?? null,
+  );
   useEffect(() => {
     let mounted = true;
-    fetch("/api/scan")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((body: { status_line?: string } | null) => {
+    cachedGetJson<{ status_line?: string }>("/api/scan")
+      .then((body) => {
         if (mounted && body?.status_line) setLine(body.status_line);
       })
       .catch(() => {});
@@ -275,18 +281,29 @@ function SideRail() {
                   : "hover:bg-surface-high/60",
               )}
             >
-              <span className="flex w-16 shrink-0 items-center justify-center">
-                <Icon className={cn("size-5", active ? "text-violet" : ZONE_ACCENT[item.zone])} />
-              </span>
-              <span
-                className={cn(
-                  "font-mono text-[12px] uppercase tracking-telemetry opacity-0 transition-opacity duration-200 group-hover:opacity-100",
-                  active ? "text-violet" : "text-on-surface-variant",
+              <NavPendingState>
+                {(pending) => (
+                  <>
+                    <span className="flex w-16 shrink-0 items-center justify-center">
+                      {pending ? (
+                        <Loader2 className="size-5 animate-spin text-violet" />
+                      ) : (
+                        <Icon className={cn("size-5", active ? "text-violet" : ZONE_ACCENT[item.zone])} />
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-mono text-[12px] uppercase tracking-telemetry opacity-0 transition-opacity duration-200 group-hover:opacity-100",
+                        active ? "text-violet" : "text-on-surface-variant",
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                  </>
                 )}
-              >
-                {item.label}
-              </span>
+              </NavPendingState>
               {active ? <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-violet" aria-hidden="true" /> : null}
+              <NavPendingBar />
             </Link>
           );
         })}
@@ -325,12 +342,21 @@ function MobileNav() {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-1 chamfer-sm transition-colors",
+              "relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-1 chamfer-sm transition-colors",
               active ? "bg-violet/15 text-violet" : "text-on-surface-variant active:bg-surface-high/60",
             )}
           >
-            <Icon className="size-5" />
+            <NavPendingState>
+              {(pending) =>
+                pending ? (
+                  <Loader2 className="size-5 animate-spin text-violet" />
+                ) : (
+                  <Icon className="size-5" />
+                )
+              }
+            </NavPendingState>
             <span className="max-w-full truncate font-mono text-[9px] uppercase tracking-wide">{item.shortLabel}</span>
+            <NavPendingBar />
           </Link>
         );
       })}
