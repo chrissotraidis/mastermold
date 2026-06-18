@@ -1025,6 +1025,12 @@ function QuickTradingCommandDeck({
           <p className="sr-only">{decision.next_action}</p>
         </div>
 
+        <QuickAutonomousNextTickRail
+          state={state}
+          autoWatch={autoWatch}
+          autoWatchPlan={autoWatchPlan}
+        />
+
         <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_13rem]">
           <QuickWalletNetWorthChart
             wallet={wallet}
@@ -1183,6 +1189,138 @@ function QuickTradingCommandDeck({
 
       <span className="sr-only" aria-label="Autonomous command deck receipt">
         Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; forward permission {forwardPermission.permission}; forward action {forwardPermission.action}; forward score {forwardPermission.permission_score}; forward can fire next tick {forwardPermission.can_fire_next_tick ? "yes" : "no"}; forward max fills {forwardPermission.max_next_fills}; forward fresh buys {forwardPermission.max_fresh_buys}; loop impact status {loopImpact.status}; loop impact action {loopImpact.action}; loop impact score {loopImpact.impact_score}; loop impact paper only {loopImpact.paper_only ? "yes" : "no"}; loop impact max fills {loopImpact.max_next_fills}; loop impact reduce frequency {loopImpact.must_reduce_frequency ? "yes" : "no"}; loop impact refresh proof {loopImpact.must_refresh_proof ? "yes" : "no"}; next dollar {capitalCommand.action}; next dollar status {capitalCommand.status}; next dollar score {capitalCommand.command_score}; paper spend {formatCurrency(capitalCommand.spend_budget_usd)}; paper release {formatCurrency(capitalCommand.release_budget_usd)}; command boundary {capitalCommand.execution_boundary}; command can execute paper {capitalCommand.can_execute_paper ? "yes" : "no"}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
+      </span>
+    </section>
+  );
+}
+
+function QuickAutonomousNextTickRail({
+  state,
+  autoWatch,
+  autoWatchPlan,
+}: {
+  state: Web3TradingState;
+  autoWatch: boolean;
+  autoWatchPlan: AutoWatchPlan;
+}) {
+  const loopImpact = state.autonomous_loop_impact_auditor;
+  const route = state.autonomous_route_refresh_execution;
+  const actionQueue = state.autonomous_action_queue;
+  const actionQueueExecution = state.autonomous_action_queue_execution;
+  const forwardPermission = state.autonomous_forward_loop_permission;
+  const sessionRun = state.autonomous_session_run;
+  const loopTick = state.autonomous_loop_tick;
+  const ledgerFills = sessionRun.requested ? sessionRun.fill_count : state.paper_account.trade_count;
+  const stages: Array<{
+    id: string;
+    label: string;
+    value: string;
+    detail: string;
+    score: number;
+    tone: QuickChipTone;
+  }> = [
+    {
+      id: "proof",
+      label: "Proof",
+      value: route.status.replaceAll("-", " "),
+      detail: route.selected_symbol ? `${route.selected_symbol} route` : state.market_source.label,
+      score: route.status === "ready" ? 92 : route.status === "blocked" ? 24 : 58,
+      tone: routeRefreshTone(route.status),
+    },
+    {
+      id: "impact",
+      label: "Impact",
+      value: loopImpact.status.replaceAll("-", " "),
+      detail: `${loopImpact.action.replaceAll("-", " ")} · ${loopImpact.next_cadence_seconds}s`,
+      score: loopImpact.impact_score,
+      tone: loopImpactTone(loopImpact.status),
+    },
+    {
+      id: "queue",
+      label: "Queue",
+      value: actionQueue.status.replaceAll("-", " "),
+      detail: `${actionQueue.items.length} actions · ${formatCompactCurrency(actionQueue.deploy_usd + actionQueue.release_usd)}`,
+      score: actionQueueExecution.queue_score,
+      tone: actionQueueStatusTone(actionQueue.status),
+    },
+    {
+      id: "ledger",
+      label: "Ledger",
+      value: `${ledgerFills} fills`,
+      detail: `${loopTick.status.replaceAll("-", " ")} · ${formatCompactSignedCurrency(sessionRun.requested ? sessionRun.net_pnl_usd : state.autonomous_wallet_telemetry.window_pnl_usd)}`,
+      score: forwardPermission.permission_score,
+      tone: forwardPermissionTone(forwardPermission.status),
+    },
+    {
+      id: "boundary",
+      label: "Boundary",
+      value: state.execution_gate.live_execution_enabled ? "live armed" : "paper only",
+      detail: state.execution_gate.live_execution_enabled ? "signer gate required" : "no custody or signing",
+      score: state.execution_gate.live_execution_enabled ? 38 : 100,
+      tone: state.execution_gate.live_execution_enabled ? "critical" : "demo",
+    },
+  ];
+  const activeStage = loopImpact.must_refresh_proof || autoWatchPlan.mode === "refresh"
+    ? "proof"
+    : loopImpact.status === "protect" || loopImpact.status === "harvest" || loopImpact.status === "tighten" || loopImpact.status === "cooldown" || loopImpact.status === "blocked"
+      ? "impact"
+      : actionQueue.items.length > 0
+        ? "queue"
+        : ledgerFills > 0
+          ? "ledger"
+          : "proof";
+  const activeIndex = Math.max(0, stages.findIndex((stage) => stage.id === activeStage));
+  const loopModeLabel = autoWatch ? `Auto watch ${autoWatchPlan.label}` : autoWatchPlan.label;
+
+  return (
+    <section className="mt-3 min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2" aria-label="Autonomous next tick flow">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Next tick flow</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {loopModeLabel} · {loopImpact.action.replaceAll("-", " ")}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={loopImpactTone(loopImpact.status)}>{loopImpact.impact_score}/100 impact</Chip>
+          <Chip tone={autoWatchPlan.mode === "minute" || autoWatchPlan.mode === "sprint" ? "engine" : autoWatchPlan.mode === "refresh" ? "caution" : "neutral"}>
+            {Math.round(autoWatchPlan.delayMs / 1000)}s cadence
+          </Chip>
+          <Chip tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"}>
+            {state.execution_gate.live_execution_enabled ? "live boundary armed" : "paper boundary"}
+          </Chip>
+        </div>
+      </div>
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-5">
+        {stages.map((stage, index) => {
+          const isActive = index === activeIndex;
+          const isDone = index < activeIndex;
+          return (
+            <div
+              key={stage.id}
+              className={cn(
+                "min-w-0 rounded-md border p-2",
+                isActive ? permissionToneClass(stage.tone) : isDone ? "border-engine/20 bg-engine/[0.045] text-engine" : "border-outline-variant/20 bg-void/20 text-on-surface",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{stage.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", isActive ? profitAuthorityBarClass(stage.tone) : isDone ? "bg-engine" : "bg-outline/60")} aria-hidden="true" />
+              </div>
+              <p className="mt-1 truncate text-xs font-semibold">{stage.value}</p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-void/60" aria-hidden="true">
+                <div className={cn("h-full rounded-full", profitAuthorityBarClass(stage.tone))} style={{ width: `${clampNumber(stage.score)}%` }} />
+              </div>
+              <p className="mt-1 truncate text-[11px] leading-4 text-outline">{stage.detail}</p>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">
+        {loopImpact.next_action} The server owns fills; the UI only schedules read-only proof, bounded local-paper ticks, and visible safety gates.
+      </p>
+      <span className="sr-only" aria-label="Autonomous next tick flow receipt">
+        Next tick flow active stage {activeStage}; auto watch {autoWatch ? "on" : "off"}; plan {autoWatchPlan.label}; cadence {Math.round(autoWatchPlan.delayMs / 1000)} seconds; proof {route.status}; impact {loopImpact.status}; queue {actionQueue.status}; ledger fills {ledgerFills}; live boundary {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
       </span>
     </section>
   );
@@ -5794,6 +5932,12 @@ function sourceQualityTone(
   if (status === "refresh-first") return "caution";
   if (status === "sample") return "demo";
   return "neutral";
+}
+
+function routeRefreshTone(status: Web3TradingState["autonomous_route_refresh_execution"]["status"]): QuickChipTone {
+  if (status === "ready") return "engine";
+  if (status === "blocked") return "critical";
+  return "caution";
 }
 
 function profitRunGuardTone(
