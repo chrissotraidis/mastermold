@@ -1557,6 +1557,49 @@ export type PromotionOrderAudit = {
   items: PromotionOrderAuditItem[];
 };
 
+export type AutonomousSourceQualityAction = "attack" | "probe" | "refresh-proof" | "fade" | "block" | "watch";
+
+export type AutonomousSourceQualityItem = {
+  token_id: string;
+  symbol: string;
+  action: AutonomousSourceQualityAction;
+  status: "organic" | "boosted-confirmed" | "paid-hype" | "refresh-first" | "blocked" | "watch";
+  source_quality_score: number;
+  organic_confirmation_score: number;
+  market_activity_score: number;
+  promotion_noise_score: number;
+  trust_score: number;
+  source_count: number;
+  paid_order_checked: boolean;
+  paid_order_count: number;
+  review_after_seconds: number;
+  max_paper_size_multiplier: number;
+  reason: string;
+  evidence: string[];
+  blockers: string[];
+};
+
+export type AutonomousSourceQualityOracle = {
+  mode: "autonomous-source-quality-oracle";
+  status: "organic" | "boosted-confirmed" | "paid-hype" | "refresh-first" | "blocked" | "sample" | "idle";
+  leader_symbol: string | null;
+  leader_action: AutonomousSourceQualityAction | null;
+  quality_score: number;
+  organic_count: number;
+  boosted_confirmed_count: number;
+  paid_hype_count: number;
+  refresh_count: number;
+  blocked_count: number;
+  can_chase: boolean;
+  needs_refresh: boolean;
+  size_multiplier: number;
+  fastest_review_seconds: number;
+  summary: string;
+  next_action: string;
+  controls: string[];
+  items: AutonomousSourceQualityItem[];
+};
+
 export type DiscoveryEdgeAction = "snipe" | "probe" | "watch" | "reject";
 
 export type DiscoveryEdgeItem = {
@@ -8291,6 +8334,7 @@ export type Web3TradingState = {
   autonomous_profit_validator: AutonomousProfitValidator;
   autonomous_order_ticket: AutonomousOrderTicket;
   autonomous_data_freshness_gate: AutonomousDataFreshnessGate;
+  autonomous_source_quality_oracle: AutonomousSourceQualityOracle;
   autonomous_market_evidence_fusion: AutonomousMarketEvidenceFusion;
   autonomous_signal_noise_trade_decision: AutonomousSignalNoiseTradeDecision;
   autonomous_execution_runway: AutonomousExecutionRunway;
@@ -11463,6 +11507,13 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       candleConviction: configuredState.autonomous_candle_conviction,
       orderTicket: configuredState.autonomous_order_ticket,
     });
+    configuredState.autonomous_source_quality_oracle = buildAutonomousSourceQualityOracle({
+      discoveryTape: configuredState.discovery_tape,
+      promotionAudit: configuredState.promotion_order_audit,
+      trendCatalyst: configuredState.trend_catalyst,
+      liveScannerReadiness: configuredState.live_scanner_readiness,
+      dataFreshnessGate: configuredState.autonomous_data_freshness_gate,
+    });
     configuredState.autonomous_market_evidence_fusion = buildAutonomousMarketEvidenceFusion({
       market: configuredState.market,
       marketIntelligence: configuredState.autonomous_market_intelligence,
@@ -13486,6 +13537,13 @@ function buildWeb3TradingState({
     candleConviction: autonomous_candle_conviction,
     orderTicket: autonomous_order_ticket,
   });
+  const autonomous_source_quality_oracle = buildAutonomousSourceQualityOracle({
+    discoveryTape: discovery_tape,
+    promotionAudit: promotion_order_audit,
+    trendCatalyst: trend_catalyst,
+    liveScannerReadiness: live_scanner_readiness,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+  });
   const autonomous_market_evidence_fusion = buildAutonomousMarketEvidenceFusion({
     market,
     marketIntelligence: autonomous_market_intelligence,
@@ -13918,6 +13976,7 @@ function buildWeb3TradingState({
     autonomous_profit_run_guard,
     autonomous_daily_profit_lock,
     autonomous_data_freshness_gate,
+    autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
@@ -15768,6 +15827,13 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     candleConviction: autonomous_candle_conviction,
     orderTicket: autonomous_order_ticket,
   });
+  const autonomous_source_quality_oracle = buildAutonomousSourceQualityOracle({
+    discoveryTape: state.discovery_tape,
+    promotionAudit: state.promotion_order_audit,
+    trendCatalyst: state.trend_catalyst,
+    liveScannerReadiness: state.live_scanner_readiness,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+  });
   const autonomous_market_evidence_fusion = buildAutonomousMarketEvidenceFusion({
     market: state.market,
     marketIntelligence: autonomous_market_intelligence,
@@ -16175,6 +16241,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_profit_run_guard,
     autonomous_daily_profit_lock,
     autonomous_data_freshness_gate,
+    autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
@@ -16568,6 +16635,13 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     candleConviction: state.autonomous_candle_conviction,
     orderTicket: state.autonomous_order_ticket,
   });
+  const autonomous_source_quality_oracle = buildAutonomousSourceQualityOracle({
+    discoveryTape: state.discovery_tape,
+    promotionAudit: state.promotion_order_audit,
+    trendCatalyst: state.trend_catalyst,
+    liveScannerReadiness: state.live_scanner_readiness,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+  });
   const autonomous_market_evidence_fusion = buildAutonomousMarketEvidenceFusion({
     market: state.market,
     marketIntelligence: state.autonomous_market_intelligence,
@@ -16777,6 +16851,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_profit_run_guard,
     autonomous_daily_profit_lock,
     autonomous_data_freshness_gate,
+    autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
@@ -20853,6 +20928,13 @@ function applyPersistentLedger(
     candleConviction: autonomous_candle_conviction,
     orderTicket: autonomous_order_ticket,
   });
+  const autonomous_source_quality_oracle = buildAutonomousSourceQualityOracle({
+    discoveryTape: state.discovery_tape,
+    promotionAudit: promotion_order_audit,
+    trendCatalyst: state.trend_catalyst,
+    liveScannerReadiness: live_scanner_readiness,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+  });
   const autonomous_market_evidence_fusion = buildAutonomousMarketEvidenceFusion({
     market: state.market,
     marketIntelligence: autonomous_market_intelligence,
@@ -21427,6 +21509,7 @@ function applyPersistentLedger(
     autonomous_profit_validator,
     autonomous_order_ticket,
     autonomous_data_freshness_gate,
+    autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
@@ -79168,6 +79251,285 @@ function liveRiskFlags(
   if (candidate?.sources.includes("dex-community-takeovers")) flags.push("community-takeover");
   if (candidate?.sources.includes("dex-latest-profiles") && ageMinutes < 240) flags.push("profile-fresh");
   return flags;
+}
+
+function buildAutonomousSourceQualityOracle({
+  discoveryTape,
+  promotionAudit,
+  trendCatalyst,
+  liveScannerReadiness,
+  dataFreshnessGate,
+}: {
+  discoveryTape: DiscoveryTape;
+  promotionAudit: PromotionOrderAudit;
+  trendCatalyst: TrendCatalystIntelligence;
+  liveScannerReadiness: LiveScannerReadiness;
+  dataFreshnessGate: AutonomousDataFreshnessGate;
+}): AutonomousSourceQualityOracle {
+  const catalystByToken = new Map(trendCatalyst.items.map((item) => [item.token_id, item]));
+  const promotionByToken = new Map(promotionAudit.items.map((item) => [item.token_id, item]));
+  const scannerByToken = new Map(liveScannerReadiness.items.map((item) => [item.token_id, item]));
+  const dataGatePenalty = dataFreshnessGate.status === "blocked"
+    ? 22
+    : dataFreshnessGate.status === "refresh" || dataFreshnessGate.status === "backfill"
+      ? 12
+      : dataFreshnessGate.status === "sample"
+        ? 4
+        : 0;
+  const items = discoveryTape.top_candidates
+    .map((candidate): AutonomousSourceQualityItem => {
+      const promotion = promotionByToken.get(candidate.token_id);
+      const catalyst = catalystByToken.get(candidate.token_id);
+      const scanner = scannerByToken.get(candidate.token_id);
+      const organicConfirmationScore = clamp(Math.round(
+        (catalyst?.organic_score ?? Math.max(0, candidate.scout_score - candidate.promotion_intensity * 0.45)) * 0.36 +
+          (scanner?.source_confirmation_score ?? candidate.sources.length * 18) * 0.26 +
+          candidate.freshness_score * 0.18 +
+          (promotion?.verdict === "organic" ? 16 : promotion?.verdict === "boosted" ? 8 : promotion?.verdict === "paid-hype" ? -12 : 0) +
+          (candidate.sources.includes("dex-community-takeovers") ? 8 : 0),
+      ), 0, 100);
+      const marketActivityScore = clamp(Math.round(
+        (catalyst?.attention_score ?? candidate.scout_score) * 0.42 +
+          Math.min(36, candidate.volume_1h_usd / Math.max(1, candidate.liquidity_usd) * 18) +
+          Math.min(22, Math.log10(Math.max(candidate.liquidity_usd, 1)) * 2.2),
+      ), 0, 100);
+      const promotionNoiseScore = clamp(Math.round(
+        Math.max(candidate.promotion_intensity, promotion?.hype_risk_score ?? 0) +
+          candidate.paid_ad_order_count * 10 +
+          (candidate.sources.includes("dex-latest-ads") ? 16 : 0) +
+          (candidate.risk_flags.includes("paid-promotion-heavy") ? 14 : 0),
+      ), 0, 100);
+      const trustScore = clamp(Math.round(
+        organicConfirmationScore * 0.42 +
+          marketActivityScore * 0.24 +
+          (scanner?.route_score ?? 0) * 0.12 +
+          (candidate.paid_order_checked ? 10 : -10) +
+          (100 - promotionNoiseScore) * 0.22 -
+          dataGatePenalty,
+      ), 0, 100);
+      const blockers = autonomousSourceQualityBlockers({
+        discoveryTape,
+        candidate,
+        promotionNoiseScore,
+        organicConfirmationScore,
+        trustScore,
+        dataFreshnessGate,
+        scanner,
+      });
+      const action = autonomousSourceQualityAction({
+        discoveryTape,
+        dataFreshnessGate,
+        trustScore,
+        organicConfirmationScore,
+        marketActivityScore,
+        promotionNoiseScore,
+        blockers,
+      });
+      const status = autonomousSourceQualityStatus(action, promotionNoiseScore, organicConfirmationScore, candidate, promotion);
+
+      return {
+        token_id: candidate.token_id,
+        symbol: candidate.symbol,
+        action,
+        status,
+        source_quality_score: trustScore,
+        organic_confirmation_score: organicConfirmationScore,
+        market_activity_score: marketActivityScore,
+        promotion_noise_score: promotionNoiseScore,
+        trust_score: trustScore,
+        source_count: candidate.sources.length,
+        paid_order_checked: candidate.paid_order_checked,
+        paid_order_count: candidate.paid_order_count,
+        review_after_seconds: Math.max(5, Math.min(scanner?.review_after_seconds ?? catalyst?.review_after_seconds ?? 45, 90)),
+        max_paper_size_multiplier: autonomousSourceQualitySizeMultiplier(action, trustScore, promotionNoiseScore),
+        reason: autonomousSourceQualityReason(action, candidate.symbol, trustScore, organicConfirmationScore, promotionNoiseScore, blockers),
+        evidence: [
+          `${candidate.sources.map(sourceLabelForModel).join(" + ")} sources`,
+          `${organicConfirmationScore}/100 organic confirmation`,
+          `${marketActivityScore}/100 market activity`,
+          `${promotionNoiseScore}/100 paid/boost noise`,
+          candidate.paid_order_checked ? `${candidate.paid_order_count} paid orders checked` : "paid orders unchecked",
+          `${dataFreshnessGate.status} data gate`,
+        ],
+        blockers,
+      };
+    })
+    .sort((a, b) =>
+      autonomousSourceQualityActionRank(b.action) - autonomousSourceQualityActionRank(a.action) ||
+      b.source_quality_score - a.source_quality_score,
+    )
+    .slice(0, 8);
+  const leader = items.find((item) => item.action === "attack" || item.action === "probe") ?? items[0] ?? null;
+  const organicCount = items.filter((item) => item.status === "organic").length;
+  const boostedConfirmedCount = items.filter((item) => item.status === "boosted-confirmed").length;
+  const paidHypeCount = items.filter((item) => item.status === "paid-hype").length;
+  const refreshCount = items.filter((item) => item.action === "refresh-proof").length;
+  const blockedCount = items.filter((item) => item.action === "block").length;
+  const status: AutonomousSourceQualityOracle["status"] = discoveryTape.status === "sample"
+    ? "sample"
+    : items.length === 0
+      ? "idle"
+      : paidHypeCount > organicCount + boostedConfirmedCount && !items.some((item) => item.action === "attack" || item.action === "probe")
+        ? "paid-hype"
+        : blockedCount > 0 && blockedCount >= items.length
+          ? "blocked"
+          : refreshCount > 0 && !items.some((item) => item.action === "attack" || item.action === "probe")
+            ? "refresh-first"
+            : organicCount > 0 && leader?.status === "organic"
+              ? "organic"
+              : boostedConfirmedCount > 0
+                ? "boosted-confirmed"
+                : paidHypeCount > 0
+                  ? "paid-hype"
+                  : "idle";
+  const canChase = Boolean(leader && (leader.action === "attack" || leader.action === "probe"));
+
+  return {
+    mode: "autonomous-source-quality-oracle",
+    status,
+    leader_symbol: leader?.symbol ?? null,
+    leader_action: leader?.action ?? null,
+    quality_score: leader?.source_quality_score ?? 0,
+    organic_count: organicCount,
+    boosted_confirmed_count: boostedConfirmedCount,
+    paid_hype_count: paidHypeCount,
+    refresh_count: refreshCount,
+    blocked_count: blockedCount,
+    can_chase: canChase,
+    needs_refresh: status === "refresh-first" || items.some((item) => item.action === "refresh-proof"),
+    size_multiplier: leader ? leader.max_paper_size_multiplier : 0,
+    fastest_review_seconds: items.length ? Math.min(...items.map((item) => item.review_after_seconds)) : dataFreshnessGate.max_staleness_seconds,
+    summary: autonomousSourceQualitySummary(status, leader, organicCount, boostedConfirmedCount, paidHypeCount, refreshCount, blockedCount),
+    next_action: leader?.reason ?? "Keep scanning until source quality is clear enough for a local paper decision.",
+    controls: [
+      "Separates organic momentum from boosted or paid-ad attention before the high-frequency paper loop can chase.",
+      "Uses DEX Screener profile, boost, ad, paid-order, pair activity, freshness, and route-readiness evidence.",
+      "Paper sizing can be reduced or blocked by paid-hype noise, unchecked orders, stale evidence, thin source coverage, or route refresh requirements.",
+    ],
+    items,
+  };
+}
+
+function autonomousSourceQualityBlockers({
+  discoveryTape,
+  candidate,
+  promotionNoiseScore,
+  organicConfirmationScore,
+  trustScore,
+  dataFreshnessGate,
+  scanner,
+}: {
+  discoveryTape: DiscoveryTape;
+  candidate: DiscoveryCandidate;
+  promotionNoiseScore: number;
+  organicConfirmationScore: number;
+  trustScore: number;
+  dataFreshnessGate: AutonomousDataFreshnessGate;
+  scanner: LiveScannerReadinessItem | undefined;
+}) {
+  const blockers: string[] = [];
+  if (discoveryTape.status === "fallback") blockers.push("Live discovery is in fallback, so source quality cannot clear.");
+  if (!candidate.paid_order_checked && discoveryTape.status === "live") blockers.push("Paid-order audit is not checked for this candidate.");
+  if (promotionNoiseScore >= 78 && organicConfirmationScore < 64) blockers.push("Paid boost or ad noise outruns organic buyer confirmation.");
+  if (candidate.sources.length < 2 && discoveryTape.status === "live") blockers.push("Source coverage is too thin for autonomous chase sizing.");
+  if (dataFreshnessGate.action === "refresh-stream" || dataFreshnessGate.action === "refresh-quote" || dataFreshnessGate.action === "fetch-candles") {
+    blockers.push(dataFreshnessGate.next_action);
+  }
+  if (scanner?.status === "blocked" || scanner?.action === "blocked") blockers.push(scanner.blockers[0] ?? "Scanner blocks this candidate.");
+  if (trustScore < 34) blockers.push("Source-quality score is below the paper-chase floor.");
+  return [...new Set(blockers)].slice(0, 5);
+}
+
+function autonomousSourceQualityAction({
+  discoveryTape,
+  dataFreshnessGate,
+  trustScore,
+  organicConfirmationScore,
+  marketActivityScore,
+  promotionNoiseScore,
+  blockers,
+}: {
+  discoveryTape: DiscoveryTape;
+  dataFreshnessGate: AutonomousDataFreshnessGate;
+  trustScore: number;
+  organicConfirmationScore: number;
+  marketActivityScore: number;
+  promotionNoiseScore: number;
+  blockers: string[];
+}): AutonomousSourceQualityAction {
+  if (blockers.some((blocker) => /fallback|refresh|quote|candle|stream|unchecked/i.test(blocker))) return "refresh-proof";
+  if (blockers.length > 0 || dataFreshnessGate.status === "blocked") return "block";
+  if (discoveryTape.status === "sample") return trustScore >= 48 ? "probe" : "watch";
+  if (trustScore >= 74 && organicConfirmationScore >= 66 && marketActivityScore >= 56 && promotionNoiseScore < 58) return "attack";
+  if (trustScore >= 56 && organicConfirmationScore >= 46 && promotionNoiseScore < 72) return "probe";
+  if (promotionNoiseScore >= 70 && organicConfirmationScore < 58) return "fade";
+  return trustScore >= 42 ? "watch" : "block";
+}
+
+function autonomousSourceQualityStatus(
+  action: AutonomousSourceQualityAction,
+  promotionNoiseScore: number,
+  organicConfirmationScore: number,
+  candidate: DiscoveryCandidate,
+  promotion: PromotionOrderAuditItem | undefined,
+): AutonomousSourceQualityItem["status"] {
+  if (promotionNoiseScore >= 72 && organicConfirmationScore < 64) return "paid-hype";
+  if (promotion?.verdict === "boosted" && organicConfirmationScore >= 52) return "boosted-confirmed";
+  if (candidate.sources.includes("dex-top-boosts") && organicConfirmationScore >= 58 && promotionNoiseScore < 72) return "boosted-confirmed";
+  if (organicConfirmationScore >= 64 && promotionNoiseScore < 58) return "organic";
+  if (action === "refresh-proof") return "refresh-first";
+  if (action === "block") return "blocked";
+  if (action === "fade") return "paid-hype";
+  return "watch";
+}
+
+function autonomousSourceQualitySizeMultiplier(action: AutonomousSourceQualityAction, trustScore: number, promotionNoiseScore: number) {
+  if (action === "attack") return Math.max(0.7, Math.min(1.2, Math.round((0.72 + (trustScore - 70) / 100 - Math.max(0, promotionNoiseScore - 50) / 180) * 100) / 100));
+  if (action === "probe") return Math.max(0.25, Math.min(0.65, Math.round((0.42 + (trustScore - 50) / 180 - Math.max(0, promotionNoiseScore - 58) / 220) * 100) / 100));
+  return 0;
+}
+
+function autonomousSourceQualityActionRank(action: AutonomousSourceQualityAction) {
+  if (action === "attack") return 6;
+  if (action === "probe") return 5;
+  if (action === "refresh-proof") return 4;
+  if (action === "watch") return 3;
+  if (action === "fade") return 2;
+  return 1;
+}
+
+function autonomousSourceQualityReason(
+  action: AutonomousSourceQualityAction,
+  symbol: string,
+  trustScore: number,
+  organicConfirmationScore: number,
+  promotionNoiseScore: number,
+  blockers: string[],
+) {
+  if (action === "attack") return `${symbol} clears source quality for local paper attack with ${trustScore}/100 trust and ${organicConfirmationScore}/100 organic confirmation.`;
+  if (action === "probe") return `${symbol} can be probed with reduced local paper size while source quality is ${trustScore}/100.`;
+  if (action === "refresh-proof") return blockers[0] ?? `Refresh paid-order, route, candle, or DEX-stream proof before sizing ${symbol}.`;
+  if (action === "fade") return `${symbol} is promotion-heavy; ${promotionNoiseScore}/100 paid or boost noise outruns clean flow.`;
+  if (action === "block") return blockers[0] ?? `Block ${symbol}; source quality is too weak for paper churn.`;
+  return `Watch ${symbol}; source quality is ${trustScore}/100 and not yet worth paper budget.`;
+}
+
+function autonomousSourceQualitySummary(
+  status: AutonomousSourceQualityOracle["status"],
+  leader: AutonomousSourceQualityItem | null,
+  organicCount: number,
+  boostedConfirmedCount: number,
+  paidHypeCount: number,
+  refreshCount: number,
+  blockedCount: number,
+) {
+  if (status === "organic") return `${organicCount} candidate${organicCount === 1 ? "" : "s"} show organic source quality; ${leader?.symbol ?? "the leader"} can feed the paper chase stack.`;
+  if (status === "boosted-confirmed") return `${boostedConfirmedCount} boosted candidate${boostedConfirmedCount === 1 ? "" : "s"} have enough organic confirmation for reduced paper sizing.`;
+  if (status === "paid-hype") return `${paidHypeCount} candidate${paidHypeCount === 1 ? "" : "s"} look promotion-heavy; fade until buyer flow and paid-order proof improve.`;
+  if (status === "refresh-first") return `${refreshCount} candidate${refreshCount === 1 ? "" : "s"} need fresher source, paid-order, candle, or route proof before paper sizing.`;
+  if (status === "blocked") return `${blockedCount} candidate${blockedCount === 1 ? "" : "s"} are blocked by source quality.`;
+  if (status === "sample") return "Sample source quality is rehearsed locally; live chase decisions require current DEX evidence.";
+  return "Source quality oracle is idle until discovery, paid-order, and scanner evidence exist.";
 }
 
 function toTradingChain(value: string | undefined): MemecoinMarket["chain"] | null {

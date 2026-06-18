@@ -3551,6 +3551,33 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_data_freshness_gate.controls.some((control) => control.includes("DEX Screener"))).toBe(true);
     expect(state.autonomous_data_freshness_gate.controls.some((control) => control.includes("Jupiter-style read-only route quotes"))).toBe(true);
+    expect(state.autonomous_source_quality_oracle.mode).toBe("autonomous-source-quality-oracle");
+    expect(["organic", "boosted-confirmed", "paid-hype", "refresh-first", "blocked", "sample", "idle"]).toContain(state.autonomous_source_quality_oracle.status);
+    expect(typeof state.autonomous_source_quality_oracle.can_chase).toBe("boolean");
+    expect(typeof state.autonomous_source_quality_oracle.needs_refresh).toBe("boolean");
+    expect(state.autonomous_source_quality_oracle.quality_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_source_quality_oracle.quality_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_source_quality_oracle.fastest_review_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_source_quality_oracle.items.length).toBeGreaterThan(0);
+    expect(state.autonomous_source_quality_oracle.items.every((item) =>
+      ["attack", "probe", "refresh-proof", "fade", "block", "watch"].includes(item.action) &&
+      ["organic", "boosted-confirmed", "paid-hype", "refresh-first", "blocked", "watch"].includes(item.status) &&
+      item.source_quality_score >= 0 &&
+      item.source_quality_score <= 100 &&
+      item.organic_confirmation_score >= 0 &&
+      item.organic_confirmation_score <= 100 &&
+      item.market_activity_score >= 0 &&
+      item.market_activity_score <= 100 &&
+      item.promotion_noise_score >= 0 &&
+      item.promotion_noise_score <= 100 &&
+      item.max_paper_size_multiplier >= 0 &&
+      item.max_paper_size_multiplier <= 1.2 &&
+      item.review_after_seconds > 0 &&
+      item.evidence.length >= 4 &&
+      item.reason.length > 0
+    )).toBe(true);
+    expect(state.autonomous_source_quality_oracle.controls.some((control) => control.includes("organic momentum"))).toBe(true);
+    expect(state.autonomous_source_quality_oracle.controls.some((control) => control.includes("paid-order"))).toBe(true);
     expect(state.autonomous_market_evidence_fusion.mode).toBe("autonomous-market-evidence-fusion");
     expect(["attack", "selective", "refresh", "protect", "blocked", "watch", "sample", "idle"]).toContain(state.autonomous_market_evidence_fusion.status);
     expect(state.autonomous_market_evidence_fusion.fusion_score).toBeGreaterThanOrEqual(0);
@@ -4239,6 +4266,18 @@ describe("Web3 autonomous trading subsystem", () => {
       verdict: "paid-hype",
       paid_ad_order_count: 2,
     });
+    expect(state.autonomous_source_quality_oracle).toMatchObject({
+      mode: "autonomous-source-quality-oracle",
+    });
+    expect(["paid-hype", "refresh-first", "blocked", "boosted-confirmed", "organic"]).toContain(state.autonomous_source_quality_oracle.status);
+    expect(state.autonomous_source_quality_oracle.items.find((item) => item.symbol === "FRESH")).toMatchObject({
+      status: "paid-hype",
+    });
+    expect(state.autonomous_source_quality_oracle.items.find((item) => item.symbol === "FRESH")?.promotion_noise_score).toBeGreaterThanOrEqual(70);
+    expect(state.autonomous_source_quality_oracle.items.find((item) => item.symbol === "FRESH")?.max_paper_size_multiplier).toBe(0);
+    if (state.autonomous_source_quality_oracle.status === "paid-hype" || state.autonomous_source_quality_oracle.status === "refresh-first" || state.autonomous_source_quality_oracle.status === "blocked") {
+      expect(buildAutonomousNextMoves(state).some((move) => move.id === "source-quality")).toBe(true);
+    }
     expect(state.discovery_edge).toMatchObject({
       mode: "discovery-edge-supervisor",
       status: "cooldown",

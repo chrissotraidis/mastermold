@@ -916,6 +916,7 @@ function QuickTradingCommandDeck({
   const wallet = state.autonomous_wallet_telemetry;
   const sessionRun = state.autonomous_session_run;
   const fusion = state.autonomous_market_evidence_fusion;
+  const sourceQuality = state.autonomous_source_quality_oracle;
   const discoveryDelta = state.live_discovery_delta_tape;
   const ranker = state.autonomous_opportunity_ranker;
   const positionBoard = state.autonomous_portfolio_mark_board;
@@ -955,6 +956,7 @@ function QuickTradingCommandDeck({
       ? "critical"
       : "caution";
   const liveTone: QuickChipTone = state.execution_gate.live_execution_enabled ? "critical" : "demo";
+  const sourceTone = sourceQualityTone(sourceQuality.status, sourceQuality.can_chase);
 
   return (
     <section className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(21rem,0.8fr)]" aria-label="Autonomous trading command deck">
@@ -971,6 +973,7 @@ function QuickTradingCommandDeck({
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Chip tone={primaryTone}>{decision.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={sourceTone}>source {sourceQuality.status.replaceAll("-", " ")}</Chip>
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watching" : autoWatchPlan.label}</Chip>
             <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
           </div>
@@ -1030,6 +1033,12 @@ function QuickTradingCommandDeck({
               value={outcome.kind === "stand-down" ? "stand down" : outcome.label}
               detail={`${formatCompactSignedCurrency(outcome.walletDeltaUsd)} wallet · ${outcome.fillDelta} fills`}
               tone={outcome.tone}
+            />
+            <ProfitMetric
+              label="Source quality"
+              value={`${sourceQuality.quality_score}/100`}
+              detail={`${sourceQuality.leader_symbol ?? "desk"} · ${sourceQuality.leader_action?.replaceAll("-", " ") ?? sourceQuality.status.replaceAll("-", " ")}`}
+              tone={sourceTone}
             />
             <ProfitMetric
               label="Discovery delta"
@@ -1116,7 +1125,7 @@ function QuickTradingCommandDeck({
       </aside>
 
       <span className="sr-only" aria-label="Autonomous command deck receipt">
-        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
+        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
       </span>
     </section>
   );
@@ -5647,6 +5656,17 @@ function dataFreshnessTone(
   return "demo";
 }
 
+function sourceQualityTone(
+  status: Web3TradingState["autonomous_source_quality_oracle"]["status"],
+  canChase: boolean,
+): QuickChipTone {
+  if (canChase || status === "organic" || status === "boosted-confirmed") return "engine";
+  if (status === "paid-hype" || status === "blocked") return "critical";
+  if (status === "refresh-first") return "caution";
+  if (status === "sample") return "demo";
+  return "neutral";
+}
+
 function profitRunGuardTone(
   status: Web3TradingState["autonomous_profit_run_guard"]["status"],
   blocksFreshBuy: boolean,
@@ -6365,6 +6385,7 @@ function averageNumbers(values: number[]) {
 
 export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNextMove[] {
   const dataGate = state.autonomous_data_freshness_gate;
+  const sourceQuality = state.autonomous_source_quality_oracle;
   const tickGovernor = state.autonomous_tick_governor;
   const commandCenter = state.autonomous_command_center;
   const commandExecution = state.autonomous_command_center_execution;
@@ -6393,6 +6414,19 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
       score: dataGate.data_score,
       budgetUsd: 0,
       tone: dataGate.status === "blocked" ? "critical" : dataGate.status === "sample" ? "demo" : "caution",
+    });
+  }
+
+  if (sourceQuality.status === "refresh-first" || sourceQuality.status === "paid-hype" || sourceQuality.status === "blocked") {
+    moves.push({
+      id: "source-quality",
+      label: sourceQuality.leader_symbol ? `Source ${sourceQuality.leader_symbol}` : "Source quality",
+      action: sourceQuality.leader_action?.replaceAll("-", " ") ?? sourceQuality.status.replaceAll("-", " "),
+      detail: sourceQuality.next_action,
+      etaSeconds: boundedSeconds(sourceQuality.fastest_review_seconds),
+      score: sourceQuality.quality_score,
+      budgetUsd: 0,
+      tone: sourceQuality.status === "paid-hype" || sourceQuality.status === "blocked" ? "critical" : "caution",
     });
   }
 
