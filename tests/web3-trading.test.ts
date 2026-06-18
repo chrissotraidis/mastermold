@@ -5400,8 +5400,14 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(["sample", "live-dex"]).toContain(state.autonomous_daemon_handoff.request.source);
     expect(state.autonomous_daemon_handoff.lease_id).toContain("handoff-");
+    expect(["idle", "acquired", "renewed", "replayed", "conflict", "expired", "blocked"]).toContain(state.autonomous_daemon_handoff.lease_status);
     expect(state.autonomous_daemon_handoff.lease_ttl_seconds).toBeGreaterThan(0);
     expect(state.autonomous_daemon_handoff.renew_after_seconds).toBeGreaterThan(0);
+    expect(typeof state.autonomous_daemon_handoff.can_issue_tick).toBe("boolean");
+    expect(state.autonomous_daemon_handoff.active_runner_id === null || typeof state.autonomous_daemon_handoff.active_runner_id === "string").toBe(true);
+    expect(state.autonomous_daemon_handoff.active_request_id === null || typeof state.autonomous_daemon_handoff.active_request_id === "string").toBe(true);
+    expect(state.autonomous_daemon_handoff.lease_replay_count).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_daemon_handoff.lease_conflict_count).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_daemon_handoff.can_trade_real_capital).toBe(false);
     expect(state.autonomous_daemon_handoff.items.map((item) => item.id)).toEqual([
       "lease",
@@ -7058,6 +7064,8 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(state.autonomous_daemon_handoff.next_wake_seconds).toBe(state.autonomous_run_envelope.next_wake_seconds);
     expect(state.autonomous_daemon_handoff.next_wake_at).toBe(state.autonomous_run_envelope.next_wake_at);
+    expect(["idle", "acquired", "renewed", "replayed", "conflict", "expired", "blocked"]).toContain(state.autonomous_daemon_handoff.lease_status);
+    expect(typeof state.autonomous_daemon_handoff.can_issue_tick).toBe("boolean");
     expect(state.autonomous_daemon_handoff.can_trade_real_capital).toBe(false);
     expect(state.autonomous_daemon_handoff.max_fills_per_lease).toBeLessThanOrEqual(3);
     expect(state.autonomous_daemon_handoff.max_trades_next_minute).toBeLessThanOrEqual(state.autonomous_run_envelope.max_trades_next_minute);
@@ -7717,6 +7725,89 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(second.post_trade_review.recommended_cadence_seconds).toBeGreaterThan(0);
   });
 
+  test("GIVEN a duplicate daemon lease request WHEN posted twice THEN the second request is replay-blocked", async () => {
+    const body = {
+      account: "persistent",
+      reset: true,
+      scenario: "breakout",
+      daemon: true,
+      daemon_lease: {
+        lease_id: "lease-replay-test-001",
+        runner_id: "runner-alpha",
+        request_id: "request-replay-test-001",
+        issued_at: new Date().toISOString(),
+      },
+    };
+    const first = await POST(
+      new Request("http://localhost/api/web3-trading", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    );
+    const replay = await POST(
+      new Request("http://localhost/api/web3-trading", {
+        method: "POST",
+        body: JSON.stringify({ ...body, reset: false }),
+      }),
+    );
+    const firstState = await json<Web3TradingState>(first);
+    const replayState = await json<Web3TradingState>(replay);
+
+    expect(first.status).toBe(200);
+    expect(replay.status).toBe(200);
+    expect(firstState.autonomous_daemon_handoff.active_runner_id).toBe("runner-alpha");
+    expect(replayState.autonomous_daemon_handoff.lease_status).toBe("replayed");
+    expect(replayState.autonomous_daemon_handoff.can_issue_tick).toBe(false);
+    expect(replayState.paper_daemon.advanced).toBe(false);
+    expect(replayState.autonomous_daemon_handoff.lease_replay_count).toBeGreaterThanOrEqual(1);
+  });
+
+  test("GIVEN an active daemon lease WHEN another runner posts THEN the conflict is persisted and no paper advance occurs", async () => {
+    const first = await POST(
+      new Request("http://localhost/api/web3-trading", {
+        method: "POST",
+        body: JSON.stringify({
+          account: "persistent",
+          reset: true,
+          scenario: "breakout",
+          daemon: true,
+          daemon_lease: {
+            lease_id: "lease-conflict-test-001",
+            runner_id: "runner-alpha",
+            request_id: "request-conflict-alpha",
+          },
+        }),
+      }),
+    );
+    const firstState = await json<Web3TradingState>(first);
+    const conflict = await POST(
+      new Request("http://localhost/api/web3-trading", {
+        method: "POST",
+        body: JSON.stringify({
+          account: "persistent",
+          scenario: "breakout",
+          daemon: true,
+          daemon_lease: {
+            lease_id: "lease-conflict-test-002",
+            runner_id: "runner-beta",
+            request_id: "request-conflict-beta",
+          },
+        }),
+      }),
+    );
+    const conflictState = await json<Web3TradingState>(conflict);
+
+    expect(first.status).toBe(200);
+    expect(conflict.status).toBe(200);
+    expect(firstState.autonomous_daemon_handoff.active_runner_id).toBe("runner-alpha");
+    expect(conflictState.autonomous_daemon_handoff.lease_status).toBe("conflict");
+    expect(conflictState.autonomous_daemon_handoff.active_runner_id).toBe("runner-alpha");
+    expect(conflictState.autonomous_daemon_handoff.lease_conflict_count).toBeGreaterThanOrEqual(1);
+    expect(conflictState.autonomous_daemon_handoff.can_issue_tick).toBe(false);
+    expect(conflictState.paper_daemon.advanced).toBe(false);
+    expect(conflictState.paper_account.cycle).toBe(firstState.paper_account.cycle);
+  });
+
   test("POST /api/web3-trading validates requested cycles", async () => {
     const bad = await POST(
       new Request("http://localhost/api/web3-trading", {
@@ -7734,6 +7825,27 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(bad.status).toBe(422);
     expect(good.status).toBe(200);
     expect((await json<Web3TradingState>(good)).scenario).toBe("rug-risk");
+  });
+
+  test("POST /api/web3-trading validates daemon lease requests", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/web3-trading", {
+        method: "POST",
+        body: JSON.stringify({
+          account: "persistent",
+          daemon: true,
+          daemon_lease: {
+            lease_id: "short",
+            runner_id: "x",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    expect(await json<{ error: string }>(response)).toEqual({
+      error: "daemon_lease.lease_id must be a string from 8 to 160 characters.",
+    });
   });
 
   test("POST /api/web3-trading validates requested source", async () => {

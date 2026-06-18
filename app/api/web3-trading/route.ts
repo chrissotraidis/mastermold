@@ -8,6 +8,7 @@ import {
   isTradingScenario,
   type AutonomousBurstRunRequest,
   type AutonomousCandleRefreshRecordRequest,
+  type AutonomousDaemonLeaseRequest,
   type AutonomousLoopTickRequest,
   type AutonomousSessionRunRequest,
   type ExecutionUpdate,
@@ -44,6 +45,7 @@ type TradingRequest = {
   autonomous_burst?: AutonomousBurstRunRequest;
   autonomous_session?: AutonomousSessionRunRequest;
   autonomous_loop?: AutonomousLoopTickRequest;
+  daemon_lease?: AutonomousDaemonLeaseRequest;
   candle_refresh?: AutonomousCandleRefreshRecordRequest;
 };
 
@@ -112,6 +114,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
   const autonomousBurst = record.autonomous_burst === undefined ? undefined : parseAutonomousBurstRunRequest(record.autonomous_burst);
   const autonomousSession = record.autonomous_session === undefined ? undefined : parseAutonomousSessionRunRequest(record.autonomous_session);
   const autonomousLoop = record.autonomous_loop === undefined ? undefined : parseAutonomousLoopTickRequest(record.autonomous_loop);
+  const daemonLease = record.daemon_lease === undefined ? undefined : parseAutonomousDaemonLeaseRequest(record.daemon_lease);
   const candleRefresh = record.candle_refresh === undefined ? undefined : parseCandleRefreshRecordRequest(record.candle_refresh);
 
   if (!isTradingScenario(scenario)) {
@@ -186,6 +189,10 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
     return { ok: false, error: autonomousLoop.error };
   }
 
+  if (daemonLease && !daemonLease.ok) {
+    return { ok: false, error: daemonLease.error };
+  }
+
   if (candleRefresh && !candleRefresh.ok) {
     return { ok: false, error: candleRefresh.error };
   }
@@ -212,6 +219,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       autonomous_burst: autonomousBurst?.value,
       autonomous_session: autonomousSession?.value,
       autonomous_loop: autonomousLoop?.value,
+      daemon_lease: daemonLease?.value,
       candle_refresh: candleRefresh?.value,
     },
   };
@@ -362,6 +370,41 @@ function parseAutonomousLoopTickRequest(value: unknown):
   }
 
   return { ok: true, value: { action: "tick" } };
+}
+
+function parseAutonomousDaemonLeaseRequest(value: unknown):
+  | { ok: true; value: AutonomousDaemonLeaseRequest }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "daemon_lease must be an object." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.lease_id !== "string" || record.lease_id.trim().length < 8 || record.lease_id.trim().length > 160) {
+    return { ok: false, error: "daemon_lease.lease_id must be a string from 8 to 160 characters." };
+  }
+
+  if (typeof record.runner_id !== "string" || record.runner_id.trim().length < 3 || record.runner_id.trim().length > 80) {
+    return { ok: false, error: "daemon_lease.runner_id must be a string from 3 to 80 characters." };
+  }
+
+  if (record.request_id !== undefined && (typeof record.request_id !== "string" || record.request_id.trim().length < 8 || record.request_id.trim().length > 180)) {
+    return { ok: false, error: "daemon_lease.request_id must be a string from 8 to 180 characters." };
+  }
+
+  if (record.issued_at !== undefined && (typeof record.issued_at !== "string" || !Number.isFinite(Date.parse(record.issued_at)))) {
+    return { ok: false, error: "daemon_lease.issued_at must be a valid ISO timestamp." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      lease_id: record.lease_id.trim(),
+      runner_id: record.runner_id.trim(),
+      ...(record.request_id === undefined ? {} : { request_id: record.request_id.trim() }),
+      ...(record.issued_at === undefined ? {} : { issued_at: record.issued_at }),
+    },
+  };
 }
 
 function parseRouteRefreshRequest(value: unknown):

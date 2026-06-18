@@ -8712,16 +8712,52 @@ export type AutonomousDaemonHandoffItem = {
   detail: string;
 };
 
+export type AutonomousDaemonLeaseStatus = "idle" | "acquired" | "renewed" | "replayed" | "conflict" | "expired" | "blocked";
+
+export type AutonomousDaemonLeaseRequest = {
+  lease_id: string;
+  runner_id: string;
+  request_id?: string;
+  issued_at?: string;
+};
+
+type AutonomousDaemonLeaseRecord = {
+  mode: "autonomous-daemon-lease";
+  lease_id: string;
+  runner_id: string;
+  request_id: string | null;
+  acquired_at: string;
+  renewed_at: string;
+  expires_at: string;
+  last_request_at: string;
+  last_request_cycle: number;
+  status: Exclude<AutonomousDaemonLeaseStatus, "idle">;
+  renewal_count: number;
+  replay_count: number;
+  conflict_count: number;
+  last_conflict_runner_id: string | null;
+  last_event: string;
+};
+
 export type AutonomousDaemonHandoff = {
   mode: "autonomous-daemon-handoff";
   status: "ready" | "observe-only" | "refresh-first" | "protect-only" | "paused" | "blocked";
   summary: string;
   runner_role: "external-scheduler";
   lease_id: string;
+  lease_status: AutonomousDaemonLeaseStatus;
   lease_ttl_seconds: number;
   renew_after_seconds: number;
   next_wake_seconds: number;
   next_wake_at: string;
+  active_runner_id: string | null;
+  active_request_id: string | null;
+  active_expires_at: string | null;
+  lease_renewal_count: number;
+  lease_replay_count: number;
+  lease_conflict_count: number;
+  last_lease_event: string | null;
+  can_issue_tick: boolean;
   endpoint: "/api/web3-trading";
   method: "POST";
   request: {
@@ -9149,6 +9185,7 @@ export type TradingStateInput = {
   autonomous_burst?: AutonomousBurstRunRequest;
   autonomous_session?: AutonomousSessionRunRequest;
   autonomous_loop?: AutonomousLoopTickRequest;
+  daemon_lease?: AutonomousDaemonLeaseRequest;
   candle_refresh?: AutonomousCandleRefreshRecordRequest;
   fetchImpl?: FetchLike;
 };
@@ -9339,6 +9376,128 @@ function persistentPaperAdvanceMode(
   if (daemonRequested && persistentPaperHasProtectiveSellReady(state)) return "protect-only";
   if (requestedPersistentPaperAdvance(input, state, daemonRequested)) return "all";
   return "off";
+}
+
+function resolveDaemonLeaseAdvanceMode(
+  input: TradingStateInput,
+  state: Web3TradingState,
+  requestedMode: PersistentPaperAdvanceMode,
+  daemonRequested: boolean,
+  accountMode: TradingAccountMode,
+  now = new Date().toISOString(),
+): PersistentPaperAdvanceMode {
+  if (!daemonRequested || accountMode !== "persistent") return requestedMode;
+  const receipt = recordAutonomousDaemonLeaseRequest({
+    state,
+    request: input.daemon_lease,
+    requestedMode,
+    now,
+  });
+  return receipt.allows_advance ? requestedMode : "off";
+}
+
+function recordAutonomousDaemonLeaseRequest({
+  state,
+  request,
+  requestedMode,
+  now,
+}: {
+  state: Web3TradingState;
+  request: AutonomousDaemonLeaseRequest | undefined;
+  requestedMode: PersistentPaperAdvanceMode;
+  now: string;
+}) {
+  const current = readLedger() ?? createLedger(now);
+  const data = parseLedgerData(current.data);
+  const prior = data.daemon_lease;
+  const leaseId = normalizeDaemonLeaseText(request?.lease_id, state.autonomous_daemon_handoff.lease_id, 160);
+  const runnerId = normalizeDaemonLeaseText(request?.runner_id, "implicit-daemon-runner", 80);
+  const requestId = request?.request_id === undefined
+    ? null
+    : normalizeDaemonLeaseText(request.request_id, "", 180) || null;
+  const issuedAt = typeof request?.issued_at === "string" && Number.isFinite(Date.parse(request.issued_at))
+    ? request.issued_at
+    : now;
+  const ttl = Math.max(20, Math.min(120, state.autonomous_daemon_handoff.lease_ttl_seconds));
+  const expiresAt = isoAfterSeconds(now, ttl);
+  const activePrior = Boolean(prior && Date.parse(prior.expires_at) > Date.parse(now));
+  const duplicateRequest = Boolean(requestId && prior?.request_id === requestId);
+  let allowsAdvance = requestedMode !== "off";
+  let next: AutonomousDaemonLeaseRecord;
+
+  if (prior && duplicateRequest) {
+    allowsAdvance = false;
+    next = {
+      ...prior,
+      status: "replayed",
+      last_request_at: now,
+      replay_count: prior.replay_count + 1,
+      last_event: `Duplicate daemon request ${requestId} was replay-blocked.`,
+    };
+  } else if (prior && activePrior && prior.runner_id !== runnerId) {
+    allowsAdvance = false;
+    next = {
+      ...prior,
+      status: "conflict",
+      last_request_at: now,
+      conflict_count: prior.conflict_count + 1,
+      last_conflict_runner_id: runnerId,
+      last_event: `Runner ${runnerId} was blocked while ${prior.runner_id} owns the active daemon lease.`,
+    };
+  } else if (prior && activePrior) {
+    next = {
+      ...prior,
+      lease_id: leaseId,
+      request_id: requestId,
+      renewed_at: now,
+      expires_at: expiresAt,
+      last_request_at: now,
+      last_request_cycle: state.paper_account.cycle,
+      status: "renewed",
+      renewal_count: prior.renewal_count + 1,
+      last_event: `Runner ${runnerId} renewed the daemon lease from ${issuedAt}.`,
+    };
+  } else {
+    next = {
+      mode: "autonomous-daemon-lease",
+      lease_id: leaseId,
+      runner_id: runnerId,
+      request_id: requestId,
+      acquired_at: now,
+      renewed_at: now,
+      expires_at: expiresAt,
+      last_request_at: now,
+      last_request_cycle: state.paper_account.cycle,
+      status: prior ? "expired" : "acquired",
+      renewal_count: 0,
+      replay_count: prior?.replay_count ?? 0,
+      conflict_count: prior?.conflict_count ?? 0,
+      last_conflict_runner_id: prior?.last_conflict_runner_id ?? null,
+      last_event: prior
+        ? `Expired daemon lease was replaced by runner ${runnerId}.`
+        : `Runner ${runnerId} acquired the daemon lease.`,
+    };
+  }
+
+  store().upsertWeb3PaperLedger({
+    ...current,
+    updated_at: now,
+    data: {
+      ...data,
+      daemon_lease: next,
+    } satisfies LedgerData,
+  });
+
+  return {
+    allows_advance: allowsAdvance,
+    lease: next,
+  };
+}
+
+function normalizeDaemonLeaseText(value: unknown, fallback: string, maxLength: number) {
+  const raw = typeof value === "string" ? value : fallback;
+  const normalized = raw.trim().replace(/[^a-zA-Z0-9_.:-]/g, "-").replace(/-+/g, "-").slice(0, maxLength);
+  return normalized || fallback.slice(0, maxLength);
 }
 
 function persistentPaperAdvanceAllowsTrade(mode: PersistentPaperAdvanceMode, trade: AutonomousTrade | null | undefined) {
@@ -10264,6 +10423,7 @@ async function runAutonomousSession(input: TradingStateInput): Promise<Web3Tradi
       cycles: Math.min(current.paper_account.cycle + 1, 24),
       daemon: true,
       advance: session.advancePaper,
+      daemon_lease: daemonLeaseForChildTick(input.daemon_lease, index + 1),
       portfolio_sweep: undefined,
       autonomous_session: undefined,
       autonomous_burst: {
@@ -10397,6 +10557,18 @@ async function runAutonomousSession(input: TradingStateInput): Promise<Web3Tradi
     autonomous_profit_learning: sessionProfitLearning,
     autonomous_profit_allocation_plan: sessionProfitAllocationPlan,
     autonomous_lane_capital_controller: sessionLaneCapitalController,
+  };
+}
+
+function daemonLeaseForChildTick(
+  lease: AutonomousDaemonLeaseRequest | undefined,
+  tickNumber: number,
+): AutonomousDaemonLeaseRequest | undefined {
+  if (!lease) return undefined;
+  const rootRequestId = lease.request_id ?? lease.lease_id;
+  return {
+    ...lease,
+    request_id: `${rootRequestId}:tick-${tickNumber}`,
   };
 }
 
@@ -12428,7 +12600,8 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       portfolioMark: configuredState.autonomous_portfolio_mark_board,
       profitIntegrity: configuredState.autonomous_profit_integrity_circuit,
     });
-    const advanceMode = persistentPaperAdvanceMode(input, configuredState, daemonRequested);
+    const requestedAdvanceMode = persistentPaperAdvanceMode(input, configuredState, daemonRequested);
+    const advanceMode = resolveDaemonLeaseAdvanceMode(input, configuredState, requestedAdvanceMode, daemonRequested, accountMode, now);
     const ledgerState = accountMode === "persistent" ? applyPersistentLedger(configuredState, advanceMode, portfolioSweep, input.autonomous_burst?.max_child_fills) : configuredState;
     const tickedState = attachPaperDaemonTick(ledgerState, {
       requested: daemonRequested,
@@ -12459,7 +12632,8 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       executionConfig,
     });
     applyOnchainEventSignals(fallbackState, parseLedgerData(readLedger()?.data).onchain_events);
-    const advanceMode = persistentPaperAdvanceMode(input, fallbackState, daemonRequested);
+    const requestedAdvanceMode = persistentPaperAdvanceMode(input, fallbackState, daemonRequested);
+    const advanceMode = resolveDaemonLeaseAdvanceMode(input, fallbackState, requestedAdvanceMode, daemonRequested, accountMode, now);
     const ledgerState = accountMode === "persistent" ? applyPersistentLedger(fallbackState, advanceMode, portfolioSweep, input.autonomous_burst?.max_child_fills) : fallbackState;
     const tickedState = attachPaperDaemonTick(ledgerState, {
       requested: daemonRequested,
@@ -12488,7 +12662,8 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     executionConfig,
   });
   applyOnchainEventSignals(liveState, parseLedgerData(readLedger()?.data).onchain_events);
-  const advanceMode = persistentPaperAdvanceMode(input, liveState, daemonRequested);
+  const requestedAdvanceMode = persistentPaperAdvanceMode(input, liveState, daemonRequested);
+  const advanceMode = resolveDaemonLeaseAdvanceMode(input, liveState, requestedAdvanceMode, daemonRequested, accountMode, now);
   const ledgerState = accountMode === "persistent" ? applyPersistentLedger(liveState, advanceMode, portfolioSweep, input.autonomous_burst?.max_child_fills) : liveState;
   const fetchImpl = input.fetchImpl ?? fetch;
   const plannedState = await attachExecutionPlans(ledgerState, fetchImpl);
@@ -17535,6 +17710,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     routeRefreshExecution: state.autonomous_route_refresh_execution,
     daemonMemory: state.paper_daemon_memory,
     liveReadiness: autonomous_live_autonomy_readiness,
+    daemonLease: parseLedgerData(readLedger()?.data).daemon_lease,
   });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
@@ -18099,6 +18275,7 @@ function applyTriggerReconciliationPatch(
       last_autonomous_session_run: data.last_autonomous_session_run,
       last_autonomous_loop_tick: data.last_autonomous_loop_tick,
       last_autonomous_candle_refresh: data.last_autonomous_candle_refresh,
+      daemon_lease: data.daemon_lease,
     } satisfies LedgerData,
   });
 
@@ -22207,6 +22384,7 @@ function applyPersistentLedger(
     routeRefreshExecution: autonomous_route_refresh_execution,
     daemonMemory: paper_daemon_memory,
     liveReadiness: autonomous_live_autonomy_readiness,
+    daemonLease: ledgerData.daemon_lease,
   });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
@@ -22855,6 +23033,7 @@ type LedgerData = {
   last_autonomous_session_run: AutonomousSessionRunReport | null;
   last_autonomous_loop_tick: AutonomousLoopTickReport | null;
   last_autonomous_candle_refresh: AutonomousCandleRefreshReceipt | null;
+  daemon_lease: AutonomousDaemonLeaseRecord | null;
 };
 
 type AutonomousAdvancePolicy = {
@@ -22892,6 +23071,7 @@ function createLedger(now: string): Web3PaperLedgerRow {
       last_autonomous_session_run: null,
       last_autonomous_loop_tick: null,
       last_autonomous_candle_refresh: null,
+      daemon_lease: null,
     } satisfies LedgerData,
   };
 }
@@ -23360,6 +23540,7 @@ function advanceLedger(
       last_autonomous_session_run: data.last_autonomous_session_run,
       last_autonomous_loop_tick: data.last_autonomous_loop_tick,
       last_autonomous_candle_refresh: data.last_autonomous_candle_refresh,
+      daemon_lease: data.daemon_lease,
     } satisfies LedgerData,
   };
 }
@@ -70154,6 +70335,7 @@ function buildAutonomousDaemonHandoff({
   routeRefreshExecution,
   daemonMemory,
   liveReadiness,
+  daemonLease = null,
 }: {
   marketSource: Web3TradingState["market_source"];
   runEnvelope: AutonomousRunEnvelope;
@@ -70164,14 +70346,23 @@ function buildAutonomousDaemonHandoff({
   routeRefreshExecution: AutonomousRouteRefreshExecution;
   daemonMemory: PaperDaemonMemory;
   liveReadiness: AutonomousLiveAutonomyReadiness;
+  daemonLease?: AutonomousDaemonLeaseRecord | null;
 }): AutonomousDaemonHandoff {
   const leaseTtlSeconds = Math.max(20, Math.min(120, runEnvelope.next_wake_seconds * 3));
   const renewAfterSeconds = Math.max(5, Math.min(runEnvelope.next_wake_seconds, Math.floor(leaseTtlSeconds * 0.55)));
   const leaseSeed = `${runEnvelope.target_symbol ?? "desk"}-${Date.parse(runEnvelope.next_wake_at) || 0}-${runEnvelope.action}`;
+  const leaseStatus = autonomousDaemonLeaseStatus(daemonLease, marketSource.fetched_at);
+  const leaseBlocksTick = leaseStatus === "conflict" || leaseStatus === "replayed" || leaseStatus === "blocked";
+  const leaseHardBlocker = leaseStatus === "conflict"
+    ? daemonLease?.last_event ?? "Another active runner owns the daemon lease."
+    : leaseStatus === "blocked"
+      ? daemonLease?.last_event ?? "Daemon lease is blocked."
+      : null;
   const canRunBackgroundPaper = liveReadiness.can_run_unattended &&
     runEnvelope.keep_running &&
     loopDirector.should_issue_daemon_tick &&
     !daemonMemory.pause_new_entries &&
+    !leaseBlocksTick &&
     liveReadiness.status !== "blocked";
   const shouldProtect = runEnvelope.action === "protect-book" ||
     tickGovernor.should_protect_first ||
@@ -70182,6 +70373,7 @@ function buildAutonomousDaemonHandoff({
     marketIngestion.status === "blocked" ||
     marketIngestion.status === "paused";
   const hardBlockers = [
+    ...(leaseHardBlocker ? [leaseHardBlocker] : []),
     ...(liveReadiness.status === "blocked" ? liveReadiness.blockers : []),
     ...loopDirector.blockers,
     ...(runEnvelope.status === "blocked" && runEnvelope.stop_reason ? [runEnvelope.stop_reason] : []),
@@ -70216,9 +70408,11 @@ function buildAutonomousDaemonHandoff({
     {
       id: "lease",
       label: "Lease",
-      status: status === "blocked" || status === "paused" ? "fail" : "pass",
-      score: status === "blocked" ? 0 : status === "paused" ? 32 : 88,
-      detail: `${leaseTtlSeconds}s lease, renew after ${renewAfterSeconds}s, id ${leaseSeed}.`,
+      status: leaseStatus === "conflict" || leaseStatus === "blocked" ? "fail" : leaseStatus === "replayed" || leaseStatus === "expired" ? "watch" : "pass",
+      score: leaseStatus === "conflict" || leaseStatus === "blocked" ? 0 : leaseStatus === "replayed" ? 36 : leaseStatus === "expired" ? 54 : 88,
+      detail: daemonLease
+        ? `${leaseStatus.replaceAll("-", " ")} for ${daemonLease.runner_id}; expires ${daemonLease.expires_at}.`
+        : `${leaseTtlSeconds}s lease, renew after ${renewAfterSeconds}s, id ${leaseSeed}.`,
     },
     {
       id: "cadence",
@@ -70272,10 +70466,19 @@ function buildAutonomousDaemonHandoff({
     summary: autonomousDaemonHandoffSummary(status, runEnvelope, liveReadiness, leaseTtlSeconds),
     runner_role: "external-scheduler",
     lease_id: `handoff-${leaseSeed}`,
+    lease_status: leaseStatus,
     lease_ttl_seconds: leaseTtlSeconds,
     renew_after_seconds: renewAfterSeconds,
     next_wake_seconds: runEnvelope.next_wake_seconds,
     next_wake_at: runEnvelope.next_wake_at,
+    active_runner_id: daemonLease?.runner_id ?? null,
+    active_request_id: daemonLease?.request_id ?? null,
+    active_expires_at: daemonLease?.expires_at ?? null,
+    lease_renewal_count: daemonLease?.renewal_count ?? 0,
+    lease_replay_count: daemonLease?.replay_count ?? 0,
+    lease_conflict_count: daemonLease?.conflict_count ?? 0,
+    last_lease_event: daemonLease?.last_event ?? null,
+    can_issue_tick: canRunBackgroundPaper && status !== "blocked" && status !== "paused" && !leaseBlocksTick,
     endpoint: "/api/web3-trading",
     method: "POST",
     request: {
@@ -70303,6 +70506,16 @@ function buildAutonomousDaemonHandoff({
     ],
     items,
   };
+}
+
+function autonomousDaemonLeaseStatus(
+  lease: AutonomousDaemonLeaseRecord | null | undefined,
+  asOf = new Date().toISOString(),
+): AutonomousDaemonLeaseStatus {
+  if (!lease) return "idle";
+  if (lease.status === "conflict" || lease.status === "replayed" || lease.status === "blocked") return lease.status;
+  if (Date.parse(lease.expires_at) <= Date.parse(asOf)) return "expired";
+  return lease.status;
 }
 
 function autonomousDaemonHandoffSummary(
@@ -76883,7 +77096,31 @@ function parseLedgerData(value: unknown): LedgerData {
     last_autonomous_candle_refresh: isAutonomousCandleRefreshReceipt(data.last_autonomous_candle_refresh)
       ? data.last_autonomous_candle_refresh
       : null,
+    daemon_lease: isAutonomousDaemonLeaseRecord(data.daemon_lease)
+      ? data.daemon_lease
+      : null,
   };
+}
+
+function isAutonomousDaemonLeaseRecord(value: unknown): value is AutonomousDaemonLeaseRecord {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Partial<AutonomousDaemonLeaseRecord>;
+  const statuses: AutonomousDaemonLeaseRecord["status"][] = ["acquired", "renewed", "replayed", "conflict", "expired", "blocked"];
+  return row.mode === "autonomous-daemon-lease" &&
+    typeof row.lease_id === "string" &&
+    typeof row.runner_id === "string" &&
+    (row.request_id === null || typeof row.request_id === "string") &&
+    typeof row.acquired_at === "string" &&
+    typeof row.renewed_at === "string" &&
+    typeof row.expires_at === "string" &&
+    typeof row.last_request_at === "string" &&
+    typeof row.last_request_cycle === "number" &&
+    typeof row.renewal_count === "number" &&
+    typeof row.replay_count === "number" &&
+    typeof row.conflict_count === "number" &&
+    (row.last_conflict_runner_id === null || typeof row.last_conflict_runner_id === "string") &&
+    typeof row.last_event === "string" &&
+    statuses.includes(row.status as AutonomousDaemonLeaseRecord["status"]);
 }
 
 function isAutonomousCandleRefreshReceipt(value: unknown): value is AutonomousCandleRefreshReceipt {

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Activity, CandlestickChart, LineChart, Pause, Play, RefreshCw, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 
 import { Chip } from "@/components/sentinel";
-import type { AutonomousCandleRefreshRecordRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
+import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
 type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "source" | "reset";
@@ -110,10 +110,13 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
     setQuickBusy(busy);
     setQuickNotice(busy === "loop" ? "Asking the backend loop throttle for the next autonomous paper step." : busy === "session" ? "Running a bounded autonomous paper cycle." : busy === "minute" ? "Running the next-minute high-frequency paper plan." : busy === "source" ? "Switching the read-only market feed." : busy === "reset" ? "Resetting the local paper account." : busy === "chart" ? "Recording fresh chart proof for the autonomous candle gate." : busy === "route" ? "Refreshing read-only route proof for the selected paper action." : busy === "route-repair" ? "Route quote is blocked; repairing the read-only market and route evidence first." : "Refreshing the autonomous market read.");
     try {
+      const requestBody = body.daemon === true && body.daemon_lease === undefined
+        ? { ...body, daemon_lease: buildDaemonLeaseRequest(previousState) }
+        : body;
       const response = await fetch("/api/web3-trading", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(requestBody),
       });
       const payload = (await response.json()) as Web3TradingState | { error: string };
       if (!response.ok || "error" in payload) {
@@ -183,6 +186,8 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           cycles: state.paper_account.cycle,
           source: state.market_source.mode,
           account: state.paper_account.mode,
+          daemon: true,
+          daemon_lease: buildDaemonLeaseRequest(state),
           autonomous_loop: {
             action: "tick",
           },
@@ -236,6 +241,16 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
     } finally {
       setQuickBusy(null);
     }
+  }
+
+  function buildDaemonLeaseRequest(current: Web3TradingState): AutonomousDaemonLeaseRequest {
+    const handoff = current.autonomous_daemon_handoff;
+    return {
+      lease_id: handoff.lease_id,
+      runner_id: "browser-auto-watch",
+      request_id: `${handoff.lease_id}:${current.paper_account.cycle}:${Date.now()}`,
+      issued_at: new Date().toISOString(),
+    };
   }
 
   function runQuickSession(mode: "cycle" | "minute" = "cycle") {
@@ -760,11 +775,14 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           </div>
 
           {focusMode === "cockpit" ? (
-            <QuickAutopilotMissionPanel
-              state={state}
-              autoWatch={autoWatch}
-              autoWatchPlan={autoWatchPlan}
-            />
+            <div className="mt-2 grid gap-2">
+              <QuickAutopilotMissionPanel
+                state={state}
+                autoWatch={autoWatch}
+                autoWatchPlan={autoWatchPlan}
+              />
+              <QuickDaemonHandoffPanel handoff={daemonHandoff} />
+            </div>
           ) : null}
 
           {focusMode === "portfolio" ? (
@@ -6674,6 +6692,7 @@ function QuickDaemonHandoffPanel({
   handoff: Web3TradingState["autonomous_daemon_handoff"];
 }) {
   const tone = daemonHandoffTone(handoff.status);
+  const leaseTone = daemonHandoffLeaseTone(handoff.lease_status);
   const laneItems = handoff.items.slice(0, 7);
 
   return (
@@ -6692,6 +6711,7 @@ function QuickDaemonHandoffPanel({
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <Chip tone={tone}>{handoff.can_run_background_paper ? "paper runner ready" : "paper runner gated"}</Chip>
+              <Chip tone={leaseTone}>{handoff.lease_status.replaceAll("-", " ")}</Chip>
               <Chip tone={handoff.can_trade_real_capital ? "critical" : "demo"}>{handoff.can_trade_real_capital ? "real funds armed" : "real funds locked"}</Chip>
             </div>
           </div>
@@ -6708,7 +6728,7 @@ function QuickDaemonHandoffPanel({
               <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Lease</p>
               <p className="mt-1 break-words font-mono text-xs text-on-surface">{handoff.lease_id}</p>
               <p className="mt-1 font-mono text-[10px] leading-4 text-outline">
-                renew {handoff.renew_after_seconds}s · wake {handoff.next_wake_seconds}s · {handoff.target_symbol ?? "desk"}
+                renew {handoff.renew_after_seconds}s · wake {handoff.next_wake_seconds}s · runner {handoff.active_runner_id ?? "open"}
               </p>
             </div>
           </div>
@@ -6728,6 +6748,8 @@ function QuickDaemonHandoffPanel({
           <ProfitMetric label="Max fills" value={`${handoff.max_fills_per_lease}`} detail={`${handoff.max_ticks_per_lease} ticks per lease`} tone={handoff.max_fills_per_lease > 0 ? "engine" : "neutral"} />
           <ProfitMetric label="HFT cap" value={`${handoff.max_trades_next_minute}/min`} detail={`${formatCompactSignedCurrency(handoff.expected_profit_per_minute_usd)}/min`} tone={handoff.max_trades_next_minute > 0 ? "engine" : "neutral"} />
           <ProfitMetric label="Budget" value={`${handoff.provider_budget_pct}%`} detail="provider budget" tone={handoff.provider_budget_pct > 85 ? "critical" : handoff.provider_budget_pct > 65 ? "caution" : "engine"} />
+          <ProfitMetric label="Lease guard" value={handoff.can_issue_tick ? "can tick" : "gated"} detail={handoff.last_lease_event ?? "lease available"} tone={handoff.can_issue_tick ? "engine" : leaseTone} />
+          <ProfitMetric label="Replays" value={`${handoff.lease_replay_count}`} detail={`${handoff.lease_conflict_count} conflicts`} tone={handoff.lease_conflict_count > 0 ? "critical" : handoff.lease_replay_count > 0 ? "caution" : "neutral"} />
           <ProfitMetric label="Mode" value={handoff.status.replaceAll("-", " ")} detail={handoff.blockers[0] ?? "lease available"} tone={tone} />
           <div className="col-span-2 rounded-md border border-outline-variant/20 bg-void/20 p-2">
             <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Stop conditions</p>
@@ -6738,7 +6760,7 @@ function QuickDaemonHandoffPanel({
         </div>
       </div>
       <span className="sr-only" aria-label="Autonomous daemon handoff receipt">
-        Daemon handoff status {handoff.status}; can run background paper {handoff.can_run_background_paper ? "yes" : "no"}; can trade real capital {handoff.can_trade_real_capital ? "yes" : "no"}; endpoint {handoff.endpoint}; method {handoff.method}; lease {handoff.lease_id}; lease ttl {handoff.lease_ttl_seconds}; renew after {handoff.renew_after_seconds}; next wake {handoff.next_wake_seconds}; source {handoff.request.source}; target {handoff.target_symbol ?? "desk"}; max ticks {handoff.max_ticks_per_lease}; max fills {handoff.max_fills_per_lease}; max trades next minute {handoff.max_trades_next_minute}; blockers {handoff.blockers.join("; ") || "none"}; stop conditions {handoff.stop_conditions.join(" ")}; controls {handoff.controls.join(" ")}
+        Daemon handoff status {handoff.status}; lease status {handoff.lease_status}; can issue tick {handoff.can_issue_tick ? "yes" : "no"}; active runner {handoff.active_runner_id ?? "none"}; active request {handoff.active_request_id ?? "none"}; lease expires {handoff.active_expires_at ?? "none"}; renewals {handoff.lease_renewal_count}; replays {handoff.lease_replay_count}; conflicts {handoff.lease_conflict_count}; can run background paper {handoff.can_run_background_paper ? "yes" : "no"}; can trade real capital {handoff.can_trade_real_capital ? "yes" : "no"}; endpoint {handoff.endpoint}; method {handoff.method}; lease {handoff.lease_id}; lease ttl {handoff.lease_ttl_seconds}; renew after {handoff.renew_after_seconds}; next wake {handoff.next_wake_seconds}; source {handoff.request.source}; target {handoff.target_symbol ?? "desk"}; max ticks {handoff.max_ticks_per_lease}; max fills {handoff.max_fills_per_lease}; max trades next minute {handoff.max_trades_next_minute}; blockers {handoff.blockers.join("; ") || "none"}; stop conditions {handoff.stop_conditions.join(" ")}; controls {handoff.controls.join(" ")}
       </span>
     </section>
   );
@@ -7274,6 +7296,13 @@ function daemonHandoffTone(status: Web3TradingState["autonomous_daemon_handoff"]
   if (status === "ready" || status === "protect-only") return "engine";
   if (status === "refresh-first" || status === "observe-only") return "caution";
   if (status === "blocked") return "critical";
+  return "neutral";
+}
+
+function daemonHandoffLeaseTone(status: Web3TradingState["autonomous_daemon_handoff"]["lease_status"]): QuickChipTone {
+  if (status === "acquired" || status === "renewed") return "engine";
+  if (status === "replayed" || status === "expired") return "caution";
+  if (status === "conflict" || status === "blocked") return "critical";
   return "neutral";
 }
 

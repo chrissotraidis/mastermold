@@ -905,7 +905,7 @@ async function main() {
     baseline.market_ingestion_plan,
   );
   assert(
-    baseline.market_ingestion_plan.provider_budget_lanes.some((lane) => lane.id === "gecko-ohlcv" && lane.limit_per_minute === 30),
+    baseline.market_ingestion_plan.provider_budget_lanes.some((lane) => lane.id === "gecko-ohlcv" && lane.limit_per_minute === 10),
     "Market ingestion should expose GeckoTerminal OHLCV budget.",
     baseline.market_ingestion_plan,
   );
