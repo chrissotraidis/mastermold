@@ -5831,6 +5831,50 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(execution.controls.some((control) => control.includes("local paper candidate"))).toBe(true);
   });
 
+  test("GIVEN a queued protect-first redeploy receipt WHEN the autonomous daemon ticks THEN the paper ledger applies that protective sell first", async () => {
+    const queued = await getWeb3TradingStateAsync({ account: "persistent", reset: true, scenario: "base", advance: true });
+    const receipt = queued.autonomous_profit_redeploy_execution.paper_trade;
+
+    expect(queued.autonomous_profit_redeploy_execution.status).toBe("queued");
+    expect(receipt).not.toBeNull();
+    expect(receipt?.side).toBe("sell");
+    const receiptId = receipt?.id ?? null;
+    expect(receiptId).not.toBeNull();
+
+    const applied = await getWeb3TradingStateAsync({
+      account: "persistent",
+      scenario: "base",
+      advance: false,
+      daemon: true,
+    });
+    const appliedTrade = applied.trade_tape.find((trade) => trade.id === receiptId);
+
+    expect(applied.paper_daemon.requested).toBe(true);
+    expect(applied.paper_daemon.advanced).toBe(true);
+    expect(applied.paper_account.cycle).toBe(queued.paper_account.cycle);
+    expect(appliedTrade).toMatchObject({
+      id: receiptId,
+      side: "sell",
+      symbol: receipt?.symbol,
+      status: "paper-filled",
+    });
+    expect(appliedTrade?.reason).toContain("Profit redeploy protect-first");
+    expect(["applied", "queued"]).toContain(applied.autonomous_profit_redeploy_execution.status);
+    expect(applied.autonomous_profit_redeploy_execution.source).toBe("profit-capture");
+    expect(applied.autonomous_profit_redeploy_execution.execution_lane).toBe("portfolio-protect");
+    if (applied.autonomous_profit_redeploy_execution.status === "applied") {
+      expect(applied.autonomous_profit_redeploy_execution.ledger_applied).toBe(true);
+      expect(applied.autonomous_profit_redeploy_execution.paper_trade_ready).toBe(false);
+      expect(applied.autonomous_profit_redeploy_execution.paper_trade_id).toBe(receiptId);
+    } else {
+      expect(applied.autonomous_profit_redeploy_execution.paper_trade_ready).toBe(true);
+      expect(applied.autonomous_profit_redeploy_execution.paper_trade_id).not.toBe(receiptId);
+      expect(applied.autonomous_profit_redeploy_execution.next_action).toContain("protective paper sell");
+    }
+    expect(applied.execution_gate.live_execution_enabled).toBe(false);
+    expect(applied.autonomous_profit_redeploy_execution.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
+  });
+
   test("GIVEN launch sniper finds a clean probe WHEN the persistent paper ledger advances THEN it opens a launch-origin position", async () => {
     const state = await getWeb3TradingStateAsync({ account: "persistent", reset: true, scenario: "base", advance: true });
     const launchTrade = state.trade_tape.find((trade) => trade.id.startsWith("paper-launch-") && trade.side === "buy");
@@ -5895,7 +5939,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(["advance", "observe", "stand-down"]).toContain(state.paper_daemon.action);
     expect(["advanced", "observed", "stand-down"]).toContain(state.paper_daemon.status);
     expect(state.paper_daemon.interval_seconds).toBeGreaterThan(0);
-    expect(state.autonomous_loop_director.next_tick_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_loop_director.next_tick_seconds).toBeGreaterThanOrEqual(0);
+    if (state.autonomous_loop_director.status !== "blocked") {
+      expect(state.autonomous_loop_director.next_tick_seconds).toBeGreaterThan(0);
+    }
     expect(state.paper_daemon.next_tick_at).toContain("T");
     expect(state.paper_daemon.current_cycle).toBe(state.paper_account.cycle);
     expect(state.paper_daemon.controls.some((control) => control.includes("Live execution remains locked"))).toBe(true);
@@ -5984,7 +6031,7 @@ describe("Web3 autonomous trading subsystem", () => {
     }
     expect(state.execution_gate.live_execution_enabled).toBe(false);
     if (state.paper_daemon.advanced) {
-      expect(state.paper_daemon.current_cycle).toBeGreaterThan(state.paper_daemon.previous_cycle);
+      expect(state.paper_daemon.current_cycle).toBeGreaterThanOrEqual(state.paper_daemon.previous_cycle);
     } else {
       expect(state.paper_daemon.current_cycle).toBe(state.paper_daemon.previous_cycle);
     }

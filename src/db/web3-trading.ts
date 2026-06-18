@@ -9049,6 +9049,22 @@ function requestedPersistentPaperAdvance(
   return daemonRequested ? state.autonomous_monitor.should_advance_paper : input.advance ?? true;
 }
 
+function queuedProfitRedeployProtectiveSell(state: Web3TradingState): AutonomousTrade | null {
+  const execution = state.autonomous_profit_redeploy_execution;
+  if (
+    execution.status !== "queued" ||
+    execution.source !== "profit-capture" ||
+    execution.execution_lane !== "portfolio-protect" ||
+    execution.selected_side !== "sell" ||
+    execution.execution_boundary !== "paper-ledger-only" ||
+    !execution.paper_trade_ready ||
+    execution.paper_trade?.side !== "sell"
+  ) {
+    return null;
+  }
+  return execution.paper_trade;
+}
+
 function persistentPaperHasProtectiveSellReady(state: Web3TradingState) {
   const coordinator = state.autonomous_protection_coordinator;
   return (
@@ -9061,6 +9077,7 @@ function persistentPaperHasProtectiveSellReady(state: Web3TradingState) {
     state.portfolio_tape_guard_execution.paper_trade?.side === "sell" ||
     state.autonomous_pressure_execution.paper_trade?.side === "sell" ||
     state.autonomous_scalp_exit_autopilot.paper_trade_ready ||
+    Boolean(queuedProfitRedeployProtectiveSell(state)) ||
     Boolean(coordinator && coordinator.status === "queued" && coordinator.ready_release_usd > 0)
   );
 }
@@ -9070,8 +9087,8 @@ function persistentPaperAdvanceMode(
   state: Web3TradingState,
   daemonRequested: boolean,
 ): PersistentPaperAdvanceMode {
-  if (requestedPersistentPaperAdvance(input, state, daemonRequested)) return "all";
   if (daemonRequested && persistentPaperHasProtectiveSellReady(state)) return "protect-only";
+  if (requestedPersistentPaperAdvance(input, state, daemonRequested)) return "all";
   return "off";
 }
 
@@ -20940,8 +20957,42 @@ function applyPersistentLedger(
     watchlistExecution: watchlist_rotation_execution,
     recentTrades: trades,
   });
+  const carriedProfitRedeployProtectiveSell = queuedProfitRedeployProtectiveSell(state);
+  const carriedProfitRedeployLane = carriedProfitRedeployProtectiveSell
+    ? state.autonomous_profit_redeploy_execution.execution_lane
+    : null;
+  const carriedProfitRedeployPosition = carriedProfitRedeployProtectiveSell
+    ? portfolio.open_positions.find((position) => position.symbol === carriedProfitRedeployProtectiveSell.symbol)
+    : null;
+  const carriedProfitRedeployPaperSell = carriedProfitRedeployProtectiveSell && carriedProfitRedeployPosition
+    ? {
+        ...carriedProfitRedeployProtectiveSell,
+        size_usd: Math.round(Math.min(carriedProfitRedeployProtectiveSell.size_usd, carriedProfitRedeployPosition.value_usd)),
+      }
+    : null;
 
-  if (canApplyPaperLanes && autonomous_tick_bundle_execution.ready_trade_count > 0) {
+  if (
+    canApplyPaperLanes &&
+    carriedProfitRedeployPaperSell &&
+    carriedProfitRedeployLane &&
+    carriedProfitRedeployPaperSell.size_usd >= 10 &&
+    !state.execution_gate.live_execution_enabled &&
+    !trades.some((trade) => trade.id === carriedProfitRedeployPaperSell.id) &&
+    persistentPaperAdvanceAllowsTrade(advanceMode, carriedProfitRedeployPaperSell)
+  ) {
+    const redeployProtected = applyArbiterPaperTradeToLedger(
+      next,
+      state.market,
+      carriedProfitRedeployPaperSell,
+    );
+    if (redeployProtected !== next) {
+      store().upsertWeb3PaperLedger(redeployProtected);
+      return applyPersistentLedger(state, "off");
+    }
+  }
+  const canApplyPreRedeployPaperLanes = canApplyPaperLanes && !protectOnlyAdvance;
+
+  if (canApplyPreRedeployPaperLanes && autonomous_tick_bundle_execution.ready_trade_count > 0) {
     const bundled = applyAutonomousTickBundleToLedger({
       row: next,
       market: state.market,
@@ -20976,7 +21027,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     autonomous_action_queue_execution.paper_trade_ready &&
     autonomous_action_queue_execution.paper_trade &&
     autonomous_action_queue_execution.selected_lane &&
@@ -21017,7 +21068,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     autonomous_command_center_execution.paper_trade_ready &&
     autonomous_command_center_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_command_center_execution.paper_trade) &&
@@ -21045,7 +21096,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     portfolio_tape_guard_execution.paper_trade_ready &&
     portfolio_tape_guard_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, portfolio_tape_guard_execution.paper_trade) &&
@@ -21069,7 +21120,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     autonomous_position_risk_execution.paper_trade_ready &&
     autonomous_position_risk_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_position_risk_execution.paper_trade) &&
@@ -21094,7 +21145,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     autonomous_pressure_execution.paper_trade_ready &&
     autonomous_pressure_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_pressure_execution.paper_trade) &&
@@ -21134,7 +21185,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     watchlist_rotation_execution.paper_trade_ready &&
     watchlist_rotation_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, watchlist_rotation_execution.paper_trade) &&
@@ -21160,7 +21211,7 @@ function applyPersistentLedger(
       return applyPersistentLedger(state, "off");
     }
   }
-  if (canApplyPaperLanes && autonomous_trade_batch.ready_count > 0) {
+  if (canApplyPreRedeployPaperLanes && autonomous_trade_batch.ready_count > 0) {
     const batched = applyAutonomousTradeBatchToLedger(next, state.market, autonomous_trade_batch, autonomous_trade_readiness_gate, sameCycleEntrySymbols, autonomous_symbol_quarantine, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, autonomous_regime_tape, autonomous_wallet_growth_director, autonomous_profit_route_selector, autonomous_execution_quality_arbiter, autonomous_token_safety_clearance, queue_protective_trigger_coverage, alpha_decay_controller, state.autonomous_source_quality_oracle, protectOnlyAdvance);
     if (batched !== next) {
       store().upsertWeb3PaperLedger(batched);
@@ -21168,7 +21219,7 @@ function applyPersistentLedger(
     }
   }
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     autonomous_trade_execution_bridge.paper_trade_ready &&
     autonomous_trade_execution_bridge.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_trade_execution_bridge.paper_trade) &&
@@ -21195,7 +21246,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     high_frequency_profit_race_execution.paper_trade_ready &&
     high_frequency_profit_race_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, high_frequency_profit_race_execution.paper_trade) &&
@@ -21223,7 +21274,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     autonomous_opportunity_race_execution.paper_trade_ready &&
     autonomous_opportunity_race_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_opportunity_race_execution.paper_trade) &&
@@ -21251,7 +21302,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     market_intelligence_execution.paper_trade_ready &&
     market_intelligence_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, market_intelligence_execution.paper_trade) &&
@@ -21276,7 +21327,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     market_pulse_execution.paper_trade_ready &&
     market_pulse_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, market_pulse_execution.paper_trade) &&
@@ -21301,7 +21352,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     autonomous_reentry_hunter.paper_trade_ready &&
     autonomous_reentry_hunter.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_reentry_hunter.paper_trade) &&
@@ -21326,7 +21377,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     scout_lifecycle.paper_trade_ready &&
     scout_lifecycle.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, scout_lifecycle.paper_trade) &&
@@ -21353,7 +21404,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPaperLanes &&
+    canApplyPreRedeployPaperLanes &&
     trend_chase_execution.paper_trade_ready &&
     trend_chase_execution.paper_trade &&
     persistentPaperAdvanceAllowsTrade(advanceMode, trend_chase_execution.paper_trade) &&
@@ -21923,47 +21974,6 @@ function applyPersistentLedger(
     recentTrades: trades,
   });
 
-  if (canApplyPaperLanes && autonomous_burst_fill_plan.child_fill_count > 0) {
-    const burstApplied = applyAutonomousBurstFillPlanToLedger({
-      row: next,
-      market: state.market,
-      burstFillPlan: autonomous_burst_fill_plan,
-      advanceMode,
-      protectiveTriggerCoverage: queue_protective_trigger_coverage,
-      tradeReadinessGate: autonomous_trade_readiness_gate,
-      symbolQuarantine: autonomous_symbol_quarantine,
-      laneCapitalController: autonomous_lane_capital_controller,
-      profitAllocationPlan: autonomous_profit_allocation_plan,
-      regimeTape: autonomous_regime_tape,
-      walletGrowthDirector: autonomous_wallet_growth_director,
-      profitRouteSelector: autonomous_profit_route_selector,
-      executionQualityArbiter: autonomous_execution_quality_arbiter,
-      tokenSafetyClearance: autonomous_token_safety_clearance,
-      alphaDecay: alpha_decay_controller,
-      sourceQuality: autonomous_source_quality_oracle,
-      protectiveSellOnly: protectOnlyAdvance,
-    });
-    if (burstApplied !== next) {
-      store().upsertWeb3PaperLedger(burstApplied);
-      return applyPersistentLedger(state, "off");
-    }
-  }
-
-  if (
-    canApplyPaperLanes &&
-    autonomous_scalp_exit_autopilot.paper_trade_ready &&
-    autonomous_scalp_exit_autopilot.paper_trade &&
-    persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_scalp_exit_autopilot.paper_trade) &&
-    !autonomous_scalp_exit_autopilot.ledger_applied &&
-    protectiveTriggerCoverageAllowsTrade(protective_trigger_coverage, autonomous_scalp_exit_autopilot.paper_trade)
-  ) {
-    const scalpExited = applyArbiterPaperTradeToLedger(next, state.market, autonomous_scalp_exit_autopilot.paper_trade);
-    if (scalpExited !== next) {
-      store().upsertWeb3PaperLedger(scalpExited);
-      return applyPersistentLedger(state, "off");
-    }
-  }
-
   if (
     canApplyPaperLanes &&
     autonomous_profit_redeploy_execution.paper_trade_ready &&
@@ -22001,6 +22011,47 @@ function applyPersistentLedger(
     );
     if (redeployed !== next) {
       store().upsertWeb3PaperLedger(redeployed);
+      return applyPersistentLedger(state, "off");
+    }
+  }
+
+  if (canApplyPaperLanes && autonomous_burst_fill_plan.child_fill_count > 0) {
+    const burstApplied = applyAutonomousBurstFillPlanToLedger({
+      row: next,
+      market: state.market,
+      burstFillPlan: autonomous_burst_fill_plan,
+      advanceMode,
+      protectiveTriggerCoverage: queue_protective_trigger_coverage,
+      tradeReadinessGate: autonomous_trade_readiness_gate,
+      symbolQuarantine: autonomous_symbol_quarantine,
+      laneCapitalController: autonomous_lane_capital_controller,
+      profitAllocationPlan: autonomous_profit_allocation_plan,
+      regimeTape: autonomous_regime_tape,
+      walletGrowthDirector: autonomous_wallet_growth_director,
+      profitRouteSelector: autonomous_profit_route_selector,
+      executionQualityArbiter: autonomous_execution_quality_arbiter,
+      tokenSafetyClearance: autonomous_token_safety_clearance,
+      alphaDecay: alpha_decay_controller,
+      sourceQuality: autonomous_source_quality_oracle,
+      protectiveSellOnly: protectOnlyAdvance,
+    });
+    if (burstApplied !== next) {
+      store().upsertWeb3PaperLedger(burstApplied);
+      return applyPersistentLedger(state, "off");
+    }
+  }
+
+  if (
+    canApplyPaperLanes &&
+    autonomous_scalp_exit_autopilot.paper_trade_ready &&
+    autonomous_scalp_exit_autopilot.paper_trade &&
+    persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_scalp_exit_autopilot.paper_trade) &&
+    !autonomous_scalp_exit_autopilot.ledger_applied &&
+    protectiveTriggerCoverageAllowsTrade(protective_trigger_coverage, autonomous_scalp_exit_autopilot.paper_trade)
+  ) {
+    const scalpExited = applyArbiterPaperTradeToLedger(next, state.market, autonomous_scalp_exit_autopilot.paper_trade);
+    if (scalpExited !== next) {
+      store().upsertWeb3PaperLedger(scalpExited);
       return applyPersistentLedger(state, "off");
     }
   }
