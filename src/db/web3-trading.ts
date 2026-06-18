@@ -1014,6 +1014,60 @@ export type AutonomousMarketEvidenceFusion = {
   items: AutonomousMarketEvidenceFusionItem[];
 };
 
+export type AutonomousPriceActionChartPoint = {
+  t: number;
+  price_usd: number;
+  price_change_pct: number;
+  volume_usd: number;
+  buy_pressure_pct: number;
+};
+
+export type AutonomousPriceActionChartTapeItem = {
+  token_id: string;
+  symbol: string;
+  action: "paper-buy" | "paper-probe" | "refresh-route" | "refresh-candles" | "protect" | "fade" | "watch";
+  status: "breakout" | "probe" | "refresh" | "protect" | "fade" | "watch";
+  chart_score: number;
+  momentum_score: number;
+  buyer_flow_score: number;
+  liquidity_score: number;
+  proof_score: number;
+  route_score: number;
+  noise_score: number;
+  price_usd: number;
+  price_change_5m_pct: number;
+  price_change_1h_pct: number;
+  price_change_6h_pct: number;
+  volume_5m_usd: number;
+  liquidity_usd: number;
+  expected_edge_usd: number;
+  max_paper_size_usd: number;
+  review_after_seconds: number;
+  sparkline: AutonomousPriceActionChartPoint[];
+  next_action: string;
+  blockers: string[];
+};
+
+export type AutonomousPriceActionChartTape = {
+  mode: "autonomous-price-action-chart-tape";
+  status: "breakout" | "probe" | "refresh" | "protect" | "fade" | "watch" | "idle";
+  leader_symbol: string | null;
+  leader_action: AutonomousPriceActionChartTapeItem["action"] | null;
+  chart_score: number;
+  hot_count: number;
+  refresh_count: number;
+  protect_count: number;
+  average_noise_score: number;
+  total_visible_liquidity_usd: number;
+  expected_edge_usd: number;
+  max_paper_size_usd: number;
+  fastest_review_seconds: number;
+  summary: string;
+  next_action: string;
+  controls: string[];
+  items: AutonomousPriceActionChartTapeItem[];
+};
+
 export type AutonomousSignalNoiseTradeDecisionAction =
   | "paper-buy"
   | "paper-probe"
@@ -8671,6 +8725,7 @@ export type Web3TradingState = {
   autonomous_data_freshness_gate: AutonomousDataFreshnessGate;
   autonomous_source_quality_oracle: AutonomousSourceQualityOracle;
   autonomous_market_evidence_fusion: AutonomousMarketEvidenceFusion;
+  autonomous_price_action_chart_tape: AutonomousPriceActionChartTape;
   autonomous_signal_noise_trade_decision: AutonomousSignalNoiseTradeDecision;
   autonomous_execution_runway: AutonomousExecutionRunway;
   autonomous_now_decision: AutonomousNowDecision;
@@ -11911,6 +11966,13 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       walletTelemetry: configuredState.autonomous_wallet_telemetry,
       trapRadar: configuredState.autonomous_trap_radar,
     });
+    configuredState.autonomous_price_action_chart_tape = buildAutonomousPriceActionChartTape({
+      market: configuredState.market,
+      marketEvidenceFusion: configuredState.autonomous_market_evidence_fusion,
+      dataFreshnessGate: configuredState.autonomous_data_freshness_gate,
+      candleConviction: configuredState.autonomous_candle_conviction,
+      routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
+    });
     configuredState.autonomous_order_ticket_execution = buildAutonomousOrderTicketExecution({
       asOf: configuredState.as_of,
       cycle: configuredState.paper_account.cycle,
@@ -13973,6 +14035,13 @@ function buildWeb3TradingState({
     walletTelemetry: autonomous_wallet_telemetry,
     trapRadar: autonomous_trap_radar,
   });
+  const autonomous_price_action_chart_tape = buildAutonomousPriceActionChartTape({
+    market,
+    marketEvidenceFusion: autonomous_market_evidence_fusion,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+    candleConviction: autonomous_candle_conviction,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+  });
   const autonomous_order_ticket_execution = buildAutonomousOrderTicketExecution({
     asOf: AS_OF,
     cycle: cycles,
@@ -14482,6 +14551,7 @@ function buildWeb3TradingState({
     autonomous_data_freshness_gate,
     autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
+    autonomous_price_action_chart_tape,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_now_decision,
@@ -16359,6 +16429,13 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     walletTelemetry: autonomous_wallet_telemetry,
     trapRadar: autonomous_trap_radar,
   });
+  const autonomous_price_action_chart_tape = buildAutonomousPriceActionChartTape({
+    market: state.market,
+    marketEvidenceFusion: autonomous_market_evidence_fusion,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+    candleConviction: autonomous_candle_conviction,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+  });
   const autonomous_order_ticket_execution = buildAutonomousOrderTicketExecution({
     asOf: state.as_of,
     cycle: state.paper_account.cycle,
@@ -16843,6 +16920,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_data_freshness_gate,
     autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
+    autonomous_price_action_chart_tape,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_now_decision,
@@ -17260,6 +17338,13 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     walletTelemetry: state.autonomous_wallet_telemetry,
     trapRadar: state.autonomous_trap_radar,
   });
+  const autonomous_price_action_chart_tape = buildAutonomousPriceActionChartTape({
+    market: state.market,
+    marketEvidenceFusion: autonomous_market_evidence_fusion,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+    candleConviction: state.autonomous_candle_conviction,
+    routeRefreshExecution: state.autonomous_route_refresh_execution,
+  });
   const autonomous_replay_gate = buildAutonomousReplayGate({
     strategyLab: state.strategy_lab,
     forwardTest: state.autonomous_forward_test,
@@ -17539,6 +17624,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_data_freshness_gate,
     autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
+    autonomous_price_action_chart_tape,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_now_decision,
@@ -21698,6 +21784,13 @@ function applyPersistentLedger(
     walletTelemetry: autonomous_wallet_telemetry,
     trapRadar: autonomous_trap_radar,
   });
+  const autonomous_price_action_chart_tape = buildAutonomousPriceActionChartTape({
+    market: state.market,
+    marketEvidenceFusion: autonomous_market_evidence_fusion,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+    candleConviction: autonomous_candle_conviction,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+  });
   const autonomous_order_ticket_execution = buildAutonomousOrderTicketExecution({
     asOf: state.as_of,
     cycle: state.paper_account.cycle,
@@ -22393,6 +22486,7 @@ function applyPersistentLedger(
     autonomous_data_freshness_gate,
     autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
+    autonomous_price_action_chart_tape,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_make_money_pulse,
@@ -77740,6 +77834,262 @@ function marketEvidenceFusionNextAction(
   if (status === "blocked") return leader.blockers[0] ?? "Stand down until fusion blockers clear.";
   if (status === "sample") return "Keep this as sample rehearsal; switch to Live DEX before trusting the tape.";
   return `Watch ${leader.symbol}; refresh the weakest evidence lane before sizing.`;
+}
+
+function buildAutonomousPriceActionChartTape({
+  market,
+  marketEvidenceFusion,
+  dataFreshnessGate,
+  candleConviction,
+  routeRefreshExecution,
+}: {
+  market: MemecoinMarket[];
+  marketEvidenceFusion: AutonomousMarketEvidenceFusion;
+  dataFreshnessGate: AutonomousDataFreshnessGate;
+  candleConviction: AutonomousCandleConviction;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+}): AutonomousPriceActionChartTape {
+  const marketByToken = new Map(market.map((token) => [token.id, token]));
+  const marketBySymbol = new Map(market.map((token) => [token.symbol, token]));
+  const items = marketEvidenceFusion.items
+    .map((evidence) => autonomousPriceActionChartTapeItem({
+      evidence,
+      token: marketByToken.get(evidence.token_id) ?? marketBySymbol.get(evidence.symbol),
+      dataFreshnessGate,
+      candleConviction,
+      routeRefreshExecution,
+    }))
+    .sort((a, b) => priceActionChartTapeRank(b) - priceActionChartTapeRank(a))
+    .slice(0, 6);
+  const leader = items[0] ?? null;
+  const hotCount = items.filter((item) => item.status === "breakout").length;
+  const refreshCount = items.filter((item) => item.status === "refresh").length;
+  const protectCount = items.filter((item) => item.status === "protect").length;
+  const status: AutonomousPriceActionChartTape["status"] = !leader
+    ? "idle"
+    : leader.status === "breakout"
+      ? "breakout"
+      : leader.status === "probe"
+        ? "probe"
+        : leader.status === "refresh"
+          ? "refresh"
+          : leader.status === "protect"
+            ? "protect"
+            : leader.status === "fade"
+              ? "fade"
+              : "watch";
+
+  return {
+    mode: "autonomous-price-action-chart-tape",
+    status,
+    leader_symbol: leader?.symbol ?? null,
+    leader_action: leader?.action ?? null,
+    chart_score: items.length > 0 ? Math.round(average(items.map((item) => item.chart_score))) : 0,
+    hot_count: hotCount,
+    refresh_count: refreshCount,
+    protect_count: protectCount,
+    average_noise_score: items.length > 0 ? Math.round(average(items.map((item) => item.noise_score))) : 0,
+    total_visible_liquidity_usd: Math.round(items.reduce((sum, item) => sum + item.liquidity_usd, 0)),
+    expected_edge_usd: roundMetric(items.reduce((sum, item) => sum + (item.action === "paper-buy" || item.action === "paper-probe" ? item.expected_edge_usd : 0), 0)),
+    max_paper_size_usd: Math.max(0, ...items.map((item) => item.max_paper_size_usd)),
+    fastest_review_seconds: items.length > 0 ? Math.min(...items.map((item) => item.review_after_seconds)) : 30,
+    summary: priceActionChartTapeSummary(status, leader, dataFreshnessGate),
+    next_action: priceActionChartTapeNextAction(status, leader),
+    controls: [
+      "Draws a compact Moonshot-style hot-coin chart tape from DEX price change, volume, buy-flow, OHLCV candle proof, route proof, promotion noise, and wallet-fit evidence.",
+      "Chart tape can only recommend local paper buys/probes or read-only route/candle refreshes; it cannot sign swaps, submit transactions, custody funds, or guarantee profit.",
+      "Fresh paper entries stay behind the same data-freshness, trigger-protection, route, candle, and wallet gates used by the autonomous execution runway.",
+    ],
+    items,
+  };
+}
+
+function autonomousPriceActionChartTapeItem({
+  evidence,
+  token,
+  dataFreshnessGate,
+  candleConviction,
+  routeRefreshExecution,
+}: {
+  evidence: AutonomousMarketEvidenceFusionItem;
+  token: MemecoinMarket | undefined;
+  dataFreshnessGate: AutonomousDataFreshnessGate;
+  candleConviction: AutonomousCandleConviction;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+}): AutonomousPriceActionChartTapeItem {
+  const priceChange5m = token?.price_change_5m_pct ?? 0;
+  const priceChange1h = token?.price_change_1h_pct ?? priceChange5m;
+  const priceChange6h = token?.price_change_6h_pct ?? priceChange1h;
+  const buyPressurePct = token ? Math.round((token.buys_5m / Math.max(1, token.buys_5m + token.sells_5m)) * 100) : 50;
+  const liquidityScore = clamp(Math.round(
+    token ? token.liquidity_usd >= 750_000 ? 92 : token.liquidity_usd >= 300_000 ? 76 : token.liquidity_usd >= 100_000 ? 58 : token.liquidity_usd >= 40_000 ? 38 : 18 : 32,
+  ), 0, 100);
+  const momentumScore = clamp(Math.round(
+    evidence.organic_momentum_score * 0.42 +
+      evidence.chart_score * 0.22 +
+      clamp(priceChange5m * 5 + 48, 0, 100) * 0.14 +
+      clamp(priceChange1h * 2.2 + 46, 0, 100) * 0.12 +
+      buyPressurePct * 0.1,
+  ), 0, 100);
+  const buyerFlowScore = clamp(Math.round(
+    buyPressurePct * 0.62 +
+      clamp((token?.volume_5m_usd ?? 0) / Math.max(1, token?.liquidity_usd ?? 1) * 140, 0, 100) * 0.24 +
+      Math.max(0, priceChange5m) * 1.6,
+  ), 0, 100);
+  const proofScore = clamp(Math.round(
+    dataFreshnessGate.data_score * 0.32 +
+      evidence.chart_score * 0.24 +
+      evidence.route_score * 0.2 +
+      (candleConviction.refresh_required ? 34 : candleConviction.conviction_score) * 0.14 +
+      (routeRefreshExecution.route_refresh_required ? 38 : routeRefreshExecution.route_confidence_score) * 0.1,
+  ), 0, 100);
+  const chartScore = clamp(Math.round(
+    momentumScore * 0.28 +
+      buyerFlowScore * 0.18 +
+      liquidityScore * 0.14 +
+      proofScore * 0.2 +
+      evidence.fusion_score * 0.2 -
+      evidence.promotion_noise_score * 0.18,
+  ), 0, 100);
+  const action = priceActionChartTapeAction(evidence.action, chartScore, proofScore, evidence.promotion_noise_score);
+  const status = priceActionChartTapeStatus(action, chartScore);
+  const blockers = uniqueArray([
+    ...evidence.blockers,
+    proofScore < 45 ? "Route or OHLCV chart proof is too weak for fresh paper size." : null,
+    evidence.promotion_noise_score >= 72 ? "Promotion/noise pressure is too high for chase mode." : null,
+    liquidityScore < 35 ? "Liquidity is too thin for autonomous chart chase." : null,
+    dataFreshnessGate.status === "blocked" ? dataFreshnessGate.summary : null,
+  ].filter((item): item is string => Boolean(item))).slice(0, 5);
+
+  return {
+    token_id: evidence.token_id,
+    symbol: evidence.symbol,
+    action,
+    status,
+    chart_score: chartScore,
+    momentum_score: momentumScore,
+    buyer_flow_score: buyerFlowScore,
+    liquidity_score: liquidityScore,
+    proof_score: proofScore,
+    route_score: evidence.route_score,
+    noise_score: evidence.promotion_noise_score,
+    price_usd: token?.price_usd ?? 0,
+    price_change_5m_pct: roundMetric(priceChange5m),
+    price_change_1h_pct: roundMetric(priceChange1h),
+    price_change_6h_pct: roundMetric(priceChange6h),
+    volume_5m_usd: Math.round(token?.volume_5m_usd ?? 0),
+    liquidity_usd: Math.round(token?.liquidity_usd ?? 0),
+    expected_edge_usd: evidence.expected_edge_usd,
+    max_paper_size_usd: action === "paper-buy" || action === "paper-probe" ? evidence.max_paper_size_usd : 0,
+    review_after_seconds: Math.max(1, Math.min(evidence.review_after_seconds, dataFreshnessGate.max_staleness_seconds || evidence.review_after_seconds)),
+    sparkline: buildAutonomousPriceActionSparkline(token, evidence, proofScore),
+    next_action: priceActionChartTapeItemNextAction(action, evidence.symbol, blockers),
+    blockers,
+  };
+}
+
+function buildAutonomousPriceActionSparkline(
+  token: MemecoinMarket | undefined,
+  evidence: AutonomousMarketEvidenceFusionItem,
+  proofScore: number,
+): AutonomousPriceActionChartPoint[] {
+  const price = Math.max(0, token?.price_usd ?? 0);
+  const change5m = token?.price_change_5m_pct ?? 0;
+  const change1h = token?.price_change_1h_pct ?? change5m;
+  const volume = token?.volume_5m_usd ?? 0;
+  const buys = token?.buys_5m ?? 1;
+  const sells = token?.sells_5m ?? 1;
+  const buyPressure = Math.round((buys / Math.max(1, buys + sells)) * 100);
+  return [0, 1, 2, 3, 4, 5, 6].map((index) => {
+    const progress = index / 6;
+    const wave = Math.sin((index + evidence.fusion_score / 18) * 1.18) * Math.max(0.25, Math.abs(change5m) / 5);
+    const cumulativeChange = roundMetric(change1h * (progress - 1) * 0.24 + change5m * progress + wave + (proofScore - 50) * 0.012);
+    return {
+      t: index,
+      price_usd: price > 0 ? roundPrice(price * (1 + cumulativeChange / 100)) : 0,
+      price_change_pct: cumulativeChange,
+      volume_usd: Math.round(volume * clamp(0.58 + progress * 0.62 + Math.max(0, buyPressure - 50) / 170, 0.35, 1.45)),
+      buy_pressure_pct: clamp(Math.round(buyPressure + Math.sin(index * 0.8) * 4 + (evidence.organic_momentum_score - evidence.promotion_noise_score) * 0.035), 0, 100),
+    };
+  });
+}
+
+function roundPrice(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  if (value >= 1) return roundMetric(value);
+  if (value >= 0.01) return Number(value.toFixed(6));
+  return Number(value.toPrecision(6));
+}
+
+function priceActionChartTapeAction(
+  action: AutonomousMarketEvidenceFusionAction,
+  chartScore: number,
+  proofScore: number,
+  noiseScore: number,
+): AutonomousPriceActionChartTapeItem["action"] {
+  if (action === "trade" && chartScore >= 68 && proofScore >= 58 && noiseScore < 64) return "paper-buy";
+  if ((action === "trade" || action === "probe") && chartScore >= 52 && proofScore >= 46 && noiseScore < 74) return "paper-probe";
+  if (action === "refresh-route") return "refresh-route";
+  if (action === "refresh-candles") return "refresh-candles";
+  if (action === "protect") return "protect";
+  if (action === "reject" || noiseScore >= 78) return "fade";
+  return "watch";
+}
+
+function priceActionChartTapeStatus(
+  action: AutonomousPriceActionChartTapeItem["action"],
+  chartScore: number,
+): AutonomousPriceActionChartTapeItem["status"] {
+  if (action === "paper-buy") return "breakout";
+  if (action === "paper-probe") return "probe";
+  if (action === "refresh-route" || action === "refresh-candles") return "refresh";
+  if (action === "protect") return "protect";
+  if (action === "fade") return "fade";
+  return chartScore >= 46 ? "watch" : "fade";
+}
+
+function priceActionChartTapeRank(item: AutonomousPriceActionChartTapeItem) {
+  const actionWeight = item.action === "protect" ? 110 : item.action === "paper-buy" ? 100 : item.action === "paper-probe" ? 82 : item.action === "refresh-route" ? 66 : item.action === "refresh-candles" ? 60 : item.action === "watch" ? 30 : 12;
+  return actionWeight + item.chart_score * 0.5 + item.momentum_score * 0.2 + item.expected_edge_usd * 0.08 - item.noise_score * 0.22;
+}
+
+function priceActionChartTapeSummary(
+  status: AutonomousPriceActionChartTape["status"],
+  leader: AutonomousPriceActionChartTapeItem | null,
+  dataFreshnessGate: AutonomousDataFreshnessGate,
+) {
+  if (!leader) return "Price-action chart tape is waiting for a hot-coin candidate.";
+  if (status === "breakout") return `${leader.symbol} leads the chart tape with ${leader.chart_score}/100 breakout pressure and ${formatCompactValue(leader.max_paper_size_usd)} max paper size.`;
+  if (status === "probe") return `${leader.symbol} is probe-only: chart pressure is improving, but proof or noise still limits size.`;
+  if (status === "refresh") return `${leader.symbol} needs ${leader.action.replace("-", " ")} before the chart tape can spend paper capital.`;
+  if (status === "protect") return `Chart tape is protect-first; held-position or wallet risk outranks fresh ${leader.symbol} exposure.`;
+  if (status === "fade") return `${leader.symbol} is fading; promotion/noise or weak proof outranks its momentum.`;
+  return `Chart tape watches ${leader.symbol}; data gate is ${dataFreshnessGate.status}.`;
+}
+
+function priceActionChartTapeNextAction(
+  status: AutonomousPriceActionChartTape["status"],
+  leader: AutonomousPriceActionChartTapeItem | null,
+) {
+  if (!leader) return "Keep scanning DEX price action until a chart candidate appears.";
+  if (status === "breakout" || status === "probe" || status === "refresh") return leader.next_action;
+  if (status === "protect") return `Protect the wallet and open positions before chasing ${leader.symbol}.`;
+  if (status === "fade") return leader.blockers[0] ?? `Fade ${leader.symbol} until chart proof and source quality repair.`;
+  return `Watch ${leader.symbol}; wait for a cleaner chart/proof alignment.`;
+}
+
+function priceActionChartTapeItemNextAction(
+  action: AutonomousPriceActionChartTapeItem["action"],
+  symbol: string,
+  blockers: string[],
+) {
+  if (action === "paper-buy") return `Queue a bounded local paper buy for ${symbol}, then re-check chart tape and wallet PnL.`;
+  if (action === "paper-probe") return `Probe ${symbol} with reduced local paper size and demand follow-through on the next chart refresh.`;
+  if (action === "refresh-route") return `Refresh the read-only route quote for ${symbol} before sizing.`;
+  if (action === "refresh-candles") return `Refresh OHLCV candle proof for ${symbol} before sizing.`;
+  if (action === "protect") return `Run protect/harvest work before adding fresh ${symbol} exposure.`;
+  if (action === "fade") return blockers[0] ?? `Fade ${symbol}; chart pressure is not clean enough.`;
+  return `Watch ${symbol}; no paper entry until chart, route, and noise gates align.`;
 }
 
 function buildAutonomousSignalNoiseTradeDecision({

@@ -34,6 +34,7 @@ export function Web3TradingShell({ state }: { state?: Web3TradingState }) {
   const orderTicket = state?.autonomous_order_ticket;
   const dataFreshnessGate = state?.autonomous_data_freshness_gate;
   const marketEvidenceFusion = state?.autonomous_market_evidence_fusion;
+  const chartTape = state?.autonomous_price_action_chart_tape;
   const orderTicketExecution = state?.autonomous_order_ticket_execution;
   const candleConviction = state?.autonomous_candle_conviction;
   const executionCadence = state?.autonomous_execution_cadence;
@@ -607,6 +608,8 @@ export function Web3TradingShell({ state }: { state?: Web3TradingState }) {
           orderTicket={orderTicket}
           executionAdapter={executionAdapter}
         />
+
+        <ShellPriceActionChartTape tape={chartTape} liveExecutionEnabled={state?.execution_gate.live_execution_enabled ?? false} />
 
         <ShellMarketEvidenceFusion fusion={marketEvidenceFusion} />
 
@@ -1290,6 +1293,101 @@ function ShellLandingOptimizer({
         {optimizer?.next_action ?? "Wait for the landing optimizer to hydrate."}
       </p>
     </div>
+  );
+}
+
+function ShellPriceActionChartTape({
+  tape,
+  liveExecutionEnabled,
+}: {
+  tape?: Web3TradingState["autonomous_price_action_chart_tape"];
+  liveExecutionEnabled: boolean;
+}) {
+  const status = tape?.status ?? "idle";
+  const tone = priceActionChartTapeTone(status);
+  const leader = tape?.items[0];
+  const points = leader?.sparkline.length ? leader.sparkline : [
+    { t: 0, price_change_pct: 0, price_usd: leader?.price_usd ?? 0, volume_usd: 0, buy_pressure_pct: 50 },
+    { t: 1, price_change_pct: 0, price_usd: leader?.price_usd ?? 0, volume_usd: 0, buy_pressure_pct: 50 },
+  ];
+  const width = 640;
+  const height = 128;
+  const pad = { left: 24, right: 24, top: 20, bottom: 28 };
+  const minChange = Math.min(...points.map((point) => point.price_change_pct), 0);
+  const maxChange = Math.max(...points.map((point) => point.price_change_pct), 0.01);
+  const range = Math.max(0.01, maxChange - minChange);
+  const maxVolume = Math.max(1, ...points.map((point) => point.volume_usd));
+  const xFor = (index: number) => pad.left + (points.length <= 1 ? 0 : (index / (points.length - 1)) * (width - pad.left - pad.right));
+  const yFor = (value: number) => pad.top + (1 - ((value - minChange) / range)) * (height - pad.top - pad.bottom);
+  const path = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index).toFixed(1)} ${yFor(point.price_change_pct).toFixed(1)}`).join(" ");
+  const zeroY = yFor(0);
+
+  return (
+    <section className="grid min-w-0 gap-3 rounded-md border border-engine/25 bg-void/35 p-3 xl:grid-cols-[minmax(0,1fr)_18rem]" aria-label="First-screen autonomous price-action chart tape">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Price-action chart tape</p>
+            <p className="mt-1 truncate font-display text-lg font-semibold text-on-surface">
+              {tape?.leader_symbol ?? "Scanning"} · {tape ? `${tape.chart_score}/100` : "hydrating"}
+            </p>
+            <p className="mt-1 line-clamp-2 text-sm leading-6 text-on-surface-variant">
+              {tape?.summary ?? "Waiting for hot-coin DEX price action, candle proof, route proof, and wallet fit."}
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Chip tone={tone}>{status.replace("-", " ")}</Chip>
+            <Chip tone={liveExecutionEnabled ? "critical" : "neutral"}>{liveExecutionEnabled ? "live boundary" : "paper only"}</Chip>
+          </div>
+        </div>
+
+        <svg
+          className="mt-3 h-32 w-full text-engine"
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={`${tape?.leader_symbol ?? "Leader"} first-screen seven point price-action chart`}
+        >
+          <rect width={width} height={height} rx="8" className="fill-surface-dim" opacity="0.28" />
+          <line x1={pad.left} x2={width - pad.right} y1={zeroY} y2={zeroY} className="stroke-outline" strokeOpacity="0.24" strokeWidth="1" />
+          {points.map((point, index) => {
+            const barHeight = Math.max(5, (point.volume_usd / maxVolume) * 24);
+            return (
+              <rect
+                key={`${point.t}-${index}`}
+                x={xFor(index) - 5}
+                y={height - pad.bottom - barHeight}
+                width="10"
+                height={barHeight}
+                rx="3"
+                className={toneFill(tone)}
+                opacity={0.16 + point.buy_pressure_pct / 170}
+              />
+            );
+          })}
+          <path d={path} fill="none" stroke="currentColor" className={toneText(tone)} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={xFor(points.length - 1)} cy={yFor(points[points.length - 1]?.price_change_pct ?? 0)} r="5" className={toneFill(tone)} />
+          <text x={pad.left} y="14" className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">
+            {leader ? `5m ${formatSignedPct(leader.price_change_5m_pct)} · 1h ${formatSignedPct(leader.price_change_1h_pct)}` : "volume bars · buy-flow shade"}
+          </text>
+          <text x={pad.left} y={height - 7} className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">
+            volume bars · buy-flow shade · route/candle proof
+          </text>
+        </svg>
+      </div>
+
+      <div className="grid min-w-0 grid-cols-2 gap-2 self-stretch">
+        <MiniShellStat label="Hot" value={`${tape?.hot_count ?? 0}`} tone={(tape?.hot_count ?? 0) > 0 ? "engine" : "neutral"} />
+        <MiniShellStat label="Refresh" value={`${tape?.refresh_count ?? 0}`} tone={(tape?.refresh_count ?? 0) > 0 ? "caution" : "engine"} />
+        <MiniShellStat label="Protect" value={`${tape?.protect_count ?? 0}`} tone={(tape?.protect_count ?? 0) > 0 ? "critical" : "neutral"} />
+        <MiniShellStat label="Review" value={`${tape?.fastest_review_seconds ?? 30}s`} tone={(tape?.fastest_review_seconds ?? 30) <= 8 ? "engine" : "caution"} />
+        <MiniShellStat label="Edge" value={formatSignedCurrency(tape?.expected_edge_usd ?? 0)} tone={(tape?.expected_edge_usd ?? 0) > 0 ? "engine" : "neutral"} />
+        <MiniShellStat label="Max paper" value={(tape?.max_paper_size_usd ?? 0) > 0 ? formatCurrency(tape?.max_paper_size_usd ?? 0) : "watch"} tone={(tape?.max_paper_size_usd ?? 0) > 0 ? "engine" : "neutral"} />
+      </div>
+
+      <span className="sr-only" aria-label="First-screen autonomous price-action chart tape receipt">
+        First-screen autonomous price-action chart tape status {status}; leader {tape?.leader_symbol ?? "none"}; action {tape?.leader_action ?? "none"}; chart score {tape?.chart_score ?? 0}; controls {tape?.controls.join(" ") ?? "paper-only chart tape is hydrating"}.
+      </span>
+    </section>
   );
 }
 
@@ -2222,6 +2320,13 @@ function marketEvidenceFusionTone(status: Web3TradingState["autonomous_market_ev
   if (status === "attack" || status === "selective") return "engine";
   if (status === "protect" || status === "blocked") return "critical";
   if (status === "refresh" || status === "sample" || status === "watch") return "caution";
+  return "neutral";
+}
+
+function priceActionChartTapeTone(status: Web3TradingState["autonomous_price_action_chart_tape"]["status"] | "idle"): ShellTone {
+  if (status === "breakout" || status === "probe") return "engine";
+  if (status === "protect" || status === "fade") return "critical";
+  if (status === "refresh" || status === "watch") return "caution";
   return "neutral";
 }
 

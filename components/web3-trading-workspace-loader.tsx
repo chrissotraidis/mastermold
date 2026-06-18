@@ -618,6 +618,8 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           {state.market_source.label} · {state.autonomous_market_evidence_fusion.can_trade ? "trade ok" : tradeBlocked ? "trade blocked" : "refresh"} · {autoWatch ? "watch on" : "watch off"} · {wakePlan.auto_watch_label} · intake {marketIntake.status} · allocator {profitAllocation.status}
         </p>
 
+        <QuickFirstScreenPriceActionRail state={state} />
+
         <QuickTradingCommandDeck
           state={state}
           autoWatch={autoWatch}
@@ -953,6 +955,96 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
 
 type AutoWatchPlan = ReturnType<typeof chooseAutoWatchPlan>;
 
+function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState }) {
+  const tape = state.autonomous_price_action_chart_tape;
+  const leader = tape.items[0];
+  const tone = priceActionChartTapeTone(tape.status);
+  const points = leader?.sparkline.length ? leader.sparkline : [
+    { t: 0, price_usd: 0, price_change_pct: 0, volume_usd: 0, buy_pressure_pct: 50 },
+    { t: 1, price_usd: 0, price_change_pct: 0, volume_usd: 0, buy_pressure_pct: 50 },
+  ];
+  const width = 620;
+  const height = 126;
+  const pad = { left: 24, right: 24, top: 18, bottom: 28 };
+  const minChange = Math.min(...points.map((point) => point.price_change_pct), 0);
+  const maxChange = Math.max(...points.map((point) => point.price_change_pct), 0.01);
+  const range = Math.max(0.01, maxChange - minChange);
+  const maxVolume = Math.max(1, ...points.map((point) => point.volume_usd));
+  const xFor = (index: number) => pad.left + (points.length <= 1 ? 0 : (index / (points.length - 1)) * (width - pad.left - pad.right));
+  const yFor = (value: number) => pad.top + (1 - ((value - minChange) / range)) * (height - pad.top - pad.bottom);
+  const path = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index).toFixed(1)} ${yFor(point.price_change_pct).toFixed(1)}`).join(" ");
+  const zeroY = yFor(0);
+
+  return (
+    <section className="mt-3 grid min-w-0 gap-2 rounded-md border border-engine/25 bg-void/30 p-2 sm:p-3 lg:grid-cols-[minmax(0,1fr)_18rem]" aria-label="First-screen autonomous price-action chart tape">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Price-action chart tape</p>
+            <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+              {tape.leader_symbol ?? "Scanning"} · {tape.chart_score}/100
+            </p>
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+              {tape.summary}
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Chip tone={tone}>{tape.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"}>
+              {state.execution_gate.live_execution_enabled ? "live boundary" : "paper only"}
+            </Chip>
+          </div>
+        </div>
+        <svg
+          className="mt-2 h-28 w-full overflow-visible"
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label={`${tape.leader_symbol ?? "Leader"} first-screen seven point price-action chart`}
+        >
+          <rect width={width} height={height} rx="8" className="fill-surface-dim" opacity="0.26" />
+          <line x1={pad.left} x2={width - pad.right} y1={zeroY} y2={zeroY} className="stroke-outline" strokeOpacity="0.24" strokeWidth="1" />
+          {points.map((point, index) => {
+            const barHeight = Math.max(5, (point.volume_usd / maxVolume) * 24);
+            return (
+              <rect
+                key={`${point.t}-${index}`}
+                x={xFor(index) - 5}
+                y={height - pad.bottom - barHeight}
+                width="10"
+                height={barHeight}
+                rx="3"
+                className={profitAuthorityBarClass(tone)}
+                opacity={0.16 + point.buy_pressure_pct / 170}
+              />
+            );
+          })}
+          <path d={path} fill="none" className={tone === "critical" ? "stroke-critical" : tone === "caution" ? "stroke-caution" : tone === "engine" ? "stroke-engine" : "stroke-outline"} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={xFor(points.length - 1)} cy={yFor(points[points.length - 1]?.price_change_pct ?? 0)} r="5" className={profitAuthorityBarClass(tone).replace("bg-", "fill-")} />
+          <text x={pad.left} y="13" className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">
+            {leader ? `5m ${formatPercent(leader.price_change_5m_pct)} · 1h ${formatPercent(leader.price_change_1h_pct)}` : "volume bars · buy-flow shade"}
+          </text>
+          <text x={pad.left} y={height - 7} className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">
+            volume bars · buy-flow shade · route/candle proof
+          </text>
+        </svg>
+      </div>
+
+      <div className="grid min-w-0 grid-cols-2 gap-1 self-stretch">
+        <MiniProofStat label="Hot" value={`${tape.hot_count}`} />
+        <MiniProofStat label="Refresh" value={`${tape.refresh_count}`} />
+        <MiniProofStat label="Protect" value={`${tape.protect_count}`} />
+        <MiniProofStat label="Review" value={`${tape.fastest_review_seconds}s`} />
+        <MiniProofStat label="Edge" value={formatCompactSignedCurrency(tape.expected_edge_usd)} />
+        <MiniProofStat label="Max paper" value={formatCompactCurrency(tape.max_paper_size_usd)} />
+      </div>
+
+      <span className="sr-only" aria-label="First-screen autonomous price-action chart tape receipt">
+        First-screen autonomous price-action chart tape status {tape.status}; leader {tape.leader_symbol ?? "none"}; action {tape.leader_action ?? "none"}; chart score {tape.chart_score}; controls {tape.controls.join(" ")}.
+      </span>
+    </section>
+  );
+}
+
 function QuickTradingCommandDeck({
   state,
   autoWatch,
@@ -981,6 +1073,7 @@ function QuickTradingCommandDeck({
   const loopImpact = state.autonomous_loop_impact_auditor;
   const minuteDiscipline = state.autonomous_minute_profit_discipline;
   const exitContract = state.autonomous_position_exit_contract;
+  const chartTape = state.autonomous_price_action_chart_tape;
   const profitCaptureAutopilot = state.autonomous_profit_capture_autopilot;
   const profitRedeployAutopilot = state.autonomous_profit_redeploy_autopilot;
   const discoveryDelta = state.live_discovery_delta_tape;
@@ -1028,6 +1121,7 @@ function QuickTradingCommandDeck({
   const loopImpactToneValue = loopImpactTone(loopImpact.status);
   const minuteDisciplineToneValue = minuteProfitDisciplineTone(minuteDiscipline.status);
   const exitContractToneValue = positionExitContractTone(exitContract.status);
+  const chartTapeToneValue = priceActionChartTapeTone(chartTape.status);
   const profitCaptureToneValue = profitCaptureAutopilotTone(profitCaptureAutopilot.status);
   const profitRedeployToneValue = profitRedeployAutopilotTone(profitRedeployAutopilot.status);
   const profitRedeployExecution = state.autonomous_profit_redeploy_execution;
@@ -1054,6 +1148,7 @@ function QuickTradingCommandDeck({
             <Chip tone={loopImpactToneValue}>impact {loopImpact.status.replaceAll("-", " ")}</Chip>
             <Chip tone={minuteDisciplineToneValue}>minute {minuteDiscipline.status.replaceAll("-", " ")}</Chip>
             <Chip tone={exitContractToneValue}>exits {exitContract.fresh_entry_permission.replaceAll("-", " ")}</Chip>
+            <Chip tone={chartTapeToneValue}>chart {chartTape.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitCaptureToneValue}>capture {profitCaptureAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitRedeployToneValue}>redeploy {profitRedeployAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitRedeployExecutionToneValue}>exec {profitRedeployExecution.status.replaceAll("-", " ")}</Chip>
@@ -1097,6 +1192,7 @@ function QuickTradingCommandDeck({
               sessionRun={sessionRun}
               loopFeedback={state.autonomous_loop_feedback}
             />
+            <QuickPriceActionChartTape state={state} />
             <QuickPaperExecutionPriorityTape state={state} />
             <QuickMinuteProfitDisciplineRail state={state} />
             <QuickPositionExitContractRail state={state} />
@@ -3841,6 +3937,131 @@ function QuickPaperExecutionPriorityTape({ state }: { state: Web3TradingState })
   );
 }
 
+function QuickPriceActionChartTape({ state }: { state: Web3TradingState }) {
+  const tape = state.autonomous_price_action_chart_tape;
+  const tone = priceActionChartTapeTone(tape.status);
+  const items = tape.items.slice(0, 3);
+
+  return (
+    <section className="min-w-0 self-start rounded-md border border-outline-variant/25 bg-void/20 p-2 sm:p-3" aria-label="Autonomous price-action chart tape">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Price-action chart tape</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {tape.leader_symbol ?? "Scanning"} · {tape.chart_score}/100
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+            {tape.summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{tape.status.replaceAll("-", " ")}</Chip>
+          <Chip tone={tape.refresh_count > 0 ? "caution" : tape.hot_count > 0 ? "engine" : "neutral"}>
+            {tape.hot_count} hot · {tape.refresh_count} refresh
+          </Chip>
+          <Chip tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"}>
+            {state.execution_gate.live_execution_enabled ? "live boundary" : "paper only"}
+          </Chip>
+        </div>
+      </div>
+
+      {items.length > 0 ? (
+        <div className="mt-2 grid gap-1.5 lg:grid-cols-3">
+          {items.map((item) => (
+            <QuickPriceActionMiniChart key={item.token_id} item={item} />
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2 text-xs leading-5 text-on-surface-variant">
+          Waiting for a chartable hot-coin candidate from DEX price action, candle proof, and route proof.
+        </p>
+      )}
+
+      <dl className="mt-2 grid grid-cols-3 gap-1" aria-label="Price-action chart tape metrics">
+        <MiniProofStat label="Edge" value={formatCompactSignedCurrency(tape.expected_edge_usd)} />
+        <MiniProofStat label="Max paper" value={formatCompactCurrency(tape.max_paper_size_usd)} />
+        <MiniProofStat label="Review" value={`${tape.fastest_review_seconds}s`} />
+      </dl>
+      <span className="sr-only" aria-label="Autonomous price-action chart tape receipt">
+        Autonomous price-action chart tape status {tape.status}; leader {tape.leader_symbol ?? "none"}; leader action {tape.leader_action ?? "none"}; chart score {tape.chart_score}; hot count {tape.hot_count}; refresh count {tape.refresh_count}; protect count {tape.protect_count}; average noise {tape.average_noise_score}; visible liquidity {formatCurrency(tape.total_visible_liquidity_usd)}; expected edge {formatSignedCurrency(tape.expected_edge_usd)}; max paper size {formatCurrency(tape.max_paper_size_usd)}; review {tape.fastest_review_seconds} seconds; controls {tape.controls.join(" ")}; top charts {items.map((item) => `${item.symbol} ${item.action} ${item.chart_score}/100 5m ${item.price_change_5m_pct}% 1h ${item.price_change_1h_pct}% proof ${item.proof_score}/100 route ${item.route_score}/100 noise ${item.noise_score}/100`).join("; ") || "none"}.
+      </span>
+    </section>
+  );
+}
+
+function QuickPriceActionMiniChart({ item }: { item: Web3TradingState["autonomous_price_action_chart_tape"]["items"][number] }) {
+  const tone = priceActionChartTapeItemTone(item.status);
+  const width = 260;
+  const height = 108;
+  const padX = 12;
+  const padY = 14;
+  const points = item.sparkline.length > 0 ? item.sparkline : [{ t: 0, price_change_pct: 0, price_usd: item.price_usd, volume_usd: 0, buy_pressure_pct: 50 }];
+  const minChange = Math.min(...points.map((point) => point.price_change_pct), 0);
+  const maxChange = Math.max(...points.map((point) => point.price_change_pct), 0.01);
+  const range = Math.max(0.01, maxChange - minChange);
+  const maxVolume = Math.max(1, ...points.map((point) => point.volume_usd));
+  const path = points.map((point, index) => {
+    const x = padX + (index / Math.max(1, points.length - 1)) * (width - padX * 2);
+    const y = padY + (1 - (point.price_change_pct - minChange) / range) * (height - padY * 2 - 22);
+    return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(" ");
+  const zeroY = padY + (1 - (0 - minChange) / range) * (height - padY * 2 - 22);
+
+  return (
+    <article className={cn("min-w-0 rounded-md border p-2", permissionToneClass(tone))} aria-label={`${item.symbol} price-action mini chart`}>
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-on-surface">{item.symbol}</p>
+          <p className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">
+            {item.action.replaceAll("-", " ")}
+          </p>
+        </div>
+        <Chip tone={tone}>{item.chart_score}/100</Chip>
+      </div>
+      <svg className="mt-2 h-28 w-full overflow-visible" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${item.symbol} seven point price-action chart`}>
+        <line x1={padX} x2={width - padX} y1={zeroY} y2={zeroY} className="stroke-outline" strokeOpacity="0.28" strokeWidth="1" />
+        {points.map((point, index) => {
+          const x = padX + (index / Math.max(1, points.length - 1)) * (width - padX * 2);
+          const barHeight = Math.max(5, (point.volume_usd / maxVolume) * 22);
+          return (
+            <rect
+              key={`${item.token_id}-${point.t}`}
+              x={x - 4}
+              y={height - 12 - barHeight}
+              width="8"
+              height={barHeight}
+              rx="2"
+              className={profitAuthorityBarClass(tone)}
+              opacity={0.18 + point.buy_pressure_pct / 180}
+            />
+          );
+        })}
+        <path d={path} fill="none" className={tone === "critical" ? "stroke-critical" : tone === "caution" ? "stroke-caution" : tone === "engine" ? "stroke-engine" : "stroke-outline"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <circle
+          cx={padX + (width - padX * 2)}
+          cy={padY + (1 - (points[points.length - 1].price_change_pct - minChange) / range) * (height - padY * 2 - 22)}
+          r="4"
+          className={profitAuthorityBarClass(tone).replace("bg-", "fill-")}
+        />
+        <text x={padX} y="12" className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">
+          5m {formatPercent(item.price_change_5m_pct)} · 1h {formatPercent(item.price_change_1h_pct)}
+        </text>
+        <text x={padX} y={height - 2} className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">
+          volume bars · buy-flow shade · proof {item.proof_score}/100
+        </text>
+      </svg>
+      <div className="mt-2 grid grid-cols-3 gap-1">
+        <MiniProofStat label="Flow" value={`${item.buyer_flow_score}/100`} />
+        <MiniProofStat label="Route" value={`${item.route_score}/100`} />
+        <MiniProofStat label="Noise" value={`${item.noise_score}/100`} />
+      </div>
+      {item.blockers.length > 0 ? (
+        <p className="mt-2 line-clamp-1 text-[11px] leading-4 text-on-surface-variant">{item.blockers[0]}</p>
+      ) : null}
+    </article>
+  );
+}
+
 function classifyQuickPaperExecutionPriority(trade: Web3TradingState["trade_tape"][number]): QuickPaperExecutionPriorityItem {
   const id = trade.id.toLowerCase();
   const reason = trade.reason.toLowerCase();
@@ -6566,6 +6787,20 @@ function positionExitContractItemTone(
   if (status === "covered") return "engine";
   if (status === "uncovered" || status === "repair" || priority === "now") return "critical";
   if (status === "planned" || status === "auth-required" || priority === "next") return "caution";
+  return "neutral";
+}
+
+function priceActionChartTapeTone(status: Web3TradingState["autonomous_price_action_chart_tape"]["status"]): QuickChipTone {
+  if (status === "breakout" || status === "probe") return "engine";
+  if (status === "refresh" || status === "watch") return "caution";
+  if (status === "protect" || status === "fade") return "critical";
+  return "neutral";
+}
+
+function priceActionChartTapeItemTone(status: Web3TradingState["autonomous_price_action_chart_tape"]["items"][number]["status"]): QuickChipTone {
+  if (status === "breakout" || status === "probe") return "engine";
+  if (status === "refresh" || status === "watch") return "caution";
+  if (status === "protect" || status === "fade") return "critical";
   return "neutral";
 }
 

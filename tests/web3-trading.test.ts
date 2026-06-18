@@ -4066,6 +4066,36 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_market_evidence_fusion.controls.some((control) => control.includes("hot-coin tape"))).toBe(true);
     expect(state.autonomous_market_evidence_fusion.controls.some((control) => control.includes("paper/read-only evidence layer"))).toBe(true);
+    expect(state.autonomous_price_action_chart_tape.mode).toBe("autonomous-price-action-chart-tape");
+    expect(["breakout", "probe", "refresh", "protect", "fade", "watch", "idle"]).toContain(state.autonomous_price_action_chart_tape.status);
+    expect(state.autonomous_price_action_chart_tape.chart_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_price_action_chart_tape.chart_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_price_action_chart_tape.fastest_review_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_price_action_chart_tape.items.length).toBeGreaterThan(0);
+    expect(state.autonomous_price_action_chart_tape.items.length).toBeLessThanOrEqual(6);
+    expect(state.autonomous_price_action_chart_tape.items.every((item) =>
+      ["paper-buy", "paper-probe", "refresh-route", "refresh-candles", "protect", "fade", "watch"].includes(item.action) &&
+      ["breakout", "probe", "refresh", "protect", "fade", "watch"].includes(item.status) &&
+      item.chart_score >= 0 &&
+      item.chart_score <= 100 &&
+      item.momentum_score >= 0 &&
+      item.momentum_score <= 100 &&
+      item.buyer_flow_score >= 0 &&
+      item.buyer_flow_score <= 100 &&
+      item.proof_score >= 0 &&
+      item.proof_score <= 100 &&
+      item.sparkline.length === 7 &&
+      item.sparkline.every((point) =>
+        point.t >= 0 &&
+        point.price_usd >= 0 &&
+        point.volume_usd >= 0 &&
+        point.buy_pressure_pct >= 0 &&
+        point.buy_pressure_pct <= 100
+      ) &&
+      item.next_action.length > 0
+    )).toBe(true);
+    expect(state.autonomous_price_action_chart_tape.controls.some((control) => control.includes("Moonshot-style hot-coin chart tape"))).toBe(true);
+    expect(state.autonomous_price_action_chart_tape.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
     expect(state.live_scanner_readiness.mode).toBe("live-scanner-readiness");
     expect(["attack-ready", "probe-ready", "refresh-first", "blocked", "sample", "idle"]).toContain(state.live_scanner_readiness.status);
     expect(state.live_scanner_readiness.source_mode).toBe(state.discovery_tape.status);

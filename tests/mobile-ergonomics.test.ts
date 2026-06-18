@@ -588,6 +588,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("hard-stop, take-profit, trailing-stop, and time-stop supervision");
     expect(web3Workspace).toContain("hard stop ${formatTokenPrice(visibleItems[0].hard_stop_price_usd)} trailing stop");
     expect(web3Workspace).toContain("exits {exitContract.fresh_entry_permission.replaceAll(\"-\", \" \")}");
+    expect(web3Workspace).toContain("Price-action chart tape");
+    expect(web3Workspace).toContain("Autonomous price-action chart tape receipt");
+    expect(web3Workspace).toContain("seven point price-action chart");
+    expect(web3Workspace).toContain("volume bars · buy-flow shade");
+    expect(web3Workspace).toContain("chart {chartTape.status.replaceAll(\"-\", \" \")}");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved for later review.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved from the Paper form.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved to review the mobile Paper flow.");
