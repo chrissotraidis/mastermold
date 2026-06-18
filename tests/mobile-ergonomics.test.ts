@@ -604,8 +604,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Autonomous operator next eight moves");
     expect(web3Workspace).toContain("Benchmark cadence:");
     expect(web3Workspace).toContain("feedback can tighten, retarget, or press Auto watch");
-    expect(web3Workspace).toContain("loop impact and profit benchmark evidence");
+    expect(web3Workspace).toContain("Provider intake:");
+    expect(web3Workspace).toContain("refresh or defer before fresh paper size");
+    expect(web3Workspace).toContain("loop impact, provider intake, and profit benchmark evidence");
     expect(web3Workspace).toContain("profit benchmark {state.autonomous_profit_benchmark.status}");
+    expect(web3Workspace).toContain("provider budget {marketIntake.provider_budget_status}");
     expect(web3Workspace).toContain("risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}");
     expect(web3Workspace).toContain("profit alpha {formatSignedCurrency(state.autonomous_profit_benchmark.cash_alpha_usd)}");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved for later review.");

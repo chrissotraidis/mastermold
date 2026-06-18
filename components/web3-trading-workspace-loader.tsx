@@ -715,6 +715,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           Benchmark cadence: {state.autonomous_profit_benchmark.status.replaceAll("-", " ")} · {formatCompactSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)} risk alpha · {state.autonomous_alpha_feedback_loop.action.replaceAll("-", " ")} feedback can tighten, retarget, or press Auto watch.
         </p>
         <p className="mt-1 text-xs leading-5 text-outline">
+          Provider intake: {marketIntake.next_provider} {marketIntake.next_lane.replaceAll("-", " ")} · {marketIntake.provider_budget_status.replaceAll("-", " ")} at {marketIntake.provider_budget_utilization_pct}% · {marketIntake.can_feed_trade_loop ? "can feed the next paper loop" : "refresh or defer before fresh paper size"}.
+        </p>
+        <p className="mt-1 text-xs leading-5 text-outline">
           Impact gate: {loopImpact.summary} Source refresh: {state.market_source.label} read refreshes first; smart ticks can attach chart proof before the backend loop owns trade and protect actions.
         </p>
         <span className="sr-only" aria-label="Autonomous chart proof action receipt">
@@ -724,7 +727,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           Proof plus tick refreshes the chart gate when needed, sends that receipt with the backend autonomous loop tick, then lets the server choose refresh, paper fill, protect, cooldown, or stand down. Live signing remains locked.
         </span>
         <span className="sr-only" aria-label="Auto watch smart tick receipt">
-          Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets loop impact and profit benchmark evidence choose whether to continue, tighten, retarget, protect, harvest, refresh, cool down, or block the next backend tick. Current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; profit benchmark {state.autonomous_profit_benchmark.status}; risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}; alpha feedback {state.autonomous_alpha_feedback_loop.action}; next cadence {loopImpact.next_cadence_seconds} seconds.
+          Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets loop impact, provider intake, and profit benchmark evidence choose whether to continue, tighten, retarget, protect, harvest, refresh, defer, cool down, or block the next backend tick. Current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; provider intake {marketIntake.status}; intake lane {marketIntake.next_lane}; provider budget {marketIntake.provider_budget_status}; can feed loop {marketIntake.can_feed_trade_loop ? "yes" : "no"}; profit benchmark {state.autonomous_profit_benchmark.status}; risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}; alpha feedback {state.autonomous_alpha_feedback_loop.action}; next cadence {loopImpact.next_cadence_seconds} seconds.
         </span>
 
         <section className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:mt-3 sm:p-3" aria-label="Web3 operator focus deck">
@@ -8126,12 +8129,16 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   const profitBenchmark = state.autonomous_profit_benchmark;
   const alphaFeedback = state.autonomous_alpha_feedback_loop;
   const profitThesis = state.autonomous_profit_thesis_verifier;
+  const marketIntake = state.autonomous_market_intake_plan;
   const hasReadyProtectLane = tickPlan.items.some((item) => item.action === "protect-now" && item.status === "ready");
   const hasReadyQueueSell = actionQueueExecution.selected_side === "sell" && actionQueueExecution.paper_trade_ready;
   const hasProtectMinuteLane = hasReadyProtectLane || hasReadyQueueSell;
   const queuedActionCount = Math.max(tickPlan.bundle_action_count, hasReadyQueueSell ? 1 : 0);
   const queuedActionLabel = `${queuedActionCount} queued action${queuedActionCount === 1 ? "" : "s"}`;
   const nextMinuteBudget = Math.max(tickPlan.next_minute_trade_budget_usd, hasReadyQueueSell ? actionQueueExecution.paper_size_usd : 0);
+  const liveIntakeActive = state.market_source.status !== "sample" && marketIntake.status !== "sample";
+  const marketIntakeAllowsMinute = !liveIntakeActive || marketIntake.can_feed_trade_loop || (profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane);
+  const intakeDelay = Math.max(2_000, Math.min(60_000, marketIntake.next_request_seconds * 1_000 || throttleDelay));
   const benchmarkDelay = Math.max(
     4_000,
     Math.min(
@@ -8143,6 +8150,7 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
     (profitVelocity.loop_permission === "multi-fill" || profitVelocity.loop_permission === "single-fill" || profitVelocity.loop_permission === "protect-only") &&
     profitVelocity.max_trades_next_minute > 0 &&
     (tickPlan.max_actions_next_minute > 0 || (profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane)) &&
+    marketIntakeAllowsMinute &&
     tickGovernor.action !== "pause" &&
     (
       (throttle.status !== "blocked" && throttle.status !== "cooldown") ||
@@ -8195,6 +8203,38 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
       delayMs: Math.max(10_000, Math.min(30_000, impactDelay || throttleDelay)),
       label: "impact tighten",
       reason: `${loopImpact.next_action} Auto watch cuts cadence because the latest paper loop impact is ${loopImpact.impact_score}/100.`,
+    };
+  }
+  if (liveIntakeActive && marketIntake.provider_budget_status === "throttled" && !hasProtectMinuteLane) {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(15_000, intakeDelay),
+      label: "provider throttle",
+      reason: `${marketIntake.next_action} Auto watch defers fresh paper action because ${marketIntake.next_provider} ${marketIntake.next_lane.replaceAll("-", " ")} is using ${marketIntake.provider_budget_utilization_pct}% of the provider budget; protective sells can still run through their own lane.`,
+    };
+  }
+  if (liveIntakeActive && marketIntake.status === "blocked" && !hasProtectMinuteLane) {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(20_000, intakeDelay),
+      label: "intake blocked",
+      reason: `${marketIntake.next_action} Auto watch blocks fresh paper size until live provider intake recovers; no signing or live submit path is opened.`,
+    };
+  }
+  if (liveIntakeActive && marketIntake.route_refresh_first && !hasProtectMinuteLane) {
+    return {
+      mode: "refresh",
+      delayMs: Math.max(2_000, Math.min(18_000, intakeDelay)),
+      label: "intake route refresh",
+      reason: `${marketIntake.next_action} Auto watch refreshes ${marketIntake.next_provider} ${marketIntake.next_lane.replaceAll("-", " ")} before a backend tick can size another paper fill.`,
+    };
+  }
+  if (liveIntakeActive && marketIntake.status === "refresh" && !marketIntake.can_feed_trade_loop && !hasProtectMinuteLane) {
+    return {
+      mode: "refresh",
+      delayMs: Math.max(2_000, Math.min(18_000, intakeDelay)),
+      label: "intake refresh",
+      reason: `${marketIntake.next_action} Auto watch refreshes read-only provider intake before the high-frequency paper loop spends another fill.`,
     };
   }
   if (tickGovernor.should_refresh_market_data || state.autonomous_data_freshness_gate.status === "refresh" || state.autonomous_data_freshness_gate.action === "fetch-candles") {

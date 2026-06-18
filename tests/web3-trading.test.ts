@@ -1897,6 +1897,174 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(plan.reason).toContain("read-only DEX Screener live evidence");
   });
 
+  test("GIVEN live intake needs route proof WHEN Auto watch plans THEN it refreshes provider evidence before a paper minute", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...state,
+      market_source: {
+        ...state.market_source,
+        mode: "live-dex",
+        status: "live",
+        label: "DEX Screener live",
+      },
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        loop_permission: "multi-fill",
+        max_trades_next_minute: 3,
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 3,
+        bundle_action_count: 3,
+      },
+      autonomous_action_queue_execution: {
+        ...state.autonomous_action_queue_execution,
+        selected_side: "buy",
+        paper_trade_ready: false,
+        paper_trade: null,
+      },
+      autonomous_tick_governor: {
+        ...state.autonomous_tick_governor,
+        status: "run-now",
+        action: "trade",
+        should_refresh_market_data: false,
+        next_tick_seconds: 3,
+      },
+      autonomous_data_freshness_gate: {
+        ...state.autonomous_data_freshness_gate,
+        status: "clear",
+        action: "allow-paper",
+        can_trade: true,
+      },
+      autonomous_loop_throttle: {
+        ...state.autonomous_loop_throttle,
+        status: "cycle",
+        can_run: true,
+      },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
+      autonomous_market_intake_plan: {
+        ...state.autonomous_market_intake_plan,
+        status: "refresh",
+        next_lane: "route-quotes",
+        next_provider: "Jupiter",
+        next_endpoint: "/order quote-only path before any signed /execute handoff",
+        next_request_seconds: 5,
+        provider_budget_status: "within-budget",
+        provider_budget_utilization_pct: 38,
+        can_feed_trade_loop: false,
+        route_refresh_first: true,
+        next_action: "Refresh route quotes before the next paper fill or protective sell.",
+      },
+      autonomous_profit_benchmark: {
+        ...state.autonomous_profit_benchmark,
+        status: "beating-cash",
+        cash_alpha_usd: 420,
+        risk_adjusted_alpha_usd: 240,
+      },
+      autonomous_alpha_feedback_loop: {
+        ...state.autonomous_alpha_feedback_loop,
+        status: "press",
+        action: "increase-bias",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("refresh");
+    expect(plan.label).toBe("intake route refresh");
+    expect(plan.reason).toContain("Refresh route quotes");
+    expect(plan.reason).toContain("Jupiter route quotes");
+  });
+
+  test("GIVEN live provider budget is throttled WHEN Auto watch plans THEN it defers fresh paper action", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...state,
+      market_source: {
+        ...state.market_source,
+        mode: "live-dex",
+        status: "live",
+        label: "DEX Screener live",
+      },
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        loop_permission: "multi-fill",
+        max_trades_next_minute: 3,
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 3,
+        bundle_action_count: 3,
+      },
+      autonomous_action_queue_execution: {
+        ...state.autonomous_action_queue_execution,
+        selected_side: "buy",
+        paper_trade_ready: false,
+        paper_trade: null,
+      },
+      autonomous_tick_governor: {
+        ...state.autonomous_tick_governor,
+        status: "run-now",
+        action: "trade",
+        should_refresh_market_data: false,
+      },
+      autonomous_data_freshness_gate: {
+        ...state.autonomous_data_freshness_gate,
+        status: "clear",
+        action: "allow-paper",
+        can_trade: true,
+      },
+      autonomous_loop_throttle: {
+        ...state.autonomous_loop_throttle,
+        status: "cycle",
+        can_run: true,
+      },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
+      autonomous_market_intake_plan: {
+        ...state.autonomous_market_intake_plan,
+        status: "watch",
+        next_lane: "candles",
+        next_provider: "GeckoTerminal",
+        next_endpoint: "/api/v2/networks/{network}/pools/{pool}/ohlcv/{timeframe}",
+        next_request_seconds: 22,
+        provider_budget_status: "throttled",
+        provider_budget_utilization_pct: 96,
+        can_feed_trade_loop: false,
+        route_refresh_first: false,
+        next_action: "Wait for GeckoTerminal candle budget before another fresh entry.",
+      },
+      autonomous_profit_benchmark: {
+        ...state.autonomous_profit_benchmark,
+        status: "beating-cash",
+        cash_alpha_usd: 420,
+        risk_adjusted_alpha_usd: 240,
+      },
+      autonomous_alpha_feedback_loop: {
+        ...state.autonomous_alpha_feedback_loop,
+        status: "press",
+        action: "increase-bias",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("cycle");
+    expect(plan.label).toBe("provider throttle");
+    expect(plan.delayMs).toBeGreaterThanOrEqual(22_000);
+    expect(plan.reason).toContain("GeckoTerminal candles");
+    expect(plan.reason).toContain("96% of the provider budget");
+  });
+
   test("GIVEN loop impact evidence WHEN Auto watch plans THEN impact can refresh, protect, tighten, or continue cadence", () => {
     const state = getWeb3TradingState("base", 0);
     const loopImpact = state.autonomous_loop_impact_auditor;
@@ -4050,7 +4218,7 @@ describe("Web3 autonomous trading subsystem", () => {
     ];
     expect([...state.autonomous_market_intake_plan.items.map((item) => item.id)].sort()).toEqual(expectedMarketIntakeLaneIds.sort());
     expect(state.autonomous_market_intake_plan.items.every((item) =>
-      ["DEX Screener", "Birdeye", "Jupiter", "Local paper wallet"].includes(item.provider) &&
+      ["DEX Screener", "GeckoTerminal", "Birdeye", "Jupiter", "Local paper wallet"].includes(item.provider) &&
       item.endpoint.length > 0 &&
       item.priority_score >= 0 &&
       item.priority_score <= 100 &&
@@ -4831,7 +4999,7 @@ describe("Web3 autonomous trading subsystem", () => {
       limit_per_minute: 60,
     });
     expect(state.market_ingestion_plan.provider_budget_lanes.find((lane) => lane.id === "dex-pairs")?.limit_per_minute).toBe(300);
-    expect(state.market_ingestion_plan.provider_budget_lanes.find((lane) => lane.id === "gecko-ohlcv")?.limit_per_minute).toBe(30);
+    expect(state.market_ingestion_plan.provider_budget_lanes.find((lane) => lane.id === "gecko-ohlcv")?.limit_per_minute).toBe(10);
     expect(state.market_ingestion_plan.provider_budget_lanes.every((lane) => lane.used_per_minute <= lane.limit_per_minute)).toBe(true);
     expect(state.autonomous_market_intake_plan.mode).toBe("autonomous-market-intake-plan");
     expect(["attack", "refresh", "watch"]).toContain(state.autonomous_market_intake_plan.status);
@@ -4843,7 +5011,7 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_market_intake_plan.items.some((item) =>
       item.id === "candles" &&
-      item.provider === "Birdeye" &&
+      item.provider === "GeckoTerminal" &&
       item.endpoint.includes("ohlcv")
     )).toBe(true);
     expect(state.autonomous_market_intake_plan.items.some((item) =>

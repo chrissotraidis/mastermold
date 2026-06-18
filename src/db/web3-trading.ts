@@ -3426,7 +3426,7 @@ export type MarketIngestionPlan = {
 export type AutonomousMarketIntakePlanItem = {
   id: "dex-discovery" | "dex-pairs" | "paid-orders" | "candles" | "route-quotes" | "wallet-net-worth";
   label: string;
-  provider: "DEX Screener" | "Birdeye" | "Jupiter" | "Local paper wallet";
+  provider: "DEX Screener" | "GeckoTerminal" | "Birdeye" | "Jupiter" | "Local paper wallet";
   endpoint: string;
   status: "ready" | "poll" | "refresh" | "throttled" | "blocked" | "sample";
   action: "stream" | "poll" | "backfill" | "quote" | "wallet-mark" | "stand-down";
@@ -31187,9 +31187,9 @@ function buildMarketProviderBudgetLanes({
   const geckoBudget = status === "sample" || status === "blocked"
     ? 0
     : quoteRefreshCount > 0
-      ? Math.min(30, Math.max(4, quoteRefreshCount * 3))
+      ? Math.min(10, Math.max(2, quoteRefreshCount * 2))
       : streamSupervisor.status === "streaming"
-        ? Math.min(30, Math.max(2, Math.ceil(watchSymbols.length / 2)))
+        ? Math.min(10, Math.max(1, Math.ceil(watchSymbols.length / 3)))
         : 0;
 
   return [
@@ -31241,12 +31241,12 @@ function buildMarketProviderBudgetLanes({
       provider: "GeckoTerminal",
       transport: status === "sample" ? "local" : "rest",
       usedPerMinute: geckoBudget,
-      limitPerMinute: 30,
-      cadenceSeconds: cadenceFromBudget(geckoBudget, 30, 60),
+      limitPerMinute: 10,
+      cadenceSeconds: cadenceFromBudget(geckoBudget, 10, 60),
       nextAction: geckoBudget > 0
         ? "Refresh candle context only for watched or urgent symbols."
         : "Hold candle polling until live chart context is needed.",
-      detail: "GeckoTerminal public API is a tighter candle-data budget, so OHLCV refresh is reserved for watched symbols and active missions.",
+      detail: "GeckoTerminal public docs describe a tight public candle-data budget, so OHLCV refresh is reserved for watched symbols and active missions.",
     }),
     marketProviderBudgetLane({
       id: "route-quotes",
@@ -51293,7 +51293,7 @@ function buildAutonomousMarketIntakePlan({
     next_action: autonomousMarketIntakeNextAction(status, next, routeRefreshFirst, walletMarkRequired),
     controls: [
       "Ranks the next read-only provider intake before the autonomous paper loop wakes again.",
-      "Uses DEX Screener discovery and pair budgets, paid-order checks, Birdeye-style candle/wallet lanes, and Jupiter route quote readiness as separate evidence lanes.",
+      "Uses DEX Screener discovery and pair budgets, paid-order checks, GeckoTerminal OHLCV candles, wallet marks, and Jupiter route quote readiness as separate evidence lanes.",
       "Provider intake can refresh evidence and paper sizing only; it cannot sign, submit, custody funds, or guarantee profit.",
     ],
     items,
@@ -51378,8 +51378,8 @@ function autonomousMarketIntakeItems({
     autonomousMarketIntakeItem({
       id: "candles",
       label: "Candles",
-      provider: "Birdeye",
-      endpoint: "/defi/ohlcv or websocket SUBSCRIBE_PRICE",
+      provider: "GeckoTerminal",
+      endpoint: "/api/v2/networks/{network}/pools/{pool}/ohlcv/{timeframe}",
       lane: candleLane,
       sample,
       blocked,
@@ -51447,7 +51447,7 @@ function autonomousMarketIntakeItem({
   detail: string;
 }): AutonomousMarketIntakePlanItem {
   const callsPerMinute = lane?.used_per_minute ?? (action === "wallet-mark" ? 2 : 0);
-  const limitPerMinute = lane?.limit_per_minute ?? (provider === "Birdeye" ? 75 : provider === "Jupiter" ? 60 : 60);
+  const limitPerMinute = lane?.limit_per_minute ?? (provider === "GeckoTerminal" ? 10 : provider === "Birdeye" ? 75 : provider === "Jupiter" ? 60 : 60);
   const utilizationPct = limitPerMinute > 0 ? Math.round((callsPerMinute / limitPerMinute) * 100) : 0;
   const status: AutonomousMarketIntakePlanItem["status"] = sample
     ? "sample"
@@ -51475,7 +51475,7 @@ function autonomousMarketIntakeItem({
     priority_score: clamp(Math.round(basePriority + candidateCount * 4 - Math.max(0, utilizationPct - 70) * 0.7 - blockers.length * 16), 0, 100),
     calls_per_minute: Math.max(0, callsPerMinute),
     limit_per_minute: limitPerMinute,
-    cadence_seconds: lane?.cadence_seconds ?? cadenceFromBudget(callsPerMinute || 2, limitPerMinute, provider === "Birdeye" ? 60 : 45),
+    cadence_seconds: lane?.cadence_seconds ?? cadenceFromBudget(callsPerMinute || 2, limitPerMinute, provider === "GeckoTerminal" ? 60 : provider === "Birdeye" ? 60 : 45),
     candidate_count: Math.max(0, candidateCount),
     symbols: symbols.slice(0, Math.max(1, Math.min(6, candidateCount || symbols.length || 1))),
     detail,
