@@ -154,6 +154,38 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(ladder.items.some((item) => item.steps.some((step) => step.kind === "moonbag" && step.size_usd >= 0))).toBe(true);
   });
 
+  test("GIVEN open positions WHEN exit contracts run THEN fresh entries depend on hard stops, take-profit, trailing stops, time stops, and coverage", () => {
+    const state = getWeb3TradingState("rug-risk", 0);
+    const contract = state.autonomous_position_exit_contract;
+
+    expect(contract.mode).toBe("autonomous-position-exit-contract");
+    expect(["covered", "planned", "auth-required", "protect", "blocked", "idle"]).toContain(contract.status);
+    expect(["open", "selective", "protect-only", "blocked"]).toContain(contract.fresh_entry_permission);
+    expect(contract.coverage_score).toBeGreaterThanOrEqual(0);
+    expect(contract.coverage_score).toBeLessThanOrEqual(100);
+    expect(contract.items.length).toBe(state.portfolio.open_positions.length);
+    expect(contract.earliest_review_seconds).toBeGreaterThan(0);
+    expect(contract.controls.some((control) => control.includes("Local paper exit contract only"))).toBe(true);
+    expect(contract.controls.some((control) => control.includes("hard stop, trailing stop, take-profit band, time-stop"))).toBe(true);
+    expect(contract.items.every((item) =>
+      ["covered", "planned", "auth-required", "repair", "uncovered", "watch"].includes(item.status) &&
+      ["monitor", "arm-bracket", "authenticate", "repair", "protect-now", "stand-down"].includes(item.action) &&
+      ["now", "next", "watch"].includes(item.priority) &&
+      item.contract_score >= 0 &&
+      item.contract_score <= 100 &&
+      item.hard_stop_price_usd > 0 &&
+      item.trailing_stop_price_usd > 0 &&
+      item.time_stop_minutes > 0 &&
+      item.review_after_seconds > 0 &&
+      item.reason.length > 0
+    )).toBe(true);
+    expect(contract.total_protected_usd + contract.at_risk_usd).toBeGreaterThan(0);
+    if (contract.uncovered_position_count > 0 || contract.requires_protection_first) {
+      expect(contract.allows_fresh_entries).toBe(false);
+      expect(["protect-only", "blocked"]).toContain(contract.fresh_entry_permission);
+    }
+  });
+
   test("GIVEN open memecoin positions WHEN liquidity exit sentinel runs THEN it sizes trims and exits before profit disappears", () => {
     const state = getWeb3TradingState("rug-risk", 1);
     const sentinel = state.liquidity_exit_sentinel;

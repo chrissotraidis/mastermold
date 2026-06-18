@@ -271,6 +271,47 @@ export type ProtectiveTriggerCoverage = {
   items: ProtectiveTriggerCoverageItem[];
 };
 
+export type AutonomousPositionExitContractItem = {
+  id: string;
+  position_id: string;
+  symbol: string;
+  status: "covered" | "planned" | "auth-required" | "repair" | "uncovered" | "watch";
+  action: "monitor" | "arm-bracket" | "authenticate" | "repair" | "protect-now" | "stand-down";
+  priority: "now" | "next" | "watch";
+  contract_score: number;
+  value_usd: number;
+  protected_notional_usd: number;
+  uncovered_notional_usd: number;
+  hard_stop_price_usd: number;
+  trailing_stop_price_usd: number;
+  take_profit_price_usd: number | null;
+  time_stop_minutes: number;
+  time_remaining_minutes: number;
+  review_after_seconds: number;
+  next_action: string;
+  reason: string;
+  blockers: string[];
+};
+
+export type AutonomousPositionExitContract = {
+  mode: "autonomous-position-exit-contract";
+  status: "covered" | "planned" | "auth-required" | "protect" | "blocked" | "idle";
+  summary: string;
+  coverage_score: number;
+  fresh_entry_permission: "open" | "selective" | "protect-only" | "blocked";
+  allows_fresh_entries: boolean;
+  requires_protection_first: boolean;
+  covered_position_count: number;
+  uncovered_position_count: number;
+  total_protected_usd: number;
+  at_risk_usd: number;
+  release_required_usd: number;
+  earliest_review_seconds: number;
+  next_action: string;
+  controls: string[];
+  items: AutonomousPositionExitContractItem[];
+};
+
 export type AutonomousTriggerOpportunityAction = "pre-arm" | "protect-now" | "repair" | "authenticate" | "monitor" | "stand-down";
 
 export type AutonomousTriggerOpportunityItem = {
@@ -8574,6 +8615,7 @@ export type Web3TradingState = {
   trigger_order_history: TriggerOrderHistoryMonitor;
   trigger_order_reconciliation: TriggerOrderReconciliation;
   protective_trigger_coverage: ProtectiveTriggerCoverage;
+  autonomous_position_exit_contract: AutonomousPositionExitContract;
   autonomous_trigger_opportunity: AutonomousTriggerOpportunity;
   autonomous_exit_bracket_governor: AutonomousExitBracketGovernor;
   autonomous_profit_runway_governor: AutonomousProfitRunwayGovernor;
@@ -11896,6 +11938,12 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       reconciliation: configuredState.trigger_order_reconciliation,
       scalpExit: configuredState.autonomous_scalp_exit_autopilot,
     });
+    configuredState.autonomous_position_exit_contract = buildAutonomousPositionExitContract({
+      portfolio: configuredState.portfolio,
+      positionExitLadder: configuredState.position_exit_ladder,
+      protectiveCoverage: configuredState.protective_trigger_coverage,
+      asOf: configuredState.as_of,
+    });
     configuredState.autonomous_trigger_opportunity = buildAutonomousTriggerOpportunity({
       coverage: configuredState.protective_trigger_coverage,
       planner: configuredState.trigger_order_planner,
@@ -13952,6 +14000,12 @@ function buildWeb3TradingState({
     reconciliation: trigger_order_reconciliation,
     scalpExit: autonomous_scalp_exit_autopilot,
   });
+  const autonomous_position_exit_contract = buildAutonomousPositionExitContract({
+    portfolio: appliedPortfolio,
+    positionExitLadder: position_exit_ladder,
+    protectiveCoverage: protective_trigger_coverage,
+    asOf: marketSource.fetched_at,
+  });
   const autonomous_trigger_opportunity = buildAutonomousTriggerOpportunity({
     coverage: protective_trigger_coverage,
     planner: trigger_order_planner,
@@ -14410,6 +14464,7 @@ function buildWeb3TradingState({
     trigger_order_history,
     trigger_order_reconciliation,
     protective_trigger_coverage,
+    autonomous_position_exit_contract,
     autonomous_trigger_opportunity,
     autonomous_exit_bracket_governor,
     autonomous_profit_runway_governor,
@@ -16331,6 +16386,12 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     reconciliation: trigger_order_reconciliation,
     scalpExit: autonomous_scalp_exit_autopilot,
   });
+  const autonomous_position_exit_contract = buildAutonomousPositionExitContract({
+    portfolio: state.portfolio,
+    positionExitLadder: position_exit_ladder,
+    protectiveCoverage: protective_trigger_coverage,
+    asOf: state.as_of,
+  });
   const autonomous_trigger_opportunity = buildAutonomousTriggerOpportunity({
     coverage: protective_trigger_coverage,
     planner: trigger_order_planner,
@@ -16764,6 +16825,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     trigger_order_history,
     trigger_order_reconciliation,
     protective_trigger_coverage,
+    autonomous_position_exit_contract,
     autonomous_trigger_opportunity,
     autonomous_exit_bracket_governor,
     autonomous_profit_runway_governor,
@@ -17544,6 +17606,12 @@ function attachTriggerOrderHistory(state: Web3TradingState, trigger_order_histor
     reconciliation: trigger_order_reconciliation,
     scalpExit: state.autonomous_scalp_exit_autopilot,
   });
+  const autonomous_position_exit_contract = buildAutonomousPositionExitContract({
+    portfolio: state.portfolio,
+    positionExitLadder: state.position_exit_ladder,
+    protectiveCoverage: protective_trigger_coverage,
+    asOf: state.as_of,
+  });
   const autonomous_trigger_opportunity = buildAutonomousTriggerOpportunity({
     coverage: protective_trigger_coverage,
     planner: state.trigger_order_planner,
@@ -17580,6 +17648,7 @@ function attachTriggerOrderHistory(state: Web3TradingState, trigger_order_histor
     trigger_order_history,
     trigger_order_reconciliation,
     protective_trigger_coverage,
+    autonomous_position_exit_contract,
     autonomous_trigger_opportunity,
     autonomous_exit_bracket_governor,
     autonomous_action_queue,
@@ -21656,6 +21725,12 @@ function applyPersistentLedger(
     reconciliation: trigger_order_reconciliation,
     scalpExit: autonomous_scalp_exit_autopilot,
   });
+  const autonomous_position_exit_contract = buildAutonomousPositionExitContract({
+    portfolio,
+    positionExitLadder: position_exit_ladder,
+    protectiveCoverage: protective_trigger_coverage,
+    asOf: state.as_of,
+  });
   const autonomous_trigger_opportunity = buildAutonomousTriggerOpportunity({
     coverage: protective_trigger_coverage,
     planner: trigger_order_planner,
@@ -22178,6 +22253,7 @@ function applyPersistentLedger(
     trigger_order_history,
     trigger_order_reconciliation,
     protective_trigger_coverage,
+    autonomous_position_exit_contract,
     autonomous_trigger_opportunity,
     autonomous_exit_bracket_governor,
     autonomous_protection_coordinator,
@@ -24538,6 +24614,301 @@ function protectiveTriggerCoverageReviewSeconds(status: ProtectiveTriggerCoverag
   if (status === "plan-ready") return 8;
   if (status === "auth-required") return 12;
   return 30;
+}
+
+function buildAutonomousPositionExitContract({
+  portfolio,
+  positionExitLadder,
+  protectiveCoverage,
+  asOf,
+}: {
+  portfolio: TradingPortfolio;
+  positionExitLadder: PositionExitLadderEngine;
+  protectiveCoverage: ProtectiveTriggerCoverage;
+  asOf: string;
+}): AutonomousPositionExitContract {
+  const ladderByPosition = new Map(positionExitLadder.items.map((item) => [item.position_id, item]));
+  const coverageByPosition = new Map(protectiveCoverage.items.map((item) => [item.position_id, item]));
+  const items = portfolio.open_positions
+    .map((position) => autonomousPositionExitContractItem({
+      position,
+      ladder: ladderByPosition.get(position.id),
+      coverage: coverageByPosition.get(position.id),
+      asOf,
+    }))
+    .sort((a, b) => autonomousPositionExitContractRank(b) - autonomousPositionExitContractRank(a));
+  const totalProtected = items.reduce((sum, item) => sum + item.protected_notional_usd, 0);
+  const atRisk = items.reduce((sum, item) => sum + item.uncovered_notional_usd, 0);
+  const releaseRequired = items
+    .filter((item) => item.priority === "now")
+    .reduce((sum, item) => sum + item.uncovered_notional_usd, 0);
+  const coveredCount = items.filter((item) => item.status === "covered").length;
+  const uncoveredCount = items.filter((item) => item.status === "uncovered" || item.status === "repair").length;
+  const authRequiredCount = items.filter((item) => item.status === "auth-required").length;
+  const plannedCount = items.filter((item) => item.status === "planned").length;
+  const coverageScore = items.length > 0 ? Math.round(average(items.map((item) => item.contract_score))) : 100;
+  const requiresProtectionFirst = items.some((item) =>
+    item.priority === "now" ||
+    item.status === "uncovered" ||
+    item.status === "repair" ||
+    item.time_remaining_minutes <= 0
+  ) || protectiveCoverage.should_pause_fresh_buys;
+  const freshEntryPermission: AutonomousPositionExitContract["fresh_entry_permission"] = items.length === 0
+    ? "open"
+    : requiresProtectionFirst
+      ? releaseRequired > 0 || uncoveredCount > 0
+        ? "blocked"
+        : "protect-only"
+      : coverageScore >= 76 && atRisk <= Math.max(25, totalProtected * 0.25)
+        ? "open"
+        : "selective";
+  const status: AutonomousPositionExitContract["status"] = items.length === 0
+    ? "idle"
+    : uncoveredCount > 0
+      ? "blocked"
+      : requiresProtectionFirst
+        ? "protect"
+        : authRequiredCount > 0
+          ? "auth-required"
+          : plannedCount > 0
+            ? "planned"
+            : "covered";
+
+  return {
+    mode: "autonomous-position-exit-contract",
+    status,
+    summary: autonomousPositionExitContractSummary(status, items.length, coverageScore, atRisk, releaseRequired),
+    coverage_score: coverageScore,
+    fresh_entry_permission: freshEntryPermission,
+    allows_fresh_entries: freshEntryPermission === "open" || freshEntryPermission === "selective",
+    requires_protection_first: requiresProtectionFirst,
+    covered_position_count: coveredCount,
+    uncovered_position_count: uncoveredCount,
+    total_protected_usd: Math.round(totalProtected),
+    at_risk_usd: Math.round(atRisk),
+    release_required_usd: Math.round(releaseRequired),
+    earliest_review_seconds: Math.min(...items.map((item) => item.review_after_seconds), protectiveCoverage.fastest_review_seconds),
+    next_action: autonomousPositionExitContractNextAction(status, freshEntryPermission, items, protectiveCoverage),
+    controls: [
+      "Local paper exit contract only: it can block fresh paper buys and shape protective exits, but it cannot sign, fund, submit, or custody real wallet orders.",
+      "Every open position is checked for a hard stop, trailing stop, take-profit band, time-stop, and provider trigger coverage before fresh exposure is allowed.",
+      "Provider-side Jupiter Trigger brackets still require live DEX feed, wallet proof, API key, Trigger JWT, vault funding, and explicit execution gates.",
+      "If coverage is missing, the autonomous loop must protect, trim, or stand down before chasing another memecoin.",
+    ],
+    items,
+  };
+}
+
+function autonomousPositionExitContractItem({
+  position,
+  ladder,
+  coverage,
+  asOf,
+}: {
+  position: TradingPosition;
+  ladder: PositionExitLadderItem | undefined;
+  coverage: ProtectiveTriggerCoverageItem | undefined;
+  asOf: string;
+}): AutonomousPositionExitContractItem {
+  const hardStop = ladder?.steps.find((step) => step.kind === "hard-stop");
+  const trailingStop = ladder?.steps.find((step) => step.kind === "trailing-stop");
+  const takeProfit = ladder?.steps.find((step) => step.kind === "take-profit");
+  const status = autonomousPositionExitContractStatus(ladder, coverage);
+  const action = autonomousPositionExitContractAction(status, coverage, ladder);
+  const priority = autonomousPositionExitContractPriority(status, ladder, coverage);
+  const ageMinutes = positionAgeMinutes(position, asOf);
+  const timeStopMinutes = autonomousPositionTimeStopMinutes(position, ladder, coverage);
+  const timeRemainingMinutes = Math.round(timeStopMinutes - ageMinutes);
+  const protectedUsd = Math.min(position.value_usd, coverage?.protected_usd ?? 0);
+  const uncoveredUsd = Math.max(0, position.value_usd - protectedUsd);
+  const blockers = [
+    ...(coverage?.blockers ?? []),
+    ...(hardStop ? [] : ["Hard stop is missing."]),
+    ...(takeProfit ? [] : ["Take-profit band is missing."]),
+    ...(trailingStop ? [] : ["Trailing stop is missing."]),
+    ...(timeRemainingMinutes <= 0 ? ["Time-stop has expired."] : []),
+    ...(status === "uncovered" ? ["Provider trigger coverage is missing."] : []),
+  ].slice(0, 6);
+  const contractScore = autonomousPositionExitContractScore(status, position, ladder, coverage, uncoveredUsd, timeRemainingMinutes, blockers.length);
+
+  return {
+    id: `exit-contract-${position.id}`,
+    position_id: position.id,
+    symbol: position.symbol,
+    status,
+    action,
+    priority,
+    contract_score: contractScore,
+    value_usd: Math.round(position.value_usd),
+    protected_notional_usd: Math.round(protectedUsd),
+    uncovered_notional_usd: Math.round(uncoveredUsd),
+    hard_stop_price_usd: hardStop?.trigger_price_usd ?? position.entry_price_usd * (1 + position.stop_loss_pct / 100),
+    trailing_stop_price_usd: trailingStop?.trigger_price_usd ?? position.trailing_stop_price_usd,
+    take_profit_price_usd: takeProfit?.trigger_price_usd ?? coverage?.take_profit_price_usd ?? position.entry_price_usd * (1 + position.take_profit_pct / 100),
+    time_stop_minutes: timeStopMinutes,
+    time_remaining_minutes: timeRemainingMinutes,
+    review_after_seconds: autonomousPositionExitContractReviewSeconds(status, priority, timeRemainingMinutes),
+    next_action: autonomousPositionExitContractItemNextAction(action, position.symbol, uncoveredUsd, timeRemainingMinutes),
+    reason: autonomousPositionExitContractReason(status, position, ladder, coverage, timeRemainingMinutes),
+    blockers,
+  };
+}
+
+function autonomousPositionExitContractStatus(
+  ladder: PositionExitLadderItem | undefined,
+  coverage: ProtectiveTriggerCoverageItem | undefined,
+): AutonomousPositionExitContractItem["status"] {
+  if (coverage?.coverage_status === "covered") return "covered";
+  if (coverage?.coverage_status === "planned") return "planned";
+  if (coverage?.coverage_status === "auth-required") return "auth-required";
+  if (coverage?.coverage_status === "repair") return "repair";
+  if (coverage?.coverage_status === "watch" && ladder?.status === "hold") return "watch";
+  return "uncovered";
+}
+
+function autonomousPositionExitContractAction(
+  status: AutonomousPositionExitContractItem["status"],
+  coverage: ProtectiveTriggerCoverageItem | undefined,
+  ladder: PositionExitLadderItem | undefined,
+): AutonomousPositionExitContractItem["action"] {
+  if (status === "covered" || status === "watch") return "monitor";
+  if (status === "planned") return coverage?.order_type === "oco" ? "arm-bracket" : "protect-now";
+  if (status === "auth-required") return "authenticate";
+  if (status === "repair") return "repair";
+  if (ladder?.status === "hold") return "stand-down";
+  return "protect-now";
+}
+
+function autonomousPositionExitContractPriority(
+  status: AutonomousPositionExitContractItem["status"],
+  ladder: PositionExitLadderItem | undefined,
+  coverage: ProtectiveTriggerCoverageItem | undefined,
+): AutonomousPositionExitContractItem["priority"] {
+  if (status === "repair" || status === "uncovered" || ladder?.status === "exit" || coverage?.priority === "now") return "now";
+  if (status === "planned" || status === "auth-required" || ladder?.status === "harvest" || ladder?.status === "trail") return "next";
+  return "watch";
+}
+
+function autonomousPositionExitContractScore(
+  status: AutonomousPositionExitContractItem["status"],
+  position: TradingPosition,
+  ladder: PositionExitLadderItem | undefined,
+  coverage: ProtectiveTriggerCoverageItem | undefined,
+  uncoveredUsd: number,
+  timeRemainingMinutes: number,
+  blockerCount: number,
+) {
+  const statusBase = status === "covered"
+    ? 94
+    : status === "planned"
+      ? 78
+      : status === "auth-required"
+        ? 62
+        : status === "watch"
+          ? 54
+          : status === "repair"
+            ? 28
+            : 18;
+  const ladderCredit = ladder ? Math.min(16, ladder.active_step_count * 4 + (ladder.status === "hold" ? 2 : 0)) : -12;
+  const exposurePenalty = uncoveredUsd > 0 ? Math.min(34, (uncoveredUsd / Math.max(1, position.value_usd)) * 34) : 0;
+  const stalePenalty = timeRemainingMinutes <= 0 ? 18 : timeRemainingMinutes < 20 ? 8 : 0;
+  const coverageCredit = Math.max(0, (coverage?.coverage_score ?? 0) - 50) * 0.18;
+  return clamp(Math.round(statusBase + ladderCredit + coverageCredit - exposurePenalty - stalePenalty - blockerCount * 3), 0, 100);
+}
+
+function autonomousPositionExitContractRank(item: AutonomousPositionExitContractItem) {
+  const statusWeight = item.status === "uncovered" ? 100 : item.status === "repair" ? 94 : item.status === "auth-required" ? 76 : item.status === "planned" ? 68 : item.status === "watch" ? 34 : 20;
+  const priorityWeight = item.priority === "now" ? 24 : item.priority === "next" ? 10 : 0;
+  const timeWeight = item.time_remaining_minutes <= 0 ? 22 : item.time_remaining_minutes < 20 ? 10 : 0;
+  return statusWeight + priorityWeight + timeWeight + item.uncovered_notional_usd * 0.01 - item.contract_score * 0.05;
+}
+
+function autonomousPositionTimeStopMinutes(
+  position: TradingPosition,
+  ladder: PositionExitLadderItem | undefined,
+  coverage: ProtectiveTriggerCoverageItem | undefined,
+) {
+  if (ladder?.status === "exit" || coverage?.priority === "now") return 90;
+  if (position.pnl_pct < -4 || coverage?.coverage_status === "uncovered") return 120;
+  if (ladder?.status === "harvest") return 240;
+  if (ladder?.status === "trail") return 360;
+  return 720;
+}
+
+function positionAgeMinutes(position: TradingPosition, asOf: string) {
+  const opened = Date.parse(position.opened_at);
+  const now = Date.parse(asOf);
+  if (!Number.isFinite(opened) || !Number.isFinite(now) || now <= opened) return 0;
+  return Math.round((now - opened) / 60_000);
+}
+
+function autonomousPositionExitContractReviewSeconds(
+  status: AutonomousPositionExitContractItem["status"],
+  priority: AutonomousPositionExitContractItem["priority"],
+  timeRemainingMinutes: number,
+) {
+  if (timeRemainingMinutes <= 0 || priority === "now" || status === "uncovered" || status === "repair") return 5;
+  if (priority === "next" || status === "planned" || status === "auth-required") return 10;
+  return 30;
+}
+
+function autonomousPositionExitContractSummary(
+  status: AutonomousPositionExitContract["status"],
+  count: number,
+  coverageScore: number,
+  atRisk: number,
+  releaseRequired: number,
+) {
+  if (status === "idle") return "No open paper positions need an exit contract yet.";
+  if (status === "covered") return `${count} open paper position${count === 1 ? "" : "s"} have covered exit contracts at ${coverageScore}/100.`;
+  if (status === "planned") return `Exit contracts are shaped, with ${formatCompactValue(atRisk)} still exposed until brackets are armed.`;
+  if (status === "auth-required") return `Exit contracts need Trigger auth/vault gates before provider brackets can be mirrored.`;
+  if (status === "protect") return `Protect-first mode: review exits before fresh buys; ${formatCompactValue(atRisk)} remains at risk.`;
+  return `Fresh buys are blocked until exit protection repairs ${formatCompactValue(releaseRequired || atRisk)} of open exposure.`;
+}
+
+function autonomousPositionExitContractNextAction(
+  status: AutonomousPositionExitContract["status"],
+  permission: AutonomousPositionExitContract["fresh_entry_permission"],
+  items: AutonomousPositionExitContractItem[],
+  coverage: ProtectiveTriggerCoverage,
+) {
+  const leader = items[0];
+  if (status === "idle") return "Wait for the first held paper coin, then attach hard-stop, take-profit, trailing, and time-stop rules.";
+  if (permission === "blocked") return leader?.next_action ?? coverage.next_action;
+  if (permission === "protect-only") return `Run protect/trim exits for ${leader?.symbol ?? "the lead position"} before redeploying capital.`;
+  if (status === "auth-required") return "Clear Trigger credentials and vault proof before treating planned brackets as provider-side coverage.";
+  if (status === "planned") return "Keep fresh entries selective until planned brackets become active or paper exits reduce exposure.";
+  return "Fresh entries can continue only while each held coin keeps its exit contract covered.";
+}
+
+function autonomousPositionExitContractItemNextAction(
+  action: AutonomousPositionExitContractItem["action"],
+  symbol: string,
+  uncoveredUsd: number,
+  timeRemainingMinutes: number,
+) {
+  if (timeRemainingMinutes <= 0) return `${symbol} hit its time-stop; trim or exit the paper position before fresh exposure.`;
+  if (action === "repair") return `Repair ${symbol} exit coverage before any redeploy.`;
+  if (action === "authenticate") return `Authenticate the ${symbol} trigger bracket path, then keep the paper exit active until provider coverage is proven.`;
+  if (action === "arm-bracket") return `Arm ${symbol} stop/take-profit bracket for ${formatCompactValue(uncoveredUsd)} exposed notional after live gates clear.`;
+  if (action === "protect-now") return `Protect ${symbol} now; ${formatCompactValue(uncoveredUsd)} is open without enough exit coverage.`;
+  if (action === "stand-down") return `Stand down on ${symbol} until a real exit band appears.`;
+  return `Monitor ${symbol}; hard stop, trailing stop, take-profit, and time-stop are supervised.`;
+}
+
+function autonomousPositionExitContractReason(
+  status: AutonomousPositionExitContractItem["status"],
+  position: TradingPosition,
+  ladder: PositionExitLadderItem | undefined,
+  coverage: ProtectiveTriggerCoverageItem | undefined,
+  timeRemainingMinutes: number,
+) {
+  if (timeRemainingMinutes <= 0) return `${position.symbol} is older than the contract time-stop for its risk state.`;
+  if (coverage?.reason) return coverage.reason;
+  if (status === "covered") return `${position.symbol} has trigger coverage plus local hard-stop, trailing-stop, take-profit, and time-stop supervision.`;
+  if (ladder) return `${position.symbol} has a local ladder but no provider-side trigger coverage yet.`;
+  return `${position.symbol} is missing an exit contract and cannot justify fresh autonomous exposure.`;
 }
 
 function buildAutonomousTriggerOpportunity({

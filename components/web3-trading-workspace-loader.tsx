@@ -980,6 +980,7 @@ function QuickTradingCommandDeck({
   const forwardPermission = state.autonomous_forward_loop_permission;
   const loopImpact = state.autonomous_loop_impact_auditor;
   const minuteDiscipline = state.autonomous_minute_profit_discipline;
+  const exitContract = state.autonomous_position_exit_contract;
   const profitCaptureAutopilot = state.autonomous_profit_capture_autopilot;
   const profitRedeployAutopilot = state.autonomous_profit_redeploy_autopilot;
   const discoveryDelta = state.live_discovery_delta_tape;
@@ -1026,6 +1027,7 @@ function QuickTradingCommandDeck({
   const forwardTone = forwardPermissionTone(forwardPermission.status);
   const loopImpactToneValue = loopImpactTone(loopImpact.status);
   const minuteDisciplineToneValue = minuteProfitDisciplineTone(minuteDiscipline.status);
+  const exitContractToneValue = positionExitContractTone(exitContract.status);
   const profitCaptureToneValue = profitCaptureAutopilotTone(profitCaptureAutopilot.status);
   const profitRedeployToneValue = profitRedeployAutopilotTone(profitRedeployAutopilot.status);
   const profitRedeployExecution = state.autonomous_profit_redeploy_execution;
@@ -1051,6 +1053,7 @@ function QuickTradingCommandDeck({
             <Chip tone={forwardTone}>forward {forwardPermission.permission.replaceAll("-", " ")}</Chip>
             <Chip tone={loopImpactToneValue}>impact {loopImpact.status.replaceAll("-", " ")}</Chip>
             <Chip tone={minuteDisciplineToneValue}>minute {minuteDiscipline.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={exitContractToneValue}>exits {exitContract.fresh_entry_permission.replaceAll("-", " ")}</Chip>
             <Chip tone={profitCaptureToneValue}>capture {profitCaptureAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitRedeployToneValue}>redeploy {profitRedeployAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitRedeployExecutionToneValue}>exec {profitRedeployExecution.status.replaceAll("-", " ")}</Chip>
@@ -1096,6 +1099,7 @@ function QuickTradingCommandDeck({
             />
             <QuickPaperExecutionPriorityTape state={state} />
             <QuickMinuteProfitDisciplineRail state={state} />
+            <QuickPositionExitContractRail state={state} />
           </div>
 
           <div className="grid gap-2">
@@ -3957,6 +3961,75 @@ function QuickMinuteProfitDisciplineRail({ state }: { state: Web3TradingState })
   );
 }
 
+function QuickPositionExitContractRail({ state }: { state: Web3TradingState }) {
+  const contract = state.autonomous_position_exit_contract;
+  const tone = positionExitContractTone(contract.status);
+  const visibleItems = contract.items.slice(0, 2);
+
+  return (
+    <section className={cn("min-w-0 self-start rounded-md border p-2 sm:p-3", permissionToneClass(tone))} aria-label="Position exit contract">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Position exit contract</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {contract.fresh_entry_permission.replaceAll("-", " ")} · {contract.coverage_score}/100
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+            {contract.summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{contract.status.replaceAll("-", " ")}</Chip>
+          <Chip tone={contract.requires_protection_first ? "caution" : "engine"}>
+            {contract.requires_protection_first ? "protect first" : "chase ok"}
+          </Chip>
+          <Chip tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"}>
+            {state.execution_gate.live_execution_enabled ? "live boundary" : "paper only"}
+          </Chip>
+        </div>
+      </div>
+
+      {visibleItems.length > 0 ? (
+        <div className="mt-2 grid gap-1.5">
+          {visibleItems.map((item) => {
+            const itemTone = positionExitContractItemTone(item.status, item.priority);
+            return (
+              <div key={item.id} className={cn("grid min-w-0 gap-1 rounded-md border p-2 md:grid-cols-[minmax(0,1fr)_auto]", permissionToneClass(itemTone))}>
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className={cn("h-2 w-2 shrink-0 rounded-full", profitAuthorityBarClass(itemTone))} aria-hidden="true" />
+                    <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.action.replaceAll("-", " ")}</p>
+                    <p className="truncate text-xs font-semibold text-on-surface">{item.symbol}</p>
+                  </div>
+                  <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-on-surface-variant">
+                    hard {formatTokenPrice(item.hard_stop_price_usd)} · take {item.take_profit_price_usd ? formatTokenPrice(item.take_profit_price_usd) : "none"} · time {item.time_remaining_minutes}m
+                  </p>
+                </div>
+                <p className="font-mono text-[11px] text-outline md:text-right">
+                  {formatCompactCurrency(item.uncovered_notional_usd)} risk
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-2 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2 text-xs leading-5 text-on-surface-variant">
+          No held paper coins yet. The first position will get hard-stop, take-profit, trailing-stop, and time-stop supervision.
+        </p>
+      )}
+
+      <dl className="mt-2 grid grid-cols-3 gap-1" aria-label="Position exit contract metrics">
+        <MiniProofStat label="Protected" value={formatCompactCurrency(contract.total_protected_usd)} />
+        <MiniProofStat label="At risk" value={formatCompactCurrency(contract.at_risk_usd)} />
+        <MiniProofStat label="Review" value={`${contract.earliest_review_seconds}s`} />
+      </dl>
+      <span className="sr-only" aria-label="Position exit contract receipt">
+        Position exit contract status {contract.status}; fresh entry permission {contract.fresh_entry_permission}; coverage score {contract.coverage_score}; allows fresh entries {contract.allows_fresh_entries ? "yes" : "no"}; requires protection first {contract.requires_protection_first ? "yes" : "no"}; covered positions {contract.covered_position_count}; uncovered positions {contract.uncovered_position_count}; protected notional {formatCurrency(contract.total_protected_usd)}; at risk {formatCurrency(contract.at_risk_usd)}; release required {formatCurrency(contract.release_required_usd)}; review {contract.earliest_review_seconds} seconds; controls {contract.controls.join(" ")}; leader {visibleItems[0] ? `${visibleItems[0].symbol} ${visibleItems[0].action} hard stop ${formatTokenPrice(visibleItems[0].hard_stop_price_usd)} trailing stop ${formatTokenPrice(visibleItems[0].trailing_stop_price_usd)} take-profit ${visibleItems[0].take_profit_price_usd ? formatTokenPrice(visibleItems[0].take_profit_price_usd) : "none"} time-stop ${visibleItems[0].time_remaining_minutes} minutes` : "none"}.
+      </span>
+    </section>
+  );
+}
+
 function QuickRotationDirectorPanel({ state }: { state: Web3TradingState }) {
   const director = state.autonomous_rotation_director;
   const tone: QuickChipTone = director.status === "rotate-now" || director.status === "retarget"
@@ -6476,6 +6549,23 @@ function minuteProfitDisciplineTone(status: Web3TradingState["autonomous_minute_
   if (status === "scale" || status === "run") return "engine";
   if (status === "tighten" || status === "protect" || status === "refresh") return "caution";
   if (status === "blocked") return "critical";
+  return "neutral";
+}
+
+function positionExitContractTone(status: Web3TradingState["autonomous_position_exit_contract"]["status"]): QuickChipTone {
+  if (status === "covered" || status === "planned") return "engine";
+  if (status === "auth-required" || status === "protect") return "caution";
+  if (status === "blocked") return "critical";
+  return "neutral";
+}
+
+function positionExitContractItemTone(
+  status: Web3TradingState["autonomous_position_exit_contract"]["items"][number]["status"],
+  priority: Web3TradingState["autonomous_position_exit_contract"]["items"][number]["priority"],
+): QuickChipTone {
+  if (status === "covered") return "engine";
+  if (status === "uncovered" || status === "repair" || priority === "now") return "critical";
+  if (status === "planned" || status === "auth-required" || priority === "next") return "caution";
   return "neutral";
 }
 

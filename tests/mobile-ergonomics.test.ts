@@ -583,6 +583,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("high-frequency allowed {discipline.high_frequency_allowed ? \"yes\" : \"no\"}");
     expect(web3Workspace).toContain("realized minute edge {formatSignedCurrency(discipline.realized_minute_edge_usd)}");
     expect(web3Workspace).toContain("Minute discipline");
+    expect(web3Workspace).toContain("Position exit contract");
+    expect(web3Workspace).toContain("Position exit contract receipt");
+    expect(web3Workspace).toContain("hard-stop, take-profit, trailing-stop, and time-stop supervision");
+    expect(web3Workspace).toContain("hard stop ${formatTokenPrice(visibleItems[0].hard_stop_price_usd)} trailing stop");
+    expect(web3Workspace).toContain("exits {exitContract.fresh_entry_permission.replaceAll(\"-\", \" \")}");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved for later review.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved from the Paper form.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved to review the mobile Paper flow.");
