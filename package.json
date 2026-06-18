@@ -10,6 +10,7 @@
     "start": "node .next/standalone/server.js",
     "seed": "bun run scripts/seed.ts",
     "typecheck": "tsc --noEmit",
+    "daemon:web3": "node scripts/web3-autonomous-daemon.mjs",
     "smoke:web3": "node scripts/web3-trading-smoke.mjs",
     "test": "bun run typecheck && bun test tests"
   },

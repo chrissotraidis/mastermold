@@ -1653,6 +1653,41 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(reloaded.autonomous_loop_tick.next_action).toBe(ticked.autonomous_loop_tick.next_action);
   });
 
+  test("GIVEN a daemon lease WHEN backend loop tick stands down THEN the lease receipt is still persisted", async () => {
+    const requestBody = {
+      scenario: "base",
+      source: "sample",
+      account: "persistent",
+      reset: true,
+      daemon: true,
+      autonomous_loop: {
+        action: "tick",
+      },
+      daemon_lease: {
+        lease_id: "lease-loop-root-test-001",
+        runner_id: "loop-root-runner",
+        request_id: "request-loop-root-test-001",
+      },
+    };
+    const first = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      body: JSON.stringify(requestBody),
+    }));
+    const replay = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      body: JSON.stringify({ ...requestBody, reset: false }),
+    }));
+    const firstState = await json<Web3TradingState>(first);
+    const replayState = await json<Web3TradingState>(replay);
+
+    expect(first.status).toBe(200);
+    expect(["acquired", "renewed", "expired"]).toContain(firstState.autonomous_daemon_handoff.lease_status);
+    expect(firstState.autonomous_daemon_handoff.active_runner_id).toBe("loop-root-runner");
+    expect(replay.status).toBe(200);
+    expect(replayState.autonomous_daemon_handoff.lease_status).toBe("replayed");
+    expect(replayState.paper_daemon.advanced).toBe(false);
+  });
+
   test("GIVEN chart proof is bundled with a backend loop tick WHEN posted THEN the server records proof before deciding the tick", async () => {
     const targetSeed = await getWeb3TradingStateAsync({
       scenario: "base",

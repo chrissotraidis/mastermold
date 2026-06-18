@@ -10574,7 +10574,7 @@ function daemonLeaseForChildTick(
 
 async function runAutonomousLoopTick(input: TradingStateInput): Promise<Web3TradingState> {
   const account: TradingAccountMode = input.account ?? "persistent";
-  const baseline = await getWeb3TradingStateAsync({
+  let baseline = await getWeb3TradingStateAsync({
     ...input,
     account,
     daemon: false,
@@ -10583,6 +10583,24 @@ async function runAutonomousLoopTick(input: TradingStateInput): Promise<Web3Trad
     autonomous_session: undefined,
     autonomous_loop: undefined,
   });
+  if (input.daemon === true && account === "persistent") {
+    recordAutonomousDaemonLeaseRequest({
+      state: baseline,
+      request: input.daemon_lease,
+      requestedMode: "off",
+      now: new Date().toISOString(),
+    });
+    baseline = applyPersistentLedger(baseline, "off");
+    if (baseline.autonomous_daemon_handoff.lease_status === "conflict" || baseline.autonomous_daemon_handoff.lease_status === "replayed" || baseline.autonomous_daemon_handoff.lease_status === "blocked") {
+      const report = buildAutonomousLoopTickReport({
+        baseline,
+        current: baseline,
+        routeRefreshed: false,
+        sessionRequested: false,
+      });
+      return attachAutonomousLoopTick(baseline, report, account);
+    }
+  }
   const throttle = baseline.autonomous_loop_throttle;
   const wakePlan = baseline.autonomous_wake_plan;
   const profitVelocity = baseline.autonomous_profit_velocity_governor;

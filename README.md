@@ -75,9 +75,24 @@ What still requires credentials/ops (not yet done): scheduled market scans
 multi-agent path), always-on cron scheduling, prompt caching, batch reflections, and
 broad account-sync coverage beyond the explicit holdings snapshot import buttons in Settings.
 
-The central invariant is unchanged: **advisory-only, read-only by construction.** The
-app never places a trade or moves funds; the engine only reads data and writes
-JSON. A static enforcement test fails if a trade/order/write endpoint is ever introduced.
+The central invariant is unchanged for real capital: **advisory-only, read-only by
+construction.** The app never places a real trade or moves funds; Web3 automation is
+confined to the local paper ledger unless signer, custody, relay, approval, and kill-switch
+gates are explicitly built and cleared. A static enforcement test fails if an unguarded
+trade/order/write endpoint is ever introduced.
+
+### Web3 autonomous paper daemon
+
+The Web3 trading workspace can be driven without the browser by the bounded paper daemon:
+
+```bash
+npm run daemon:web3 -- --base-url=http://localhost:4010 --ticks=1 --heartbeat-when-gated --json
+```
+
+The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
+receipts, refuses real-capital autonomy, and exits on conflicting runners. It is intended
+for local/paper monitoring and rehearsal only; live signing, transaction submission, and
+fund custody remain credential-gated future work.
 
 ## Architecture: the engine and the app
 

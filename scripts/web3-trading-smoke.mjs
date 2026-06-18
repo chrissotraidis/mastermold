@@ -1,3 +1,5 @@
+import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
+
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
 
 function fail(message, detail) {
@@ -4712,9 +4714,27 @@ async function main() {
     advance: false,
   });
 
+  const daemonRun = await runWeb3AutonomousDaemon({
+    baseUrl,
+    scenario: "base",
+    source: "sample",
+    runnerId: "implicit-daemon-runner",
+    maxTicks: 1,
+    intervalMs: 0,
+    heartbeatWhenGated: true,
+    exitOnBlocked: false,
+  });
+  assert(daemonRun.paper_only === true, "Autonomous daemon smoke run must remain paper-only.", daemonRun);
+  assert(daemonRun.events.length === 1, "Autonomous daemon smoke run should execute one bounded tick.", daemonRun);
+  assert(daemonRun.events[0].status === "posted", "Autonomous daemon smoke run should post a leased backend tick.", daemonRun);
+  assert(["acquired", "renewed", "replayed", "expired"].includes(daemonRun.events[0].lease_status), "Autonomous daemon smoke run should return a recorded non-conflicting lease status.", daemonRun);
+  assert(daemonRun.events[0].active_runner_id === "implicit-daemon-runner" || daemonRun.events[0].active_runner_id === null, "Autonomous daemon smoke run should own or safely idle the lease.", daemonRun);
+
   const summary = {
     baseUrl,
     scenario: tick.payload.scenario,
+    daemonRunner: daemonRun.events[0].status,
+    daemonLease: daemonRun.events[0].lease_status,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,
