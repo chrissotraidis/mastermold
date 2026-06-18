@@ -826,14 +826,14 @@ describe("mobile ergonomics source contracts", () => {
     const reviewReadiness = source("components/review-readiness.tsx");
 
     expect(readme).toContain("future bounded Web3 automation layer");
-    expect(readme).toContain("The full forward-evaluation harness with baselines, costs, enough resolved calls");
+    expect(readme).toContain("Long-horizon live/out-of-sample forward evaluation with external baseline comparisons");
     expect(readme).toContain("broad TypeScript route, copy, persistence");
     expect(readme).toContain("explicit holdings snapshot import buttons in Settings");
     expect(readme).toContain("automatic broad internet/news scanning is still off by default");
     expect(readme).toContain("suggested paper trades");
     expect(readme).toContain("past-call review");
     expect(readme).toContain("alert-feedback → alert-rule tuning loop");
-    expect(reviewReadiness).toContain("The full forward-evaluation harness with baselines, costs, enough resolved calls");
+    expect(reviewReadiness).toContain("Long-horizon live/out-of-sample forward evaluation with external baselines");
     expect(`${readme}\n${reviewReadiness}`).not.toMatch(/54 TypeScript tests|16 deterministic|structural yield|DSR\/PBO\/MinTRL|Alpaca live-shadow|live evaluation harness|proof of edge|decision edge|edge claim|paper predictions|track-record-by-tier|screener-gated|screener-threshold/i);
   });
 

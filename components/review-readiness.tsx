@@ -67,6 +67,7 @@ const disclosureSections = [
       "Autonomous daemon handoff now exposes and persists an external-scheduler lease guard with endpoint, POST payload, renewal timing, active runner/request id, expiry, replay/conflict counts, max ticks/fills, provider budget, stop conditions, and paper-only live-boundary controls so overlapping daemon calls cannot silently double-advance the local paper loop.",
       "A runnable Web3 autonomous daemon script can now operate the existing backend loop outside the browser with bounded tick counts, lease ownership, replay/conflict protection, gated-heartbeat mode, JSON run receipts, and a hard paper-only refusal if real-capital autonomy is armed.",
       "A Web3 autonomous forward-run harness now resets the local paper ledger, runs bounded daemon ticks, compares start/end wallet equity, reports net paper PnL against a target, and can fail deployment checks when the make-money loop is not producing target paper alpha.",
+      "The Web3 autonomous forward suite now repeats the bounded paper-daemon proof across base, breakout, and rug-risk sample regimes, reporting aggregate PnL, moved/traded regime counts, and best/worst scenario outcomes so the make-money loop is not judged from one tape only.",
       "A clean persistent paper wallet can now take one daemon-owned bounded scout entry on the deterministic high-signal sample tape, so the forward run proves real local paper cycle/fill movement instead of only posting heartbeat ticks.",
       "Autonomous wallet telemetry turns paper daemon memory, portfolio equity, cash, exposure, drawdown, PnL slope, and blocker/fill counts into a first-class compounding/harvest/recover/cooldown/protect wallet verdict and net-worth curve.",
       "Autonomous wallet growth director fuses wallet net-worth curve, regime tape, lane capital, command-board edge, paper fill quality, churn, portfolio heat, and release pressure into one press/scalp/compound/harvest/protect/recover/pause posture with heat-capped fresh-buy limits and release targets.",
@@ -711,7 +712,7 @@ const disclosureSections = [
     items: [
       "Chat context does not read the whole market yet; it saves app context for chat.",
       "Account snapshots do not refresh on a schedule. Import holdings again before relying on balances.",
-      "The full forward-evaluation harness with baselines, costs, enough resolved calls, and pre-written pass/fail gates.",
+      "Long-horizon live/out-of-sample forward evaluation with external baselines, real route costs, enough resolved calls, and pre-written pass/fail gates.",
       "A real executor connected to chains, with custody limits and a working kill switch.",
       "Wallet session keys, real signed Jupiter/Raydium transaction execution, submit/retry handling, and durable real-money autonomous trade persistence.",
       "A real landing adapter for Jupiter Swap V2 order/execute, router submit, Helius Sender, Jito tips, confirmation monitoring, and real fill reconciliation.",

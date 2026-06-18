@@ -88,6 +88,7 @@ The Web3 trading workspace can be driven without the browser by the bounded pape
 ```bash
 npm run daemon:web3 -- --base-url=http://localhost:4010 --ticks=1 --heartbeat-when-gated --json
 npm run forward:web3 -- --base-url=http://localhost:4010 --ticks=6 --min-net-pnl=0 --json
+npm run forward-suite:web3 -- --base-url=http://localhost:4010 --ticks=2 --min-net-pnl=0 --json
 ```
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
@@ -95,8 +96,10 @@ receipts, refuses real-capital autonomy, and exits on conflicting runners. It is
 for local/paper monitoring and rehearsal only; live signing, transaction submission, and
 fund custody remain credential-gated future work. The forward run resets the local paper
 ledger, runs bounded daemon ticks, compares start/end wallet equity, and reports whether
-the paper loop met the requested net-PnL target; add `--fail-under-target` when that report
-should gate deployment.
+the paper loop met the requested net-PnL target. The forward suite repeats that proof across
+base, breakout, and rug-risk sample regimes so reviewers can see aggregate PnL, traded
+regimes, and worst/best scenario outcomes; add `--fail-under-target` when that report should
+gate deployment.
 
 ## Architecture: the engine and the app
 
@@ -188,8 +191,8 @@ Intentionally not implemented / blocked on credentials or ops:
   coverage, and scheduled refresh are not complete.
 - Automated equity trading (architectural non-goal — permanent).
 - Real Web3 execution, signing, simulation, custody, on-chain spend caps, or chain RPC.
-- The full forward-evaluation harness with baselines, costs, enough resolved calls,
-  and pass/fail gates written before seeing results.
+- Long-horizon live/out-of-sample forward evaluation with external baseline comparisons,
+  real route costs, enough resolved calls, and pass/fail gates written before seeing results.
 - CPA-reviewed tax treatment before any real capital.
 - Multi-user accounts, public signup, or managing anyone else's money.
 

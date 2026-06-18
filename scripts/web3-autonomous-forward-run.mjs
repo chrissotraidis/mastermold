@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
 
 const DEFAULT_BASE_URL = "http://localhost:4010";
+const FORWARD_SCENARIOS = ["base", "breakout", "rug-risk"];
 
 export function parseForwardRunArgs(argv = [], env = process.env) {
   const flags = new Map();
@@ -14,7 +15,7 @@ export function parseForwardRunArgs(argv = [], env = process.env) {
 
   return {
     baseUrl: normalizeBaseUrl(flags.get("base-url") ?? env.WEB3_TRADING_BASE_URL ?? DEFAULT_BASE_URL),
-    scenario: normalizeChoice(flags.get("scenario") ?? env.WEB3_FORWARD_SCENARIO ?? "breakout", ["base", "breakout", "rug-risk"], "breakout"),
+    scenario: normalizeChoice(flags.get("scenario") ?? env.WEB3_FORWARD_SCENARIO ?? "breakout", [...FORWARD_SCENARIOS, "all"], "breakout"),
     source: normalizeChoice(flags.get("source") ?? env.WEB3_FORWARD_SOURCE ?? "sample", ["sample", "live-dex"], "sample"),
     runnerId: normalizeLeaseText(flags.get("runner-id") ?? env.WEB3_FORWARD_RUNNER_ID ?? "forward-run-daemon", "forward-run-daemon", 80),
     ticks: boundedInteger(flags.get("ticks") ?? env.WEB3_FORWARD_TICKS, 6, 1, 120),
@@ -31,7 +32,7 @@ export async function runWeb3AutonomousForwardRun(input = {}) {
     ...parseForwardRunArgs([], {}),
     ...input,
     baseUrl: normalizeBaseUrl(input.baseUrl ?? DEFAULT_BASE_URL),
-    scenario: normalizeChoice(input.scenario ?? "breakout", ["base", "breakout", "rug-risk"], "breakout"),
+    scenario: normalizeChoice(input.scenario ?? "breakout", [...FORWARD_SCENARIOS, "all"], "breakout"),
     source: normalizeChoice(input.source ?? "sample", ["sample", "live-dex"], "sample"),
     runnerId: normalizeLeaseText(input.runnerId ?? "forward-run-daemon", "forward-run-daemon", 80),
     ticks: boundedInteger(input.ticks, 6, 1, 120),
@@ -40,6 +41,16 @@ export async function runWeb3AutonomousForwardRun(input = {}) {
     heartbeatWhenGated: input.heartbeatWhenGated !== false,
     failUnderTarget: Boolean(input.failUnderTarget),
   };
+
+  if (config.scenario === "all") {
+    const report = await runWeb3AutonomousForwardSuite(config);
+    if (config.failUnderTarget && !report.target_met) {
+      const error = new Error(`Autonomous forward suite missed target by ${formatCurrency(report.target_gap_usd)}.`);
+      error.report = report;
+      throw error;
+    }
+    return report;
+  }
 
   const startedAt = new Date().toISOString();
   const baseline = await postTrading(config, {
@@ -69,6 +80,44 @@ export async function runWeb3AutonomousForwardRun(input = {}) {
   });
   if (config.failUnderTarget && !report.target_met) {
     const error = new Error(`Autonomous forward run missed target by ${formatCurrency(report.target_gap_usd)}.`);
+    error.report = report;
+    throw error;
+  }
+  return report;
+}
+
+export async function runWeb3AutonomousForwardSuite(input = {}) {
+  const config = {
+    ...parseForwardRunArgs([], {}),
+    ...input,
+    baseUrl: normalizeBaseUrl(input.baseUrl ?? DEFAULT_BASE_URL),
+    source: normalizeChoice(input.source ?? "sample", ["sample", "live-dex"], "sample"),
+    runnerId: normalizeLeaseText(input.runnerId ?? "forward-suite-daemon", "forward-suite-daemon", 80),
+    ticks: boundedInteger(input.ticks, 6, 1, 120),
+    intervalMs: boundedInteger(input.intervalMs, 0, 0, 120_000),
+    minNetPnlUsd: boundedNumber(input.minNetPnlUsd, 0, -1_000_000, 1_000_000),
+    heartbeatWhenGated: input.heartbeatWhenGated !== false,
+    failUnderTarget: Boolean(input.failUnderTarget),
+  };
+  const startedAt = new Date().toISOString();
+  const scenarioReports = [];
+
+  for (const scenario of FORWARD_SCENARIOS) {
+    scenarioReports.push(await runWeb3AutonomousForwardRun({
+      ...config,
+      scenario,
+      runnerId: normalizeLeaseText(`${config.runnerId}-${scenario}`, `${config.runnerId}-${scenario}`, 80),
+      failUnderTarget: false,
+    }));
+  }
+
+  const report = buildForwardSuiteReport({
+    config,
+    startedAt,
+    scenarios: scenarioReports,
+  });
+  if (config.failUnderTarget && !report.target_met) {
+    const error = new Error(`Autonomous forward suite missed target by ${formatCurrency(report.target_gap_usd)}.`);
     error.report = report;
     throw error;
   }
@@ -135,6 +184,67 @@ export function buildForwardRunReport({
       "Forward run resets only the local persistent paper ledger.",
       "No wallet signer, transaction relay, custody provider, or real-capital approval is invoked.",
       "Use --fail-under-target when this report should gate deployment on positive paper PnL.",
+    ],
+  };
+}
+
+export function buildForwardSuiteReport({
+  config,
+  startedAt,
+  scenarios,
+}) {
+  const netPnl = roundMoney(scenarios.reduce((sum, report) => sum + Number(report.net_pnl_usd ?? 0), 0));
+  const postedTicks = scenarios.reduce((sum, report) => sum + Number(report.posted_ticks ?? 0), 0);
+  const advancedTicks = scenarios.reduce((sum, report) => sum + Number(report.advanced_ticks ?? 0), 0);
+  const blockedTicks = scenarios.reduce((sum, report) => sum + Number(report.blocked_ticks ?? 0), 0);
+  const tradeCountDelta = scenarios.reduce((sum, report) => sum + Number(report.trade_count_delta ?? 0), 0);
+  const profitableCount = scenarios.filter((report) => report.net_pnl_usd > 0).length;
+  const targetGap = roundMoney(netPnl - config.minNetPnlUsd);
+  const targetMet = targetGap >= 0;
+  const worstScenario = [...scenarios].sort((a, b) => a.net_pnl_usd - b.net_pnl_usd)[0] ?? null;
+  const bestScenario = [...scenarios].sort((a, b) => b.net_pnl_usd - a.net_pnl_usd)[0] ?? null;
+  const verdict = targetMet && profitableCount === scenarios.length
+    ? "all-profitable"
+    : targetMet && profitableCount > 0
+      ? "mixed-target-met"
+      : targetMet
+        ? "flat-target-met"
+        : netPnl > 0
+          ? "profitable-below-target"
+          : "not-profitable";
+
+  return {
+    mode: "web3-autonomous-forward-suite",
+    paper_only: true,
+    base_url: config.baseUrl,
+    source: config.source,
+    runner_id: config.runnerId,
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    scenario_count: scenarios.length,
+    requested_ticks_per_scenario: config.ticks,
+    requested_ticks_total: scenarios.reduce((sum, report) => sum + Number(report.requested_ticks ?? 0), 0),
+    posted_ticks: postedTicks,
+    advanced_ticks: advancedTicks,
+    blocked_ticks: blockedTicks,
+    trade_count_delta: tradeCountDelta,
+    net_pnl_usd: netPnl,
+    min_net_pnl_usd: roundMoney(config.minNetPnlUsd),
+    target_gap_usd: targetGap,
+    target_met: targetMet,
+    verdict,
+    profitable_scenario_count: profitableCount,
+    advanced_scenario_count: scenarios.filter((report) => report.advanced_ticks > 0).length,
+    traded_scenario_count: scenarios.filter((report) => report.trade_count_delta > 0).length,
+    best_scenario: bestScenario?.scenario ?? null,
+    best_scenario_pnl_usd: bestScenario ? roundMoney(bestScenario.net_pnl_usd) : 0,
+    worst_scenario: worstScenario?.scenario ?? null,
+    worst_scenario_pnl_usd: worstScenario ? roundMoney(worstScenario.net_pnl_usd) : 0,
+    scenarios,
+    controls: [
+      "Forward suite resets the local persistent paper ledger separately for each regime.",
+      "No wallet signer, transaction relay, custody provider, or real-capital approval is invoked.",
+      "Aggregate verdicts can catch overfitting to a single breakout tape.",
     ],
   };
 }
@@ -218,6 +328,11 @@ async function main() {
     const report = await runWeb3AutonomousForwardRun(config);
     if (config.json) {
       console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+    if (report.mode === "web3-autonomous-forward-suite") {
+      console.log(`${report.verdict}: ${formatCurrency(report.net_pnl_usd)} across ${report.scenario_count} regimes, ${report.posted_ticks}/${report.requested_ticks_total} posted daemon ticks.`);
+      console.log(`Best: ${report.best_scenario ?? "n/a"} ${formatCurrency(report.best_scenario_pnl_usd)}; worst: ${report.worst_scenario ?? "n/a"} ${formatCurrency(report.worst_scenario_pnl_usd)}.`);
       return;
     }
     console.log(`${report.verdict}: ${formatCurrency(report.net_pnl_usd)} over ${report.posted_ticks}/${report.requested_ticks} posted daemon ticks.`);

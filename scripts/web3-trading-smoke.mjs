@@ -4732,7 +4732,7 @@ async function main() {
   assert(daemonRun.events[0].active_runner_id === "implicit-daemon-runner" || daemonRun.events[0].active_runner_id === null, "Autonomous daemon smoke run should own or safely idle the lease.", daemonRun);
   const forwardRun = await runWeb3AutonomousForwardRun({
     baseUrl,
-    scenario: "breakout",
+    scenario: "all",
     source: "sample",
     runnerId: "smoke-forward-runner",
     ticks: 2,
@@ -4740,14 +4740,16 @@ async function main() {
     heartbeatWhenGated: true,
     minNetPnlUsd: 0,
   });
-  assert(forwardRun.mode === "web3-autonomous-forward-run", "Autonomous forward run should return a report.", forwardRun);
-  assert(forwardRun.paper_only === true, "Autonomous forward run must stay paper-only.", forwardRun);
-  assert(forwardRun.requested_ticks === 2 && forwardRun.posted_ticks >= 1, "Autonomous forward run should execute bounded daemon ticks.", forwardRun);
-  assert(forwardRun.advanced_ticks >= 1, "Autonomous forward run should advance at least one local paper tick from a clean high-signal wallet.", forwardRun);
-  assert(forwardRun.trade_count_delta >= 1, "Autonomous forward run should record at least one bounded local paper fill.", forwardRun);
-  assert(forwardRun.final_cycle >= 1, "Autonomous forward run should move the persistent paper cycle forward.", forwardRun);
-  assert(typeof forwardRun.net_pnl_usd === "number" && typeof forwardRun.target_met === "boolean", "Autonomous forward run should quantify paper PnL and target status.", forwardRun);
-  assert(["profitable", "flat-target-met", "profitable-below-target", "not-profitable"].includes(forwardRun.verdict), "Autonomous forward run should publish a known profit verdict.", forwardRun);
+  assert(forwardRun.mode === "web3-autonomous-forward-suite", "Autonomous forward suite should return a multi-regime report.", forwardRun);
+  assert(forwardRun.paper_only === true, "Autonomous forward suite must stay paper-only.", forwardRun);
+  assert(forwardRun.scenario_count === 3, "Autonomous forward suite should cover base, breakout, and rug-risk regimes.", forwardRun);
+  assert(forwardRun.requested_ticks_per_scenario === 2 && forwardRun.posted_ticks >= 3, "Autonomous forward suite should execute bounded daemon ticks in each regime.", forwardRun);
+  assert(forwardRun.advanced_ticks >= 1, "Autonomous forward suite should advance at least one local paper tick from a clean high-signal wallet.", forwardRun);
+  assert(forwardRun.trade_count_delta >= 1, "Autonomous forward suite should record at least one bounded local paper fill.", forwardRun);
+  assert(forwardRun.advanced_scenario_count >= 1 && forwardRun.traded_scenario_count >= 1, "Autonomous forward suite should disclose which regimes actually moved paper capital.", forwardRun);
+  assert(["base", "breakout", "rug-risk"].every((scenario) => forwardRun.scenarios.some((report) => report.scenario === scenario)), "Autonomous forward suite should include all sample regimes.", forwardRun);
+  assert(typeof forwardRun.net_pnl_usd === "number" && typeof forwardRun.target_met === "boolean", "Autonomous forward suite should quantify aggregate paper PnL and target status.", forwardRun);
+  assert(["all-profitable", "mixed-target-met", "flat-target-met", "profitable-below-target", "not-profitable"].includes(forwardRun.verdict), "Autonomous forward suite should publish a known profit verdict.", forwardRun);
 
   const summary = {
     baseUrl,
@@ -4757,6 +4759,8 @@ async function main() {
     forwardVerdict: forwardRun.verdict,
     forwardNetPnl: forwardRun.net_pnl_usd,
     forwardTargetMet: forwardRun.target_met,
+    forwardScenarios: forwardRun.scenario_count,
+    forwardTradedScenarios: forwardRun.traded_scenario_count,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,
