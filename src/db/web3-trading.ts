@@ -10608,6 +10608,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       market: configuredState.market,
       cycle: configuredState.paper_account.cycle,
       simulator: configuredState.autonomous_tradeability_simulator,
+      sourceQuality: configuredState.autonomous_source_quality_oracle,
       recentTrades: configuredState.trade_tape,
     });
     configuredState.autonomous_market_pulse = buildAutonomousMarketPulse({
@@ -11046,6 +11047,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
 	      tickPlan: configuredState.autonomous_tick_plan,
 	      routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
 	      alphaDecay: configuredState.alpha_decay_controller,
+	      sourceQuality: configuredState.autonomous_source_quality_oracle,
 	      commandCenterExecution: configuredState.autonomous_command_center_execution,
 	      positionRiskExecution: configuredState.autonomous_position_risk_execution,
 	      highFrequencyRaceExecution: configuredState.high_frequency_profit_race_execution,
@@ -11280,6 +11282,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     queue: configuredState.autonomous_action_queue,
     routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
     alphaDecay: configuredState.alpha_decay_controller,
+    sourceQuality: configuredState.autonomous_source_quality_oracle,
     commandExecution: configuredState.autonomous_command_center_execution,
       pressureExecution: configuredState.autonomous_pressure_execution,
       tradeabilityExecution: configuredState.autonomous_tradeability_execution,
@@ -11377,6 +11380,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       tickPlan: configuredState.autonomous_tick_plan,
       routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
       alphaDecay: configuredState.alpha_decay_controller,
+      sourceQuality: configuredState.autonomous_source_quality_oracle,
       commandCenterExecution: configuredState.autonomous_command_center_execution,
       positionRiskExecution: configuredState.autonomous_position_risk_execution,
       highFrequencyRaceExecution: configuredState.high_frequency_profit_race_execution,
@@ -11789,6 +11793,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       market: configuredState.market,
       cycle: configuredState.paper_account.cycle,
       ranker: configuredState.autonomous_opportunity_ranker,
+      sourceQuality: configuredState.autonomous_source_quality_oracle,
       recentTrades: configuredState.trade_tape,
     });
     configuredState.autonomous_rotation_director = buildAutonomousRotationDirector({
@@ -13907,6 +13912,7 @@ function buildWeb3TradingState({
     market,
     cycle: cycles,
     ranker: autonomous_opportunity_ranker,
+    sourceQuality: autonomous_source_quality_oracle,
     recentTrades: trade_tape,
   });
   const autonomous_rotation_director = buildAutonomousRotationDirector({
@@ -15379,6 +15385,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
 	    tickPlan: autonomous_tick_plan,
 	    routeRefreshExecution: autonomous_route_refresh_execution,
 	    alphaDecay: alpha_decay_controller,
+	    sourceQuality: state.autonomous_source_quality_oracle,
 	    commandCenterExecution: autonomous_command_center_execution,
 	    positionRiskExecution: autonomous_position_risk_execution,
 	    highFrequencyRaceExecution: high_frequency_profit_race_execution,
@@ -15596,6 +15603,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     queue: autonomous_action_queue,
     routeRefreshExecution: autonomous_route_refresh_execution,
     alphaDecay: alpha_decay_controller,
+    sourceQuality: state.autonomous_source_quality_oracle,
     commandExecution: autonomous_command_center_execution,
     pressureExecution: autonomous_pressure_execution,
     tradeabilityExecution: state.autonomous_tradeability_execution,
@@ -16198,6 +16206,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     market: state.market,
     cycle: state.paper_account.cycle,
     ranker: autonomous_opportunity_ranker,
+    sourceQuality: autonomous_source_quality_oracle,
     recentTrades: state.trade_tape,
   });
   const autonomous_rotation_director = buildAutonomousRotationDirector({
@@ -16821,6 +16830,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     market: state.market,
     cycle: state.paper_account.cycle,
     ranker: autonomous_opportunity_ranker,
+    sourceQuality: autonomous_source_quality_oracle,
     recentTrades: state.trade_tape,
   });
   const autonomous_rotation_director = buildAutonomousRotationDirector({
@@ -20349,6 +20359,7 @@ function applyPersistentLedger(
     market: state.market,
     cycle: state.paper_account.cycle,
     simulator: state.autonomous_tradeability_simulator,
+    sourceQuality: state.autonomous_source_quality_oracle,
     recentTrades: trades,
   });
   const queue_protective_trigger_coverage = buildProtectiveTriggerCoverage({
@@ -20379,6 +20390,7 @@ function applyPersistentLedger(
     queue: autonomous_action_queue,
     routeRefreshExecution: autonomous_route_refresh_execution,
     alphaDecay: alpha_decay_controller,
+    sourceQuality: state.autonomous_source_quality_oracle,
     commandExecution: autonomous_command_center_execution,
     pressureExecution: autonomous_pressure_execution,
     tradeabilityExecution: autonomous_tradeability_execution,
@@ -20399,6 +20411,7 @@ function applyPersistentLedger(
       tickPlan: autonomous_tick_plan,
       routeRefreshExecution: autonomous_route_refresh_execution,
       alphaDecay: alpha_decay_controller,
+      sourceQuality: state.autonomous_source_quality_oracle,
       protectiveTriggerCoverage: queue_protective_trigger_coverage,
       commandCenterExecution: autonomous_command_center_execution,
       positionRiskExecution: autonomous_position_risk_execution,
@@ -20446,6 +20459,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, autonomous_action_queue_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, autonomous_action_queue_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, autonomous_action_queue_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, autonomous_action_queue_execution.paper_trade) &&
     (
       autonomous_action_queue_execution.paper_trade.side !== "buy" ||
       !sameCycleEntrySymbols.has(autonomous_action_queue_execution.paper_trade.symbol)
@@ -20480,6 +20494,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, autonomous_command_center_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, autonomous_command_center_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, autonomous_command_center_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, autonomous_command_center_execution.paper_trade) &&
     (
       (autonomous_command_center_execution.paper_trade.side !== "buy" && autonomous_command_center_execution.paper_trade.side !== "sell") ||
       !sameCycleEntrySymbols.has(autonomous_command_center_execution.paper_trade.symbol)
@@ -20506,6 +20521,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, portfolio_tape_guard_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, portfolio_tape_guard_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, portfolio_tape_guard_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, portfolio_tape_guard_execution.paper_trade) &&
     !sameCycleEntrySymbols.has(portfolio_tape_guard_execution.paper_trade.symbol)
   ) {
     const tapeGuarded = applyAllocatorAwarePaperTradeToLedger(next, state.market, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, "portfolio-protect", portfolio_tape_guard_execution.paper_trade);
@@ -20530,6 +20546,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, autonomous_position_risk_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, autonomous_position_risk_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, autonomous_position_risk_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, autonomous_position_risk_execution.paper_trade) &&
     !sameCycleEntrySymbols.has(autonomous_position_risk_execution.paper_trade.symbol)
   ) {
     const protectedLedger = applyAllocatorAwarePaperTradeToLedger(next, state.market, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, "portfolio-protect", autonomous_position_risk_execution.paper_trade);
@@ -20559,6 +20576,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, autonomous_pressure_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, autonomous_pressure_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, autonomous_pressure_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, autonomous_pressure_execution.paper_trade) &&
     (
       autonomous_pressure_execution.paper_trade.side !== "buy" ||
       !sameCycleEntrySymbols.has(autonomous_pressure_execution.paper_trade.symbol)
@@ -20593,6 +20611,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, watchlist_rotation_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, watchlist_rotation_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, watchlist_rotation_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, watchlist_rotation_execution.paper_trade) &&
     (
       watchlist_rotation_execution.paper_trade.side !== "buy" ||
       !sameCycleEntrySymbols.has(watchlist_rotation_execution.paper_trade.symbol)
@@ -20605,7 +20624,7 @@ function applyPersistentLedger(
     }
   }
   if (canApplyPaperLanes && autonomous_trade_batch.ready_count > 0) {
-    const batched = applyAutonomousTradeBatchToLedger(next, state.market, autonomous_trade_batch, autonomous_trade_readiness_gate, sameCycleEntrySymbols, autonomous_symbol_quarantine, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, autonomous_regime_tape, autonomous_wallet_growth_director, autonomous_profit_route_selector, autonomous_execution_quality_arbiter, autonomous_token_safety_clearance, queue_protective_trigger_coverage, alpha_decay_controller, protectOnlyAdvance);
+    const batched = applyAutonomousTradeBatchToLedger(next, state.market, autonomous_trade_batch, autonomous_trade_readiness_gate, sameCycleEntrySymbols, autonomous_symbol_quarantine, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, autonomous_regime_tape, autonomous_wallet_growth_director, autonomous_profit_route_selector, autonomous_execution_quality_arbiter, autonomous_token_safety_clearance, queue_protective_trigger_coverage, alpha_decay_controller, state.autonomous_source_quality_oracle, protectOnlyAdvance);
     if (batched !== next) {
       store().upsertWeb3PaperLedger(batched);
       return applyPersistentLedger(state, "off");
@@ -20625,6 +20644,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, autonomous_trade_execution_bridge.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, autonomous_trade_execution_bridge.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, autonomous_trade_execution_bridge.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, autonomous_trade_execution_bridge.paper_trade) &&
     (
       autonomous_trade_execution_bridge.paper_trade.side !== "sell" ||
       !sameCycleEntrySymbols.has(autonomous_trade_execution_bridge.paper_trade.symbol)
@@ -20652,6 +20672,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, high_frequency_profit_race_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, high_frequency_profit_race_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, high_frequency_profit_race_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, high_frequency_profit_race_execution.paper_trade) &&
     (
       high_frequency_profit_race_execution.paper_trade.side !== "buy" ||
       !sameCycleEntrySymbols.has(high_frequency_profit_race_execution.paper_trade.symbol)
@@ -20679,6 +20700,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, autonomous_opportunity_race_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, autonomous_opportunity_race_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, autonomous_opportunity_race_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, autonomous_opportunity_race_execution.paper_trade) &&
     (
       autonomous_opportunity_race_execution.paper_trade.side !== "sell" ||
       !sameCycleEntrySymbols.has(autonomous_opportunity_race_execution.paper_trade.symbol)
@@ -20706,6 +20728,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, market_intelligence_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, market_intelligence_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, market_intelligence_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, market_intelligence_execution.paper_trade) &&
     !sameCycleEntrySymbols.has(market_intelligence_execution.paper_trade.symbol)
   ) {
     const intelligenceLedger = applyAllocatorAwarePaperTradeToLedger(next, state.market, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, "market-intelligence", market_intelligence_execution.paper_trade);
@@ -20730,6 +20753,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, market_pulse_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, market_pulse_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, market_pulse_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, market_pulse_execution.paper_trade) &&
     !sameCycleEntrySymbols.has(market_pulse_execution.paper_trade.symbol)
   ) {
     const pulsed = applyAllocatorAwarePaperTradeToLedger(next, state.market, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, "market-pulse", market_pulse_execution.paper_trade);
@@ -20754,6 +20778,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, autonomous_reentry_hunter.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, autonomous_reentry_hunter.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, autonomous_reentry_hunter.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, autonomous_reentry_hunter.paper_trade) &&
     !sameCycleEntrySymbols.has(autonomous_reentry_hunter.paper_trade.symbol)
   ) {
     const reentered = applyAllocatorAwarePaperTradeToLedger(next, state.market, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, "reentry-hunter", autonomous_reentry_hunter.paper_trade);
@@ -20777,6 +20802,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, scout_lifecycle.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, scout_lifecycle.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, scout_lifecycle.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, scout_lifecycle.paper_trade) &&
     (
       scout_lifecycle.paper_trade.side !== "sell" ||
       !sameCycleEntrySymbols.has(scout_lifecycle.paper_trade.symbol)
@@ -20807,6 +20833,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, trend_chase_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, trend_chase_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, trend_chase_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(state.autonomous_source_quality_oracle, trend_chase_execution.paper_trade) &&
     !sameCycleEntrySymbols.has(trend_chase_execution.paper_trade.symbol)
   ) {
     const chased = applyAllocatorAwarePaperTradeToLedger(next, state.market, autonomous_lane_capital_controller, autonomous_profit_allocation_plan, "trend-chase", trend_chase_execution.paper_trade);
@@ -21266,6 +21293,7 @@ function applyPersistentLedger(
     market: state.market,
     cycle: next.cycle,
     ranker: autonomous_opportunity_ranker,
+    sourceQuality: autonomous_source_quality_oracle,
     recentTrades: trades,
   });
   const autonomous_rotation_director = buildAutonomousRotationDirector({
@@ -21307,6 +21335,7 @@ function applyPersistentLedger(
       executionQualityArbiter: autonomous_execution_quality_arbiter,
       tokenSafetyClearance: autonomous_token_safety_clearance,
       alphaDecay: alpha_decay_controller,
+      sourceQuality: autonomous_source_quality_oracle,
       protectiveSellOnly: protectOnlyAdvance,
     });
     if (burstApplied !== next) {
@@ -21345,6 +21374,7 @@ function applyPersistentLedger(
     autonomousExecutionQualityArbiterAllowsTrade(autonomous_execution_quality_arbiter, autonomous_opportunity_rank_execution.paper_trade) &&
     autonomousTokenSafetyClearanceAllowsTrade(autonomous_token_safety_clearance, autonomous_opportunity_rank_execution.paper_trade) &&
     autonomousAlphaDecayAllowsTrade(alpha_decay_controller, autonomous_opportunity_rank_execution.paper_trade) &&
+    autonomousSourceQualityAllowsTrade(autonomous_source_quality_oracle, autonomous_opportunity_rank_execution.paper_trade) &&
     !sameCycleEntrySymbols.has(autonomous_opportunity_rank_execution.paper_trade.symbol)
   ) {
     const rankedOpportunity = applyAllocatorAwarePaperTradeToLedger(
@@ -36277,6 +36307,7 @@ function buildAutonomousActionQueueExecution({
   queue,
   routeRefreshExecution,
   alphaDecay,
+  sourceQuality,
   commandExecution,
   pressureExecution,
   tradeabilityExecution,
@@ -36292,6 +36323,7 @@ function buildAutonomousActionQueueExecution({
   queue: AutonomousActionQueue;
   routeRefreshExecution?: AutonomousRouteRefreshExecution;
   alphaDecay?: AlphaDecayController;
+  sourceQuality?: AutonomousSourceQualityOracle;
   commandExecution: AutonomousCommandCenterExecution;
   pressureExecution: AutonomousPressureExecution;
   tradeabilityExecution: AutonomousTradeabilityExecution;
@@ -36328,12 +36360,14 @@ function buildAutonomousActionQueueExecution({
   const trade = appliedTrade ?? sourceTrade;
   const routeFreshnessBlocker = autonomousActionQueueRouteFreshnessBlocker(selected, routeRefreshExecution);
   const alphaDecayBlocker = autonomousAlphaDecayTradeBlocker(alphaDecay, trade);
+  const sourceQualityBlocker = autonomousSourceQualityTradeBlocker(sourceQuality, trade);
   const sourceBlockers = source?.blockers ?? [];
   const blockers = [...new Set([
     ...(selected?.blockers ?? []),
     ...sourceBlockers,
     routeFreshnessBlocker,
     alphaDecayBlocker,
+    sourceQualityBlocker,
     selected && selected.paper_trade_ready && !trade ? `${selected.label} is marked paper-ready but has no paper trade payload.` : null,
   ].filter((item): item is string => Boolean(item)))].slice(0, 6);
   const ledgerApplied = Boolean(selected?.ledger_applied || source?.ledger_applied);
@@ -36383,6 +36417,7 @@ function buildAutonomousActionQueueExecution({
       "Maps the queue winner back to its original paper executor, so existing paper trade payloads and guardrails remain authoritative.",
       "Fresh buy, scalp, and refresh lanes are vetoed when route-refresh execution is blocked or still requires read-only quote evidence.",
       "Fresh buys are vetoed when alpha timing decay says the setup is stale, too late, or above the current timing cap.",
+      "Fresh buys are vetoed when source quality marks the candidate paid-hype, refresh-first, blocked, or missing current proof.",
       "Reuses readiness, symbol quarantine, lane-capital, regime, wallet-growth, profit-route, execution-quality, and token-safety gates before applying.",
       "Execution remains paper-ledger-only and cannot sign, submit, custody funds, broadcast swaps, or guarantee profit.",
     ],
@@ -54383,6 +54418,7 @@ function applyAutonomousTradeBatchToLedger(
   tokenSafetyClearance?: AutonomousTokenSafetyClearance,
   protectiveTriggerCoverage?: ProtectiveTriggerCoverage,
   alphaDecay?: AlphaDecayController,
+  sourceQuality?: AutonomousSourceQualityOracle,
   protectiveSellOnly = false,
 ): Web3PaperLedgerRow {
   return batch.items
@@ -54400,6 +54436,7 @@ function applyAutonomousTradeBatchToLedger(
       autonomousExecutionQualityArbiterAllowsTrade(executionQualityArbiter, item.paper_trade) &&
       autonomousTokenSafetyClearanceAllowsTrade(tokenSafetyClearance, item.paper_trade) &&
       autonomousAlphaDecayAllowsTrade(alphaDecay, item.paper_trade) &&
+      autonomousSourceQualityAllowsTrade(sourceQuality, item.paper_trade) &&
       (item.paper_trade.side !== "sell" || !sameCycleEntrySymbols.has(item.paper_trade.symbol))
     )
     .sort((a, b) => a.sequence - b.sequence)
@@ -54423,6 +54460,7 @@ function applyAutonomousBurstFillPlanToLedger({
   executionQualityArbiter,
   tokenSafetyClearance,
   alphaDecay,
+  sourceQuality,
   protectiveSellOnly = false,
 }: {
   row: Web3PaperLedgerRow;
@@ -54440,6 +54478,7 @@ function applyAutonomousBurstFillPlanToLedger({
   executionQualityArbiter?: AutonomousExecutionQualityArbiter;
   tokenSafetyClearance?: AutonomousTokenSafetyClearance;
   alphaDecay?: AlphaDecayController;
+  sourceQuality?: AutonomousSourceQualityOracle;
   protectiveSellOnly?: boolean;
 }): Web3PaperLedgerRow {
   if (burstFillPlan.execution_boundary !== "paper-ledger-only") return row;
@@ -54463,6 +54502,7 @@ function applyAutonomousBurstFillPlanToLedger({
     if (!autonomousExecutionQualityArbiterAllowsTrade(executionQualityArbiter, adjustedTrade)) continue;
     if (!autonomousTokenSafetyClearanceAllowsTrade(tokenSafetyClearance, adjustedTrade)) continue;
     if (!autonomousAlphaDecayAllowsTrade(alphaDecay, adjustedTrade)) continue;
+    if (!autonomousSourceQualityAllowsTrade(sourceQuality, adjustedTrade)) continue;
     next = applyArbiterPaperTradeToLedger(next, market, adjustedTrade);
   }
 
@@ -64118,6 +64158,7 @@ function attachPaperDaemonTick(
 	    tickPlan: autonomousTickPlan,
     routeRefreshExecution: state.autonomous_route_refresh_execution,
     alphaDecay: state.alpha_decay_controller,
+    sourceQuality: state.autonomous_source_quality_oracle,
     commandCenterExecution: autonomousCommandCenterExecution,
     positionRiskExecution: state.autonomous_position_risk_execution,
     highFrequencyRaceExecution: state.high_frequency_profit_race_execution,
@@ -64240,6 +64281,7 @@ function attachPaperDaemonTick(
     queue: autonomousActionQueue,
     routeRefreshExecution: state.autonomous_route_refresh_execution,
     alphaDecay: state.alpha_decay_controller,
+    sourceQuality: state.autonomous_source_quality_oracle,
     commandExecution: autonomousCommandCenterExecution,
     pressureExecution: autonomousPressureExecution,
     tradeabilityExecution: state.autonomous_tradeability_execution,
@@ -64629,6 +64671,7 @@ function attachPaperDaemonTick(
     market: state.market,
     cycle: state.paper_account.cycle,
     ranker: autonomousOpportunityRanker,
+    sourceQuality: state.autonomous_source_quality_oracle,
     recentTrades: state.trade_tape,
   });
   const autonomousRotationDirector = buildAutonomousRotationDirector({
@@ -64977,6 +65020,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
 	    tickPlan: autonomousTickPlan,
     routeRefreshExecution: state.autonomous_route_refresh_execution,
     alphaDecay: state.alpha_decay_controller,
+    sourceQuality: state.autonomous_source_quality_oracle,
     commandCenterExecution: autonomousCommandCenterExecution,
     positionRiskExecution: state.autonomous_position_risk_execution,
     highFrequencyRaceExecution: state.high_frequency_profit_race_execution,
@@ -65064,6 +65108,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     queue: autonomousActionQueue,
     routeRefreshExecution: state.autonomous_route_refresh_execution,
     alphaDecay: state.alpha_decay_controller,
+    sourceQuality: state.autonomous_source_quality_oracle,
     commandExecution: autonomousCommandCenterExecution,
     pressureExecution: autonomousPressureExecution,
     tradeabilityExecution: state.autonomous_tradeability_execution,
@@ -65453,6 +65498,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     market: state.market,
     cycle: state.paper_account.cycle,
     ranker: autonomousOpportunityRanker,
+    sourceQuality: state.autonomous_source_quality_oracle,
     recentTrades: state.trade_tape,
   });
   const autonomousRotationDirector = buildAutonomousRotationDirector({
@@ -67747,6 +67793,7 @@ function buildAutonomousTickBundleExecution({
   tickPlan,
   routeRefreshExecution,
   alphaDecay,
+  sourceQuality,
   commandCenterExecution,
   positionRiskExecution,
   highFrequencyRaceExecution,
@@ -67757,6 +67804,7 @@ function buildAutonomousTickBundleExecution({
   tickPlan: AutonomousTickPlan;
   routeRefreshExecution?: AutonomousRouteRefreshExecution;
   alphaDecay?: AlphaDecayController;
+  sourceQuality?: AutonomousSourceQualityOracle;
   commandCenterExecution?: AutonomousCommandCenterExecution;
   positionRiskExecution: AutonomousPositionRiskExecution;
   highFrequencyRaceExecution: HighFrequencyProfitRaceExecution;
@@ -67826,7 +67874,8 @@ function buildAutonomousTickBundleExecution({
     const exposureDelta = trade ? (trade.side === "buy" ? trade.size_usd : -trade.size_usd) : 0;
     const routeFreshnessBlocker = autonomousTickBundleRouteFreshnessBlocker(item, trade, routeRefreshExecution);
     const alphaDecayBlocker = autonomousAlphaDecayTradeBlocker(alphaDecay, trade);
-    const blockers = [...new Set([...(source.blockers ?? []), item.blocker, routeFreshnessBlocker, alphaDecayBlocker].filter((entry): entry is string => Boolean(entry)))];
+    const sourceQualityBlocker = autonomousSourceQualityTradeBlocker(sourceQuality, trade);
+    const blockers = [...new Set([...(source.blockers ?? []), item.blocker, routeFreshnessBlocker, alphaDecayBlocker, sourceQualityBlocker].filter((entry): entry is string => Boolean(entry)))];
     const status: AutonomousTickBundleExecutionItem["status"] = source.ledger_applied
       ? "applied"
       : source.paper_trade_ready && trade && blockers.length === 0
@@ -67893,6 +67942,7 @@ function buildAutonomousTickBundleExecution({
       "Ready paper fills still pass through the existing idempotent paper-ledger boundary before cash or exposure changes.",
       "Fresh entry bundle lanes are vetoed when route-refresh execution is blocked or still requires read-only quote evidence.",
       "Fresh entry bundle lanes are vetoed when alpha timing decay says the setup is stale, late, or above the timing cap.",
+      "Fresh entry bundle lanes are vetoed when source quality marks the candidate paid-hype, refresh-first, blocked, or missing current proof.",
       "Refresh-only lanes can accelerate route or market checks, but they do not mutate the paper ledger.",
       "The bundle stays capped by the tick plan throughput envelope and cannot sign, submit, settle, or move live funds.",
     ],
@@ -68365,6 +68415,7 @@ function applyAutonomousTickBundleToLedger({
   tickPlan,
   routeRefreshExecution,
   alphaDecay,
+  sourceQuality,
   protectiveTriggerCoverage,
   commandCenterExecution,
   positionRiskExecution,
@@ -68390,6 +68441,7 @@ function applyAutonomousTickBundleToLedger({
   tickPlan: AutonomousTickPlan;
   routeRefreshExecution?: AutonomousRouteRefreshExecution;
   alphaDecay?: AlphaDecayController;
+  sourceQuality?: AutonomousSourceQualityOracle;
   protectiveTriggerCoverage?: ProtectiveTriggerCoverage;
   commandCenterExecution?: AutonomousCommandCenterExecution;
   positionRiskExecution: AutonomousPositionRiskExecution;
@@ -68436,6 +68488,7 @@ function applyAutonomousTickBundleToLedger({
     if (protectiveSellOnly && trade.side !== "sell") continue;
     if (autonomousTickBundleRouteFreshnessBlocker(item, trade, routeRefreshExecution)) continue;
     if (!autonomousAlphaDecayAllowsTrade(alphaDecay, trade)) continue;
+    if (!autonomousSourceQualityAllowsTrade(sourceQuality, trade)) continue;
     if (!protectiveTriggerCoverageAllowsTrade(protectiveTriggerCoverage, trade)) continue;
     if (bundleFeedback.protective_sell_only && trade.side === "buy") continue;
     if (!autonomousSymbolQuarantineAllowsTrade(symbolQuarantine, trade)) continue;
@@ -68447,6 +68500,7 @@ function applyAutonomousTickBundleToLedger({
     if (!autonomousProfitRouteSelectorAllowsTrade(profitRouteSelector, adjustedTrade)) continue;
     if (!autonomousExecutionQualityArbiterAllowsTrade(executionQualityArbiter, adjustedTrade)) continue;
     if (!autonomousTokenSafetyClearanceAllowsTrade(tokenSafetyClearance, adjustedTrade)) continue;
+    if (!autonomousSourceQualityAllowsTrade(sourceQuality, adjustedTrade)) continue;
     const readinessAllowed = autonomousTradeReadinessAllowsTrade(tradeReadinessGate, adjustedTrade) ||
       (item.id === "tick-plan-trend-chase" && trendChaseExecution.uses_scout_reserve);
     if (!readinessAllowed) continue;
@@ -76403,11 +76457,13 @@ function buildAutonomousOpportunityRankExecution({
   market,
   cycle,
   ranker,
+  sourceQuality,
   recentTrades = [],
 }: {
   market: MemecoinMarket[];
   cycle: number;
   ranker: AutonomousOpportunityRanker;
+  sourceQuality?: AutonomousSourceQualityOracle;
   recentTrades?: AutonomousTrade[];
 }): AutonomousOpportunityRankExecution {
   const selected = ranker.items.find((item) => item.action === "paper-attack" || item.action === "paper-probe")
@@ -76417,12 +76473,16 @@ function buildAutonomousOpportunityRankExecution({
   const token = selected
     ? market.find((entry) => entry.id === selected.token_id || entry.symbol === selected.symbol)
     : null;
+  const sourceQualityBlocker = selected
+    ? autonomousSourceQualityBuyBlocker(sourceQuality, selected.symbol)
+    : null;
   const canBuildTrade = Boolean(
     selected &&
       token &&
       (selected.action === "paper-attack" || selected.action === "paper-probe") &&
       selected.max_paper_size_usd >= 10 &&
-      selected.blockers.length === 0,
+      selected.blockers.length === 0 &&
+      !sourceQualityBlocker,
   );
   const tradeId = selected ? `paper-opportunity-rank-${cycle}-${selected.symbol.toLowerCase()}` : "";
   const ledgerTrade = tradeId ? latestAutonomousTradeById(recentTrades, tradeId) : null;
@@ -76447,6 +76507,7 @@ function buildAutonomousOpportunityRankExecution({
     selected && selected.max_paper_size_usd < 10 && (selected.action === "paper-attack" || selected.action === "paper-probe")
       ? `${selected.symbol} ranked size is below the local paper-ledger minimum.`
       : null,
+    sourceQualityBlocker,
     ranker.status === "protect" ? ranker.next_action : null,
   ].filter((item): item is string => Boolean(item)))].slice(0, 6);
   const ledgerApplied = Boolean(ledgerTrade);
@@ -76480,6 +76541,7 @@ function buildAutonomousOpportunityRankExecution({
     controls: [
       "Turns the top attack/probe opportunity rank into one bounded local paper-ledger buy candidate.",
       "Requires a market price, minimum size, no rank blockers, and the same downstream paper-ledger guardrails before applying.",
+      "Fresh opportunity buys are vetoed when source quality marks the candidate paid-hype, refresh-first, blocked, or missing current proof.",
       "Refresh, protect, block, and watch rank outcomes cannot create fresh paper buys.",
       "Cannot sign, submit, custody funds, broadcast swaps, or guarantee profit.",
     ],
@@ -77661,11 +77723,13 @@ function buildAutonomousTradeabilityExecution({
   market,
   cycle,
   simulator,
+  sourceQuality,
   recentTrades = [],
 }: {
   market: MemecoinMarket[];
   cycle: number;
   simulator: AutonomousTradeabilitySimulator;
+  sourceQuality?: AutonomousSourceQualityOracle;
   recentTrades?: AutonomousTrade[];
 }): AutonomousTradeabilityExecution {
   const selected = simulator.items.find((item) => item.action === "paper-fill" || item.action === "paper-probe")
@@ -77675,12 +77739,16 @@ function buildAutonomousTradeabilityExecution({
   const token = selected
     ? market.find((entry) => entry.id === selected.token_id || entry.symbol === selected.symbol)
     : null;
+  const sourceQualityBlocker = selected
+    ? autonomousSourceQualityBuyBlocker(sourceQuality, selected.symbol)
+    : null;
   const canBuildTrade = Boolean(
     selected &&
       token &&
       (selected.action === "paper-fill" || selected.action === "paper-probe") &&
       selected.recommended_size_usd >= 10 &&
-      selected.blockers.length === 0,
+      selected.blockers.length === 0 &&
+      !sourceQualityBlocker,
   );
   const tradeId = selected ? `paper-tradeability-${cycle}-${selected.symbol.toLowerCase()}` : "";
   const ledgerTrade = tradeId ? latestAutonomousTradeById(recentTrades, tradeId) : null;
@@ -77708,6 +77776,7 @@ function buildAutonomousTradeabilityExecution({
     selected && selected.modeled_slippage_bps >= 260
       ? `${selected.symbol} modeled slippage is above the fill ceiling.`
       : null,
+    sourceQualityBlocker,
   ].filter((item): item is string => Boolean(item)))].slice(0, 6);
   const ledgerApplied = Boolean(ledgerTrade);
   const paperTradeReady = Boolean(paperTrade && !ledgerApplied && blockers.length === 0);
@@ -77744,6 +77813,7 @@ function buildAutonomousTradeabilityExecution({
     controls: [
       "Turns the top fillable/probe verdict into one bounded local paper-ledger buy candidate.",
       "Requires route confidence, depth, modeled slippage, fill quality, churn, price, and minimum-size checks before queueing.",
+      "Fresh fillability buys are vetoed when source quality marks the candidate paid-hype, refresh-first, blocked, or missing current proof.",
       "Cannot sign, submit, route, custody funds, broadcast swaps, or guarantee profit.",
     ],
   };
@@ -79530,6 +79600,55 @@ function autonomousSourceQualitySummary(
   if (status === "blocked") return `${blockedCount} candidate${blockedCount === 1 ? "" : "s"} are blocked by source quality.`;
   if (status === "sample") return "Sample source quality is rehearsed locally; live chase decisions require current DEX evidence.";
   return "Source quality oracle is idle until discovery, paid-order, and scanner evidence exist.";
+}
+
+function autonomousSourceQualityItemForSymbol(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  symbol: string | null | undefined,
+) {
+  if (!sourceQuality || !symbol) return null;
+  return sourceQuality.items.find((item) => item.symbol === symbol) ?? null;
+}
+
+function autonomousSourceQualityBuyBlocker(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  symbol: string | null | undefined,
+) {
+  if (!sourceQuality || !symbol) return null;
+  const item = autonomousSourceQualityItemForSymbol(sourceQuality, symbol);
+  if (!item) {
+    if (sourceQuality.status === "sample" || sourceQuality.status === "idle") return null;
+    return `Source-quality oracle has no current proof for ${symbol}.`;
+  }
+  if (item.action === "attack" || item.action === "probe") return null;
+  if (item.status === "paid-hype" || item.action === "fade") {
+    return item.reason || `${item.symbol} is paid-hype; fresh buys stay blocked until organic flow confirms.`;
+  }
+  if (item.status === "refresh-first" || item.action === "refresh-proof") {
+    return item.reason || `${item.symbol} needs source-quality proof refresh before a fresh buy.`;
+  }
+  if (item.status === "blocked" || item.action === "block") {
+    return item.reason || `${item.symbol} is blocked by source quality.`;
+  }
+  if (item.max_paper_size_multiplier <= 0 && sourceQuality.status !== "sample") {
+    return item.reason || `${item.symbol} source quality does not allow fresh paper sizing.`;
+  }
+  return null;
+}
+
+function autonomousSourceQualityTradeBlocker(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  trade: AutonomousTrade | null | undefined,
+) {
+  if (!trade || trade.side !== "buy") return null;
+  return autonomousSourceQualityBuyBlocker(sourceQuality, trade.symbol);
+}
+
+function autonomousSourceQualityAllowsTrade(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  trade: AutonomousTrade | null | undefined,
+) {
+  return !autonomousSourceQualityTradeBlocker(sourceQuality, trade);
 }
 
 function toTradingChain(value: string | undefined): MemecoinMarket["chain"] | null {

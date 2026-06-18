@@ -4275,9 +4275,31 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(state.autonomous_source_quality_oracle.items.find((item) => item.symbol === "FRESH")?.promotion_noise_score).toBeGreaterThanOrEqual(70);
     expect(state.autonomous_source_quality_oracle.items.find((item) => item.symbol === "FRESH")?.max_paper_size_multiplier).toBe(0);
+    expect([
+      state.autonomous_tradeability_execution,
+      state.autonomous_action_queue_execution,
+      state.autonomous_opportunity_rank_execution,
+    ].some((execution) =>
+      execution.paper_trade_ready &&
+      execution.paper_trade?.side === "buy" &&
+      execution.paper_trade.symbol === "FRESH"
+    )).toBe(false);
+    expect(state.autonomous_action_queue_execution.controls.some((control) => control.includes("source quality"))).toBe(true);
+    expect(state.autonomous_tick_bundle_execution.controls.some((control) => control.includes("source quality"))).toBe(true);
     if (state.autonomous_source_quality_oracle.status === "paid-hype" || state.autonomous_source_quality_oracle.status === "refresh-first" || state.autonomous_source_quality_oracle.status === "blocked") {
       expect(buildAutonomousNextMoves(state).some((move) => move.id === "source-quality")).toBe(true);
     }
+    const advanced = await getWeb3TradingStateAsync({
+      account: "persistent",
+      reset: true,
+      source: "live-dex",
+      fetchImpl,
+      advance: true,
+    });
+    expect(advanced.autonomous_source_quality_oracle.items.find((item) => item.symbol === "FRESH")).toMatchObject({
+      status: "paid-hype",
+    });
+    expect(advanced.trade_tape.some((trade) => trade.side === "buy" && trade.symbol === "FRESH")).toBe(false);
     expect(state.discovery_edge).toMatchObject({
       mode: "discovery-edge-supervisor",
       status: "cooldown",
