@@ -4749,6 +4749,9 @@ async function main() {
   assert(forwardRun.advanced_scenario_count >= 1 && forwardRun.traded_scenario_count >= 1, "Autonomous forward suite should disclose which regimes actually moved paper capital.", forwardRun);
   assert(["base", "breakout", "rug-risk"].every((scenario) => forwardRun.scenarios.some((report) => report.scenario === scenario)), "Autonomous forward suite should include all sample regimes.", forwardRun);
   assert(typeof forwardRun.net_pnl_usd === "number" && typeof forwardRun.target_met === "boolean", "Autonomous forward suite should quantify aggregate paper PnL and target status.", forwardRun);
+  assert(typeof forwardRun.hot_coin_baseline_pnl_usd === "number" && typeof forwardRun.hot_coin_alpha_usd === "number", "Autonomous forward suite should compare agent PnL against the best visible coin baseline.", forwardRun);
+  assert(["beat-hot-coin-suite", "lagged-hot-coin-suite"].includes(forwardRun.hot_coin_baseline_verdict), "Autonomous forward suite should publish a known hot-coin baseline verdict.", forwardRun);
+  assert(forwardRun.scenarios.every((report) => typeof report.hot_coin_alpha_usd === "number" && typeof report.agent_return_pct === "number"), "Every forward scenario should expose visible-market alpha metrics.", forwardRun.scenarios);
   assert(["all-profitable", "mixed-target-met", "flat-target-met", "profitable-below-target", "not-profitable"].includes(forwardRun.verdict), "Autonomous forward suite should publish a known profit verdict.", forwardRun);
 
   const summary = {
@@ -4761,6 +4764,8 @@ async function main() {
     forwardTargetMet: forwardRun.target_met,
     forwardScenarios: forwardRun.scenario_count,
     forwardTradedScenarios: forwardRun.traded_scenario_count,
+    forwardHotCoinAlpha: forwardRun.hot_coin_alpha_usd,
+    forwardHotCoinVerdict: forwardRun.hot_coin_baseline_verdict,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

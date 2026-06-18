@@ -70,7 +70,7 @@ export async function runWeb3AutonomousForwardRun(input = {}) {
     heartbeatWhenGated: config.heartbeatWhenGated,
     exitOnBlocked: false,
   });
-  const final = await fetchTradingState(config);
+  const final = await fetchTradingState(config, latestPaperCycle(daemonRun));
   const report = buildForwardRunReport({
     config,
     startedAt,
@@ -136,6 +136,7 @@ export function buildForwardRunReport({
   const netPnl = roundMoney(endEquity - startEquity);
   const startTrades = Number(baseline.paper_account?.trade_count ?? 0);
   const endTrades = Number(final.paper_account?.trade_count ?? startTrades);
+  const visibleBaseline = buildVisibleMarketBaseline({ baseline, final, startEquity, netPnl });
   const postedEvents = daemonRun.events.filter((event) => event.status === "posted");
   const advancedEvents = postedEvents.filter((event) => event.paper_advanced);
   const blockedEvents = daemonRun.events.filter((event) => event.status === "blocked");
@@ -170,6 +171,17 @@ export function buildForwardRunReport({
     target_gap_usd: targetGap,
     target_met: targetMet,
     verdict,
+    agent_return_pct: visibleBaseline.agent_return_pct,
+    idle_cash_pnl_usd: 0,
+    cash_alpha_usd: visibleBaseline.cash_alpha_usd,
+    hot_coin_baseline_symbol: visibleBaseline.best_symbol,
+    hot_coin_baseline_return_pct: visibleBaseline.best_return_pct,
+    hot_coin_baseline_pnl_usd: visibleBaseline.best_wallet_pnl_usd,
+    hot_coin_alpha_usd: visibleBaseline.best_coin_alpha_usd,
+    cold_coin_baseline_symbol: visibleBaseline.worst_symbol,
+    cold_coin_baseline_return_pct: visibleBaseline.worst_return_pct,
+    cold_coin_baseline_pnl_usd: visibleBaseline.worst_wallet_pnl_usd,
+    visible_baseline_verdict: visibleBaseline.verdict,
     trade_count_delta: Math.max(0, endTrades - startTrades),
     final_cycle: final.paper_account?.cycle ?? null,
     final_lease_status: final.autonomous_daemon_handoff?.lease_status ?? "missing",
@@ -188,6 +200,53 @@ export function buildForwardRunReport({
   };
 }
 
+function buildVisibleMarketBaseline({ baseline, final, startEquity, netPnl }) {
+  const endById = new Map((final.market ?? []).map((token) => [token.id, token]));
+  const rows = (baseline.market ?? [])
+    .flatMap((startToken) => {
+      const endToken = endById.get(startToken.id);
+      const startPrice = Number(startToken.price_usd ?? 0);
+      const endPrice = Number(endToken?.price_usd ?? startToken.price_usd ?? 0);
+      if (!startToken.id || !startToken.symbol || startPrice <= 0 || endPrice <= 0) return [];
+      const returnPct = ((endPrice - startPrice) / startPrice) * 100;
+      return [{
+        symbol: startToken.symbol,
+        token_id: startToken.id,
+        return_pct: roundMoney(returnPct),
+        wallet_pnl_usd: roundMoney(startEquity * (returnPct / 100)),
+      }];
+    })
+    .sort((a, b) => b.return_pct - a.return_pct);
+  const best = rows[0] ?? null;
+  const worst = rows[rows.length - 1] ?? null;
+  const bestCoinAlpha = roundMoney(netPnl - (best?.wallet_pnl_usd ?? 0));
+  const agentReturnPct = startEquity > 0 ? roundMoney((netPnl / startEquity) * 100) : 0;
+  const verdict = best
+    ? bestCoinAlpha >= 0
+      ? "beat-hot-coin"
+      : netPnl > 0
+        ? "profitable-but-lagged-hot-coin"
+        : "lagged-hot-coin"
+    : netPnl > 0
+      ? "beat-cash"
+      : netPnl === 0
+        ? "flat-vs-cash"
+        : "lost-vs-cash";
+
+  return {
+    agent_return_pct: agentReturnPct,
+    cash_alpha_usd: roundMoney(netPnl),
+    best_symbol: best?.symbol ?? null,
+    best_return_pct: best?.return_pct ?? 0,
+    best_wallet_pnl_usd: best?.wallet_pnl_usd ?? 0,
+    best_coin_alpha_usd: bestCoinAlpha,
+    worst_symbol: worst?.symbol ?? null,
+    worst_return_pct: worst?.return_pct ?? 0,
+    worst_wallet_pnl_usd: worst?.wallet_pnl_usd ?? 0,
+    verdict,
+  };
+}
+
 export function buildForwardSuiteReport({
   config,
   startedAt,
@@ -199,6 +258,8 @@ export function buildForwardSuiteReport({
   const blockedTicks = scenarios.reduce((sum, report) => sum + Number(report.blocked_ticks ?? 0), 0);
   const tradeCountDelta = scenarios.reduce((sum, report) => sum + Number(report.trade_count_delta ?? 0), 0);
   const profitableCount = scenarios.filter((report) => report.net_pnl_usd > 0).length;
+  const hotCoinBaselinePnl = roundMoney(scenarios.reduce((sum, report) => sum + Number(report.hot_coin_baseline_pnl_usd ?? 0), 0));
+  const hotCoinAlpha = roundMoney(netPnl - hotCoinBaselinePnl);
   const targetGap = roundMoney(netPnl - config.minNetPnlUsd);
   const targetMet = targetGap >= 0;
   const worstScenario = [...scenarios].sort((a, b) => a.net_pnl_usd - b.net_pnl_usd)[0] ?? null;
@@ -233,6 +294,9 @@ export function buildForwardSuiteReport({
     target_gap_usd: targetGap,
     target_met: targetMet,
     verdict,
+    hot_coin_baseline_pnl_usd: hotCoinBaselinePnl,
+    hot_coin_alpha_usd: hotCoinAlpha,
+    hot_coin_baseline_verdict: hotCoinAlpha >= 0 ? "beat-hot-coin-suite" : "lagged-hot-coin-suite",
     profitable_scenario_count: profitableCount,
     advanced_scenario_count: scenarios.filter((report) => report.advanced_ticks > 0).length,
     traded_scenario_count: scenarios.filter((report) => report.trade_count_delta > 0).length,
@@ -249,9 +313,17 @@ export function buildForwardSuiteReport({
   };
 }
 
-async function fetchTradingState(config) {
+function latestPaperCycle(daemonRun) {
+  const cycles = daemonRun.events
+    .map((event) => Number(event.paper_cycle))
+    .filter((cycle) => Number.isFinite(cycle) && cycle >= 0);
+  return cycles.length > 0 ? Math.max(...cycles) : 0;
+}
+
+async function fetchTradingState(config, cycles = 0) {
   const url = new URL("/api/web3-trading", config.baseUrl);
   url.searchParams.set("scenario", config.scenario);
+  url.searchParams.set("cycles", String(Math.max(0, Math.trunc(cycles))));
   url.searchParams.set("source", config.source);
   url.searchParams.set("account", "persistent");
   url.searchParams.set("advance", "false");

@@ -98,8 +98,8 @@ fund custody remain credential-gated future work. The forward run resets the loc
 ledger, runs bounded daemon ticks, compares start/end wallet equity, and reports whether
 the paper loop met the requested net-PnL target. The forward suite repeats that proof across
 base, breakout, and rug-risk sample regimes so reviewers can see aggregate PnL, traded
-regimes, and worst/best scenario outcomes; add `--fail-under-target` when that report should
-gate deployment.
+regimes, worst/best scenario outcomes, and hot-coin baseline alpha versus the best visible
+coin; add `--fail-under-target` when that report should gate deployment.
 
 ## Architecture: the engine and the app
 
