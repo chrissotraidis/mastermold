@@ -8677,6 +8677,33 @@ export type AutonomousSignerOps = {
   items: AutonomousSignerOpsItem[];
 };
 
+export type AutonomousLiveAutonomyReadinessItem = {
+  id: "daemon" | "market" | "route" | "fees" | "policy" | "signer" | "relay" | "kill-switch";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  score: number;
+  detail: string;
+  blocker: string | null;
+};
+
+export type AutonomousLiveAutonomyReadiness = {
+  mode: "autonomous-live-autonomy-readiness";
+  status: "paper-only" | "daemon-gated" | "signature-gated" | "submit-gated" | "live-ready" | "blocked";
+  summary: string;
+  readiness_score: number;
+  can_run_unattended: boolean;
+  can_trade_real_capital: boolean;
+  live_execution_permitted: boolean;
+  max_live_trade_usd: number;
+  daily_cap_remaining_usd: number;
+  fastest_ttl_seconds: number;
+  next_wake_seconds: number;
+  next_action: string;
+  blockers: string[];
+  controls: string[];
+  items: AutonomousLiveAutonomyReadinessItem[];
+};
+
 export type Web3TradingState = {
   as_of: string;
   scenario: TradingScenario;
@@ -8920,6 +8947,7 @@ export type Web3TradingState = {
   autonomous_execution_adapter_readiness: AutonomousExecutionAdapterReadiness;
   autonomous_custody_mandate: AutonomousCustodyMandate;
   autonomous_signer_ops: AutonomousSignerOps;
+  autonomous_live_autonomy_readiness: AutonomousLiveAutonomyReadiness;
   execution_readiness: ExecutionReadiness;
   execution_audit: ExecutionAudit;
   execution_gate: ExecutionGate;
@@ -12166,6 +12194,21 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       walletTelemetry: configuredState.autonomous_wallet_telemetry,
       daemonMemory: configuredState.paper_daemon_memory,
     });
+    configuredState.autonomous_live_autonomy_readiness = buildAutonomousLiveAutonomyReadiness({
+      executionReadiness: configuredState.execution_readiness,
+      executionGate: configuredState.execution_gate,
+      liveArming: configuredState.live_execution_arming,
+      executionAdapter: configuredState.autonomous_execution_adapter_readiness,
+      custodyMandate: configuredState.autonomous_custody_mandate,
+      signerOps: configuredState.autonomous_signer_ops,
+      orderHandoff: configuredState.autonomous_order_handoff,
+      preSubmitRehearsal: configuredState.pre_submit_rehearsal,
+      sessionSupervisor: configuredState.autonomous_session_supervisor,
+      runEnvelope: configuredState.autonomous_run_envelope,
+      routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
+      marketIngestion: configuredState.market_ingestion_plan,
+      daemonMemory: configuredState.paper_daemon_memory,
+    });
     configuredState.autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
       runEnvelope: configuredState.autonomous_run_envelope,
       objective: configuredState.autonomous_profit_objective,
@@ -14263,6 +14306,21 @@ function buildWeb3TradingState({
     walletTelemetry: autonomous_wallet_telemetry,
     daemonMemory: paper_daemon_memory,
   });
+  const autonomous_live_autonomy_readiness = buildAutonomousLiveAutonomyReadiness({
+    executionReadiness: execution_readiness,
+    executionGate: execution_gate,
+    liveArming: live_execution_arming,
+    executionAdapter: autonomous_execution_adapter_readiness,
+    custodyMandate: autonomous_custody_mandate,
+    signerOps: autonomous_signer_ops,
+    orderHandoff: autonomous_order_handoff,
+    preSubmitRehearsal: pre_submit_rehearsal,
+    sessionSupervisor: autonomous_session_supervisor,
+    runEnvelope: autonomous_run_envelope,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    marketIngestion: market_ingestion_plan,
+    daemonMemory: paper_daemon_memory,
+  });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
     objective: autonomous_profit_objective,
@@ -14799,6 +14857,7 @@ function buildWeb3TradingState({
     autonomous_execution_adapter_readiness,
     autonomous_custody_mandate,
     autonomous_signer_ops,
+    autonomous_live_autonomy_readiness,
     execution_readiness,
     execution_audit,
     execution_gate,
@@ -16665,6 +16724,21 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     walletTelemetry: autonomous_wallet_telemetry,
     daemonMemory: state.paper_daemon_memory,
   });
+  const autonomous_live_autonomy_readiness = buildAutonomousLiveAutonomyReadiness({
+    executionReadiness: state.execution_readiness,
+    executionGate: state.execution_gate,
+    liveArming: state.live_execution_arming,
+    executionAdapter: autonomous_execution_adapter_readiness,
+    custodyMandate: autonomous_custody_mandate,
+    signerOps: autonomous_signer_ops,
+    orderHandoff: state.autonomous_order_handoff,
+    preSubmitRehearsal: state.pre_submit_rehearsal,
+    sessionSupervisor: autonomous_session_supervisor,
+    runEnvelope: autonomous_run_envelope,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    marketIngestion: state.market_ingestion_plan,
+    daemonMemory: state.paper_daemon_memory,
+  });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
     objective: autonomous_profit_objective,
@@ -17067,6 +17141,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_execution_adapter_readiness,
     autonomous_custody_mandate,
     autonomous_signer_ops,
+    autonomous_live_autonomy_readiness,
     signal_alpha_attribution,
     autonomous_setup_memory,
     performance_scorecard,
@@ -17356,6 +17431,21 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     marketIngestion: state.market_ingestion_plan,
     dexFreshness: state.dex_stream_freshness,
     walletTelemetry: state.autonomous_wallet_telemetry,
+    daemonMemory: state.paper_daemon_memory,
+  });
+  const autonomous_live_autonomy_readiness = buildAutonomousLiveAutonomyReadiness({
+    executionReadiness: state.execution_readiness,
+    executionGate: state.execution_gate,
+    liveArming: state.live_execution_arming,
+    executionAdapter: autonomous_execution_adapter_readiness,
+    custodyMandate: autonomous_custody_mandate,
+    signerOps: autonomous_signer_ops,
+    orderHandoff: state.autonomous_order_handoff,
+    preSubmitRehearsal: state.pre_submit_rehearsal,
+    sessionSupervisor: autonomous_session_supervisor,
+    runEnvelope: autonomous_run_envelope,
+    routeRefreshExecution: state.autonomous_route_refresh_execution,
+    marketIngestion: state.market_ingestion_plan,
     daemonMemory: state.paper_daemon_memory,
   });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
@@ -17696,6 +17786,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_reaction_loop,
     autonomous_landing_optimizer,
     autonomous_run_envelope,
+    autonomous_live_autonomy_readiness,
     autonomous_profit_run_guard,
     autonomous_daily_profit_lock,
     autonomous_data_freshness_gate,
@@ -22002,6 +22093,21 @@ function applyPersistentLedger(
     walletTelemetry: autonomous_wallet_telemetry,
     daemonMemory: paper_daemon_memory,
   });
+  const autonomous_live_autonomy_readiness = buildAutonomousLiveAutonomyReadiness({
+    executionReadiness: state.execution_readiness,
+    executionGate: state.execution_gate,
+    liveArming: state.live_execution_arming,
+    executionAdapter: autonomous_execution_adapter_readiness,
+    custodyMandate: state.autonomous_custody_mandate,
+    signerOps: state.autonomous_signer_ops,
+    orderHandoff: state.autonomous_order_handoff,
+    preSubmitRehearsal: state.pre_submit_rehearsal,
+    sessionSupervisor: autonomous_session_supervisor,
+    runEnvelope: autonomous_run_envelope,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    marketIngestion: market_ingestion_plan,
+    daemonMemory: paper_daemon_memory,
+  });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
     objective: state.autonomous_profit_objective,
@@ -22442,6 +22548,7 @@ function applyPersistentLedger(
     autonomous_reaction_loop,
     autonomous_landing_optimizer,
     autonomous_run_envelope,
+    autonomous_live_autonomy_readiness,
     autonomous_profit_run_guard,
     autonomous_daily_profit_lock,
     autonomous_replay_gate,
@@ -69721,6 +69828,219 @@ function autonomousSessionNextAction(
   if (status === "stand-down") return failed?.blocker ?? "Keep exits and risk monitoring active.";
   if (status === "blocked") return failed?.blocker ?? orderHandoff.next_action;
   return monitor.summary;
+}
+
+function buildAutonomousLiveAutonomyReadiness({
+  executionReadiness,
+  executionGate,
+  liveArming,
+  executionAdapter,
+  custodyMandate,
+  signerOps,
+  orderHandoff,
+  preSubmitRehearsal,
+  sessionSupervisor,
+  runEnvelope,
+  routeRefreshExecution,
+  marketIngestion,
+  daemonMemory,
+}: {
+  executionReadiness: ExecutionReadiness;
+  executionGate: ExecutionGate;
+  liveArming: LiveExecutionArming;
+  executionAdapter: AutonomousExecutionAdapterReadiness;
+  custodyMandate: AutonomousCustodyMandate;
+  signerOps: AutonomousSignerOps;
+  orderHandoff: AutonomousOrderHandoff;
+  preSubmitRehearsal: PreSubmitRehearsal;
+  sessionSupervisor: AutonomousSessionSupervisor;
+  runEnvelope: AutonomousRunEnvelope;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+  marketIngestion: MarketIngestionPlan;
+  daemonMemory: PaperDaemonMemory;
+}): AutonomousLiveAutonomyReadiness {
+  const killSwitchFail = executionReadiness.checks.some((check) => check.id === "kill-switch" && check.status === "fail");
+  const routeReady = executionAdapter.quote_request_ready &&
+    !routeRefreshExecution.route_refresh_required &&
+    preSubmitRehearsal.blocked_count === 0;
+  const feeReady = preSubmitRehearsal.items.every((item) =>
+    item.path === "paper-ledger" ||
+    item.checks.some((check) => check.id === "fees" && check.status !== "fail")
+  );
+  const policyReady = custodyMandate.status === "armed" &&
+    custodyMandate.spend_limit_usd > 0 &&
+    custodyMandate.per_trade_limit_usd > 0 &&
+    custodyMandate.remaining_cap_usd > 0 &&
+    custodyMandate.max_slippage_bps <= executionReadiness.config.max_slippage_bps;
+  const signerReady = signerOps.can_request_signature &&
+    signerOps.status !== "blocked" &&
+    custodyMandate.status === "armed";
+  const relayReady = liveArming.submit_ready &&
+    executionAdapter.submit_ready &&
+    orderHandoff.submit_count > 0;
+  const daemonReady = runEnvelope.keep_running &&
+    sessionSupervisor.should_keep_running &&
+    !daemonMemory.pause_new_entries;
+  const marketReady = marketIngestion.provider_budget_status !== "paused" &&
+    marketIngestion.provider_budget_status !== "throttled" &&
+    marketIngestion.status !== "blocked" &&
+    marketIngestion.status !== "paused";
+
+  const items: AutonomousLiveAutonomyReadinessItem[] = [
+    {
+      id: "daemon",
+      label: "Durable loop",
+      status: daemonReady ? "pass" : runEnvelope.keep_running || sessionSupervisor.should_keep_running ? "watch" : "fail",
+      score: runEnvelope.run_confidence_score,
+      detail: `${runEnvelope.status.replace("-", " ")} loop; next wake in ${runEnvelope.next_wake_seconds}s with ${daemonMemory.window_size} remembered paper tick${daemonMemory.window_size === 1 ? "" : "s"}.`,
+      blocker: daemonReady ? null : runEnvelope.stop_reason ?? sessionSupervisor.next_action,
+    },
+    {
+      id: "market",
+      label: "Live market feed",
+      status: marketReady ? "pass" : marketIngestion.provider_budget_status === "paused" ? "fail" : "watch",
+      score: clamp(Math.round(100 - Math.max(0, marketIngestion.provider_budget_utilization_pct - 30) * 0.75), 20, 92),
+      detail: `${marketIngestion.status.replace("-", " ")} ingestion at ${marketIngestion.provider_budget_utilization_pct}% provider budget; next refresh in ${marketIngestion.next_provider_refresh_seconds}s.`,
+      blocker: marketReady ? null : marketIngestion.next_action,
+    },
+    {
+      id: "route",
+      label: "Route freshness",
+      status: routeReady ? "pass" : routeRefreshExecution.route_refresh_required || executionAdapter.status === "refresh-required" ? "fail" : "watch",
+      score: executionAdapter.readiness_score,
+      detail: `${executionAdapter.active_adapter.replaceAll("-", " ")} with ${executionAdapter.quote_provider.replaceAll("-", " ")} quote evidence and ${executionAdapter.fastest_ttl_seconds}s fastest TTL.`,
+      blocker: routeReady ? null : executionAdapter.next_action,
+    },
+    {
+      id: "fees",
+      label: "Fee budget",
+      status: feeReady ? "pass" : "fail",
+      score: feeReady ? 82 : 28,
+      detail: "Solana base fee, priority fee, route cost, slippage, TTL, and relay readiness must be priced before a signed path can run.",
+      blocker: feeReady ? null : preSubmitRehearsal.next_action,
+    },
+    {
+      id: "policy",
+      label: "Spend policy",
+      status: policyReady ? "pass" : custodyMandate.status === "bounded-ready" || custodyMandate.status === "setup-required" ? "watch" : "fail",
+      score: custodyMandate.status === "armed" ? 90 : custodyMandate.status === "bounded-ready" ? 68 : custodyMandate.status === "setup-required" ? 42 : 12,
+      detail: `${custodyMandate.provider.replaceAll("-", " ")} cap ${formatCompactValue(custodyMandate.per_trade_limit_usd)} per trade, ${formatCompactValue(custodyMandate.remaining_cap_usd)} remaining.`,
+      blocker: policyReady ? null : custodyMandate.next_action,
+    },
+    {
+      id: "signer",
+      label: "Signer boundary",
+      status: signerReady ? "pass" : signerOps.status === "signature-needed" || signerOps.status === "setup-required" ? "watch" : "fail",
+      score: signerOps.items.find((item) => item.provider === signerOps.active_provider)?.readiness_score ?? 0,
+      detail: `${signerOps.active_provider.replaceAll("-", " ")} ${signerOps.can_auto_sign ? "auto-sign allowed" : signerOps.can_request_signature ? "signature request allowed" : "cannot request signature"}.`,
+      blocker: signerReady ? null : signerOps.next_action,
+    },
+    {
+      id: "relay",
+      label: "Submit relay",
+      status: relayReady ? "pass" : liveArming.submit_ready || executionAdapter.submit_ready ? "watch" : "fail",
+      score: relayReady ? 92 : liveArming.submit_ready || executionAdapter.submit_ready ? 58 : 22,
+      detail: `${liveArming.transaction_path.replaceAll("-", " ")} submit ${liveArming.submit_ready ? "ready" : "locked"}; handoff ${orderHandoff.status.replaceAll("-", " ")}.`,
+      blocker: relayReady ? null : liveArming.next_action,
+    },
+    {
+      id: "kill-switch",
+      label: "Kill switch",
+      status: killSwitchFail ? "fail" : "pass",
+      score: killSwitchFail ? 0 : 100,
+      detail: killSwitchFail ? "Operator kill switch is on." : "Kill switch is clear, but live execution still requires every other gate.",
+      blocker: killSwitchFail ? "Turn the kill switch off only after signer, route, relay, and spend policy are audited." : null,
+    },
+  ];
+
+  const blockers = items
+    .filter((item) => item.status === "fail")
+    .map((item) => item.blocker ?? item.detail)
+    .filter(Boolean)
+    .slice(0, 8);
+  const readinessScore = clamp(Math.round(items.reduce((sum, item) => sum + item.score, 0) / Math.max(1, items.length)), 0, 100);
+  const liveExecutionPermitted = executionGate.live_execution_enabled &&
+    liveArming.submit_ready &&
+    executionAdapter.submit_ready &&
+    policyReady &&
+    signerReady &&
+    relayReady &&
+    daemonReady &&
+    marketReady &&
+    !killSwitchFail;
+  const canRunUnattended = daemonReady && marketReady && !killSwitchFail && runEnvelope.keep_running;
+  const canTradeRealCapital = liveExecutionPermitted && blockers.length === 0;
+  const status: AutonomousLiveAutonomyReadiness["status"] = killSwitchFail
+    ? "blocked"
+    : !executionGate.live_execution_enabled
+      ? "paper-only"
+      : !daemonReady
+        ? "daemon-gated"
+        : !policyReady || !signerReady
+          ? "signature-gated"
+          : !relayReady || !routeReady || !feeReady
+            ? "submit-gated"
+            : canTradeRealCapital
+              ? "live-ready"
+              : "blocked";
+  const ttlCandidates = [
+    executionAdapter.fastest_ttl_seconds,
+    preSubmitRehearsal.fastest_window_seconds,
+  ].filter((value) => value > 0);
+
+  return {
+    mode: "autonomous-live-autonomy-readiness",
+    status,
+    summary: liveAutonomyReadinessSummary(status, readinessScore, canTradeRealCapital, executionGate, liveArming, runEnvelope),
+    readiness_score: readinessScore,
+    can_run_unattended: canRunUnattended,
+    can_trade_real_capital: canTradeRealCapital,
+    live_execution_permitted: liveExecutionPermitted,
+    max_live_trade_usd: canTradeRealCapital ? Math.min(liveArming.max_trade_usd, custodyMandate.per_trade_limit_usd) : 0,
+    daily_cap_remaining_usd: canTradeRealCapital ? Math.min(liveArming.daily_cap_remaining_usd, custodyMandate.remaining_cap_usd) : 0,
+    fastest_ttl_seconds: ttlCandidates.length > 0 ? Math.min(...ttlCandidates) : 0,
+    next_wake_seconds: runEnvelope.next_wake_seconds,
+    next_action: liveAutonomyReadinessNextAction(status, items, executionGate, runEnvelope),
+    blockers,
+    controls: [
+      "This audit is the final transition gate between local paper automation and any future real-capital autonomous path.",
+      "Live autonomy requires a durable loop, live market feed, fresh route proof, fee and TTL rehearsal, bounded spend policy, signer boundary, submit relay, and a clear kill switch.",
+      "Paper-only status is intentional while live execution is disabled; browser Auto Watch and local paper daemon ticks cannot move funds.",
+      "Signer payloads remain hash-only in app state, and real transaction bytes/private keys are not stored here.",
+    ],
+    items,
+  };
+}
+
+function liveAutonomyReadinessSummary(
+  status: AutonomousLiveAutonomyReadiness["status"],
+  readinessScore: number,
+  canTradeRealCapital: boolean,
+  executionGate: ExecutionGate,
+  liveArming: LiveExecutionArming,
+  runEnvelope: AutonomousRunEnvelope,
+) {
+  if (canTradeRealCapital) return `Live autonomy is ready at ${readinessScore}/100 with ${formatCompactValue(liveArming.max_trade_usd)} max trade cap and ${runEnvelope.next_wake_seconds}s wake cadence.`;
+  if (status === "paper-only") return `Paper autonomy is active at ${readinessScore}/100, but real-capital trading is locked because live execution is disabled.`;
+  if (status === "blocked") return `Live autonomy is blocked at ${readinessScore}/100; do not sign, submit, or run unattended with real funds.`;
+  if (status === "signature-gated") return `Live autonomy is signature-gated at ${readinessScore}/100; signer policy, wallet scope, or spend caps are not ready.`;
+  if (status === "submit-gated") return `Live autonomy is submit-gated at ${readinessScore}/100; route, TTL, fee, relay, or confirmation proof is incomplete.`;
+  if (status === "daemon-gated") return `Live autonomy is daemon-gated at ${readinessScore}/100; durable unattended loop controls are not ready.`;
+  return executionGate.live_blockers[0] ?? liveArming.summary;
+}
+
+function liveAutonomyReadinessNextAction(
+  status: AutonomousLiveAutonomyReadiness["status"],
+  items: AutonomousLiveAutonomyReadinessItem[],
+  executionGate: ExecutionGate,
+  runEnvelope: AutonomousRunEnvelope,
+) {
+  const killSwitch = items.find((item) => item.id === "kill-switch" && item.status === "fail");
+  const failed = items.find((item) => item.status === "fail");
+  if (status === "live-ready") return runEnvelope.next_action;
+  if (killSwitch) return killSwitch.blocker ?? killSwitch.detail;
+  if (status === "paper-only") return executionGate.live_blockers[0] ?? "Keep running only local paper automation until live execution is explicitly configured.";
+  return failed?.blocker ?? runEnvelope.stop_reason ?? runEnvelope.next_action;
 }
 
 function autonomousSessionItemRank(item: AutonomousSessionSupervisorItem) {

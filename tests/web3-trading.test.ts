@@ -5362,6 +5362,31 @@ describe("Web3 autonomous trading subsystem", () => {
       item.readiness_score <= 100
     )).toBe(true);
     expect(state.autonomous_signer_ops.controls.some((control) => control.includes("private keys"))).toBe(true);
+    expect(state.autonomous_live_autonomy_readiness.mode).toBe("autonomous-live-autonomy-readiness");
+    expect(["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"]).toContain(state.autonomous_live_autonomy_readiness.status);
+    expect(state.autonomous_live_autonomy_readiness.can_trade_real_capital).toBe(false);
+    expect(state.autonomous_live_autonomy_readiness.live_execution_permitted).toBe(false);
+    expect(state.autonomous_live_autonomy_readiness.max_live_trade_usd).toBe(0);
+    expect(state.autonomous_live_autonomy_readiness.readiness_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_live_autonomy_readiness.readiness_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_live_autonomy_readiness.items.map((item) => item.id)).toEqual([
+      "daemon",
+      "market",
+      "route",
+      "fees",
+      "policy",
+      "signer",
+      "relay",
+      "kill-switch",
+    ]);
+    expect(state.autonomous_live_autonomy_readiness.items.every((item) =>
+      ["pass", "watch", "fail"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(state.autonomous_live_autonomy_readiness.controls.some((control) => control.includes("final transition gate"))).toBe(true);
+    expect(state.autonomous_live_autonomy_readiness.controls.some((control) => control.includes("cannot move funds"))).toBe(true);
     expect(state.autonomous_wallet_telemetry.mode).toBe("autonomous-wallet-telemetry");
     expect(["compounding", "harvest", "recover", "flat", "cooldown", "protect"]).toContain(state.autonomous_wallet_telemetry.status);
     expect(state.autonomous_wallet_telemetry.curve.length).toBeGreaterThanOrEqual(2);
@@ -6189,6 +6214,17 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_custody_mandate.checks.find((check) => check.id === "live-gates")?.status).not.toBe("pass");
     expect(state.autonomous_custody_mandate.next_action).toMatch(/wallet prompts|Clear|configure/i);
     expect(JSON.stringify(state.autonomous_custody_mandate)).not.toContain("unsigned-transaction-redacted-by-engine");
+    expect(state.autonomous_live_autonomy_readiness).toMatchObject({
+      mode: "autonomous-live-autonomy-readiness",
+      status: "paper-only",
+      can_trade_real_capital: false,
+      live_execution_permitted: false,
+      max_live_trade_usd: 0,
+      daily_cap_remaining_usd: 0,
+    });
+    expect(state.autonomous_live_autonomy_readiness.items.find((item) => item.id === "route")?.detail).toContain("TTL");
+    expect(state.autonomous_live_autonomy_readiness.items.find((item) => item.id === "signer")?.status).not.toBe("pass");
+    expect(state.autonomous_live_autonomy_readiness.next_action).toMatch(/live execution|locked|disabled/i);
     expect(state.execution_retry_planner.items.find((item) => item.symbol === "LIVE")?.action).toMatch(/send|retry|resize|slice|escalate-priority|paper/);
     expect(state.execution_intents.intents.find((intent) => intent.symbol === "LIVE")).toMatchObject({
       plan_id: plan?.id,
@@ -6498,6 +6534,12 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(["ready", "blocked"]).toContain(state.autonomous_signer_ops.status);
     expect(state.autonomous_signer_ops.items.find((item) => item.provider === "privy-server-wallet")?.checks.every((check) => check.status !== "fail")).toBe(true);
+    expect(state.autonomous_live_autonomy_readiness.status).toBe("paper-only");
+    expect(state.autonomous_live_autonomy_readiness.can_trade_real_capital).toBe(false);
+    expect(state.autonomous_live_autonomy_readiness.live_execution_permitted).toBe(false);
+    expect(state.autonomous_live_autonomy_readiness.items.find((item) => item.id === "relay")?.status).not.toBe("fail");
+    expect(state.autonomous_live_autonomy_readiness.items.find((item) => item.id === "policy")?.status).toBe("pass");
+    expect(state.autonomous_live_autonomy_readiness.summary).toContain("real-capital trading is locked");
     expect(state.execution_audit.latest).toMatchObject({
       status: "confirmed",
       request_id: "order-123",
@@ -6523,6 +6565,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.transaction_lifecycle.status).toBe("blocked");
     expect(state.transaction_lifecycle.items.every((item) => item.stage !== "awaiting-signature")).toBe(true);
     expect(state.execution_gate.live_execution_enabled).toBe(false);
+    expect(state.autonomous_live_autonomy_readiness.status).toBe("blocked");
+    expect(state.autonomous_live_autonomy_readiness.can_trade_real_capital).toBe(false);
+    expect(state.autonomous_live_autonomy_readiness.items.find((item) => item.id === "kill-switch")?.status).toBe("fail");
+    expect(state.autonomous_live_autonomy_readiness.next_action).toMatch(/kill switch/i);
   });
 
   test("GIVEN the kill switch is on WHEN an execution drill runs THEN it records a blocked audit entry", async () => {

@@ -456,6 +456,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
   const tokenSafety = state.autonomous_token_safety_clearance;
   const tradeability = state.autonomous_tradeability_simulator;
   const executionAdapter = state.autonomous_execution_adapter_readiness;
+  const liveAutonomyReadiness = state.autonomous_live_autonomy_readiness;
   const marketIngestion = state.market_ingestion_plan;
   const marketIntake = state.autonomous_market_intake_plan;
   const sprintTapeItems = state.autonomous_market_evidence_fusion.items.slice(0, 2);
@@ -877,6 +878,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
 
           {focusMode === "wiring" ? (
             <div className="mt-2 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" aria-label="Autonomous wiring focus">
+              <div className="xl:col-span-2">
+                <QuickLiveAutonomyReadinessAudit readiness={liveAutonomyReadiness} />
+              </div>
               <QuickExecutionReadinessBridge
                 adapter={executionAdapter}
                 ingestion={marketIngestion}
@@ -6590,6 +6594,76 @@ function QuickExecutionReadinessBridge({
   );
 }
 
+function QuickLiveAutonomyReadinessAudit({
+  readiness,
+}: {
+  readiness: Web3TradingState["autonomous_live_autonomy_readiness"];
+}) {
+  const width = 640;
+  const height = 132;
+  const topItems = readiness.items.slice(0, 8);
+  const statusTone = liveAutonomyReadinessTone(readiness.status);
+
+  return (
+    <section className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:mt-3 sm:p-3" aria-label="Live autonomy readiness audit">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Live autonomy audit</p>
+              <p className="mt-1 break-words text-sm font-semibold text-on-surface">
+                {readiness.status.replaceAll("-", " ")} - {readiness.readiness_score}/100
+              </p>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+                {readiness.summary}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Chip tone={statusTone}>{readiness.can_trade_real_capital ? "real-cap ready" : "real-cap locked"}</Chip>
+              <Chip tone={readiness.can_run_unattended ? "engine" : "caution"}>{readiness.can_run_unattended ? "loop ready" : "loop gated"}</Chip>
+            </div>
+          </div>
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            role="img"
+            aria-label="Live autonomy gate audit chart"
+            className="mt-2 h-32 w-full text-engine"
+          >
+            <rect width={width} height={height} rx="8" className="fill-surface-dim" opacity="0.28" />
+            <text x="12" y="17" className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">gate</text>
+            <text x="128" y="17" className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">readiness</text>
+            {topItems.map((item, index) => {
+              const y = 28 + index * 12;
+              const barWidth = Math.max(3, item.score / 100 * 350);
+              return (
+                <g key={item.id}>
+                  <text x="12" y={y + 8} className="fill-on-surface font-mono text-[9px] font-semibold">{item.label}</text>
+                  <rect x="128" y={y + 2} width="350" height="6" rx="3" className="fill-outline" opacity="0.12" />
+                  <rect x="128" y={y + 2} width={barWidth} height="6" rx="3" className={liveAutonomyItemSvgClass(item.status)} opacity="0.82" />
+                  <text x="492" y={y + 8} className="fill-outline font-mono text-[8px]">{item.status}</text>
+                  <text x="570" y={y + 8} className="fill-outline font-mono text-[8px]">{item.score}</text>
+                </g>
+              );
+            })}
+            <text x="128" y={height - 8} className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">daemon - market - route - fees - policy - signer - relay - kill switch</text>
+          </svg>
+        </div>
+        <div className="grid grid-cols-2 gap-1" aria-label="Live autonomy readiness metrics">
+          <ProfitMetric label="Real funds" value={readiness.can_trade_real_capital ? "ready" : "locked"} detail={readiness.live_execution_permitted ? "permitted" : "not permitted"} tone={readiness.can_trade_real_capital ? "critical" : "demo"} />
+          <ProfitMetric label="Max trade" value={formatCompactCurrency(readiness.max_live_trade_usd)} detail={`${formatCompactCurrency(readiness.daily_cap_remaining_usd)} day cap`} tone={readiness.max_live_trade_usd > 0 ? "critical" : "neutral"} />
+          <ProfitMetric label="Loop" value={readiness.can_run_unattended ? "ready" : "gated"} detail={`${readiness.next_wake_seconds}s wake`} tone={readiness.can_run_unattended ? "engine" : "caution"} />
+          <ProfitMetric label="TTL" value={`${readiness.fastest_ttl_seconds}s`} detail={readiness.next_action} tone={readiness.fastest_ttl_seconds > 0 ? "engine" : "neutral"} />
+          <ProfitMetric label="Blockers" value={`${readiness.blockers.length}`} detail={readiness.blockers[0] ?? "none"} tone={readiness.blockers.length > 0 ? "critical" : "engine"} />
+          <ProfitMetric label="Boundary" value={readiness.status.replaceAll("-", " ")} detail="final live gate" tone={statusTone} />
+        </div>
+      </div>
+      <span className="sr-only" aria-label="Live autonomy readiness receipt">
+        Live autonomy readiness status {readiness.status}; score {readiness.readiness_score}; can run unattended {readiness.can_run_unattended ? "yes" : "no"}; can trade real capital {readiness.can_trade_real_capital ? "yes" : "no"}; live execution permitted {readiness.live_execution_permitted ? "yes" : "no"}; max live trade {formatCurrency(readiness.max_live_trade_usd)}; daily cap remaining {formatCurrency(readiness.daily_cap_remaining_usd)}; blockers {readiness.blockers.join("; ") || "none"}; controls {readiness.controls.join(" ")}
+      </span>
+    </section>
+  );
+}
+
 function QuickMarketIntakePlanner({
   plan,
 }: {
@@ -7100,6 +7174,20 @@ function executionAdapterStatusTone(
   if (status === "blocked") return "critical";
   if (status === "paper-only") return "demo";
   return "neutral";
+}
+
+function liveAutonomyReadinessTone(status: Web3TradingState["autonomous_live_autonomy_readiness"]["status"]): QuickChipTone {
+  if (status === "live-ready") return "engine";
+  if (status === "paper-only") return "demo";
+  if (status === "daemon-gated") return "caution";
+  if (status === "blocked") return "critical";
+  return "caution";
+}
+
+function liveAutonomyItemSvgClass(status: Web3TradingState["autonomous_live_autonomy_readiness"]["items"][number]["status"]) {
+  if (status === "pass") return "fill-engine";
+  if (status === "watch") return "fill-caution";
+  return "fill-critical";
 }
 
 function executionAdapterItemSvgClass(status: Web3TradingState["autonomous_execution_adapter_readiness"]["items"][number]["status"]) {
