@@ -1521,9 +1521,11 @@ function QuickProfitRedeployAutopilotStrip({ state }: { state: Web3TradingState 
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Redeploy execution</p>
             <p className="mt-1 truncate text-xs font-semibold text-on-surface">
-              {execution.source.replaceAll("-", " ")} · {execution.symbol ?? "no target"}
+              {execution.execution_lane?.replaceAll("-", " ") ?? execution.source.replaceAll("-", " ")} · {execution.symbol ?? "no target"}
             </p>
-            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{execution.next_action}</p>
+            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">
+              {execution.paper_trade_id ? `${execution.paper_trade_id} · ` : ""}{execution.next_action}
+            </p>
           </div>
           <Chip tone={executionTone}>{execution.execution_score}/100</Chip>
         </div>
@@ -1546,7 +1548,7 @@ function QuickProfitRedeployAutopilotStrip({ state }: { state: Web3TradingState 
         {redeploy.summary} {execution.summary}
       </p>
       <span className="sr-only" aria-label="Autonomous profit redeploy autopilot receipt">
-        Profit redeploy autopilot status {redeploy.status}; action {redeploy.action}; from {redeploy.from_symbol ?? "none"}; target {redeploy.symbol ?? "none"}; score {redeploy.redeploy_score}; redeploy budget {formatCurrency(redeploy.redeploy_budget_usd)}; released cash {formatCurrency(redeploy.released_cash_usd)}; reserve {formatCurrency(redeploy.reserve_usd)}; expected edge {formatCurrency(redeploy.expected_edge_usd)}; cadence {redeploy.next_cadence_seconds} seconds; can redeploy paper {redeploy.can_redeploy_paper ? "yes" : "no"}; refresh proof {redeploy.must_refresh_proof ? "yes" : "no"}; protect first {redeploy.must_protect_first ? "yes" : "no"}; boundary {redeploy.execution_boundary}; execution status {execution.status}; execution source {execution.source}; execution symbol {execution.symbol ?? "none"}; capped size {formatCurrency(execution.capped_size_usd)}; ledger applied {execution.ledger_applied ? "yes" : "no"}; execution boundary {execution.execution_boundary}; blockers {[...redeploy.blockers, ...execution.blockers].join("; ") || "none"}.
+        Profit redeploy autopilot status {redeploy.status}; action {redeploy.action}; from {redeploy.from_symbol ?? "none"}; target {redeploy.symbol ?? "none"}; score {redeploy.redeploy_score}; redeploy budget {formatCurrency(redeploy.redeploy_budget_usd)}; released cash {formatCurrency(redeploy.released_cash_usd)}; reserve {formatCurrency(redeploy.reserve_usd)}; expected edge {formatCurrency(redeploy.expected_edge_usd)}; cadence {redeploy.next_cadence_seconds} seconds; can redeploy paper {redeploy.can_redeploy_paper ? "yes" : "no"}; refresh proof {redeploy.must_refresh_proof ? "yes" : "no"}; protect first {redeploy.must_protect_first ? "yes" : "no"}; boundary {redeploy.execution_boundary}; execution status {execution.status}; execution source {execution.source}; execution lane {execution.execution_lane ?? "none"}; execution paper trade id {execution.paper_trade_id ?? "none"}; execution symbol {execution.symbol ?? "none"}; capped size {formatCurrency(execution.capped_size_usd)}; ledger applied {execution.ledger_applied ? "yes" : "no"}; execution boundary {execution.execution_boundary}; blockers {[...redeploy.blockers, ...execution.blockers].join("; ") || "none"}.
       </span>
     </section>
   );

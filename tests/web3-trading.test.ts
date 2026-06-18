@@ -1496,18 +1496,23 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(redeploy.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
     expect(execution.mode).toBe("autonomous-profit-redeploy-execution");
-    expect(execution.status).toBe("protect-first");
-    expect(execution.paper_trade_ready).toBe(false);
-    expect(execution.paper_trade).toBeNull();
-    expect(execution.execution_boundary).toBe("read-only-refresh");
-    expect(execution.next_action).toContain("protective paper");
+    expect(execution.status).toBe("queued");
+    expect(execution.source).toBe("profit-capture");
+    expect(execution.execution_lane).toBe("portfolio-protect");
+    expect(execution.paper_trade_ready).toBe(true);
+    expect(execution.paper_trade).toMatchObject({
+      side: "sell",
+      symbol: redeploy.from_symbol,
+    });
+    expect(execution.execution_boundary).toBe("paper-ledger-only");
+    expect(execution.next_action).toContain("protective paper sell");
     expect(execution.items.find((item) => item.id === "autopilot")).toMatchObject({
       status: "watch",
       value: "protect first",
     });
     expect(execution.items.find((item) => item.id === "boundary")).toMatchObject({
       status: "pass",
-      value: "read only refresh",
+      value: "paper ledger only",
     });
   });
 
@@ -2416,9 +2421,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_profit_redeploy_autopilot.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
     expect(state.autonomous_profit_redeploy_execution.mode).toBe("autonomous-profit-redeploy-execution");
     expect(["queued", "applied", "wait-proof", "protect-first", "cooldown", "blocked", "idle"]).toContain(state.autonomous_profit_redeploy_execution.status);
-    expect(["opportunity-rank", "reentry-hunter", "rotation-director", "none"]).toContain(state.autonomous_profit_redeploy_execution.source);
-    expect(["buy", "hold"]).toContain(state.autonomous_profit_redeploy_execution.selected_side);
+    expect(["opportunity-rank", "reentry-hunter", "profit-capture", "rotation-director", "none"]).toContain(state.autonomous_profit_redeploy_execution.source);
+    expect(["opportunity-race", "reentry-hunter", "portfolio-protect", null]).toContain(state.autonomous_profit_redeploy_execution.execution_lane);
+    expect(["buy", "sell", "hold"]).toContain(state.autonomous_profit_redeploy_execution.selected_side);
     expect(["paper-ledger-only", "read-only-refresh", "blocked-live"]).toContain(state.autonomous_profit_redeploy_execution.execution_boundary);
+    expect(state.autonomous_profit_redeploy_execution.paper_trade_id === null || state.autonomous_profit_redeploy_execution.paper_trade_id.length > 0).toBe(true);
     expect(state.autonomous_profit_redeploy_execution.execution_score).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_profit_redeploy_execution.execution_score).toBeLessThanOrEqual(100);
     expect(state.autonomous_profit_redeploy_execution.requested_size_usd).toBeGreaterThanOrEqual(0);
@@ -2440,9 +2447,17 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_profit_redeploy_execution.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
     if (state.autonomous_profit_redeploy_execution.paper_trade_ready) {
       expect(state.autonomous_profit_redeploy_execution.paper_trade).not.toBeNull();
-      expect(state.autonomous_profit_redeploy_execution.selected_side).toBe("buy");
+      expect(["buy", "sell"]).toContain(state.autonomous_profit_redeploy_execution.selected_side);
       expect(state.autonomous_profit_redeploy_execution.execution_boundary).toBe("paper-ledger-only");
-      expect(state.autonomous_profit_redeploy_execution.capped_size_usd).toBeLessThanOrEqual(state.autonomous_profit_redeploy_execution.redeploy_budget_usd);
+      expect(state.autonomous_profit_redeploy_execution.execution_lane).not.toBeNull();
+      expect(state.autonomous_profit_redeploy_execution.paper_trade_id).toBe(state.autonomous_profit_redeploy_execution.paper_trade!.id);
+      if (state.autonomous_profit_redeploy_execution.source !== "profit-capture") {
+        expect(state.autonomous_profit_redeploy_execution.capped_size_usd).toBeLessThanOrEqual(state.autonomous_profit_redeploy_execution.redeploy_budget_usd);
+      }
+    }
+    if (state.autonomous_profit_redeploy_execution.ledger_applied) {
+      expect(state.autonomous_profit_redeploy_execution.paper_trade_id).not.toBeNull();
+      expect(state.autonomous_profit_redeploy_execution.execution_lane).not.toBeNull();
     }
     if (["wait-proof", "protect-first", "cooldown"].includes(state.autonomous_profit_redeploy_execution.status)) {
       expect(state.autonomous_profit_redeploy_execution.paper_trade_ready).toBe(false);
@@ -5784,9 +5799,36 @@ describe("Web3 autonomous trading subsystem", () => {
     }
     if (state.autonomous_profit_redeploy_autopilot.status === "protect-first") {
       expect(state.autonomous_profit_redeploy_autopilot.symbol).not.toBe(state.autonomous_profit_redeploy_autopilot.from_symbol);
-      expect(state.autonomous_profit_redeploy_execution.status).toBe("protect-first");
-      expect(state.autonomous_profit_redeploy_execution.paper_trade_ready).toBe(false);
+      expect(["queued", "protect-first"]).toContain(state.autonomous_profit_redeploy_execution.status);
+      if (state.autonomous_profit_redeploy_execution.status === "queued") {
+        expect(state.autonomous_profit_redeploy_execution.source).toBe("profit-capture");
+        expect(state.autonomous_profit_redeploy_execution.paper_trade_ready).toBe(true);
+      } else {
+        expect(state.autonomous_profit_redeploy_execution.paper_trade_ready).toBe(false);
+      }
     }
+  });
+
+  test("GIVEN protect-first released profit WHEN persistent paper advances THEN redeploy execution queues the protective paper sell", async () => {
+    const state = await getWeb3TradingStateAsync({ account: "persistent", reset: true, scenario: "base", advance: true });
+    const execution = state.autonomous_profit_redeploy_execution;
+
+    expect(execution.status).toBe("queued");
+    expect(execution.source).toBe("profit-capture");
+    expect(execution.execution_lane).toBe("portfolio-protect");
+    expect(execution.paper_trade_ready).toBe(true);
+    expect(execution.paper_trade_id).toBe(execution.paper_trade!.id);
+    expect(execution.paper_trade).toMatchObject({
+      side: "sell",
+      status: "paper-filled",
+    });
+    expect(execution.paper_trade?.size_usd).toBeGreaterThanOrEqual(10);
+    expect(execution.paper_trade?.size_usd ?? 0).toBeLessThanOrEqual(state.portfolio.open_positions.find((position) => position.symbol === execution.paper_trade?.symbol)?.value_usd ?? 0);
+    expect(execution.paper_trade?.reason).toContain("Profit redeploy protect-first");
+    expect(execution.execution_boundary).toBe("paper-ledger-only");
+    expect(state.execution_gate.live_execution_enabled).toBe(false);
+    expect(execution.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
+    expect(execution.controls.some((control) => control.includes("local paper candidate"))).toBe(true);
   });
 
   test("GIVEN launch sniper finds a clean probe WHEN the persistent paper ledger advances THEN it opens a launch-origin position", async () => {
