@@ -3578,6 +3578,29 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_source_quality_oracle.controls.some((control) => control.includes("organic momentum"))).toBe(true);
     expect(state.autonomous_source_quality_oracle.controls.some((control) => control.includes("paid-order"))).toBe(true);
+    const sourceQualityBySymbol = new Map(state.autonomous_source_quality_oracle.items.map((item) => [item.symbol, item]));
+    const sourceSizedExecutions = [
+      {
+        execution: state.autonomous_tradeability_execution,
+        requestedSizeUsd: state.autonomous_tradeability_execution.selected_symbol
+          ? state.autonomous_tradeability_simulator.items.find((item) => item.symbol === state.autonomous_tradeability_execution.selected_symbol)?.recommended_size_usd ?? 0
+          : 0,
+      },
+      {
+        execution: state.autonomous_opportunity_rank_execution,
+        requestedSizeUsd: state.autonomous_opportunity_rank_execution.selected_symbol
+          ? state.autonomous_opportunity_ranker.items.find((item) => item.symbol === state.autonomous_opportunity_rank_execution.selected_symbol)?.max_paper_size_usd ?? 0
+          : 0,
+      },
+    ];
+    for (const { execution, requestedSizeUsd } of sourceSizedExecutions) {
+      const trade = execution.paper_trade;
+      const sourceQualityItem = trade?.side === "buy" ? sourceQualityBySymbol.get(trade.symbol) : null;
+      if (trade && sourceQualityItem && sourceQualityItem.max_paper_size_multiplier < 0.995 && requestedSizeUsd >= 10) {
+        expect(trade.size_usd).toBeLessThanOrEqual(Math.round(requestedSizeUsd * sourceQualityItem.max_paper_size_multiplier));
+        expect(trade.reason).toContain("Source-quality sizing caps");
+      }
+    }
     expect(state.autonomous_market_evidence_fusion.mode).toBe("autonomous-market-evidence-fusion");
     expect(["attack", "selective", "refresh", "protect", "blocked", "watch", "sample", "idle"]).toContain(state.autonomous_market_evidence_fusion.status);
     expect(state.autonomous_market_evidence_fusion.fusion_score).toBeGreaterThanOrEqual(0);

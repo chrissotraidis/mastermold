@@ -36357,10 +36357,18 @@ function buildAutonomousActionQueueExecution({
   const appliedTrade = sourceTrade && (source?.ledger_applied || selected?.ledger_applied)
     ? latestAutonomousTradeById(recentTrades, sourceTrade.id) ?? sourceTrade
     : null;
-  const trade = appliedTrade ?? sourceTrade;
+  const ledgerApplied = Boolean(selected?.ledger_applied || source?.ledger_applied);
+  const rawTrade = appliedTrade ?? sourceTrade;
+  const sourceSizedTrade = ledgerApplied
+    ? rawTrade
+    : autonomousSourceQualityAdjustedTrade(sourceQuality, rawTrade);
+  const sourceQualitySizingBlocker = !ledgerApplied
+    ? autonomousSourceQualitySizingBlocker(sourceQuality, rawTrade)
+    : null;
+  const trade = sourceSizedTrade ?? rawTrade;
   const routeFreshnessBlocker = autonomousActionQueueRouteFreshnessBlocker(selected, routeRefreshExecution);
-  const alphaDecayBlocker = autonomousAlphaDecayTradeBlocker(alphaDecay, trade);
-  const sourceQualityBlocker = autonomousSourceQualityTradeBlocker(sourceQuality, trade);
+  const alphaDecayBlocker = autonomousAlphaDecayTradeBlocker(alphaDecay, rawTrade);
+  const sourceQualityBlocker = autonomousSourceQualityTradeBlocker(sourceQuality, rawTrade);
   const sourceBlockers = source?.blockers ?? [];
   const blockers = [...new Set([
     ...(selected?.blockers ?? []),
@@ -36368,9 +36376,9 @@ function buildAutonomousActionQueueExecution({
     routeFreshnessBlocker,
     alphaDecayBlocker,
     sourceQualityBlocker,
+    sourceQualitySizingBlocker,
     selected && selected.paper_trade_ready && !trade ? `${selected.label} is marked paper-ready but has no paper trade payload.` : null,
   ].filter((item): item is string => Boolean(item)))].slice(0, 6);
-  const ledgerApplied = Boolean(selected?.ledger_applied || source?.ledger_applied);
   const routeRefreshVetoed = Boolean(routeFreshnessBlocker);
   const paperTradeReady = Boolean(selected?.paper_trade_ready && trade && blockers.length === 0 && !routeRefreshVetoed);
   const status: AutonomousActionQueueExecution["status"] = ledgerApplied
@@ -54441,7 +54449,11 @@ function applyAutonomousTradeBatchToLedger(
     )
     .sort((a, b) => a.sequence - b.sequence)
     .slice(0, gate?.max_batch_trades ?? batch.max_trades_per_cycle)
-    .reduce((next, item) => applyAllocatorAwarePaperTradeToLedger(next, market, laneCapitalController, profitAllocationPlan, "arbiter", item.paper_trade!), row);
+    .reduce((next, item) => {
+      const sourceSizedTrade = autonomousSourceQualityAdjustedTrade(sourceQuality, item.paper_trade);
+      if (!sourceSizedTrade) return next;
+      return applyAllocatorAwarePaperTradeToLedger(next, market, laneCapitalController, profitAllocationPlan, "arbiter", sourceSizedTrade);
+    }, row);
 }
 
 function applyAutonomousBurstFillPlanToLedger({
@@ -54503,7 +54515,9 @@ function applyAutonomousBurstFillPlanToLedger({
     if (!autonomousTokenSafetyClearanceAllowsTrade(tokenSafetyClearance, adjustedTrade)) continue;
     if (!autonomousAlphaDecayAllowsTrade(alphaDecay, adjustedTrade)) continue;
     if (!autonomousSourceQualityAllowsTrade(sourceQuality, adjustedTrade)) continue;
-    next = applyArbiterPaperTradeToLedger(next, market, adjustedTrade);
+    const sourceSizedTrade = autonomousSourceQualityAdjustedTrade(sourceQuality, adjustedTrade);
+    if (!sourceSizedTrade) continue;
+    next = applyArbiterPaperTradeToLedger(next, market, sourceSizedTrade);
   }
 
   return next;
@@ -67867,15 +67881,22 @@ function buildAutonomousTickBundleExecution({
         blocker: item.status === "blocked" ? item.blocker ?? "Bundle lane is blocked." : "This lane delegates to the existing one-fill paper advance path.",
       };
     }
-    const trade = source.paper_trade;
+    const rawTrade = source.paper_trade;
+    const sourceSizedTrade = source.ledger_applied
+      ? rawTrade
+      : autonomousSourceQualityAdjustedTrade(sourceQuality, rawTrade);
+    const sourceQualitySizingBlocker = !source.ledger_applied
+      ? autonomousSourceQualitySizingBlocker(sourceQuality, rawTrade)
+      : null;
+    const trade = sourceSizedTrade ?? rawTrade;
     const notional = Math.round(trade?.size_usd ?? item.paper_budget_usd);
     const side = trade?.side ?? (item.action === "protect-now" ? "sell" : item.action === "trade-now" ? "buy" : "hold");
     const cashDelta = trade ? (trade.side === "buy" ? -trade.size_usd : trade.size_usd) : 0;
     const exposureDelta = trade ? (trade.side === "buy" ? trade.size_usd : -trade.size_usd) : 0;
-    const routeFreshnessBlocker = autonomousTickBundleRouteFreshnessBlocker(item, trade, routeRefreshExecution);
-    const alphaDecayBlocker = autonomousAlphaDecayTradeBlocker(alphaDecay, trade);
-    const sourceQualityBlocker = autonomousSourceQualityTradeBlocker(sourceQuality, trade);
-    const blockers = [...new Set([...(source.blockers ?? []), item.blocker, routeFreshnessBlocker, alphaDecayBlocker, sourceQualityBlocker].filter((entry): entry is string => Boolean(entry)))];
+    const routeFreshnessBlocker = autonomousTickBundleRouteFreshnessBlocker(item, rawTrade, routeRefreshExecution);
+    const alphaDecayBlocker = autonomousAlphaDecayTradeBlocker(alphaDecay, rawTrade);
+    const sourceQualityBlocker = autonomousSourceQualityTradeBlocker(sourceQuality, rawTrade);
+    const blockers = [...new Set([...(source.blockers ?? []), item.blocker, routeFreshnessBlocker, alphaDecayBlocker, sourceQualityBlocker, sourceQualitySizingBlocker].filter((entry): entry is string => Boolean(entry)))];
     const status: AutonomousTickBundleExecutionItem["status"] = source.ledger_applied
       ? "applied"
       : source.paper_trade_ready && trade && blockers.length === 0
@@ -68501,16 +68522,18 @@ function applyAutonomousTickBundleToLedger({
     if (!autonomousExecutionQualityArbiterAllowsTrade(executionQualityArbiter, adjustedTrade)) continue;
     if (!autonomousTokenSafetyClearanceAllowsTrade(tokenSafetyClearance, adjustedTrade)) continue;
     if (!autonomousSourceQualityAllowsTrade(sourceQuality, adjustedTrade)) continue;
-    const readinessAllowed = autonomousTradeReadinessAllowsTrade(tradeReadinessGate, adjustedTrade) ||
+    const sourceSizedTrade = autonomousSourceQualityAdjustedTrade(sourceQuality, adjustedTrade);
+    if (!sourceSizedTrade) continue;
+    const readinessAllowed = autonomousTradeReadinessAllowsTrade(tradeReadinessGate, sourceSizedTrade) ||
       (item.id === "tick-plan-trend-chase" && trendChaseExecution.uses_scout_reserve);
     if (!readinessAllowed) continue;
-    if (entrySymbols.has(adjustedTrade.symbol)) continue;
+    if (entrySymbols.has(sourceSizedTrade.symbol)) continue;
 
     const before = next;
-    next = applyArbiterPaperTradeToLedger(next, market, adjustedTrade);
+    next = applyArbiterPaperTradeToLedger(next, market, sourceSizedTrade);
     if (next !== before) {
       appliedCount += 1;
-      if (adjustedTrade.side === "buy") entrySymbols.add(adjustedTrade.symbol);
+      if (sourceSizedTrade.side === "buy") entrySymbols.add(sourceSizedTrade.symbol);
     }
   }
 
@@ -76476,13 +76499,20 @@ function buildAutonomousOpportunityRankExecution({
   const sourceQualityBlocker = selected
     ? autonomousSourceQualityBuyBlocker(sourceQuality, selected.symbol)
     : null;
+  const sourceSizedPaperSizeUsd = selected
+    ? autonomousSourceQualityAdjustedSizeUsd(sourceQuality, selected.symbol, selected.max_paper_size_usd)
+    : 0;
+  const sourceQualitySizingBlocker = selected && (selected.action === "paper-attack" || selected.action === "paper-probe")
+    ? autonomousSourceQualitySizingBlockerForSize(sourceQuality, selected.symbol, selected.max_paper_size_usd)
+    : null;
   const canBuildTrade = Boolean(
     selected &&
       token &&
       (selected.action === "paper-attack" || selected.action === "paper-probe") &&
-      selected.max_paper_size_usd >= 10 &&
+      sourceSizedPaperSizeUsd >= 10 &&
       selected.blockers.length === 0 &&
-      !sourceQualityBlocker,
+      !sourceQualityBlocker &&
+      !sourceQualitySizingBlocker,
   );
   const tradeId = selected ? `paper-opportunity-rank-${cycle}-${selected.symbol.toLowerCase()}` : "";
   const ledgerTrade = tradeId ? latestAutonomousTradeById(recentTrades, tradeId) : null;
@@ -76491,10 +76521,16 @@ function buildAutonomousOpportunityRankExecution({
         id: tradeId,
         side: "buy",
         symbol: selected.symbol,
-        size_usd: Math.round(selected.max_paper_size_usd),
+        size_usd: sourceSizedPaperSizeUsd,
         price_usd: token.price_usd,
         status: "paper-filled",
-        reason: `Opportunity rank ${selected.action.replace("paper-", "")}: ${selected.decision}`,
+        reason: autonomousSourceQualityAdjustedReason(
+          sourceQuality,
+          selected.symbol,
+          sourceSizedPaperSizeUsd,
+          selected.max_paper_size_usd,
+          `Opportunity rank ${selected.action.replace("paper-", "")}: ${selected.decision}`,
+        ),
         created_at: shiftedTime(cycle, 96),
       }
     : null);
@@ -76508,6 +76544,7 @@ function buildAutonomousOpportunityRankExecution({
       ? `${selected.symbol} ranked size is below the local paper-ledger minimum.`
       : null,
     sourceQualityBlocker,
+    sourceQualitySizingBlocker,
     ranker.status === "protect" ? ranker.next_action : null,
   ].filter((item): item is string => Boolean(item)))].slice(0, 6);
   const ledgerApplied = Boolean(ledgerTrade);
@@ -76519,7 +76556,7 @@ function buildAutonomousOpportunityRankExecution({
       : selected && (blockers.length > 0 || selected.action === "refresh-proof" || selected.action === "protect-capital" || selected.action === "block")
         ? "blocked"
         : "idle";
-  const paperSize = Math.round(paperTrade?.size_usd ?? selected?.max_paper_size_usd ?? 0);
+  const paperSize = Math.round(paperTrade?.size_usd ?? sourceSizedPaperSizeUsd);
 
   return {
     mode: "opportunity-rank-paper-execution",
@@ -77742,13 +77779,20 @@ function buildAutonomousTradeabilityExecution({
   const sourceQualityBlocker = selected
     ? autonomousSourceQualityBuyBlocker(sourceQuality, selected.symbol)
     : null;
+  const sourceSizedPaperSizeUsd = selected
+    ? autonomousSourceQualityAdjustedSizeUsd(sourceQuality, selected.symbol, selected.recommended_size_usd)
+    : 0;
+  const sourceQualitySizingBlocker = selected && (selected.action === "paper-fill" || selected.action === "paper-probe")
+    ? autonomousSourceQualitySizingBlockerForSize(sourceQuality, selected.symbol, selected.recommended_size_usd)
+    : null;
   const canBuildTrade = Boolean(
     selected &&
       token &&
       (selected.action === "paper-fill" || selected.action === "paper-probe") &&
-      selected.recommended_size_usd >= 10 &&
+      sourceSizedPaperSizeUsd >= 10 &&
       selected.blockers.length === 0 &&
-      !sourceQualityBlocker,
+      !sourceQualityBlocker &&
+      !sourceQualitySizingBlocker,
   );
   const tradeId = selected ? `paper-tradeability-${cycle}-${selected.symbol.toLowerCase()}` : "";
   const ledgerTrade = tradeId ? latestAutonomousTradeById(recentTrades, tradeId) : null;
@@ -77757,10 +77801,16 @@ function buildAutonomousTradeabilityExecution({
         id: tradeId,
         side: "buy",
         symbol: selected.symbol,
-        size_usd: Math.round(selected.recommended_size_usd),
+        size_usd: sourceSizedPaperSizeUsd,
         price_usd: token.price_usd,
         status: "paper-filled",
-        reason: `Tradeability paper ${selected.action.replace("paper-", "")}: ${selected.decision}`,
+        reason: autonomousSourceQualityAdjustedReason(
+          sourceQuality,
+          selected.symbol,
+          sourceSizedPaperSizeUsd,
+          selected.recommended_size_usd,
+          `Tradeability paper ${selected.action.replace("paper-", "")}: ${selected.decision}`,
+        ),
         created_at: shiftedTime(cycle, 88),
       }
     : null);
@@ -77773,6 +77823,7 @@ function buildAutonomousTradeabilityExecution({
     selected && selected.recommended_size_usd < 10 && (selected.action === "paper-fill" || selected.action === "paper-probe")
       ? `${selected.symbol} size is below the local paper-ledger minimum.`
       : null,
+    sourceQualitySizingBlocker,
     selected && selected.modeled_slippage_bps >= 260
       ? `${selected.symbol} modeled slippage is above the fill ceiling.`
       : null,
@@ -77787,7 +77838,7 @@ function buildAutonomousTradeabilityExecution({
       : selected && (blockers.length > 0 || selected.action === "resize" || selected.action === "requote" || selected.action === "blocked")
         ? "blocked"
         : "idle";
-  const paperSize = Math.round(paperTrade?.size_usd ?? selected?.recommended_size_usd ?? 0);
+  const paperSize = Math.round(paperTrade?.size_usd ?? sourceSizedPaperSizeUsd);
 
   return {
     mode: "tradeability-paper-execution",
@@ -79649,6 +79700,83 @@ function autonomousSourceQualityAllowsTrade(
   trade: AutonomousTrade | null | undefined,
 ) {
   return !autonomousSourceQualityTradeBlocker(sourceQuality, trade);
+}
+
+function autonomousSourceQualityRuntimeSizeMultiplier(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  symbol: string | null | undefined,
+) {
+  if (!sourceQuality || !symbol) return 1;
+  const item = autonomousSourceQualityItemForSymbol(sourceQuality, symbol);
+  if (!item) return sourceQuality.status === "sample" || sourceQuality.status === "idle" ? 1 : 0;
+  if (item.action !== "attack" && item.action !== "probe") return 0;
+  return roundMetric(clamp(Math.min(1, item.max_paper_size_multiplier), 0, 1));
+}
+
+function autonomousSourceQualityAdjustedSizeUsd(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  symbol: string | null | undefined,
+  requestedSizeUsd: number,
+) {
+  const size = Math.round(Math.max(0, requestedSizeUsd));
+  if (size <= 0) return 0;
+  if (autonomousSourceQualityBuyBlocker(sourceQuality, symbol)) return 0;
+  const multiplier = autonomousSourceQualityRuntimeSizeMultiplier(sourceQuality, symbol);
+  if (multiplier >= 0.995) return size;
+  const adjusted = Math.round(size * multiplier);
+  return adjusted >= 10 ? adjusted : 0;
+}
+
+function autonomousSourceQualityAdjustedReason(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  symbol: string | null | undefined,
+  adjustedSizeUsd: number,
+  requestedSizeUsd: number,
+  reason: string,
+) {
+  const requested = Math.round(Math.max(0, requestedSizeUsd));
+  if (!symbol || adjustedSizeUsd <= 0 || requested <= 0 || adjustedSizeUsd >= requested) return reason;
+  const item = autonomousSourceQualityItemForSymbol(sourceQuality, symbol);
+  const pct = Math.round((adjustedSizeUsd / requested) * 100);
+  return `${reason} Source-quality sizing caps ${symbol} at ${pct}%${item ? ` (${item.status})` : ""}.`;
+}
+
+function autonomousSourceQualityAdjustedTrade(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  trade: AutonomousTrade | null | undefined,
+): AutonomousTrade | null {
+  if (!trade) return null;
+  if (trade.side !== "buy") return trade;
+  if (autonomousSourceQualityTradeBlocker(sourceQuality, trade)) return null;
+  const adjustedSizeUsd = autonomousSourceQualityAdjustedSizeUsd(sourceQuality, trade.symbol, trade.size_usd);
+  if (adjustedSizeUsd <= 0) return null;
+  if (adjustedSizeUsd >= Math.round(trade.size_usd)) return trade;
+  return {
+    ...trade,
+    size_usd: adjustedSizeUsd,
+    reason: autonomousSourceQualityAdjustedReason(sourceQuality, trade.symbol, adjustedSizeUsd, trade.size_usd, trade.reason),
+  };
+}
+
+function autonomousSourceQualitySizingBlockerForSize(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  symbol: string | null | undefined,
+  requestedSizeUsd: number,
+) {
+  const size = Math.round(Math.max(0, requestedSizeUsd));
+  if (!symbol || size < 10) return null;
+  if (autonomousSourceQualityBuyBlocker(sourceQuality, symbol)) return null;
+  if (autonomousSourceQualityAdjustedSizeUsd(sourceQuality, symbol, size) >= 10) return null;
+  const multiplier = autonomousSourceQualityRuntimeSizeMultiplier(sourceQuality, symbol);
+  return `Source-quality sizing caps ${symbol} to ${Math.round(multiplier * 100)}%, below the local paper-ledger minimum.`;
+}
+
+function autonomousSourceQualitySizingBlocker(
+  sourceQuality: AutonomousSourceQualityOracle | undefined,
+  trade: AutonomousTrade | null | undefined,
+) {
+  if (!trade || trade.side !== "buy") return null;
+  return autonomousSourceQualitySizingBlockerForSize(sourceQuality, trade.symbol, trade.size_usd);
 }
 
 function toTradingChain(value: string | undefined): MemecoinMarket["chain"] | null {
