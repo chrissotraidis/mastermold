@@ -378,7 +378,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
       return;
     }
     const autoPlan = chooseAutoWatchPlan(state);
-    if (autoWatchPrimed && autoPlan.mode !== "minute" && autoPlan.mode !== "refresh" && !state.autonomous_loop_throttle.can_run && state.autonomous_loop_throttle.status !== "refresh") {
+    if (shouldPauseAutoWatchForPlan(state, autoPlan, autoWatchPrimed)) {
       setAutoWatch(false);
       setAutoWatchPrimed(false);
       setQuickNotice(`Auto watch paused: ${state.autonomous_loop_throttle.next_action}`);
@@ -969,6 +969,17 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
 }
 
 type AutoWatchPlan = ReturnType<typeof chooseAutoWatchPlan>;
+
+export function shouldPauseAutoWatchForPlan(
+  state: Web3TradingState,
+  autoPlan: AutoWatchPlan,
+  autoWatchPrimed: boolean,
+) {
+  if (!autoWatchPrimed) return false;
+  if (autoPlan.mode === "minute" || autoPlan.mode === "refresh") return false;
+  if (autoPlan.action === "loop") return false;
+  return !state.autonomous_loop_throttle.can_run && state.autonomous_loop_throttle.status !== "refresh";
+}
 
 function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState }) {
   const tape = state.autonomous_price_action_chart_tape;

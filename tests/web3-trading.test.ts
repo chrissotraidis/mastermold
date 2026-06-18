@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
-import { buildAutonomousNextMoves, chooseAutoWatchPlan } from "@/components/web3-trading-workspace-loader";
+import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import {
   getWeb3TradingStateAsync,
   getWeb3TradingState,
@@ -1972,6 +1972,24 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(plan.reason).toContain("stands down fresh paper entries");
   });
 
+  test("GIVEN Auto watch is primed on a safety loop plan WHEN throttle is blocked THEN it keeps monitoring", () => {
+    const state = getWeb3TradingState("base", 0);
+    const blockedThrottleState = {
+      ...state,
+      autonomous_loop_throttle: {
+        ...state.autonomous_loop_throttle,
+        status: "blocked",
+        can_run: false,
+        next_action: "Throttle is blocked, but safety review must keep observing.",
+      },
+    } satisfies Web3TradingState;
+    const plan = chooseAutoWatchPlan(blockedThrottleState);
+
+    expect(plan.label).toBe("profit lock stand-down");
+    expect(plan.action).toBe("loop");
+    expect(shouldPauseAutoWatchForPlan(blockedThrottleState, plan, true)).toBe(false);
+  });
+
   test("GIVEN profit integrity cools down WHEN Auto watch plans THEN it stops fresh frequency before the minute loop", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
@@ -2074,6 +2092,52 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(plan.delayMs).toBeGreaterThanOrEqual(12_000);
     expect(plan.reason).toContain("Cool down after the last fill shortfall");
     expect(plan.reason).toContain("quality 42/100");
+  });
+
+  test("GIVEN a non-loop blocked plan WHEN Auto watch is primed THEN it pauses instead of spinning", () => {
+    const state = getWeb3TradingState("base", 0);
+    const blockedState = {
+      ...withClearExecutionLane(withOpenProfitSafety(state)),
+      autonomous_loop_throttle: {
+        ...state.autonomous_loop_throttle,
+        status: "blocked",
+        can_run: false,
+        next_action: "The old throttle is fully blocked.",
+      },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        max_trades_next_minute: 0,
+      },
+      autonomous_profit_benchmark: {
+        ...state.autonomous_profit_benchmark,
+        status: "learning",
+        risk_adjusted_alpha_usd: 0,
+      },
+      autonomous_alpha_feedback_loop: {
+        ...state.autonomous_alpha_feedback_loop,
+        status: "idle",
+        action: "stand-down",
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 0,
+        bundle_action_count: 0,
+      },
+    } satisfies Web3TradingState;
+    const plan = chooseAutoWatchPlan(blockedState);
+
+    expect(plan.label).toBe("auto blocked");
+    expect(plan.action).toBeUndefined();
+    expect(shouldPauseAutoWatchForPlan(blockedState, plan, true)).toBe(true);
+    expect(shouldPauseAutoWatchForPlan(blockedState, plan, false)).toBe(false);
   });
 
   test("GIVEN stale live market evidence WHEN Auto watch plans THEN it refreshes read-only evidence instead of pausing", () => {

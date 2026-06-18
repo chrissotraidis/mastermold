@@ -10,6 +10,7 @@ const getMarketEvidenceFusionTone = (status: Web3TradingState["autonomous_market
   if (status === "refresh" || status === "sample" || status === "watch") return "caution";
   return "neutral";
 };
+const marketEvidenceFusionTone = getMarketEvidenceFusionTone;
 
 export function Web3TradingShell({ state }: { state?: Web3TradingState }) {
   const governor = state?.autonomous_tick_governor;
