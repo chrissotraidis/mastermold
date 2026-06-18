@@ -10572,6 +10572,108 @@ function daemonLeaseForChildTick(
   };
 }
 
+type CleanWalletScoutCandidate = {
+  token: MemecoinMarket;
+  signal: TradingSignal;
+  size_usd: number;
+};
+
+function cleanWalletScoutCandidate(state: Web3TradingState): CleanWalletScoutCandidate | null {
+  if (state.market_source.mode !== "sample") return null;
+  if (state.execution_gate.live_execution_enabled) return null;
+  if (state.portfolio.open_positions.length > 0 || state.paper_account.trade_count > 0) return null;
+
+  const candidates = state.signals
+    .filter((signal) => signal.action === "buy" && signal.score >= 74 && signal.suggested_size_usd >= 100)
+    .flatMap((signal) => {
+      const token = state.market.find((item) => item.id === signal.token_id && item.price_usd > 0);
+      if (!token) return [];
+      const hasHardRisk = token.risk_flags.some(isCleanWalletScoutHardRiskFlag) ||
+        signal.risk_warnings.some(isCleanWalletScoutHardRiskFlag);
+      if (hasHardRisk || token.liquidity_usd < 1_000_000 || token.price_change_5m_pct <= 0 || token.price_change_1h_pct <= 0) return [];
+      const buyPressure = token.buys_5m / Math.max(1, token.buys_5m + token.sells_5m);
+      if (buyPressure < 0.52) return [];
+      const size = Math.floor(Math.min(
+        signal.suggested_size_usd,
+        state.execution_readiness.config.max_trade_usd,
+        state.portfolio.cash_usd * 0.03,
+        token.liquidity_usd * 0.00025,
+        750,
+      ));
+      if (size < 100) return [];
+      return [{
+        token,
+        signal,
+        size_usd: size,
+        buyPressure,
+      }];
+    })
+    .sort((a, b) =>
+      Number(a.token.risk_flags.length > 0) - Number(b.token.risk_flags.length > 0) ||
+      b.signal.score - a.signal.score ||
+      b.buyPressure - a.buyPressure ||
+      b.token.volume_1h_usd - a.token.volume_1h_usd
+    );
+
+  const selected = candidates[0];
+  return selected ? { token: selected.token, signal: selected.signal, size_usd: selected.size_usd } : null;
+}
+
+function isCleanWalletScoutHardRiskFlag(flag: string) {
+  const normalized = flag.toLowerCase();
+  return normalized.includes("new-pair") ||
+    normalized.includes("thin-liquidity") ||
+    normalized.includes("paid-promotion-heavy") ||
+    normalized.includes("momentum-break") ||
+    normalized.includes("honeypot") ||
+    normalized.includes("freeze") ||
+    normalized.includes("mint-authority");
+}
+
+function shouldRunCleanWalletScoutTick(input: TradingStateInput, account: TradingAccountMode, state: Web3TradingState) {
+  return input.daemon === true &&
+    account === "persistent" &&
+    state.paper_account.persisted &&
+    state.autonomous_daemon_handoff.lease_status !== "conflict" &&
+    state.autonomous_daemon_handoff.lease_status !== "replayed" &&
+    state.autonomous_daemon_handoff.lease_status !== "blocked" &&
+    Boolean(cleanWalletScoutCandidate(state));
+}
+
+function applyCleanWalletScoutTick(state: Web3TradingState, candidate: CleanWalletScoutCandidate) {
+  const now = new Date().toISOString();
+  const current = readLedger() ?? createLedger(now);
+  const data = parseLedgerData(current.data);
+  if (data.positions.length > 0 || data.trades.length > 0) return null;
+  const nextCycle = current.cycle + 1;
+  const trade: AutonomousTrade = {
+    id: `paper-clean-wallet-scout-${nextCycle}-${candidate.token.symbol}-0`,
+    side: "buy",
+    symbol: candidate.token.symbol,
+    size_usd: candidate.size_usd,
+    price_usd: candidate.token.price_usd,
+    status: "paper-filled",
+    reason: `Clean-wallet scout: ${candidate.signal.thesis} Bounded to ${formatCompactValue(candidate.size_usd)} in local paper mode before any scale-up.`,
+    created_at: now,
+  };
+  const applied = applyArbiterPaperTradeToLedger(current, state.market, trade);
+  if (applied === current) return null;
+  store().upsertWeb3PaperLedger({
+    ...applied,
+    cycle: nextCycle,
+    updated_at: now,
+    data: parseLedgerData(applied.data),
+  });
+  const ledgerState = applyPersistentLedger(state, "off");
+  const tickedState = attachPaperDaemonTick(ledgerState, {
+    requested: true,
+    previousCycle: current.cycle,
+    advanced: true,
+    monitorDecision: state.autonomous_monitor,
+  });
+  return recordPaperDaemonMemory(tickedState);
+}
+
 async function runAutonomousLoopTick(input: TradingStateInput): Promise<Web3TradingState> {
   const account: TradingAccountMode = input.account ?? "persistent";
   let baseline = await getWeb3TradingStateAsync({
@@ -10672,6 +10774,28 @@ async function runAutonomousLoopTick(input: TradingStateInput): Promise<Web3Trad
         summaryLabel: protectBook ? "protect-minute" : "wake-minute",
       });
     return attachAutonomousLoopTick(sessionState, report, account);
+  }
+
+  const cleanWalletScout = cleanWalletScoutCandidate(baseline);
+  if (cleanWalletScout && shouldRunCleanWalletScoutTick(input, account, baseline)) {
+    const scoutState = applyCleanWalletScoutTick(baseline, cleanWalletScout);
+    if (scoutState) {
+      const report = {
+        ...buildAutonomousLoopTickReport({
+          baseline,
+          current: scoutState,
+          routeRefreshed: false,
+          sessionRequested: true,
+          actionOverride: "run-cycle",
+          summaryLabel: "clean-wallet-scout",
+        }),
+        fill_count: Math.max(1, scoutState.paper_daemon.filled_count),
+        blocked_count: scoutState.paper_daemon.blocked_count,
+        summary: `Backend daemon opened one bounded clean-wallet scout in ${cleanWalletScout.token.symbol} for ${formatCompactValue(cleanWalletScout.size_usd)} local paper notional; live signing, custody, and submission stayed locked.`,
+        next_action: `Monitor ${cleanWalletScout.token.symbol} PnL, stop, liquidity, and buy-flow before any scale-up.`,
+      } satisfies AutonomousLoopTickReport;
+      return attachAutonomousLoopTick(scoutState, report, account);
+    }
   }
 
   if (!throttle.can_run || throttle.status === "blocked" || throttle.status === "cooldown" || throttle.status === "idle") {

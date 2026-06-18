@@ -4732,7 +4732,7 @@ async function main() {
   assert(daemonRun.events[0].active_runner_id === "implicit-daemon-runner" || daemonRun.events[0].active_runner_id === null, "Autonomous daemon smoke run should own or safely idle the lease.", daemonRun);
   const forwardRun = await runWeb3AutonomousForwardRun({
     baseUrl,
-    scenario: "base",
+    scenario: "breakout",
     source: "sample",
     runnerId: "smoke-forward-runner",
     ticks: 2,
@@ -4743,6 +4743,9 @@ async function main() {
   assert(forwardRun.mode === "web3-autonomous-forward-run", "Autonomous forward run should return a report.", forwardRun);
   assert(forwardRun.paper_only === true, "Autonomous forward run must stay paper-only.", forwardRun);
   assert(forwardRun.requested_ticks === 2 && forwardRun.posted_ticks >= 1, "Autonomous forward run should execute bounded daemon ticks.", forwardRun);
+  assert(forwardRun.advanced_ticks >= 1, "Autonomous forward run should advance at least one local paper tick from a clean high-signal wallet.", forwardRun);
+  assert(forwardRun.trade_count_delta >= 1, "Autonomous forward run should record at least one bounded local paper fill.", forwardRun);
+  assert(forwardRun.final_cycle >= 1, "Autonomous forward run should move the persistent paper cycle forward.", forwardRun);
   assert(typeof forwardRun.net_pnl_usd === "number" && typeof forwardRun.target_met === "boolean", "Autonomous forward run should quantify paper PnL and target status.", forwardRun);
   assert(["profitable", "flat-target-met", "profitable-below-target", "not-profitable"].includes(forwardRun.verdict), "Autonomous forward run should publish a known profit verdict.", forwardRun);
 

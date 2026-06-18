@@ -7797,6 +7797,48 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(replayState.autonomous_daemon_handoff.lease_replay_count).toBeGreaterThanOrEqual(1);
   });
 
+  test("GIVEN a clean persistent paper wallet WHEN a daemon loop tick runs THEN it opens one bounded paper scout", async () => {
+    const reset = await getWeb3TradingStateAsync({
+      scenario: "breakout",
+      source: "sample",
+      account: "persistent",
+      reset: true,
+      advance: false,
+    });
+    const response = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      body: JSON.stringify({
+        scenario: "breakout",
+        source: "sample",
+        account: "persistent",
+        daemon: true,
+        autonomous_loop: {
+          action: "tick",
+        },
+        daemon_lease: {
+          lease_id: reset.autonomous_daemon_handoff.lease_id,
+          runner_id: "clean-wallet-scout-test",
+          request_id: "request-clean-wallet-scout-test-001",
+        },
+      }),
+    }));
+    const state = await json<Web3TradingState>(response);
+    const buys = state.trade_tape.filter((trade) => trade.id.startsWith("paper-clean-wallet-scout-") && trade.side === "buy");
+
+    expect(response.status).toBe(200);
+    expect(state.execution_gate.live_execution_enabled).toBe(false);
+    expect(state.paper_daemon.advanced).toBe(true);
+    expect(state.paper_account.cycle).toBe(1);
+    expect(state.paper_account.trade_count).toBe(1);
+    expect(state.portfolio.open_positions).toHaveLength(1);
+    expect(state.autonomous_loop_tick.status).toBe("session-run");
+    expect(state.autonomous_loop_tick.action).toBe("run-cycle");
+    expect(state.autonomous_loop_tick.fill_count).toBeGreaterThanOrEqual(1);
+    expect(state.autonomous_loop_tick.summary).toContain("bounded clean-wallet scout");
+    expect(buys).toHaveLength(1);
+    expect(buys[0].size_usd).toBeLessThanOrEqual(750);
+  });
+
   test("GIVEN an active daemon lease WHEN another runner posts THEN the conflict is persisted and no paper advance occurs", async () => {
     const first = await POST(
       new Request("http://localhost/api/web3-trading", {
