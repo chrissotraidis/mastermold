@@ -457,6 +457,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
   const tradeability = state.autonomous_tradeability_simulator;
   const executionAdapter = state.autonomous_execution_adapter_readiness;
   const liveAutonomyReadiness = state.autonomous_live_autonomy_readiness;
+  const daemonHandoff = state.autonomous_daemon_handoff;
   const marketIngestion = state.market_ingestion_plan;
   const marketIntake = state.autonomous_market_intake_plan;
   const sprintTapeItems = state.autonomous_market_evidence_fusion.items.slice(0, 2);
@@ -880,6 +881,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
             <div className="mt-2 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" aria-label="Autonomous wiring focus">
               <div className="xl:col-span-2">
                 <QuickLiveAutonomyReadinessAudit readiness={liveAutonomyReadiness} />
+              </div>
+              <div className="xl:col-span-2">
+                <QuickDaemonHandoffPanel handoff={daemonHandoff} />
               </div>
               <QuickExecutionReadinessBridge
                 adapter={executionAdapter}
@@ -6664,6 +6668,82 @@ function QuickLiveAutonomyReadinessAudit({
   );
 }
 
+function QuickDaemonHandoffPanel({
+  handoff,
+}: {
+  handoff: Web3TradingState["autonomous_daemon_handoff"];
+}) {
+  const tone = daemonHandoffTone(handoff.status);
+  const laneItems = handoff.items.slice(0, 7);
+
+  return (
+    <section className="rounded-md border border-outline-variant/30 bg-surface-dim/15 p-2 sm:p-3" aria-label="Autonomous daemon handoff">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Daemon handoff</p>
+              <p className="mt-1 break-words text-sm font-semibold text-on-surface">
+                {handoff.status.replaceAll("-", " ")} lease · {handoff.lease_ttl_seconds}s
+              </p>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+                {handoff.summary}
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Chip tone={tone}>{handoff.can_run_background_paper ? "paper runner ready" : "paper runner gated"}</Chip>
+              <Chip tone={handoff.can_trade_real_capital ? "critical" : "demo"}>{handoff.can_trade_real_capital ? "real funds armed" : "real funds locked"}</Chip>
+            </div>
+          </div>
+
+          <div className="mt-2 grid gap-1 sm:grid-cols-2" aria-label="Daemon handoff request contract">
+            <div className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Request</p>
+              <p className="mt-1 break-words font-mono text-xs text-on-surface">{handoff.method} {handoff.endpoint}</p>
+              <p className="mt-1 break-words font-mono text-[10px] leading-4 text-outline">
+                account={handoff.request.account} · source={handoff.request.source} · daemon={String(handoff.request.daemon)} · advance={String(handoff.request.advance)}
+              </p>
+            </div>
+            <div className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Lease</p>
+              <p className="mt-1 break-words font-mono text-xs text-on-surface">{handoff.lease_id}</p>
+              <p className="mt-1 font-mono text-[10px] leading-4 text-outline">
+                renew {handoff.renew_after_seconds}s · wake {handoff.next_wake_seconds}s · {handoff.target_symbol ?? "desk"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-2 grid gap-1 sm:grid-cols-7" aria-label="Daemon handoff readiness lanes">
+            {laneItems.map((item) => (
+              <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 px-2 py-1.5">
+                <p className="truncate font-mono text-[9px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                <p className={cn("mt-0.5 font-mono text-xs font-semibold", daemonHandoffItemTextClass(item.status))}>{item.score}/100</p>
+                <p className="mt-0.5 truncate font-mono text-[9px] uppercase tracking-telemetry text-outline">{item.status}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1" aria-label="Daemon handoff metrics">
+          <ProfitMetric label="Max fills" value={`${handoff.max_fills_per_lease}`} detail={`${handoff.max_ticks_per_lease} ticks per lease`} tone={handoff.max_fills_per_lease > 0 ? "engine" : "neutral"} />
+          <ProfitMetric label="HFT cap" value={`${handoff.max_trades_next_minute}/min`} detail={`${formatCompactSignedCurrency(handoff.expected_profit_per_minute_usd)}/min`} tone={handoff.max_trades_next_minute > 0 ? "engine" : "neutral"} />
+          <ProfitMetric label="Budget" value={`${handoff.provider_budget_pct}%`} detail="provider budget" tone={handoff.provider_budget_pct > 85 ? "critical" : handoff.provider_budget_pct > 65 ? "caution" : "engine"} />
+          <ProfitMetric label="Mode" value={handoff.status.replaceAll("-", " ")} detail={handoff.blockers[0] ?? "lease available"} tone={tone} />
+          <div className="col-span-2 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Stop conditions</p>
+            <p className="mt-1 line-clamp-4 text-xs leading-5 text-on-surface-variant">
+              {handoff.stop_conditions.slice(0, 3).join(" ")}
+            </p>
+          </div>
+        </div>
+      </div>
+      <span className="sr-only" aria-label="Autonomous daemon handoff receipt">
+        Daemon handoff status {handoff.status}; can run background paper {handoff.can_run_background_paper ? "yes" : "no"}; can trade real capital {handoff.can_trade_real_capital ? "yes" : "no"}; endpoint {handoff.endpoint}; method {handoff.method}; lease {handoff.lease_id}; lease ttl {handoff.lease_ttl_seconds}; renew after {handoff.renew_after_seconds}; next wake {handoff.next_wake_seconds}; source {handoff.request.source}; target {handoff.target_symbol ?? "desk"}; max ticks {handoff.max_ticks_per_lease}; max fills {handoff.max_fills_per_lease}; max trades next minute {handoff.max_trades_next_minute}; blockers {handoff.blockers.join("; ") || "none"}; stop conditions {handoff.stop_conditions.join(" ")}; controls {handoff.controls.join(" ")}
+      </span>
+    </section>
+  );
+}
+
 function QuickMarketIntakePlanner({
   plan,
 }: {
@@ -7188,6 +7268,19 @@ function liveAutonomyItemSvgClass(status: Web3TradingState["autonomous_live_auto
   if (status === "pass") return "fill-engine";
   if (status === "watch") return "fill-caution";
   return "fill-critical";
+}
+
+function daemonHandoffTone(status: Web3TradingState["autonomous_daemon_handoff"]["status"]): QuickChipTone {
+  if (status === "ready" || status === "protect-only") return "engine";
+  if (status === "refresh-first" || status === "observe-only") return "caution";
+  if (status === "blocked") return "critical";
+  return "neutral";
+}
+
+function daemonHandoffItemTextClass(status: Web3TradingState["autonomous_daemon_handoff"]["items"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
+  return "text-critical";
 }
 
 function executionAdapterItemSvgClass(status: Web3TradingState["autonomous_execution_adapter_readiness"]["items"][number]["status"]) {

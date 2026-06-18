@@ -5387,6 +5387,39 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_live_autonomy_readiness.controls.some((control) => control.includes("final transition gate"))).toBe(true);
     expect(state.autonomous_live_autonomy_readiness.controls.some((control) => control.includes("cannot move funds"))).toBe(true);
+    expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
+    expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);
+    expect(state.autonomous_daemon_handoff.runner_role).toBe("external-scheduler");
+    expect(state.autonomous_daemon_handoff.endpoint).toBe("/api/web3-trading");
+    expect(state.autonomous_daemon_handoff.method).toBe("POST");
+    expect(state.autonomous_daemon_handoff.request).toMatchObject({
+      account: "persistent",
+      daemon: true,
+      advance: false,
+      reset: false,
+    });
+    expect(["sample", "live-dex"]).toContain(state.autonomous_daemon_handoff.request.source);
+    expect(state.autonomous_daemon_handoff.lease_id).toContain("handoff-");
+    expect(state.autonomous_daemon_handoff.lease_ttl_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_daemon_handoff.renew_after_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_daemon_handoff.can_trade_real_capital).toBe(false);
+    expect(state.autonomous_daemon_handoff.items.map((item) => item.id)).toEqual([
+      "lease",
+      "cadence",
+      "payload",
+      "market",
+      "route",
+      "risk",
+      "live-boundary",
+    ]);
+    expect(state.autonomous_daemon_handoff.items.every((item) =>
+      ["pass", "watch", "fail"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(state.autonomous_daemon_handoff.stop_conditions.some((condition) => condition.includes("lease expires"))).toBe(true);
+    expect(state.autonomous_daemon_handoff.controls.some((control) => control.includes("lease contract"))).toBe(true);
     expect(state.autonomous_wallet_telemetry.mode).toBe("autonomous-wallet-telemetry");
     expect(["compounding", "harvest", "recover", "flat", "cooldown", "protect"]).toContain(state.autonomous_wallet_telemetry.status);
     expect(state.autonomous_wallet_telemetry.curve.length).toBeGreaterThanOrEqual(2);
@@ -7015,6 +7048,24 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_loop_director.route_refresh_status).toBe(state.route_refresh_queue.status);
     expect(typeof state.autonomous_loop_director.should_refresh_route_quotes).toBe("boolean");
     expect(state.autonomous_loop_director.controls.some((control) => control.includes("Repeated autonomous advances"))).toBe(true);
+    expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
+    expect(state.autonomous_daemon_handoff.request).toMatchObject({
+      account: "persistent",
+      source: "sample",
+      daemon: true,
+      advance: false,
+      reset: false,
+    });
+    expect(state.autonomous_daemon_handoff.next_wake_seconds).toBe(state.autonomous_run_envelope.next_wake_seconds);
+    expect(state.autonomous_daemon_handoff.next_wake_at).toBe(state.autonomous_run_envelope.next_wake_at);
+    expect(state.autonomous_daemon_handoff.can_trade_real_capital).toBe(false);
+    expect(state.autonomous_daemon_handoff.max_fills_per_lease).toBeLessThanOrEqual(3);
+    expect(state.autonomous_daemon_handoff.max_trades_next_minute).toBeLessThanOrEqual(state.autonomous_run_envelope.max_trades_next_minute);
+    if (state.autonomous_daemon_handoff.status === "blocked" || state.autonomous_daemon_handoff.status === "paused") {
+      expect(state.autonomous_daemon_handoff.can_run_background_paper).toBe(false);
+    }
+    expect(state.autonomous_daemon_handoff.stop_conditions.some((condition) => condition.includes("Never sign"))).toBe(true);
+    expect(state.autonomous_daemon_handoff.controls.some((control) => control.includes("overlapping runners"))).toBe(true);
     if (["blocked", "halted", "paused"].includes(state.autonomous_loop_director.status)) {
       expect(state.autonomous_loop_director.client_should_run).toBe(false);
     } else {

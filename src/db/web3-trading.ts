@@ -8704,6 +8704,47 @@ export type AutonomousLiveAutonomyReadiness = {
   items: AutonomousLiveAutonomyReadinessItem[];
 };
 
+export type AutonomousDaemonHandoffItem = {
+  id: "lease" | "cadence" | "payload" | "market" | "route" | "risk" | "live-boundary";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  score: number;
+  detail: string;
+};
+
+export type AutonomousDaemonHandoff = {
+  mode: "autonomous-daemon-handoff";
+  status: "ready" | "observe-only" | "refresh-first" | "protect-only" | "paused" | "blocked";
+  summary: string;
+  runner_role: "external-scheduler";
+  lease_id: string;
+  lease_ttl_seconds: number;
+  renew_after_seconds: number;
+  next_wake_seconds: number;
+  next_wake_at: string;
+  endpoint: "/api/web3-trading";
+  method: "POST";
+  request: {
+    account: "persistent";
+    source: TradingMarketSource;
+    daemon: true;
+    advance: false;
+    reset: false;
+  };
+  can_run_background_paper: boolean;
+  can_trade_real_capital: boolean;
+  target_symbol: string | null;
+  max_ticks_per_lease: number;
+  max_fills_per_lease: number;
+  max_trades_next_minute: number;
+  provider_budget_pct: number;
+  expected_profit_per_minute_usd: number;
+  stop_conditions: string[];
+  blockers: string[];
+  controls: string[];
+  items: AutonomousDaemonHandoffItem[];
+};
+
 export type Web3TradingState = {
   as_of: string;
   scenario: TradingScenario;
@@ -8948,6 +8989,7 @@ export type Web3TradingState = {
   autonomous_custody_mandate: AutonomousCustodyMandate;
   autonomous_signer_ops: AutonomousSignerOps;
   autonomous_live_autonomy_readiness: AutonomousLiveAutonomyReadiness;
+  autonomous_daemon_handoff: AutonomousDaemonHandoff;
   execution_readiness: ExecutionReadiness;
   execution_audit: ExecutionAudit;
   execution_gate: ExecutionGate;
@@ -12209,6 +12251,17 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       marketIngestion: configuredState.market_ingestion_plan,
       daemonMemory: configuredState.paper_daemon_memory,
     });
+    configuredState.autonomous_daemon_handoff = buildAutonomousDaemonHandoff({
+      marketSource: configuredState.market_source,
+      runEnvelope: configuredState.autonomous_run_envelope,
+      loopDirector: configuredState.autonomous_loop_director,
+      sessionSupervisor: configuredState.autonomous_session_supervisor,
+      tickGovernor: configuredState.autonomous_tick_governor,
+      marketIngestion: configuredState.market_ingestion_plan,
+      routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
+      daemonMemory: configuredState.paper_daemon_memory,
+      liveReadiness: configuredState.autonomous_live_autonomy_readiness,
+    });
     configuredState.autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
       runEnvelope: configuredState.autonomous_run_envelope,
       objective: configuredState.autonomous_profit_objective,
@@ -14321,6 +14374,17 @@ function buildWeb3TradingState({
     marketIngestion: market_ingestion_plan,
     daemonMemory: paper_daemon_memory,
   });
+  const autonomous_daemon_handoff = buildAutonomousDaemonHandoff({
+    marketSource,
+    runEnvelope: autonomous_run_envelope,
+    loopDirector: autonomous_loop_director,
+    sessionSupervisor: autonomous_session_supervisor,
+    tickGovernor: autonomous_tick_governor,
+    marketIngestion: market_ingestion_plan,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    daemonMemory: paper_daemon_memory,
+    liveReadiness: autonomous_live_autonomy_readiness,
+  });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
     objective: autonomous_profit_objective,
@@ -14858,6 +14922,7 @@ function buildWeb3TradingState({
     autonomous_custody_mandate,
     autonomous_signer_ops,
     autonomous_live_autonomy_readiness,
+    autonomous_daemon_handoff,
     execution_readiness,
     execution_audit,
     execution_gate,
@@ -16739,6 +16804,17 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     marketIngestion: state.market_ingestion_plan,
     daemonMemory: state.paper_daemon_memory,
   });
+  const autonomous_daemon_handoff = buildAutonomousDaemonHandoff({
+    marketSource: state.market_source,
+    runEnvelope: autonomous_run_envelope,
+    loopDirector: state.autonomous_loop_director,
+    sessionSupervisor: autonomous_session_supervisor,
+    tickGovernor: state.autonomous_tick_governor,
+    marketIngestion: state.market_ingestion_plan,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    daemonMemory: state.paper_daemon_memory,
+    liveReadiness: autonomous_live_autonomy_readiness,
+  });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
     objective: autonomous_profit_objective,
@@ -17142,6 +17218,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_custody_mandate,
     autonomous_signer_ops,
     autonomous_live_autonomy_readiness,
+    autonomous_daemon_handoff,
     signal_alpha_attribution,
     autonomous_setup_memory,
     performance_scorecard,
@@ -17447,6 +17524,17 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     routeRefreshExecution: state.autonomous_route_refresh_execution,
     marketIngestion: state.market_ingestion_plan,
     daemonMemory: state.paper_daemon_memory,
+  });
+  const autonomous_daemon_handoff = buildAutonomousDaemonHandoff({
+    marketSource: state.market_source,
+    runEnvelope: autonomous_run_envelope,
+    loopDirector: state.autonomous_loop_director,
+    sessionSupervisor: autonomous_session_supervisor,
+    tickGovernor: state.autonomous_tick_governor,
+    marketIngestion: state.market_ingestion_plan,
+    routeRefreshExecution: state.autonomous_route_refresh_execution,
+    daemonMemory: state.paper_daemon_memory,
+    liveReadiness: autonomous_live_autonomy_readiness,
   });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
@@ -17787,6 +17875,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_landing_optimizer,
     autonomous_run_envelope,
     autonomous_live_autonomy_readiness,
+    autonomous_daemon_handoff,
     autonomous_profit_run_guard,
     autonomous_daily_profit_lock,
     autonomous_data_freshness_gate,
@@ -22108,6 +22197,17 @@ function applyPersistentLedger(
     marketIngestion: market_ingestion_plan,
     daemonMemory: paper_daemon_memory,
   });
+  const autonomous_daemon_handoff = buildAutonomousDaemonHandoff({
+    marketSource: state.market_source,
+    runEnvelope: autonomous_run_envelope,
+    loopDirector: state.autonomous_loop_director,
+    sessionSupervisor: autonomous_session_supervisor,
+    tickGovernor: state.autonomous_tick_governor,
+    marketIngestion: market_ingestion_plan,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    daemonMemory: paper_daemon_memory,
+    liveReadiness: autonomous_live_autonomy_readiness,
+  });
   const autonomous_profit_run_guard = buildAutonomousProfitRunGuard({
     runEnvelope: autonomous_run_envelope,
     objective: state.autonomous_profit_objective,
@@ -22549,6 +22649,7 @@ function applyPersistentLedger(
     autonomous_landing_optimizer,
     autonomous_run_envelope,
     autonomous_live_autonomy_readiness,
+    autonomous_daemon_handoff,
     autonomous_profit_run_guard,
     autonomous_daily_profit_lock,
     autonomous_replay_gate,
@@ -70041,6 +70142,181 @@ function liveAutonomyReadinessNextAction(
   if (killSwitch) return killSwitch.blocker ?? killSwitch.detail;
   if (status === "paper-only") return executionGate.live_blockers[0] ?? "Keep running only local paper automation until live execution is explicitly configured.";
   return failed?.blocker ?? runEnvelope.stop_reason ?? runEnvelope.next_action;
+}
+
+function buildAutonomousDaemonHandoff({
+  marketSource,
+  runEnvelope,
+  loopDirector,
+  sessionSupervisor,
+  tickGovernor,
+  marketIngestion,
+  routeRefreshExecution,
+  daemonMemory,
+  liveReadiness,
+}: {
+  marketSource: Web3TradingState["market_source"];
+  runEnvelope: AutonomousRunEnvelope;
+  loopDirector: AutonomousLoopDirector;
+  sessionSupervisor: AutonomousSessionSupervisor;
+  tickGovernor: AutonomousTickGovernor;
+  marketIngestion: MarketIngestionPlan;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+  daemonMemory: PaperDaemonMemory;
+  liveReadiness: AutonomousLiveAutonomyReadiness;
+}): AutonomousDaemonHandoff {
+  const leaseTtlSeconds = Math.max(20, Math.min(120, runEnvelope.next_wake_seconds * 3));
+  const renewAfterSeconds = Math.max(5, Math.min(runEnvelope.next_wake_seconds, Math.floor(leaseTtlSeconds * 0.55)));
+  const leaseSeed = `${runEnvelope.target_symbol ?? "desk"}-${Date.parse(runEnvelope.next_wake_at) || 0}-${runEnvelope.action}`;
+  const canRunBackgroundPaper = liveReadiness.can_run_unattended &&
+    runEnvelope.keep_running &&
+    loopDirector.should_issue_daemon_tick &&
+    !daemonMemory.pause_new_entries &&
+    liveReadiness.status !== "blocked";
+  const shouldProtect = runEnvelope.action === "protect-book" ||
+    tickGovernor.should_protect_first ||
+    sessionSupervisor.status === "harvest";
+  const shouldRefresh = runEnvelope.action === "refresh-market" ||
+    runEnvelope.action === "refresh-route" ||
+    routeRefreshExecution.route_refresh_required ||
+    marketIngestion.status === "blocked" ||
+    marketIngestion.status === "paused";
+  const hardBlockers = [
+    ...(liveReadiness.status === "blocked" ? liveReadiness.blockers : []),
+    ...loopDirector.blockers,
+    ...(runEnvelope.status === "blocked" && runEnvelope.stop_reason ? [runEnvelope.stop_reason] : []),
+    ...(daemonMemory.pause_new_entries ? [daemonMemory.recommended_action] : []),
+  ].filter(Boolean).slice(0, 8);
+  const status: AutonomousDaemonHandoff["status"] = hardBlockers.length > 0 || runEnvelope.status === "blocked"
+    ? "blocked"
+    : !canRunBackgroundPaper && (runEnvelope.status === "cooldown" || daemonMemory.status === "cooldown" || daemonMemory.status === "halted")
+      ? "paused"
+      : shouldProtect
+        ? "protect-only"
+        : shouldRefresh
+          ? "refresh-first"
+          : canRunBackgroundPaper && runEnvelope.run_enabled && tickGovernor.can_auto_advance
+            ? "ready"
+            : canRunBackgroundPaper || runEnvelope.keep_running || sessionSupervisor.should_keep_running
+              ? "observe-only"
+              : "paused";
+  const blockers = status === "blocked"
+    ? hardBlockers
+    : status === "paused"
+      ? [runEnvelope.stop_reason ?? daemonMemory.recommended_action ?? "The autonomous runner is paused until cadence, risk, or memory gates reopen."]
+      : [];
+  const stopConditions = [
+    "Stop when the lease expires before renewal or another runner owns the lease.",
+    "Stop on kill switch, live-readiness blocked status, signer boundary failure, or custody-policy failure.",
+    "Stop fresh buys when daemon memory pauses entries, daily loss/profit lock tightens, or provider budget throttles.",
+    "Refresh route or market evidence before paper fills when route TTL, candle proof, or live DEX source freshness is stale.",
+    "Never sign, submit, or custody real funds from this handoff; live execution remains a separate gated path.",
+  ];
+  const items: AutonomousDaemonHandoffItem[] = [
+    {
+      id: "lease",
+      label: "Lease",
+      status: status === "blocked" || status === "paused" ? "fail" : "pass",
+      score: status === "blocked" ? 0 : status === "paused" ? 32 : 88,
+      detail: `${leaseTtlSeconds}s lease, renew after ${renewAfterSeconds}s, id ${leaseSeed}.`,
+    },
+    {
+      id: "cadence",
+      label: "Cadence",
+      status: runEnvelope.keep_running ? "pass" : loopDirector.client_should_run ? "watch" : "fail",
+      score: runEnvelope.run_confidence_score,
+      detail: `${runEnvelope.next_wake_seconds}s wake; ${runEnvelope.max_trades_next_minute} max trades next minute; loop ${runEnvelope.status}.`,
+    },
+    {
+      id: "payload",
+      label: "POST payload",
+      status: canRunBackgroundPaper ? "pass" : runEnvelope.keep_running ? "watch" : "fail",
+      score: canRunBackgroundPaper ? 90 : runEnvelope.keep_running ? 58 : 24,
+      detail: `POST /api/web3-trading with persistent paper account, ${marketSource.mode} source, daemon=true, advance=false.`,
+    },
+    {
+      id: "market",
+      label: "Market feed",
+      status: marketIngestion.status === "blocked" || marketIngestion.provider_budget_status === "paused" ? "fail" : marketIngestion.provider_budget_status === "throttled" ? "watch" : "pass",
+      score: clamp(Math.round(100 - Math.max(0, marketIngestion.provider_budget_utilization_pct - 25) * 0.72), 18, 94),
+      detail: `${marketIngestion.status.replaceAll("-", " ")} feed at ${marketIngestion.provider_budget_utilization_pct}% provider budget.`,
+    },
+    {
+      id: "route",
+      label: "Route proof",
+      status: routeRefreshExecution.status === "blocked" ? "fail" : routeRefreshExecution.route_refresh_required ? "watch" : "pass",
+      score: routeRefreshExecution.route_confidence_score,
+      detail: `${routeRefreshExecution.status.replaceAll("-", " ")}; ${routeRefreshExecution.next_action}`,
+    },
+    {
+      id: "risk",
+      label: "Risk memory",
+      status: daemonMemory.pause_new_entries ? "fail" : daemonMemory.status === "cooldown" ? "watch" : "pass",
+      score: daemonMemory.pause_new_entries ? 18 : daemonMemory.status === "cooldown" ? 48 : 84,
+      detail: `${daemonMemory.window_size} remembered ticks, ${formatCompactValue(daemonMemory.window_pnl_usd)} window PnL, ${daemonMemory.blocked_count} blocks.`,
+    },
+    {
+      id: "live-boundary",
+      label: "Live boundary",
+      status: liveReadiness.status === "blocked" ? "fail" : liveReadiness.can_trade_real_capital ? "watch" : "pass",
+      score: liveReadiness.can_trade_real_capital ? 62 : liveReadiness.status === "blocked" ? 0 : 94,
+      detail: liveReadiness.can_trade_real_capital
+        ? "Real-capital gates report ready, but daemon handoff still requires explicit live executor separation."
+        : `Real-capital execution remains ${liveReadiness.status.replaceAll("-", " ")}; this handoff is paper-loop only.`,
+    },
+  ];
+
+  return {
+    mode: "autonomous-daemon-handoff",
+    status,
+    summary: autonomousDaemonHandoffSummary(status, runEnvelope, liveReadiness, leaseTtlSeconds),
+    runner_role: "external-scheduler",
+    lease_id: `handoff-${leaseSeed}`,
+    lease_ttl_seconds: leaseTtlSeconds,
+    renew_after_seconds: renewAfterSeconds,
+    next_wake_seconds: runEnvelope.next_wake_seconds,
+    next_wake_at: runEnvelope.next_wake_at,
+    endpoint: "/api/web3-trading",
+    method: "POST",
+    request: {
+      account: "persistent",
+      source: marketSource.mode,
+      daemon: true,
+      advance: false,
+      reset: false,
+    },
+    can_run_background_paper: canRunBackgroundPaper && status !== "blocked" && status !== "paused",
+    can_trade_real_capital: false,
+    target_symbol: runEnvelope.target_symbol,
+    max_ticks_per_lease: Math.max(1, Math.min(6, runEnvelope.max_session_ticks || 1)),
+    max_fills_per_lease: status === "observe-only" || status === "paused" || status === "blocked" ? 0 : Math.max(0, Math.min(3, runEnvelope.max_session_fills)),
+    max_trades_next_minute: status === "observe-only" || status === "paused" || status === "blocked" ? 0 : runEnvelope.max_trades_next_minute,
+    provider_budget_pct: runEnvelope.provider_utilization_pct,
+    expected_profit_per_minute_usd: roundMetric(runEnvelope.expected_profit_per_minute_usd),
+    stop_conditions: stopConditions,
+    blockers,
+    controls: [
+      "External schedulers should treat this as a lease contract, not a live wallet approval.",
+      "The payload reuses the existing backend daemon path and lets the server decide observe, refresh, protect, or paper-fill each tick.",
+      "Use idempotent lease renewal and stop conditions so overlapping runners do not double-advance the paper ledger.",
+      "The handoff intentionally sets can_trade_real_capital=false until a separate live executor, signer, custody policy, and compliance gate are implemented.",
+    ],
+    items,
+  };
+}
+
+function autonomousDaemonHandoffSummary(
+  status: AutonomousDaemonHandoff["status"],
+  runEnvelope: AutonomousRunEnvelope,
+  liveReadiness: AutonomousLiveAutonomyReadiness,
+  leaseTtlSeconds: number,
+) {
+  if (status === "ready") return `External scheduler may run the bounded paper daemon lease for ${leaseTtlSeconds}s; next ${runEnvelope.action.replaceAll("-", " ")} targets ${runEnvelope.target_symbol ?? "the desk"}.`;
+  if (status === "protect-only") return `External scheduler may run a protect-only paper lease; fresh buys stay constrained while the book is defended.`;
+  if (status === "refresh-first") return `External scheduler should refresh market or route evidence before another paper fill.`;
+  if (status === "observe-only") return `External scheduler may heartbeat the paper daemon, but paper fills are not currently authorized.`;
+  if (status === "paused") return `External scheduler should pause until cadence, memory, or risk gates reopen.`;
+  return `External scheduler is blocked; ${liveReadiness.next_action || runEnvelope.stop_reason || "do not run unattended."}`;
 }
 
 function autonomousSessionItemRank(item: AutonomousSessionSupervisorItem) {
