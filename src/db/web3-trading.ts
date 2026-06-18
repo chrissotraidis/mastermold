@@ -16854,6 +16854,21 @@ function attachTriggerOrderHistory(state: Web3TradingState, trigger_order_histor
     protectiveCoverage: protective_trigger_coverage,
     walletPerformance: state.autonomous_wallet_performance_governor,
   });
+  const autonomous_action_queue = protective_trigger_coverage.should_pause_fresh_buys
+    ? {
+        ...state.autonomous_action_queue,
+        fresh_buy_protection_status: "protect-first" as const,
+        fresh_buy_blocker: protective_trigger_coverage.next_action,
+        fresh_buy_blocked_count: Math.max(1, state.autonomous_action_queue.fresh_buy_blocked_count),
+      }
+    : state.autonomous_action_queue;
+  const autonomous_session_planner = protective_trigger_coverage.should_pause_fresh_buys
+    ? {
+        ...state.autonomous_session_planner,
+        max_fresh_buys: 0,
+        next_action: protective_trigger_coverage.next_action,
+      }
+    : state.autonomous_session_planner;
   return {
     ...state,
     trigger_order_history,
@@ -16861,6 +16876,8 @@ function attachTriggerOrderHistory(state: Web3TradingState, trigger_order_histor
     protective_trigger_coverage,
     autonomous_trigger_opportunity,
     autonomous_exit_bracket_governor,
+    autonomous_action_queue,
+    autonomous_session_planner,
   };
 }
 
@@ -17319,7 +17336,7 @@ function buildTriggerOrderHistoryMonitor({
   const requestState = filter?.state ?? "active";
   const limit = clamp(Math.round(filter?.limit ?? 20), 1, 100);
   const offset = Math.max(0, Math.round(filter?.offset ?? 0));
-  const activeCount = items.filter((item) => item.order_state === "open" || item.order_state === "pending" || item.order_state === "executing").length;
+  const activeCount = items.filter(triggerHistoryOrderHasActiveState).length;
   const filledCount = items.filter((item) => item.order_state === "filled").length;
   const cancelledCount = items.filter((item) => item.order_state === "cancelled").length;
   const expiredCount = items.filter((item) => item.order_state === "expired").length;
@@ -17517,7 +17534,7 @@ function triggerHistorySummary(
   if (status === "failed") return blockers[0] ?? "Trigger order history sync failed.";
   if (items.length === 0) return planner.ready_count > 0 ? "History sync is ready; no provider orders were returned yet." : "History sync is ready for future Trigger orders.";
   const filled = items.filter((item) => item.order_state === "filled").length;
-  const active = items.filter((item) => item.order_state === "open" || item.order_state === "pending" || item.order_state === "executing").length;
+  const active = items.filter(triggerHistoryOrderHasActiveState).length;
   if (status === "active-risk") return `${active} Trigger order${active === 1 ? "" : "s"} need close monitoring because at least one order is executing or failed.`;
   if (status === "filled") return `${filled} completed Trigger order${filled === 1 ? "" : "s"} can be reconciled into portfolio outcomes.`;
   return `${items.length} Trigger order${items.length === 1 ? "" : "s"} synced from Jupiter order history.`;
@@ -18284,7 +18301,7 @@ async function quoteJupiterPlan(
       price_impact_pct: numberOrNull(quote.priceImpactPct),
       quoted_at: quotedAt,
       quote_context_slot: typeof quote.contextSlot === "number" ? quote.contextSlot : null,
-      quote_time_taken_seconds: typeof quote.timeTaken === "number" ? roundMetric(quote.timeTaken) : null,
+      quote_time_taken_seconds: typeof quote.timeTaken === "number" ? roundQuoteSeconds(quote.timeTaken) : null,
       slippage_bps: readiness.config.max_slippage_bps,
       route_label: routeLabel,
       gate: "would-block-live",
@@ -23442,10 +23459,10 @@ function protectiveTriggerCoverageItem({
   scalp: AutonomousScalpExitItem | undefined;
 }): ProtectiveTriggerCoverageItem {
   const activeOrder = plan ? triggerHistoryActiveForPlan(history, plan) : false;
-  const coverageStatus: ProtectiveTriggerCoverageItem["coverage_status"] = repair
-    ? "repair"
-    : activeOrder
-      ? "covered"
+  const coverageStatus: ProtectiveTriggerCoverageItem["coverage_status"] = activeOrder
+    ? "covered"
+    : repair
+      ? "repair"
       : plan?.status === "ready"
         ? "planned"
         : plan?.status === "auth-required"
@@ -23502,12 +23519,16 @@ function triggerHistoryOrderProtectsPlan(order: TriggerOrderHistoryItem, plan: T
 }
 
 function triggerHistoryOrderIsStillActive(order: TriggerOrderHistoryItem) {
-  const state = order.order_state.toLowerCase();
-  if (state !== "active" && state !== "open" && state !== "triggered") return false;
+  if (!triggerHistoryOrderHasActiveState(order)) return false;
   if (order.fill_percent !== null && order.fill_percent >= 0.99) return false;
   return order.latest_event_type !== "fill" &&
     order.latest_event_type !== "cancelled" &&
     order.latest_event_type !== "expired";
+}
+
+function triggerHistoryOrderHasActiveState(order: TriggerOrderHistoryItem) {
+  const state = order.order_state.toLowerCase();
+  return state === "active" || state === "open" || state === "pending" || state === "executing" || state === "triggered";
 }
 
 function protectiveTriggerCoverageScore(
@@ -27209,6 +27230,10 @@ function autonomousEdgeStackExecutionNextAction(
 
 function roundMetric(value: number) {
   return Math.round(value * 10) / 10;
+}
+
+function roundQuoteSeconds(value: number) {
+  return Math.round(value * 1000) / 1000;
 }
 
 function medianNumber(values: number[]) {
@@ -52034,7 +52059,7 @@ function buildAutonomousOpportunityRace({
     status,
     winner_action: winner.action,
     winner_symbol: winner.symbol,
-    fastest_decision_seconds: Math.min(...fallbackItems.map((item) => item.urgency_seconds)),
+    fastest_decision_seconds: Math.max(1, Math.min(...fallbackItems.map((item) => item.urgency_seconds))),
     deploy_notional_usd: Math.round(actionable.filter((item) => item.side === "buy").reduce((sum, item) => sum + item.recommended_notional_usd, 0)),
     release_notional_usd: Math.round(actionable.filter((item) => item.side === "sell").reduce((sum, item) => sum + item.recommended_notional_usd, 0)),
     expected_edge_usd: Math.round(actionable.reduce((sum, item) => sum + Math.max(0, item.expected_edge_usd), 0)),
@@ -52123,12 +52148,12 @@ function opportunityRaceEntryItem({
     signal_score: Math.round(signalScore),
 	    route_score: Math.round(routeScore),
 	    wallet_score: walletScore,
-	    urgency_seconds: Math.min(
+	    urgency_seconds: Math.max(1, Math.min(
 	      arbiterItem.review_after_seconds,
 	      opportunity?.snipe_window_seconds ?? 30,
 	      signalNoiseItem?.review_after_seconds ?? 30,
 	      trendVelocityItem?.chase_window_seconds ?? 30,
-	    ),
+	    )),
 	    recommended_notional_usd: notional,
     expected_edge_usd: Math.round(Math.max(0, arbiterItem.expected_profit_usd, notional * Math.max(0, arbiterItem.net_edge_pct) / 100)),
     risk_usd: Math.round(Math.max(arbiterItem.max_loss_usd, notional * Math.max(1, arbiterItem.expected_loss_pct) / 100)),
@@ -59987,7 +60012,7 @@ function buildAutonomousCommandCenter({
     expected_edge_usd: expectedEdge,
     expected_edge_per_minute_usd: expectedPerMinute,
     risk_usd: riskUsd,
-    fastest_review_seconds: Math.min(...fallbackItems.map((item) => item.review_after_seconds)),
+    fastest_review_seconds: Math.max(1, Math.min(...fallbackItems.map((item) => item.review_after_seconds))),
     paper_trade_ready: actionable.some((item) => item.status === "ready" || item.status === "queued"),
     live_blocker_count: liveBlockerCount,
     summary: commandCenterSummary(status, primary, expectedEdge, expectedPerMinute),
@@ -69483,7 +69508,7 @@ function buildPaperDaemonTick({
   monitorDecision?: AutonomousMonitorSchedule;
 }): PaperDaemonTick {
   const decision = monitorDecision ?? state.autonomous_monitor;
-  const wake = state.autonomous_monitor;
+  const wake = decision;
   const governorBlocked = !state.autonomy_risk_governor.allow_paper_advance;
   const standDown = decision.status === "stand-down" ||
     state.autopilot.status === "stand-down" ||

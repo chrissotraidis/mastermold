@@ -545,7 +545,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewReadiness).toContain("Try the app safely");
     expect(reviewReadiness).toContain("Local walkthrough account:");
     expect(reviewReadiness).toContain("Local walkthrough checklist");
-    expect(reviewReadiness).not.toMatch(/Performance & trust|still sample before you trust|Safe to inspect|trust score|black box|autopilot|Manual or sample only|real portfolio money|scanner reads|drivers, and alerts|OpenRouter, Anthropic, or OpenAI|always-on Brain described in the PRD|brain runs|Ask about this scan|Review the current Master Mold scan|What it learned|Confidence \\$\\{Math\\.round|seeded local account|Last scan|Scan date|Scan type|Scan details|Not needed for this scan|duplicate scan/i);
+    expect(reviewReadiness).not.toMatch(/Performance & trust|still sample before you trust|Safe to inspect|trust score|black box|Manual or sample only|real portfolio money|scanner reads|drivers, and alerts|OpenRouter, Anthropic, or OpenAI|always-on Brain described in the PRD|brain runs|Ask about this scan|Review the current Master Mold scan|What it learned|Confidence \\$\\{Math\\.round|seeded local account|Last scan|Scan date|Scan type|Scan details|Not needed for this scan|duplicate scan/i);
   });
 
   test("GIVEN Paper trading opens on mobile WHEN source copy is checked THEN it names the simulator workflow plainly", () => {

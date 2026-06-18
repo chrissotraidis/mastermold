@@ -6408,10 +6408,14 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
   });
 
   if (queue.items.length > 0 || queueExecution.selected_queue_id) {
+    const queueAction = queueExecution.selected_side === "sell" &&
+      (queueExecution.selected_action === "protect" || queueExecution.selected_action === "harvest")
+      ? "sell"
+      : queueExecution.selected_action.replaceAll("-", " ");
     moves.push({
       id: "queue",
       label: queueExecution.selected_symbol ?? queue.leader_symbol ?? "Action queue",
-      action: queueExecution.selected_action.replaceAll("-", " "),
+      action: queueAction,
       detail: queueExecution.summary || queue.next_action,
       etaSeconds: boundedSeconds(queueExecution.review_after_seconds || queue.fastest_review_seconds),
       score: queueExecution.queue_score || Math.max(1, queue.ready_count * 18),
