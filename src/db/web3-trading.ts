@@ -5377,6 +5377,56 @@ export type AutonomousProfitCaptureAutopilot = {
   items: AutonomousProfitCaptureAutopilotItem[];
 };
 
+export type AutonomousProfitRedeployAutopilotStatus =
+  | "redeploy"
+  | "probe"
+  | "wait-proof"
+  | "protect-first"
+  | "cooldown"
+  | "blocked"
+  | "idle";
+
+export type AutonomousProfitRedeployAutopilotAction =
+  | "paper-redeploy"
+  | "paper-probe"
+  | "refresh-proof"
+  | "protect-before-redeploy"
+  | "cooldown"
+  | "stand-down"
+  | "observe";
+
+export type AutonomousProfitRedeployAutopilotItem = {
+  id: "capture" | "candidate" | "cash" | "integrity" | "intake" | "boundary";
+  label: string;
+  status: "pass" | "watch" | "block";
+  score: number;
+  value: string;
+  detail: string;
+};
+
+export type AutonomousProfitRedeployAutopilot = {
+  mode: "autonomous-profit-redeploy-autopilot";
+  status: AutonomousProfitRedeployAutopilotStatus;
+  action: AutonomousProfitRedeployAutopilotAction;
+  symbol: string | null;
+  from_symbol: string | null;
+  redeploy_budget_usd: number;
+  released_cash_usd: number;
+  reserve_usd: number;
+  expected_edge_usd: number;
+  redeploy_score: number;
+  next_cadence_seconds: number;
+  can_redeploy_paper: boolean;
+  must_refresh_proof: boolean;
+  must_protect_first: boolean;
+  execution_boundary: "paper-ledger-only" | "read-only-refresh" | "blocked-live";
+  summary: string;
+  next_action: string;
+  blockers: string[];
+  controls: string[];
+  items: AutonomousProfitRedeployAutopilotItem[];
+};
+
 export type AutonomousScalpExitAction = "eject" | "trim" | "harvest" | "trail" | "press" | "hold" | "refresh" | "stand-down";
 
 export type AutonomousScalpExitItem = {
@@ -8586,6 +8636,7 @@ export type Web3TradingState = {
   profit_lock_autopilot: ProfitLockAutopilot;
   profit_capture_race: ProfitCaptureRace;
   autonomous_profit_capture_autopilot: AutonomousProfitCaptureAutopilot;
+  autonomous_profit_redeploy_autopilot: AutonomousProfitRedeployAutopilot;
   autonomous_scalp_exit_autopilot: AutonomousScalpExitAutopilot;
   high_frequency_profit_race: HighFrequencyProfitRace;
   high_frequency_profit_race_execution: HighFrequencyProfitRaceExecution;
@@ -14198,6 +14249,19 @@ function buildWeb3TradingState({
     actionQueueExecution: autonomous_action_queue_execution,
     loopImpact: autonomous_loop_impact_auditor,
   });
+  const autonomous_profit_redeploy_autopilot = buildAutonomousProfitRedeployAutopilot({
+    profitCapture: autonomous_profit_capture_autopilot,
+    rotationDirector: autonomous_rotation_director,
+    opportunityRanker: autonomous_opportunity_ranker,
+    opportunityExecution: autonomous_opportunity_rank_execution,
+    reentryHunter: autonomous_reentry_hunter,
+    marketIntake: autonomous_market_intake_plan,
+    walletTelemetry: autonomous_wallet_telemetry,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    capitalCommand: autonomous_capital_command,
+    actionQueue: autonomous_action_queue,
+    loopImpact: autonomous_loop_impact_auditor,
+  });
   return {
     as_of: marketSource.fetched_at,
     scenario,
@@ -14390,6 +14454,7 @@ function buildWeb3TradingState({
     profit_lock_autopilot,
 	    profit_capture_race,
     autonomous_profit_capture_autopilot,
+    autonomous_profit_redeploy_autopilot,
     autonomous_scalp_exit_autopilot,
 	    high_frequency_profit_race,
 	    high_frequency_profit_race_execution,
@@ -16534,6 +16599,19 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     actionQueueExecution: state.autonomous_action_queue_execution,
     loopImpact: autonomous_loop_impact_auditor,
   });
+  const autonomous_profit_redeploy_autopilot = buildAutonomousProfitRedeployAutopilot({
+    profitCapture: autonomous_profit_capture_autopilot,
+    rotationDirector: autonomous_rotation_director,
+    opportunityRanker: autonomous_opportunity_ranker,
+    opportunityExecution: autonomous_opportunity_rank_execution,
+    reentryHunter: state.autonomous_reentry_hunter,
+    marketIntake: autonomous_market_intake_plan,
+    walletTelemetry: autonomous_wallet_telemetry,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    capitalCommand: autonomous_capital_command,
+    actionQueue: state.autonomous_action_queue,
+    loopImpact: autonomous_loop_impact_auditor,
+  });
   return {
     ...state,
     execution_plans: plans,
@@ -16600,6 +16678,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     profit_lock_autopilot,
     profit_capture_race,
     autonomous_profit_capture_autopilot,
+    autonomous_profit_redeploy_autopilot,
     autonomous_scalp_exit_autopilot,
     high_frequency_profit_race,
     high_frequency_profit_race_execution,
@@ -17197,6 +17276,19 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     sourceQuality: autonomous_source_quality_oracle,
     walletTelemetry: state.autonomous_wallet_telemetry,
   });
+  const autonomous_profit_redeploy_autopilot = buildAutonomousProfitRedeployAutopilot({
+    profitCapture: state.autonomous_profit_capture_autopilot,
+    rotationDirector: autonomous_rotation_director,
+    opportunityRanker: autonomous_opportunity_ranker,
+    opportunityExecution: autonomous_opportunity_rank_execution,
+    reentryHunter: state.autonomous_reentry_hunter,
+    marketIntake: autonomous_market_intake_plan,
+    walletTelemetry: state.autonomous_wallet_telemetry,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    capitalCommand: autonomous_capital_command,
+    actionQueue: state.autonomous_action_queue,
+    loopImpact: autonomous_loop_impact_auditor,
+  });
   return {
     ...state,
     execution_audit,
@@ -17243,6 +17335,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_loop_director,
     autonomous_burst_scheduler,
     autonomous_capital_command,
+    autonomous_profit_redeploy_autopilot,
     autonomous_trade_mission,
   };
 }
@@ -21706,6 +21799,19 @@ function applyPersistentLedger(
     sourceQuality: autonomous_source_quality_oracle,
     walletTelemetry: autonomous_wallet_telemetry,
   });
+  const autonomous_profit_redeploy_autopilot = buildAutonomousProfitRedeployAutopilot({
+    profitCapture: state.autonomous_profit_capture_autopilot,
+    rotationDirector: autonomous_rotation_director,
+    opportunityRanker: autonomous_opportunity_ranker,
+    opportunityExecution: autonomous_opportunity_rank_execution,
+    reentryHunter: autonomous_reentry_hunter,
+    marketIntake: autonomous_market_intake_plan,
+    walletTelemetry: autonomous_wallet_telemetry,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    capitalCommand: autonomous_capital_command,
+    actionQueue: autonomous_action_queue,
+    loopImpact: autonomous_loop_impact_auditor,
+  });
 
   if (canApplyPaperLanes && autonomous_burst_fill_plan.child_fill_count > 0) {
     const burstApplied = applyAutonomousBurstFillPlanToLedger({
@@ -21941,6 +22047,7 @@ function applyPersistentLedger(
     autonomous_opportunity_ranker,
     autonomous_rotation_director,
     autonomous_opportunity_rank_execution,
+    autonomous_profit_redeploy_autopilot,
     autonomous_now_decision,
     autonomous_order_ticket_execution,
     autonomous_candle_conviction,
@@ -43800,6 +43907,286 @@ function profitCaptureAutopilotNextAction(
   if (action === "tighten-trail") return "Tighten the trailing stop and wake the tape before adding exposure.";
   if (status === "idle") return "Wait for an open paper position or fresh wallet PnL before profit capture can act.";
   return "Stand down until blockers clear or profit-capture evidence improves.";
+}
+
+function buildAutonomousProfitRedeployAutopilot({
+  profitCapture,
+  rotationDirector,
+  opportunityRanker,
+  opportunityExecution,
+  reentryHunter,
+  marketIntake,
+  walletTelemetry,
+  profitIntegrity,
+  capitalCommand,
+  actionQueue,
+  loopImpact,
+}: {
+  profitCapture: AutonomousProfitCaptureAutopilot;
+  rotationDirector: AutonomousRotationDirector;
+  opportunityRanker: AutonomousOpportunityRanker;
+  opportunityExecution: AutonomousOpportunityRankExecution;
+  reentryHunter: AutonomousReentryHunter;
+  marketIntake: AutonomousMarketIntakePlan;
+  walletTelemetry: AutonomousWalletTelemetry;
+  profitIntegrity: AutonomousProfitIntegrityCircuit;
+  capitalCommand: AutonomousCapitalCommand;
+  actionQueue: AutonomousActionQueue;
+  loopImpact: AutonomousLoopImpactAuditor;
+}): AutonomousProfitRedeployAutopilot {
+  const rankedCandidate = opportunityRanker.items.find((item) => item.action === "paper-attack" || item.action === "paper-probe") ?? opportunityRanker.items[0] ?? null;
+  const reentryCandidate = reentryHunter.items[0] ?? null;
+  const candidateSymbol = opportunityExecution.paper_trade_ready
+    ? opportunityExecution.selected_symbol
+    : reentryHunter.paper_trade_ready
+      ? reentryHunter.leader_symbol
+      : rotationDirector.to_symbol ?? opportunityRanker.leader_symbol ?? reentryHunter.leader_symbol;
+  const fromSymbol = profitCapture.symbol ?? rotationDirector.from_symbol ?? capitalCommand.target_symbol ?? actionQueue.leader_symbol;
+  const mustProtectFirst = profitCapture.must_apply_protective_sell ||
+    profitCapture.status === "race" ||
+    profitCapture.status === "trim" ||
+    profitCapture.status === "harvest" ||
+    rotationDirector.status === "protect" ||
+    capitalCommand.action === "protect-first" ||
+    actionQueue.status === "protect" ||
+    profitIntegrity.should_protect_first;
+  const mustRefreshProof = profitCapture.must_refresh_route ||
+    loopImpact.must_refresh_proof ||
+    marketIntake.status === "blocked" ||
+    !marketIntake.can_feed_trade_loop ||
+    opportunityRanker.status === "refresh";
+  const cooldown = walletTelemetry.status === "cooldown" ||
+    loopImpact.status === "cooldown" ||
+    profitIntegrity.permission === "cooldown";
+  const releasedCashUsd = Math.round(Math.max(
+    profitCapture.release_usd,
+    rotationDirector.release_usd,
+    actionQueue.release_usd,
+    capitalCommand.release_budget_usd,
+  ));
+  const candidateBudget = Math.max(
+    opportunityExecution.paper_trade_ready ? opportunityExecution.paper_size_usd : 0,
+    reentryHunter.paper_trade_ready ? reentryHunter.max_reentry_usd : 0,
+    rotationDirector.deploy_usd,
+    capitalCommand.spend_budget_usd,
+    actionQueue.deploy_usd,
+  );
+  const deployableCash = Math.max(0, walletTelemetry.cash_usd + releasedCashUsd);
+  const redeployBudget = Math.round(Math.max(0, Math.min(
+    deployableCash,
+    candidateBudget,
+    walletTelemetry.equity_usd * 0.12,
+    releasedCashUsd > 0 ? Math.max(125, releasedCashUsd * 0.72) : walletTelemetry.cash_usd * 0.18,
+  )));
+  const expectedEdgeUsd = Math.round(Math.max(
+    opportunityExecution.expected_edge_usd,
+    reentryHunter.expected_edge_usd,
+    rotationDirector.expected_edge_usd,
+    rankedCandidate?.expected_edge_usd ?? 0,
+  ));
+  const candidateScore = Math.max(
+    opportunityExecution.opportunity_score,
+    opportunityRanker.best_score,
+    rotationDirector.opportunity_score,
+    reentryCandidate?.reentry_score ?? 0,
+  );
+  const cashScore = clamp(Math.round(
+    Math.min(100, deployableCash / Math.max(1, walletTelemetry.equity_usd) * 240) +
+      (releasedCashUsd > 0 ? 12 : 0) -
+      Math.min(24, walletTelemetry.max_drawdown_pct * 2.4),
+  ), 0, 100);
+  const intakeScore = marketIntake.can_feed_trade_loop ? 88 : marketIntake.status === "blocked" ? 16 : 52;
+  const score = clamp(Math.round(
+    candidateScore * 0.3 +
+      cashScore * 0.18 +
+      profitIntegrity.integrity_score * 0.18 +
+      loopImpact.impact_score * 0.14 +
+      intakeScore * 0.1 +
+      rotationDirector.rotation_score * 0.1 -
+      (mustRefreshProof ? 14 : 0) -
+      (mustProtectFirst ? 12 : 0) -
+      (cooldown ? 18 : 0),
+  ), 0, 100);
+  const candidateReady = opportunityExecution.paper_trade_ready || reentryHunter.paper_trade_ready ||
+    (rotationDirector.action === "retarget-hot-coin" && rotationDirector.deploy_usd >= 10);
+  const blockers = [...new Set([
+    mustProtectFirst ? "Protective sell, harvest, or held-position defense must complete before released capital can chase again." : null,
+    mustRefreshProof ? "Read-only route, chart, or source proof must refresh before the redeploy lane can trust sizing." : null,
+    cooldown ? "Wallet or loop impact is in cooldown, so fresh redeploy waits." : null,
+    profitIntegrity.should_pause_fresh_buys ? "Profit integrity pauses fresh buys until the wallet loop improves." : null,
+    !candidateReady ? "No ranked attack, probe, or re-entry candidate is ready for paper redeploy." : null,
+    redeployBudget < 10 && candidateReady ? "Redeploy budget is below the local paper-ledger minimum." : null,
+    ...opportunityExecution.blockers.slice(0, 2),
+    ...reentryHunter.items.flatMap((item) => item.blockers.slice(0, 1)).slice(0, 1),
+  ].filter((item): item is string => Boolean(item)))].slice(0, 6);
+
+  let status: AutonomousProfitRedeployAutopilotStatus = "idle";
+  let action: AutonomousProfitRedeployAutopilotAction = "observe";
+  if (mustProtectFirst) {
+    status = "protect-first";
+    action = "protect-before-redeploy";
+  } else if (mustRefreshProof) {
+    status = "wait-proof";
+    action = "refresh-proof";
+  } else if (cooldown) {
+    status = "cooldown";
+    action = "cooldown";
+  } else if (profitIntegrity.should_pause_fresh_buys || blockers.length > 0 && !candidateReady) {
+    status = "blocked";
+    action = "stand-down";
+  } else if (candidateReady && redeployBudget >= 25 && score >= 68) {
+    status = "redeploy";
+    action = "paper-redeploy";
+  } else if (candidateReady && redeployBudget >= 10 && score >= 52) {
+    status = "probe";
+    action = "paper-probe";
+  } else if (candidateReady) {
+    status = "blocked";
+    action = "stand-down";
+  }
+  const canRedeployPaper = (status === "redeploy" || status === "probe") &&
+    redeployBudget >= 10 &&
+    candidateReady &&
+    blockers.length === 0;
+  const executionBoundary: AutonomousProfitRedeployAutopilot["execution_boundary"] = mustRefreshProof
+    ? "read-only-refresh"
+    : canRedeployPaper
+      ? "paper-ledger-only"
+      : "blocked-live";
+  const nextCadenceSeconds = profitRedeployAutopilotCadence(status, loopImpact.next_cadence_seconds, opportunityExecution.review_after_seconds, reentryHunter.fastest_review_seconds);
+
+  return {
+    mode: "autonomous-profit-redeploy-autopilot",
+    status,
+    action,
+    symbol: candidateSymbol,
+    from_symbol: fromSymbol,
+    redeploy_budget_usd: canRedeployPaper ? redeployBudget : 0,
+    released_cash_usd: releasedCashUsd,
+    reserve_usd: Math.round(Math.max(0, deployableCash - (canRedeployPaper ? redeployBudget : 0))),
+    expected_edge_usd: canRedeployPaper ? expectedEdgeUsd : 0,
+    redeploy_score: score,
+    next_cadence_seconds: nextCadenceSeconds,
+    can_redeploy_paper: canRedeployPaper,
+    must_refresh_proof: mustRefreshProof,
+    must_protect_first: mustProtectFirst,
+    execution_boundary: executionBoundary,
+    summary: profitRedeployAutopilotSummary(status, fromSymbol, candidateSymbol, releasedCashUsd, redeployBudget),
+    next_action: profitRedeployAutopilotNextAction(status, action, fromSymbol, candidateSymbol, nextCadenceSeconds, blockers),
+    blockers,
+    controls: [
+      "Connects profit capture to the next redeploy decision so released cash cannot automatically chase noisy memecoins.",
+      "Protective sells, harvests, stale proof, cooldown impact, source intake gaps, and profit-integrity pauses outrank fresh paper buys.",
+      "Redeploy/probe can only create a bounded local paper-ledger candidate; it cannot sign swaps, submit transactions, custody funds, run after the app stops, or guarantee profit.",
+    ],
+    items: [
+      {
+        id: "capture",
+        label: "Released profit",
+        status: mustProtectFirst ? "block" : releasedCashUsd > 0 ? "pass" : "watch",
+        score: profitCapture.autopilot_score,
+        value: `${formatCompactValue(releasedCashUsd)} release`,
+        detail: profitCapture.next_action,
+      },
+      {
+        id: "candidate",
+        label: "Next target",
+        status: candidateReady ? "pass" : candidateScore < 42 ? "block" : "watch",
+        score: candidateScore,
+        value: candidateSymbol ?? "none",
+        detail: opportunityExecution.paper_trade_ready
+          ? opportunityExecution.summary
+          : reentryHunter.paper_trade_ready
+            ? reentryHunter.summary
+            : rotationDirector.next_action,
+      },
+      {
+        id: "cash",
+        label: "Paper cash",
+        status: redeployBudget >= 25 ? "pass" : deployableCash >= 10 ? "watch" : "block",
+        score: cashScore,
+        value: `${formatCompactValue(canRedeployPaper ? redeployBudget : deployableCash)} usable`,
+        detail: `${formatCompactValue(walletTelemetry.cash_usd)} cash plus ${formatCompactValue(releasedCashUsd)} modeled release, ${formatCompactValue(Math.max(0, deployableCash - redeployBudget))} reserve.`,
+      },
+      {
+        id: "integrity",
+        label: "Integrity",
+        status: profitIntegrity.should_pause_fresh_buys || profitIntegrity.should_protect_first ? "block" : profitIntegrity.can_continue ? "pass" : "watch",
+        score: profitIntegrity.integrity_score,
+        value: profitIntegrity.permission.replaceAll("-", " "),
+        detail: profitIntegrity.next_action,
+      },
+      {
+        id: "intake",
+        label: "Source intake",
+        status: marketIntake.can_feed_trade_loop ? "pass" : marketIntake.status === "blocked" ? "block" : "watch",
+        score: intakeScore,
+        value: marketIntake.status.replaceAll("-", " "),
+        detail: marketIntake.next_action,
+      },
+      {
+        id: "boundary",
+        label: "Boundary",
+        status: executionBoundary === "paper-ledger-only" || executionBoundary === "read-only-refresh" ? "pass" : "block",
+        score: executionBoundary === "paper-ledger-only" ? 94 : executionBoundary === "read-only-refresh" ? 76 : 10,
+        value: executionBoundary.replaceAll("-", " "),
+        detail: executionBoundary === "paper-ledger-only"
+          ? "Only the local paper ledger can receive the redeploy candidate."
+          : executionBoundary === "read-only-refresh"
+            ? "Only read-only proof refresh is allowed before redeploy."
+            : "Fresh redeploy is blocked; live execution remains unavailable.",
+      },
+    ],
+  };
+}
+
+function profitRedeployAutopilotCadence(
+  status: AutonomousProfitRedeployAutopilotStatus,
+  impactCadenceSeconds: number,
+  rankReviewSeconds: number,
+  reentryReviewSeconds: number,
+) {
+  if (status === "redeploy") return Math.max(3, Math.min(rankReviewSeconds, impactCadenceSeconds, 12));
+  if (status === "probe") return Math.max(5, Math.min(rankReviewSeconds, reentryReviewSeconds, impactCadenceSeconds, 18));
+  if (status === "wait-proof") return Math.max(4, Math.min(impactCadenceSeconds, 20));
+  if (status === "protect-first") return Math.max(3, Math.min(impactCadenceSeconds, 16));
+  if (status === "cooldown") return Math.max(20, Math.min(impactCadenceSeconds, 75));
+  if (status === "blocked") return Math.max(15, Math.min(impactCadenceSeconds, 60));
+  return Math.max(20, Math.min(impactCadenceSeconds, 45));
+}
+
+function profitRedeployAutopilotSummary(
+  status: AutonomousProfitRedeployAutopilotStatus,
+  fromSymbol: string | null,
+  targetSymbol: string | null,
+  releasedCashUsd: number,
+  redeployBudgetUsd: number,
+) {
+  if (status === "redeploy") return `Released paper capital can redeploy ${formatCompactValue(redeployBudgetUsd)} toward ${targetSymbol ?? "the top ranked coin"}.`;
+  if (status === "probe") return `Released paper capital can only probe ${targetSymbol ?? "the top ranked coin"} with a bounded starter size.`;
+  if (status === "wait-proof") return `${fromSymbol ?? "Released capital"} waits for fresh route, chart, or source proof before redeploying.`;
+  if (status === "protect-first") return `${fromSymbol ?? "The held book"} must be protected before ${formatCompactValue(releasedCashUsd)} can become chase capital.`;
+  if (status === "cooldown") return "Redeploy is paused while wallet or loop impact cooldown clears.";
+  if (status === "blocked") return "Redeploy is blocked until candidate, budget, and integrity gates line up.";
+  return "Redeploy autopilot is idle until profit capture releases cash or a clean target appears.";
+}
+
+function profitRedeployAutopilotNextAction(
+  status: AutonomousProfitRedeployAutopilotStatus,
+  action: AutonomousProfitRedeployAutopilotAction,
+  fromSymbol: string | null,
+  targetSymbol: string | null,
+  reviewAfterSeconds: number,
+  blockers: string[],
+) {
+  if (status === "redeploy") return `Queue a bounded local paper redeploy into ${targetSymbol ?? "the top ranked coin"} and re-score in ${reviewAfterSeconds}s.`;
+  if (status === "probe") return `Use only a small local paper probe for ${targetSymbol ?? "the top ranked coin"}, then re-check wallet impact in ${reviewAfterSeconds}s.`;
+  if (status === "wait-proof") return "Refresh read-only proof first, then rerun profit capture and redeploy sizing before any fresh paper buy.";
+  if (status === "protect-first") return `Protect or harvest ${fromSymbol ?? "the held book"} before allowing released cash to chase again.`;
+  if (status === "cooldown") return blockers[0] ?? "Wait for cooldown evidence to improve before redeploy.";
+  if (status === "blocked") return blockers[0] ?? "Stand down until redeploy evidence improves.";
+  if (action === "observe") return "Keep watching for released paper cash and a clean ranked candidate.";
+  return "Stand down until redeploy blockers clear.";
 }
 
 function buildAutonomousScalpExitAutopilot({

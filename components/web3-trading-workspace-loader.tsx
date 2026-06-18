@@ -440,6 +440,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
   const profitForecast = state.autonomous_profit_forecast;
   const profitVelocity = state.autonomous_profit_velocity_governor;
   const profitCaptureAutopilot = state.autonomous_profit_capture_autopilot;
+  const profitRedeployAutopilot = state.autonomous_profit_redeploy_autopilot;
   const tickPlan = state.autonomous_tick_plan;
   const tickGovernor = state.autonomous_tick_governor;
   const actionQueue = state.autonomous_action_queue;
@@ -521,6 +522,17 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
             : "text-outline",
     },
     {
+      label: "Redeploy",
+      value: profitRedeployAutopilot.status.replace("-", " "),
+      tone: profitRedeployAutopilot.status === "redeploy" || profitRedeployAutopilot.status === "probe"
+        ? "text-engine"
+        : profitRedeployAutopilot.status === "wait-proof" || profitRedeployAutopilot.status === "protect-first"
+          ? "text-caution"
+          : profitRedeployAutopilot.status === "blocked" || profitRedeployAutopilot.status === "cooldown"
+            ? "text-critical"
+            : "text-outline",
+    },
+    {
       label: "Refresh",
       value: wakePlan.should_refresh_first || autoWatchPlan.mode === "refresh" ? "first" : "current",
       tone: wakePlan.should_refresh_first || autoWatchPlan.mode === "refresh" ? "text-caution" : "text-engine",
@@ -572,6 +584,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
             </Chip>
             <Chip tone={profitCaptureAutopilotTone(profitCaptureAutopilot.status)}>
               capture {profitCaptureAutopilot.status.replace("-", " ")}
+            </Chip>
+            <Chip tone={profitRedeployAutopilotTone(profitRedeployAutopilot.status)}>
+              redeploy {profitRedeployAutopilot.status.replace("-", " ")}
             </Chip>
             <Chip tone={wakePlan.can_auto_watch_run ? wakePlan.status === "minute" || wakePlan.status === "sprint" ? "engine" : "caution" : "critical"}>
               {wakePlan.auto_watch_label}
@@ -953,6 +968,7 @@ function QuickTradingCommandDeck({
   const forwardPermission = state.autonomous_forward_loop_permission;
   const loopImpact = state.autonomous_loop_impact_auditor;
   const profitCaptureAutopilot = state.autonomous_profit_capture_autopilot;
+  const profitRedeployAutopilot = state.autonomous_profit_redeploy_autopilot;
   const discoveryDelta = state.live_discovery_delta_tape;
   const ranker = state.autonomous_opportunity_ranker;
   const positionBoard = state.autonomous_portfolio_mark_board;
@@ -997,6 +1013,7 @@ function QuickTradingCommandDeck({
   const forwardTone = forwardPermissionTone(forwardPermission.status);
   const loopImpactToneValue = loopImpactTone(loopImpact.status);
   const profitCaptureToneValue = profitCaptureAutopilotTone(profitCaptureAutopilot.status);
+  const profitRedeployToneValue = profitRedeployAutopilotTone(profitRedeployAutopilot.status);
 
   return (
     <section className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(21rem,0.8fr)]" aria-label="Autonomous trading command deck">
@@ -1018,6 +1035,7 @@ function QuickTradingCommandDeck({
             <Chip tone={forwardTone}>forward {forwardPermission.permission.replaceAll("-", " ")}</Chip>
             <Chip tone={loopImpactToneValue}>impact {loopImpact.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitCaptureToneValue}>capture {profitCaptureAutopilot.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={profitRedeployToneValue}>redeploy {profitRedeployAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watching" : autoWatchPlan.label}</Chip>
             <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
           </div>
@@ -1049,6 +1067,7 @@ function QuickTradingCommandDeck({
           autoWatchPlan={autoWatchPlan}
         />
         <QuickProfitCaptureAutopilotStrip state={state} />
+        <QuickProfitRedeployAutopilotStrip state={state} />
 
         <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_13rem]">
           <QuickWalletNetWorthChart
@@ -1236,6 +1255,7 @@ function QuickAutonomousNextTickRail({
   const sessionRun = state.autonomous_session_run;
   const loopTick = state.autonomous_loop_tick;
   const capture = state.autonomous_profit_capture_autopilot;
+  const redeploy = state.autonomous_profit_redeploy_autopilot;
   const ledgerFills = sessionRun.requested ? sessionRun.fill_count : state.paper_account.trade_count;
   const stages: Array<{
     id: string;
@@ -1270,6 +1290,14 @@ function QuickAutonomousNextTickRail({
       tone: actionQueueStatusTone(actionQueue.status),
     },
     {
+      id: "redeploy",
+      label: "Redeploy",
+      value: redeploy.status.replaceAll("-", " "),
+      detail: `${redeploy.symbol ?? "no target"} · ${formatCompactCurrency(redeploy.redeploy_budget_usd)}`,
+      score: redeploy.redeploy_score,
+      tone: profitRedeployAutopilotTone(redeploy.status),
+    },
+    {
       id: "ledger",
       label: "Ledger",
       value: `${ledgerFills} fills`,
@@ -1290,7 +1318,9 @@ function QuickAutonomousNextTickRail({
     ? "proof"
     : loopImpact.status === "protect" || loopImpact.status === "harvest" || loopImpact.status === "tighten" || loopImpact.status === "cooldown" || loopImpact.status === "blocked"
       ? "impact"
-      : actionQueue.items.length > 0
+      : redeploy.status === "redeploy" || redeploy.status === "probe" || redeploy.status === "wait-proof" || redeploy.status === "protect-first"
+        ? "redeploy"
+        : actionQueue.items.length > 0
         ? "queue"
         : ledgerFills > 0
           ? "ledger"
@@ -1312,6 +1342,9 @@ function QuickAutonomousNextTickRail({
           <Chip tone={profitCaptureAutopilotTone(capture.status)}>
             capture {capture.action.replaceAll("-", " ")}
           </Chip>
+          <Chip tone={profitRedeployAutopilotTone(redeploy.status)}>
+            redeploy {redeploy.action.replaceAll("-", " ")}
+          </Chip>
           <Chip tone={autoWatchPlan.mode === "minute" || autoWatchPlan.mode === "sprint" ? "engine" : autoWatchPlan.mode === "refresh" ? "caution" : "neutral"}>
             {Math.round(autoWatchPlan.delayMs / 1000)}s cadence
           </Chip>
@@ -1320,7 +1353,7 @@ function QuickAutonomousNextTickRail({
           </Chip>
         </div>
       </div>
-      <div className="mt-2 grid gap-1.5 sm:grid-cols-5">
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-3 xl:grid-cols-6">
         {stages.map((stage, index) => {
           const isActive = index === activeIndex;
           const isDone = index < activeIndex;
@@ -1346,10 +1379,10 @@ function QuickAutonomousNextTickRail({
         })}
       </div>
       <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">
-        {loopImpact.next_action} Profit capture: {capture.next_action} The server owns fills; the UI only schedules read-only proof, bounded local-paper ticks, and visible safety gates.
+        {loopImpact.next_action} Profit capture: {capture.next_action} Redeploy: {redeploy.next_action} The server owns fills; the UI only schedules read-only proof, bounded local-paper ticks, and visible safety gates.
       </p>
       <span className="sr-only" aria-label="Autonomous next tick flow receipt">
-        Next tick flow active stage {activeStage}; auto watch {autoWatch ? "on" : "off"}; plan {autoWatchPlan.label}; cadence {Math.round(autoWatchPlan.delayMs / 1000)} seconds; proof {route.status}; impact {loopImpact.status}; profit capture {capture.status} {capture.action}; capture release {formatCurrency(capture.release_usd)}; capture boundary {capture.execution_boundary}; queue {actionQueue.status}; ledger fills {ledgerFills}; live boundary {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+        Next tick flow active stage {activeStage}; auto watch {autoWatch ? "on" : "off"}; plan {autoWatchPlan.label}; cadence {Math.round(autoWatchPlan.delayMs / 1000)} seconds; proof {route.status}; impact {loopImpact.status}; profit capture {capture.status} {capture.action}; capture release {formatCurrency(capture.release_usd)}; capture boundary {capture.execution_boundary}; redeploy {redeploy.status} {redeploy.action}; redeploy budget {formatCurrency(redeploy.redeploy_budget_usd)}; redeploy boundary {redeploy.execution_boundary}; queue {actionQueue.status}; ledger fills {ledgerFills}; live boundary {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
       </span>
     </section>
   );
@@ -1401,6 +1434,59 @@ function QuickProfitCaptureAutopilotStrip({ state }: { state: Web3TradingState }
       </p>
       <span className="sr-only" aria-label="Autonomous profit capture autopilot receipt">
         Profit capture autopilot status {capture.status}; action {capture.action}; symbol {capture.symbol ?? "none"}; score {capture.autopilot_score}; release {formatCurrency(capture.release_usd)}; keep {formatCurrency(capture.keep_usd)}; protected profit {formatCurrency(capture.protected_profit_usd)}; cadence {capture.next_cadence_seconds} seconds; protective sell {capture.must_apply_protective_sell ? "yes" : "no"}; refresh route {capture.must_refresh_route ? "yes" : "no"}; can press fresh buy {capture.can_press_fresh_buy ? "yes" : "no"}; paper ready {capture.paper_trade_ready ? "yes" : "no"}; boundary {capture.execution_boundary}; blockers {capture.blockers.join("; ") || "none"}.
+      </span>
+    </section>
+  );
+}
+
+function QuickProfitRedeployAutopilotStrip({ state }: { state: Web3TradingState }) {
+  const redeploy = state.autonomous_profit_redeploy_autopilot;
+  const tone = profitRedeployAutopilotTone(redeploy.status);
+  const visibleItems = redeploy.items.slice(0, 4);
+
+  return (
+    <section className={cn("mt-2 min-w-0 rounded-md border p-2", permissionToneClass(tone))} aria-label="Autonomous profit redeploy autopilot">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Profit redeploy autopilot</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {(redeploy.from_symbol ?? "Profit")} {"->"} {redeploy.symbol ?? "wait"} · {redeploy.action.replaceAll("-", " ")}
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-outline">{redeploy.next_action}</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{redeploy.redeploy_score}/100</Chip>
+          <Chip tone={redeploy.can_redeploy_paper ? "engine" : redeploy.must_refresh_proof ? "caution" : "neutral"}>
+            {redeploy.can_redeploy_paper ? formatCompactCurrency(redeploy.redeploy_budget_usd) : redeploy.must_refresh_proof ? "refresh proof" : redeploy.execution_boundary.replaceAll("-", " ")}
+          </Chip>
+          <Chip tone={redeploy.must_protect_first ? "caution" : "demo"}>
+            {redeploy.must_protect_first ? "protect first" : formatCompactCurrency(redeploy.reserve_usd)}
+          </Chip>
+        </div>
+      </div>
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-4">
+        {visibleItems.map((item) => {
+          const itemTone: QuickChipTone = item.status === "pass" ? "engine" : item.status === "block" ? "critical" : "caution";
+          return (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", profitAuthorityBarClass(itemTone))} aria-hidden="true" />
+              </div>
+              <p className="mt-1 truncate text-xs font-semibold text-on-surface">{item.value}</p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-dim/60" aria-hidden="true">
+                <div className={cn("h-full rounded-full", profitAuthorityBarClass(itemTone))} style={{ width: `${clampNumber(item.score)}%` }} />
+              </div>
+              <p className="mt-1 truncate text-[11px] leading-4 text-outline">{item.detail}</p>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">
+        {redeploy.summary}
+      </p>
+      <span className="sr-only" aria-label="Autonomous profit redeploy autopilot receipt">
+        Profit redeploy autopilot status {redeploy.status}; action {redeploy.action}; from {redeploy.from_symbol ?? "none"}; target {redeploy.symbol ?? "none"}; score {redeploy.redeploy_score}; redeploy budget {formatCurrency(redeploy.redeploy_budget_usd)}; released cash {formatCurrency(redeploy.released_cash_usd)}; reserve {formatCurrency(redeploy.reserve_usd)}; expected edge {formatCurrency(redeploy.expected_edge_usd)}; cadence {redeploy.next_cadence_seconds} seconds; can redeploy paper {redeploy.can_redeploy_paper ? "yes" : "no"}; refresh proof {redeploy.must_refresh_proof ? "yes" : "no"}; protect first {redeploy.must_protect_first ? "yes" : "no"}; boundary {redeploy.execution_boundary}; blockers {redeploy.blockers.join("; ") || "none"}.
       </span>
     </section>
   );
@@ -6102,6 +6188,13 @@ function profitCaptureAutopilotTone(status: Web3TradingState["autonomous_profit_
   if (status === "press") return "engine";
   if (status === "race" || status === "trim" || status === "harvest" || status === "trail" || status === "refresh") return "caution";
   if (status === "blocked") return "critical";
+  return "neutral";
+}
+
+function profitRedeployAutopilotTone(status: Web3TradingState["autonomous_profit_redeploy_autopilot"]["status"]): QuickChipTone {
+  if (status === "redeploy" || status === "probe") return "engine";
+  if (status === "wait-proof" || status === "protect-first") return "caution";
+  if (status === "blocked" || status === "cooldown") return "critical";
   return "neutral";
 }
 

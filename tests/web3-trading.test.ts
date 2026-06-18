@@ -1472,6 +1472,30 @@ describe("Web3 autonomous trading subsystem", () => {
     });
   });
 
+  test("GIVEN released profit still needs proof WHEN redeploy autopilot plans THEN it refuses to chase before refresh", () => {
+    const state = getWeb3TradingState("base", 0);
+    const redeploy = state.autonomous_profit_redeploy_autopilot;
+
+    expect(redeploy.mode).toBe("autonomous-profit-redeploy-autopilot");
+    expect(redeploy.status).toBe("protect-first");
+    expect(redeploy.action).toBe("protect-before-redeploy");
+    expect(redeploy.must_protect_first).toBe(true);
+    expect(redeploy.must_refresh_proof).toBe(true);
+    expect(redeploy.can_redeploy_paper).toBe(false);
+    expect(redeploy.redeploy_budget_usd).toBe(0);
+    expect(redeploy.released_cash_usd).toBeGreaterThan(0);
+    expect(redeploy.execution_boundary).toBe("read-only-refresh");
+    expect(redeploy.next_action).toContain("Protect");
+    expect(redeploy.items.find((item) => item.id === "capture")).toMatchObject({
+      status: "block",
+    });
+    expect(redeploy.items.find((item) => item.id === "boundary")).toMatchObject({
+      status: "pass",
+      value: "read only refresh",
+    });
+    expect(redeploy.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
+  });
+
   test("GIVEN a persistent paper account WHEN backend loop tick runs THEN the loop receipt survives reload", async () => {
     const ticked = await getWeb3TradingStateAsync({
       scenario: "base",
@@ -2353,6 +2377,28 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_profit_capture_autopilot.controls.some((control) => control.includes("Condenses profit-capture race"))).toBe(true);
     expect(state.autonomous_profit_capture_autopilot.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
+    expect(state.autonomous_profit_redeploy_autopilot.mode).toBe("autonomous-profit-redeploy-autopilot");
+    expect(["redeploy", "probe", "wait-proof", "protect-first", "cooldown", "blocked", "idle"]).toContain(state.autonomous_profit_redeploy_autopilot.status);
+    expect(["paper-redeploy", "paper-probe", "refresh-proof", "protect-before-redeploy", "cooldown", "stand-down", "observe"]).toContain(state.autonomous_profit_redeploy_autopilot.action);
+    expect(state.autonomous_profit_redeploy_autopilot.redeploy_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_autopilot.redeploy_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_profit_redeploy_autopilot.redeploy_budget_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_autopilot.released_cash_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_autopilot.reserve_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_autopilot.next_cadence_seconds).toBeGreaterThan(0);
+    expect(typeof state.autonomous_profit_redeploy_autopilot.can_redeploy_paper).toBe("boolean");
+    expect(typeof state.autonomous_profit_redeploy_autopilot.must_refresh_proof).toBe("boolean");
+    expect(typeof state.autonomous_profit_redeploy_autopilot.must_protect_first).toBe("boolean");
+    expect(state.autonomous_profit_redeploy_autopilot.items.map((item) => item.id)).toEqual(["capture", "candidate", "cash", "integrity", "intake", "boundary"]);
+    expect(state.autonomous_profit_redeploy_autopilot.items.every((item) =>
+      ["pass", "watch", "block"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.value.length > 0 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(state.autonomous_profit_redeploy_autopilot.controls.some((control) => control.includes("Connects profit capture"))).toBe(true);
+    expect(state.autonomous_profit_redeploy_autopilot.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
     expect(state.autonomous_profit_benchmark.mode).toBe("autonomous-profit-benchmark");
     expect(["beating-cash", "lagging-cash", "beating-selected", "lagging-selected", "protecting-capital", "learning"]).toContain(state.autonomous_profit_benchmark.status);
     expect(state.autonomous_profit_benchmark.benchmark_score).toBeGreaterThanOrEqual(0);
