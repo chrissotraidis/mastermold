@@ -901,7 +901,20 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(fillLedger.recent_fill_count).toBeLessThanOrEqual(Math.min(8, state.trade_tape.length));
     expect(fillLedger.paper_volume_usd).toBeGreaterThanOrEqual(0);
     expect(fillLedger.net_pnl_usd).toBe(Math.round(state.portfolio.realized_pnl_usd + state.portfolio.unrealized_pnl_usd));
+    expect(["press", "keep", "tighten", "protect", "learn", "idle"]).toContain(fillLedger.last_fill_verdict);
+    expect(fillLedger.last_fill_profit_score).toBeGreaterThanOrEqual(0);
+    expect(fillLedger.last_fill_profit_score).toBeLessThanOrEqual(100);
+    expect(fillLedger.last_fill_quality_score).toBeGreaterThanOrEqual(0);
+    expect(fillLedger.last_fill_quality_score).toBeLessThanOrEqual(100);
+    expect(fillLedger.last_fill_shortfall_usd).toBeGreaterThanOrEqual(0);
+    expect(["press", "selective", "protect-only", "cooldown", "wait"]).toContain(fillLedger.next_fill_permission);
+    expect(fillLedger.last_fill_audit.length).toBeGreaterThan(0);
+    if (fillLedger.recent_fill_count > 0) {
+      expect(fillLedger.last_fill_profit_score).toBeGreaterThan(0);
+      expect(fillLedger.last_fill_symbol).toBeTruthy();
+    }
     expect(fillLedger.controls.some((control) => control.includes("local paper-ledger fills"))).toBe(true);
+    expect(fillLedger.controls.some((control) => control.includes("last-fill profit audit"))).toBe(true);
     expect(fillLedger.items.every((item) =>
       ["launch-sniper", "launch-graduation", "signal-policy", "market-pulse", "market-intelligence", "arbiter", "opportunity-race", "candle", "protection", "manual-paper"].includes(item.lane) &&
       ["press", "keep", "tighten", "protect"].includes(item.discipline) &&

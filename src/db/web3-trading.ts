@@ -7273,6 +7273,13 @@ export type AutonomousFillLedgerDigest = {
   worst_lane: AutonomousStrategyAttributionLane | null;
   last_fill_symbol: string | null;
   last_fill_side: AutonomousTrade["side"] | null;
+  last_fill_verdict: "press" | "keep" | "tighten" | "protect" | "learn" | "idle";
+  last_fill_profit_score: number;
+  last_fill_edge_usd: number;
+  last_fill_quality_score: number;
+  last_fill_shortfall_usd: number;
+  next_fill_permission: "press" | "selective" | "protect-only" | "cooldown" | "wait";
+  last_fill_audit: string;
   recommended_discipline: "press-winners" | "protect-book" | "tighten-churn" | "collect-evidence" | "wait";
   controls: string[];
   items: AutonomousFillLedgerDigestItem[];
@@ -10293,6 +10300,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       performance: configuredState.performance_scorecard,
       churnEfficiency: configuredState.churn_efficiency_auditor,
       strategyAttribution: configuredState.autonomous_strategy_attribution,
+      paperExecutionQuality: configuredState.paper_execution_quality,
     });
     configuredState.autonomous_outcome_memory_governor = buildAutonomousOutcomeMemoryGovernor({
       setupMemory: configuredState.autonomous_setup_memory,
@@ -12303,6 +12311,7 @@ function buildWeb3TradingState({
     performance: performance_scorecard,
     churnEfficiency: churn_efficiency_auditor,
     strategyAttribution: autonomous_strategy_attribution,
+    paperExecutionQuality: paper_execution_quality,
   });
   const autonomy_risk_governor = buildAutonomyRiskGovernor({
     performance: performance_scorecard,
@@ -14622,6 +14631,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     performance: performance_scorecard,
     churnEfficiency: churn_efficiency_auditor,
     strategyAttribution: autonomous_strategy_attribution,
+    paperExecutionQuality: paper_execution_quality,
   });
   const autonomy_risk_governor = buildAutonomyRiskGovernor({
     performance: performance_scorecard,
@@ -19393,6 +19403,7 @@ function applyPersistentLedger(
     performance: performance_scorecard,
     churnEfficiency: churn_efficiency_auditor,
     strategyAttribution: autonomous_strategy_attribution,
+    paperExecutionQuality: paper_execution_quality,
   });
   const autonomy_risk_governor = buildAutonomyRiskGovernor({
     performance: performance_scorecard,
@@ -62551,12 +62562,14 @@ function buildAutonomousFillLedgerDigest({
   performance,
   churnEfficiency,
   strategyAttribution,
+  paperExecutionQuality,
 }: {
   portfolio: TradingPortfolio;
   tradeTape: AutonomousTrade[];
   performance: PerformanceScorecard;
   churnEfficiency: ChurnEfficiencyAuditor;
   strategyAttribution: AutonomousStrategyAttribution;
+  paperExecutionQuality?: PaperExecutionQuality;
 }): AutonomousFillLedgerDigest {
   const recentTrades = tradeTape.slice(0, 8);
   const buyCount = recentTrades.filter((trade) => trade.side === "buy").length;
@@ -62605,6 +62618,13 @@ function buildAutonomousFillLedgerDigest({
   const lastFill = recentTrades[0] ?? null;
   const bestLane = strategyAttribution.best_lane;
   const worstLane = strategyAttribution.worst_lane;
+  const lastFillAudit = autonomousFillLedgerLastFillAudit({
+    lastFill,
+    lastItem: items[0] ?? null,
+    performance,
+    churnEfficiency,
+    paperExecutionQuality,
+  });
   const recommendedDiscipline: AutonomousFillLedgerDigest["recommended_discipline"] = recentTrades.length === 0
     ? "wait"
     : churnEfficiency.status === "stop" || churnEfficiency.entry_permission === "blocked"
@@ -62645,10 +62665,18 @@ function buildAutonomousFillLedgerDigest({
     worst_lane: worstLane,
     last_fill_symbol: lastFill?.symbol ?? null,
     last_fill_side: lastFill?.side ?? null,
+    last_fill_verdict: lastFillAudit.verdict,
+    last_fill_profit_score: lastFillAudit.score,
+    last_fill_edge_usd: lastFillAudit.edgeUsd,
+    last_fill_quality_score: lastFillAudit.qualityScore,
+    last_fill_shortfall_usd: lastFillAudit.shortfallUsd,
+    next_fill_permission: lastFillAudit.permission,
+    last_fill_audit: lastFillAudit.audit,
     recommended_discipline: recommendedDiscipline,
     controls: [
       "Summarizes the latest local paper-ledger fills so the cockpit shows what the autonomous loop actually did.",
       "Uses strategy attribution, wallet PnL, and churn discipline to decide whether the next paper cycle should press, protect, tighten, or keep collecting evidence.",
+      "Runs a last-fill profit audit so the next high-frequency paper action must earn permission from edge, fill quality, shortfall, churn, and scorecard evidence.",
       "This is a local paper-trade digest only; it cannot prove live profitability, sign transactions, submit swaps, or move wallet funds.",
     ],
     items,
@@ -62669,6 +62697,95 @@ function autonomousFillLedgerLaneLabel(lane: AutonomousStrategyAttributionLane) 
     "manual-paper": "Manual paper",
   };
   return labels[lane] ?? lane;
+}
+
+function autonomousFillLedgerLastFillAudit({
+  lastFill,
+  lastItem,
+  performance,
+  churnEfficiency,
+  paperExecutionQuality,
+}: {
+  lastFill: AutonomousTrade | null;
+  lastItem: AutonomousFillLedgerDigestItem | null;
+  performance: PerformanceScorecard;
+  churnEfficiency: ChurnEfficiencyAuditor;
+  paperExecutionQuality?: PaperExecutionQuality;
+}) {
+  if (!lastFill || !lastItem) {
+    return {
+      verdict: "idle" as const,
+      score: 0,
+      edgeUsd: 0,
+      qualityScore: 0,
+      shortfallUsd: 0,
+      permission: "wait" as const,
+      audit: "No paper fill has landed yet, so the loop must collect evidence before pressing.",
+    };
+  }
+
+  const quality = paperExecutionQuality?.items.find((item) => item.trade_id === lastFill.id);
+  const qualityScore = clamp(Math.round(
+    quality?.quality_score ??
+      (lastFill.side === "sell" ? 76 : lastItem.status === "profitable" ? 70 : lastItem.status === "dragging" ? 34 : 52),
+  ), 0, 100);
+  const shortfallUsd = Math.round(Math.max(0, quality?.implementation_shortfall_usd ?? 0));
+  const edgeUsd = Math.round(lastItem.estimated_contribution_usd - shortfallUsd);
+  const churnDragUsd = churnEfficiency.trade_count > 0
+    ? churnEfficiency.friction_usd / Math.max(1, churnEfficiency.trade_count)
+    : 0;
+  const score = clamp(Math.round(
+    42 +
+      qualityScore * 0.32 +
+      performance.risk_adjusted_score * 0.18 +
+      Math.max(-22, Math.min(24, edgeUsd * 0.85)) -
+      Math.min(22, shortfallUsd * 0.9) -
+      Math.min(16, churnDragUsd * 0.65) +
+      (lastFill.side === "sell" ? 8 : 0) +
+      (lastItem.discipline === "press" ? 7 : lastItem.discipline === "tighten" ? -9 : 0),
+  ), 0, 100);
+  const verdict: AutonomousFillLedgerDigest["last_fill_verdict"] = lastFill.side === "sell"
+    ? "protect"
+    : score >= 76 && edgeUsd > 0 && qualityScore >= 62
+      ? "press"
+      : score >= 55 && edgeUsd >= -3
+        ? "keep"
+        : score < 38 || edgeUsd < -12 || qualityScore < 38
+          ? "tighten"
+          : "learn";
+  const permission: AutonomousFillLedgerDigest["next_fill_permission"] = verdict === "press"
+    ? "press"
+    : verdict === "keep" || verdict === "learn"
+      ? "selective"
+      : verdict === "protect"
+        ? "protect-only"
+        : "cooldown";
+
+  return {
+    verdict,
+    score,
+    edgeUsd,
+    qualityScore,
+    shortfallUsd,
+    permission,
+    audit: autonomousFillLedgerLastFillAuditSummary(verdict, lastFill, edgeUsd, qualityScore, shortfallUsd, permission),
+  };
+}
+
+function autonomousFillLedgerLastFillAuditSummary(
+  verdict: AutonomousFillLedgerDigest["last_fill_verdict"],
+  lastFill: AutonomousTrade,
+  edgeUsd: number,
+  qualityScore: number,
+  shortfallUsd: number,
+  permission: AutonomousFillLedgerDigest["next_fill_permission"],
+) {
+  if (verdict === "press") return `Last ${lastFill.symbol} paper ${lastFill.side} earned press permission: ${formatSignedCompactValue(edgeUsd)} edge, ${qualityScore}/100 fill quality, ${formatCompactValue(shortfallUsd)} shortfall.`;
+  if (verdict === "keep") return `Last ${lastFill.symbol} paper ${lastFill.side} keeps the loop selective with ${qualityScore}/100 fill quality and ${formatSignedCompactValue(edgeUsd)} edge.`;
+  if (verdict === "tighten") return `Last ${lastFill.symbol} paper ${lastFill.side} forces cooldown: ${formatSignedCompactValue(edgeUsd)} edge after ${formatCompactValue(shortfallUsd)} shortfall.`;
+  if (verdict === "protect") return `Last ${lastFill.symbol} paper sell is protective; fresh entries stay ${permission.replace("-", " ")} until wallet pressure clears.`;
+  if (verdict === "learn") return `Last ${lastFill.symbol} paper ${lastFill.side} needs another small evidence tick before scaling.`;
+  return "Last-fill audit is idle until a local paper fill lands.";
 }
 
 function autonomousFillLedgerDigestSummary(
@@ -64423,6 +64540,7 @@ function attachPaperDaemonTick(
     performance: state.performance_scorecard,
     churnEfficiency: state.churn_efficiency_auditor,
     strategyAttribution: state.autonomous_strategy_attribution,
+    paperExecutionQuality: state.paper_execution_quality,
   });
   const autonomousSessionPlanner = buildAutonomousSessionPlanner({
     scanner: state.live_scanner_readiness,
@@ -65262,6 +65380,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     performance: state.performance_scorecard,
     churnEfficiency: state.churn_efficiency_auditor,
     strategyAttribution: state.autonomous_strategy_attribution,
+    paperExecutionQuality: state.paper_execution_quality,
   });
   const autonomousSessionPlanner = buildAutonomousSessionPlanner({
     scanner: state.live_scanner_readiness,

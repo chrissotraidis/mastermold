@@ -919,6 +919,7 @@ function QuickTradingCommandDeck({
   const sourceQuality = state.autonomous_source_quality_oracle;
   const thesis = state.autonomous_profit_thesis_verifier;
   const capitalCommand = state.autonomous_capital_command;
+  const fillLedger = state.autonomous_fill_ledger_digest;
   const discoveryDelta = state.live_discovery_delta_tape;
   const ranker = state.autonomous_opportunity_ranker;
   const positionBoard = state.autonomous_portfolio_mark_board;
@@ -959,6 +960,7 @@ function QuickTradingCommandDeck({
       : "caution";
   const liveTone: QuickChipTone = state.execution_gate.live_execution_enabled ? "critical" : "demo";
   const sourceTone = sourceQualityTone(sourceQuality.status, sourceQuality.can_chase);
+  const fillAuditToneValue = fillAuditTone(fillLedger.last_fill_verdict);
 
   return (
     <section className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(21rem,0.8fr)]" aria-label="Autonomous trading command deck">
@@ -976,6 +978,7 @@ function QuickTradingCommandDeck({
           <div className="flex flex-wrap justify-end gap-2">
             <Chip tone={primaryTone}>{decision.status.replaceAll("-", " ")}</Chip>
             <Chip tone={sourceTone}>source {sourceQuality.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={fillAuditToneValue}>last fill {fillLedger.next_fill_permission.replaceAll("-", " ")}</Chip>
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watching" : autoWatchPlan.label}</Chip>
             <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
           </div>
@@ -1042,6 +1045,12 @@ function QuickTradingCommandDeck({
               value={capitalCommand.action.replaceAll("-", " ")}
               detail={`${formatCompactCurrency(capitalCommand.spend_budget_usd)} spend · ${formatCompactCurrency(capitalCommand.release_budget_usd)} release`}
               tone={capitalCommandTone(capitalCommand.status)}
+            />
+            <ProfitMetric
+              label="Last fill audit"
+              value={`${fillLedger.last_fill_profit_score}/100`}
+              detail={`${fillLedger.last_fill_verdict} · ${formatCompactSignedCurrency(fillLedger.last_fill_edge_usd)} edge`}
+              tone={fillAuditToneValue}
             />
             <ProfitMetric
               label="Source quality"
@@ -2019,6 +2028,7 @@ function QuickProfitFeedbackRibbon({
   const maxContribution = Math.max(1, ...items.map((item) => Math.abs(item.contribution_usd)));
   const statusTone = profitLearningTone(learning.status);
   const digestTone = fillLedgerStatusTone(digest.status);
+  const lastFillTone = fillAuditTone(digest.last_fill_verdict);
   const memoryTone: QuickChipTone = outcomeMemory.status === "press" || outcomeMemory.status === "compound"
     ? "engine"
     : outcomeMemory.status === "protect" || outcomeMemory.status === "cooldown"
@@ -2046,6 +2056,7 @@ function QuickProfitFeedbackRibbon({
             <div className="flex flex-wrap justify-end gap-2">
               <Chip tone={statusTone}>{learning.confidence_score}/100 learn</Chip>
               <Chip tone={digestTone}>{digest.recommended_discipline.replaceAll("-", " ")}</Chip>
+              <Chip tone={lastFillTone}>{digest.next_fill_permission.replaceAll("-", " ")}</Chip>
               <Chip tone={memoryTone}>{outcomeMemory.next_bias.replaceAll("-", " ")}</Chip>
             </div>
           </div>
@@ -2080,6 +2091,7 @@ function QuickProfitFeedbackRibbon({
         </div>
         <div className="grid min-w-0 grid-cols-2 gap-1 xl:grid-cols-1" aria-label="Autonomous profit feedback metrics">
           <ProfitMetric label="Paper PnL" value={formatCompactSignedCurrency(learning.net_pnl_usd)} detail={`${formatCompactSignedCurrency(learning.realized_pnl_usd)} realized`} tone={learning.net_pnl_usd >= 0 ? "engine" : "critical"} />
+          <ProfitMetric label="Last fill audit" value={`${digest.last_fill_profit_score}/100`} detail={`${digest.last_fill_verdict} · ${formatCompactSignedCurrency(digest.last_fill_edge_usd)}`} tone={lastFillTone} />
           <ProfitMetric label="Expectancy" value={formatCompactSignedCurrency(learning.expectancy_usd)} detail={`${digest.recent_fill_count} fills`} tone={learning.expectancy_usd >= 0 ? "engine" : "critical"} />
           <ProfitMetric label="Best lane" value={bestLane} detail={formatCompactSignedCurrency(attribution.net_contribution_usd)} tone={attribution.net_contribution_usd >= 0 ? "engine" : "critical"} />
           <ProfitMetric label="Worst drag" value={learning.worst_drag ?? worstLane} detail={`${attribution.recommended_size_bias}x bias`} tone={learning.worst_drag || attribution.worst_lane ? "caution" : "engine"} />
@@ -2088,7 +2100,7 @@ function QuickProfitFeedbackRibbon({
         </div>
       </div>
       <span className="sr-only" aria-label="Autonomous profit feedback receipt">
-        Profit feedback {learning.status}; confidence {learning.confidence_score}; net paper PnL {formatSignedCurrency(learning.net_pnl_usd)}; realized {formatSignedCurrency(learning.realized_pnl_usd)}; open {formatSignedCurrency(learning.open_pnl_usd)}; expectancy {formatSignedCurrency(learning.expectancy_usd)}; next size {learning.size_multiplier}x; cadence {learning.cadence_seconds} seconds; deploy bias {formatCurrency(learning.deploy_bias_usd)}; release bias {formatCurrency(learning.release_bias_usd)}; best signal {learning.best_signal ?? "none"}; worst drag {learning.worst_drag ?? "none"}; fill digest {digest.status}; recent fills {digest.recent_fill_count}; strategy attribution {attribution.status}; best lane {attribution.best_lane ?? "none"}; worst lane {attribution.worst_lane ?? "none"}; outcome memory {outcomeMemory.status}; next bias {outcomeMemory.next_bias}; daemon memory {daemonMemory.status}; daemon window PnL {formatSignedCurrency(daemonMemory.window_pnl_usd)}.
+        Profit feedback {learning.status}; confidence {learning.confidence_score}; net paper PnL {formatSignedCurrency(learning.net_pnl_usd)}; realized {formatSignedCurrency(learning.realized_pnl_usd)}; open {formatSignedCurrency(learning.open_pnl_usd)}; expectancy {formatSignedCurrency(learning.expectancy_usd)}; next size {learning.size_multiplier}x; cadence {learning.cadence_seconds} seconds; deploy bias {formatCurrency(learning.deploy_bias_usd)}; release bias {formatCurrency(learning.release_bias_usd)}; best signal {learning.best_signal ?? "none"}; worst drag {learning.worst_drag ?? "none"}; fill digest {digest.status}; recent fills {digest.recent_fill_count}; last fill verdict {digest.last_fill_verdict}; last fill profit score {digest.last_fill_profit_score}; last fill edge {formatSignedCurrency(digest.last_fill_edge_usd)}; last fill quality {digest.last_fill_quality_score}; last fill shortfall {formatCurrency(digest.last_fill_shortfall_usd)}; next fill permission {digest.next_fill_permission}; strategy attribution {attribution.status}; best lane {attribution.best_lane ?? "none"}; worst lane {attribution.worst_lane ?? "none"}; outcome memory {outcomeMemory.status}; next bias {outcomeMemory.next_bias}; daemon memory {daemonMemory.status}; daemon window PnL {formatSignedCurrency(daemonMemory.window_pnl_usd)}.
       </span>
     </section>
   );
@@ -5061,6 +5073,7 @@ function QuickFillLearningLedger({
       : outcomeMemory.status === "selective" || outcomeMemory.status === "learning"
         ? "caution"
         : "neutral";
+  const auditTone = fillAuditTone(digest.last_fill_verdict);
 
   return (
     <section className="rounded-md border border-engine/20 bg-void/20 p-2 sm:p-3" aria-label="Autonomous fill learning ledger">
@@ -5078,6 +5091,7 @@ function QuickFillLearningLedger({
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <Chip tone={statusTone}>{digest.status}</Chip>
+              <Chip tone={auditTone}>{digest.next_fill_permission.replaceAll("-", " ")}</Chip>
               <Chip tone={memoryTone}>{outcomeMemory.next_bias.replaceAll("-", " ")}</Chip>
             </div>
           </div>
@@ -5143,14 +5157,17 @@ function QuickFillLearningLedger({
           </p>
           <dl className="mt-2 grid grid-cols-2 gap-1" aria-label="Fill learning metrics">
             <ProfitMetric label="Net fills" value={formatCompactSignedCurrency(digest.net_pnl_usd)} detail={`${digest.buy_count}/${digest.sell_count} buy/sell`} tone={digest.net_pnl_usd >= 0 ? "engine" : "critical"} />
+            <ProfitMetric label="Last audit" value={`${digest.last_fill_profit_score}/100`} detail={digest.next_fill_permission.replaceAll("-", " ")} tone={auditTone} />
             <ProfitMetric label="Volume" value={formatCompactCurrency(digest.paper_volume_usd)} detail={`${formatCompactCurrency(digest.average_fill_usd)} avg`} tone={digest.paper_volume_usd > 0 ? "engine" : "neutral"} />
+            <ProfitMetric label="Fill quality" value={`${digest.last_fill_quality_score}/100`} detail={`${formatCompactCurrency(digest.last_fill_shortfall_usd)} shortfall`} tone={auditTone} />
             <ProfitMetric label="Best lane" value={digest.best_lane ? shortLaneLabel(digest.best_lane) : "none"} detail={formatCompactSignedCurrency(attribution.net_contribution_usd)} tone={attribution.net_contribution_usd >= 0 ? "engine" : "critical"} />
             <ProfitMetric label="Outcome" value={`${outcomeMemory.memory_score}/100`} detail={`${outcomeMemory.size_multiplier}x size`} tone={memoryTone} />
             <ProfitMetric label="Win rate" value={`${Math.round(outcomeMemory.win_rate_pct)}%`} detail={`${outcomeMemory.profit_factor}x factor`} tone={outcomeMemory.win_rate_pct >= 50 ? "engine" : outcomeMemory.win_rate_pct > 0 ? "caution" : "neutral"} />
             <ProfitMetric label="Last fill" value={digest.last_fill_symbol ?? "none"} detail={digest.last_fill_side ?? "waiting"} tone={digest.last_fill_side === "sell" ? "caution" : digest.last_fill_side === "buy" ? "engine" : "neutral"} />
           </dl>
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-on-surface-variant">{digest.last_fill_audit}</p>
           <span className="sr-only" aria-label="Autonomous fill learning receipt">
-            Fill learning ledger status {digest.status}; discipline {digest.recommended_discipline}; recent fills {digest.recent_fill_count}; buys {digest.buy_count}; sells {digest.sell_count}; paper volume {formatCurrency(digest.paper_volume_usd)}; net paper PnL {formatSignedCurrency(digest.net_pnl_usd)}; best lane {digest.best_lane ?? "none"}; worst lane {digest.worst_lane ?? "none"}; strategy attribution {attribution.status}; active lanes {attribution.active_lane_count}; outcome memory {outcomeMemory.status}; next bias {outcomeMemory.next_bias}; controls {digest.controls.join(" ")}
+            Fill learning ledger status {digest.status}; discipline {digest.recommended_discipline}; recent fills {digest.recent_fill_count}; buys {digest.buy_count}; sells {digest.sell_count}; paper volume {formatCurrency(digest.paper_volume_usd)}; net paper PnL {formatSignedCurrency(digest.net_pnl_usd)}; last fill verdict {digest.last_fill_verdict}; last fill score {digest.last_fill_profit_score}; last fill edge {formatSignedCurrency(digest.last_fill_edge_usd)}; last fill quality {digest.last_fill_quality_score}; last fill shortfall {formatCurrency(digest.last_fill_shortfall_usd)}; next fill permission {digest.next_fill_permission}; best lane {digest.best_lane ?? "none"}; worst lane {digest.worst_lane ?? "none"}; strategy attribution {attribution.status}; active lanes {attribution.active_lane_count}; outcome memory {outcomeMemory.status}; next bias {outcomeMemory.next_bias}; controls {digest.controls.join(" ")}
           </span>
         </div>
       </div>
@@ -5797,6 +5814,13 @@ function fillLedgerStatusTone(status: Web3TradingState["autonomous_fill_ledger_d
   if (status === "pressing" || status === "profitable") return "engine";
   if (status === "protecting" || status === "cooldown") return "critical";
   if (status === "learning") return "caution";
+  return "neutral";
+}
+
+function fillAuditTone(verdict: Web3TradingState["autonomous_fill_ledger_digest"]["last_fill_verdict"]): QuickChipTone {
+  if (verdict === "press" || verdict === "keep") return "engine";
+  if (verdict === "tighten" || verdict === "protect") return "critical";
+  if (verdict === "learn") return "caution";
   return "neutral";
 }
 
