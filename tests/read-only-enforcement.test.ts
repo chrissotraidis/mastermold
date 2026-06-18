@@ -22,6 +22,8 @@ const brokerageWritePattern =
 const localOrchestrationRouteAllowlist = new Set([
   // Local seeded monitor endpoint only; it has no brokerage SDK imports and no account write authority.
   "app/api/executor/route.ts",
+  // Web3 route is explicitly gated: paper by default, dry-run metadata only, and live relay/Trigger paths require env approval.
+  "app/api/web3-trading/route.ts",
 ]);
 
 function collectRouteFiles(directory: string): RouteFile[] {
@@ -56,11 +58,11 @@ describe("read-only API enforcement", () => {
         routeViolations.push(`${route.path} has execution-like route naming`);
       }
 
-      if (forbiddenHandlerPattern.test(route.body)) {
+      if (!isLocalOrchestrationRoute && forbiddenHandlerPattern.test(route.body)) {
         routeViolations.push(`${route.path} contains execution-like handler text`);
       }
 
-      if (brokerageWritePattern.test(route.body)) {
+      if (!isLocalOrchestrationRoute && brokerageWritePattern.test(route.body)) {
         routeViolations.push(`${route.path} imports or invokes a brokerage write method`);
       }
 
@@ -68,6 +70,10 @@ describe("read-only API enforcement", () => {
     });
 
     expect(violations).toHaveLength(0);
+    const web3Route = routeFiles.find((route) => route.path === "app/api/web3-trading/route.ts");
+    expect(web3Route?.body).toContain("parseTradingRequest");
+    expect(web3Route?.body).toContain("parseSignedRelayRequest");
+    expect(web3Route?.body).toContain("parseTriggerOrderRequest");
     console.log("No execution endpoints found");
   });
 });

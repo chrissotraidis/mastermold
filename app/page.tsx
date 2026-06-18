@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import {
   AlertTriangle,
   ArrowRight,
+  Bot,
   BookOpenText,
   CircleSlash2,
   LineChart,
@@ -248,9 +249,10 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
           </aside>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-3" aria-label="More places to review">
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="More places to review">
           <FooterLink href="/portfolio" icon={LineChart} label="Portfolio" note="Holdings snapshots and concentration" />
           <FooterLink href="/paper" icon={Wallet} label="Paper trading" note="Test ideas in the simulator" />
+          <FooterLink href="/trading" icon={Bot} label="Web3 Autopilot" note="Autonomous memecoin paper desk" />
           <FooterLink href="/review" icon={ShieldCheck} label="Performance" note="Past calls, limits, and trust" />
         </section>
       </div>

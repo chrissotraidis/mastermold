@@ -47,6 +47,7 @@ export function SentinelFace({
   return (
     <div
       className={cn("relative isolate h-full w-full", className)}
+      style={{ width: "100%", height: "100%" }}
       role="img"
       aria-label={`Master Mold — ${st.label}${speaking ? ", speaking" : ""}`}
     >
@@ -57,6 +58,8 @@ export function SentinelFace({
         draggable={false}
         className="h-full w-full select-none object-contain"
         style={{
+          width: "100%",
+          height: "100%",
           filter: st.filter,
           maskImage: "radial-gradient(ellipse 64% 72% at 50% 47%, #000 58%, transparent 84%)",
           WebkitMaskImage: "radial-gradient(ellipse 64% 72% at 50% 47%, #000 58%, transparent 84%)",

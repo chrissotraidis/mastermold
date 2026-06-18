@@ -81,6 +81,27 @@ export type ProductMetricEventRow = {
   created_at: string;
 };
 
+export type Web3PaperLedgerRow = {
+  id: "default";
+  cash_usd: number;
+  realized_pnl_usd: number;
+  cycle: number;
+  updated_at: string;
+  data: unknown;
+};
+
+export type Web3ExecutionConfigRow = {
+  id: "default";
+  updated_at: string;
+  data: unknown;
+};
+
+export type Web3ExecutionAuditRow = {
+  id: string;
+  created_at: string;
+  data: unknown;
+};
+
 export interface PersistAdapter {
   readonly backend: "sqlite" | "memory";
   loggedJournalEntries(): DecisionJournalEntry[];
@@ -114,6 +135,13 @@ export interface PersistAdapter {
   upsertBrainRun(run: BrainRun): void;
   marketMemoryFacts(limit?: number): MarketMemoryFact[];
   upsertMarketMemoryFact(fact: MarketMemoryFact): void;
+  web3PaperLedger(): Web3PaperLedgerRow | null;
+  upsertWeb3PaperLedger(row: Web3PaperLedgerRow): void;
+  resetWeb3PaperLedger(): void;
+  web3ExecutionConfig(): Web3ExecutionConfigRow | null;
+  upsertWeb3ExecutionConfig(row: Web3ExecutionConfigRow): void;
+  web3ExecutionAudits(limit?: number): Web3ExecutionAuditRow[];
+  appendWeb3ExecutionAudit(row: Web3ExecutionAuditRow): void;
 }
 
 type StoreSnapshot = {
@@ -129,6 +157,9 @@ type StoreSnapshot = {
   product_events: ProductMetricEventRow[];
   brain_runs: BrainRun[];
   market_memory: MarketMemoryFact[];
+  web3_paper_ledger: Web3PaperLedgerRow | null;
+  web3_execution_config: Web3ExecutionConfigRow | null;
+  web3_execution_audits: Web3ExecutionAuditRow[];
 };
 
 const emptySnapshot = (): StoreSnapshot => ({
@@ -144,6 +175,9 @@ const emptySnapshot = (): StoreSnapshot => ({
   product_events: [],
   brain_runs: [],
   market_memory: [],
+  web3_paper_ledger: null,
+  web3_execution_config: null,
+  web3_execution_audits: [],
 });
 
 // --- bun:sqlite adapter -----------------------------------------------------
@@ -274,6 +308,22 @@ class SqliteAdapter implements PersistAdapter {
       );
       CREATE INDEX IF NOT EXISTS idx_market_memory_symbol ON market_memory(symbol);
       CREATE INDEX IF NOT EXISTS idx_market_memory_updated_at ON market_memory(updated_at);
+      CREATE TABLE IF NOT EXISTS web3_paper_ledger (
+        id TEXT PRIMARY KEY,
+        updated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS web3_execution_config (
+        id TEXT PRIMARY KEY,
+        updated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS web3_execution_audits (
+        id TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_web3_execution_audits_created ON web3_execution_audits(created_at);
     `);
   }
 
@@ -532,6 +582,52 @@ class SqliteAdapter implements PersistAdapter {
       )
       .run(fact.id, fact.symbol, fact.topic, fact.updated_at, fact.knowledge_time, JSON.stringify(fact));
   }
+
+  web3PaperLedger(): Web3PaperLedgerRow | null {
+    const row = this.db
+      .query("SELECT data FROM web3_paper_ledger WHERE id = ?")
+      .get("default") as { data: string } | null;
+    return row ? (JSON.parse(row.data) as Web3PaperLedgerRow) : null;
+  }
+
+  upsertWeb3PaperLedger(row: Web3PaperLedgerRow): void {
+    this.db
+      .query("INSERT OR REPLACE INTO web3_paper_ledger (id, updated_at, data) VALUES (?, ?, ?)")
+      .run(row.id, row.updated_at, JSON.stringify(row));
+  }
+
+  resetWeb3PaperLedger(): void {
+    this.db.query("DELETE FROM web3_paper_ledger WHERE id = ?").run("default");
+  }
+
+  web3ExecutionConfig(): Web3ExecutionConfigRow | null {
+    const row = this.db
+      .query("SELECT data FROM web3_execution_config WHERE id = ?")
+      .get("default") as { data: string } | null;
+    return row ? (JSON.parse(row.data) as Web3ExecutionConfigRow) : null;
+  }
+
+  upsertWeb3ExecutionConfig(row: Web3ExecutionConfigRow): void {
+    this.db
+      .query("INSERT OR REPLACE INTO web3_execution_config (id, updated_at, data) VALUES (?, ?, ?)")
+      .run(row.id, row.updated_at, JSON.stringify(row));
+  }
+
+  web3ExecutionAudits(limit = 25): Web3ExecutionAuditRow[] {
+    return this.db
+      .query("SELECT id, created_at, data FROM web3_execution_audits ORDER BY created_at DESC LIMIT ?")
+      .all(limit)
+      .map((row) => {
+        const r = row as { id: string; created_at: string; data: string };
+        return { id: r.id, created_at: r.created_at, data: safeParse(r.data) };
+      });
+  }
+
+  appendWeb3ExecutionAudit(row: Web3ExecutionAuditRow): void {
+    this.db
+      .query("INSERT OR REPLACE INTO web3_execution_audits (id, created_at, data) VALUES (?, ?, ?)")
+      .run(row.id, row.created_at, JSON.stringify(row.data ?? {}));
+  }
 }
 
 function safeParse(value: string): unknown {
@@ -558,6 +654,9 @@ class MemoryAdapter implements PersistAdapter {
   private productEventRows: ProductMetricEventRow[] = [];
   private brainRunRows: BrainRun[] = [];
   private marketMemoryRows: MarketMemoryFact[] = [];
+  private web3LedgerRow: Web3PaperLedgerRow | null = null;
+  private web3ExecutionConfigRow: Web3ExecutionConfigRow | null = null;
+  private web3ExecutionAuditRows: Web3ExecutionAuditRow[] = [];
 
   loggedJournalEntries() {
     return [...this.journal];
@@ -668,6 +767,30 @@ class MemoryAdapter implements PersistAdapter {
   upsertMarketMemoryFact(fact: MarketMemoryFact) {
     this.marketMemoryRows = this.marketMemoryRows.filter((row) => row.id !== fact.id);
     this.marketMemoryRows.push(fact);
+  }
+  web3PaperLedger() {
+    return this.web3LedgerRow;
+  }
+  upsertWeb3PaperLedger(row: Web3PaperLedgerRow) {
+    this.web3LedgerRow = row;
+  }
+  resetWeb3PaperLedger() {
+    this.web3LedgerRow = null;
+  }
+  web3ExecutionConfig() {
+    return this.web3ExecutionConfigRow;
+  }
+  upsertWeb3ExecutionConfig(row: Web3ExecutionConfigRow) {
+    this.web3ExecutionConfigRow = row;
+  }
+  web3ExecutionAudits(limit = 25) {
+    return [...this.web3ExecutionAuditRows]
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .slice(0, limit);
+  }
+  appendWeb3ExecutionAudit(row: Web3ExecutionAuditRow) {
+    this.web3ExecutionAuditRows = this.web3ExecutionAuditRows.filter((item) => item.id !== row.id);
+    this.web3ExecutionAuditRows.push(row);
   }
 }
 
@@ -813,6 +936,38 @@ class JsonFileAdapter implements PersistAdapter {
     snapshot.market_memory.push(fact);
     this.write(snapshot);
   }
+  web3PaperLedger() {
+    return this.read().web3_paper_ledger;
+  }
+  upsertWeb3PaperLedger(row: Web3PaperLedgerRow) {
+    const snapshot = this.read();
+    snapshot.web3_paper_ledger = row;
+    this.write(snapshot);
+  }
+  resetWeb3PaperLedger() {
+    const snapshot = this.read();
+    snapshot.web3_paper_ledger = null;
+    this.write(snapshot);
+  }
+  web3ExecutionConfig() {
+    return this.read().web3_execution_config;
+  }
+  upsertWeb3ExecutionConfig(row: Web3ExecutionConfigRow) {
+    const snapshot = this.read();
+    snapshot.web3_execution_config = row;
+    this.write(snapshot);
+  }
+  web3ExecutionAudits(limit = 25) {
+    return this.read()
+      .web3_execution_audits.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .slice(0, limit);
+  }
+  appendWeb3ExecutionAudit(row: Web3ExecutionAuditRow) {
+    const snapshot = this.read();
+    snapshot.web3_execution_audits = snapshot.web3_execution_audits.filter((item) => item.id !== row.id);
+    snapshot.web3_execution_audits.push(row);
+    this.write(snapshot);
+  }
 
   private read(): StoreSnapshot {
     try {
@@ -828,6 +983,9 @@ class JsonFileAdapter implements PersistAdapter {
         runs: parsed.runs && typeof parsed.runs === "object" ? parsed.runs : {},
         brain_runs: Array.isArray(parsed.brain_runs) ? parsed.brain_runs : [],
         market_memory: Array.isArray(parsed.market_memory) ? parsed.market_memory : [],
+        web3_paper_ledger: parsed.web3_paper_ledger ?? null,
+        web3_execution_config: parsed.web3_execution_config ?? null,
+        web3_execution_audits: Array.isArray(parsed.web3_execution_audits) ? parsed.web3_execution_audits : [],
       };
     } catch {
       return emptySnapshot();

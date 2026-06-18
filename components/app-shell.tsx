@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  Bot,
   ClipboardCheck,
   Gamepad2,
   Hexagon,
@@ -39,8 +40,9 @@ const NAV: NavItem[] = [
   { href: "/", label: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", icon: LineChart, zone: "observe" },
   { href: "/paper", label: "Paper", icon: Gamepad2, zone: "advise" },
+  { href: "/trading", label: "Web3 Autopilot", icon: Bot, zone: "act" },
   { href: "/review", label: "Performance", icon: ClipboardCheck, zone: "system" },
-  { href: "/executor", label: "Executor", icon: Power, zone: "act" },
+  { href: "/executor", label: "Safety Preview", icon: Power, zone: "act" },
   { href: "/settings/integrations", label: "Settings", icon: Settings, zone: "system" },
 ];
 
@@ -141,7 +143,7 @@ function TopBar({
         {isChatPage ? (
           <div className="relative size-11 shrink-0" aria-hidden="true">
             <SentinelFace state={killEngaged ? "kill" : faceState} speaking={speaking} />
-            <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30" aria-hidden="true" />
+            <span className="absolute inset-0 rounded-full ring-1 ring-violet/30" aria-hidden="true" />
           </div>
         ) : (
           <Link
@@ -150,7 +152,7 @@ function TopBar({
             className="group relative size-11 shrink-0"
           >
             <SentinelFace state={killEngaged ? "kill" : faceState} speaking={speaking} />
-            <span className="absolute -inset-1 rounded-full ring-1 ring-violet/30 transition group-hover:ring-violet/70" aria-hidden="true" />
+            <span className="absolute inset-0 rounded-full ring-1 ring-violet/30 transition group-hover:ring-violet/70" aria-hidden="true" />
           </Link>
         )}
         <Link href="/" className="flex min-h-11 items-center font-display text-2xl font-bold tracking-tighter text-violet">
@@ -322,8 +324,8 @@ const MOBILE: Array<NavItem & { shortLabel: string }> = [
   { href: "/", label: "Today", shortLabel: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: LineChart, zone: "observe" },
   { href: "/paper", label: "Paper", shortLabel: "Paper", icon: Gamepad2, zone: "advise" },
+  { href: "/trading", label: "Web3 Autopilot", shortLabel: "Autopilot", icon: Bot, zone: "act" },
   { href: "/review", label: "Performance", shortLabel: "Performance", icon: ClipboardCheck, zone: "system" },
-  { href: "/settings/integrations", label: "Settings", shortLabel: "Settings", icon: Settings, zone: "system" },
 ];
 
 function MobileNav() {
@@ -430,7 +432,7 @@ export function FirstRunBanner() {
       <Info className="mt-0.5 size-4 shrink-0 text-violet" />
       <p className="text-sm leading-6 text-on-surface-variant">
         <strong className="text-on-surface">Advisory only.</strong> Master Mold can't move your
-        equity or crypto. The executor is preview-only here and signs nothing.
+        equity or crypto. Web3 Autopilot is paper-gated, and the safety preview signs nothing.
       </p>
       <Link
         href="/review"
