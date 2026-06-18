@@ -4249,6 +4249,37 @@ export type AutonomousTickBundleExecution = {
   items: AutonomousTickBundleExecutionItem[];
 };
 
+export type AutonomousCapitalCommandItem = {
+  id: "tick" | "capital" | "profit" | "wallet" | "source" | "execution";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  score: number;
+  value: string;
+  detail: string;
+};
+
+export type AutonomousCapitalCommand = {
+  mode: "autonomous-capital-command";
+  status: "deploy" | "harvest" | "protect" | "refresh" | "observe" | "blocked" | "idle";
+  action: "deploy-now" | "harvest-first" | "protect-first" | "refresh-first" | "observe" | "stand-down";
+  target_symbol: string | null;
+  command_score: number;
+  spend_budget_usd: number;
+  release_budget_usd: number;
+  reserved_cash_usd: number;
+  expected_edge_usd: number;
+  risk_budget_usd: number;
+  next_tick_seconds: number;
+  max_child_fills: number;
+  can_execute_paper: boolean;
+  execution_boundary: "paper-ledger-only" | "read-only-refresh" | "blocked-paper-only";
+  summary: string;
+  next_action: string;
+  blockers: string[];
+  controls: string[];
+  items: AutonomousCapitalCommandItem[];
+};
+
 export type AutonomousTickBundleFeedbackItem = {
   id: string;
   label: string;
@@ -8404,6 +8435,7 @@ export type Web3TradingState = {
   autonomous_tick_plan: AutonomousTickPlan;
   autonomous_tick_governor: AutonomousTickGovernor;
   autonomous_tick_bundle_execution: AutonomousTickBundleExecution;
+  autonomous_capital_command: AutonomousCapitalCommand;
   autonomous_tick_bundle_feedback: AutonomousTickBundleFeedback;
   autonomous_wallet_performance_governor: AutonomousWalletPerformanceGovernor;
   autonomous_trade_mission: AutonomousTradeMission;
@@ -11067,6 +11099,17 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
 	      daemonMemory: configuredState.paper_daemon_memory,
 	      tradeReadinessGate: configuredState.autonomous_trade_readiness_gate,
 	    });
+    configuredState.autonomous_capital_command = buildAutonomousCapitalCommand({
+      tickPlan: configuredState.autonomous_tick_plan,
+      tickGovernor: configuredState.autonomous_tick_governor,
+      capitalAllocator: configuredState.autonomous_capital_allocator,
+      dailyProfitLock: configuredState.autonomous_daily_profit_lock,
+      profitIntegrity: configuredState.autonomous_profit_integrity_circuit,
+      tradeMission: configuredState.autonomous_trade_mission,
+      bundleExecution: configuredState.autonomous_tick_bundle_execution,
+      sourceQuality: configuredState.autonomous_source_quality_oracle,
+      walletTelemetry: configuredState.autonomous_wallet_telemetry,
+    });
     configuredState.autonomous_wallet_performance_governor = buildAutonomousWalletPerformanceGovernor({
       walletTelemetry: configuredState.autonomous_wallet_telemetry,
       performance: configuredState.performance_scorecard,
@@ -11399,6 +11442,17 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       churnEfficiency: configuredState.churn_efficiency_auditor,
       daemonMemory: configuredState.paper_daemon_memory,
       tradeReadinessGate: configuredState.autonomous_trade_readiness_gate,
+    });
+    configuredState.autonomous_capital_command = buildAutonomousCapitalCommand({
+      tickPlan: configuredState.autonomous_tick_plan,
+      tickGovernor: configuredState.autonomous_tick_governor,
+      capitalAllocator: configuredState.autonomous_capital_allocator,
+      dailyProfitLock: configuredState.autonomous_daily_profit_lock,
+      profitIntegrity: configuredState.autonomous_profit_integrity_circuit,
+      tradeMission: configuredState.autonomous_trade_mission,
+      bundleExecution: configuredState.autonomous_tick_bundle_execution,
+      sourceQuality: configuredState.autonomous_source_quality_oracle,
+      walletTelemetry: configuredState.autonomous_wallet_telemetry,
     });
     configuredState.autonomous_wallet_performance_governor = buildAutonomousWalletPerformanceGovernor({
       walletTelemetry: configuredState.autonomous_wallet_telemetry,
@@ -13926,6 +13980,17 @@ function buildWeb3TradingState({
     portfolioMark: autonomous_portfolio_mark_board,
     profitIntegrity: autonomous_profit_integrity_circuit,
   });
+  const autonomous_capital_command = buildAutonomousCapitalCommand({
+    tickPlan: autonomous_tick_plan_with_edge,
+    tickGovernor: autonomous_tick_governor_with_edge,
+    capitalAllocator: autonomous_capital_allocator,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    tradeMission: autonomous_trade_mission_with_race,
+    bundleExecution: autonomous_tick_bundle_execution_with_edge,
+    sourceQuality: autonomous_source_quality_oracle,
+    walletTelemetry: autonomous_wallet_telemetry,
+  });
   const autonomous_loop_tick = idleAutonomousLoopTick({
     paper_account: {
       mode: accountMode,
@@ -14111,6 +14176,7 @@ function buildWeb3TradingState({
     autonomous_edge_stack,
     autonomous_edge_stack_execution,
     autonomous_tick_bundle_execution: autonomous_tick_bundle_execution_with_edge,
+    autonomous_capital_command,
     autonomous_tick_bundle_feedback: autonomous_tick_bundle_feedback_with_edge,
     autonomous_wallet_performance_governor: autonomous_wallet_performance_governor_with_edge,
     autonomous_trade_mission: autonomous_trade_mission_with_race,
@@ -16220,6 +16286,17 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     portfolioMark: state.autonomous_portfolio_mark_board,
     profitIntegrity: autonomous_profit_integrity_circuit,
   });
+  const autonomous_capital_command = buildAutonomousCapitalCommand({
+    tickPlan: autonomous_tick_plan_with_edge,
+    tickGovernor: autonomous_tick_governor_with_edge,
+    capitalAllocator: autonomous_capital_allocator,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    tradeMission: autonomous_trade_mission_with_race,
+    bundleExecution: autonomous_tick_bundle_execution_with_edge,
+    sourceQuality: autonomous_source_quality_oracle,
+    walletTelemetry: autonomous_wallet_telemetry,
+  });
   const autonomous_loop_tick = preserveAutonomousLoopTick(state, {
     paper_account: state.paper_account,
     portfolio: state.portfolio,
@@ -16395,6 +16472,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_edge_stack,
     autonomous_edge_stack_execution,
     autonomous_tick_bundle_execution: autonomous_tick_bundle_execution_with_edge,
+    autonomous_capital_command,
     autonomous_tick_bundle_feedback: autonomous_tick_bundle_feedback_with_edge,
     autonomous_wallet_performance_governor: autonomous_wallet_performance_governor_with_edge,
 	    autonomous_trade_mission: autonomous_trade_mission_with_race,
@@ -16850,6 +16928,17 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_loop_throttle,
     autonomous_strategy_selector: state.autonomous_strategy_selector,
   });
+  const autonomous_capital_command = buildAutonomousCapitalCommand({
+    tickPlan: state.autonomous_tick_plan,
+    tickGovernor: state.autonomous_tick_governor,
+    capitalAllocator: autonomous_capital_allocator,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    tradeMission: autonomous_trade_mission,
+    bundleExecution: state.autonomous_tick_bundle_execution,
+    sourceQuality: autonomous_source_quality_oracle,
+    walletTelemetry: state.autonomous_wallet_telemetry,
+  });
   return {
     ...state,
     execution_audit,
@@ -16893,6 +16982,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_session_supervisor,
     autonomous_loop_director,
     autonomous_burst_scheduler,
+    autonomous_capital_command,
     autonomous_trade_mission,
   };
 }
@@ -21320,6 +21410,17 @@ function applyPersistentLedger(
     autonomous_loop_throttle,
     autonomous_strategy_selector,
   });
+  const autonomous_capital_command = buildAutonomousCapitalCommand({
+    tickPlan: autonomous_tick_plan,
+    tickGovernor: autonomous_tick_governor,
+    capitalAllocator: autonomous_capital_allocator,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    tradeMission: autonomous_trade_mission_with_race,
+    bundleExecution: autonomous_tick_bundle_execution,
+    sourceQuality: autonomous_source_quality_oracle,
+    walletTelemetry: autonomous_wallet_telemetry,
+  });
 
   if (canApplyPaperLanes && autonomous_burst_fill_plan.child_fill_count > 0) {
     const burstApplied = applyAutonomousBurstFillPlanToLedger({
@@ -21564,6 +21665,7 @@ function applyPersistentLedger(
 	    autonomous_tick_plan,
 	    autonomous_tick_governor,
 	    autonomous_tick_bundle_execution,
+    autonomous_capital_command,
     autonomous_tick_bundle_feedback,
     autonomous_trade_mission: autonomous_trade_mission_with_race,
     autonomous_wake_plan,
@@ -64699,6 +64801,17 @@ function attachPaperDaemonTick(
     portfolioMark: autonomousPortfolioMarkBoard,
     profitIntegrity: autonomousProfitIntegrityCircuit,
   });
+  const autonomousCapitalCommand = buildAutonomousCapitalCommand({
+    tickPlan: autonomousTickPlan,
+    tickGovernor: autonomousTickGovernor,
+    capitalAllocator: autonomousCapitalAllocator,
+    dailyProfitLock: state.autonomous_daily_profit_lock,
+    profitIntegrity: autonomousProfitIntegrityCircuit,
+    tradeMission: autonomousTradeMission,
+    bundleExecution: autonomousTickBundleExecution,
+    sourceQuality: state.autonomous_source_quality_oracle,
+    walletTelemetry: autonomousWalletTelemetry,
+  });
   return {
     ...state,
     paper_daemon: paperDaemon,
@@ -64772,6 +64885,7 @@ function attachPaperDaemonTick(
     autonomous_tick_plan: autonomousTickPlan,
     autonomous_tick_governor: autonomousTickGovernor,
     autonomous_tick_bundle_execution: autonomousTickBundleExecution,
+    autonomous_capital_command: autonomousCapitalCommand,
     autonomous_tick_bundle_feedback: autonomousTickBundleFeedback,
     autonomous_wallet_performance_governor: autonomousWalletPerformanceGovernor,
     autonomous_trade_mission: autonomousTradeMission,
@@ -65526,6 +65640,17 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     portfolioMark: autonomousPortfolioMarkBoard,
     profitIntegrity: autonomousProfitIntegrityCircuit,
   });
+  const autonomousCapitalCommand = buildAutonomousCapitalCommand({
+    tickPlan: autonomousTickPlan,
+    tickGovernor: autonomousTickGovernor,
+    capitalAllocator: autonomousCapitalAllocator,
+    dailyProfitLock: state.autonomous_daily_profit_lock,
+    profitIntegrity: autonomousProfitIntegrityCircuit,
+    tradeMission: autonomousTradeMission,
+    bundleExecution: autonomousTickBundleExecution,
+    sourceQuality: state.autonomous_source_quality_oracle,
+    walletTelemetry: autonomousWalletTelemetry,
+  });
   return {
     ...state,
     paper_daemon_memory: paperDaemonMemory,
@@ -65552,6 +65677,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     autonomous_tick_plan: autonomousTickPlan,
     autonomous_tick_governor: autonomousTickGovernor,
     autonomous_tick_bundle_execution: autonomousTickBundleExecution,
+    autonomous_capital_command: autonomousCapitalCommand,
     autonomous_tick_bundle_feedback: autonomousTickBundleFeedback,
     autonomous_wallet_performance_governor: autonomousWalletPerformanceGovernor,
     autonomous_trade_mission: autonomousTradeMission,
@@ -68172,6 +68298,248 @@ function tickBundleFeedbackNextAction(
   if (status === "cooldown") return "Skip fresh bundled buys; keep watching for protective exits or cleaner PnL slope.";
   if (status === "press") return `Let the loop apply the strongest ${readyFreshBuys} fresh paper lane${readyFreshBuys === 1 ? "" : "s"} inside the cap.`;
   return "Apply only the best paper lane, then let post-trade feedback decide whether to press.";
+}
+
+function buildAutonomousCapitalCommand({
+  tickPlan,
+  tickGovernor,
+  capitalAllocator,
+  dailyProfitLock,
+  profitIntegrity,
+  tradeMission,
+  bundleExecution,
+  sourceQuality,
+  walletTelemetry,
+}: {
+  tickPlan: AutonomousTickPlan;
+  tickGovernor: AutonomousTickGovernor;
+  capitalAllocator: AutonomousCapitalAllocator;
+  dailyProfitLock: AutonomousDailyProfitLock;
+  profitIntegrity: AutonomousProfitIntegrityCircuit;
+  tradeMission: AutonomousTradeMission;
+  bundleExecution: AutonomousTickBundleExecution;
+  sourceQuality: AutonomousSourceQualityOracle;
+  walletTelemetry: AutonomousWalletTelemetry;
+}): AutonomousCapitalCommand {
+  const leader = tickPlan.items[0] ?? null;
+  const targetSymbol = tickGovernor.leader_symbol ?? tradeMission.target_symbol ?? leader?.symbol ?? capitalAllocator.items.find((item) => item.priority === "now")?.symbol ?? null;
+  const capitalScore = capitalAllocator.allocation_score;
+  const tickScore = tickGovernor.decision_score;
+  const walletScore = clamp(Math.round(
+    56 +
+      walletTelemetry.window_pnl_pct * 5 +
+      walletTelemetry.slope_usd_per_tick * 0.12 -
+      walletTelemetry.max_drawdown_pct * 4 -
+      Math.max(0, walletTelemetry.blocked_count - walletTelemetry.fill_count) * 2,
+  ), 0, 100);
+  const sourceScore = sourceQuality.quality_score;
+  const executionScore = clamp(Math.round(
+    42 +
+      bundleExecution.ready_trade_count * 12 +
+      bundleExecution.applied_trade_count * 8 -
+      bundleExecution.blocked_count * 10 -
+      (bundleExecution.route_refresh_vetoed ? 18 : 0) +
+      (bundleExecution.status === "ready" || bundleExecution.status === "applied" ? 12 : 0),
+  ), 0, 100);
+  const profitScore = profitIntegrity.integrity_score;
+  const commandScore = clamp(Math.round(
+    tickScore * 0.25 +
+      capitalScore * 0.2 +
+      profitScore * 0.2 +
+      walletScore * 0.14 +
+      sourceScore * 0.11 +
+      executionScore * 0.1,
+  ), 0, 100);
+  const blockers = [...new Set([
+    ...tickGovernor.blockers,
+    ...capitalAllocator.blockers,
+    ...(leader?.blocker ? [leader.blocker] : []),
+    ...(dailyProfitLock.stop_reason ? [dailyProfitLock.stop_reason] : []),
+    ...(profitIntegrity.should_pause_fresh_buys ? ["Profit integrity pauses fresh buys before the next capital command."] : []),
+    ...(bundleExecution.route_refresh_vetoed ? [bundleExecution.route_refresh_blocker ?? "Route refresh is vetoing fresh paper entries."] : []),
+    ...(sourceQuality.status === "blocked" ? ["Source quality blocks hot-coin chasing until evidence refreshes."] : []),
+  ])].filter(Boolean).slice(0, 6);
+  const shouldProtect = tickGovernor.should_protect_first ||
+    profitIntegrity.should_protect_first ||
+    dailyProfitLock.loop_permission === "protect-only" ||
+    leader?.action === "protect-now";
+  const shouldRefresh = !shouldProtect && (
+    tickGovernor.should_request_route_quote ||
+    tickGovernor.should_refresh_market_data ||
+    tickPlan.status === "refresh" ||
+    bundleExecution.route_refresh_vetoed ||
+    sourceQuality.status === "refresh-first"
+  );
+  const shouldHarvest = !shouldProtect &&
+    !shouldRefresh &&
+    (dailyProfitLock.status === "lock-profit" || dailyProfitLock.status === "harvest" || capitalAllocator.status === "harvest" || tradeMission.objective === "harvest");
+  const shouldDeploy = !shouldProtect &&
+    !shouldRefresh &&
+    !shouldHarvest &&
+    tickGovernor.should_trade &&
+    tickPlan.bundle_trade_budget_usd > 0 &&
+    bundleExecution.ready_trade_count > 0 &&
+    dailyProfitLock.fresh_buy_allowed &&
+    !profitIntegrity.should_pause_fresh_buys;
+
+  let status: AutonomousCapitalCommand["status"] = "idle";
+  let action: AutonomousCapitalCommand["action"] = "observe";
+  if ((tickGovernor.status === "blocked" || tickPlan.status === "blocked" || capitalAllocator.status === "blocked") && blockers.length > 0) {
+    status = "blocked";
+    action = "stand-down";
+  } else if (shouldProtect) {
+    status = "protect";
+    action = "protect-first";
+  } else if (shouldRefresh) {
+    status = "refresh";
+    action = "refresh-first";
+  } else if (shouldHarvest) {
+    status = "harvest";
+    action = "harvest-first";
+  } else if (shouldDeploy) {
+    status = "deploy";
+    action = "deploy-now";
+  } else if (tickPlan.status === "observe" || tickGovernor.status === "observe") {
+    status = "observe";
+    action = "observe";
+  }
+
+  const spendBudgetUsd = action === "deploy-now"
+    ? Math.round(Math.min(
+      tickPlan.bundle_trade_budget_usd,
+      tickGovernor.paper_budget_usd || tickPlan.next_minute_trade_budget_usd || tickPlan.bundle_trade_budget_usd,
+      capitalAllocator.deploy_budget_usd || tickPlan.bundle_trade_budget_usd,
+      dailyProfitLock.deploy_allowed_usd || tickPlan.bundle_trade_budget_usd,
+    ))
+    : 0;
+  const releaseBudgetUsd = action === "protect-first" || action === "harvest-first"
+    ? Math.round(Math.max(
+      tickGovernor.protective_sell_release_usd,
+      capitalAllocator.release_budget_usd,
+      dailyProfitLock.release_required_usd,
+      tradeMission.release_budget_usd,
+    ))
+    : 0;
+  const canExecutePaper = (action === "deploy-now" || action === "protect-first" || action === "harvest-first") &&
+    tickGovernor.can_auto_advance &&
+    bundleExecution.ready_trade_count > 0 &&
+    bundleExecution.status !== "blocked" &&
+    !bundleExecution.route_refresh_vetoed;
+  const executionBoundary: AutonomousCapitalCommand["execution_boundary"] = canExecutePaper
+    ? "paper-ledger-only"
+    : action === "refresh-first"
+      ? "read-only-refresh"
+      : "blocked-paper-only";
+  const items: AutonomousCapitalCommandItem[] = [
+    {
+      id: "tick",
+      label: "Tick plan",
+      status: tickPlan.status === "trade" || tickPlan.status === "protect" ? "pass" : tickPlan.status === "blocked" ? "fail" : "watch",
+      score: tickScore,
+      value: tickPlan.throughput_mode.replace("-", " "),
+      detail: `${tickPlan.bundle_action_count} actions, ${formatCompactValue(tickPlan.bundle_trade_budget_usd)} next-minute paper budget.`,
+    },
+    {
+      id: "capital",
+      label: "Capital",
+      status: capitalAllocator.status === "deploy" || capitalAllocator.status === "rebalance" ? "pass" : capitalAllocator.status === "blocked" ? "fail" : "watch",
+      score: capitalScore,
+      value: capitalAllocator.status,
+      detail: `${formatCompactValue(capitalAllocator.deploy_budget_usd)} deploy, ${formatCompactValue(capitalAllocator.release_budget_usd)} release, ${formatCompactValue(capitalAllocator.reserved_cash_usd)} reserve.`,
+    },
+    {
+      id: "profit",
+      label: "Profit gate",
+      status: profitIntegrity.can_continue && !profitIntegrity.should_pause_fresh_buys ? "pass" : profitIntegrity.should_protect_first || profitIntegrity.should_pause_fresh_buys ? "fail" : "watch",
+      score: profitScore,
+      value: profitIntegrity.permission.replace("-", " "),
+      detail: `${profitIntegrity.max_next_fills} fills, ${profitIntegrity.size_multiplier}x size, ${formatSignedCompactValue(profitIntegrity.expected_value_usd)} EV.`,
+    },
+    {
+      id: "wallet",
+      label: "Wallet",
+      status: walletScore >= 65 ? "pass" : walletScore < 38 ? "fail" : "watch",
+      score: walletScore,
+      value: formatSignedCompactValue(walletTelemetry.window_pnl_usd),
+      detail: `${walletTelemetry.max_drawdown_pct.toFixed(1)}% drawdown, ${formatCompactValue(walletTelemetry.exposure_usd)} exposed.`,
+    },
+    {
+      id: "source",
+      label: "Source",
+      status: sourceQuality.can_chase ? "pass" : sourceQuality.status === "blocked" ? "fail" : "watch",
+      score: sourceScore,
+      value: sourceQuality.status.replace("-", " "),
+      detail: `${sourceQuality.leader_symbol ?? "desk"} · ${sourceQuality.leader_action?.replace("-", " ") ?? "watch"}.`,
+    },
+    {
+      id: "execution",
+      label: "Execution",
+      status: canExecutePaper ? "pass" : action === "refresh-first" ? "watch" : "fail",
+      score: executionScore,
+      value: bundleExecution.status.replace("-", " "),
+      detail: `${bundleExecution.ready_trade_count} ready, ${bundleExecution.blocked_count} blocked, ${executionBoundary}.`,
+    },
+  ];
+
+  return {
+    mode: "autonomous-capital-command",
+    status,
+    action,
+    target_symbol: targetSymbol,
+    command_score: commandScore,
+    spend_budget_usd: Math.max(0, spendBudgetUsd),
+    release_budget_usd: Math.max(0, releaseBudgetUsd),
+    reserved_cash_usd: Math.round(capitalAllocator.reserved_cash_usd),
+    expected_edge_usd: roundMetric(Math.max(0, tickPlan.bundle_expected_edge_usd, tickGovernor.expected_edge_usd, tradeMission.expected_profit_usd)),
+    risk_budget_usd: Math.round(Math.max(0, tickPlan.risk_usd, tickGovernor.risk_budget_usd, tradeMission.max_risk_usd)),
+    next_tick_seconds: Math.max(2, Math.min(tickPlan.tick_seconds, tickGovernor.next_tick_seconds || tickPlan.tick_seconds, tradeMission.next_tick_seconds || tickPlan.tick_seconds)),
+    max_child_fills: Math.max(0, Math.min(tickPlan.bundle_trade_count, tickGovernor.max_paper_trades, dailyProfitLock.max_next_fills, profitIntegrity.max_next_fills)),
+    can_execute_paper: canExecutePaper,
+    execution_boundary: executionBoundary,
+    summary: autonomousCapitalCommandSummary(status, action, targetSymbol, commandScore, spendBudgetUsd, releaseBudgetUsd),
+    next_action: autonomousCapitalCommandNextAction(action, targetSymbol, spendBudgetUsd, releaseBudgetUsd, blockers, tickPlan, bundleExecution),
+    blockers,
+    controls: [
+      "Compresses the tick plan, governor, capital allocator, profit lock, source quality, wallet, and bundle rehearsal into one next-dollar command.",
+      "Deploy/harvest/protect commands remain bounded to the local paper ledger and cannot sign, submit, settle, custody funds, or bypass route/source/profit gates.",
+      "Refresh-first and stand-down commands keep the reason visible before another high-frequency paper action is allowed.",
+    ],
+    items,
+  };
+}
+
+function autonomousCapitalCommandSummary(
+  status: AutonomousCapitalCommand["status"],
+  action: AutonomousCapitalCommand["action"],
+  targetSymbol: string | null,
+  score: number,
+  spendUsd: number,
+  releaseUsd: number,
+) {
+  if (status === "deploy") return `Capital command clears ${score}/100: deploy up to ${formatCompactValue(spendUsd)} local paper into ${targetSymbol ?? "the ranked hot lane"}.`;
+  if (status === "harvest") return `Capital command harvests ${formatCompactValue(releaseUsd)} before spending fresh paper capital.`;
+  if (status === "protect") return `Capital command protects ${targetSymbol ?? "the held book"} first with ${formatCompactValue(releaseUsd)} release pressure.`;
+  if (status === "refresh") return `Capital command refreshes route/source evidence before spending on ${targetSymbol ?? "the next lane"}.`;
+  if (status === "blocked") return "Capital command stands down because the paper executor is blocked by capital, source, route, or profit gates.";
+  if (status === "observe") return `Capital command observes ${targetSymbol ?? "the desk"} until a next-dollar paper edge clears.`;
+  return `Capital command is idle; action ${action} waits for the next autonomous tick.`;
+}
+
+function autonomousCapitalCommandNextAction(
+  action: AutonomousCapitalCommand["action"],
+  targetSymbol: string | null,
+  spendUsd: number,
+  releaseUsd: number,
+  blockers: string[],
+  tickPlan: AutonomousTickPlan,
+  bundleExecution: AutonomousTickBundleExecution,
+) {
+  if (action === "deploy-now") return `Apply the strongest local paper child fills toward ${targetSymbol ?? "the ranked candidate"} up to ${formatCompactValue(spendUsd)}, then re-score wallet alpha.`;
+  if (action === "harvest-first") return `Harvest ${formatCompactValue(releaseUsd)} in local paper before reopening fresh buys.`;
+  if (action === "protect-first") return `Protect ${targetSymbol ?? "the held book"} first; fresh paper spending waits behind the release lane.`;
+  if (action === "refresh-first") return bundleExecution.route_refresh_blocker ?? tickPlan.throttle_reason;
+  if (action === "stand-down") return blockers[0] ?? "Stand down until the next capital command has a clean paper edge.";
+  return tickPlan.next_action;
 }
 
 function buildAutonomousWalletPerformanceGovernor({

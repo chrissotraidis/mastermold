@@ -918,6 +918,7 @@ function QuickTradingCommandDeck({
   const fusion = state.autonomous_market_evidence_fusion;
   const sourceQuality = state.autonomous_source_quality_oracle;
   const thesis = state.autonomous_profit_thesis_verifier;
+  const capitalCommand = state.autonomous_capital_command;
   const discoveryDelta = state.live_discovery_delta_tape;
   const ranker = state.autonomous_opportunity_ranker;
   const positionBoard = state.autonomous_portfolio_mark_board;
@@ -1010,6 +1011,7 @@ function QuickTradingCommandDeck({
           <div className="grid gap-2">
             <QuickAutonomousDecisionOwner state={state} compact />
             <QuickPositionReactionTape state={state} compact />
+            <QuickCapitalCommandTile command={capitalCommand} />
             <div className="hidden lg:block">
               <QuickProfitLoopTile
                 state={state}
@@ -1034,6 +1036,12 @@ function QuickTradingCommandDeck({
               value={outcome.kind === "stand-down" ? "stand down" : outcome.label}
               detail={`${formatCompactSignedCurrency(outcome.walletDeltaUsd)} wallet · ${outcome.fillDelta} fills`}
               tone={outcome.tone}
+            />
+            <ProfitMetric
+              label="Next dollar"
+              value={capitalCommand.action.replaceAll("-", " ")}
+              detail={`${formatCompactCurrency(capitalCommand.spend_budget_usd)} spend · ${formatCompactCurrency(capitalCommand.release_budget_usd)} release`}
+              tone={capitalCommandTone(capitalCommand.status)}
             />
             <ProfitMetric
               label="Source quality"
@@ -1132,9 +1140,69 @@ function QuickTradingCommandDeck({
       </aside>
 
       <span className="sr-only" aria-label="Autonomous command deck receipt">
-        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
+        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; next dollar {capitalCommand.action}; next dollar status {capitalCommand.status}; next dollar score {capitalCommand.command_score}; paper spend {formatCurrency(capitalCommand.spend_budget_usd)}; paper release {formatCurrency(capitalCommand.release_budget_usd)}; command boundary {capitalCommand.execution_boundary}; command can execute paper {capitalCommand.can_execute_paper ? "yes" : "no"}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
       </span>
     </section>
+  );
+}
+
+function QuickCapitalCommandTile({
+  command,
+}: {
+  command: Web3TradingState["autonomous_capital_command"];
+}) {
+  const tone = capitalCommandTone(command.status);
+  const proofItems = command.items.slice(0, 6);
+
+  return (
+    <div className={cn("min-w-0 rounded-md border p-2", permissionToneClass(tone))} aria-label="Next dollar capital command">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Next dollar</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {command.action.replaceAll("-", " ")} {command.target_symbol ?? "desk"}
+          </p>
+          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{command.next_action}</p>
+        </div>
+        <Chip tone={tone}>{command.command_score}/100</Chip>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <MiniProofStat label="Spend" value={formatCompactCurrency(command.spend_budget_usd)} />
+        <MiniProofStat label="Release" value={formatCompactCurrency(command.release_budget_usd)} />
+        <MiniProofStat label="Edge" value={formatCompactSignedCurrency(command.expected_edge_usd)} />
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        {proofItems.map((item) => (
+          <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 px-2 py-1.5">
+            <div className="flex items-center justify-between gap-1.5">
+              <p className="truncate font-mono text-[9px] uppercase tracking-telemetry text-outline">{item.label}</p>
+              <span className={cn("font-mono text-[9px] font-semibold", item.status === "pass" ? "text-engine" : item.status === "fail" ? "text-critical" : "text-caution")}>
+                {item.score}
+              </span>
+            </div>
+            <p className="mt-0.5 truncate text-[11px] font-semibold text-on-surface">{item.value}</p>
+          </div>
+        ))}
+      </div>
+      <p className="sr-only">
+        Capital command {command.status}, boundary {command.execution_boundary}, can execute paper {command.can_execute_paper ? "yes" : "no"}, blockers {command.blockers.join("; ") || "none"}.
+      </p>
+    </div>
+  );
+}
+
+function MiniProofStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 px-2 py-1.5">
+      <p className="truncate font-mono text-[9px] uppercase tracking-telemetry text-outline">{label}</p>
+      <p className="mt-0.5 truncate font-mono text-[11px] font-semibold text-on-surface">{value}</p>
+    </div>
   );
 }
 
@@ -5699,6 +5767,13 @@ function burstFeedbackTone(
   if (!blocksFreshBuy && (status === "scale" || status === "keep")) return "engine";
   if (status === "blocked" || status === "protect") return "critical";
   if (status === "tighten") return "caution";
+  return "neutral";
+}
+
+function capitalCommandTone(status: Web3TradingState["autonomous_capital_command"]["status"]): QuickChipTone {
+  if (status === "deploy") return "engine";
+  if (status === "protect" || status === "blocked") return "critical";
+  if (status === "harvest" || status === "refresh") return "caution";
   return "neutral";
 }
 

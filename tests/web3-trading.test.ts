@@ -2834,6 +2834,32 @@ describe("Web3 autonomous trading subsystem", () => {
         item.lane === "entry"
       )).toBe(false);
     }
+    expect(state.autonomous_capital_command.mode).toBe("autonomous-capital-command");
+    expect(["deploy", "harvest", "protect", "refresh", "observe", "blocked", "idle"]).toContain(state.autonomous_capital_command.status);
+    expect(["deploy-now", "harvest-first", "protect-first", "refresh-first", "observe", "stand-down"]).toContain(state.autonomous_capital_command.action);
+    expect(state.autonomous_capital_command.command_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_capital_command.command_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_capital_command.spend_budget_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_capital_command.release_budget_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_capital_command.reserved_cash_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_capital_command.expected_edge_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_capital_command.risk_budget_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_capital_command.next_tick_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_capital_command.max_child_fills).toBeGreaterThanOrEqual(0);
+    expect(typeof state.autonomous_capital_command.can_execute_paper).toBe("boolean");
+    expect(["paper-ledger-only", "read-only-refresh", "blocked-paper-only"]).toContain(state.autonomous_capital_command.execution_boundary);
+    expect(state.autonomous_capital_command.summary.length).toBeGreaterThan(0);
+    expect(state.autonomous_capital_command.next_action.length).toBeGreaterThan(0);
+    expect(state.autonomous_capital_command.items.map((item) => item.id)).toEqual(["tick", "capital", "profit", "wallet", "source", "execution"]);
+    expect(state.autonomous_capital_command.items.every((item) =>
+      ["pass", "watch", "fail"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.value.length > 0 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(state.autonomous_capital_command.controls.some((control) => control.includes("next-dollar command"))).toBe(true);
+    expect(state.autonomous_capital_command.controls.some((control) => control.includes("cannot sign"))).toBe(true);
     expect(state.autonomous_tick_bundle_feedback.mode).toBe("tick-bundle-feedback-governor");
     expect(["press", "selective", "cooldown", "protect", "idle"]).toContain(state.autonomous_tick_bundle_feedback.status);
     expect(state.autonomous_tick_bundle_feedback.bundle_quality_score).toBeGreaterThanOrEqual(0);
