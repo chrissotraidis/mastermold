@@ -109,6 +109,32 @@ function withClearExecutionLane(state: Web3TradingState): Web3TradingState {
   };
 }
 
+function withOpenProfitSafety(state: Web3TradingState): Web3TradingState {
+  return {
+    ...state,
+    autonomous_daily_profit_lock: {
+      ...state.autonomous_daily_profit_lock,
+      status: "run",
+      action: "trade",
+      loop_permission: "open",
+      fresh_buy_allowed: true,
+      protect_sell_allowed: true,
+      stop_reason: null,
+      next_action: "Daily lock is open for the lane under test.",
+    },
+    autonomous_profit_integrity_circuit: {
+      ...state.autonomous_profit_integrity_circuit,
+      status: "continue",
+      permission: "trade",
+      action: "keep-running",
+      can_continue: true,
+      should_pause_fresh_buys: false,
+      should_protect_first: false,
+      next_action: "Profit integrity is clear for the lane under test.",
+    },
+  };
+}
+
 describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {
     const state = getWeb3TradingState("base", 0);
@@ -1852,7 +1878,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN a ready queue-owned sell WHEN Auto watch plans THEN it selects the protect-minute lane", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withOpenProfitSafety(state),
       autonomous_tick_plan: {
         ...state.autonomous_tick_plan,
         items: [],
@@ -1869,10 +1895,86 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(plan.reason).toContain("Backend loop tick owns");
   });
 
+  test("GIVEN a daily profit lock needs harvest WHEN Auto watch plans THEN it protects gains before fresh entries", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...withOpenProfitSafety(state),
+      autonomous_daily_profit_lock: {
+        ...state.autonomous_daily_profit_lock,
+        status: "harvest",
+        action: "harvest",
+        loop_permission: "harvest-only",
+        fresh_buy_allowed: false,
+        protect_sell_allowed: true,
+        release_required_usd: 115,
+        max_next_fills: 2,
+        review_after_seconds: 5,
+        next_action: "Harvest $115 before any fresh memecoin entry.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("minute");
+    expect(plan.label).toBe("profit lock harvest");
+    expect(plan.action).toBe("loop");
+    expect(plan.reason).toContain("Harvest $115");
+    expect(plan.reason).toContain("before fresh buys");
+  });
+
+  test("GIVEN a daily loss brake stands down WHEN Auto watch plans THEN it blocks high-frequency entries", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...withOpenProfitSafety(state),
+      autonomous_daily_profit_lock: {
+        ...state.autonomous_daily_profit_lock,
+        status: "stand-down",
+        action: "stand-down",
+        loop_permission: "stand-down",
+        fresh_buy_allowed: false,
+        protect_sell_allowed: false,
+        stop_reason: "Daily loss brake is hit.",
+        review_after_seconds: 7,
+        next_action: "Daily loss brake is hit.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("cycle");
+    expect(plan.label).toBe("profit lock stand-down");
+    expect(plan.action).toBe("loop");
+    expect(plan.delayMs).toBeGreaterThanOrEqual(30_000);
+    expect(plan.reason).toContain("Daily loss brake is hit");
+    expect(plan.reason).toContain("stands down fresh paper entries");
+  });
+
+  test("GIVEN profit integrity cools down WHEN Auto watch plans THEN it stops fresh frequency before the minute loop", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...withOpenProfitSafety(state),
+      autonomous_profit_integrity_circuit: {
+        ...state.autonomous_profit_integrity_circuit,
+        status: "cooldown",
+        permission: "cooldown",
+        action: "cooldown",
+        integrity_score: 38,
+        cadence_seconds: 9,
+        can_continue: false,
+        should_pause_fresh_buys: true,
+        should_protect_first: false,
+        next_action: "Cooldown until paper PnL quality repairs.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("cycle");
+    expect(plan.label).toBe("integrity cooldown");
+    expect(plan.action).toBe("loop");
+    expect(plan.delayMs).toBeGreaterThanOrEqual(12_000);
+    expect(plan.reason).toContain("Cooldown until paper PnL quality repairs");
+    expect(plan.reason).toContain("will not press fresh entries");
+  });
+
   test("GIVEN stale live market evidence WHEN Auto watch plans THEN it refreshes read-only evidence instead of pausing", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withOpenProfitSafety(state),
       market_source: {
         ...state.market_source,
         mode: "live-dex",
@@ -1927,7 +2029,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN live intake needs route proof WHEN Auto watch plans THEN it refreshes provider evidence before a paper minute", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withOpenProfitSafety(state),
       market_source: {
         ...state.market_source,
         mode: "live-dex",
@@ -2011,7 +2113,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN live provider budget is throttled WHEN Auto watch plans THEN it defers fresh paper action", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withOpenProfitSafety(state),
       market_source: {
         ...state.market_source,
         mode: "live-dex",
@@ -2095,7 +2197,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN execution runway needs route proof WHEN Auto watch plans THEN it refreshes route proof before another paper tick", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withOpenProfitSafety(state),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         loop_permission: "multi-fill",
@@ -2190,7 +2292,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN execution heartbeat protects the wallet WHEN Auto watch plans THEN it protects before fresh exposure", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withOpenProfitSafety(state),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         loop_permission: "multi-fill",
@@ -2275,7 +2377,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN execution runway is blocked WHEN Auto watch plans THEN it stays in review instead of pressing paper size", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withOpenProfitSafety(state),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         loop_permission: "multi-fill",
@@ -2350,7 +2452,7 @@ describe("Web3 autonomous trading subsystem", () => {
     const state = getWeb3TradingState("base", 0);
     const loopImpact = state.autonomous_loop_impact_auditor;
     const quietMinuteLoop = {
-      ...withClearExecutionLane(state),
+      ...withClearExecutionLane(withOpenProfitSafety(state)),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         max_trades_next_minute: 0,
@@ -2450,7 +2552,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN lagging profit benchmark evidence WHEN Auto watch plans THEN it tightens cadence before another paper action", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...withClearExecutionLane(state),
+      ...withClearExecutionLane(withOpenProfitSafety(state)),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         max_trades_next_minute: 0,
@@ -2503,7 +2605,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN missed hot-tape alpha WHEN Auto watch plans THEN it refreshes evidence for retarget review", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...withClearExecutionLane(state),
+      ...withClearExecutionLane(withOpenProfitSafety(state)),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         max_trades_next_minute: 0,

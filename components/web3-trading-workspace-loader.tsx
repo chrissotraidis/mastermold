@@ -1902,6 +1902,8 @@ function QuickAutopilotMissionPanel({
   const wallet = state.autonomous_wallet_telemetry;
   const profitControl = state.autonomous_profit_control;
   const profitObjective = state.autonomous_profit_objective;
+  const dailyProfitLock = state.autonomous_daily_profit_lock;
+  const profitIntegrity = state.autonomous_profit_integrity_circuit;
   const profitVelocity = state.autonomous_profit_velocity_governor;
   const allocation = state.autonomous_profit_allocation_plan;
   const route = state.autonomous_route_refresh_execution;
@@ -2002,6 +2004,7 @@ function QuickAutopilotMissionPanel({
             </div>
             <div className="flex flex-wrap justify-end gap-2">
               <Chip tone={missionTone}>{command.status.replaceAll("-", " ")}</Chip>
+              <Chip tone={dailyLockTone(dailyProfitLock.loop_permission)}>{dailyProfitLock.loop_permission.replaceAll("-", " ")}</Chip>
               <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
               <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watch running" : autoWatchPlan.label}</Chip>
             </div>
@@ -2059,18 +2062,18 @@ function QuickAutopilotMissionPanel({
             </Chip>
           </div>
           <dl className="mt-2 grid grid-cols-2 gap-1" aria-label="Autopilot mission metrics">
-            <ProfitMetric label="Target" value={`${targetPct}%`} detail={formatCompactCurrency(profitObjective.target_net_pnl_usd)} tone={profitObjective.progress_pct >= 100 ? "engine" : "caution"} />
+            <ProfitMetric label="Lock" value={dailyProfitLock.loop_permission.replaceAll("-", " ")} detail={`${targetPct}% target`} tone={dailyLockTone(dailyProfitLock.loop_permission)} />
             <ProfitMetric label="Edge" value={formatCompactSignedCurrency(command.expected_edge_per_minute_usd)} detail={`${command.command_score}/100 command`} tone={command.expected_edge_per_minute_usd > 0 ? "engine" : "neutral"} />
-            <ProfitMetric label="Batch" value={`${state.autonomous_trade_batch.ready_count}/${state.autonomous_trade_batch.planned_count}`} detail={`${readiness.max_batch_trades} max`} tone={state.autonomous_trade_batch.ready_count > 0 ? "engine" : "neutral"} />
+            <ProfitMetric label="Integrity" value={`${profitIntegrity.integrity_score}/100`} detail={profitIntegrity.permission.replaceAll("-", " ")} tone={profitIntegrity.permission === "scale" || profitIntegrity.permission === "trade" ? "engine" : profitIntegrity.permission === "stand-down" || profitIntegrity.permission === "cooldown" ? "critical" : "caution"} />
             <ProfitMetric label="Route" value={route.status.replaceAll("-", " ")} detail={route.selected_symbol ?? "proof"} tone={route.status === "ready" ? "engine" : route.status === "blocked" ? "critical" : "caution"} />
             <ProfitMetric label="Candle" value={candle.status} detail={candle.symbol ?? state.autonomous_candle_conviction.target_symbol ?? "target"} tone={candle.status === "ready" ? "engine" : candle.status === "blocked" ? "critical" : "caution"} />
             <ProfitMetric label="Wallet" value={formatCompactCurrency(wallet.equity_usd)} detail={`${formatCompactCurrency(wallet.exposure_usd)} exposure`} tone={wallet.window_pnl_usd >= 0 ? "engine" : "critical"} />
           </dl>
           <p className="mt-2 line-clamp-2 text-xs leading-5 text-on-surface-variant">
-            {autoWatch ? `Auto watch is handing refresh or tick authority to the backend every ${autoWatchPlan.delayMs / 1000}s.` : autoWatchPlan.reason}
+            {autoWatch ? `Auto watch is handing ${autoWatchPlan.label} authority to the backend every ${autoWatchPlan.delayMs / 1000}s with daily lock ${dailyProfitLock.loop_permission.replaceAll("-", " ")} and integrity ${profitIntegrity.permission.replaceAll("-", " ")}.` : autoWatchPlan.reason}
           </p>
           <span className="sr-only" aria-label="Autopilot mission receipt">
-            Autopilot mission control: selected {leaderAction} {leaderSymbol}; command {command.status}; command score {command.command_score}; expected edge per minute {formatSignedCurrency(command.expected_edge_per_minute_usd)}; profit target {formatCurrency(profitObjective.target_net_pnl_usd)} at {profitObjective.progress_pct} percent; profit velocity {profitVelocity.status} with {profitVelocity.max_trades_next_minute} max trades next minute; route proof {route.status}; candle proof {candle.status}; queue execution {queueExecution.status}; paper ledger trades {state.paper_account.trade_count}; wallet equity {formatCurrency(wallet.equity_usd)}; wallet window PnL {formatSignedCurrency(wallet.window_pnl_usd)}; live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+            Autopilot mission control: selected {leaderAction} {leaderSymbol}; command {command.status}; command score {command.command_score}; expected edge per minute {formatSignedCurrency(command.expected_edge_per_minute_usd)}; profit target {formatCurrency(profitObjective.target_net_pnl_usd)} at {profitObjective.progress_pct} percent; daily profit lock {dailyProfitLock.loop_permission} with {formatSignedCurrency(dailyProfitLock.current_net_pnl_usd)} session PnL; profit integrity {profitIntegrity.permission} at {profitIntegrity.integrity_score}/100; profit velocity {profitVelocity.status} with {profitVelocity.max_trades_next_minute} max trades next minute; auto watch plan {autoWatchPlan.label}; route proof {route.status}; candle proof {candle.status}; queue execution {queueExecution.status}; paper ledger trades {state.paper_account.trade_count}; wallet equity {formatCurrency(wallet.equity_usd)}; wallet window PnL {formatSignedCurrency(wallet.window_pnl_usd)}; live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
           </span>
         </div>
       </div>
@@ -8159,6 +8162,8 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   const profitBenchmark = state.autonomous_profit_benchmark;
   const alphaFeedback = state.autonomous_alpha_feedback_loop;
   const profitThesis = state.autonomous_profit_thesis_verifier;
+  const dailyProfitLock = state.autonomous_daily_profit_lock;
+  const profitIntegrity = state.autonomous_profit_integrity_circuit;
   const marketIntake = state.autonomous_market_intake_plan;
   const executionRunway = state.autonomous_execution_runway;
   const executionHeartbeat = state.autonomous_execution_heartbeat;
@@ -8168,6 +8173,8 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   const queuedActionCount = Math.max(tickPlan.bundle_action_count, hasReadyQueueSell ? 1 : 0);
   const queuedActionLabel = `${queuedActionCount} queued action${queuedActionCount === 1 ? "" : "s"}`;
   const nextMinuteBudget = Math.max(tickPlan.next_minute_trade_budget_usd, hasReadyQueueSell ? actionQueueExecution.paper_size_usd : 0);
+  const profitLockDelay = Math.max(3_000, Math.min(45_000, dailyProfitLock.review_after_seconds * 1_000 || throttleDelay));
+  const integrityDelay = Math.max(3_000, Math.min(45_000, profitIntegrity.cadence_seconds * 1_000 || throttleDelay));
   const liveIntakeActive = state.market_source.status !== "sample" && marketIntake.status !== "sample";
   const marketIntakeAllowsMinute = !liveIntakeActive || marketIntake.can_feed_trade_loop || (profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane);
   const intakeDelay = Math.max(2_000, Math.min(60_000, marketIntake.next_request_seconds * 1_000 || throttleDelay));
@@ -8196,6 +8203,69 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
       (profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane)
     )
   );
+  if (dailyProfitLock.loop_permission === "stand-down" || dailyProfitLock.status === "stand-down") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(30_000, profitLockDelay),
+      label: "profit lock stand-down",
+      reason: `${dailyProfitLock.next_action} Auto watch stands down fresh paper entries because the daily profit lock is ${dailyProfitLock.loop_permission}; protective sells stay paper-only and live signing remains locked.`,
+      action: "loop",
+    };
+  }
+  if (dailyProfitLock.loop_permission === "paused") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(12_000, profitLockDelay),
+      label: "profit lock pause",
+      reason: `${dailyProfitLock.next_action} Auto watch pauses fresh memecoin entries until the daily loss brake and profit target evidence repair.`,
+      action: "loop",
+    };
+  }
+  if (dailyProfitLock.loop_permission === "harvest-only" || dailyProfitLock.loop_permission === "protect-only") {
+    if (dailyProfitLock.protect_sell_allowed && hasProtectMinuteLane) {
+      return {
+        mode: "minute",
+        delayMs: Math.max(2_000, Math.min(18_000, tickGovernor.next_tick_seconds * 1_000 || profitLockDelay)),
+        label: dailyProfitLock.loop_permission === "harvest-only" ? "profit lock harvest" : "profit lock protect",
+        reason: `${dailyProfitLock.next_action} Auto watch uses ${queuedActionLabel} to ${dailyProfitLock.loop_permission.replaceAll("-", " ")} before fresh buys: ${formatCompactCurrency(nextMinuteBudget)} paper budget, ${dailyProfitLock.max_next_fills} fills max, ${formatCompactSignedCurrency(dailyProfitLock.current_net_pnl_usd)} session PnL.`,
+        action: "loop",
+      };
+    }
+    return {
+      mode: "cycle",
+      delayMs: profitLockDelay,
+      label: dailyProfitLock.loop_permission === "harvest-only" ? "profit lock harvest" : "profit lock protect",
+      reason: `${dailyProfitLock.next_action} Auto watch blocks fresh paper buys while the daily lock is ${dailyProfitLock.loop_permission}; it will keep polling for a bounded protect or harvest lane.`,
+      action: "loop",
+    };
+  }
+  if (profitIntegrity.permission === "stand-down" || profitIntegrity.status === "blocked") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(20_000, integrityDelay),
+      label: "integrity stand-down",
+      reason: `${profitIntegrity.next_action} Auto watch blocks fresh frequency because profit integrity is ${profitIntegrity.status} at ${profitIntegrity.integrity_score}/100.`,
+      action: "loop",
+    };
+  }
+  if (profitIntegrity.permission === "cooldown" || profitIntegrity.status === "cooldown" || profitIntegrity.should_pause_fresh_buys) {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(12_000, integrityDelay),
+      label: profitIntegrity.permission === "protect-only" || profitIntegrity.should_protect_first ? "integrity protect" : "integrity cooldown",
+      reason: `${profitIntegrity.next_action} Auto watch will not press fresh entries until profit integrity clears; permission is ${profitIntegrity.permission.replaceAll("-", " ")}.`,
+      action: "loop",
+    };
+  }
+  if (profitIntegrity.permission === "protect-only" || profitIntegrity.should_protect_first) {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(3_000, Math.min(18_000, integrityDelay)),
+      label: "integrity protect",
+      reason: `${profitIntegrity.next_action} Auto watch runs protection before fresh size because profit integrity is ${profitIntegrity.integrity_score}/100.`,
+      action: "loop",
+    };
+  }
   if (canRunMinuteLoop && profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane) {
     return {
       mode: "minute",
