@@ -979,6 +979,7 @@ function QuickTradingCommandDeck({
   const fillLedger = state.autonomous_fill_ledger_digest;
   const forwardPermission = state.autonomous_forward_loop_permission;
   const loopImpact = state.autonomous_loop_impact_auditor;
+  const minuteDiscipline = state.autonomous_minute_profit_discipline;
   const profitCaptureAutopilot = state.autonomous_profit_capture_autopilot;
   const profitRedeployAutopilot = state.autonomous_profit_redeploy_autopilot;
   const discoveryDelta = state.live_discovery_delta_tape;
@@ -1024,6 +1025,7 @@ function QuickTradingCommandDeck({
   const fillAuditToneValue = fillAuditTone(fillLedger.last_fill_verdict);
   const forwardTone = forwardPermissionTone(forwardPermission.status);
   const loopImpactToneValue = loopImpactTone(loopImpact.status);
+  const minuteDisciplineToneValue = minuteProfitDisciplineTone(minuteDiscipline.status);
   const profitCaptureToneValue = profitCaptureAutopilotTone(profitCaptureAutopilot.status);
   const profitRedeployToneValue = profitRedeployAutopilotTone(profitRedeployAutopilot.status);
   const profitRedeployExecution = state.autonomous_profit_redeploy_execution;
@@ -1048,6 +1050,7 @@ function QuickTradingCommandDeck({
             <Chip tone={fillAuditToneValue}>last fill {fillLedger.next_fill_permission.replaceAll("-", " ")}</Chip>
             <Chip tone={forwardTone}>forward {forwardPermission.permission.replaceAll("-", " ")}</Chip>
             <Chip tone={loopImpactToneValue}>impact {loopImpact.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={minuteDisciplineToneValue}>minute {minuteDiscipline.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitCaptureToneValue}>capture {profitCaptureAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitRedeployToneValue}>redeploy {profitRedeployAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitRedeployExecutionToneValue}>exec {profitRedeployExecution.status.replaceAll("-", " ")}</Chip>
@@ -1092,6 +1095,7 @@ function QuickTradingCommandDeck({
               loopFeedback={state.autonomous_loop_feedback}
             />
             <QuickPaperExecutionPriorityTape state={state} />
+            <QuickMinuteProfitDisciplineRail state={state} />
           </div>
 
           <div className="grid gap-2">
@@ -1146,6 +1150,12 @@ function QuickTradingCommandDeck({
               value={`${loopImpact.impact_score}/100`}
               detail={`${loopImpact.action.replaceAll("-", " ")} · ${formatCompactSignedCurrency(loopImpact.equity_delta_usd)} equity`}
               tone={loopImpactToneValue}
+            />
+            <ProfitMetric
+              label="Minute discipline"
+              value={`${minuteDiscipline.discipline_score}/100`}
+              detail={`${minuteDiscipline.action.replaceAll("-", " ")} · ${minuteDiscipline.max_trades_next_minute}/m`}
+              tone={minuteDisciplineToneValue}
             />
             <ProfitMetric
               label="Profit capture"
@@ -3888,6 +3898,65 @@ function classifyQuickPaperExecutionPriority(trade: Web3TradingState["trade_tape
   };
 }
 
+function QuickMinuteProfitDisciplineRail({ state }: { state: Web3TradingState }) {
+  const discipline = state.autonomous_minute_profit_discipline;
+  const tone = minuteProfitDisciplineTone(discipline.status);
+  const visibleItems = discipline.items.slice(0, 3);
+
+  return (
+    <section className="min-w-0 self-start rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2 sm:p-3" aria-label="Minute profit discipline">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Minute profit discipline</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {discipline.action.replaceAll("-", " ")} · {discipline.target_symbol ?? "desk"}
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+            {discipline.summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{discipline.discipline_score}/100</Chip>
+          <Chip tone={discipline.high_frequency_allowed ? "engine" : discipline.should_protect_first ? "caution" : "neutral"}>
+            {discipline.max_trades_next_minute}/m
+          </Chip>
+          <Chip tone={discipline.fresh_buy_allowed ? "engine" : discipline.should_refresh_first ? "caution" : "critical"}>
+            {discipline.fresh_buy_allowed ? "fresh ok" : discipline.should_refresh_first ? "refresh first" : "no fresh"}
+          </Chip>
+        </div>
+      </div>
+
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-3">
+        {visibleItems.map((item) => (
+          <div key={item.id} className={cn("min-w-0 rounded-md border p-2", permissionToneClass(minuteProofItemTone(item.status)))}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", profitAuthorityBarClass(minuteProofItemTone(item.status)))} aria-hidden="true" />
+            </div>
+            <p className="mt-1 truncate text-xs font-semibold text-on-surface">{item.value}</p>
+            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      {discipline.blockers.length > 0 ? (
+        <p className="mt-2 line-clamp-2 rounded-md border border-caution/25 bg-caution/10 p-2 text-[11px] leading-4 text-on-surface-variant">
+          {discipline.blockers[0]}
+        </p>
+      ) : null}
+
+      <dl className="mt-2 grid grid-cols-3 gap-1" aria-label="Minute profit discipline metrics">
+        <MiniProofStat label="Realized" value={formatCompactSignedCurrency(discipline.realized_minute_edge_usd)} />
+        <MiniProofStat label="Expected" value={`${formatCompactSignedCurrency(discipline.expected_profit_per_minute_usd)}/m`} />
+        <MiniProofStat label="Drag" value={formatCompactCurrency(discipline.churn_drag_usd + discipline.execution_drag_usd)} />
+      </dl>
+      <span className="sr-only" aria-label="Minute profit discipline receipt">
+        Minute profit discipline status {discipline.status}; action {discipline.action}; target {discipline.target_symbol ?? "desk"}; discipline score {discipline.discipline_score}; high-frequency allowed {discipline.high_frequency_allowed ? "yes" : "no"}; fresh buy allowed {discipline.fresh_buy_allowed ? "yes" : "no"}; protect first {discipline.should_protect_first ? "yes" : "no"}; refresh first {discipline.should_refresh_first ? "yes" : "no"}; realized minute edge {formatSignedCurrency(discipline.realized_minute_edge_usd)}; expected profit per minute {formatSignedCurrency(discipline.expected_profit_per_minute_usd)}; max trades next minute {discipline.max_trades_next_minute}; max fresh buys {discipline.max_fresh_buys}; max protective sells {discipline.max_protective_sells}; cadence {discipline.next_cadence_seconds} seconds; blockers {discipline.blockers.join("; ") || "none"}.
+      </span>
+    </section>
+  );
+}
+
 function QuickRotationDirectorPanel({ state }: { state: Web3TradingState }) {
   const director = state.autonomous_rotation_director;
   const tone: QuickChipTone = director.status === "rotate-now" || director.status === "retarget"
@@ -6401,6 +6470,19 @@ function loopImpactTone(status: Web3TradingState["autonomous_loop_impact_auditor
   if (status === "tighten" || status === "harvest" || status === "protect" || status === "refresh") return "caution";
   if (status === "cooldown" || status === "blocked") return "critical";
   return "neutral";
+}
+
+function minuteProfitDisciplineTone(status: Web3TradingState["autonomous_minute_profit_discipline"]["status"]): QuickChipTone {
+  if (status === "scale" || status === "run") return "engine";
+  if (status === "tighten" || status === "protect" || status === "refresh") return "caution";
+  if (status === "blocked") return "critical";
+  return "neutral";
+}
+
+function minuteProofItemTone(status: Web3TradingState["autonomous_minute_profit_discipline"]["items"][number]["status"]): QuickChipTone {
+  if (status === "pass") return "engine";
+  if (status === "fail") return "critical";
+  return "caution";
 }
 
 function profitCaptureAutopilotTone(status: Web3TradingState["autonomous_profit_capture_autopilot"]["status"]): QuickChipTone {

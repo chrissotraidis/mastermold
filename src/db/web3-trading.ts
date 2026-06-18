@@ -6640,6 +6640,40 @@ export type AutonomousProfitAccountability = {
   items: AutonomousProfitAccountabilityItem[];
 };
 
+export type AutonomousMinuteProfitDisciplineItem = {
+  id: "velocity" | "execution" | "churn" | "fill-quality" | "wallet" | "impact";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  score: number;
+  value: string;
+  detail: string;
+};
+
+export type AutonomousMinuteProfitDiscipline = {
+  mode: "autonomous-minute-profit-discipline";
+  status: "scale" | "run" | "tighten" | "protect" | "refresh" | "blocked" | "idle";
+  action: "increase-frequency" | "keep-running" | "tighten-size" | "protect-wallet" | "refresh-proof" | "stand-down" | "observe";
+  target_symbol: string | null;
+  discipline_score: number;
+  high_frequency_allowed: boolean;
+  fresh_buy_allowed: boolean;
+  should_protect_first: boolean;
+  should_refresh_first: boolean;
+  realized_minute_edge_usd: number;
+  expected_profit_per_minute_usd: number;
+  churn_drag_usd: number;
+  execution_drag_usd: number;
+  max_trades_next_minute: number;
+  max_fresh_buys: number;
+  max_protective_sells: number;
+  next_cadence_seconds: number;
+  summary: string;
+  next_action: string;
+  controls: string[];
+  blockers: string[];
+  items: AutonomousMinuteProfitDisciplineItem[];
+};
+
 export type AutonomousProfitIntegrityCircuitItem = {
   id: "validator" | "forecast" | "execution" | "safety" | "accountability" | "loop";
   label: string;
@@ -8714,6 +8748,7 @@ export type Web3TradingState = {
   autonomous_wake_plan: AutonomousWakePlan;
   autonomous_forward_loop_permission: AutonomousForwardLoopPermission;
   autonomous_loop_impact_auditor: AutonomousLoopImpactAuditor;
+  autonomous_minute_profit_discipline: AutonomousMinuteProfitDiscipline;
   autonomous_loop_tick: AutonomousLoopTickReport;
   learning_loop: AdaptiveLearningLoop;
   signal_alpha_attribution: SignalAlphaAttribution;
@@ -14300,6 +14335,16 @@ function buildWeb3TradingState({
     candleRefresh: autonomous_candle_refresh,
     executionGate: execution_gate,
   });
+  const autonomous_minute_profit_discipline = buildAutonomousMinuteProfitDiscipline({
+    profitVelocity: autonomous_profit_velocity_governor,
+    highFrequencyRace: high_frequency_profit_race,
+    highFrequencyExecution: high_frequency_profit_race_execution,
+    churnEfficiency: churn_efficiency_auditor,
+    paperExecutionQuality: paper_execution_quality,
+    profitAccountability: autonomous_profit_accountability,
+    loopImpact: autonomous_loop_impact_auditor,
+    forwardPermission: autonomous_forward_loop_permission,
+  });
   const autonomous_profit_capture_autopilot = buildAutonomousProfitCaptureAutopilot({
     profitCaptureRace: profit_capture_race,
     portfolioMarkBoard: autonomous_portfolio_mark_board,
@@ -14404,6 +14449,7 @@ function buildWeb3TradingState({
     autonomous_wake_plan,
     autonomous_market_intake_plan,
     autonomous_loop_impact_auditor,
+    autonomous_minute_profit_discipline,
     autonomous_loop_tick,
     strategy_lab,
     autonomous_forward_test,
@@ -16663,6 +16709,16 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     candleRefresh: state.autonomous_candle_refresh,
     executionGate: state.execution_gate,
   });
+  const autonomous_minute_profit_discipline = buildAutonomousMinuteProfitDiscipline({
+    profitVelocity: autonomous_profit_velocity_governor,
+    highFrequencyRace: high_frequency_profit_race,
+    highFrequencyExecution: high_frequency_profit_race_execution,
+    churnEfficiency: state.churn_efficiency_auditor,
+    paperExecutionQuality: state.paper_execution_quality,
+    profitAccountability: autonomous_profit_accountability,
+    loopImpact: autonomous_loop_impact_auditor,
+    forwardPermission: autonomous_forward_loop_permission,
+  });
   const autonomous_profit_capture_autopilot = buildAutonomousProfitCaptureAutopilot({
     profitCaptureRace: state.profit_capture_race,
     portfolioMarkBoard: state.autonomous_portfolio_mark_board,
@@ -16747,6 +16803,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_wake_plan,
     autonomous_market_intake_plan,
     autonomous_loop_impact_auditor,
+    autonomous_minute_profit_discipline,
     autonomous_loop_tick,
     capital_rotation,
     autopilot,
@@ -17350,6 +17407,16 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     candleRefresh: state.autonomous_candle_refresh,
     executionGate: state.execution_gate,
   });
+  const autonomous_minute_profit_discipline = buildAutonomousMinuteProfitDiscipline({
+    profitVelocity: state.autonomous_profit_velocity_governor,
+    highFrequencyRace: state.high_frequency_profit_race,
+    highFrequencyExecution: state.high_frequency_profit_race_execution,
+    churnEfficiency: state.churn_efficiency_auditor,
+    paperExecutionQuality: state.paper_execution_quality,
+    profitAccountability: autonomous_profit_accountability,
+    loopImpact: autonomous_loop_impact_auditor,
+    forwardPermission: autonomous_forward_loop_permission,
+  });
   const autonomous_capital_command = buildAutonomousCapitalCommand({
     tickPlan: state.autonomous_tick_plan,
     tickGovernor: state.autonomous_tick_governor,
@@ -17432,6 +17499,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_wake_plan,
     autonomous_market_intake_plan,
     autonomous_loop_impact_auditor,
+    autonomous_minute_profit_discipline,
     autonomous_loop_tick,
     autonomous_custody_mandate,
     autonomous_signer_ops,
@@ -21929,6 +21997,16 @@ function applyPersistentLedger(
     candleRefresh: autonomous_candle_refresh,
     executionGate: state.execution_gate,
   });
+  const autonomous_minute_profit_discipline = buildAutonomousMinuteProfitDiscipline({
+    profitVelocity: state.autonomous_profit_velocity_governor,
+    highFrequencyRace: high_frequency_profit_race,
+    highFrequencyExecution: high_frequency_profit_race_execution,
+    churnEfficiency: state.churn_efficiency_auditor,
+    paperExecutionQuality: state.paper_execution_quality,
+    profitAccountability: autonomous_profit_accountability,
+    loopImpact: autonomous_loop_impact_auditor,
+    forwardPermission: autonomous_forward_loop_permission,
+  });
   const autonomous_capital_command = buildAutonomousCapitalCommand({
     tickPlan: autonomous_tick_plan,
     tickGovernor: autonomous_tick_governor,
@@ -22244,6 +22322,7 @@ function applyPersistentLedger(
     autonomous_make_money_pulse,
     autonomous_forward_loop_permission,
     autonomous_loop_impact_auditor,
+    autonomous_minute_profit_discipline,
     autonomous_profit_benchmark,
     autonomous_alpha_feedback_loop,
     autonomous_profit_thesis_verifier,
@@ -50189,6 +50268,283 @@ function buildAutonomousLoopImpactAuditor({
       chartNeedsRefresh,
     }),
   };
+}
+
+function buildAutonomousMinuteProfitDiscipline({
+  profitVelocity,
+  highFrequencyRace,
+  highFrequencyExecution,
+  churnEfficiency,
+  paperExecutionQuality,
+  profitAccountability,
+  loopImpact,
+  forwardPermission,
+}: {
+  profitVelocity: AutonomousProfitVelocityGovernor;
+  highFrequencyRace: HighFrequencyProfitRace;
+  highFrequencyExecution: HighFrequencyProfitRaceExecution;
+  churnEfficiency: ChurnEfficiencyAuditor;
+  paperExecutionQuality: PaperExecutionQuality;
+  profitAccountability: AutonomousProfitAccountability;
+  loopImpact: AutonomousLoopImpactAuditor;
+  forwardPermission: AutonomousForwardLoopPermission;
+}): AutonomousMinuteProfitDiscipline {
+  const fillQualityAverage = paperExecutionQuality.items.length > 0
+    ? paperExecutionQuality.items.reduce((sum, item) => sum + item.quality_score, 0) / paperExecutionQuality.items.length
+    : paperExecutionQuality.status === "idle" ? 50 : paperExecutionQuality.status === "excellent" ? 88 : paperExecutionQuality.status === "acceptable" ? 72 : paperExecutionQuality.status === "degraded" ? 42 : 22;
+  const velocityScore = clamp(Math.round(
+    profitVelocity.velocity_score +
+      (profitVelocity.loop_permission === "multi-fill" ? 8 : profitVelocity.loop_permission === "single-fill" ? 2 : -10) +
+      Math.min(16, Math.max(0, profitVelocity.expected_profit_per_minute_usd) * 2) -
+      (profitVelocity.provider_utilization_pct >= 90 ? 12 : profitVelocity.provider_utilization_pct >= 78 ? 5 : 0),
+  ), 0, 100);
+  const executionScore = clamp(Math.round(
+    highFrequencyRace.average_score * 0.45 +
+      (highFrequencyExecution.paper_trade_ready ? 22 : 0) +
+      (highFrequencyExecution.ledger_applied ? 12 : 0) +
+      Math.min(18, Math.max(0, highFrequencyExecution.expected_profit_per_minute_usd) * 3) -
+      Math.min(20, Math.max(0, highFrequencyExecution.churn_cost_bps) / 4) -
+      (highFrequencyExecution.status === "blocked" ? 18 : 0),
+  ), 0, 100);
+  const churnScore = clamp(Math.round(
+    churnEfficiency.churn_score +
+      Math.min(18, churnEfficiency.net_edge_usd / 12) -
+      Math.min(22, churnEfficiency.friction_usd / 10) +
+      (churnEfficiency.entry_permission === "open" ? 8 : churnEfficiency.entry_permission === "selective" ? 2 : -12),
+  ), 0, 100);
+  const fillScore = clamp(Math.round(
+    fillQualityAverage -
+      Math.min(18, paperExecutionQuality.implementation_shortfall_usd / 8) -
+      Math.min(16, paperExecutionQuality.adverse_slippage_usd / 8) +
+      Math.min(10, paperExecutionQuality.fill_rate_pct / 12),
+  ), 0, 100);
+  const walletScore = clamp(Math.round(
+    profitAccountability.accountability_score +
+      (profitAccountability.making_money ? 10 : -12) +
+      Math.min(16, profitAccountability.window_pnl_usd / 12) -
+      Math.min(18, Math.max(0, profitAccountability.max_drawdown_pct - 2) * 6),
+  ), 0, 100);
+  const impactScore = clamp(Math.round(
+    loopImpact.impact_score +
+      (loopImpact.can_press_next_loop ? 8 : -6) -
+      (loopImpact.must_reduce_frequency ? 10 : 0) -
+      (loopImpact.must_refresh_proof ? 10 : 0),
+  ), 0, 100);
+  const realizedMinuteEdge = roundMetric(
+    Math.max(profitAccountability.window_pnl_usd, loopImpact.session_pnl_usd) -
+      Math.max(0, churnEfficiency.friction_usd) -
+      Math.max(0, paperExecutionQuality.implementation_shortfall_usd),
+  );
+  const expectedProfitPerMinute = roundMetric(Math.max(
+    profitVelocity.expected_profit_per_minute_usd,
+    highFrequencyRace.expected_profit_per_minute_usd,
+    highFrequencyExecution.expected_profit_per_minute_usd,
+  ));
+  const disciplineScore = clamp(Math.round(
+    velocityScore * 0.18 +
+      executionScore * 0.17 +
+      churnScore * 0.17 +
+      fillScore * 0.14 +
+      walletScore * 0.18 +
+      impactScore * 0.16,
+  ), 0, 100);
+  const protectFirst = forwardPermission.requires_protection_first ||
+    loopImpact.status === "protect" ||
+    profitAccountability.action === "protect-wallet" ||
+    churnEfficiency.entry_permission === "blocked";
+  const refreshFirst = forwardPermission.permission === "refresh-first" ||
+    loopImpact.must_refresh_proof ||
+    profitVelocity.loop_permission === "refresh-only" ||
+    highFrequencyRace.action_plan.route_refresh_required;
+  const hardBlocked = forwardPermission.permission === "stand-down" ||
+    profitVelocity.loop_permission === "blocked" ||
+    highFrequencyRace.status === "blocked" ||
+    highFrequencyExecution.status === "blocked";
+  const freshBuyAllowed = !hardBlocked &&
+    !protectFirst &&
+    !refreshFirst &&
+    forwardPermission.allows_fresh_buy &&
+    churnEfficiency.can_open_fresh_entries &&
+    profitVelocity.loop_permission !== "protect-only";
+  const highFrequencyAllowed = freshBuyAllowed &&
+    disciplineScore >= 64 &&
+    realizedMinuteEdge >= -4 &&
+    expectedProfitPerMinute > 0 &&
+    fillScore >= 48 &&
+    impactScore >= 48;
+  const status: AutonomousMinuteProfitDiscipline["status"] = hardBlocked
+    ? "blocked"
+    : refreshFirst
+      ? "refresh"
+      : protectFirst
+        ? "protect"
+        : highFrequencyAllowed && disciplineScore >= 78 && realizedMinuteEdge > 0
+          ? "scale"
+          : highFrequencyAllowed
+            ? "run"
+            : disciplineScore >= 46
+              ? "tighten"
+              : loopImpact.requested || profitAccountability.fill_count > 0
+                ? "protect"
+                : "idle";
+  const action: AutonomousMinuteProfitDiscipline["action"] = status === "scale"
+    ? "increase-frequency"
+    : status === "run"
+      ? "keep-running"
+      : status === "tighten"
+        ? "tighten-size"
+        : status === "protect"
+          ? "protect-wallet"
+          : status === "refresh"
+            ? "refresh-proof"
+            : status === "blocked"
+              ? "stand-down"
+              : "observe";
+  const maxTradesNextMinute = status === "scale"
+    ? Math.max(1, Math.min(6, profitVelocity.max_trades_next_minute, forwardPermission.max_next_fills, loopImpact.max_next_fills || 6))
+    : status === "run"
+      ? Math.max(1, Math.min(3, profitVelocity.max_trades_next_minute, forwardPermission.max_next_fills, loopImpact.max_next_fills || 3))
+      : status === "tighten"
+        ? 1
+        : status === "protect"
+          ? Math.max(1, forwardPermission.max_protective_sells)
+          : 0;
+  const maxFreshBuys = freshBuyAllowed ? Math.min(maxTradesNextMinute, forwardPermission.max_fresh_buys) : 0;
+  const maxProtectiveSells = status === "protect"
+    ? Math.max(1, forwardPermission.max_protective_sells)
+    : Math.max(0, Math.min(forwardPermission.max_protective_sells, maxTradesNextMinute));
+  const nextCadenceSeconds = status === "scale"
+    ? Math.max(1, Math.min(8, profitVelocity.cooldown_seconds || loopImpact.next_cadence_seconds || 6))
+    : status === "run"
+      ? Math.max(3, Math.min(14, loopImpact.next_cadence_seconds || profitVelocity.cooldown_seconds || 10))
+      : status === "tighten"
+        ? Math.max(12, Math.min(30, loopImpact.next_cadence_seconds + 8))
+        : status === "protect" || status === "refresh"
+          ? Math.max(5, Math.min(20, loopImpact.next_cadence_seconds || 12))
+          : 30;
+  const blockers = [
+    hardBlocked ? forwardPermission.blockers[0] ?? highFrequencyExecution.blockers[0] ?? "Minute discipline is blocked by forward permission or high-frequency execution." : null,
+    refreshFirst ? "Refresh route, chart, or source proof before the next high-frequency paper entry." : null,
+    protectFirst ? "Protect-first posture outranks new high-frequency buys until wallet risk is reduced." : null,
+    realizedMinuteEdge < 0 ? `Recent minute edge is negative after churn and execution drag (${formatSignedCompactValue(realizedMinuteEdge)}).` : null,
+    fillScore < 48 ? "Paper fill quality is too weak for another fast entry." : null,
+    churnEfficiency.entry_permission === "cooldown" ? "Churn auditor requires cooldown before another fresh entry." : null,
+  ].filter((item): item is string => Boolean(item)).slice(0, 6);
+  const items: AutonomousMinuteProfitDisciplineItem[] = [
+    {
+      id: "velocity",
+      label: "Velocity",
+      status: velocityScore >= 62 ? "pass" : velocityScore >= 42 ? "watch" : "fail",
+      score: velocityScore,
+      value: profitVelocity.loop_permission.replace("-", " "),
+      detail: `${profitVelocity.max_trades_next_minute}/m cap · ${formatSignedCompactValue(profitVelocity.expected_profit_per_minute_usd)}/m modeled.`,
+    },
+    {
+      id: "execution",
+      label: "HF execution",
+      status: executionScore >= 62 ? "pass" : executionScore >= 42 ? "watch" : "fail",
+      score: executionScore,
+      value: highFrequencyExecution.status,
+      detail: `${highFrequencyRace.action_plan.action.replace("-", " ")} ${highFrequencyRace.leader_symbol ?? "desk"} · ${formatSignedCompactValue(highFrequencyExecution.expected_profit_per_minute_usd)}/m.`,
+    },
+    {
+      id: "churn",
+      label: "Churn",
+      status: churnScore >= 62 ? "pass" : churnScore >= 42 ? "watch" : "fail",
+      score: churnScore,
+      value: formatSignedCompactValue(churnEfficiency.net_edge_usd),
+      detail: `${formatCompactValue(churnEfficiency.friction_usd)} friction · ${churnEfficiency.entry_permission.replace("-", " ")} entries.`,
+    },
+    {
+      id: "fill-quality",
+      label: "Fill quality",
+      status: fillScore >= 62 ? "pass" : fillScore >= 42 ? "watch" : "fail",
+      score: fillScore,
+      value: `${Math.round(paperExecutionQuality.fill_rate_pct)}% filled`,
+      detail: `${Math.round(paperExecutionQuality.average_slippage_bps)}bps slippage · ${formatCompactValue(paperExecutionQuality.implementation_shortfall_usd)} shortfall.`,
+    },
+    {
+      id: "wallet",
+      label: "Wallet",
+      status: walletScore >= 62 ? "pass" : walletScore >= 42 ? "watch" : "fail",
+      score: walletScore,
+      value: formatSignedCompactValue(profitAccountability.window_pnl_usd),
+      detail: `${profitAccountability.status.replace("-", " ")} accountability · ${formatPct(profitAccountability.max_drawdown_pct)} drawdown.`,
+    },
+    {
+      id: "impact",
+      label: "Loop impact",
+      status: impactScore >= 62 ? "pass" : impactScore >= 42 ? "watch" : "fail",
+      score: impactScore,
+      value: loopImpact.action.replace("-", " "),
+      detail: `${formatSignedCompactValue(loopImpact.session_pnl_usd)} session · ${loopImpact.fill_delta}/${loopImpact.block_delta} fills/blocks.`,
+    },
+  ];
+
+  return {
+    mode: "autonomous-minute-profit-discipline",
+    status,
+    action,
+    target_symbol: highFrequencyExecution.selected_symbol ?? highFrequencyRace.leader_symbol ?? forwardPermission.target_symbol,
+    discipline_score: disciplineScore,
+    high_frequency_allowed: highFrequencyAllowed,
+    fresh_buy_allowed: freshBuyAllowed,
+    should_protect_first: protectFirst,
+    should_refresh_first: refreshFirst,
+    realized_minute_edge_usd: realizedMinuteEdge,
+    expected_profit_per_minute_usd: expectedProfitPerMinute,
+    churn_drag_usd: roundMetric(Math.max(0, churnEfficiency.friction_usd)),
+    execution_drag_usd: roundMetric(Math.max(0, paperExecutionQuality.implementation_shortfall_usd + paperExecutionQuality.adverse_slippage_usd)),
+    max_trades_next_minute: maxTradesNextMinute,
+    max_fresh_buys: maxFreshBuys,
+    max_protective_sells: maxProtectiveSells,
+    next_cadence_seconds: nextCadenceSeconds,
+    summary: autonomousMinuteProfitDisciplineSummary(status, disciplineScore, highFrequencyRace.leader_symbol, realizedMinuteEdge, expectedProfitPerMinute, maxTradesNextMinute),
+    next_action: autonomousMinuteProfitDisciplineNextAction(status, action, blockers, forwardPermission, loopImpact, highFrequencyRace),
+    controls: [
+      "Checks whether the next high-frequency minute is justified by expected profit, paper execution readiness, churn net edge, fill quality, wallet accountability, and latest loop impact.",
+      "Allows fast fresh buys only when recent paper edge is positive enough after churn and execution drag; otherwise it tightens, protects, refreshes, or stands down.",
+      "Uses DEX/route/feed evidence as read-only proof and keeps every fill local-paper unless separate live custody and signing gates are explicitly armed.",
+      "Minute discipline cannot guarantee profit, custody funds, sign swaps, submit transactions, or keep running after the app/browser stops.",
+    ],
+    blockers,
+    items,
+  };
+}
+
+function autonomousMinuteProfitDisciplineSummary(
+  status: AutonomousMinuteProfitDiscipline["status"],
+  score: number,
+  symbol: string | null,
+  realizedMinuteEdge: number,
+  expectedProfitPerMinute: number,
+  maxTradesNextMinute: number,
+) {
+  const target = symbol ?? "the desk";
+  if (status === "scale") return `Minute discipline can scale ${target}: ${score}/100 with ${formatSignedCompactValue(realizedMinuteEdge)} realized minute edge and ${maxTradesNextMinute} paper trades allowed.`;
+  if (status === "run") return `Minute discipline can keep ${target} running: ${score}/100 with ${formatSignedCompactValue(expectedProfitPerMinute)}/m modeled edge.`;
+  if (status === "tighten") return `Minute discipline tightens ${target}: ${score}/100; use one smaller paper action before re-auditing churn and fills.`;
+  if (status === "protect") return `Minute discipline is protect-first for ${target}; wallet or churn pressure outranks fresh high-frequency buys.`;
+  if (status === "refresh") return `Minute discipline needs fresh proof for ${target} before the next fast paper entry.`;
+  if (status === "blocked") return `Minute discipline blocks ${target}; forward permission or high-frequency execution is not safe enough.`;
+  return `Minute discipline is observing ${target}; run a bounded paper tick to create proof before speeding up.`;
+}
+
+function autonomousMinuteProfitDisciplineNextAction(
+  status: AutonomousMinuteProfitDiscipline["status"],
+  action: AutonomousMinuteProfitDiscipline["action"],
+  blockers: string[],
+  forwardPermission: AutonomousForwardLoopPermission,
+  loopImpact: AutonomousLoopImpactAuditor,
+  highFrequencyRace: HighFrequencyProfitRace,
+) {
+  if (status === "scale") return "Allow the next high-frequency paper minute, but re-audit immediately after fills land.";
+  if (status === "run") return forwardPermission.next_action || highFrequencyRace.next_action;
+  if (status === "tighten") return "Run no more than one reduced paper fill, then require a fresh minute-discipline receipt.";
+  if (status === "protect") return loopImpact.next_action || "Protect paper wallet exposure before any fresh entry.";
+  if (status === "refresh") return "Refresh route, chart, or source proof before another high-frequency paper entry.";
+  if (status === "blocked") return blockers[0] ?? forwardPermission.next_action;
+  return action === "observe" ? "Wait for a bounded paper tick or high-frequency race receipt." : highFrequencyRace.next_action;
 }
 
 function autonomousLoopImpactSummary(

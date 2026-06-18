@@ -578,6 +578,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Paper execution priority receipt");
     expect(web3Workspace).toContain("Protect-first redeploy sell applied before released cash can chase again.");
     expect(web3Workspace).toContain('live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}');
+    expect(web3Workspace).toContain("Minute profit discipline");
+    expect(web3Workspace).toContain("Minute profit discipline receipt");
+    expect(web3Workspace).toContain("high-frequency allowed {discipline.high_frequency_allowed ? \"yes\" : \"no\"}");
+    expect(web3Workspace).toContain("realized minute edge {formatSignedCurrency(discipline.realized_minute_edge_usd)}");
+    expect(web3Workspace).toContain("Minute discipline");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved for later review.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved from the Paper form.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved to review the mobile Paper flow.");

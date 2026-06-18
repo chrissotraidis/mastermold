@@ -3060,6 +3060,37 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_profit_accountability.controls.some((control) => control.includes("paper wallet PnL"))).toBe(true);
     expect(state.autonomous_profit_accountability.controls.some((control) => control.includes("Local paper-accountability only"))).toBe(true);
+    expect(state.autonomous_minute_profit_discipline.mode).toBe("autonomous-minute-profit-discipline");
+    expect(["scale", "run", "tighten", "protect", "refresh", "blocked", "idle"]).toContain(state.autonomous_minute_profit_discipline.status);
+    expect(["increase-frequency", "keep-running", "tighten-size", "protect-wallet", "refresh-proof", "stand-down", "observe"]).toContain(state.autonomous_minute_profit_discipline.action);
+    expect(typeof state.autonomous_minute_profit_discipline.high_frequency_allowed).toBe("boolean");
+    expect(typeof state.autonomous_minute_profit_discipline.fresh_buy_allowed).toBe("boolean");
+    expect(typeof state.autonomous_minute_profit_discipline.should_protect_first).toBe("boolean");
+    expect(typeof state.autonomous_minute_profit_discipline.should_refresh_first).toBe("boolean");
+    expect(state.autonomous_minute_profit_discipline.discipline_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_minute_profit_discipline.discipline_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_minute_profit_discipline.max_trades_next_minute).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_minute_profit_discipline.max_trades_next_minute).toBeLessThanOrEqual(6);
+    expect(state.autonomous_minute_profit_discipline.max_fresh_buys).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_minute_profit_discipline.max_fresh_buys).toBeLessThanOrEqual(state.autonomous_minute_profit_discipline.max_trades_next_minute);
+    expect(state.autonomous_minute_profit_discipline.max_protective_sells).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_minute_profit_discipline.next_cadence_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_minute_profit_discipline.items.map((item) => item.id)).toEqual(["velocity", "execution", "churn", "fill-quality", "wallet", "impact"]);
+    expect(state.autonomous_minute_profit_discipline.items.every((item) =>
+      ["pass", "watch", "fail"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.value.length > 0 &&
+      item.detail.length > 0
+    )).toBe(true);
+    if (!state.autonomous_minute_profit_discipline.high_frequency_allowed) {
+      expect(
+        state.autonomous_minute_profit_discipline.max_fresh_buys === 0 ||
+          state.autonomous_minute_profit_discipline.status === "tighten"
+      ).toBe(true);
+    }
+    expect(state.autonomous_minute_profit_discipline.controls.some((control) => control.includes("expected profit"))).toBe(true);
+    expect(state.autonomous_minute_profit_discipline.controls.some((control) => control.includes("cannot guarantee profit"))).toBe(true);
     expect(state.autonomous_profit_integrity_circuit.mode).toBe("autonomous-profit-integrity-circuit");
     expect(["press", "continue", "probe", "protect", "cooldown", "blocked", "learning"]).toContain(state.autonomous_profit_integrity_circuit.status);
     expect(["scale", "trade", "probe", "protect-only", "cooldown", "stand-down"]).toContain(state.autonomous_profit_integrity_circuit.permission);
