@@ -878,6 +878,7 @@ describe("Web3 autonomous trading subsystem", () => {
     const commandPerformance = state.autonomous_command_performance;
     const profitControl = state.autonomous_profit_control;
     const fillLedger = state.autonomous_fill_ledger_digest;
+    const forwardPermission = state.autonomous_forward_loop_permission;
 
     expect(["compounding", "learning", "overtrading", "protect"]).toContain(scorecard.status);
     expect(scorecard.net_pnl_usd).toBe(Math.round(state.portfolio.realized_pnl_usd + state.portfolio.unrealized_pnl_usd));
@@ -977,6 +978,29 @@ describe("Web3 autonomous trading subsystem", () => {
       Array.isArray(item.evidence) &&
       Array.isArray(item.blockers)
     )).toBe(true);
+
+    expect(forwardPermission.mode).toBe("autonomous-forward-loop-permission");
+    expect(["press", "probe", "harvest", "protect", "refresh", "cooldown", "blocked", "observe"]).toContain(forwardPermission.status);
+    expect(["press", "selective", "harvest-only", "protect-only", "refresh-first", "cooldown", "stand-down"]).toContain(forwardPermission.permission);
+    expect(["run-minute", "run-loop", "paper-probe", "harvest-profit", "protect-book", "refresh-proof", "cooldown", "stand-down"]).toContain(forwardPermission.action);
+    expect(forwardPermission.permission_score).toBeGreaterThanOrEqual(0);
+    expect(forwardPermission.permission_score).toBeLessThanOrEqual(100);
+    expect(forwardPermission.fill_audit_score).toBe(fillLedger.last_fill_profit_score);
+    expect(forwardPermission.max_next_fills).toBeGreaterThanOrEqual(0);
+    expect(forwardPermission.max_fresh_buys).toBeLessThanOrEqual(forwardPermission.max_next_fills);
+    expect(forwardPermission.required_after_fill_score).toBeGreaterThan(0);
+    expect(typeof forwardPermission.can_fire_next_tick).toBe("boolean");
+    expect(typeof forwardPermission.allows_fresh_buy).toBe("boolean");
+    expect(typeof forwardPermission.requires_protection_first).toBe("boolean");
+    expect(forwardPermission.items.map((item) => item.id)).toEqual(["fill-audit", "profit-proof", "integrity", "throttle", "wake", "decision"]);
+    expect(forwardPermission.items.every((item) =>
+      ["pass", "watch", "fail"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.value.length > 0 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(forwardPermission.controls.some((control) => control.includes("Final forward permission"))).toBe(true);
     expect(commandExecution.mode).toBe("command-center-paper-execution");
     expect(["queued", "applied", "blocked", "idle"]).toContain(commandExecution.status);
     expect(commandExecution.execution_boundary).toBe("paper-ledger-only");
@@ -2135,6 +2159,14 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_make_money_pulse.controls.some((control) => control.includes("Single make-money pulse"))).toBe(true);
     expect(state.autonomous_make_money_pulse.controls.some((control) => control.includes("local paper ledger") || control.includes("local paper-ledger"))).toBe(true);
+    expect(state.autonomous_forward_loop_permission.mode).toBe("autonomous-forward-loop-permission");
+    expect(["press", "probe", "harvest", "protect", "refresh", "cooldown", "blocked", "observe"]).toContain(state.autonomous_forward_loop_permission.status);
+    expect(["press", "selective", "harvest-only", "protect-only", "refresh-first", "cooldown", "stand-down"]).toContain(state.autonomous_forward_loop_permission.permission);
+    expect(["run-minute", "run-loop", "paper-probe", "harvest-profit", "protect-book", "refresh-proof", "cooldown", "stand-down"]).toContain(state.autonomous_forward_loop_permission.action);
+    expect(state.autonomous_forward_loop_permission.permission_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_forward_loop_permission.permission_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_forward_loop_permission.items.map((item) => item.id)).toEqual(["fill-audit", "profit-proof", "integrity", "throttle", "wake", "decision"]);
+    expect(state.autonomous_forward_loop_permission.controls.some((control) => control.includes("Final forward permission"))).toBe(true);
     expect(state.autonomous_profit_benchmark.mode).toBe("autonomous-profit-benchmark");
     expect(["beating-cash", "lagging-cash", "beating-selected", "lagging-selected", "protecting-capital", "learning"]).toContain(state.autonomous_profit_benchmark.status);
     expect(state.autonomous_profit_benchmark.benchmark_score).toBeGreaterThanOrEqual(0);

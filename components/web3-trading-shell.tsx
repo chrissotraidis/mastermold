@@ -57,6 +57,7 @@ export function Web3TradingShell({ state }: { state?: Web3TradingState }) {
   const burstFillExecution = state?.autonomous_burst_fill_execution;
   const profitAccountability = state?.autonomous_profit_accountability;
   const fillLedger = state?.autonomous_fill_ledger_digest;
+  const forwardPermission = state?.autonomous_forward_loop_permission;
   const loopItems = buildShellAutonomousLoopItems({
     marketPulse,
     edgeStack,
@@ -602,6 +603,7 @@ export function Web3TradingShell({ state }: { state?: Web3TradingState }) {
           profitVelocity={profitVelocity}
           profitLaneScoreboard={profitLaneScoreboard}
           fillLedger={fillLedger}
+          forwardPermission={forwardPermission}
           orderTicket={orderTicket}
           executionAdapter={executionAdapter}
         />
@@ -1361,6 +1363,7 @@ function ShellMoneyMissionStrip({
   profitVelocity,
   profitLaneScoreboard,
   fillLedger,
+  forwardPermission,
   orderTicket,
   executionAdapter,
 }: {
@@ -1378,6 +1381,7 @@ function ShellMoneyMissionStrip({
   profitVelocity?: Web3TradingState["autonomous_profit_velocity_governor"];
   profitLaneScoreboard?: Web3TradingState["autonomous_profit_lane_scoreboard"];
   fillLedger?: Web3TradingState["autonomous_fill_ledger_digest"];
+  forwardPermission?: Web3TradingState["autonomous_forward_loop_permission"];
   orderTicket?: Web3TradingState["autonomous_order_ticket"];
   executionAdapter?: Web3TradingState["autonomous_execution_adapter_readiness"];
 }) {
@@ -1390,6 +1394,7 @@ function ShellMoneyMissionStrip({
   const burstTone = burstFillPlan ? burstFillPlanTone(burstFillPlan.status) : guardTone;
   const feedbackTone = burstOutcomeFeedback ? burstOutcomeFeedbackTone(burstOutcomeFeedback.status) : burstTone;
   const fillAuditTone = fillLedger ? shellFillAuditTone(fillLedger.last_fill_verdict) : feedbackTone;
+  const forwardTone = forwardPermission ? shellForwardPermissionTone(forwardPermission.status) : fillAuditTone;
   const burstExecutionToneValue = burstFillExecution ? burstFillExecutionTone(burstFillExecution.status) : burstTone;
   const accountabilityTone = profitAccountability ? profitAccountabilityTone(profitAccountability.status) : feedbackTone;
   const leaderLaneItem = profitLaneScoreboard?.items.find((item) => item.status === "leader") ?? profitLaneScoreboard?.items[0];
@@ -1437,6 +1442,7 @@ function ShellMoneyMissionStrip({
               <Chip tone={burstTone}>Burst fill plan: {burstFillPlan?.status.replace("-", " ") ?? "hydrating"}</Chip>
               <Chip tone={feedbackTone}>Burst feedback: {burstOutcomeFeedback?.action.replace("-", " ") ?? "hydrating"}</Chip>
               <Chip tone={fillAuditTone}>Last fill: {fillLedger?.next_fill_permission.replace("-", " ") ?? "hydrating"}</Chip>
+              <Chip tone={forwardTone}>Forward: {forwardPermission?.permission.replace("-", " ") ?? "hydrating"}</Chip>
               <Chip tone={burstExecutionToneValue}>Burst execution: {burstFillExecution?.status.replace("-", " ") ?? "hydrating"}</Chip>
               <Chip tone={accountabilityTone}>Profit proof: {profitAccountability?.action.replace("-", " ") ?? "hydrating"}</Chip>
               <Chip tone={runTone}>Run envelope: {runStatus.replace("-", " ")}</Chip>
@@ -1467,6 +1473,8 @@ function ShellMoneyMissionStrip({
             <MiniShellStat label="Fill quality" value={`${burstOutcomeFeedback?.paper_quality_score ?? 0}/100`} tone={burstOutcomeFeedback ? scoreTone(burstOutcomeFeedback.paper_quality_score) : "neutral"} />
             <MiniShellStat label="Last fill audit" value={fillLedger ? `${fillLedger.last_fill_profit_score}/100` : "hydrating"} tone={fillAuditTone} />
             <MiniShellStat label="Next fill" value={fillLedger?.next_fill_permission.replace("-", " ") ?? "hydrating"} tone={fillAuditTone} />
+            <MiniShellStat label="Forward permission" value={forwardPermission ? `${forwardPermission.permission_score}/100` : "hydrating"} tone={forwardTone} />
+            <MiniShellStat label="Forward action" value={forwardPermission?.action.replace("-", " ") ?? "hydrating"} tone={forwardTone} />
             <MiniShellStat label="Fresh-buy block" value={freshBuyBlocked ? "on" : "off"} tone={freshBuyBlocked ? "critical" : "engine"} />
           </div>
         </div>
@@ -1478,6 +1486,7 @@ function ShellMoneyMissionStrip({
             <MiniShellStat label="Burst total" value={(burstFillPlan?.total_notional_usd ?? 0) > 0 ? formatCurrency(burstFillPlan?.total_notional_usd ?? 0) : "none"} tone={(burstFillPlan?.total_notional_usd ?? 0) > 0 ? "engine" : "neutral"} />
             <MiniShellStat label="Fill quality" value={`${burstOutcomeFeedback?.paper_quality_score ?? 0}/100`} tone={burstOutcomeFeedback ? scoreTone(burstOutcomeFeedback.paper_quality_score) : "neutral"} />
             <MiniShellStat label="Last fill" value={fillLedger?.last_fill_verdict ?? "hydrating"} tone={fillAuditTone} />
+            <MiniShellStat label="Forward" value={forwardPermission?.permission.replace("-", " ") ?? "hydrating"} tone={forwardTone} />
             <MiniShellStat label="Daily mode" value={dailyProfitLock?.action.replace("-", " ") ?? "watch"} tone={lockTone} />
             <MiniShellStat label="Route quotes/min" value={`${envelope?.route_quotes_per_minute ?? 0}`} tone={(envelope?.route_quotes_per_minute ?? 0) > 0 ? "engine" : "neutral"} />
             <MiniShellStat label="EV/min" value={formatSignedCurrency(profitVelocity?.expected_profit_per_minute_usd ?? envelope?.expected_profit_per_minute_usd ?? 0)} tone={(profitVelocity?.expected_profit_per_minute_usd ?? envelope?.expected_profit_per_minute_usd ?? 0) > 0 ? "engine" : "neutral"} />
@@ -2248,6 +2257,13 @@ function shellFillAuditTone(verdict: Web3TradingState["autonomous_fill_ledger_di
   if (verdict === "press" || verdict === "keep") return "engine";
   if (verdict === "tighten" || verdict === "protect") return "critical";
   if (verdict === "learn") return "caution";
+  return "neutral";
+}
+
+function shellForwardPermissionTone(status: Web3TradingState["autonomous_forward_loop_permission"]["status"]): ShellTone {
+  if (status === "press" || status === "probe") return "engine";
+  if (status === "harvest" || status === "protect" || status === "refresh") return "caution";
+  if (status === "cooldown" || status === "blocked") return "critical";
   return "neutral";
 }
 

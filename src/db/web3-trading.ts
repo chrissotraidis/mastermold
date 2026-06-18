@@ -6637,6 +6637,44 @@ export type AutonomousLoopFeedback = {
   items: AutonomousLoopFeedbackItem[];
 };
 
+export type AutonomousForwardLoopPermissionItem = {
+  id: "fill-audit" | "profit-proof" | "integrity" | "throttle" | "wake" | "decision";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  score: number;
+  value: string;
+  detail: string;
+};
+
+export type AutonomousForwardLoopPermission = {
+  mode: "autonomous-forward-loop-permission";
+  status: "press" | "probe" | "harvest" | "protect" | "refresh" | "cooldown" | "blocked" | "observe";
+  permission: "press" | "selective" | "harvest-only" | "protect-only" | "refresh-first" | "cooldown" | "stand-down";
+  action: "run-minute" | "run-loop" | "paper-probe" | "harvest-profit" | "protect-book" | "refresh-proof" | "cooldown" | "stand-down";
+  target_symbol: string | null;
+  can_fire_next_tick: boolean;
+  allows_fresh_buy: boolean;
+  requires_protection_first: boolean;
+  permission_score: number;
+  fill_audit_score: number;
+  profit_integrity_score: number;
+  throttle_score: number;
+  wake_seconds: number;
+  max_next_fills: number;
+  max_fresh_buys: number;
+  max_protective_sells: number;
+  size_multiplier: number;
+  deploy_budget_usd: number;
+  release_budget_usd: number;
+  expected_edge_usd: number;
+  required_after_fill_score: number;
+  summary: string;
+  next_action: string;
+  controls: string[];
+  blockers: string[];
+  items: AutonomousForwardLoopPermissionItem[];
+};
+
 export type LiveExecutionArmingCheck = {
   id: "mode" | "kill-switch" | "wallet" | "api-key" | "rpc" | "operator-approval" | "governor" | "edge" | "preflight";
   label: string;
@@ -8491,6 +8529,7 @@ export type Web3TradingState = {
   autonomous_loop_feedback: AutonomousLoopFeedback;
   autonomous_loop_throttle: AutonomousLoopThrottle;
   autonomous_wake_plan: AutonomousWakePlan;
+  autonomous_forward_loop_permission: AutonomousForwardLoopPermission;
   autonomous_loop_tick: AutonomousLoopTickReport;
   learning_loop: AdaptiveLearningLoop;
   signal_alpha_attribution: SignalAlphaAttribution;
@@ -11827,6 +11866,17 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       loopFeedback: configuredState.autonomous_loop_feedback,
       profitAccountability: configuredState.autonomous_profit_accountability,
     });
+    configuredState.autonomous_forward_loop_permission = buildAutonomousForwardLoopPermission({
+      fillLedgerDigest: configuredState.autonomous_fill_ledger_digest,
+      profitIntegrity: configuredState.autonomous_profit_integrity_circuit,
+      profitAccountability: configuredState.autonomous_profit_accountability,
+      loopThrottle: configuredState.autonomous_loop_throttle,
+      wakePlan: configuredState.autonomous_wake_plan,
+      nowDecision: configuredState.autonomous_now_decision,
+      makeMoneyPulse: configuredState.autonomous_make_money_pulse,
+      dailyProfitLock: configuredState.autonomous_daily_profit_lock,
+      burstOutcomeFeedback: configuredState.autonomous_burst_outcome_feedback,
+    });
     configuredState.autonomous_profit_benchmark = buildAutonomousProfitBenchmark({
       market: configuredState.market,
       walletTelemetry: configuredState.autonomous_wallet_telemetry,
@@ -13947,6 +13997,17 @@ function buildWeb3TradingState({
     loopFeedback: autonomous_loop_feedback,
     profitAccountability: autonomous_profit_accountability,
   });
+  const autonomous_forward_loop_permission = buildAutonomousForwardLoopPermission({
+    fillLedgerDigest: autonomous_fill_ledger_digest,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    profitAccountability: autonomous_profit_accountability,
+    loopThrottle: autonomous_loop_throttle,
+    wakePlan: autonomous_wake_plan,
+    nowDecision: autonomous_now_decision,
+    makeMoneyPulse: autonomous_make_money_pulse,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    burstOutcomeFeedback: autonomous_burst_outcome_feedback,
+  });
   const autonomous_profit_benchmark = buildAutonomousProfitBenchmark({
     market,
     walletTelemetry: autonomous_wallet_telemetry,
@@ -14065,6 +14126,7 @@ function buildWeb3TradingState({
     autonomous_execution_runway,
     autonomous_now_decision,
     autonomous_make_money_pulse,
+    autonomous_forward_loop_permission,
     autonomous_profit_benchmark,
     autonomous_alpha_feedback_loop,
     autonomous_profit_thesis_verifier,
@@ -16254,6 +16316,17 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     loopFeedback: autonomous_loop_feedback,
     profitAccountability: autonomous_profit_accountability,
   });
+  const autonomous_forward_loop_permission = buildAutonomousForwardLoopPermission({
+    fillLedgerDigest: autonomous_fill_ledger_digest,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    profitAccountability: autonomous_profit_accountability,
+    loopThrottle: autonomous_loop_throttle,
+    wakePlan: autonomous_wake_plan,
+    nowDecision: autonomous_now_decision,
+    makeMoneyPulse: autonomous_make_money_pulse,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    burstOutcomeFeedback: autonomous_burst_outcome_feedback,
+  });
   const autonomous_profit_benchmark = buildAutonomousProfitBenchmark({
     market: state.market,
     walletTelemetry: autonomous_wallet_telemetry,
@@ -16346,6 +16419,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_execution_runway,
     autonomous_now_decision,
     autonomous_make_money_pulse,
+    autonomous_forward_loop_permission,
     autonomous_profit_benchmark,
     autonomous_alpha_feedback_loop,
     autonomous_profit_thesis_verifier,
@@ -16890,6 +16964,17 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     loopFeedback: autonomous_loop_feedback,
     profitAccountability: autonomous_profit_accountability,
   });
+  const autonomous_forward_loop_permission = buildAutonomousForwardLoopPermission({
+    fillLedgerDigest: state.autonomous_fill_ledger_digest,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    profitAccountability: autonomous_profit_accountability,
+    loopThrottle: autonomous_loop_throttle,
+    wakePlan: autonomous_wake_plan,
+    nowDecision: autonomous_now_decision,
+    makeMoneyPulse: autonomous_make_money_pulse,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    burstOutcomeFeedback: state.autonomous_burst_outcome_feedback,
+  });
   const autonomous_profit_benchmark = buildAutonomousProfitBenchmark({
     market: state.market,
     walletTelemetry: state.autonomous_wallet_telemetry,
@@ -16969,6 +17054,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_execution_runway,
     autonomous_now_decision,
     autonomous_make_money_pulse,
+    autonomous_forward_loop_permission,
     autonomous_profit_benchmark,
     autonomous_alpha_feedback_loop,
     autonomous_profit_thesis_verifier,
@@ -21366,6 +21452,17 @@ function applyPersistentLedger(
     loopFeedback: autonomous_loop_feedback,
     profitAccountability: autonomous_profit_accountability,
   });
+  const autonomous_forward_loop_permission = buildAutonomousForwardLoopPermission({
+    fillLedgerDigest: autonomous_fill_ledger_digest,
+    profitIntegrity: autonomous_profit_integrity_circuit,
+    profitAccountability: autonomous_profit_accountability,
+    loopThrottle: autonomous_loop_throttle,
+    wakePlan: autonomous_wake_plan,
+    nowDecision: autonomous_now_decision,
+    makeMoneyPulse: autonomous_make_money_pulse,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    burstOutcomeFeedback: autonomous_burst_outcome_feedback,
+  });
   const autonomous_profit_benchmark = buildAutonomousProfitBenchmark({
     market: state.market,
     walletTelemetry: autonomous_wallet_telemetry,
@@ -21659,6 +21756,7 @@ function applyPersistentLedger(
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_make_money_pulse,
+    autonomous_forward_loop_permission,
     autonomous_profit_benchmark,
     autonomous_alpha_feedback_loop,
     autonomous_profit_thesis_verifier,
@@ -48334,6 +48432,283 @@ function autonomousWakePlanItems({
   ];
 }
 
+function buildAutonomousForwardLoopPermission({
+  fillLedgerDigest,
+  profitIntegrity,
+  profitAccountability,
+  loopThrottle,
+  wakePlan,
+  nowDecision,
+  makeMoneyPulse,
+  dailyProfitLock,
+  burstOutcomeFeedback,
+}: {
+  fillLedgerDigest: AutonomousFillLedgerDigest;
+  profitIntegrity: AutonomousProfitIntegrityCircuit;
+  profitAccountability: AutonomousProfitAccountability;
+  loopThrottle: AutonomousLoopThrottle;
+  wakePlan: AutonomousWakePlan;
+  nowDecision: AutonomousNowDecision;
+  makeMoneyPulse: AutonomousMakeMoneyPulse;
+  dailyProfitLock: AutonomousDailyProfitLock;
+  burstOutcomeFeedback: AutonomousBurstOutcomeFeedback;
+}): AutonomousForwardLoopPermission {
+  const fillScore = fillLedgerDigest.last_fill_profit_score || (fillLedgerDigest.recent_fill_count > 0 ? 42 : 0);
+  const fillPressAllowed = fillLedgerDigest.next_fill_permission === "press";
+  const fillSelectiveAllowed = fillLedgerDigest.next_fill_permission === "press" || fillLedgerDigest.next_fill_permission === "selective";
+  const protectFirst = fillLedgerDigest.next_fill_permission === "protect-only" ||
+    profitIntegrity.should_protect_first ||
+    loopThrottle.status === "protect" ||
+    wakePlan.status === "protect" ||
+    makeMoneyPulse.protective_sell_required ||
+    dailyProfitLock.loop_permission === "protect-only";
+  const refreshFirst = wakePlan.status === "refresh" ||
+    loopThrottle.should_refresh_first ||
+    nowDecision.route_refresh_required ||
+    nowDecision.chart_proof_required ||
+    profitIntegrity.permission === "probe" && nowDecision.status === "refresh";
+  const cooldown = fillLedgerDigest.next_fill_permission === "cooldown" ||
+    loopThrottle.status === "cooldown" ||
+    wakePlan.status === "cooldown" ||
+    profitAccountability.status === "tighten" && profitIntegrity.status === "cooldown";
+  const hardBlocked = loopThrottle.status === "blocked" ||
+    wakePlan.status === "blocked" ||
+    nowDecision.status === "blocked" ||
+    profitIntegrity.permission === "stand-down" ||
+    dailyProfitLock.loop_permission === "stand-down" ||
+    fillLedgerDigest.next_fill_permission === "wait" && fillLedgerDigest.recent_fill_count > 0 && profitIntegrity.integrity_score < 35;
+  const permissionScore = clamp(Math.round(
+    fillScore * 0.22 +
+      profitIntegrity.integrity_score * 0.22 +
+      profitAccountability.accountability_score * 0.18 +
+      loopThrottle.throttle_score * 0.14 +
+      makeMoneyPulse.pulse_score * 0.12 +
+      nowDecision.decision_score * 0.08 +
+      (wakePlan.can_auto_watch_run ? 8 : -10) +
+      (dailyProfitLock.fresh_buy_allowed ? 4 : dailyProfitLock.protect_sell_allowed ? -2 : -12) -
+      (burstOutcomeFeedback.blocks_fresh_buy ? 8 : 0),
+  ), 0, 100);
+  const status: AutonomousForwardLoopPermission["status"] = hardBlocked
+    ? "blocked"
+    : refreshFirst
+      ? "refresh"
+      : protectFirst
+        ? makeMoneyPulse.status === "harvest" || nowDecision.action === "paper-sell" ? "harvest" : "protect"
+        : cooldown
+          ? "cooldown"
+          : permissionScore >= 74 && fillPressAllowed && profitIntegrity.permission === "scale" && loopThrottle.status === "sprint"
+            ? "press"
+            : permissionScore >= 54 && fillSelectiveAllowed && (loopThrottle.can_run || wakePlan.can_auto_watch_run)
+              ? "probe"
+              : wakePlan.can_auto_watch_run && nowDecision.status !== "idle"
+                ? "observe"
+                : "blocked";
+  const permission: AutonomousForwardLoopPermission["permission"] = status === "press"
+    ? "press"
+    : status === "probe" || status === "observe"
+      ? "selective"
+      : status === "harvest"
+        ? "harvest-only"
+        : status === "protect"
+          ? "protect-only"
+          : status === "refresh"
+            ? "refresh-first"
+            : status === "cooldown"
+              ? "cooldown"
+              : "stand-down";
+  const action: AutonomousForwardLoopPermission["action"] = status === "press"
+    ? wakePlan.next_client_action === "run-minute" ? "run-minute" : "run-loop"
+    : status === "probe" || status === "observe"
+      ? wakePlan.next_client_action === "run-minute" ? "run-minute" : "paper-probe"
+      : status === "harvest"
+        ? "harvest-profit"
+        : status === "protect"
+          ? "protect-book"
+          : status === "refresh"
+            ? "refresh-proof"
+            : status === "cooldown"
+              ? "cooldown"
+              : "stand-down";
+  const allowsFreshBuy = (status === "press" || status === "probe") &&
+    dailyProfitLock.fresh_buy_allowed &&
+    !profitIntegrity.should_pause_fresh_buys &&
+    !burstOutcomeFeedback.blocks_fresh_buy &&
+    fillLedgerDigest.next_fill_permission !== "protect-only";
+  const maxNextFills = Math.max(0, Math.min(
+    fillLedgerDigest.next_fill_permission === "press" ? 6 : fillLedgerDigest.next_fill_permission === "selective" ? 2 : 1,
+    profitIntegrity.max_next_fills,
+    profitAccountability.max_next_fills,
+    loopThrottle.max_total_fills,
+    wakePlan.max_total_fills,
+    dailyProfitLock.max_next_fills,
+    burstOutcomeFeedback.max_next_child_fills || 1,
+  ));
+  const canFireNextTick = (status === "press" || status === "probe" || status === "harvest" || status === "protect" || status === "refresh") &&
+    action !== "stand-down" &&
+    wakePlan.next_client_action !== "stand-down" &&
+    (!allowsFreshBuy || maxNextFills > 0);
+  const blockers = [
+    hardBlocked ? nowDecision.blockers[0] ?? loopThrottle.next_action ?? profitIntegrity.next_action : null,
+    cooldown ? loopThrottle.next_action : null,
+    !fillSelectiveAllowed && (status === "probe" || status === "press") ? fillLedgerDigest.last_fill_audit : null,
+    profitIntegrity.should_pause_fresh_buys && !protectFirst ? profitIntegrity.next_action : null,
+    burstOutcomeFeedback.blocks_fresh_buy && allowsFreshBuy ? burstOutcomeFeedback.next_action : null,
+  ].filter((item): item is string => Boolean(item)).slice(0, 5);
+
+  return {
+    mode: "autonomous-forward-loop-permission",
+    status,
+    permission,
+    action,
+    target_symbol: nowDecision.target_symbol ?? wakePlan.target_symbol ?? makeMoneyPulse.target_symbol,
+    can_fire_next_tick: canFireNextTick,
+    allows_fresh_buy: allowsFreshBuy,
+    requires_protection_first: protectFirst,
+    permission_score: permissionScore,
+    fill_audit_score: fillScore,
+    profit_integrity_score: profitIntegrity.integrity_score,
+    throttle_score: loopThrottle.throttle_score,
+    wake_seconds: wakePlan.next_wake_seconds,
+    max_next_fills: canFireNextTick ? maxNextFills : 0,
+    max_fresh_buys: allowsFreshBuy ? Math.min(loopThrottle.max_fresh_buys, wakePlan.max_fresh_buys, maxNextFills) : 0,
+    max_protective_sells: protectFirst || status === "harvest" ? Math.max(1, Math.min(loopThrottle.max_protective_sells, wakePlan.max_protective_sells || loopThrottle.max_protective_sells)) : loopThrottle.max_protective_sells,
+    size_multiplier: roundMetric(status === "press"
+      ? Math.min(1.5, loopThrottle.size_multiplier * profitIntegrity.size_multiplier)
+      : status === "probe" || status === "observe"
+        ? Math.min(0.85, loopThrottle.size_multiplier, profitIntegrity.size_multiplier)
+        : status === "protect" || status === "harvest"
+          ? 0.35
+          : 0),
+    deploy_budget_usd: allowsFreshBuy ? Math.round(Math.min(loopThrottle.deploy_budget_usd, wakePlan.deploy_budget_usd) * (status === "press" ? 1 : 0.6)) : 0,
+    release_budget_usd: status === "harvest" || status === "protect" ? Math.max(loopThrottle.release_budget_usd, wakePlan.release_budget_usd, dailyProfitLock.release_required_usd) : loopThrottle.release_budget_usd,
+    expected_edge_usd: roundMetric(Math.max(0, nowDecision.expected_edge_usd, makeMoneyPulse.expected_profit_per_minute_usd, loopThrottle.expected_profit_usd)),
+    required_after_fill_score: status === "press" ? 72 : status === "probe" ? 58 : status === "protect" || status === "harvest" ? 45 : 64,
+    summary: autonomousForwardLoopPermissionSummary(status, permission, nowDecision.target_symbol ?? wakePlan.target_symbol ?? makeMoneyPulse.target_symbol, permissionScore, maxNextFills),
+    next_action: autonomousForwardLoopPermissionNextAction(status, action, nowDecision, wakePlan, fillLedgerDigest, profitIntegrity, loopThrottle, blockers),
+    controls: [
+      "Final forward permission for the next autonomous local paper tick after last-fill audit, profit integrity, loop throttle, wake plan, and now-decision evidence agree.",
+      "Fresh buys require selective-or-better last-fill permission plus daily lock, burst feedback, and profit-integrity clearance.",
+      "Protection, harvest, refresh, cooldown, and stand-down permissions outrank fresh entries even when market momentum is strong.",
+      "Local paper loop only; it cannot sign, submit, custody funds, keep running after the app stops, or guarantee profit.",
+    ],
+    blockers,
+    items: autonomousForwardLoopPermissionItems({
+      fillLedgerDigest,
+      profitIntegrity,
+      profitAccountability,
+      loopThrottle,
+      wakePlan,
+      nowDecision,
+      makeMoneyPulse,
+    }),
+  };
+}
+
+function autonomousForwardLoopPermissionSummary(
+  status: AutonomousForwardLoopPermission["status"],
+  permission: AutonomousForwardLoopPermission["permission"],
+  targetSymbol: string | null,
+  score: number,
+  maxFills: number,
+) {
+  const target = targetSymbol ?? "the desk";
+  if (status === "press") return `Forward permission can press ${target}: ${score}/100 with ${maxFills} next paper fills.`;
+  if (status === "probe") return `Forward permission is selective on ${target}: ${score}/100; use a smaller proof-seeking paper action.`;
+  if (status === "harvest") return `Forward permission is harvest-only for ${target}; capture paper profit before fresh risk.`;
+  if (status === "protect") return `Forward permission is protect-only for ${target}; reduce wallet risk before fresh buys.`;
+  if (status === "refresh") return `Forward permission requires fresh proof for ${target} before another paper fill.`;
+  if (status === "cooldown") return `Forward permission is cooling down ${target}; wait for cleaner fill and wallet evidence.`;
+  if (status === "blocked") return `Forward permission blocks ${target}; ${permission.replace("-", " ")} is the only safe command.`;
+  return `Forward permission is observing ${target}; keep monitoring until the next paper edge is stronger.`;
+}
+
+function autonomousForwardLoopPermissionNextAction(
+  status: AutonomousForwardLoopPermission["status"],
+  action: AutonomousForwardLoopPermission["action"],
+  nowDecision: AutonomousNowDecision,
+  wakePlan: AutonomousWakePlan,
+  fillLedgerDigest: AutonomousFillLedgerDigest,
+  profitIntegrity: AutonomousProfitIntegrityCircuit,
+  loopThrottle: AutonomousLoopThrottle,
+  blockers: string[],
+) {
+  if (status === "press") return `Use ${action.replace("-", " ")} only if the next fill can keep the post-fill audit above the press threshold.`;
+  if (status === "probe" || status === "observe") return nowDecision.next_action;
+  if (status === "harvest" || status === "protect") return profitIntegrity.next_action || loopThrottle.next_action;
+  if (status === "refresh") return wakePlan.next_action || nowDecision.next_action;
+  if (status === "cooldown") return loopThrottle.next_action || fillLedgerDigest.last_fill_audit;
+  return blockers[0] ?? profitIntegrity.next_action ?? "Stand down until forward permission repairs.";
+}
+
+function autonomousForwardLoopPermissionItems({
+  fillLedgerDigest,
+  profitIntegrity,
+  profitAccountability,
+  loopThrottle,
+  wakePlan,
+  nowDecision,
+  makeMoneyPulse,
+}: {
+  fillLedgerDigest: AutonomousFillLedgerDigest;
+  profitIntegrity: AutonomousProfitIntegrityCircuit;
+  profitAccountability: AutonomousProfitAccountability;
+  loopThrottle: AutonomousLoopThrottle;
+  wakePlan: AutonomousWakePlan;
+  nowDecision: AutonomousNowDecision;
+  makeMoneyPulse: AutonomousMakeMoneyPulse;
+}): AutonomousForwardLoopPermissionItem[] {
+  return [
+    {
+      id: "fill-audit",
+      label: "Last fill",
+      status: fillLedgerDigest.next_fill_permission === "press" || fillLedgerDigest.next_fill_permission === "selective" ? "pass" : fillLedgerDigest.next_fill_permission === "wait" ? "watch" : "fail",
+      score: fillLedgerDigest.last_fill_profit_score,
+      value: fillLedgerDigest.next_fill_permission.replace("-", " "),
+      detail: fillLedgerDigest.last_fill_audit,
+    },
+    {
+      id: "profit-proof",
+      label: "Profit proof",
+      status: profitAccountability.status === "press" || profitAccountability.status === "compound" ? "pass" : profitAccountability.status === "blocked" ? "fail" : "watch",
+      score: profitAccountability.accountability_score,
+      value: profitAccountability.action.replace("-", " "),
+      detail: profitAccountability.summary,
+    },
+    {
+      id: "integrity",
+      label: "Integrity",
+      status: profitIntegrity.can_continue ? "pass" : profitIntegrity.status === "blocked" ? "fail" : "watch",
+      score: profitIntegrity.integrity_score,
+      value: profitIntegrity.permission.replace("-", " "),
+      detail: profitIntegrity.summary,
+    },
+    {
+      id: "throttle",
+      label: "Throttle",
+      status: loopThrottle.can_run ? "pass" : loopThrottle.status === "blocked" ? "fail" : "watch",
+      score: loopThrottle.throttle_score,
+      value: loopThrottle.action.replace("-", " "),
+      detail: loopThrottle.summary,
+    },
+    {
+      id: "wake",
+      label: "Wake",
+      status: wakePlan.can_auto_watch_run ? "pass" : wakePlan.status === "blocked" ? "fail" : "watch",
+      score: clamp(Math.round(100 - wakePlan.next_wake_seconds * 1.4 + wakePlan.max_total_fills * 7), 0, 100),
+      value: wakePlan.next_client_action.replace("-", " "),
+      detail: wakePlan.summary,
+    },
+    {
+      id: "decision",
+      label: "Now decision",
+      status: nowDecision.status === "attack" || nowDecision.status === "probe" || nowDecision.status === "loop" || nowDecision.status === "protect" ? "pass" : nowDecision.status === "blocked" ? "fail" : "watch",
+      score: nowDecision.decision_score,
+      value: nowDecision.action.replace("-", " "),
+      detail: `${makeMoneyPulse.status.replace("-", " ")} pulse; ${nowDecision.summary}`,
+    },
+  ];
+}
+
 function buildAutonomousMarketIntakePlan({
   marketSource,
   ingestionPlan,
@@ -64877,6 +65252,17 @@ function attachPaperDaemonTick(
     loopFeedback: autonomousLoopFeedback,
     profitAccountability: autonomousProfitAccountability,
   });
+  const autonomousForwardLoopPermission = buildAutonomousForwardLoopPermission({
+    fillLedgerDigest: autonomousFillLedgerDigest,
+    profitIntegrity: autonomousProfitIntegrityCircuit,
+    profitAccountability: autonomousProfitAccountability,
+    loopThrottle: autonomousLoopThrottle,
+    wakePlan: autonomousWakePlan,
+    nowDecision: autonomousNowDecision,
+    makeMoneyPulse: autonomousMakeMoneyPulse,
+    dailyProfitLock: state.autonomous_daily_profit_lock,
+    burstOutcomeFeedback: state.autonomous_burst_outcome_feedback,
+  });
   const autonomousProfitBenchmark = buildAutonomousProfitBenchmark({
     market: state.market,
     walletTelemetry: autonomousWalletTelemetry,
@@ -64978,6 +65364,7 @@ function attachPaperDaemonTick(
 	    autonomous_execution_runway: autonomousExecutionRunway,
 	    autonomous_now_decision: autonomousNowDecision,
 	    autonomous_make_money_pulse: autonomousMakeMoneyPulse,
+	    autonomous_forward_loop_permission: autonomousForwardLoopPermission,
 	    autonomous_profit_benchmark: autonomousProfitBenchmark,
 	    autonomous_alpha_feedback_loop: autonomousAlphaFeedbackLoop,
 	    autonomous_profit_thesis_verifier: autonomousProfitThesisVerifier,
@@ -65717,6 +66104,17 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     loopFeedback: autonomousLoopFeedback,
     profitAccountability: autonomousProfitAccountability,
   });
+  const autonomousForwardLoopPermission = buildAutonomousForwardLoopPermission({
+    fillLedgerDigest: autonomousFillLedgerDigest,
+    profitIntegrity: autonomousProfitIntegrityCircuit,
+    profitAccountability: autonomousProfitAccountability,
+    loopThrottle: autonomousLoopThrottle,
+    wakePlan: autonomousWakePlan,
+    nowDecision: autonomousNowDecision,
+    makeMoneyPulse: autonomousMakeMoneyPulse,
+    dailyProfitLock: state.autonomous_daily_profit_lock,
+    burstOutcomeFeedback: state.autonomous_burst_outcome_feedback,
+  });
   const autonomousProfitBenchmark = buildAutonomousProfitBenchmark({
     market: state.market,
     walletTelemetry: autonomousWalletTelemetry,
@@ -65832,6 +66230,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
 	    autonomous_execution_runway: autonomousExecutionRunway,
 	    autonomous_now_decision: autonomousNowDecision,
 	    autonomous_make_money_pulse: autonomousMakeMoneyPulse,
+	    autonomous_forward_loop_permission: autonomousForwardLoopPermission,
 	    autonomous_profit_benchmark: autonomousProfitBenchmark,
 	    autonomous_alpha_feedback_loop: autonomousAlphaFeedbackLoop,
 	    autonomous_profit_thesis_verifier: autonomousProfitThesisVerifier,

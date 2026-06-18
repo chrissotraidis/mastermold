@@ -920,6 +920,7 @@ function QuickTradingCommandDeck({
   const thesis = state.autonomous_profit_thesis_verifier;
   const capitalCommand = state.autonomous_capital_command;
   const fillLedger = state.autonomous_fill_ledger_digest;
+  const forwardPermission = state.autonomous_forward_loop_permission;
   const discoveryDelta = state.live_discovery_delta_tape;
   const ranker = state.autonomous_opportunity_ranker;
   const positionBoard = state.autonomous_portfolio_mark_board;
@@ -961,6 +962,7 @@ function QuickTradingCommandDeck({
   const liveTone: QuickChipTone = state.execution_gate.live_execution_enabled ? "critical" : "demo";
   const sourceTone = sourceQualityTone(sourceQuality.status, sourceQuality.can_chase);
   const fillAuditToneValue = fillAuditTone(fillLedger.last_fill_verdict);
+  const forwardTone = forwardPermissionTone(forwardPermission.status);
 
   return (
     <section className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(21rem,0.8fr)]" aria-label="Autonomous trading command deck">
@@ -979,6 +981,7 @@ function QuickTradingCommandDeck({
             <Chip tone={primaryTone}>{decision.status.replaceAll("-", " ")}</Chip>
             <Chip tone={sourceTone}>source {sourceQuality.status.replaceAll("-", " ")}</Chip>
             <Chip tone={fillAuditToneValue}>last fill {fillLedger.next_fill_permission.replaceAll("-", " ")}</Chip>
+            <Chip tone={forwardTone}>forward {forwardPermission.permission.replaceAll("-", " ")}</Chip>
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watching" : autoWatchPlan.label}</Chip>
             <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
           </div>
@@ -1051,6 +1054,12 @@ function QuickTradingCommandDeck({
               value={`${fillLedger.last_fill_profit_score}/100`}
               detail={`${fillLedger.last_fill_verdict} · ${formatCompactSignedCurrency(fillLedger.last_fill_edge_usd)} edge`}
               tone={fillAuditToneValue}
+            />
+            <ProfitMetric
+              label="Forward permission"
+              value={`${forwardPermission.permission_score}/100`}
+              detail={`${forwardPermission.action.replaceAll("-", " ")} · ${forwardPermission.max_next_fills} fills`}
+              tone={forwardTone}
             />
             <ProfitMetric
               label="Source quality"
@@ -1149,7 +1158,7 @@ function QuickTradingCommandDeck({
       </aside>
 
       <span className="sr-only" aria-label="Autonomous command deck receipt">
-        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; next dollar {capitalCommand.action}; next dollar status {capitalCommand.status}; next dollar score {capitalCommand.command_score}; paper spend {formatCurrency(capitalCommand.spend_budget_usd)}; paper release {formatCurrency(capitalCommand.release_budget_usd)}; command boundary {capitalCommand.execution_boundary}; command can execute paper {capitalCommand.can_execute_paper ? "yes" : "no"}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
+        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; forward permission {forwardPermission.permission}; forward action {forwardPermission.action}; forward score {forwardPermission.permission_score}; forward can fire next tick {forwardPermission.can_fire_next_tick ? "yes" : "no"}; forward max fills {forwardPermission.max_next_fills}; forward fresh buys {forwardPermission.max_fresh_buys}; next dollar {capitalCommand.action}; next dollar status {capitalCommand.status}; next dollar score {capitalCommand.command_score}; paper spend {formatCurrency(capitalCommand.spend_budget_usd)}; paper release {formatCurrency(capitalCommand.release_budget_usd)}; command boundary {capitalCommand.execution_boundary}; command can execute paper {capitalCommand.can_execute_paper ? "yes" : "no"}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
       </span>
     </section>
   );
@@ -5821,6 +5830,13 @@ function fillAuditTone(verdict: Web3TradingState["autonomous_fill_ledger_digest"
   if (verdict === "press" || verdict === "keep") return "engine";
   if (verdict === "tighten" || verdict === "protect") return "critical";
   if (verdict === "learn") return "caution";
+  return "neutral";
+}
+
+function forwardPermissionTone(status: Web3TradingState["autonomous_forward_loop_permission"]["status"]): QuickChipTone {
+  if (status === "press" || status === "probe") return "engine";
+  if (status === "harvest" || status === "protect" || status === "refresh") return "caution";
+  if (status === "cooldown" || status === "blocked") return "critical";
   return "neutral";
 }
 
