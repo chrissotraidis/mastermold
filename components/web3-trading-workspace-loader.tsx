@@ -921,6 +921,7 @@ function QuickTradingCommandDeck({
   const capitalCommand = state.autonomous_capital_command;
   const fillLedger = state.autonomous_fill_ledger_digest;
   const forwardPermission = state.autonomous_forward_loop_permission;
+  const loopImpact = state.autonomous_loop_impact_auditor;
   const discoveryDelta = state.live_discovery_delta_tape;
   const ranker = state.autonomous_opportunity_ranker;
   const positionBoard = state.autonomous_portfolio_mark_board;
@@ -963,6 +964,7 @@ function QuickTradingCommandDeck({
   const sourceTone = sourceQualityTone(sourceQuality.status, sourceQuality.can_chase);
   const fillAuditToneValue = fillAuditTone(fillLedger.last_fill_verdict);
   const forwardTone = forwardPermissionTone(forwardPermission.status);
+  const loopImpactToneValue = loopImpactTone(loopImpact.status);
 
   return (
     <section className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(21rem,0.8fr)]" aria-label="Autonomous trading command deck">
@@ -982,6 +984,7 @@ function QuickTradingCommandDeck({
             <Chip tone={sourceTone}>source {sourceQuality.status.replaceAll("-", " ")}</Chip>
             <Chip tone={fillAuditToneValue}>last fill {fillLedger.next_fill_permission.replaceAll("-", " ")}</Chip>
             <Chip tone={forwardTone}>forward {forwardPermission.permission.replaceAll("-", " ")}</Chip>
+            <Chip tone={loopImpactToneValue}>impact {loopImpact.status.replaceAll("-", " ")}</Chip>
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watching" : autoWatchPlan.label}</Chip>
             <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
           </div>
@@ -1060,6 +1063,12 @@ function QuickTradingCommandDeck({
               value={`${forwardPermission.permission_score}/100`}
               detail={`${forwardPermission.action.replaceAll("-", " ")} · ${forwardPermission.max_next_fills} fills`}
               tone={forwardTone}
+            />
+            <ProfitMetric
+              label="Loop impact"
+              value={`${loopImpact.impact_score}/100`}
+              detail={`${loopImpact.action.replaceAll("-", " ")} · ${formatCompactSignedCurrency(loopImpact.equity_delta_usd)} equity`}
+              tone={loopImpactToneValue}
             />
             <ProfitMetric
               label="Source quality"
@@ -1158,7 +1167,7 @@ function QuickTradingCommandDeck({
       </aside>
 
       <span className="sr-only" aria-label="Autonomous command deck receipt">
-        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; forward permission {forwardPermission.permission}; forward action {forwardPermission.action}; forward score {forwardPermission.permission_score}; forward can fire next tick {forwardPermission.can_fire_next_tick ? "yes" : "no"}; forward max fills {forwardPermission.max_next_fills}; forward fresh buys {forwardPermission.max_fresh_buys}; next dollar {capitalCommand.action}; next dollar status {capitalCommand.status}; next dollar score {capitalCommand.command_score}; paper spend {formatCurrency(capitalCommand.spend_budget_usd)}; paper release {formatCurrency(capitalCommand.release_budget_usd)}; command boundary {capitalCommand.execution_boundary}; command can execute paper {capitalCommand.can_execute_paper ? "yes" : "no"}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
+        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; forward permission {forwardPermission.permission}; forward action {forwardPermission.action}; forward score {forwardPermission.permission_score}; forward can fire next tick {forwardPermission.can_fire_next_tick ? "yes" : "no"}; forward max fills {forwardPermission.max_next_fills}; forward fresh buys {forwardPermission.max_fresh_buys}; loop impact status {loopImpact.status}; loop impact action {loopImpact.action}; loop impact score {loopImpact.impact_score}; loop impact paper only {loopImpact.paper_only ? "yes" : "no"}; loop impact max fills {loopImpact.max_next_fills}; loop impact reduce frequency {loopImpact.must_reduce_frequency ? "yes" : "no"}; loop impact refresh proof {loopImpact.must_refresh_proof ? "yes" : "no"}; next dollar {capitalCommand.action}; next dollar status {capitalCommand.status}; next dollar score {capitalCommand.command_score}; paper spend {formatCurrency(capitalCommand.spend_budget_usd)}; paper release {formatCurrency(capitalCommand.release_budget_usd)}; command boundary {capitalCommand.execution_boundary}; command can execute paper {capitalCommand.can_execute_paper ? "yes" : "no"}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
       </span>
     </section>
   );
@@ -2622,7 +2631,9 @@ function QuickAgentActionOutcomePanel({
   busy: QuickBusyState | null;
 }) {
   const current = outcome ?? buildQuickAgentWaitingOutcome(state);
+  const loopImpact = state.autonomous_loop_impact_auditor;
   const actionTone = busy ? "caution" : current.tone;
+  const impactTone = loopImpactTone(loopImpact.status);
   const statusText = busy
     ? `${busy.replaceAll("-", " ")} running`
     : outcome
@@ -2643,10 +2654,11 @@ function QuickAgentActionOutcomePanel({
         <Chip tone={actionTone}>{current.afterDecision}</Chip>
       </div>
 
-      <dl className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Agent action outcome metrics">
+      <dl className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-5" aria-label="Agent action outcome metrics">
         <ProfitMetric label="Wallet delta" value={formatCompactSignedCurrency(current.walletDeltaUsd)} detail={`${formatCompactSignedCurrency(current.windowPnlDeltaUsd)} window`} tone={current.walletDeltaUsd >= 0 ? "engine" : "critical"} />
         <ProfitMetric label="Exposure" value={formatCompactSignedCurrency(current.exposureDeltaUsd)} detail={`${current.tradeDelta >= 0 ? "+" : ""}${current.tradeDelta} trades`} tone={current.exposureDeltaUsd <= 0 ? "engine" : "caution"} />
         <ProfitMetric label="Loop result" value={current.loopStatus} detail={`${current.fillDelta >= 0 ? "+" : ""}${current.fillDelta} fills · ${current.blockDelta >= 0 ? "+" : ""}${current.blockDelta} blocks`} tone={current.fillDelta > 0 ? "engine" : current.blockDelta > 0 ? "critical" : "neutral"} />
+        <ProfitMetric label="Impact audit" value={`${loopImpact.impact_score}/100`} detail={loopImpact.action.replaceAll("-", " ")} tone={impactTone} />
         <ProfitMetric label="Proof state" value={current.routeStatus} detail={`chart ${current.chartStatus}`} tone={current.routeStatus === "ready" || current.chartStatus === "ready" ? "engine" : current.routeStatus === "blocked" || current.chartStatus === "blocked" ? "critical" : "caution"} />
       </dl>
 
@@ -2662,7 +2674,7 @@ function QuickAgentActionOutcomePanel({
       </div>
 
       <span className="sr-only" aria-label="Agent action outcome receipt">
-        Agent action outcome {outcome ? "recorded" : "waiting"}; label {current.label}; kind {current.kind}; before decision {current.beforeDecision}; after decision {current.afterDecision}; wallet delta {formatSignedCurrency(current.walletDeltaUsd)}; window PnL delta {formatSignedCurrency(current.windowPnlDeltaUsd)}; exposure delta {formatSignedCurrency(current.exposureDeltaUsd)}; trade delta {current.tradeDelta}; cycle delta {current.cycleDelta}; fill delta {current.fillDelta}; block delta {current.blockDelta}; route status {current.routeStatus}; chart status {current.chartStatus}; loop status {current.loopStatus}; session status {current.sessionStatus}; boundary {current.boundary}; next action {current.nextAction}.
+        Agent action outcome {outcome ? "recorded" : "waiting"}; label {current.label}; kind {current.kind}; before decision {current.beforeDecision}; after decision {current.afterDecision}; wallet delta {formatSignedCurrency(current.walletDeltaUsd)}; window PnL delta {formatSignedCurrency(current.windowPnlDeltaUsd)}; exposure delta {formatSignedCurrency(current.exposureDeltaUsd)}; trade delta {current.tradeDelta}; cycle delta {current.cycleDelta}; fill delta {current.fillDelta}; block delta {current.blockDelta}; impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; impact reduce frequency {loopImpact.must_reduce_frequency ? "yes" : "no"}; route status {current.routeStatus}; chart status {current.chartStatus}; loop status {current.loopStatus}; session status {current.sessionStatus}; boundary {current.boundary}; next action {current.nextAction}.
       </span>
     </section>
   );
@@ -5836,6 +5848,13 @@ function fillAuditTone(verdict: Web3TradingState["autonomous_fill_ledger_digest"
 function forwardPermissionTone(status: Web3TradingState["autonomous_forward_loop_permission"]["status"]): QuickChipTone {
   if (status === "press" || status === "probe") return "engine";
   if (status === "harvest" || status === "protect" || status === "refresh") return "caution";
+  if (status === "cooldown" || status === "blocked") return "critical";
+  return "neutral";
+}
+
+function loopImpactTone(status: Web3TradingState["autonomous_loop_impact_auditor"]["status"]): QuickChipTone {
+  if (status === "compound" || status === "continue") return "engine";
+  if (status === "tighten" || status === "harvest" || status === "protect" || status === "refresh") return "caution";
   if (status === "cooldown" || status === "blocked") return "critical";
   return "neutral";
 }

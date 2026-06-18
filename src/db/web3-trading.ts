@@ -6675,6 +6675,42 @@ export type AutonomousForwardLoopPermission = {
   items: AutonomousForwardLoopPermissionItem[];
 };
 
+export type AutonomousLoopImpactAuditorItem = {
+  id: "equity" | "exposure" | "fills" | "permission" | "proof" | "boundary";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  score: number;
+  value: string;
+  detail: string;
+};
+
+export type AutonomousLoopImpactAuditor = {
+  mode: "autonomous-loop-impact-auditor";
+  status: "compound" | "continue" | "tighten" | "harvest" | "protect" | "refresh" | "cooldown" | "blocked" | "idle";
+  action: "increase-frequency" | "keep-running" | "tighten-size" | "harvest-profit" | "protect-wallet" | "refresh-proof" | "cooldown" | "stand-down" | "observe";
+  impact_score: number;
+  requested: boolean;
+  paper_only: boolean;
+  target_symbol: string | null;
+  equity_delta_usd: number;
+  session_pnl_usd: number;
+  exposure_delta_usd: number;
+  fill_delta: number;
+  block_delta: number;
+  permission_before: string;
+  permission_after: AutonomousForwardLoopPermission["permission"];
+  can_press_next_loop: boolean;
+  must_reduce_frequency: boolean;
+  must_refresh_proof: boolean;
+  max_next_fills: number;
+  next_cadence_seconds: number;
+  summary: string;
+  next_action: string;
+  controls: string[];
+  blockers: string[];
+  items: AutonomousLoopImpactAuditorItem[];
+};
+
 export type LiveExecutionArmingCheck = {
   id: "mode" | "kill-switch" | "wallet" | "api-key" | "rpc" | "operator-approval" | "governor" | "edge" | "preflight";
   label: string;
@@ -8530,6 +8566,7 @@ export type Web3TradingState = {
   autonomous_loop_throttle: AutonomousLoopThrottle;
   autonomous_wake_plan: AutonomousWakePlan;
   autonomous_forward_loop_permission: AutonomousForwardLoopPermission;
+  autonomous_loop_impact_auditor: AutonomousLoopImpactAuditor;
   autonomous_loop_tick: AutonomousLoopTickReport;
   learning_loop: AdaptiveLearningLoop;
   signal_alpha_attribution: SignalAlphaAttribution;
@@ -11877,6 +11914,19 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       dailyProfitLock: configuredState.autonomous_daily_profit_lock,
       burstOutcomeFeedback: configuredState.autonomous_burst_outcome_feedback,
     });
+    configuredState.autonomous_loop_impact_auditor = buildAutonomousLoopImpactAuditor({
+      walletTelemetry: configuredState.autonomous_wallet_telemetry,
+      sessionRun: configuredState.autonomous_session_run,
+      loopTick: configuredState.autonomous_loop_tick,
+      loopFeedback: configuredState.autonomous_loop_feedback,
+      loopThrottle: configuredState.autonomous_loop_throttle,
+      forwardPermission: configuredState.autonomous_forward_loop_permission,
+      nowDecision: configuredState.autonomous_now_decision,
+      routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
+      candleConviction: configuredState.autonomous_candle_conviction,
+      candleRefresh: configuredState.autonomous_candle_refresh,
+      executionGate: configuredState.execution_gate,
+    });
     configuredState.autonomous_profit_benchmark = buildAutonomousProfitBenchmark({
       market: configuredState.market,
       walletTelemetry: configuredState.autonomous_wallet_telemetry,
@@ -14073,6 +14123,19 @@ function buildWeb3TradingState({
     autonomous_loop_throttle,
     autonomous_strategy_selector,
   });
+  const autonomous_loop_impact_auditor = buildAutonomousLoopImpactAuditor({
+    walletTelemetry: autonomous_wallet_telemetry,
+    sessionRun: autonomous_session_run,
+    loopTick: autonomous_loop_tick,
+    loopFeedback: autonomous_loop_feedback,
+    loopThrottle: autonomous_loop_throttle,
+    forwardPermission: autonomous_forward_loop_permission,
+    nowDecision: autonomous_now_decision,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    candleConviction: autonomous_candle_conviction,
+    candleRefresh: autonomous_candle_refresh,
+    executionGate: execution_gate,
+  });
   return {
     as_of: marketSource.fetched_at,
     scenario,
@@ -14143,6 +14206,7 @@ function buildWeb3TradingState({
     autonomous_loop_throttle,
     autonomous_wake_plan,
     autonomous_market_intake_plan,
+    autonomous_loop_impact_auditor,
     autonomous_loop_tick,
     strategy_lab,
     autonomous_forward_test,
@@ -16386,6 +16450,19 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_loop_throttle,
     autonomous_strategy_selector,
   });
+  const autonomous_loop_impact_auditor = buildAutonomousLoopImpactAuditor({
+    walletTelemetry: autonomous_wallet_telemetry,
+    sessionRun: state.autonomous_session_run,
+    loopTick: autonomous_loop_tick,
+    loopFeedback: autonomous_loop_feedback,
+    loopThrottle: autonomous_loop_throttle,
+    forwardPermission: autonomous_forward_loop_permission,
+    nowDecision: autonomous_now_decision,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    candleConviction: autonomous_candle_conviction,
+    candleRefresh: state.autonomous_candle_refresh,
+    executionGate: state.execution_gate,
+  });
   return {
     ...state,
     execution_plans: plans,
@@ -16436,6 +16513,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_loop_throttle,
     autonomous_wake_plan,
     autonomous_market_intake_plan,
+    autonomous_loop_impact_auditor,
     autonomous_loop_tick,
     capital_rotation,
     autopilot,
@@ -17023,6 +17101,19 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_loop_throttle,
     autonomous_strategy_selector: state.autonomous_strategy_selector,
   });
+  const autonomous_loop_impact_auditor = buildAutonomousLoopImpactAuditor({
+    walletTelemetry: state.autonomous_wallet_telemetry,
+    sessionRun: state.autonomous_session_run,
+    loopTick: autonomous_loop_tick,
+    loopFeedback: autonomous_loop_feedback,
+    loopThrottle: autonomous_loop_throttle,
+    forwardPermission: autonomous_forward_loop_permission,
+    nowDecision: autonomous_now_decision,
+    routeRefreshExecution: state.autonomous_route_refresh_execution,
+    candleConviction: state.autonomous_candle_conviction,
+    candleRefresh: state.autonomous_candle_refresh,
+    executionGate: state.execution_gate,
+  });
   const autonomous_capital_command = buildAutonomousCapitalCommand({
     tickPlan: state.autonomous_tick_plan,
     tickGovernor: state.autonomous_tick_governor,
@@ -17071,6 +17162,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_loop_throttle,
     autonomous_wake_plan,
     autonomous_market_intake_plan,
+    autonomous_loop_impact_auditor,
     autonomous_loop_tick,
     autonomous_custody_mandate,
     autonomous_signer_ops,
@@ -21518,6 +21610,19 @@ function applyPersistentLedger(
     autonomous_loop_throttle,
     autonomous_strategy_selector,
   });
+  const autonomous_loop_impact_auditor = buildAutonomousLoopImpactAuditor({
+    walletTelemetry: autonomous_wallet_telemetry,
+    sessionRun: state.autonomous_session_run,
+    loopTick: autonomous_loop_tick,
+    loopFeedback: autonomous_loop_feedback,
+    loopThrottle: autonomous_loop_throttle,
+    forwardPermission: autonomous_forward_loop_permission,
+    nowDecision: autonomous_now_decision,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    candleConviction: autonomous_candle_conviction,
+    candleRefresh: autonomous_candle_refresh,
+    executionGate: state.execution_gate,
+  });
   const autonomous_capital_command = buildAutonomousCapitalCommand({
     tickPlan: autonomous_tick_plan,
     tickGovernor: autonomous_tick_governor,
@@ -21757,6 +21862,7 @@ function applyPersistentLedger(
     autonomous_execution_runway,
     autonomous_make_money_pulse,
     autonomous_forward_loop_permission,
+    autonomous_loop_impact_auditor,
     autonomous_profit_benchmark,
     autonomous_alpha_feedback_loop,
     autonomous_profit_thesis_verifier,
@@ -48709,6 +48815,350 @@ function autonomousForwardLoopPermissionItems({
   ];
 }
 
+function buildAutonomousLoopImpactAuditor({
+  walletTelemetry,
+  sessionRun,
+  loopTick,
+  loopFeedback,
+  loopThrottle,
+  forwardPermission,
+  nowDecision,
+  routeRefreshExecution,
+  candleConviction,
+  candleRefresh,
+  executionGate,
+}: {
+  walletTelemetry: AutonomousWalletTelemetry;
+  sessionRun: AutonomousSessionRunReport;
+  loopTick: AutonomousLoopTickReport;
+  loopFeedback: AutonomousLoopFeedback;
+  loopThrottle: AutonomousLoopThrottle;
+  forwardPermission: AutonomousForwardLoopPermission;
+  nowDecision: AutonomousNowDecision;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+  candleConviction: AutonomousCandleConviction;
+  candleRefresh: AutonomousCandleRefreshReceipt;
+  executionGate: ExecutionGate;
+}): AutonomousLoopImpactAuditor {
+  const requested = sessionRun.requested || loopTick.requested;
+  const equityDelta = roundMetric(sessionRun.requested
+    ? sessionRun.end_equity_usd - sessionRun.start_equity_usd
+    : loopTick.requested
+      ? loopTick.ended_equity_usd - loopTick.started_equity_usd
+      : walletTelemetry.window_pnl_usd);
+  const sessionPnl = roundMetric(sessionRun.requested ? sessionRun.net_pnl_usd : loopTick.requested ? loopTick.net_pnl_usd : loopFeedback.tick_pnl_usd);
+  const exposureDelta = roundMetric(sessionRun.requested ? sessionRun.exposure_delta_usd : 0);
+  const fillDelta = Math.max(0, sessionRun.requested ? sessionRun.fill_count : loopTick.fill_count);
+  const blockDelta = Math.max(0, sessionRun.requested ? sessionRun.blocked_count : loopTick.blocked_count);
+  const paperOnly = !executionGate.live_execution_enabled &&
+    (nowDecision.execution_boundary === "paper-ledger-only" ||
+      nowDecision.execution_boundary === "read-only-route-refresh" ||
+      nowDecision.execution_boundary === "read-only-chart-refresh" ||
+      nowDecision.execution_boundary === "blocked-paper-only");
+  const routeNeedsRefresh = nowDecision.route_refresh_required ||
+    routeRefreshExecution.status === "blocked";
+  const chartNeedsRefresh = nowDecision.chart_proof_required ||
+    candleConviction.status === "refresh" ||
+    candleConviction.status === "reject" ||
+    (candleRefresh.requested && candleRefresh.status === "blocked");
+  const proofScore = clamp(Math.round(
+    routeRefreshExecution.route_confidence_score * 0.45 +
+      candleConviction.chart_score * 0.45 +
+      (routeNeedsRefresh ? -14 : 6) +
+      (chartNeedsRefresh ? -14 : 6),
+  ), 0, 100);
+  const equityScore = clamp(Math.round(52 + Math.min(28, equityDelta / 8) + Math.min(18, sessionPnl / 8) - Math.min(24, Math.max(0, -equityDelta) / 5)), 0, 100);
+  const exposureScore = clamp(Math.round(
+    60 -
+      Math.max(0, exposureDelta) * 0.28 +
+      Math.max(0, -exposureDelta) * 0.22 -
+      walletTelemetry.exposure_pct * 0.18 -
+      walletTelemetry.max_drawdown_pct * 4,
+  ), 0, 100);
+  const fillScore = clamp(Math.round(
+    50 +
+      Math.min(22, fillDelta * 8) -
+      Math.min(28, blockDelta * 9) +
+      (fillDelta > 0 && equityDelta >= 0 ? 12 : 0) -
+      (fillDelta > 0 && equityDelta < 0 ? 14 : 0),
+  ), 0, 100);
+  const permissionScore = clamp(Math.round(
+    forwardPermission.permission_score +
+      (forwardPermission.can_fire_next_tick ? 6 : -8) +
+      (forwardPermission.permission === "press" ? 8 : forwardPermission.permission === "selective" ? 3 : 0) -
+      (forwardPermission.permission === "stand-down" || forwardPermission.permission === "cooldown" ? 12 : 0),
+  ), 0, 100);
+  const boundaryScore = paperOnly ? 88 : 18;
+  const impactScore = clamp(Math.round(
+    equityScore * 0.24 +
+      exposureScore * 0.15 +
+      fillScore * 0.17 +
+      permissionScore * 0.2 +
+      proofScore * 0.14 +
+      boundaryScore * 0.1,
+  ), 0, 100);
+  const hardBlocked = !paperOnly ||
+    forwardPermission.permission === "stand-down" ||
+    loopThrottle.status === "blocked" ||
+    nowDecision.status === "blocked";
+  const mustRefreshProof = routeNeedsRefresh || chartNeedsRefresh || forwardPermission.permission === "refresh-first";
+  const protectFirst = forwardPermission.requires_protection_first ||
+    forwardPermission.permission === "protect-only" ||
+    walletTelemetry.status === "protect" ||
+    exposureDelta > 0 && equityDelta < 0 ||
+    walletTelemetry.max_drawdown_pct >= 4;
+  const shouldHarvest = forwardPermission.permission === "harvest-only" ||
+    sessionPnl > 0 && (forwardPermission.release_budget_usd > 0 || walletTelemetry.exposure_pct >= 55);
+  const mustReduceFrequency = hardBlocked ||
+    protectFirst ||
+    mustRefreshProof ||
+    impactScore < 58 ||
+    blockDelta > fillDelta ||
+    exposureDelta > 0 && sessionPnl <= 0;
+  const status: AutonomousLoopImpactAuditor["status"] = !requested
+    ? "idle"
+    : hardBlocked
+      ? "blocked"
+      : mustRefreshProof
+        ? "refresh"
+        : protectFirst
+          ? "protect"
+          : shouldHarvest
+            ? "harvest"
+            : impactScore >= 78 && equityDelta > 0 && forwardPermission.permission === "press"
+              ? "compound"
+              : impactScore >= 62 && equityDelta >= 0 && forwardPermission.can_fire_next_tick
+                ? "continue"
+                : impactScore >= 44
+                  ? "tighten"
+                  : "cooldown";
+  const action: AutonomousLoopImpactAuditor["action"] = status === "compound"
+    ? "increase-frequency"
+    : status === "continue"
+      ? "keep-running"
+      : status === "tighten"
+        ? "tighten-size"
+        : status === "harvest"
+          ? "harvest-profit"
+          : status === "protect"
+            ? "protect-wallet"
+            : status === "refresh"
+              ? "refresh-proof"
+              : status === "cooldown"
+                ? "cooldown"
+                : status === "blocked"
+                  ? "stand-down"
+                  : "observe";
+  const blockers = [
+    !paperOnly ? "Loop impact auditor requires the local paper boundary; live signing, broker, or live-gated execution is not allowed here." : null,
+    forwardPermission.permission === "stand-down" ? forwardPermission.next_action : null,
+    loopThrottle.status === "blocked" ? loopThrottle.next_action : null,
+    routeNeedsRefresh ? routeRefreshExecution.blockers[0] ?? "Route proof must refresh before the next paper loop." : null,
+    chartNeedsRefresh ? candleConviction.blockers[0] ?? candleRefresh.next_action ?? "Chart proof must refresh before the next paper loop." : null,
+    exposureDelta > 0 && sessionPnl <= 0 ? "The latest loop added exposure without proving positive paper PnL." : null,
+    blockDelta > fillDelta ? "Blocked decisions outnumbered fills in the latest loop." : null,
+  ].filter((item): item is string => Boolean(item)).slice(0, 6);
+  const nextCadenceSeconds = status === "compound"
+    ? Math.max(1, Math.min(6, loopThrottle.cadence_seconds))
+    : status === "continue"
+      ? Math.max(3, Math.min(12, loopThrottle.cadence_seconds))
+      : status === "tighten"
+        ? Math.max(10, Math.min(24, loopThrottle.cadence_seconds + 6))
+        : status === "harvest" || status === "protect"
+          ? Math.max(3, Math.min(14, loopThrottle.cadence_seconds))
+          : status === "refresh"
+            ? Math.max(4, Math.min(18, loopThrottle.cadence_seconds))
+            : 30;
+  const maxNextFills = status === "compound"
+    ? Math.max(1, Math.min(6, forwardPermission.max_next_fills, loopThrottle.max_total_fills))
+    : status === "continue"
+      ? Math.max(1, Math.min(3, forwardPermission.max_next_fills, loopThrottle.max_total_fills))
+      : status === "tighten"
+        ? Math.max(0, Math.min(1, forwardPermission.max_next_fills))
+        : status === "harvest" || status === "protect"
+          ? Math.max(1, forwardPermission.max_protective_sells)
+          : 0;
+
+  return {
+    mode: "autonomous-loop-impact-auditor",
+    status,
+    action,
+    impact_score: impactScore,
+    requested,
+    paper_only: paperOnly,
+    target_symbol: forwardPermission.target_symbol ?? nowDecision.target_symbol ?? loopThrottle.target_symbol,
+    equity_delta_usd: equityDelta,
+    session_pnl_usd: sessionPnl,
+    exposure_delta_usd: exposureDelta,
+    fill_delta: fillDelta,
+    block_delta: blockDelta,
+    permission_before: loopTick.action === "none" ? "none" : loopTick.action,
+    permission_after: forwardPermission.permission,
+    can_press_next_loop: status === "compound" || status === "continue",
+    must_reduce_frequency: mustReduceFrequency,
+    must_refresh_proof: mustRefreshProof,
+    max_next_fills: maxNextFills,
+    next_cadence_seconds: nextCadenceSeconds,
+    summary: autonomousLoopImpactSummary(status, impactScore, equityDelta, sessionPnl, fillDelta, blockDelta, forwardPermission.target_symbol ?? nowDecision.target_symbol),
+    next_action: autonomousLoopImpactNextAction(status, action, forwardPermission, nowDecision, blockers, nextCadenceSeconds),
+    controls: [
+      "Audits the latest backend paper loop or bounded session before the agent is allowed to keep pressing.",
+      "Rewards wallet equity improvement, positive paper PnL, clean fills, proof freshness, and a strict local paper boundary.",
+      "Exposure growth without profit, blocked-loop pressure, stale route/chart proof, protect-first posture, or live-gated execution forces tighten, refresh, protect, cooldown, or stand-down.",
+      "Paper feedback only; it cannot sign swaps, submit transactions, custody funds, keep running after the app stops, or guarantee profit.",
+    ],
+    blockers,
+    items: autonomousLoopImpactItems({
+      equityScore,
+      exposureScore,
+      fillScore,
+      permissionScore,
+      proofScore,
+      boundaryScore,
+      equityDelta,
+      sessionPnl,
+      exposureDelta,
+      fillDelta,
+      blockDelta,
+      forwardPermission,
+      routeRefreshExecution,
+      candleConviction,
+      paperOnly,
+      routeNeedsRefresh,
+      chartNeedsRefresh,
+    }),
+  };
+}
+
+function autonomousLoopImpactSummary(
+  status: AutonomousLoopImpactAuditor["status"],
+  score: number,
+  equityDelta: number,
+  sessionPnl: number,
+  fillDelta: number,
+  blockDelta: number,
+  targetSymbol: string | null,
+) {
+  const target = targetSymbol ?? "the desk";
+  if (status === "compound") return `Loop impact can compound ${target}: ${score}/100 with ${formatSignedCompactValue(equityDelta)} equity delta and ${fillDelta} clean fill${fillDelta === 1 ? "" : "s"}.`;
+  if (status === "continue") return `Loop impact keeps ${target} running: ${score}/100 with ${formatSignedCompactValue(sessionPnl)} latest paper PnL.`;
+  if (status === "tighten") return `Loop impact tightens ${target}: ${score}/100; reduce size or cadence before the next paper action.`;
+  if (status === "harvest") return `Loop impact is harvest-first for ${target}; capture paper profit before adding fresh exposure.`;
+  if (status === "protect") return `Loop impact is protect-first for ${target}; exposure or drawdown pressure outranks fresh buys.`;
+  if (status === "refresh") return `Loop impact requires proof refresh for ${target} before another paper fill.`;
+  if (status === "cooldown") return `Loop impact cools down ${target}: ${score}/100 with ${blockDelta} blocker${blockDelta === 1 ? "" : "s"}.`;
+  if (status === "blocked") return `Loop impact blocks ${target}; boundary, permission, or throttle evidence is not safe enough.`;
+  return `Loop impact is idle for ${target} until a backend paper loop or bounded session runs.`;
+}
+
+function autonomousLoopImpactNextAction(
+  status: AutonomousLoopImpactAuditor["status"],
+  action: AutonomousLoopImpactAuditor["action"],
+  forwardPermission: AutonomousForwardLoopPermission,
+  nowDecision: AutonomousNowDecision,
+  blockers: string[],
+  cadenceSeconds: number,
+) {
+  if (status === "compound") return `Keep the loop moving every ${cadenceSeconds}s only while post-loop impact stays positive.`;
+  if (status === "continue") return forwardPermission.next_action;
+  if (status === "tighten") return "Run at most one smaller paper action, then re-audit equity, exposure, fills, and blockers.";
+  if (status === "harvest") return "Harvest or trim paper profit before another fresh buy.";
+  if (status === "protect") return "Protect wallet exposure first; use sell, harvest, or cooldown lanes before fresh entries.";
+  if (status === "refresh") return nowDecision.route_refresh_required || nowDecision.chart_proof_required ? nowDecision.next_action : forwardPermission.next_action;
+  if (status === "cooldown") return "Wait for a cleaner proof and wallet tick before the next autonomous paper action.";
+  if (status === "blocked") return blockers[0] ?? forwardPermission.next_action;
+  return action === "observe" ? "Run a bounded backend paper tick to create impact evidence." : forwardPermission.next_action;
+}
+
+function autonomousLoopImpactItems({
+  equityScore,
+  exposureScore,
+  fillScore,
+  permissionScore,
+  proofScore,
+  boundaryScore,
+  equityDelta,
+  sessionPnl,
+  exposureDelta,
+  fillDelta,
+  blockDelta,
+  forwardPermission,
+  routeRefreshExecution,
+  candleConviction,
+  paperOnly,
+  routeNeedsRefresh,
+  chartNeedsRefresh,
+}: {
+  equityScore: number;
+  exposureScore: number;
+  fillScore: number;
+  permissionScore: number;
+  proofScore: number;
+  boundaryScore: number;
+  equityDelta: number;
+  sessionPnl: number;
+  exposureDelta: number;
+  fillDelta: number;
+  blockDelta: number;
+  forwardPermission: AutonomousForwardLoopPermission;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+  candleConviction: AutonomousCandleConviction;
+  paperOnly: boolean;
+  routeNeedsRefresh: boolean;
+  chartNeedsRefresh: boolean;
+}): AutonomousLoopImpactAuditorItem[] {
+  return [
+    {
+      id: "equity",
+      label: "Equity impact",
+      status: equityScore >= 62 ? "pass" : equityScore >= 42 ? "watch" : "fail",
+      score: equityScore,
+      value: formatSignedCompactValue(equityDelta),
+      detail: `${formatSignedCompactValue(sessionPnl)} latest paper PnL after the loop/session receipt.`,
+    },
+    {
+      id: "exposure",
+      label: "Exposure",
+      status: exposureScore >= 62 ? "pass" : exposureScore >= 42 ? "watch" : "fail",
+      score: exposureScore,
+      value: formatSignedCompactValue(exposureDelta),
+      detail: exposureDelta <= 0 ? "Loop did not add fresh exposure." : "Loop added exposure; require positive paper PnL before pressing.",
+    },
+    {
+      id: "fills",
+      label: "Fills",
+      status: fillScore >= 62 ? "pass" : fillScore >= 42 ? "watch" : "fail",
+      score: fillScore,
+      value: `${fillDelta}/${blockDelta}`,
+      detail: `${fillDelta} fills and ${blockDelta} blockers in the latest backend loop/session.`,
+    },
+    {
+      id: "permission",
+      label: "Permission",
+      status: permissionScore >= 62 ? "pass" : permissionScore >= 42 ? "watch" : "fail",
+      score: permissionScore,
+      value: forwardPermission.permission.replace("-", " "),
+      detail: `${forwardPermission.action.replace("-", " ")} at ${forwardPermission.permission_score}/100 forward permission.`,
+    },
+    {
+      id: "proof",
+      label: "Proof",
+      status: proofScore >= 62 ? "pass" : proofScore >= 42 ? "watch" : "fail",
+      score: proofScore,
+      value: routeNeedsRefresh || chartNeedsRefresh ? "refresh" : "current",
+      detail: `${routeRefreshExecution.status.replace("-", " ")} route, ${candleConviction.status.replace("-", " ")} chart.`,
+    },
+    {
+      id: "boundary",
+      label: "Boundary",
+      status: paperOnly ? "pass" : "fail",
+      score: boundaryScore,
+      value: paperOnly ? "paper only" : "live gated",
+      detail: paperOnly ? "Local paper ledger remains the only execution boundary." : "Loop impact refuses live signing or broker-gated execution.",
+    },
+  ];
+}
+
 function buildAutonomousMarketIntakePlan({
   marketSource,
   ingestionPlan,
@@ -65263,6 +65713,19 @@ function attachPaperDaemonTick(
     dailyProfitLock: state.autonomous_daily_profit_lock,
     burstOutcomeFeedback: state.autonomous_burst_outcome_feedback,
   });
+  const autonomousLoopImpactAuditor = buildAutonomousLoopImpactAuditor({
+    walletTelemetry: autonomousWalletTelemetry,
+    sessionRun: state.autonomous_session_run,
+    loopTick: state.autonomous_loop_tick,
+    loopFeedback: autonomousLoopFeedback,
+    loopThrottle: autonomousLoopThrottle,
+    forwardPermission: autonomousForwardLoopPermission,
+    nowDecision: autonomousNowDecision,
+    routeRefreshExecution: autonomousRouteRefreshExecution,
+    candleConviction: autonomousCandleConviction,
+    candleRefresh: state.autonomous_candle_refresh,
+    executionGate: state.execution_gate,
+  });
   const autonomousProfitBenchmark = buildAutonomousProfitBenchmark({
     market: state.market,
     walletTelemetry: autonomousWalletTelemetry,
@@ -65365,6 +65828,7 @@ function attachPaperDaemonTick(
 	    autonomous_now_decision: autonomousNowDecision,
 	    autonomous_make_money_pulse: autonomousMakeMoneyPulse,
 	    autonomous_forward_loop_permission: autonomousForwardLoopPermission,
+	    autonomous_loop_impact_auditor: autonomousLoopImpactAuditor,
 	    autonomous_profit_benchmark: autonomousProfitBenchmark,
 	    autonomous_alpha_feedback_loop: autonomousAlphaFeedbackLoop,
 	    autonomous_profit_thesis_verifier: autonomousProfitThesisVerifier,
@@ -66115,6 +66579,19 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     dailyProfitLock: state.autonomous_daily_profit_lock,
     burstOutcomeFeedback: state.autonomous_burst_outcome_feedback,
   });
+  const autonomousLoopImpactAuditor = buildAutonomousLoopImpactAuditor({
+    walletTelemetry: autonomousWalletTelemetry,
+    sessionRun: state.autonomous_session_run,
+    loopTick: state.autonomous_loop_tick,
+    loopFeedback: autonomousLoopFeedback,
+    loopThrottle: autonomousLoopThrottle,
+    forwardPermission: autonomousForwardLoopPermission,
+    nowDecision: autonomousNowDecision,
+    routeRefreshExecution: autonomousRouteRefreshExecution,
+    candleConviction: autonomousCandleConviction,
+    candleRefresh: state.autonomous_candle_refresh,
+    executionGate: state.execution_gate,
+  });
   const autonomousProfitBenchmark = buildAutonomousProfitBenchmark({
     market: state.market,
     walletTelemetry: autonomousWalletTelemetry,
@@ -66231,6 +66708,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
 	    autonomous_now_decision: autonomousNowDecision,
 	    autonomous_make_money_pulse: autonomousMakeMoneyPulse,
 	    autonomous_forward_loop_permission: autonomousForwardLoopPermission,
+	    autonomous_loop_impact_auditor: autonomousLoopImpactAuditor,
 	    autonomous_profit_benchmark: autonomousProfitBenchmark,
 	    autonomous_alpha_feedback_loop: autonomousAlphaFeedbackLoop,
 	    autonomous_profit_thesis_verifier: autonomousProfitThesisVerifier,

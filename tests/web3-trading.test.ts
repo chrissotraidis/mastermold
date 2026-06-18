@@ -879,6 +879,7 @@ describe("Web3 autonomous trading subsystem", () => {
     const profitControl = state.autonomous_profit_control;
     const fillLedger = state.autonomous_fill_ledger_digest;
     const forwardPermission = state.autonomous_forward_loop_permission;
+    const loopImpact = state.autonomous_loop_impact_auditor;
 
     expect(["compounding", "learning", "overtrading", "protect"]).toContain(scorecard.status);
     expect(scorecard.net_pnl_usd).toBe(Math.round(state.portfolio.realized_pnl_usd + state.portfolio.unrealized_pnl_usd));
@@ -1001,6 +1002,29 @@ describe("Web3 autonomous trading subsystem", () => {
       item.detail.length > 0
     )).toBe(true);
     expect(forwardPermission.controls.some((control) => control.includes("Final forward permission"))).toBe(true);
+
+    expect(loopImpact.mode).toBe("autonomous-loop-impact-auditor");
+    expect(["compound", "continue", "tighten", "harvest", "protect", "refresh", "cooldown", "blocked", "idle"]).toContain(loopImpact.status);
+    expect(["increase-frequency", "keep-running", "tighten-size", "harvest-profit", "protect-wallet", "refresh-proof", "cooldown", "stand-down", "observe"]).toContain(loopImpact.action);
+    expect(loopImpact.impact_score).toBeGreaterThanOrEqual(0);
+    expect(loopImpact.impact_score).toBeLessThanOrEqual(100);
+    expect(loopImpact.permission_after).toBe(forwardPermission.permission);
+    expect(loopImpact.max_next_fills).toBeGreaterThanOrEqual(0);
+    expect(loopImpact.next_cadence_seconds).toBeGreaterThan(0);
+    expect(typeof loopImpact.requested).toBe("boolean");
+    expect(loopImpact.paper_only).toBe(true);
+    expect(typeof loopImpact.can_press_next_loop).toBe("boolean");
+    expect(typeof loopImpact.must_reduce_frequency).toBe("boolean");
+    expect(typeof loopImpact.must_refresh_proof).toBe("boolean");
+    expect(loopImpact.items.map((item) => item.id)).toEqual(["equity", "exposure", "fills", "permission", "proof", "boundary"]);
+    expect(loopImpact.items.every((item) =>
+      ["pass", "watch", "fail"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.value.length > 0 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(loopImpact.controls.some((control) => control.includes("Audits the latest backend paper loop"))).toBe(true);
     expect(commandExecution.mode).toBe("command-center-paper-execution");
     expect(["queued", "applied", "blocked", "idle"]).toContain(commandExecution.status);
     expect(commandExecution.execution_boundary).toBe("paper-ledger-only");
@@ -2167,6 +2191,15 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_forward_loop_permission.permission_score).toBeLessThanOrEqual(100);
     expect(state.autonomous_forward_loop_permission.items.map((item) => item.id)).toEqual(["fill-audit", "profit-proof", "integrity", "throttle", "wake", "decision"]);
     expect(state.autonomous_forward_loop_permission.controls.some((control) => control.includes("Final forward permission"))).toBe(true);
+    expect(state.autonomous_loop_impact_auditor.mode).toBe("autonomous-loop-impact-auditor");
+    expect(["compound", "continue", "tighten", "harvest", "protect", "refresh", "cooldown", "blocked", "idle"]).toContain(state.autonomous_loop_impact_auditor.status);
+    expect(["increase-frequency", "keep-running", "tighten-size", "harvest-profit", "protect-wallet", "refresh-proof", "cooldown", "stand-down", "observe"]).toContain(state.autonomous_loop_impact_auditor.action);
+    expect(state.autonomous_loop_impact_auditor.impact_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_loop_impact_auditor.impact_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_loop_impact_auditor.permission_after).toBe(state.autonomous_forward_loop_permission.permission);
+    expect(state.autonomous_loop_impact_auditor.paper_only).toBe(true);
+    expect(state.autonomous_loop_impact_auditor.items.map((item) => item.id)).toEqual(["equity", "exposure", "fills", "permission", "proof", "boundary"]);
+    expect(state.autonomous_loop_impact_auditor.controls.some((control) => control.includes("Audits the latest backend paper loop"))).toBe(true);
     expect(state.autonomous_profit_benchmark.mode).toBe("autonomous-profit-benchmark");
     expect(["beating-cash", "lagging-cash", "beating-selected", "lagging-selected", "protecting-capital", "learning"]).toContain(state.autonomous_profit_benchmark.status);
     expect(state.autonomous_profit_benchmark.benchmark_score).toBeGreaterThanOrEqual(0);
