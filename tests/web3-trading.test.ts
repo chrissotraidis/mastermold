@@ -2175,6 +2175,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_profit_thesis_verifier.risk_score).toBeLessThanOrEqual(100);
     expect(state.autonomous_profit_thesis_verifier.sizing_multiplier).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_profit_thesis_verifier.sizing_multiplier).toBeLessThanOrEqual(1.2);
+    expect(state.autonomous_profit_thesis_verifier.chase_urgency_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_thesis_verifier.chase_urgency_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_profit_thesis_verifier.chase_size_multiplier).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_thesis_verifier.chase_size_multiplier).toBeLessThanOrEqual(1.2);
+    expect(state.autonomous_profit_thesis_verifier.chase_budget_usd).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_profit_thesis_verifier.review_after_seconds).toBeGreaterThan(0);
     expect(state.autonomous_profit_thesis_verifier.items.map((item) => item.id)).toEqual(["setup", "evidence", "outcome", "alpha", "risk"]);
     expect(state.autonomous_profit_thesis_verifier.items.every((item) =>
@@ -2185,6 +2190,7 @@ describe("Web3 autonomous trading subsystem", () => {
       item.detail.length > 0
     )).toBe(true);
     expect(state.autonomous_profit_thesis_verifier.controls.some((control) => control.includes("idle cash"))).toBe(true);
+    expect(state.autonomous_profit_thesis_verifier.controls.some((control) => control.includes("Chase pressure"))).toBe(true);
     expect(state.autonomous_profit_thesis_verifier.controls.some((control) => control.includes("cannot override custody"))).toBe(true);
     expect(state.autonomous_opportunity_ranker.mode).toBe("autonomous-opportunity-ranker");
     expect(["attack-ready", "probe-ready", "retarget", "protect", "refresh", "blocked", "learning", "idle"]).toContain(state.autonomous_opportunity_ranker.status);
@@ -2218,6 +2224,12 @@ describe("Web3 autonomous trading subsystem", () => {
       item.decision.length > 0 &&
       item.evidence.length > 0
     )).toBe(true);
+    const thesisRankItem = state.autonomous_profit_thesis_verifier.target_symbol
+      ? state.autonomous_opportunity_ranker.items.find((item) => item.symbol === state.autonomous_profit_thesis_verifier.target_symbol)
+      : null;
+    if (thesisRankItem && state.autonomous_profit_thesis_verifier.chase_urgency_score > 0) {
+      expect(thesisRankItem.evidence.some((item) => item.includes("chase urgency"))).toBe(true);
+    }
     expect(state.autonomous_opportunity_ranker.controls.some((control) => control.includes("scanner readiness"))).toBe(true);
     expect(state.autonomous_opportunity_ranker.controls.some((control) => control.includes("local-paper only"))).toBe(true);
     expect(state.autonomous_rotation_director.mode).toBe("autonomous-rotation-director");

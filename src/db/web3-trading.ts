@@ -1237,6 +1237,9 @@ export type AutonomousProfitThesisVerifier = {
   alpha_score: number;
   risk_score: number;
   sizing_multiplier: number;
+  chase_urgency_score: number;
+  chase_size_multiplier: number;
+  chase_budget_usd: number;
   expected_net_edge_usd: number;
   missed_alpha_usd: number;
   review_after_seconds: number;
@@ -75898,11 +75901,45 @@ function buildAutonomousProfitThesisVerifier({
     action = "probe-thesis";
   }
   const sizingMultiplier = autonomousProfitThesisSizing(status, thesisScore, alphaFeedback.size_bias);
+  const missedAlphaUsd = Math.max(0, benchmark.opportunity_gap_usd);
+  const chaseAllowed = makeMoneyPulse.fresh_buy_allowed &&
+    !makeMoneyPulse.protective_sell_required &&
+    status !== "protect" &&
+    status !== "blocked" &&
+    status !== "tighten";
+  const chaseUrgencyScore = chaseAllowed
+    ? clamp(Math.round(
+      thesisScore * 0.28 +
+        alphaFeedback.target_bias_score * 0.24 +
+        makeMoneyPulse.market_score * 0.18 +
+        profitLaneScoreboard.trade_frequency_score * 0.14 +
+        clamp(Math.round(missedAlphaRatio * 520), 0, 18) -
+        Math.max(0, walletTelemetry.max_drawdown_pct - 2.5) * 4,
+    ), 0, 100)
+    : 0;
+  const chaseSizeMultiplier = chaseAllowed
+    ? roundMetric(clamp(
+      sizingMultiplier *
+        (status === "retarget" ? 1.08 : status === "validated" ? 1.02 : 0.88) +
+        Math.min(0.18, missedAlphaRatio * 1.4) -
+        Math.max(0, walletTelemetry.max_drawdown_pct - 3) / 60,
+      status === "validated" ? 0.72 : 0.32,
+      status === "validated" ? 1.2 : status === "retarget" ? 0.92 : 0.72,
+    ))
+    : 0;
+  const baseChaseBudgetUsd = Math.max(
+    makeMoneyPulse.deploy_now_usd,
+    profitLaneScoreboard.expected_net_profit_usd > 0 ? profitLaneScoreboard.expected_net_profit_usd * 4 : 0,
+    missedAlphaUsd > 0 ? missedAlphaUsd * 0.12 : 0,
+  );
+  const chaseBudgetUsd = chaseAllowed
+    ? Math.round(Math.max(0, Math.min(baseChaseBudgetUsd, makeMoneyPulse.deploy_now_usd || baseChaseBudgetUsd) * chaseSizeMultiplier))
+    : 0;
   const reviewAfterSeconds = Math.max(5, Math.min(
     makeMoneyPulse.reaction_seconds,
     alphaFeedback.review_after_seconds,
     profitLaneScoreboard.review_after_seconds,
-    status === "validated" || status === "probing" ? 12 : 45,
+    chaseUrgencyScore >= 72 ? 8 : status === "validated" || status === "probing" ? 12 : 45,
   ));
   const targetSymbol = alphaFeedback.learning_symbol ?? makeMoneyPulse.target_symbol ?? benchmark.selected_symbol ?? benchmark.hot_coin_symbol;
   const expectedNetEdgeUsd = roundMetric(
@@ -75969,14 +76006,18 @@ function buildAutonomousProfitThesisVerifier({
     alpha_score: alphaScore,
     risk_score: riskScore,
     sizing_multiplier: sizingMultiplier,
+    chase_urgency_score: chaseUrgencyScore,
+    chase_size_multiplier: chaseSizeMultiplier,
+    chase_budget_usd: roundMetric(chaseBudgetUsd),
     expected_net_edge_usd: expectedNetEdgeUsd,
-    missed_alpha_usd: roundMetric(Math.max(0, benchmark.opportunity_gap_usd)),
+    missed_alpha_usd: roundMetric(missedAlphaUsd),
     review_after_seconds: reviewAfterSeconds,
     summary: autonomousProfitThesisSummary(status, thesisScore, targetSymbol, expectedNetEdgeUsd),
     next_action: autonomousProfitThesisNextAction(action, targetSymbol, reviewAfterSeconds, makeMoneyPulse),
     blockers,
     controls: [
       "Profit thesis must beat idle cash, visible hot-coin opportunity, and risk-adjusted paper outcome before pressing size.",
+      "Chase pressure converts missed visible alpha into a bounded local paper urgency, size multiplier, and budget for the opportunity ranker.",
       "Retarget, tighten, protect, and block verdicts reduce or stop fresh paper entries before any live signing path is considered.",
       "Thesis sizing is bounded by local paper evidence and cannot override custody, route, trigger, or wallet protection gates.",
     ],
@@ -76064,8 +76105,10 @@ function buildAutonomousOpportunityRanker({
       ? clamp(Math.round((100 - trap.trap_score) * 0.56 + trap.chase_score * 0.44), 0, 100)
       : 50;
     const tradeabilityScore = trade?.tradeability_score ?? 0;
-    const thesisFitScore = thesis.target_symbol === symbol
-      ? thesis.thesis_score
+    const chaseTarget = thesis.target_symbol === symbol;
+    const chaseUrgency = chaseTarget ? thesis.chase_urgency_score : 0;
+    const thesisFitScore = chaseTarget
+      ? clamp(Math.round(thesis.thesis_score * 0.68 + chaseUrgency * 0.32), 0, 100)
       : clamp(Math.round(
         48 +
           (thesis.status === "retarget" ? 12 : 0) +
@@ -76080,7 +76123,8 @@ function buildAutonomousOpportunityRanker({
         trapClearanceScore * 0.18 +
         tradeabilityScore * 0.22 +
         thesisFitScore * 0.16 -
-        noiseScore * 0.08,
+        noiseScore * 0.08 +
+        chaseUrgency * 0.08,
     ), 0, 100);
     const blockers = [...new Set([
       ...(scannerItem?.blockers ?? []),
@@ -76109,8 +76153,10 @@ function buildAutonomousOpportunityRanker({
       alpha?.max_paper_size_usd ?? 0,
       trade?.recommended_size_usd ?? 0,
       trap?.max_chase_usd ?? 0,
+      chaseTarget ? thesis.chase_budget_usd : 0,
     );
-    const sizeMultiplier = action === "paper-attack" ? thesis.sizing_multiplier || 0.82 : action === "paper-probe" ? Math.max(0.28, Math.min(0.58, thesis.sizing_multiplier || 0.42)) : 0;
+    const thesisSizeMultiplier = thesis.chase_size_multiplier > 0 ? thesis.chase_size_multiplier : thesis.sizing_multiplier;
+    const sizeMultiplier = action === "paper-attack" ? thesisSizeMultiplier || 0.82 : action === "paper-probe" ? Math.max(0.28, Math.min(0.58, thesisSizeMultiplier || 0.42)) : 0;
     const maxPaperSizeUsd = Math.round(Math.max(0, sizeBase * sizeMultiplier));
     const executionDrag = trade?.expected_shortfall_usd ?? 0;
     const expectedEdgeUsd = roundMetric(maxPaperSizeUsd * Math.max(-0.35, (opportunityScore - 50) / 100) + (thesis.target_symbol === symbol ? thesis.expected_net_edge_usd * 0.12 : 0) - executionDrag);
@@ -76143,8 +76189,9 @@ function buildAutonomousOpportunityRanker({
         `${trapClearanceScore}/100 trap clearance`,
         `${tradeabilityScore}/100 tradeability`,
         `${thesisFitScore}/100 thesis fit`,
+        chaseTarget ? `${chaseUrgency}/100 chase urgency` : null,
         `${noiseScore}/100 noise`,
-      ],
+      ].filter((item): item is string => Boolean(item)),
       blockers,
     };
   }).sort((a, b) =>

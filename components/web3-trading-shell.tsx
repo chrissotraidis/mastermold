@@ -793,6 +793,7 @@ export function Web3TradingShell({ state }: { state?: Web3TradingState }) {
               forecastFeedback={forecastFeedback}
               tradeability={tradeability}
               wallet={wallet}
+              thesis={state?.autonomous_profit_thesis_verifier}
             />
             <ShellOrderTicket ticket={orderTicket} execution={orderTicketExecution} candle={candleConviction} />
             <ShellExecutionCadence cadence={executionCadence} />
@@ -1031,6 +1032,7 @@ function ShellMakeMoneyProof({
   forecastFeedback,
   tradeability,
   wallet,
+  thesis,
 }: {
   profit?: Web3TradingState["autonomous_profit_validator"];
   profitRoute?: Web3TradingState["autonomous_profit_route_selector"];
@@ -1040,6 +1042,7 @@ function ShellMakeMoneyProof({
   forecastFeedback?: Web3TradingState["autonomous_forecast_feedback"];
   tradeability?: Web3TradingState["autonomous_tradeability_simulator"];
   wallet?: Web3TradingState["autonomous_wallet_telemetry"];
+  thesis?: Web3TradingState["autonomous_profit_thesis_verifier"];
 }) {
   const verdict = profitRoute?.selected_action ?? profit?.permission ?? "hydrate";
   const proofTone = proofStatusTone(profit?.status ?? profitRoute?.status ?? "idle");
@@ -1070,7 +1073,7 @@ function ShellMakeMoneyProof({
         <Chip tone={proofTone}>Proof verdict: {String(verdict).replace("-", " ")}</Chip>
       </div>
 
-      <div className="mt-3 grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="mt-3 grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-8">
         <MiniShellStat label="EV/min proof" value={formatSignedCurrency(evPerMinute)} tone={evPerMinute > 0 ? "engine" : "critical"} />
         <MiniShellStat label="Route quality" value={`${routeScore}/100`} tone={scoreTone(routeScore)} />
         <MiniShellStat label="Execution" value={`${executionScore}/100`} tone={scoreTone(executionScore)} />
@@ -1078,6 +1081,7 @@ function ShellMakeMoneyProof({
         <MiniShellStat label="Trap radar" value={`${trapScore}/100`} tone={trapRadarTone(trapRadar?.status, trapScore)} />
         <MiniShellStat label="Forecast" value={`${forecastScore}/100`} tone={scoreTone(forecastScore)} />
         <MiniShellStat label="Wallet" value={`${Math.max(0, walletScore)}/100`} tone={scoreTone(walletScore)} />
+        <MiniShellStat label="Chase pressure" value={`${thesis?.chase_urgency_score ?? 0}/100`} tone={thesis ? scoreTone(thesis.chase_urgency_score) : "neutral"} />
       </div>
 
       <p className={cn("mt-2 line-clamp-1 text-xs leading-5 sm:line-clamp-2", blockers.length > 0 ? "text-caution" : "text-engine")}>
