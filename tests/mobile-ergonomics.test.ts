@@ -590,6 +590,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("exits {exitContract.fresh_entry_permission.replaceAll(\"-\", \" \")}");
     expect(web3Workspace).toContain("Price-action chart tape");
     expect(web3Workspace).toContain("Autonomous price-action chart tape receipt");
+    expect(web3Workspace).toContain("First-screen autonomous price-action chart tape receipt");
+    expect(web3Workspace).toContain("chart-tape execution contract");
+    expect(web3Workspace).toContain("contract {contract.status.replaceAll(\"-\", \" \")}");
+    expect(web3Workspace).toContain("boundary {contract.execution_boundary}");
     expect(web3Workspace).toContain("seven point price-action chart");
     expect(web3Workspace).toContain("volume bars · buy-flow shade");
     expect(web3Workspace).toContain("chart {chartTape.status.replaceAll(\"-\", \" \")}");

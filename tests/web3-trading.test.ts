@@ -2008,7 +2008,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(queueMove?.action).toBe("sell");
     expect(queueMove?.tone).toBe("engine");
     expect(queueMove?.budgetUsd).toBeGreaterThan(0);
-    expect(moves.length).toBeLessThanOrEqual(6);
+    expect(moves.length).toBeLessThanOrEqual(7);
+  });
+
+  test("GIVEN chart tape evidence WHEN next moves are built THEN the chart execution contract is visible in the compact operator timeline", () => {
+    const state = getWeb3TradingState("base", 0);
+    const moves = buildAutonomousNextMoves(state);
+    const chartMove = moves.find((move) => move.id === "chart-contract");
+
+    expect(chartMove?.label).toContain("Chart");
+    expect(chartMove?.action).toBe(state.autonomous_price_action_execution_contract.action.replaceAll("-", " "));
+    expect(chartMove?.detail).toBe(state.autonomous_price_action_execution_contract.summary);
+    expect(chartMove?.etaSeconds).toBe(state.autonomous_price_action_execution_contract.review_after_seconds);
+    expect(chartMove?.budgetUsd).toBe(state.autonomous_price_action_execution_contract.paper_notional_usd);
   });
 
   test("GIVEN launch timing state WHEN next moves are built THEN the fresh-entry decision is visible before the long desk", () => {
@@ -4096,6 +4108,27 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_price_action_chart_tape.controls.some((control) => control.includes("Moonshot-style hot-coin chart tape"))).toBe(true);
     expect(state.autonomous_price_action_chart_tape.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
+    expect(state.autonomous_price_action_execution_contract.mode).toBe("autonomous-price-action-execution-contract");
+    expect(["paper-ready", "probe-ready", "refresh-first", "protect-first", "fade", "blocked", "watch", "idle"]).toContain(state.autonomous_price_action_execution_contract.status);
+    expect(["paper-buy", "paper-probe", "refresh-route", "refresh-candles", "protect", "fade", "watch"]).toContain(state.autonomous_price_action_execution_contract.action);
+    expect(state.autonomous_price_action_execution_contract.contract_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_price_action_execution_contract.contract_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_price_action_execution_contract.review_after_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_price_action_execution_contract.items.map((item) => item.id)).toEqual(["chart", "proof", "wallet", "profit-lock", "run-guard", "boundary"]);
+    expect(state.autonomous_price_action_execution_contract.items.every((item) =>
+      ["pass", "watch", "fail"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(state.autonomous_price_action_execution_contract.safeguards.some((item) => item.includes("cannot sign"))).toBe(true);
+    expect(state.autonomous_price_action_execution_contract.safeguards.some((item) => item.includes("Paper notional is capped"))).toBe(true);
+    if (state.autonomous_price_action_execution_contract.can_queue_paper) {
+      expect(state.autonomous_price_action_execution_contract.execution_boundary).toBe("paper-ledger-only");
+      expect(state.autonomous_price_action_execution_contract.paper_notional_usd).toBeGreaterThan(0);
+    } else {
+      expect(state.autonomous_price_action_execution_contract.paper_notional_usd).toBe(0);
+    }
     expect(state.live_scanner_readiness.mode).toBe("live-scanner-readiness");
     expect(["attack-ready", "probe-ready", "refresh-first", "blocked", "sample", "idle"]).toContain(state.live_scanner_readiness.status);
     expect(state.live_scanner_readiness.source_mode).toBe(state.discovery_tape.status);

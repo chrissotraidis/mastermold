@@ -620,6 +620,8 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
 
         <QuickFirstScreenPriceActionRail state={state} />
 
+        <QuickAutonomousNextMoves items={nextMoves} state={state} />
+
         <QuickTradingCommandDeck
           state={state}
           autoWatch={autoWatch}
@@ -805,7 +807,6 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
                 sessionRun={sessionRun}
               />
               <QuickProfitAllocationPlan plan={profitAllocation} />
-              <QuickAutonomousNextMoves items={nextMoves} state={state} />
               <div className="xl:col-span-2">
                 <QuickExecutionRunway runway={executionRunway} />
               </div>
@@ -957,8 +958,10 @@ type AutoWatchPlan = ReturnType<typeof chooseAutoWatchPlan>;
 
 function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState }) {
   const tape = state.autonomous_price_action_chart_tape;
+  const contract = state.autonomous_price_action_execution_contract;
   const leader = tape.items[0];
   const tone = priceActionChartTapeTone(tape.status);
+  const contractTone = priceActionExecutionContractTone(contract.status);
   const points = leader?.sparkline.length ? leader.sparkline : [
     { t: 0, price_usd: 0, price_change_pct: 0, volume_usd: 0, buy_pressure_pct: 50 },
     { t: 1, price_usd: 0, price_change_pct: 0, volume_usd: 0, buy_pressure_pct: 50 },
@@ -990,6 +993,7 @@ function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState })
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Chip tone={tone}>{tape.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={contractTone}>contract {contract.status.replaceAll("-", " ")}</Chip>
             <Chip tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"}>
               {state.execution_gate.live_execution_enabled ? "live boundary" : "paper only"}
             </Chip>
@@ -1035,11 +1039,13 @@ function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState })
         <MiniProofStat label="Protect" value={`${tape.protect_count}`} />
         <MiniProofStat label="Review" value={`${tape.fastest_review_seconds}s`} />
         <MiniProofStat label="Edge" value={formatCompactSignedCurrency(tape.expected_edge_usd)} />
-        <MiniProofStat label="Max paper" value={formatCompactCurrency(tape.max_paper_size_usd)} />
+        <MiniProofStat label="Contract" value={`${contract.contract_score}/100`} />
+        <MiniProofStat label="Paper cap" value={formatCompactCurrency(contract.paper_notional_usd)} />
+        <MiniProofStat label="Fills" value={`${contract.max_fill_count}`} />
       </div>
 
       <span className="sr-only" aria-label="First-screen autonomous price-action chart tape receipt">
-        First-screen autonomous price-action chart tape status {tape.status}; leader {tape.leader_symbol ?? "none"}; action {tape.leader_action ?? "none"}; chart score {tape.chart_score}; controls {tape.controls.join(" ")}.
+        First-screen autonomous price-action chart tape status {tape.status}; leader {tape.leader_symbol ?? "none"}; action {tape.leader_action ?? "none"}; chart score {tape.chart_score}; execution contract {contract.status}; contract action {contract.action}; can queue paper {contract.can_queue_paper ? "yes" : "no"}; paper notional {formatCurrency(contract.paper_notional_usd)}; boundary {contract.execution_boundary}; safeguards {contract.safeguards.join(" ")}; controls {tape.controls.join(" ")}.
       </span>
     </section>
   );
@@ -5926,7 +5932,7 @@ function QuickAutonomousNextMoves({ items, state }: { items: AutonomousNextMove[
         </div>
       </div>
 
-      <div className="mt-3 grid gap-1" aria-label="Autonomous operator next six moves">
+      <div className="mt-3 grid gap-1" aria-label="Autonomous operator next seven moves">
         {items.map((item, index) => (
           <div key={item.id} className={cn("grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 rounded-md border px-2 py-2", nextMoveToneClass(item.tone))}>
             <div className="flex h-7 w-7 items-center justify-center rounded-md border border-current/25 bg-void/25 font-mono text-[10px] font-semibold">
@@ -5957,7 +5963,7 @@ function QuickAutonomousNextMoves({ items, state }: { items: AutonomousNextMove[
       </div>
 
       <span className="sr-only" aria-label="Autonomous next moves receipt">
-        Next moves are built from the read-only freshness gate, command execution, action queue, execution runway, autonomous launch timing, protective trigger opportunity, loop throttle, and wallet feedback. Leader {leader?.label ?? "none"} action {leader?.action ?? "none"}; launch timing {state.autonomous_launch_timing.status}; trigger opportunity {state.autonomous_trigger_opportunity.status}; live execution stays {state.execution_gate.live_execution_enabled ? "armed by credentials" : "locked"}.
+        Next moves are built from the read-only freshness gate, source quality, chart-tape execution contract, command execution, action queue, execution runway, autonomous launch timing, protective trigger opportunity, loop throttle, and wallet feedback. Leader {leader?.label ?? "none"} action {leader?.action ?? "none"}; chart contract {state.autonomous_price_action_execution_contract.status}; chart boundary {state.autonomous_price_action_execution_contract.execution_boundary}; launch timing {state.autonomous_launch_timing.status}; trigger opportunity {state.autonomous_trigger_opportunity.status}; live execution stays {state.execution_gate.live_execution_enabled ? "armed by credentials" : "locked"}.
       </span>
     </section>
   );
@@ -6804,6 +6810,13 @@ function priceActionChartTapeItemTone(status: Web3TradingState["autonomous_price
   return "neutral";
 }
 
+function priceActionExecutionContractTone(status: Web3TradingState["autonomous_price_action_execution_contract"]["status"]): QuickChipTone {
+  if (status === "paper-ready" || status === "probe-ready") return "engine";
+  if (status === "refresh-first" || status === "watch") return "caution";
+  if (status === "protect-first" || status === "fade" || status === "blocked") return "critical";
+  return "neutral";
+}
+
 function minuteProofItemTone(status: Web3TradingState["autonomous_minute_profit_discipline"]["items"][number]["status"]): QuickChipTone {
   if (status === "pass") return "engine";
   if (status === "fail") return "critical";
@@ -7506,6 +7519,7 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
   const queue = state.autonomous_action_queue;
   const queueExecution = state.autonomous_action_queue_execution;
   const runway = state.autonomous_execution_runway;
+  const chartContract = state.autonomous_price_action_execution_contract;
   const activeRunwayStep = runway.steps.find((step) => step.id === runway.next_step_id) ?? runway.steps[0] ?? null;
   const throttle = state.autonomous_loop_throttle;
   const walletFeedback = state.autonomous_loop_feedback;
@@ -7541,6 +7555,19 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
       score: sourceQuality.quality_score,
       budgetUsd: 0,
       tone: sourceQuality.status === "paid-hype" || sourceQuality.status === "blocked" ? "critical" : "caution",
+    });
+  }
+
+  if (chartContract.symbol || chartContract.status !== "idle") {
+    moves.push({
+      id: "chart-contract",
+      label: chartContract.symbol ? `Chart ${chartContract.symbol}` : "Chart contract",
+      action: chartContract.action.replaceAll("-", " "),
+      detail: chartContract.summary,
+      etaSeconds: boundedSeconds(chartContract.review_after_seconds),
+      score: chartContract.contract_score,
+      budgetUsd: chartContract.paper_notional_usd,
+      tone: priceActionExecutionContractTone(chartContract.status),
     });
   }
 
@@ -7668,7 +7695,7 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
     if (!deduped.has(move.id)) deduped.set(move.id, move);
   }
 
-  return Array.from(deduped.values()).slice(0, 6);
+  return Array.from(deduped.values()).slice(0, 7);
 }
 
 function boundedSeconds(value: number) {

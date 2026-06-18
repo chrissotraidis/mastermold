@@ -1068,6 +1068,52 @@ export type AutonomousPriceActionChartTape = {
   items: AutonomousPriceActionChartTapeItem[];
 };
 
+export type AutonomousPriceActionExecutionContractAction =
+  | "paper-buy"
+  | "paper-probe"
+  | "refresh-route"
+  | "refresh-candles"
+  | "protect"
+  | "fade"
+  | "watch";
+
+export type AutonomousPriceActionExecutionContractItem = {
+  id: "chart" | "proof" | "wallet" | "profit-lock" | "run-guard" | "boundary";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  score: number;
+  value: string;
+  detail: string;
+};
+
+export type AutonomousPriceActionExecutionContract = {
+  mode: "autonomous-price-action-execution-contract";
+  status: "paper-ready" | "probe-ready" | "refresh-first" | "protect-first" | "fade" | "blocked" | "watch" | "idle";
+  action: AutonomousPriceActionExecutionContractAction;
+  symbol: string | null;
+  token_id: string | null;
+  contract_score: number;
+  chart_score: number;
+  proof_score: number;
+  wallet_score: number;
+  profit_lock_score: number;
+  noise_score: number;
+  expected_edge_usd: number;
+  paper_notional_usd: number;
+  max_fill_count: number;
+  review_after_seconds: number;
+  can_queue_paper: boolean;
+  should_refresh_route: boolean;
+  should_refresh_candles: boolean;
+  should_protect_first: boolean;
+  execution_boundary: "paper-ledger-only" | "read-only-route-refresh" | "read-only-chart-refresh" | "protect-paper-only" | "blocked-paper-only";
+  summary: string;
+  next_action: string;
+  blockers: string[];
+  safeguards: string[];
+  items: AutonomousPriceActionExecutionContractItem[];
+};
+
 export type AutonomousSignalNoiseTradeDecisionAction =
   | "paper-buy"
   | "paper-probe"
@@ -8726,6 +8772,7 @@ export type Web3TradingState = {
   autonomous_source_quality_oracle: AutonomousSourceQualityOracle;
   autonomous_market_evidence_fusion: AutonomousMarketEvidenceFusion;
   autonomous_price_action_chart_tape: AutonomousPriceActionChartTape;
+  autonomous_price_action_execution_contract: AutonomousPriceActionExecutionContract;
   autonomous_signal_noise_trade_decision: AutonomousSignalNoiseTradeDecision;
   autonomous_execution_runway: AutonomousExecutionRunway;
   autonomous_now_decision: AutonomousNowDecision;
@@ -11973,6 +12020,13 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       candleConviction: configuredState.autonomous_candle_conviction,
       routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
     });
+    configuredState.autonomous_price_action_execution_contract = buildAutonomousPriceActionExecutionContract({
+      chartTape: configuredState.autonomous_price_action_chart_tape,
+      dataFreshnessGate: configuredState.autonomous_data_freshness_gate,
+      walletTelemetry: configuredState.autonomous_wallet_telemetry,
+      dailyProfitLock: configuredState.autonomous_daily_profit_lock,
+      profitRunGuard: configuredState.autonomous_profit_run_guard,
+    });
     configuredState.autonomous_order_ticket_execution = buildAutonomousOrderTicketExecution({
       asOf: configuredState.as_of,
       cycle: configuredState.paper_account.cycle,
@@ -14233,6 +14287,13 @@ function buildWeb3TradingState({
     portfolioMarkBoard: autonomous_portfolio_mark_board,
     daemonMemory: paper_daemon_memory,
   });
+  const autonomous_price_action_execution_contract = buildAutonomousPriceActionExecutionContract({
+    chartTape: autonomous_price_action_chart_tape,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+    walletTelemetry: autonomous_wallet_telemetry,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    profitRunGuard: autonomous_profit_run_guard,
+  });
   const autonomous_replay_gate = buildAutonomousReplayGate({
     strategyLab: strategy_lab,
     forwardTest: autonomous_forward_test,
@@ -14552,6 +14613,7 @@ function buildWeb3TradingState({
     autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
     autonomous_price_action_chart_tape,
+    autonomous_price_action_execution_contract,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_now_decision,
@@ -16627,6 +16689,13 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     portfolioMarkBoard: autonomous_portfolio_mark_board,
     daemonMemory: state.paper_daemon_memory,
   });
+  const autonomous_price_action_execution_contract = buildAutonomousPriceActionExecutionContract({
+    chartTape: autonomous_price_action_chart_tape,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+    walletTelemetry: autonomous_wallet_telemetry,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    profitRunGuard: autonomous_profit_run_guard,
+  });
   const autonomous_replay_gate = buildAutonomousReplayGate({
     strategyLab: state.strategy_lab,
     forwardTest: autonomous_forward_test,
@@ -16921,6 +16990,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
     autonomous_price_action_chart_tape,
+    autonomous_price_action_execution_contract,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_now_decision,
@@ -17345,6 +17415,13 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     candleConviction: state.autonomous_candle_conviction,
     routeRefreshExecution: state.autonomous_route_refresh_execution,
   });
+  const autonomous_price_action_execution_contract = buildAutonomousPriceActionExecutionContract({
+    chartTape: autonomous_price_action_chart_tape,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+    walletTelemetry: state.autonomous_wallet_telemetry,
+    dailyProfitLock: state.autonomous_daily_profit_lock,
+    profitRunGuard: state.autonomous_profit_run_guard,
+  });
   const autonomous_replay_gate = buildAutonomousReplayGate({
     strategyLab: state.strategy_lab,
     forwardTest: state.autonomous_forward_test,
@@ -17625,6 +17702,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
     autonomous_price_action_chart_tape,
+    autonomous_price_action_execution_contract,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_now_decision,
@@ -21948,6 +22026,13 @@ function applyPersistentLedger(
     portfolioMarkBoard: autonomous_portfolio_mark_board,
     daemonMemory: paper_daemon_memory,
   });
+  const autonomous_price_action_execution_contract = buildAutonomousPriceActionExecutionContract({
+    chartTape: autonomous_price_action_chart_tape,
+    dataFreshnessGate: autonomous_data_freshness_gate,
+    walletTelemetry: autonomous_wallet_telemetry,
+    dailyProfitLock: autonomous_daily_profit_lock,
+    profitRunGuard: autonomous_profit_run_guard,
+  });
   const autonomous_replay_gate = buildAutonomousReplayGate({
     strategyLab: state.strategy_lab,
     forwardTest: autonomous_forward_test,
@@ -22487,6 +22572,7 @@ function applyPersistentLedger(
     autonomous_source_quality_oracle,
     autonomous_market_evidence_fusion,
     autonomous_price_action_chart_tape,
+    autonomous_price_action_execution_contract,
     autonomous_signal_noise_trade_decision,
     autonomous_execution_runway,
     autonomous_make_money_pulse,
@@ -78090,6 +78176,295 @@ function priceActionChartTapeItemNextAction(
   if (action === "protect") return `Run protect/harvest work before adding fresh ${symbol} exposure.`;
   if (action === "fade") return blockers[0] ?? `Fade ${symbol}; chart pressure is not clean enough.`;
   return `Watch ${symbol}; no paper entry until chart, route, and noise gates align.`;
+}
+
+function buildAutonomousPriceActionExecutionContract({
+  chartTape,
+  dataFreshnessGate,
+  walletTelemetry,
+  dailyProfitLock,
+  profitRunGuard,
+}: {
+  chartTape: AutonomousPriceActionChartTape;
+  dataFreshnessGate: AutonomousDataFreshnessGate;
+  walletTelemetry: AutonomousWalletTelemetry;
+  dailyProfitLock: AutonomousDailyProfitLock;
+  profitRunGuard: AutonomousProfitRunGuard;
+}): AutonomousPriceActionExecutionContract {
+  const leader = chartTape.items[0] ?? null;
+  const walletScore = clamp(Math.round(
+    100 -
+      walletTelemetry.max_drawdown_pct * 7 -
+      Math.max(0, walletTelemetry.exposure_pct - 58) * 0.8 +
+      Math.max(-18, Math.min(18, walletTelemetry.window_pnl_pct * 3)),
+  ), 0, 100);
+  const profitLockScore = clamp(Math.round(
+    (dailyProfitLock.fresh_buy_allowed ? 72 : 30) +
+      Math.min(22, dailyProfitLock.loss_budget_remaining_usd / Math.max(1, dailyProfitLock.stop_loss_usd) * 18) +
+      (dailyProfitLock.loop_permission === "open" ? 8 : dailyProfitLock.loop_permission === "harvest-only" ? -6 : -18),
+  ), 0, 100);
+  const runGuardScore = clamp(profitRunGuard.profit_guard_score, 0, 100);
+
+  if (!leader) {
+    return {
+      mode: "autonomous-price-action-execution-contract",
+      status: "idle",
+      action: "watch",
+      symbol: null,
+      token_id: null,
+      contract_score: 0,
+      chart_score: 0,
+      proof_score: 0,
+      wallet_score: walletScore,
+      profit_lock_score: profitLockScore,
+      noise_score: chartTape.average_noise_score,
+      expected_edge_usd: 0,
+      paper_notional_usd: 0,
+      max_fill_count: 0,
+      review_after_seconds: chartTape.fastest_review_seconds,
+      can_queue_paper: false,
+      should_refresh_route: dataFreshnessGate.next_refresh_lane === "jupiter-quote",
+      should_refresh_candles: dataFreshnessGate.next_refresh_lane === "gecko-ohlcv",
+      should_protect_first: dailyProfitLock.loop_permission === "protect-only" || profitRunGuard.blocks_fresh_buy,
+      execution_boundary: "blocked-paper-only",
+      summary: "Chart-tape execution contract is waiting for a chartable candidate.",
+      next_action: "Keep scanning price action until chart, route, wallet, and profit-lock evidence align.",
+      blockers: ["No chart-tape leader is available."],
+      safeguards: priceActionExecutionContractSafeguards(),
+      items: priceActionExecutionContractItems({
+        leader: null,
+        dataFreshnessGate,
+        walletScore,
+        profitLockScore,
+        profitRunGuard,
+        boundary: "blocked-paper-only",
+      }),
+    };
+  }
+
+  const shouldRefreshRoute = leader.action === "refresh-route" || dataFreshnessGate.next_refresh_lane === "jupiter-quote" || leader.route_score < 48;
+  const shouldRefreshCandles = leader.action === "refresh-candles" || dataFreshnessGate.next_refresh_lane === "gecko-ohlcv" || leader.proof_score < 45;
+  const shouldProtectFirst = leader.action === "protect" ||
+    dailyProfitLock.loop_permission === "protect-only" ||
+    dailyProfitLock.loop_permission === "harvest-only" ||
+    profitRunGuard.blocks_fresh_buy ||
+    profitRunGuard.action === "protect-wallet" ||
+    walletTelemetry.max_drawdown_pct >= 7 ||
+    walletTelemetry.exposure_pct >= 76;
+  const baseContractScore = clamp(Math.round(
+    leader.chart_score * 0.32 +
+      leader.proof_score * 0.22 +
+      walletScore * 0.16 +
+      profitLockScore * 0.14 +
+      runGuardScore * 0.12 -
+      leader.noise_score * 0.16,
+  ), 0, 100);
+  const canQueuePaper = (leader.action === "paper-buy" || leader.action === "paper-probe") &&
+    dataFreshnessGate.can_trade &&
+    dailyProfitLock.fresh_buy_allowed &&
+    !shouldProtectFirst &&
+    !shouldRefreshRoute &&
+    !shouldRefreshCandles &&
+    leader.blockers.length === 0 &&
+    baseContractScore >= (leader.action === "paper-buy" ? 60 : 48);
+  const paperNotionalUsd = canQueuePaper
+    ? Math.round(Math.max(0, Math.min(
+      leader.max_paper_size_usd,
+      dailyProfitLock.deploy_allowed_usd,
+      chartTape.max_paper_size_usd,
+    )))
+    : 0;
+  const maxFillCount = canQueuePaper
+    ? Math.max(1, Math.min(dataFreshnessGate.max_next_fills, dailyProfitLock.max_next_fills, profitRunGuard.max_next_fills || 1))
+    : 0;
+  const action: AutonomousPriceActionExecutionContractAction = canQueuePaper
+    ? leader.action
+    : shouldProtectFirst
+      ? "protect"
+      : shouldRefreshRoute
+        ? "refresh-route"
+        : shouldRefreshCandles
+          ? "refresh-candles"
+          : leader.action === "fade"
+            ? "fade"
+            : "watch";
+  const status: AutonomousPriceActionExecutionContract["status"] = canQueuePaper
+    ? leader.action === "paper-buy" ? "paper-ready" : "probe-ready"
+    : action === "protect"
+      ? "protect-first"
+      : action === "refresh-route" || action === "refresh-candles"
+        ? "refresh-first"
+        : action === "fade"
+          ? "fade"
+          : leader.blockers.length > 0 || dataFreshnessGate.status === "blocked"
+            ? "blocked"
+            : "watch";
+  const executionBoundary: AutonomousPriceActionExecutionContract["execution_boundary"] = canQueuePaper
+    ? "paper-ledger-only"
+    : action === "refresh-route"
+      ? "read-only-route-refresh"
+      : action === "refresh-candles"
+        ? "read-only-chart-refresh"
+        : action === "protect"
+          ? "protect-paper-only"
+          : "blocked-paper-only";
+  const blockers = uniqueArray([
+    ...leader.blockers,
+    !dataFreshnessGate.can_trade ? `Data freshness gate is ${dataFreshnessGate.status}.` : null,
+    !dailyProfitLock.fresh_buy_allowed ? `Daily profit lock is ${dailyProfitLock.loop_permission}.` : null,
+    profitRunGuard.blocks_fresh_buy ? `Profit run guard is ${profitRunGuard.status}.` : null,
+    shouldRefreshRoute ? "Route proof must refresh before chart-tape paper size." : null,
+    shouldRefreshCandles ? "Candle proof must refresh before chart-tape paper size." : null,
+    shouldProtectFirst ? "Wallet or profit lock is protect-first." : null,
+    baseContractScore < 48 ? `Chart execution contract score is ${baseContractScore}/100.` : null,
+    paperNotionalUsd <= 0 && canQueuePaper ? "Paper notional is capped to zero by wallet or lock limits." : null,
+  ].filter((item): item is string => Boolean(item))).slice(0, 7);
+
+  return {
+    mode: "autonomous-price-action-execution-contract",
+    status,
+    action,
+    symbol: leader.symbol,
+    token_id: leader.token_id,
+    contract_score: baseContractScore,
+    chart_score: leader.chart_score,
+    proof_score: leader.proof_score,
+    wallet_score: walletScore,
+    profit_lock_score: profitLockScore,
+    noise_score: leader.noise_score,
+    expected_edge_usd: canQueuePaper ? leader.expected_edge_usd : 0,
+    paper_notional_usd: paperNotionalUsd,
+    max_fill_count: maxFillCount,
+    review_after_seconds: Math.min(leader.review_after_seconds, chartTape.fastest_review_seconds),
+    can_queue_paper: canQueuePaper && paperNotionalUsd > 0,
+    should_refresh_route: shouldRefreshRoute,
+    should_refresh_candles: shouldRefreshCandles,
+    should_protect_first: shouldProtectFirst,
+    execution_boundary: executionBoundary,
+    summary: priceActionExecutionContractSummary(status, leader, paperNotionalUsd, baseContractScore),
+    next_action: priceActionExecutionContractNextAction(action, leader, blockers),
+    blockers,
+    safeguards: priceActionExecutionContractSafeguards(),
+    items: priceActionExecutionContractItems({
+      leader,
+      dataFreshnessGate,
+      walletScore,
+      profitLockScore,
+      profitRunGuard,
+      boundary: executionBoundary,
+    }),
+  };
+}
+
+function priceActionExecutionContractSummary(
+  status: AutonomousPriceActionExecutionContract["status"],
+  leader: AutonomousPriceActionChartTapeItem,
+  paperNotionalUsd: number,
+  contractScore: number,
+) {
+  if (status === "paper-ready") return `${leader.symbol} has a chart-tape paper-buy contract: ${contractScore}/100 score and ${formatCompactValue(paperNotionalUsd)} capped notional.`;
+  if (status === "probe-ready") return `${leader.symbol} is probe-ready from chart tape with reduced local paper sizing.`;
+  if (status === "refresh-first") return `${leader.symbol} needs fresh read-only proof before chart-tape paper sizing.`;
+  if (status === "protect-first") return `Chart tape defers ${leader.symbol}; wallet/profit protection must run first.`;
+  if (status === "fade") return `${leader.symbol} is a fade until noise and weak proof repair.`;
+  if (status === "blocked") return `Chart-tape contract blocks ${leader.symbol} until blockers clear.`;
+  return `Chart-tape contract watches ${leader.symbol} for a cleaner paper setup.`;
+}
+
+function priceActionExecutionContractNextAction(
+  action: AutonomousPriceActionExecutionContractAction,
+  leader: AutonomousPriceActionChartTapeItem,
+  blockers: string[],
+) {
+  if (action === "paper-buy") return `Queue one bounded local paper buy for ${leader.symbol}; re-check chart, wallet PnL, and proof after the fill.`;
+  if (action === "paper-probe") return `Queue one reduced local paper probe for ${leader.symbol}; require follow-through before scaling.`;
+  if (action === "refresh-route") return `Refresh read-only Jupiter-style route proof for ${leader.symbol} before sizing.`;
+  if (action === "refresh-candles") return `Refresh GeckoTerminal-style OHLCV proof for ${leader.symbol} before sizing.`;
+  if (action === "protect") return `Run protection/harvest work before adding fresh ${leader.symbol} chart exposure.`;
+  if (action === "fade") return blockers[0] ?? `Fade ${leader.symbol}; chart pressure is not clean enough.`;
+  return `Watch ${leader.symbol}; no paper action until chart, proof, wallet, and profit-lock gates align.`;
+}
+
+function priceActionExecutionContractSafeguards() {
+  return [
+    "Chart-tape contract is local paper-only: it cannot sign, submit, broadcast, custody funds, or create live orders.",
+    "Paper notional is capped by chart evidence, data freshness, daily profit lock, profit run guard, and wallet drawdown/exposure.",
+    "Refresh actions are read-only evidence work; protect actions can only target the local paper ledger unless separate live gates are explicitly armed.",
+  ];
+}
+
+function priceActionExecutionContractItems({
+  leader,
+  dataFreshnessGate,
+  walletScore,
+  profitLockScore,
+  profitRunGuard,
+  boundary,
+}: {
+  leader: AutonomousPriceActionChartTapeItem | null;
+  dataFreshnessGate: AutonomousDataFreshnessGate;
+  walletScore: number;
+  profitLockScore: number;
+  profitRunGuard: AutonomousProfitRunGuard;
+  boundary: AutonomousPriceActionExecutionContract["execution_boundary"];
+}): AutonomousPriceActionExecutionContractItem[] {
+  const chartScore = leader?.chart_score ?? 0;
+  const proofScore = leader?.proof_score ?? dataFreshnessGate.data_score;
+  return [
+    {
+      id: "chart",
+      label: "Chart",
+      status: chartScore >= 58 ? "pass" : chartScore >= 42 ? "watch" : "fail",
+      score: chartScore,
+      value: leader ? `${leader.symbol} ${leader.action.replace("-", " ")}` : "none",
+      detail: leader ? `${signedPercentLabel(leader.price_change_5m_pct)} 5m, ${leader.buyer_flow_score}/100 buyer flow.` : "No chart leader is available.",
+    },
+    {
+      id: "proof",
+      label: "Proof",
+      status: proofScore >= 58 && dataFreshnessGate.can_trade ? "pass" : proofScore >= 42 ? "watch" : "fail",
+      score: proofScore,
+      value: dataFreshnessGate.next_refresh_lane.replace("-", " "),
+      detail: dataFreshnessGate.next_action,
+    },
+    {
+      id: "wallet",
+      label: "Wallet",
+      status: walletScore >= 62 ? "pass" : walletScore >= 42 ? "watch" : "fail",
+      score: walletScore,
+      value: `${walletScore}/100`,
+      detail: "Wallet drawdown and exposure cap chart-tape paper size.",
+    },
+    {
+      id: "profit-lock",
+      label: "Profit lock",
+      status: profitLockScore >= 62 ? "pass" : profitLockScore >= 42 ? "watch" : "fail",
+      score: profitLockScore,
+      value: `${profitLockScore}/100`,
+      detail: "Daily target/loss brake gates fresh paper buys.",
+    },
+    {
+      id: "run-guard",
+      label: "Run guard",
+      status: !profitRunGuard.blocks_fresh_buy && profitRunGuard.profit_guard_score >= 55 ? "pass" : profitRunGuard.status === "blocked" ? "fail" : "watch",
+      score: profitRunGuard.profit_guard_score,
+      value: profitRunGuard.status.replace("-", " "),
+      detail: profitRunGuard.next_action,
+    },
+    {
+      id: "boundary",
+      label: "Boundary",
+      status: boundary === "paper-ledger-only" ? "pass" : boundary === "blocked-paper-only" ? "fail" : "watch",
+      score: boundary === "paper-ledger-only" ? 80 : boundary === "blocked-paper-only" ? 30 : 55,
+      value: boundary.replaceAll("-", " "),
+      detail: "Execution remains paper/read-only unless future live gates are explicitly configured.",
+    },
+  ];
+}
+
+function signedPercentLabel(value: number) {
+  const rounded = roundMetric(value);
+  return `${rounded > 0 ? "+" : ""}${rounded}%`;
 }
 
 function buildAutonomousSignalNoiseTradeDecision({
