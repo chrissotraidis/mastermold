@@ -602,6 +602,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Agent alpha {formatCompactSignedCurrency(benchmark.cash_alpha_usd)} vs cash");
     expect(web3Workspace).toContain("equity solid · cash dash · hot tape dots");
     expect(web3Workspace).toContain("Autonomous operator next eight moves");
+    expect(web3Workspace).toContain("re-entry {state.autonomous_reentry_hunter.status.replaceAll(\"-\", \" \")}");
+    expect(web3Workspace).toContain("profit benchmark, re-entry hunter, command execution");
+    expect(web3Workspace).toContain("re-entry leader {state.autonomous_reentry_hunter.leader_symbol ?? \"none\"}");
+    expect(web3Workspace).toContain("re-entry cap {formatCurrency(state.autonomous_reentry_hunter.max_reentry_usd)}");
     expect(web3Workspace).toContain("Benchmark cadence:");
     expect(web3Workspace).toContain("feedback can tighten, retarget, or press Auto watch");
     expect(web3Workspace).toContain("Provider intake:");

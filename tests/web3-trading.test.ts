@@ -2593,6 +2593,24 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(benchmarkMove?.budgetUsd).toBe(state.autonomous_profit_thesis_verifier.chase_budget_usd);
   });
 
+  test("GIVEN re-entry hunter evidence WHEN next moves are built THEN missed-runner review is visible before the long desk", () => {
+    const state = getWeb3TradingState("base", 0);
+    const moves = buildAutonomousNextMoves(state);
+    const reentryMove = moves.find((move) => move.id === "reentry-hunter");
+
+    expect(reentryMove?.label).toContain("Re-entry");
+    expect(reentryMove?.action).toBe(state.autonomous_reentry_hunter.status.replaceAll("-", " "));
+    expect(reentryMove?.detail).toContain(state.autonomous_reentry_hunter.next_action);
+    expect(reentryMove?.detail).toContain(state.autonomous_reentry_hunter.paper_trade_ready ? "local paper gates" : "No live signing");
+    expect(reentryMove?.etaSeconds).toBe(state.autonomous_reentry_hunter.fastest_review_seconds);
+    expect(reentryMove?.budgetUsd).toBe(Math.max(
+      state.autonomous_reentry_hunter.max_reentry_usd,
+      state.autonomous_reentry_hunter.paper_trade?.size_usd ?? 0,
+    ));
+    expect(moves.map((move) => move.id)).toContain("reentry-hunter");
+    expect(moves.length).toBeLessThanOrEqual(8);
+  });
+
   test("GIVEN launch timing state WHEN next moves are built THEN the fresh-entry decision is visible before the long desk", () => {
     const state = getWeb3TradingState("base", 0);
     const moves = buildAutonomousNextMoves(state);

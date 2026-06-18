@@ -6081,6 +6081,9 @@ function QuickAutonomousNextMoves({ items, state }: { items: AutonomousNextMove[
           <Chip tone={state.autonomous_trigger_opportunity.status === "protect" || state.autonomous_trigger_opportunity.status === "pre-arm" ? "engine" : state.autonomous_trigger_opportunity.status === "repair" || state.autonomous_trigger_opportunity.status === "auth-required" ? "caution" : state.autonomous_trigger_opportunity.status === "blocked" ? "critical" : "neutral"}>
             trigger {state.autonomous_trigger_opportunity.status.replaceAll("-", " ")}
           </Chip>
+          <Chip tone={state.autonomous_reentry_hunter.paper_trade_ready ? "engine" : state.autonomous_reentry_hunter.status === "blocked" ? "critical" : state.autonomous_reentry_hunter.status === "watch" ? "caution" : "neutral"}>
+            re-entry {state.autonomous_reentry_hunter.status.replaceAll("-", " ")}
+          </Chip>
           <Chip tone={state.autonomous_execution_runway.can_auto_paper ? "engine" : state.autonomous_execution_runway.status === "blocked" ? "critical" : "caution"}>
             {state.autonomous_execution_runway.status.replaceAll("-", " ")}
           </Chip>
@@ -6118,7 +6121,7 @@ function QuickAutonomousNextMoves({ items, state }: { items: AutonomousNextMove[
       </div>
 
       <span className="sr-only" aria-label="Autonomous next moves receipt">
-        Next moves are built from the read-only freshness gate, source quality, chart-tape execution contract, profit benchmark, command execution, action queue, execution runway, autonomous launch timing, protective trigger opportunity, loop throttle, and wallet feedback. Leader {leader?.label ?? "none"} action {leader?.action ?? "none"}; chart contract {state.autonomous_price_action_execution_contract.status}; chart boundary {state.autonomous_price_action_execution_contract.execution_boundary}; profit benchmark {state.autonomous_profit_benchmark.status}; profit alpha {formatSignedCurrency(state.autonomous_profit_benchmark.cash_alpha_usd)}; profit thesis {state.autonomous_profit_thesis_verifier.status}; launch timing {state.autonomous_launch_timing.status}; trigger opportunity {state.autonomous_trigger_opportunity.status}; live execution stays {state.execution_gate.live_execution_enabled ? "armed by credentials" : "locked"}.
+        Next moves are built from the read-only freshness gate, source quality, chart-tape execution contract, profit benchmark, re-entry hunter, command execution, action queue, execution runway, autonomous launch timing, protective trigger opportunity, loop throttle, and wallet feedback. Leader {leader?.label ?? "none"} action {leader?.action ?? "none"}; chart contract {state.autonomous_price_action_execution_contract.status}; chart boundary {state.autonomous_price_action_execution_contract.execution_boundary}; profit benchmark {state.autonomous_profit_benchmark.status}; profit alpha {formatSignedCurrency(state.autonomous_profit_benchmark.cash_alpha_usd)}; profit thesis {state.autonomous_profit_thesis_verifier.status}; re-entry hunter {state.autonomous_reentry_hunter.status}; re-entry leader {state.autonomous_reentry_hunter.leader_symbol ?? "none"}; re-entry ready {state.autonomous_reentry_hunter.ready_count}; re-entry cap {formatCurrency(state.autonomous_reentry_hunter.max_reentry_usd)}; launch timing {state.autonomous_launch_timing.status}; trigger opportunity {state.autonomous_trigger_opportunity.status}; live execution stays {state.execution_gate.live_execution_enabled ? "armed by credentials" : "locked"}.
       </span>
     </section>
   );
@@ -7678,6 +7681,7 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
   const profitBenchmark = state.autonomous_profit_benchmark;
   const profitThesis = state.autonomous_profit_thesis_verifier;
   const alphaFeedback = state.autonomous_alpha_feedback_loop;
+  const reentryHunter = state.autonomous_reentry_hunter;
   const activeRunwayStep = runway.steps.find((step) => step.id === runway.next_step_id) ?? runway.steps[0] ?? null;
   const throttle = state.autonomous_loop_throttle;
   const walletFeedback = state.autonomous_loop_feedback;
@@ -7740,16 +7744,24 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
     tone: profitBenchmarkTone(profitBenchmark),
   });
 
-  moves.push({
-    id: "command",
-    label: commandExecution.selected_symbol ?? commandCenter.primary_symbol ?? "Command",
-    action: (commandExecution.selected_action ?? commandCenter.primary_action).replaceAll("-", " "),
-    detail: commandExecution.summary || commandCenter.next_action,
-    etaSeconds: boundedSeconds(commandCenter.fastest_review_seconds),
-    score: commandCenter.command_score,
-    budgetUsd: Math.max(0, commandCenter.risk_usd),
-    tone: commandExecutionTone(commandExecution.status),
-  });
+  if (reentryHunter.status !== "idle" || reentryHunter.items.length > 0) {
+    moves.push({
+      id: "reentry-hunter",
+      label: reentryHunter.leader_symbol ? `Re-entry ${reentryHunter.leader_symbol}` : "Re-entry hunter",
+      action: reentryHunter.status.replaceAll("-", " "),
+      detail: `${reentryHunter.next_action} ${reentryHunter.paper_trade_ready ? "Queue stays inside local paper gates." : "No live signing or wallet spend is opened."}`,
+      etaSeconds: boundedSeconds(reentryHunter.fastest_review_seconds),
+      score: reentryHunter.items[0]?.reentry_score ?? (reentryHunter.paper_trade_ready ? 72 : reentryHunter.status === "blocked" ? 28 : 45),
+      budgetUsd: Math.max(reentryHunter.max_reentry_usd, reentryHunter.paper_trade?.size_usd ?? 0),
+      tone: reentryHunter.paper_trade_ready
+        ? "engine"
+        : reentryHunter.status === "blocked"
+          ? "critical"
+          : reentryHunter.status === "watch"
+            ? "caution"
+            : "neutral",
+    });
+  }
 
   if (queue.items.length > 0 || queueExecution.selected_queue_id) {
     const queueAction = queueExecution.selected_side === "sell" &&
@@ -7827,6 +7839,17 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
         : trigger.status === "blocked"
           ? "critical"
           : "neutral",
+  });
+
+  moves.push({
+    id: "command",
+    label: commandExecution.selected_symbol ?? commandCenter.primary_symbol ?? "Command",
+    action: (commandExecution.selected_action ?? commandCenter.primary_action).replaceAll("-", " "),
+    detail: commandExecution.summary || commandCenter.next_action,
+    etaSeconds: boundedSeconds(commandCenter.fastest_review_seconds),
+    score: commandCenter.command_score,
+    budgetUsd: Math.max(0, commandCenter.risk_usd),
+    tone: commandExecutionTone(commandExecution.status),
   });
 
   moves.push({
