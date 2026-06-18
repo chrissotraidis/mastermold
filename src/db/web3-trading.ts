@@ -17276,8 +17276,16 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     sourceQuality: autonomous_source_quality_oracle,
     walletTelemetry: state.autonomous_wallet_telemetry,
   });
+  const autonomous_profit_capture_autopilot = buildAutonomousProfitCaptureAutopilot({
+    profitCaptureRace: state.profit_capture_race,
+    portfolioMarkBoard: state.autonomous_portfolio_mark_board,
+    walletTelemetry: state.autonomous_wallet_telemetry,
+    routeRefreshExecution: state.autonomous_route_refresh_execution,
+    actionQueueExecution: state.autonomous_action_queue_execution,
+    loopImpact: autonomous_loop_impact_auditor,
+  });
   const autonomous_profit_redeploy_autopilot = buildAutonomousProfitRedeployAutopilot({
-    profitCapture: state.autonomous_profit_capture_autopilot,
+    profitCapture: autonomous_profit_capture_autopilot,
     rotationDirector: autonomous_rotation_director,
     opportunityRanker: autonomous_opportunity_ranker,
     opportunityExecution: autonomous_opportunity_rank_execution,
@@ -17335,6 +17343,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     autonomous_loop_director,
     autonomous_burst_scheduler,
     autonomous_capital_command,
+    autonomous_profit_capture_autopilot,
     autonomous_profit_redeploy_autopilot,
     autonomous_trade_mission,
   };
@@ -21799,8 +21808,16 @@ function applyPersistentLedger(
     sourceQuality: autonomous_source_quality_oracle,
     walletTelemetry: autonomous_wallet_telemetry,
   });
+  const autonomous_profit_capture_autopilot = buildAutonomousProfitCaptureAutopilot({
+    profitCaptureRace: profit_capture_race,
+    portfolioMarkBoard: autonomous_portfolio_mark_board,
+    walletTelemetry: autonomous_wallet_telemetry,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    actionQueueExecution: normalized_action_queue_execution,
+    loopImpact: autonomous_loop_impact_auditor,
+  });
   const autonomous_profit_redeploy_autopilot = buildAutonomousProfitRedeployAutopilot({
-    profitCapture: state.autonomous_profit_capture_autopilot,
+    profitCapture: autonomous_profit_capture_autopilot,
     rotationDirector: autonomous_rotation_director,
     opportunityRanker: autonomous_opportunity_ranker,
     opportunityExecution: autonomous_opportunity_rank_execution,
@@ -21981,6 +21998,7 @@ function applyPersistentLedger(
     position_commander,
     profit_lock_autopilot,
 	    profit_capture_race,
+    autonomous_profit_capture_autopilot,
     autonomous_scalp_exit_autopilot,
 	    high_frequency_profit_race,
 	    high_frequency_profit_race_execution,
@@ -44054,12 +44072,16 @@ function buildAutonomousProfitRedeployAutopilot({
       ? "paper-ledger-only"
       : "blocked-live";
   const nextCadenceSeconds = profitRedeployAutopilotCadence(status, loopImpact.next_cadence_seconds, opportunityExecution.review_after_seconds, reentryHunter.fastest_review_seconds);
+  const displayTargetSymbol = (status === "protect-first" || status === "wait-proof" || status === "cooldown") &&
+    candidateSymbol === fromSymbol
+    ? null
+    : candidateSymbol;
 
   return {
     mode: "autonomous-profit-redeploy-autopilot",
     status,
     action,
-    symbol: candidateSymbol,
+    symbol: displayTargetSymbol,
     from_symbol: fromSymbol,
     redeploy_budget_usd: canRedeployPaper ? redeployBudget : 0,
     released_cash_usd: releasedCashUsd,
@@ -44071,8 +44093,8 @@ function buildAutonomousProfitRedeployAutopilot({
     must_refresh_proof: mustRefreshProof,
     must_protect_first: mustProtectFirst,
     execution_boundary: executionBoundary,
-    summary: profitRedeployAutopilotSummary(status, fromSymbol, candidateSymbol, releasedCashUsd, redeployBudget),
-    next_action: profitRedeployAutopilotNextAction(status, action, fromSymbol, candidateSymbol, nextCadenceSeconds, blockers),
+    summary: profitRedeployAutopilotSummary(status, fromSymbol, displayTargetSymbol, releasedCashUsd, redeployBudget),
+    next_action: profitRedeployAutopilotNextAction(status, action, fromSymbol, displayTargetSymbol, nextCadenceSeconds, blockers),
     blockers,
     controls: [
       "Connects profit capture to the next redeploy decision so released cash cannot automatically chase noisy memecoins.",

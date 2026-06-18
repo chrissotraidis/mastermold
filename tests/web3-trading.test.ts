@@ -5715,6 +5715,29 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(second.autonomous_command_center_execution.controls.some((control) => control.includes("defensive sell"))).toBe(true);
   });
 
+  test("GIVEN a persistent paper account WHEN redeploy is rebuilt THEN capture symbols match the live paper book", async () => {
+    await getWeb3TradingStateAsync({ account: "persistent", reset: true, scenario: "base", advance: true });
+    const state = await getWeb3TradingStateAsync({ account: "persistent", scenario: "base", advance: false });
+    const heldSymbols = new Set(state.portfolio.open_positions.map((position) => position.symbol));
+
+    expect(heldSymbols.size).toBeGreaterThan(0);
+    expect(state.autonomous_profit_capture_autopilot.mode).toBe("autonomous-profit-capture-autopilot");
+    expect(state.autonomous_profit_redeploy_autopilot.mode).toBe("autonomous-profit-redeploy-autopilot");
+    if (state.autonomous_profit_capture_autopilot.symbol) {
+      expect(heldSymbols.has(state.autonomous_profit_capture_autopilot.symbol)).toBe(true);
+    }
+    if (state.autonomous_profit_redeploy_autopilot.from_symbol) {
+      expect(heldSymbols.has(state.autonomous_profit_redeploy_autopilot.from_symbol)).toBe(true);
+    }
+    if (state.autonomous_profit_redeploy_autopilot.released_cash_usd > 0) {
+      expect(state.autonomous_profit_redeploy_autopilot.from_symbol).toBe(state.autonomous_profit_capture_autopilot.symbol);
+      expect(state.autonomous_profit_redeploy_autopilot.next_action).toContain(state.autonomous_profit_redeploy_autopilot.from_symbol ?? "");
+    }
+    if (state.autonomous_profit_redeploy_autopilot.status === "protect-first") {
+      expect(state.autonomous_profit_redeploy_autopilot.symbol).not.toBe(state.autonomous_profit_redeploy_autopilot.from_symbol);
+    }
+  });
+
   test("GIVEN launch sniper finds a clean probe WHEN the persistent paper ledger advances THEN it opens a launch-origin position", async () => {
     const state = await getWeb3TradingStateAsync({ account: "persistent", reset: true, scenario: "base", advance: true });
     const launchTrade = state.trade_tape.find((trade) => trade.id.startsWith("paper-launch-") && trade.side === "buy");
