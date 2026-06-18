@@ -4,6 +4,13 @@ import { Chip, Panel } from "@/components/sentinel";
 import { cn } from "@/lib/utils";
 import type { Web3TradingState } from "@/src/db/web3-trading";
 
+const getMarketEvidenceFusionTone = (status: Web3TradingState["autonomous_market_evidence_fusion"]["status"]): ShellTone => {
+  if (status === "attack" || status === "selective") return "engine";
+  if (status === "protect" || status === "blocked") return "critical";
+  if (status === "refresh" || status === "sample" || status === "watch") return "caution";
+  return "neutral";
+};
+
 export function Web3TradingShell({ state }: { state?: Web3TradingState }) {
   const governor = state?.autonomous_tick_governor;
   const wallet = state?.autonomous_wallet_telemetry;
@@ -578,7 +585,7 @@ export function Web3TradingShell({ state }: { state?: Web3TradingState }) {
             <ShellWalletStat wallet={wallet} />
             <ShellStat label="Net" value={formatSignedCurrency(wallet?.net_pnl_usd ?? 0)} tone={(wallet?.net_pnl_usd ?? 0) >= 0 ? "engine" : "critical"} />
             <ShellStat label="Daily lock" value={dailyProfitLock?.loop_permission.replace("-", " ") ?? "hydrating"} tone={dailyProfitLock ? dailyProfitLockTone(dailyProfitLock.status) : "caution"} />
-            <ShellStat label="Fusion" value={marketEvidenceFusion ? `${marketEvidenceFusion.fusion_score}/100` : "hydrating"} tone={marketEvidenceFusion ? marketEvidenceFusionTone(marketEvidenceFusion.status) : "caution"} />
+            <ShellStat label="Fusion" value={marketEvidenceFusion ? `${marketEvidenceFusion.fusion_score}/100` : "hydrating"} tone={marketEvidenceFusion ? getMarketEvidenceFusionTone(marketEvidenceFusion.status) : "caution"} />
             <ShellStat label="Data gate" value={dataFreshnessGate ? `${dataFreshnessGate.data_score}/100` : "hydrating"} tone={dataFreshnessGate ? dataFreshnessGateTone(dataFreshnessGate.status) : "caution"} />
             <ShellStat label="Replay gate" value={replayGate ? `${replayGate.replay_score}/100` : "hydrating"} tone={replayGate ? replayGateTone(replayGate.status) : "caution"} />
             <ShellStat label="Wallet mark" value={portfolioMarkBoard?.status.replace("-", " ") ?? "hydrating"} tone={portfolioMarkBoard ? portfolioMarkBoardTone(portfolioMarkBoard.status) : "caution"} />
@@ -1393,7 +1400,7 @@ function ShellPriceActionChartTape({
 
 function ShellMarketEvidenceFusion({ fusion }: { fusion?: Web3TradingState["autonomous_market_evidence_fusion"] }) {
   const status = fusion?.status ?? "idle";
-  const tone = fusion ? marketEvidenceFusionTone(status) : "neutral";
+  const tone = fusion ? getMarketEvidenceFusionTone(status) : "neutral";
   const items = fusion?.items.slice(0, 4) ?? [];
 
   return (
@@ -2313,13 +2320,6 @@ function dataFreshnessGateTone(status: Web3TradingState["autonomous_data_freshne
   if (status === "clear" || status === "tradeable") return "engine";
   if (status === "refresh" || status === "backfill" || status === "sample") return "caution";
   if (status === "blocked") return "critical";
-  return "neutral";
-}
-
-function marketEvidenceFusionTone(status: Web3TradingState["autonomous_market_evidence_fusion"]["status"]): ShellTone {
-  if (status === "attack" || status === "selective") return "engine";
-  if (status === "protect" || status === "blocked") return "critical";
-  if (status === "refresh" || status === "sample" || status === "watch") return "caution";
   return "neutral";
 }
 

@@ -712,6 +712,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           Auto decision: {!autoWatchPrimed && autoWatch ? `Refresh ${state.market_source.label} before the backend loop tick chooses the next local paper action.` : autoWatchPlan.reason}
         </p>
         <p className="mt-1 text-xs leading-5 text-outline">
+          Benchmark cadence: {state.autonomous_profit_benchmark.status.replaceAll("-", " ")} · {formatCompactSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)} risk alpha · {state.autonomous_alpha_feedback_loop.action.replaceAll("-", " ")} feedback can tighten, retarget, or press Auto watch.
+        </p>
+        <p className="mt-1 text-xs leading-5 text-outline">
           Impact gate: {loopImpact.summary} Source refresh: {state.market_source.label} read refreshes first; smart ticks can attach chart proof before the backend loop owns trade and protect actions.
         </p>
         <span className="sr-only" aria-label="Autonomous chart proof action receipt">
@@ -721,7 +724,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           Proof plus tick refreshes the chart gate when needed, sends that receipt with the backend autonomous loop tick, then lets the server choose refresh, paper fill, protect, cooldown, or stand down. Live signing remains locked.
         </span>
         <span className="sr-only" aria-label="Auto watch smart tick receipt">
-          Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets loop impact choose whether to continue, tighten, protect, harvest, refresh, cool down, or block the next backend tick. Current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; next cadence {loopImpact.next_cadence_seconds} seconds.
+          Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets loop impact and profit benchmark evidence choose whether to continue, tighten, retarget, protect, harvest, refresh, cool down, or block the next backend tick. Current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; profit benchmark {state.autonomous_profit_benchmark.status}; risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}; alpha feedback {state.autonomous_alpha_feedback_loop.action}; next cadence {loopImpact.next_cadence_seconds} seconds.
         </span>
 
         <section className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:mt-3 sm:p-3" aria-label="Web3 operator focus deck">
@@ -8120,12 +8123,22 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   const tickPlan = state.autonomous_tick_plan;
   const tickGovernor = state.autonomous_tick_governor;
   const actionQueueExecution = state.autonomous_action_queue_execution;
+  const profitBenchmark = state.autonomous_profit_benchmark;
+  const alphaFeedback = state.autonomous_alpha_feedback_loop;
+  const profitThesis = state.autonomous_profit_thesis_verifier;
   const hasReadyProtectLane = tickPlan.items.some((item) => item.action === "protect-now" && item.status === "ready");
   const hasReadyQueueSell = actionQueueExecution.selected_side === "sell" && actionQueueExecution.paper_trade_ready;
   const hasProtectMinuteLane = hasReadyProtectLane || hasReadyQueueSell;
   const queuedActionCount = Math.max(tickPlan.bundle_action_count, hasReadyQueueSell ? 1 : 0);
   const queuedActionLabel = `${queuedActionCount} queued action${queuedActionCount === 1 ? "" : "s"}`;
   const nextMinuteBudget = Math.max(tickPlan.next_minute_trade_budget_usd, hasReadyQueueSell ? actionQueueExecution.paper_size_usd : 0);
+  const benchmarkDelay = Math.max(
+    4_000,
+    Math.min(
+      30_000,
+      Math.min(alphaFeedback.review_after_seconds, profitThesis.review_after_seconds, throttle.cadence_seconds || 30) * 1_000,
+    ),
+  );
   const canRunMinuteLoop = (
     (profitVelocity.loop_permission === "multi-fill" || profitVelocity.loop_permission === "single-fill" || profitVelocity.loop_permission === "protect-only") &&
     profitVelocity.max_trades_next_minute > 0 &&
@@ -8184,6 +8197,14 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
       reason: `${loopImpact.next_action} Auto watch cuts cadence because the latest paper loop impact is ${loopImpact.impact_score}/100.`,
     };
   }
+  if (tickGovernor.should_refresh_market_data || state.autonomous_data_freshness_gate.status === "refresh" || state.autonomous_data_freshness_gate.action === "fetch-candles") {
+    return {
+      mode: "refresh",
+      delayMs: Math.max(2_000, Math.min(15_000, tickGovernor.next_tick_seconds * 1_000 || throttleDelay)),
+      label: "auto refresh",
+      reason: `${state.autonomous_data_freshness_gate.next_action} Auto watch will refresh read-only ${state.market_source.label} evidence before another paper action.`,
+    };
+  }
   if (canRunMinuteLoop) {
     return {
       mode: "minute",
@@ -8192,14 +8213,6 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
         : Math.max(2_000, Math.min(20_000, tickGovernor.next_tick_seconds * 1_000)),
       label: profitVelocity.loop_permission === "multi-fill" ? "auto minute" : profitVelocity.loop_permission === "protect-only" ? "auto protect minute" : "auto single minute",
       reason: `${profitVelocity.loop_permission.replace("-", " ")} from profit velocity with ${loopImpact.status} impact: ${profitVelocity.max_trades_next_minute} trades/min max, ${queuedActionLabel}, ${formatCompactCurrency(nextMinuteBudget)} paper budget, ${formatCompactSignedCurrency(profitVelocity.expected_profit_per_minute_usd)}/min modeled edge. Backend loop tick owns the trade/protect action.`,
-    };
-  }
-  if (tickGovernor.should_refresh_market_data || state.autonomous_data_freshness_gate.status === "refresh" || state.autonomous_data_freshness_gate.action === "fetch-candles") {
-    return {
-      mode: "refresh",
-      delayMs: Math.max(2_000, Math.min(15_000, tickGovernor.next_tick_seconds * 1_000 || throttleDelay)),
-      label: "auto refresh",
-      reason: `${state.autonomous_data_freshness_gate.next_action} Auto watch will refresh read-only ${state.market_source.label} evidence before another paper action.`,
     };
   }
   if (throttle.status === "sprint") {
@@ -8226,6 +8239,40 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
       delayMs: throttleDelay,
       label: "auto refresh",
       reason: `${throttle.summary} Auto watch will refresh source evidence before another local paper action.`,
+    };
+  }
+  if (alphaFeedback.status === "retarget" && profitBenchmark.opportunity_gap_usd > profitBenchmark.cash_baseline_usd * 0.04) {
+    return {
+      mode: "refresh",
+      delayMs: Math.max(4_000, Math.min(15_000, benchmarkDelay)),
+      label: "alpha retarget",
+      reason: `${alphaFeedback.next_action} Auto watch refreshes read-only market and chart evidence because ${profitBenchmark.hot_coin_symbol ?? "the hot tape"} shows a ${formatCompactCurrency(profitBenchmark.opportunity_gap_usd)} benchmark gap.`,
+    };
+  }
+  if (
+    profitBenchmark.status === "lagging-cash" ||
+    alphaFeedback.status === "tighten" ||
+    profitBenchmark.risk_adjusted_alpha_usd < 0
+  ) {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(12_000, benchmarkDelay),
+      label: "alpha tighten",
+      reason: `${profitBenchmark.conclusion} ${alphaFeedback.next_action} Auto watch tightens cadence until the paper wallet repairs ${formatCompactSignedCurrency(profitBenchmark.risk_adjusted_alpha_usd)} risk-adjusted alpha.`,
+    };
+  }
+  if (
+    (profitThesis.status === "validated" || profitThesis.status === "probing") &&
+    profitBenchmark.cash_alpha_usd >= 0 &&
+    profitBenchmark.risk_adjusted_alpha_usd >= 0 &&
+    throttle.can_run
+  ) {
+    const thesisDelay = Math.max(3_000, Math.min(18_000, benchmarkDelay));
+    return {
+      mode: profitThesis.status === "validated" ? "sprint" : "cycle",
+      delayMs: thesisDelay,
+      label: profitThesis.status === "validated" ? "alpha sprint" : "alpha probe",
+      reason: `${profitThesis.next_action} Auto watch lets the backend loop follow the profit thesis after ${formatCompactSignedCurrency(profitBenchmark.cash_alpha_usd)} paper alpha versus cash; next check in ${Math.round(thesisDelay / 1_000)}s.`,
     };
   }
   if (throttle.status === "cooldown" || throttle.status === "blocked") {

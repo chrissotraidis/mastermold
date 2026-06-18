@@ -1998,6 +1998,110 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(continuePlan.reason).toContain("continue impact");
   });
 
+  test("GIVEN lagging profit benchmark evidence WHEN Auto watch plans THEN it tightens cadence before another paper action", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...state,
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        max_trades_next_minute: 0,
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 0,
+        bundle_action_count: 0,
+      },
+      autonomous_tick_governor: {
+        ...state.autonomous_tick_governor,
+        should_refresh_market_data: false,
+      },
+      autonomous_data_freshness_gate: {
+        ...state.autonomous_data_freshness_gate,
+        status: "clear",
+        action: "allow-paper",
+      },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
+      autonomous_profit_benchmark: {
+        ...state.autonomous_profit_benchmark,
+        status: "lagging-cash",
+        cash_alpha_usd: -260,
+        risk_adjusted_alpha_usd: -410,
+        conclusion: "Benchmark 31/100: the paper agent is lagging idle cash by $260; tighten size and learn before pressing.",
+      },
+      autonomous_alpha_feedback_loop: {
+        ...state.autonomous_alpha_feedback_loop,
+        status: "tighten",
+        action: "tighten-size",
+        review_after_seconds: 14,
+        next_action: "Tighten fresh paper size and require benchmark recovery within 14s.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("cycle");
+    expect(plan.label).toBe("alpha tighten");
+    expect(plan.delayMs).toBeGreaterThanOrEqual(12_000);
+    expect(plan.reason).toContain("lagging idle cash");
+    expect(plan.reason).toContain("risk-adjusted alpha");
+  });
+
+  test("GIVEN missed hot-tape alpha WHEN Auto watch plans THEN it refreshes evidence for retarget review", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...state,
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        max_trades_next_minute: 0,
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 0,
+        bundle_action_count: 0,
+      },
+      autonomous_tick_governor: {
+        ...state.autonomous_tick_governor,
+        should_refresh_market_data: false,
+      },
+      autonomous_data_freshness_gate: {
+        ...state.autonomous_data_freshness_gate,
+        status: "clear",
+        action: "allow-paper",
+      },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
+      autonomous_profit_benchmark: {
+        ...state.autonomous_profit_benchmark,
+        status: "beating-cash",
+        hot_coin_symbol: "BONK",
+        opportunity_gap_usd: state.autonomous_profit_benchmark.cash_baseline_usd * 0.08,
+      },
+      autonomous_alpha_feedback_loop: {
+        ...state.autonomous_alpha_feedback_loop,
+        status: "retarget",
+        action: "retarget-hot-lane",
+        review_after_seconds: 10,
+        next_action: "Review BONK against current safety and route gates before the next paper entry.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("refresh");
+    expect(plan.label).toBe("alpha retarget");
+    expect(plan.reason).toContain("BONK");
+    expect(plan.reason).toContain("benchmark gap");
+  });
+
   test("GIVEN a protect-only paper wallet WHEN next moves are built THEN the queue-owned sell is visible before the long desk", () => {
     const state = getWeb3TradingState("base", 0);
     const moves = buildAutonomousNextMoves(state);
