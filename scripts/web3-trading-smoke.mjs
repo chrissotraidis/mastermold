@@ -1,4 +1,5 @@
 import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
+import { runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
 
@@ -4729,12 +4730,30 @@ async function main() {
   assert(daemonRun.events[0].status === "posted", "Autonomous daemon smoke run should post a leased backend tick.", daemonRun);
   assert(["acquired", "renewed", "replayed", "expired"].includes(daemonRun.events[0].lease_status), "Autonomous daemon smoke run should return a recorded non-conflicting lease status.", daemonRun);
   assert(daemonRun.events[0].active_runner_id === "implicit-daemon-runner" || daemonRun.events[0].active_runner_id === null, "Autonomous daemon smoke run should own or safely idle the lease.", daemonRun);
+  const forwardRun = await runWeb3AutonomousForwardRun({
+    baseUrl,
+    scenario: "base",
+    source: "sample",
+    runnerId: "smoke-forward-runner",
+    ticks: 2,
+    intervalMs: 0,
+    heartbeatWhenGated: true,
+    minNetPnlUsd: 0,
+  });
+  assert(forwardRun.mode === "web3-autonomous-forward-run", "Autonomous forward run should return a report.", forwardRun);
+  assert(forwardRun.paper_only === true, "Autonomous forward run must stay paper-only.", forwardRun);
+  assert(forwardRun.requested_ticks === 2 && forwardRun.posted_ticks >= 1, "Autonomous forward run should execute bounded daemon ticks.", forwardRun);
+  assert(typeof forwardRun.net_pnl_usd === "number" && typeof forwardRun.target_met === "boolean", "Autonomous forward run should quantify paper PnL and target status.", forwardRun);
+  assert(["profitable", "flat-target-met", "profitable-below-target", "not-profitable"].includes(forwardRun.verdict), "Autonomous forward run should publish a known profit verdict.", forwardRun);
 
   const summary = {
     baseUrl,
     scenario: tick.payload.scenario,
     daemonRunner: daemonRun.events[0].status,
     daemonLease: daemonRun.events[0].lease_status,
+    forwardVerdict: forwardRun.verdict,
+    forwardNetPnl: forwardRun.net_pnl_usd,
+    forwardTargetMet: forwardRun.target_met,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

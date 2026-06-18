@@ -1,0 +1,234 @@
+#!/usr/bin/env node
+import { pathToFileURL } from "node:url";
+import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
+
+const DEFAULT_BASE_URL = "http://localhost:4010";
+
+export function parseForwardRunArgs(argv = [], env = process.env) {
+  const flags = new Map();
+  for (const arg of argv) {
+    if (!arg.startsWith("--")) continue;
+    const [key, rawValue] = arg.slice(2).split("=", 2);
+    flags.set(key, rawValue ?? "true");
+  }
+
+  return {
+    baseUrl: normalizeBaseUrl(flags.get("base-url") ?? env.WEB3_TRADING_BASE_URL ?? DEFAULT_BASE_URL),
+    scenario: normalizeChoice(flags.get("scenario") ?? env.WEB3_FORWARD_SCENARIO ?? "breakout", ["base", "breakout", "rug-risk"], "breakout"),
+    source: normalizeChoice(flags.get("source") ?? env.WEB3_FORWARD_SOURCE ?? "sample", ["sample", "live-dex"], "sample"),
+    runnerId: normalizeLeaseText(flags.get("runner-id") ?? env.WEB3_FORWARD_RUNNER_ID ?? "forward-run-daemon", "forward-run-daemon", 80),
+    ticks: boundedInteger(flags.get("ticks") ?? env.WEB3_FORWARD_TICKS, 6, 1, 120),
+    intervalMs: boundedInteger(flags.get("interval-ms") ?? env.WEB3_FORWARD_INTERVAL_MS, 0, 0, 120_000),
+    minNetPnlUsd: boundedNumber(flags.get("min-net-pnl") ?? env.WEB3_FORWARD_MIN_NET_PNL_USD, 0, -1_000_000, 1_000_000),
+    heartbeatWhenGated: booleanFlag(flags.get("heartbeat-when-gated") ?? env.WEB3_FORWARD_HEARTBEAT_WHEN_GATED, true),
+    failUnderTarget: booleanFlag(flags.get("fail-under-target") ?? env.WEB3_FORWARD_FAIL_UNDER_TARGET, false),
+    json: booleanFlag(flags.get("json") ?? env.WEB3_FORWARD_JSON, false),
+  };
+}
+
+export async function runWeb3AutonomousForwardRun(input = {}) {
+  const config = {
+    ...parseForwardRunArgs([], {}),
+    ...input,
+    baseUrl: normalizeBaseUrl(input.baseUrl ?? DEFAULT_BASE_URL),
+    scenario: normalizeChoice(input.scenario ?? "breakout", ["base", "breakout", "rug-risk"], "breakout"),
+    source: normalizeChoice(input.source ?? "sample", ["sample", "live-dex"], "sample"),
+    runnerId: normalizeLeaseText(input.runnerId ?? "forward-run-daemon", "forward-run-daemon", 80),
+    ticks: boundedInteger(input.ticks, 6, 1, 120),
+    intervalMs: boundedInteger(input.intervalMs, 0, 0, 120_000),
+    minNetPnlUsd: boundedNumber(input.minNetPnlUsd, 0, -1_000_000, 1_000_000),
+    heartbeatWhenGated: input.heartbeatWhenGated !== false,
+    failUnderTarget: Boolean(input.failUnderTarget),
+  };
+
+  const startedAt = new Date().toISOString();
+  const baseline = await postTrading(config, {
+    scenario: config.scenario,
+    source: config.source,
+    account: "persistent",
+    reset: true,
+    advance: false,
+  });
+  const daemonRun = await runWeb3AutonomousDaemon({
+    baseUrl: config.baseUrl,
+    scenario: config.scenario,
+    source: config.source,
+    runnerId: config.runnerId,
+    maxTicks: config.ticks,
+    intervalMs: config.intervalMs,
+    heartbeatWhenGated: config.heartbeatWhenGated,
+    exitOnBlocked: false,
+  });
+  const final = await fetchTradingState(config);
+  const report = buildForwardRunReport({
+    config,
+    startedAt,
+    baseline,
+    final,
+    daemonRun,
+  });
+  if (config.failUnderTarget && !report.target_met) {
+    const error = new Error(`Autonomous forward run missed target by ${formatCurrency(report.target_gap_usd)}.`);
+    error.report = report;
+    throw error;
+  }
+  return report;
+}
+
+export function buildForwardRunReport({
+  config,
+  startedAt,
+  baseline,
+  final,
+  daemonRun,
+}) {
+  const startEquity = Number(baseline.portfolio?.equity_usd ?? 0);
+  const endEquity = Number(final.portfolio?.equity_usd ?? startEquity);
+  const netPnl = roundMoney(endEquity - startEquity);
+  const startTrades = Number(baseline.paper_account?.trade_count ?? 0);
+  const endTrades = Number(final.paper_account?.trade_count ?? startTrades);
+  const postedEvents = daemonRun.events.filter((event) => event.status === "posted");
+  const advancedEvents = postedEvents.filter((event) => event.paper_advanced);
+  const blockedEvents = daemonRun.events.filter((event) => event.status === "blocked");
+  const targetGap = roundMoney(netPnl - config.minNetPnlUsd);
+  const targetMet = targetGap >= 0;
+  const verdict = targetMet && netPnl > 0
+    ? "profitable"
+    : targetMet
+      ? "flat-target-met"
+      : netPnl > 0
+        ? "profitable-below-target"
+        : "not-profitable";
+  const latestEvent = daemonRun.events[daemonRun.events.length - 1] ?? null;
+
+  return {
+    mode: "web3-autonomous-forward-run",
+    paper_only: true,
+    base_url: config.baseUrl,
+    scenario: config.scenario,
+    source: config.source,
+    runner_id: config.runnerId,
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    requested_ticks: config.ticks,
+    posted_ticks: postedEvents.length,
+    advanced_ticks: advancedEvents.length,
+    blocked_ticks: blockedEvents.length,
+    start_equity_usd: roundMoney(startEquity),
+    end_equity_usd: roundMoney(endEquity),
+    net_pnl_usd: netPnl,
+    min_net_pnl_usd: roundMoney(config.minNetPnlUsd),
+    target_gap_usd: targetGap,
+    target_met: targetMet,
+    verdict,
+    trade_count_delta: Math.max(0, endTrades - startTrades),
+    final_cycle: final.paper_account?.cycle ?? null,
+    final_lease_status: final.autonomous_daemon_handoff?.lease_status ?? "missing",
+    final_loop_status: final.autonomous_loop_tick?.status ?? "unknown",
+    final_loop_action: final.autonomous_loop_tick?.action ?? "unknown",
+    final_profit_benchmark: final.autonomous_profit_benchmark?.status ?? "unknown",
+    final_make_money_pulse: final.autonomous_make_money_pulse?.status ?? "unknown",
+    final_next_action: final.autonomous_loop_tick?.next_action ?? final.autonomous_daemon_handoff?.summary ?? "No final action returned.",
+    latest_event: latestEvent,
+    events: daemonRun.events,
+    controls: [
+      "Forward run resets only the local persistent paper ledger.",
+      "No wallet signer, transaction relay, custody provider, or real-capital approval is invoked.",
+      "Use --fail-under-target when this report should gate deployment on positive paper PnL.",
+    ],
+  };
+}
+
+async function fetchTradingState(config) {
+  const url = new URL("/api/web3-trading", config.baseUrl);
+  url.searchParams.set("scenario", config.scenario);
+  url.searchParams.set("source", config.source);
+  url.searchParams.set("account", "persistent");
+  url.searchParams.set("advance", "false");
+  const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  return readJson(response, "fetch final trading state");
+}
+
+async function postTrading(config, body) {
+  const response = await fetch(new URL("/api/web3-trading", config.baseUrl), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
+  });
+  return readJson(response, "reset paper ledger");
+}
+
+async function readJson(response, label) {
+  const text = await response.text();
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error(`Could not ${label}: expected JSON, got ${text.slice(0, 220)}`);
+  }
+  if (!response.ok || payload?.error) {
+    throw new Error(`Could not ${label}: ${payload?.error ?? response.status}`);
+  }
+  return payload;
+}
+
+function normalizeBaseUrl(value) {
+  return String(value || DEFAULT_BASE_URL).replace(/\/$/, "");
+}
+
+function normalizeChoice(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+function normalizeLeaseText(value, fallback, maxLength) {
+  const normalized = String(value || fallback).trim().replace(/[^a-zA-Z0-9_.:-]/g, "-").replace(/-+/g, "-").slice(0, maxLength);
+  return normalized || fallback.slice(0, maxLength);
+}
+
+function boundedInteger(value, fallback, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
+function boundedNumber(value, fallback, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function booleanFlag(value, fallback) {
+  if (value === undefined) return fallback;
+  if (typeof value === "boolean") return value;
+  return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+}
+
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function formatCurrency(value) {
+  return `${value >= 0 ? "+" : "-"}$${Math.abs(value).toFixed(2)}`;
+}
+
+async function main() {
+  const config = parseForwardRunArgs(process.argv.slice(2), process.env);
+  try {
+    const report = await runWeb3AutonomousForwardRun(config);
+    if (config.json) {
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+    console.log(`${report.verdict}: ${formatCurrency(report.net_pnl_usd)} over ${report.posted_ticks}/${report.requested_ticks} posted daemon ticks.`);
+    console.log(`Next: ${report.final_next_action}`);
+  } catch (error) {
+    if (config.json && error?.report) console.error(JSON.stringify(error.report, null, 2));
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}
