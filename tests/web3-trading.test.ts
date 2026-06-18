@@ -1475,6 +1475,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN released profit still needs proof WHEN redeploy autopilot plans THEN it refuses to chase before refresh", () => {
     const state = getWeb3TradingState("base", 0);
     const redeploy = state.autonomous_profit_redeploy_autopilot;
+    const execution = state.autonomous_profit_redeploy_execution;
 
     expect(redeploy.mode).toBe("autonomous-profit-redeploy-autopilot");
     expect(redeploy.status).toBe("protect-first");
@@ -1494,6 +1495,20 @@ describe("Web3 autonomous trading subsystem", () => {
       value: "read only refresh",
     });
     expect(redeploy.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
+    expect(execution.mode).toBe("autonomous-profit-redeploy-execution");
+    expect(execution.status).toBe("protect-first");
+    expect(execution.paper_trade_ready).toBe(false);
+    expect(execution.paper_trade).toBeNull();
+    expect(execution.execution_boundary).toBe("read-only-refresh");
+    expect(execution.next_action).toContain("protective paper");
+    expect(execution.items.find((item) => item.id === "autopilot")).toMatchObject({
+      status: "watch",
+      value: "protect first",
+    });
+    expect(execution.items.find((item) => item.id === "boundary")).toMatchObject({
+      status: "pass",
+      value: "read only refresh",
+    });
   });
 
   test("GIVEN a persistent paper account WHEN backend loop tick runs THEN the loop receipt survives reload", async () => {
@@ -2399,6 +2414,39 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_profit_redeploy_autopilot.controls.some((control) => control.includes("Connects profit capture"))).toBe(true);
     expect(state.autonomous_profit_redeploy_autopilot.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
+    expect(state.autonomous_profit_redeploy_execution.mode).toBe("autonomous-profit-redeploy-execution");
+    expect(["queued", "applied", "wait-proof", "protect-first", "cooldown", "blocked", "idle"]).toContain(state.autonomous_profit_redeploy_execution.status);
+    expect(["opportunity-rank", "reentry-hunter", "rotation-director", "none"]).toContain(state.autonomous_profit_redeploy_execution.source);
+    expect(["buy", "hold"]).toContain(state.autonomous_profit_redeploy_execution.selected_side);
+    expect(["paper-ledger-only", "read-only-refresh", "blocked-live"]).toContain(state.autonomous_profit_redeploy_execution.execution_boundary);
+    expect(state.autonomous_profit_redeploy_execution.execution_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_execution.execution_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_profit_redeploy_execution.requested_size_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_execution.capped_size_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_execution.redeploy_budget_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_execution.released_cash_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_redeploy_execution.expected_edge_usd).toBeGreaterThanOrEqual(0);
+    expect(typeof state.autonomous_profit_redeploy_execution.paper_trade_ready).toBe("boolean");
+    expect(typeof state.autonomous_profit_redeploy_execution.ledger_applied).toBe("boolean");
+    expect(state.autonomous_profit_redeploy_execution.items.map((item) => item.id)).toEqual(["autopilot", "source", "budget", "ledger", "boundary"]);
+    expect(state.autonomous_profit_redeploy_execution.items.every((item) =>
+      ["pass", "watch", "block"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.value.length > 0 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(state.autonomous_profit_redeploy_execution.controls.some((control) => control.includes("auditable local paper execution receipt"))).toBe(true);
+    expect(state.autonomous_profit_redeploy_execution.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
+    if (state.autonomous_profit_redeploy_execution.paper_trade_ready) {
+      expect(state.autonomous_profit_redeploy_execution.paper_trade).not.toBeNull();
+      expect(state.autonomous_profit_redeploy_execution.selected_side).toBe("buy");
+      expect(state.autonomous_profit_redeploy_execution.execution_boundary).toBe("paper-ledger-only");
+      expect(state.autonomous_profit_redeploy_execution.capped_size_usd).toBeLessThanOrEqual(state.autonomous_profit_redeploy_execution.redeploy_budget_usd);
+    }
+    if (["wait-proof", "protect-first", "cooldown"].includes(state.autonomous_profit_redeploy_execution.status)) {
+      expect(state.autonomous_profit_redeploy_execution.paper_trade_ready).toBe(false);
+    }
     expect(state.autonomous_profit_benchmark.mode).toBe("autonomous-profit-benchmark");
     expect(["beating-cash", "lagging-cash", "beating-selected", "lagging-selected", "protecting-capital", "learning"]).toContain(state.autonomous_profit_benchmark.status);
     expect(state.autonomous_profit_benchmark.benchmark_score).toBeGreaterThanOrEqual(0);
@@ -5723,6 +5771,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(heldSymbols.size).toBeGreaterThan(0);
     expect(state.autonomous_profit_capture_autopilot.mode).toBe("autonomous-profit-capture-autopilot");
     expect(state.autonomous_profit_redeploy_autopilot.mode).toBe("autonomous-profit-redeploy-autopilot");
+    expect(state.autonomous_profit_redeploy_execution.mode).toBe("autonomous-profit-redeploy-execution");
     if (state.autonomous_profit_capture_autopilot.symbol) {
       expect(heldSymbols.has(state.autonomous_profit_capture_autopilot.symbol)).toBe(true);
     }
@@ -5735,6 +5784,8 @@ describe("Web3 autonomous trading subsystem", () => {
     }
     if (state.autonomous_profit_redeploy_autopilot.status === "protect-first") {
       expect(state.autonomous_profit_redeploy_autopilot.symbol).not.toBe(state.autonomous_profit_redeploy_autopilot.from_symbol);
+      expect(state.autonomous_profit_redeploy_execution.status).toBe("protect-first");
+      expect(state.autonomous_profit_redeploy_execution.paper_trade_ready).toBe(false);
     }
   });
 

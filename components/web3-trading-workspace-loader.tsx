@@ -441,6 +441,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
   const profitVelocity = state.autonomous_profit_velocity_governor;
   const profitCaptureAutopilot = state.autonomous_profit_capture_autopilot;
   const profitRedeployAutopilot = state.autonomous_profit_redeploy_autopilot;
+  const profitRedeployExecution = state.autonomous_profit_redeploy_execution;
   const tickPlan = state.autonomous_tick_plan;
   const tickGovernor = state.autonomous_tick_governor;
   const actionQueue = state.autonomous_action_queue;
@@ -529,6 +530,17 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
         : profitRedeployAutopilot.status === "wait-proof" || profitRedeployAutopilot.status === "protect-first"
           ? "text-caution"
           : profitRedeployAutopilot.status === "blocked" || profitRedeployAutopilot.status === "cooldown"
+            ? "text-critical"
+            : "text-outline",
+    },
+    {
+      label: "Redeploy exec",
+      value: profitRedeployExecution.status.replace("-", " "),
+      tone: profitRedeployExecution.status === "queued" || profitRedeployExecution.status === "applied"
+        ? "text-engine"
+        : profitRedeployExecution.status === "wait-proof" || profitRedeployExecution.status === "protect-first"
+          ? "text-caution"
+          : profitRedeployExecution.status === "blocked" || profitRedeployExecution.status === "cooldown"
             ? "text-critical"
             : "text-outline",
     },
@@ -1014,6 +1026,8 @@ function QuickTradingCommandDeck({
   const loopImpactToneValue = loopImpactTone(loopImpact.status);
   const profitCaptureToneValue = profitCaptureAutopilotTone(profitCaptureAutopilot.status);
   const profitRedeployToneValue = profitRedeployAutopilotTone(profitRedeployAutopilot.status);
+  const profitRedeployExecution = state.autonomous_profit_redeploy_execution;
+  const profitRedeployExecutionToneValue = profitRedeployExecutionTone(profitRedeployExecution.status);
 
   return (
     <section className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(21rem,0.8fr)]" aria-label="Autonomous trading command deck">
@@ -1036,6 +1050,7 @@ function QuickTradingCommandDeck({
             <Chip tone={loopImpactToneValue}>impact {loopImpact.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitCaptureToneValue}>capture {profitCaptureAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={profitRedeployToneValue}>redeploy {profitRedeployAutopilot.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={profitRedeployExecutionToneValue}>exec {profitRedeployExecution.status.replaceAll("-", " ")}</Chip>
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watching" : autoWatchPlan.label}</Chip>
             <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
           </div>
@@ -1134,6 +1149,12 @@ function QuickTradingCommandDeck({
               value={`${profitCaptureAutopilot.autopilot_score}/100`}
               detail={`${profitCaptureAutopilot.action.replaceAll("-", " ")} · ${formatCompactCurrency(profitCaptureAutopilot.release_usd)} release`}
               tone={profitCaptureToneValue}
+            />
+            <ProfitMetric
+              label="Redeploy exec"
+              value={`${profitRedeployExecution.execution_score}/100`}
+              detail={`${profitRedeployExecution.status.replaceAll("-", " ")} · ${formatCompactCurrency(profitRedeployExecution.capped_size_usd || profitRedeployExecution.redeploy_budget_usd)} cap`}
+              tone={profitRedeployExecutionToneValue}
             />
             <ProfitMetric
               label="Source quality"
@@ -1256,6 +1277,7 @@ function QuickAutonomousNextTickRail({
   const loopTick = state.autonomous_loop_tick;
   const capture = state.autonomous_profit_capture_autopilot;
   const redeploy = state.autonomous_profit_redeploy_autopilot;
+  const redeployExecution = state.autonomous_profit_redeploy_execution;
   const ledgerFills = sessionRun.requested ? sessionRun.fill_count : state.paper_account.trade_count;
   const stages: Array<{
     id: string;
@@ -1292,10 +1314,10 @@ function QuickAutonomousNextTickRail({
     {
       id: "redeploy",
       label: "Redeploy",
-      value: redeploy.status.replaceAll("-", " "),
-      detail: `${redeploy.symbol ?? "no target"} · ${formatCompactCurrency(redeploy.redeploy_budget_usd)}`,
-      score: redeploy.redeploy_score,
-      tone: profitRedeployAutopilotTone(redeploy.status),
+      value: `${redeploy.status.replaceAll("-", " ")} / ${redeployExecution.status.replaceAll("-", " ")}`,
+      detail: `${redeployExecution.symbol ?? redeploy.symbol ?? "no target"} · ${formatCompactCurrency(redeployExecution.capped_size_usd || redeploy.redeploy_budget_usd)}`,
+      score: Math.max(redeploy.redeploy_score, redeployExecution.execution_score),
+      tone: profitRedeployExecutionTone(redeployExecution.status),
     },
     {
       id: "ledger",
@@ -1318,7 +1340,7 @@ function QuickAutonomousNextTickRail({
     ? "proof"
     : loopImpact.status === "protect" || loopImpact.status === "harvest" || loopImpact.status === "tighten" || loopImpact.status === "cooldown" || loopImpact.status === "blocked"
       ? "impact"
-      : redeploy.status === "redeploy" || redeploy.status === "probe" || redeploy.status === "wait-proof" || redeploy.status === "protect-first"
+      : redeploy.status === "redeploy" || redeploy.status === "probe" || redeploy.status === "wait-proof" || redeploy.status === "protect-first" || redeployExecution.status === "queued" || redeployExecution.status === "applied"
         ? "redeploy"
         : actionQueue.items.length > 0
         ? "queue"
@@ -1344,6 +1366,9 @@ function QuickAutonomousNextTickRail({
           </Chip>
           <Chip tone={profitRedeployAutopilotTone(redeploy.status)}>
             redeploy {redeploy.action.replaceAll("-", " ")}
+          </Chip>
+          <Chip tone={profitRedeployExecutionTone(redeployExecution.status)}>
+            exec {redeployExecution.execution_boundary.replaceAll("-", " ")}
           </Chip>
           <Chip tone={autoWatchPlan.mode === "minute" || autoWatchPlan.mode === "sprint" ? "engine" : autoWatchPlan.mode === "refresh" ? "caution" : "neutral"}>
             {Math.round(autoWatchPlan.delayMs / 1000)}s cadence
@@ -1441,8 +1466,11 @@ function QuickProfitCaptureAutopilotStrip({ state }: { state: Web3TradingState }
 
 function QuickProfitRedeployAutopilotStrip({ state }: { state: Web3TradingState }) {
   const redeploy = state.autonomous_profit_redeploy_autopilot;
+  const execution = state.autonomous_profit_redeploy_execution;
   const tone = profitRedeployAutopilotTone(redeploy.status);
+  const executionTone = profitRedeployExecutionTone(execution.status);
   const visibleItems = redeploy.items.slice(0, 4);
+  const executionItems = execution.items.slice(0, 3);
 
   return (
     <section className={cn("mt-2 min-w-0 rounded-md border p-2", permissionToneClass(tone))} aria-label="Autonomous profit redeploy autopilot">
@@ -1461,6 +1489,12 @@ function QuickProfitRedeployAutopilotStrip({ state }: { state: Web3TradingState 
           </Chip>
           <Chip tone={redeploy.must_protect_first ? "caution" : "demo"}>
             {redeploy.must_protect_first ? "protect first" : formatCompactCurrency(redeploy.reserve_usd)}
+          </Chip>
+          <Chip tone={executionTone}>
+            exec {execution.status.replaceAll("-", " ")}
+          </Chip>
+          <Chip tone={execution.execution_boundary === "paper-ledger-only" ? "demo" : executionTone}>
+            {execution.execution_boundary.replaceAll("-", " ")}
           </Chip>
         </div>
       </div>
@@ -1482,11 +1516,37 @@ function QuickProfitRedeployAutopilotStrip({ state }: { state: Web3TradingState 
           );
         })}
       </div>
+      <div className="mt-2 rounded-md border border-outline-variant/20 bg-void/20 p-2" aria-label="Autonomous profit redeploy execution receipt">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Redeploy execution</p>
+            <p className="mt-1 truncate text-xs font-semibold text-on-surface">
+              {execution.source.replaceAll("-", " ")} · {execution.symbol ?? "no target"}
+            </p>
+            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{execution.next_action}</p>
+          </div>
+          <Chip tone={executionTone}>{execution.execution_score}/100</Chip>
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          {executionItems.map((item) => {
+            const itemTone: QuickChipTone = item.status === "pass" ? "engine" : item.status === "block" ? "critical" : "caution";
+            return (
+              <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 px-2 py-1.5">
+                <div className="flex items-center justify-between gap-1.5">
+                  <p className="truncate font-mono text-[9px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", profitAuthorityBarClass(itemTone))} aria-hidden="true" />
+                </div>
+                <p className="mt-0.5 truncate text-[11px] font-semibold text-on-surface">{item.value}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
       <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">
-        {redeploy.summary}
+        {redeploy.summary} {execution.summary}
       </p>
       <span className="sr-only" aria-label="Autonomous profit redeploy autopilot receipt">
-        Profit redeploy autopilot status {redeploy.status}; action {redeploy.action}; from {redeploy.from_symbol ?? "none"}; target {redeploy.symbol ?? "none"}; score {redeploy.redeploy_score}; redeploy budget {formatCurrency(redeploy.redeploy_budget_usd)}; released cash {formatCurrency(redeploy.released_cash_usd)}; reserve {formatCurrency(redeploy.reserve_usd)}; expected edge {formatCurrency(redeploy.expected_edge_usd)}; cadence {redeploy.next_cadence_seconds} seconds; can redeploy paper {redeploy.can_redeploy_paper ? "yes" : "no"}; refresh proof {redeploy.must_refresh_proof ? "yes" : "no"}; protect first {redeploy.must_protect_first ? "yes" : "no"}; boundary {redeploy.execution_boundary}; blockers {redeploy.blockers.join("; ") || "none"}.
+        Profit redeploy autopilot status {redeploy.status}; action {redeploy.action}; from {redeploy.from_symbol ?? "none"}; target {redeploy.symbol ?? "none"}; score {redeploy.redeploy_score}; redeploy budget {formatCurrency(redeploy.redeploy_budget_usd)}; released cash {formatCurrency(redeploy.released_cash_usd)}; reserve {formatCurrency(redeploy.reserve_usd)}; expected edge {formatCurrency(redeploy.expected_edge_usd)}; cadence {redeploy.next_cadence_seconds} seconds; can redeploy paper {redeploy.can_redeploy_paper ? "yes" : "no"}; refresh proof {redeploy.must_refresh_proof ? "yes" : "no"}; protect first {redeploy.must_protect_first ? "yes" : "no"}; boundary {redeploy.execution_boundary}; execution status {execution.status}; execution source {execution.source}; execution symbol {execution.symbol ?? "none"}; capped size {formatCurrency(execution.capped_size_usd)}; ledger applied {execution.ledger_applied ? "yes" : "no"}; execution boundary {execution.execution_boundary}; blockers {[...redeploy.blockers, ...execution.blockers].join("; ") || "none"}.
       </span>
     </section>
   );
@@ -6193,6 +6253,13 @@ function profitCaptureAutopilotTone(status: Web3TradingState["autonomous_profit_
 
 function profitRedeployAutopilotTone(status: Web3TradingState["autonomous_profit_redeploy_autopilot"]["status"]): QuickChipTone {
   if (status === "redeploy" || status === "probe") return "engine";
+  if (status === "wait-proof" || status === "protect-first") return "caution";
+  if (status === "blocked" || status === "cooldown") return "critical";
+  return "neutral";
+}
+
+function profitRedeployExecutionTone(status: Web3TradingState["autonomous_profit_redeploy_execution"]["status"]): QuickChipTone {
+  if (status === "queued" || status === "applied") return "engine";
   if (status === "wait-proof" || status === "protect-first") return "caution";
   if (status === "blocked" || status === "cooldown") return "critical";
   return "neutral";
