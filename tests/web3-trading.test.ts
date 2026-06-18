@@ -1448,6 +1448,30 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_session_run.max_total_fills).toBeLessThanOrEqual(Math.max(1, baseline.autonomous_wake_plan.max_total_fills, baseline.autonomous_profit_velocity_governor.max_trades_next_minute));
   });
 
+  test("GIVEN a held-profit race with stale proof WHEN profit capture autopilot plans THEN it refreshes before trusting release sizing", () => {
+    const state = getWeb3TradingState("base", 0);
+    const capture = state.autonomous_profit_capture_autopilot;
+
+    expect(capture.mode).toBe("autonomous-profit-capture-autopilot");
+    expect(capture.status).toBe("race");
+    expect(capture.action).toBe("exit-now");
+    expect(capture.side).toBe("sell");
+    expect(capture.release_usd).toBeGreaterThan(0);
+    expect(capture.must_refresh_route).toBe(true);
+    expect(capture.must_apply_protective_sell).toBe(false);
+    expect(capture.paper_trade_ready).toBe(false);
+    expect(capture.execution_boundary).toBe("read-only-refresh");
+    expect(capture.next_action).toContain("Refresh read-only route proof");
+    expect(capture.items.find((item) => item.id === "route")).toMatchObject({
+      status: "watch",
+      value: state.autonomous_route_refresh_execution.status.replace("-", " "),
+    });
+    expect(capture.items.find((item) => item.id === "boundary")).toMatchObject({
+      status: "pass",
+      value: "read only refresh",
+    });
+  });
+
   test("GIVEN a persistent paper account WHEN backend loop tick runs THEN the loop receipt survives reload", async () => {
     const ticked = await getWeb3TradingStateAsync({
       scenario: "base",
@@ -2308,6 +2332,27 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_loop_impact_auditor.paper_only).toBe(true);
     expect(state.autonomous_loop_impact_auditor.items.map((item) => item.id)).toEqual(["equity", "exposure", "fills", "permission", "proof", "boundary"]);
     expect(state.autonomous_loop_impact_auditor.controls.some((control) => control.includes("Audits the latest backend paper loop"))).toBe(true);
+    expect(state.autonomous_profit_capture_autopilot.mode).toBe("autonomous-profit-capture-autopilot");
+    expect(["race", "trim", "harvest", "trail", "press", "refresh", "blocked", "idle"]).toContain(state.autonomous_profit_capture_autopilot.status);
+    expect(["exit-now", "trim-now", "harvest-profit", "tighten-trail", "press-runner", "refresh-route", "stand-down", "observe"]).toContain(state.autonomous_profit_capture_autopilot.action);
+    expect(state.autonomous_profit_capture_autopilot.autopilot_score).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_capture_autopilot.autopilot_score).toBeLessThanOrEqual(100);
+    expect(state.autonomous_profit_capture_autopilot.release_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_capture_autopilot.keep_usd).toBeGreaterThanOrEqual(0);
+    expect(state.autonomous_profit_capture_autopilot.next_cadence_seconds).toBeGreaterThan(0);
+    expect(typeof state.autonomous_profit_capture_autopilot.must_apply_protective_sell).toBe("boolean");
+    expect(typeof state.autonomous_profit_capture_autopilot.must_refresh_route).toBe("boolean");
+    expect(typeof state.autonomous_profit_capture_autopilot.can_press_fresh_buy).toBe("boolean");
+    expect(state.autonomous_profit_capture_autopilot.items.map((item) => item.id)).toEqual(["race", "wallet", "route", "queue", "impact", "boundary"]);
+    expect(state.autonomous_profit_capture_autopilot.items.every((item) =>
+      ["pass", "watch", "block"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.value.length > 0 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(state.autonomous_profit_capture_autopilot.controls.some((control) => control.includes("Condenses profit-capture race"))).toBe(true);
+    expect(state.autonomous_profit_capture_autopilot.controls.some((control) => control.includes("cannot sign swaps"))).toBe(true);
     expect(state.autonomous_profit_benchmark.mode).toBe("autonomous-profit-benchmark");
     expect(["beating-cash", "lagging-cash", "beating-selected", "lagging-selected", "protecting-capital", "learning"]).toContain(state.autonomous_profit_benchmark.status);
     expect(state.autonomous_profit_benchmark.benchmark_score).toBeGreaterThanOrEqual(0);

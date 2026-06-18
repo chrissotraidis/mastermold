@@ -5324,6 +5324,59 @@ export type ProfitCaptureRace = {
   items: ProfitCaptureRaceItem[];
 };
 
+export type AutonomousProfitCaptureAutopilotStatus =
+  | "race"
+  | "trim"
+  | "harvest"
+  | "trail"
+  | "press"
+  | "refresh"
+  | "blocked"
+  | "idle";
+
+export type AutonomousProfitCaptureAutopilotAction =
+  | "exit-now"
+  | "trim-now"
+  | "harvest-profit"
+  | "tighten-trail"
+  | "press-runner"
+  | "refresh-route"
+  | "stand-down"
+  | "observe";
+
+export type AutonomousProfitCaptureAutopilotItem = {
+  id: "race" | "wallet" | "route" | "queue" | "impact" | "boundary";
+  label: string;
+  status: "pass" | "watch" | "block";
+  score: number;
+  value: string;
+  detail: string;
+};
+
+export type AutonomousProfitCaptureAutopilot = {
+  mode: "autonomous-profit-capture-autopilot";
+  status: AutonomousProfitCaptureAutopilotStatus;
+  action: AutonomousProfitCaptureAutopilotAction;
+  symbol: string | null;
+  side: "buy" | "sell" | "hold";
+  autopilot_score: number;
+  release_usd: number;
+  keep_usd: number;
+  protected_profit_usd: number;
+  expected_wallet_delta_usd: number;
+  next_cadence_seconds: number;
+  must_apply_protective_sell: boolean;
+  must_refresh_route: boolean;
+  can_press_fresh_buy: boolean;
+  paper_trade_ready: boolean;
+  execution_boundary: "paper-ledger-only" | "read-only-refresh" | "blocked-live";
+  summary: string;
+  next_action: string;
+  blockers: string[];
+  controls: string[];
+  items: AutonomousProfitCaptureAutopilotItem[];
+};
+
 export type AutonomousScalpExitAction = "eject" | "trim" | "harvest" | "trail" | "press" | "hold" | "refresh" | "stand-down";
 
 export type AutonomousScalpExitItem = {
@@ -8532,6 +8585,7 @@ export type Web3TradingState = {
   position_commander: PositionCommander;
   profit_lock_autopilot: ProfitLockAutopilot;
   profit_capture_race: ProfitCaptureRace;
+  autonomous_profit_capture_autopilot: AutonomousProfitCaptureAutopilot;
   autonomous_scalp_exit_autopilot: AutonomousScalpExitAutopilot;
   high_frequency_profit_race: HighFrequencyProfitRace;
   high_frequency_profit_race_execution: HighFrequencyProfitRaceExecution;
@@ -14136,6 +14190,14 @@ function buildWeb3TradingState({
     candleRefresh: autonomous_candle_refresh,
     executionGate: execution_gate,
   });
+  const autonomous_profit_capture_autopilot = buildAutonomousProfitCaptureAutopilot({
+    profitCaptureRace: profit_capture_race,
+    portfolioMarkBoard: autonomous_portfolio_mark_board,
+    walletTelemetry: autonomous_wallet_telemetry,
+    routeRefreshExecution: autonomous_route_refresh_execution,
+    actionQueueExecution: autonomous_action_queue_execution,
+    loopImpact: autonomous_loop_impact_auditor,
+  });
   return {
     as_of: marketSource.fetched_at,
     scenario,
@@ -14327,6 +14389,7 @@ function buildWeb3TradingState({
     position_commander,
     profit_lock_autopilot,
 	    profit_capture_race,
+    autonomous_profit_capture_autopilot,
     autonomous_scalp_exit_autopilot,
 	    high_frequency_profit_race,
 	    high_frequency_profit_race_execution,
@@ -16463,6 +16526,14 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     candleRefresh: state.autonomous_candle_refresh,
     executionGate: state.execution_gate,
   });
+  const autonomous_profit_capture_autopilot = buildAutonomousProfitCaptureAutopilot({
+    profitCaptureRace: state.profit_capture_race,
+    portfolioMarkBoard: state.autonomous_portfolio_mark_board,
+    walletTelemetry: state.autonomous_wallet_telemetry,
+    routeRefreshExecution: state.autonomous_route_refresh_execution,
+    actionQueueExecution: state.autonomous_action_queue_execution,
+    loopImpact: autonomous_loop_impact_auditor,
+  });
   return {
     ...state,
     execution_plans: plans,
@@ -16528,6 +16599,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     position_commander,
     profit_lock_autopilot,
     profit_capture_race,
+    autonomous_profit_capture_autopilot,
     autonomous_scalp_exit_autopilot,
     high_frequency_profit_race,
     high_frequency_profit_race_execution,
@@ -43496,6 +43568,238 @@ function profitCaptureRaceActionRank(action: ProfitCaptureRaceAction) {
   if (action === "press") return 3;
   if (action === "blocked") return 2;
   return 1;
+}
+
+function buildAutonomousProfitCaptureAutopilot({
+  profitCaptureRace,
+  portfolioMarkBoard,
+  walletTelemetry,
+  routeRefreshExecution,
+  actionQueueExecution,
+  loopImpact,
+}: {
+  profitCaptureRace: ProfitCaptureRace;
+  portfolioMarkBoard: AutonomousPortfolioMarkBoard;
+  walletTelemetry: AutonomousWalletTelemetry;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+  actionQueueExecution: AutonomousActionQueueExecution;
+  loopImpact: AutonomousLoopImpactAuditor;
+}): AutonomousProfitCaptureAutopilot {
+  const leader = profitCaptureRace.items[0] ?? null;
+  const routeNeedsRefresh = Boolean(leader?.route_required) ||
+    routeRefreshExecution.status === "blocked" ||
+    routeRefreshExecution.status === "watching" ||
+    routeRefreshExecution.status === "requesting";
+  const queueProtectReady = actionQueueExecution.paper_trade_ready &&
+    actionQueueExecution.selected_side === "sell" &&
+    actionQueueExecution.blockers.length === 0;
+  const releaseUsd = Math.max(
+    leader?.recommended_release_usd ?? 0,
+    queueProtectReady ? actionQueueExecution.paper_size_usd : 0,
+    portfolioMarkBoard.release_pressure_usd,
+  );
+  const protectedProfit = Math.max(0, leader?.protected_profit_usd ?? 0);
+  const raceScore = leader?.race_score ?? profitCaptureRace.average_race_score;
+  const routeScore = routeRefreshExecution.status === "ready"
+    ? 92
+    : routeRefreshExecution.status === "blocked"
+      ? 18
+      : 44;
+  const queueScore = actionQueueExecution.queue_score;
+  const walletScore = clamp(Math.round(
+    62 +
+      Math.max(-28, Math.min(24, walletTelemetry.window_pnl_pct * 3.2)) -
+      Math.min(24, walletTelemetry.max_drawdown_pct * 3) +
+      (walletTelemetry.status === "compounding" ? 10 : walletTelemetry.status === "protect" || walletTelemetry.status === "cooldown" ? -12 : 0),
+  ), 0, 100);
+  const score = clamp(Math.round(
+    raceScore * 0.34 +
+      queueScore * 0.18 +
+      routeScore * 0.16 +
+      walletScore * 0.14 +
+      loopImpact.impact_score * 0.12 +
+      (releaseUsd > 0 ? 8 : 0) -
+      (routeNeedsRefresh ? 10 : 0),
+  ), 0, 100);
+  const blockers = [
+    routeNeedsRefresh ? "Fresh sell route or chart proof is required before trusting the release size." : null,
+    routeRefreshExecution.status === "blocked" ? routeRefreshExecution.next_action : null,
+    loopImpact.status === "blocked" ? loopImpact.next_action : null,
+    actionQueueExecution.blockers[0] ?? null,
+  ].filter((item): item is string => Boolean(item)).slice(0, 4);
+  const hasOpenPosition = portfolioMarkBoard.held_count > 0;
+  let status: AutonomousProfitCaptureAutopilotStatus = "idle";
+  let action: AutonomousProfitCaptureAutopilotAction = "observe";
+  let side: AutonomousProfitCaptureAutopilot["side"] = "hold";
+  if (!hasOpenPosition) {
+    status = "idle";
+    action = "observe";
+  } else if (routeNeedsRefresh && !queueProtectReady) {
+    status = "refresh";
+    action = "refresh-route";
+  } else if (loopImpact.status === "blocked" || profitCaptureRace.status === "blocked") {
+    status = "blocked";
+    action = "stand-down";
+  } else if (queueProtectReady || profitCaptureRace.status === "race") {
+    status = "race";
+    action = "exit-now";
+    side = "sell";
+  } else if (profitCaptureRace.status === "trim") {
+    status = "trim";
+    action = "trim-now";
+    side = "sell";
+  } else if (profitCaptureRace.status === "harvest") {
+    status = "harvest";
+    action = "harvest-profit";
+    side = "sell";
+  } else if (profitCaptureRace.status === "press" && loopImpact.can_press_next_loop && !loopImpact.must_reduce_frequency && !loopImpact.must_refresh_proof) {
+    status = "press";
+    action = "press-runner";
+    side = "buy";
+  } else if (profitCaptureRace.status === "trail" || portfolioMarkBoard.status === "protect" || portfolioMarkBoard.status === "harvest") {
+    status = "trail";
+    action = "tighten-trail";
+  }
+  const mustApplyProtectiveSell = side === "sell" && queueProtectReady && !routeNeedsRefresh;
+  const canPressFreshBuy = action === "press-runner" &&
+    loopImpact.can_press_next_loop &&
+    routeRefreshExecution.status === "ready" &&
+    walletTelemetry.status !== "cooldown" &&
+    walletTelemetry.status !== "protect";
+  const executionBoundary: AutonomousProfitCaptureAutopilot["execution_boundary"] = routeNeedsRefresh && !mustApplyProtectiveSell
+    ? "read-only-refresh"
+    : actionQueueExecution.execution_boundary === "paper-ledger-only"
+      ? "paper-ledger-only"
+      : "blocked-live";
+
+  return {
+    mode: "autonomous-profit-capture-autopilot",
+    status,
+    action,
+    symbol: leader?.symbol ?? actionQueueExecution.selected_symbol ?? portfolioMarkBoard.leader_symbol,
+    side,
+    autopilot_score: score,
+    release_usd: Math.round(releaseUsd),
+    keep_usd: Math.round(Math.max(0, (leader?.current_value_usd ?? portfolioMarkBoard.exposure_usd) - releaseUsd)),
+    protected_profit_usd: Math.round(protectedProfit),
+    expected_wallet_delta_usd: Math.round(side === "sell" ? releaseUsd : Math.max(0, portfolioMarkBoard.press_budget_usd)),
+    next_cadence_seconds: profitCaptureAutopilotCadence(status, routeNeedsRefresh, leader?.time_to_decision_seconds, loopImpact.next_cadence_seconds),
+    must_apply_protective_sell: mustApplyProtectiveSell,
+    must_refresh_route: routeNeedsRefresh,
+    can_press_fresh_buy: canPressFreshBuy,
+    paper_trade_ready: actionQueueExecution.paper_trade_ready && actionQueueExecution.selected_side === side && blockers.length === 0,
+    execution_boundary: executionBoundary,
+    summary: profitCaptureAutopilotSummary(status, leader?.symbol ?? actionQueueExecution.selected_symbol ?? portfolioMarkBoard.leader_symbol, releaseUsd, routeNeedsRefresh),
+    next_action: profitCaptureAutopilotNextAction(status, action, routeNeedsRefresh, mustApplyProtectiveSell, canPressFreshBuy, blockers),
+    blockers,
+    controls: [
+      "Condenses profit-capture race, held-position mark-to-market, route proof, queue readiness, wallet telemetry, and loop impact into one next profit action.",
+      "Protective paper sells can outrank fresh buys; stale route proof switches the autopilot to read-only refresh before relying on release sizing.",
+      "Press-runner mode requires fresh proof, positive loop impact, and wallet permission; blocked or cooldown impact reduces cadence instead.",
+      "This autopilot is local paper/read-only orchestration only; it cannot sign swaps, submit transactions, custody funds, run after the app stops, or guarantee profit.",
+    ],
+    items: [
+      {
+        id: "race",
+        label: "Profit race",
+        status: profitCaptureRace.status === "blocked" ? "block" : profitCaptureRace.status === "idle" ? "watch" : "pass",
+        score: raceScore,
+        value: profitCaptureRace.status.replace("-", " "),
+        detail: leader?.reason ?? profitCaptureRace.summary,
+      },
+      {
+        id: "wallet",
+        label: "Wallet",
+        status: walletTelemetry.status === "protect" || walletTelemetry.status === "cooldown" ? "watch" : "pass",
+        score: walletScore,
+        value: `${walletTelemetry.window_pnl_usd >= 0 ? "+" : ""}${formatCompactValue(walletTelemetry.window_pnl_usd)}`,
+        detail: `${formatCompactValue(walletTelemetry.exposure_usd)} exposed, ${walletTelemetry.max_drawdown_pct.toFixed(1)}% drawdown.`,
+      },
+      {
+        id: "route",
+        label: "Route proof",
+        status: routeRefreshExecution.status === "blocked" ? "block" : routeNeedsRefresh ? "watch" : "pass",
+        score: routeScore,
+        value: routeRefreshExecution.status.replace("-", " "),
+        detail: routeNeedsRefresh ? routeRefreshExecution.next_action : "Route proof is fresh enough for the paper release decision.",
+      },
+      {
+        id: "queue",
+        label: "Queue",
+        status: queueProtectReady ? "pass" : actionQueueExecution.status === "blocked" ? "block" : "watch",
+        score: queueScore,
+        value: actionQueueExecution.status.replace("-", " "),
+        detail: queueProtectReady ? `${actionQueueExecution.selected_symbol ?? "Position"} protective paper sell is queued.` : actionQueueExecution.next_action,
+      },
+      {
+        id: "impact",
+        label: "Loop impact",
+        status: loopImpact.status === "blocked" || loopImpact.status === "cooldown" ? "block" : loopImpact.must_reduce_frequency || loopImpact.must_refresh_proof ? "watch" : "pass",
+        score: loopImpact.impact_score,
+        value: loopImpact.status.replace("-", " "),
+        detail: loopImpact.next_action,
+      },
+      {
+        id: "boundary",
+        label: "Boundary",
+        status: executionBoundary === "paper-ledger-only" || executionBoundary === "read-only-refresh" ? "pass" : "block",
+        score: executionBoundary === "paper-ledger-only" ? 94 : executionBoundary === "read-only-refresh" ? 76 : 12,
+        value: executionBoundary.replaceAll("-", " "),
+        detail: executionBoundary === "paper-ledger-only" ? "Only the local paper ledger can be changed." : executionBoundary === "read-only-refresh" ? "Only read-only proof refresh is allowed." : "Live execution is blocked.",
+      },
+    ],
+  };
+}
+
+function profitCaptureAutopilotCadence(
+  status: AutonomousProfitCaptureAutopilotStatus,
+  routeNeedsRefresh: boolean,
+  raceDecisionSeconds: number | undefined,
+  impactCadenceSeconds: number,
+) {
+  if (status === "race") return routeNeedsRefresh ? 2 : Math.max(2, Math.min(5, raceDecisionSeconds ?? impactCadenceSeconds));
+  if (status === "trim") return Math.max(3, Math.min(8, raceDecisionSeconds ?? impactCadenceSeconds));
+  if (status === "harvest") return Math.max(5, Math.min(12, raceDecisionSeconds ?? impactCadenceSeconds));
+  if (status === "refresh") return Math.max(4, Math.min(18, impactCadenceSeconds));
+  if (status === "press") return Math.max(6, Math.min(15, impactCadenceSeconds));
+  if (status === "trail") return Math.max(8, Math.min(20, impactCadenceSeconds));
+  if (status === "blocked") return Math.max(20, Math.min(60, impactCadenceSeconds));
+  return Math.max(20, Math.min(45, impactCadenceSeconds));
+}
+
+function profitCaptureAutopilotSummary(
+  status: AutonomousProfitCaptureAutopilotStatus,
+  symbol: string | null,
+  releaseUsd: number,
+  routeNeedsRefresh: boolean,
+) {
+  const target = symbol ?? "the wallet";
+  if (status === "race") return `${target} is in profit-capture race mode with ${formatCompactValue(releaseUsd)} ready to release${routeNeedsRefresh ? " after proof refresh" : ""}.`;
+  if (status === "trim") return `${target} should trim ${formatCompactValue(releaseUsd)} before pressure worsens.`;
+  if (status === "harvest") return `${target} should harvest paper profit before edge decay catches the position.`;
+  if (status === "press") return `${target} can press only as a protected runner with fresh proof and positive impact.`;
+  if (status === "trail") return `${target} should tighten the runner trail and keep watching the tape.`;
+  if (status === "refresh") return `${target} needs read-only route proof before the profit-capture autopilot trusts sizing.`;
+  if (status === "blocked") return `${target} has profit-capture pressure, but blockers prevent autonomous action.`;
+  return "No held paper position needs profit capture yet.";
+}
+
+function profitCaptureAutopilotNextAction(
+  status: AutonomousProfitCaptureAutopilotStatus,
+  action: AutonomousProfitCaptureAutopilotAction,
+  routeNeedsRefresh: boolean,
+  mustApplyProtectiveSell: boolean,
+  canPressFreshBuy: boolean,
+  blockers: string[],
+) {
+  if (blockers[0] && status === "blocked") return blockers[0];
+  if (routeNeedsRefresh && !mustApplyProtectiveSell) return "Refresh read-only route proof, then rerun profit-capture sizing before the next paper fill.";
+  if (mustApplyProtectiveSell) return "Apply the queued protective paper sell before considering any fresh entry.";
+  if (action === "trim-now" || action === "harvest-profit") return "Apply the bounded paper release and re-score wallet impact immediately after the fill.";
+  if (canPressFreshBuy) return "Allow a protected runner press only if the next wake keeps proof and impact positive.";
+  if (action === "tighten-trail") return "Tighten the trailing stop and wake the tape before adding exposure.";
+  if (status === "idle") return "Wait for an open paper position or fresh wallet PnL before profit capture can act.";
+  return "Stand down until blockers clear or profit-capture evidence improves.";
 }
 
 function buildAutonomousScalpExitAutopilot({

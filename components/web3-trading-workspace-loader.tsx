@@ -439,6 +439,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
   const tradeBatch = state.autonomous_trade_batch;
   const profitForecast = state.autonomous_profit_forecast;
   const profitVelocity = state.autonomous_profit_velocity_governor;
+  const profitCaptureAutopilot = state.autonomous_profit_capture_autopilot;
   const tickPlan = state.autonomous_tick_plan;
   const tickGovernor = state.autonomous_tick_governor;
   const actionQueue = state.autonomous_action_queue;
@@ -509,6 +510,17 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
             : "text-caution",
     },
     {
+      label: "Capture",
+      value: profitCaptureAutopilot.status.replace("-", " "),
+      tone: profitCaptureAutopilot.status === "race" || profitCaptureAutopilot.status === "trim" || profitCaptureAutopilot.status === "harvest"
+        ? "text-caution"
+        : profitCaptureAutopilot.status === "press"
+          ? "text-engine"
+          : profitCaptureAutopilot.status === "blocked"
+            ? "text-critical"
+            : "text-outline",
+    },
+    {
       label: "Refresh",
       value: wakePlan.should_refresh_first || autoWatchPlan.mode === "refresh" ? "first" : "current",
       tone: wakePlan.should_refresh_first || autoWatchPlan.mode === "refresh" ? "text-caution" : "text-engine",
@@ -557,6 +569,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
             </Chip>
             <Chip tone={loopImpactTone(loopImpact.status)}>
               impact {loopImpact.status.replace("-", " ")}
+            </Chip>
+            <Chip tone={profitCaptureAutopilotTone(profitCaptureAutopilot.status)}>
+              capture {profitCaptureAutopilot.status.replace("-", " ")}
             </Chip>
             <Chip tone={wakePlan.can_auto_watch_run ? wakePlan.status === "minute" || wakePlan.status === "sprint" ? "engine" : "caution" : "critical"}>
               {wakePlan.auto_watch_label}
@@ -937,6 +952,7 @@ function QuickTradingCommandDeck({
   const fillLedger = state.autonomous_fill_ledger_digest;
   const forwardPermission = state.autonomous_forward_loop_permission;
   const loopImpact = state.autonomous_loop_impact_auditor;
+  const profitCaptureAutopilot = state.autonomous_profit_capture_autopilot;
   const discoveryDelta = state.live_discovery_delta_tape;
   const ranker = state.autonomous_opportunity_ranker;
   const positionBoard = state.autonomous_portfolio_mark_board;
@@ -980,6 +996,7 @@ function QuickTradingCommandDeck({
   const fillAuditToneValue = fillAuditTone(fillLedger.last_fill_verdict);
   const forwardTone = forwardPermissionTone(forwardPermission.status);
   const loopImpactToneValue = loopImpactTone(loopImpact.status);
+  const profitCaptureToneValue = profitCaptureAutopilotTone(profitCaptureAutopilot.status);
 
   return (
     <section className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(21rem,0.8fr)]" aria-label="Autonomous trading command deck">
@@ -1000,6 +1017,7 @@ function QuickTradingCommandDeck({
             <Chip tone={fillAuditToneValue}>last fill {fillLedger.next_fill_permission.replaceAll("-", " ")}</Chip>
             <Chip tone={forwardTone}>forward {forwardPermission.permission.replaceAll("-", " ")}</Chip>
             <Chip tone={loopImpactToneValue}>impact {loopImpact.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={profitCaptureToneValue}>capture {profitCaptureAutopilot.status.replaceAll("-", " ")}</Chip>
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watching" : autoWatchPlan.label}</Chip>
             <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
           </div>
@@ -1030,6 +1048,7 @@ function QuickTradingCommandDeck({
           autoWatch={autoWatch}
           autoWatchPlan={autoWatchPlan}
         />
+        <QuickProfitCaptureAutopilotStrip state={state} />
 
         <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_13rem]">
           <QuickWalletNetWorthChart
@@ -1090,6 +1109,12 @@ function QuickTradingCommandDeck({
               value={`${loopImpact.impact_score}/100`}
               detail={`${loopImpact.action.replaceAll("-", " ")} · ${formatCompactSignedCurrency(loopImpact.equity_delta_usd)} equity`}
               tone={loopImpactToneValue}
+            />
+            <ProfitMetric
+              label="Profit capture"
+              value={`${profitCaptureAutopilot.autopilot_score}/100`}
+              detail={`${profitCaptureAutopilot.action.replaceAll("-", " ")} · ${formatCompactCurrency(profitCaptureAutopilot.release_usd)} release`}
+              tone={profitCaptureToneValue}
             />
             <ProfitMetric
               label="Source quality"
@@ -1188,7 +1213,7 @@ function QuickTradingCommandDeck({
       </aside>
 
       <span className="sr-only" aria-label="Autonomous command deck receipt">
-        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; forward permission {forwardPermission.permission}; forward action {forwardPermission.action}; forward score {forwardPermission.permission_score}; forward can fire next tick {forwardPermission.can_fire_next_tick ? "yes" : "no"}; forward max fills {forwardPermission.max_next_fills}; forward fresh buys {forwardPermission.max_fresh_buys}; loop impact status {loopImpact.status}; loop impact action {loopImpact.action}; loop impact score {loopImpact.impact_score}; loop impact paper only {loopImpact.paper_only ? "yes" : "no"}; loop impact max fills {loopImpact.max_next_fills}; loop impact reduce frequency {loopImpact.must_reduce_frequency ? "yes" : "no"}; loop impact refresh proof {loopImpact.must_refresh_proof ? "yes" : "no"}; next dollar {capitalCommand.action}; next dollar status {capitalCommand.status}; next dollar score {capitalCommand.command_score}; paper spend {formatCurrency(capitalCommand.spend_budget_usd)}; paper release {formatCurrency(capitalCommand.release_budget_usd)}; command boundary {capitalCommand.execution_boundary}; command can execute paper {capitalCommand.can_execute_paper ? "yes" : "no"}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
+        Command deck target {leaderSymbol}; decision {decision.status}; action {decision.action}; expected edge {formatSignedCurrency(decision.expected_edge_usd)}; forward permission {forwardPermission.permission}; forward action {forwardPermission.action}; forward score {forwardPermission.permission_score}; forward can fire next tick {forwardPermission.can_fire_next_tick ? "yes" : "no"}; forward max fills {forwardPermission.max_next_fills}; forward fresh buys {forwardPermission.max_fresh_buys}; loop impact status {loopImpact.status}; loop impact action {loopImpact.action}; loop impact score {loopImpact.impact_score}; loop impact paper only {loopImpact.paper_only ? "yes" : "no"}; loop impact max fills {loopImpact.max_next_fills}; loop impact reduce frequency {loopImpact.must_reduce_frequency ? "yes" : "no"}; loop impact refresh proof {loopImpact.must_refresh_proof ? "yes" : "no"}; profit capture status {profitCaptureAutopilot.status}; profit capture action {profitCaptureAutopilot.action}; profit capture score {profitCaptureAutopilot.autopilot_score}; profit capture release {formatCurrency(profitCaptureAutopilot.release_usd)}; profit capture boundary {profitCaptureAutopilot.execution_boundary}; profit capture ready {profitCaptureAutopilot.paper_trade_ready ? "yes" : "no"}; next dollar {capitalCommand.action}; next dollar status {capitalCommand.status}; next dollar score {capitalCommand.command_score}; paper spend {formatCurrency(capitalCommand.spend_budget_usd)}; paper release {formatCurrency(capitalCommand.release_budget_usd)}; command boundary {capitalCommand.execution_boundary}; command can execute paper {capitalCommand.can_execute_paper ? "yes" : "no"}; source quality {sourceQuality.status}; source quality score {sourceQuality.quality_score}; source leader {sourceQuality.leader_symbol ?? "none"}; source action {sourceQuality.leader_action ?? "none"}; source can chase {sourceQuality.can_chase ? "yes" : "no"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; chase size {thesis.chase_size_multiplier}x; wallet equity {formatCurrency(wallet.equity_usd)}; wallet PnL {formatSignedCurrency(wallet.window_pnl_usd)}; route {route.status}; execution {execution.status}; paper boundary {decision.execution_boundary}; blockers {decision.blockers.join("; ") || "none"}.
       </span>
     </section>
   );
@@ -1210,6 +1235,7 @@ function QuickAutonomousNextTickRail({
   const forwardPermission = state.autonomous_forward_loop_permission;
   const sessionRun = state.autonomous_session_run;
   const loopTick = state.autonomous_loop_tick;
+  const capture = state.autonomous_profit_capture_autopilot;
   const ledgerFills = sessionRun.requested ? sessionRun.fill_count : state.paper_account.trade_count;
   const stages: Array<{
     id: string;
@@ -1283,6 +1309,9 @@ function QuickAutonomousNextTickRail({
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           <Chip tone={loopImpactTone(loopImpact.status)}>{loopImpact.impact_score}/100 impact</Chip>
+          <Chip tone={profitCaptureAutopilotTone(capture.status)}>
+            capture {capture.action.replaceAll("-", " ")}
+          </Chip>
           <Chip tone={autoWatchPlan.mode === "minute" || autoWatchPlan.mode === "sprint" ? "engine" : autoWatchPlan.mode === "refresh" ? "caution" : "neutral"}>
             {Math.round(autoWatchPlan.delayMs / 1000)}s cadence
           </Chip>
@@ -1317,10 +1346,61 @@ function QuickAutonomousNextTickRail({
         })}
       </div>
       <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">
-        {loopImpact.next_action} The server owns fills; the UI only schedules read-only proof, bounded local-paper ticks, and visible safety gates.
+        {loopImpact.next_action} Profit capture: {capture.next_action} The server owns fills; the UI only schedules read-only proof, bounded local-paper ticks, and visible safety gates.
       </p>
       <span className="sr-only" aria-label="Autonomous next tick flow receipt">
-        Next tick flow active stage {activeStage}; auto watch {autoWatch ? "on" : "off"}; plan {autoWatchPlan.label}; cadence {Math.round(autoWatchPlan.delayMs / 1000)} seconds; proof {route.status}; impact {loopImpact.status}; queue {actionQueue.status}; ledger fills {ledgerFills}; live boundary {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+        Next tick flow active stage {activeStage}; auto watch {autoWatch ? "on" : "off"}; plan {autoWatchPlan.label}; cadence {Math.round(autoWatchPlan.delayMs / 1000)} seconds; proof {route.status}; impact {loopImpact.status}; profit capture {capture.status} {capture.action}; capture release {formatCurrency(capture.release_usd)}; capture boundary {capture.execution_boundary}; queue {actionQueue.status}; ledger fills {ledgerFills}; live boundary {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+      </span>
+    </section>
+  );
+}
+
+function QuickProfitCaptureAutopilotStrip({ state }: { state: Web3TradingState }) {
+  const capture = state.autonomous_profit_capture_autopilot;
+  const tone = profitCaptureAutopilotTone(capture.status);
+  const visibleItems = capture.items.slice(0, 4);
+
+  return (
+    <section className={cn("mt-2 min-w-0 rounded-md border p-2", permissionToneClass(tone))} aria-label="Autonomous profit capture autopilot">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Profit capture autopilot</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {capture.symbol ?? "Wallet"} · {capture.action.replaceAll("-", " ")}
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-outline">{capture.next_action}</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{capture.autopilot_score}/100</Chip>
+          <Chip tone={capture.must_refresh_route ? "caution" : "engine"}>{capture.must_refresh_route ? "refresh proof" : "proof ok"}</Chip>
+          <Chip tone={capture.must_apply_protective_sell ? "caution" : capture.can_press_fresh_buy ? "engine" : "neutral"}>
+            {capture.must_apply_protective_sell ? "sell first" : capture.can_press_fresh_buy ? "press ok" : capture.execution_boundary.replaceAll("-", " ")}
+          </Chip>
+        </div>
+      </div>
+      <div className="mt-2 grid gap-1.5 sm:grid-cols-4">
+        {visibleItems.map((item) => {
+          const itemTone: QuickChipTone = item.status === "pass" ? "engine" : item.status === "block" ? "critical" : "caution";
+          return (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", profitAuthorityBarClass(itemTone))} aria-hidden="true" />
+              </div>
+              <p className="mt-1 truncate text-xs font-semibold text-on-surface">{item.value}</p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-dim/60" aria-hidden="true">
+                <div className={cn("h-full rounded-full", profitAuthorityBarClass(itemTone))} style={{ width: `${clampNumber(item.score)}%` }} />
+              </div>
+              <p className="mt-1 truncate text-[11px] leading-4 text-outline">{item.detail}</p>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">
+        {capture.summary}
+      </p>
+      <span className="sr-only" aria-label="Autonomous profit capture autopilot receipt">
+        Profit capture autopilot status {capture.status}; action {capture.action}; symbol {capture.symbol ?? "none"}; score {capture.autopilot_score}; release {formatCurrency(capture.release_usd)}; keep {formatCurrency(capture.keep_usd)}; protected profit {formatCurrency(capture.protected_profit_usd)}; cadence {capture.next_cadence_seconds} seconds; protective sell {capture.must_apply_protective_sell ? "yes" : "no"}; refresh route {capture.must_refresh_route ? "yes" : "no"}; can press fresh buy {capture.can_press_fresh_buy ? "yes" : "no"}; paper ready {capture.paper_trade_ready ? "yes" : "no"}; boundary {capture.execution_boundary}; blockers {capture.blockers.join("; ") || "none"}.
       </span>
     </section>
   );
@@ -6015,6 +6095,13 @@ function loopImpactTone(status: Web3TradingState["autonomous_loop_impact_auditor
   if (status === "compound" || status === "continue") return "engine";
   if (status === "tighten" || status === "harvest" || status === "protect" || status === "refresh") return "caution";
   if (status === "cooldown" || status === "blocked") return "critical";
+  return "neutral";
+}
+
+function profitCaptureAutopilotTone(status: Web3TradingState["autonomous_profit_capture_autopilot"]["status"]): QuickChipTone {
+  if (status === "press") return "engine";
+  if (status === "race" || status === "trim" || status === "harvest" || status === "trail" || status === "refresh") return "caution";
+  if (status === "blocked") return "critical";
   return "neutral";
 }
 
