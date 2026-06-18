@@ -82,6 +82,33 @@ async function json<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
+function withClearExecutionLane(state: Web3TradingState): Web3TradingState {
+  return {
+    ...state,
+    autonomous_execution_runway: {
+      ...state.autonomous_execution_runway,
+      status: "watch",
+      action: "watch",
+      can_auto_paper: true,
+      should_refresh_route: false,
+      should_refresh_chart: false,
+      should_protect_first: false,
+      route_vetoed: false,
+      chart_refresh_required: false,
+      next_action: "Execution runway is clear for the lane under test.",
+    },
+    autonomous_execution_heartbeat: {
+      ...state.autonomous_execution_heartbeat,
+      status: "press",
+      primary_action: "press",
+      route_vetoed: false,
+      should_refresh_routes: false,
+      should_protect_first: false,
+      next_action: "Execution heartbeat is clear for the lane under test.",
+    },
+  };
+}
+
 describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {
     const state = getWeb3TradingState("base", 0);
@@ -2065,11 +2092,265 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(plan.reason).toContain("96% of the provider budget");
   });
 
+  test("GIVEN execution runway needs route proof WHEN Auto watch plans THEN it refreshes route proof before another paper tick", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...state,
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        loop_permission: "multi-fill",
+        max_trades_next_minute: 3,
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 3,
+        bundle_action_count: 3,
+      },
+      autonomous_action_queue_execution: {
+        ...state.autonomous_action_queue_execution,
+        selected_side: "buy",
+        paper_trade_ready: false,
+        paper_trade: null,
+      },
+      autonomous_tick_governor: {
+        ...state.autonomous_tick_governor,
+        action: "trade",
+        should_refresh_market_data: false,
+        next_tick_seconds: 4,
+      },
+      autonomous_data_freshness_gate: {
+        ...state.autonomous_data_freshness_gate,
+        status: "clear",
+        action: "allow-paper",
+        can_trade: true,
+      },
+      autonomous_loop_throttle: {
+        ...state.autonomous_loop_throttle,
+        status: "cycle",
+        can_run: true,
+      },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
+      autonomous_execution_runway: {
+        ...state.autonomous_execution_runway,
+        status: "refresh",
+        action: "refresh-route",
+        can_auto_paper: false,
+        should_refresh_route: true,
+        should_refresh_chart: false,
+        should_protect_first: false,
+        route_vetoed: true,
+        chart_refresh_required: false,
+        next_tick_seconds: 4,
+        next_action: "Refresh route quote before another paper fill.",
+      },
+      autonomous_execution_heartbeat: {
+        ...state.autonomous_execution_heartbeat,
+        status: "refresh",
+        primary_action: "refresh",
+        should_refresh_routes: true,
+        should_protect_first: false,
+        route_vetoed: true,
+        next_tick_seconds: 4,
+        next_action: "Heartbeat wants current read-only route proof.",
+      },
+      autonomous_market_intake_plan: {
+        ...state.autonomous_market_intake_plan,
+        status: "watch",
+        can_feed_trade_loop: true,
+        route_refresh_first: false,
+      },
+      autonomous_profit_benchmark: {
+        ...state.autonomous_profit_benchmark,
+        status: "beating-cash",
+        cash_alpha_usd: 420,
+        risk_adjusted_alpha_usd: 240,
+      },
+      autonomous_alpha_feedback_loop: {
+        ...state.autonomous_alpha_feedback_loop,
+        status: "press",
+        action: "increase-bias",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("refresh");
+    expect(plan.label).toBe("execution route refresh");
+    expect(plan.action).toBe("route-refresh");
+    expect(plan.delayMs).toBe(4_000);
+    expect(plan.reason).toContain("Refresh route quote");
+    expect(plan.reason).toContain("route proof");
+  });
+
+  test("GIVEN execution heartbeat protects the wallet WHEN Auto watch plans THEN it protects before fresh exposure", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...state,
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        loop_permission: "multi-fill",
+        max_trades_next_minute: 3,
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 3,
+        bundle_action_count: 3,
+      },
+      autonomous_action_queue_execution: {
+        ...state.autonomous_action_queue_execution,
+        selected_side: "buy",
+        paper_trade_ready: false,
+        paper_trade: null,
+      },
+      autonomous_tick_governor: {
+        ...state.autonomous_tick_governor,
+        should_refresh_market_data: false,
+      },
+      autonomous_data_freshness_gate: {
+        ...state.autonomous_data_freshness_gate,
+        status: "clear",
+        action: "allow-paper",
+      },
+      autonomous_loop_throttle: {
+        ...state.autonomous_loop_throttle,
+        status: "cycle",
+        can_run: true,
+      },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
+      autonomous_execution_runway: {
+        ...state.autonomous_execution_runway,
+        status: "protect",
+        action: "protect",
+        can_auto_paper: false,
+        should_refresh_route: false,
+        should_refresh_chart: false,
+        should_protect_first: true,
+        route_vetoed: false,
+        chart_refresh_required: false,
+        next_tick_seconds: 5,
+        next_action: "Protect paper exposure before chasing another entry.",
+      },
+      autonomous_execution_heartbeat: {
+        ...state.autonomous_execution_heartbeat,
+        status: "protect",
+        primary_action: "protect",
+        should_refresh_routes: false,
+        should_protect_first: true,
+        route_vetoed: false,
+        next_tick_seconds: 5,
+        next_action: "Heartbeat is protecting wallet exposure.",
+      },
+      autonomous_profit_benchmark: {
+        ...state.autonomous_profit_benchmark,
+        status: "beating-cash",
+        cash_alpha_usd: 420,
+        risk_adjusted_alpha_usd: 240,
+      },
+      autonomous_alpha_feedback_loop: {
+        ...state.autonomous_alpha_feedback_loop,
+        status: "press",
+        action: "increase-bias",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("cycle");
+    expect(plan.label).toBe("execution protect");
+    expect(plan.action).toBe("loop");
+    expect(plan.reason).toContain("Protect paper exposure");
+    expect(plan.reason).toContain("before fresh buys");
+  });
+
+  test("GIVEN execution runway is blocked WHEN Auto watch plans THEN it stays in review instead of pressing paper size", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...state,
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        loop_permission: "multi-fill",
+        max_trades_next_minute: 3,
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 3,
+        bundle_action_count: 3,
+      },
+      autonomous_action_queue_execution: {
+        ...state.autonomous_action_queue_execution,
+        selected_side: "buy",
+        paper_trade_ready: false,
+        paper_trade: null,
+      },
+      autonomous_tick_governor: {
+        ...state.autonomous_tick_governor,
+        should_refresh_market_data: false,
+      },
+      autonomous_data_freshness_gate: {
+        ...state.autonomous_data_freshness_gate,
+        status: "clear",
+        action: "allow-paper",
+      },
+      autonomous_loop_throttle: {
+        ...state.autonomous_loop_throttle,
+        status: "cycle",
+        can_run: true,
+      },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
+      autonomous_execution_runway: {
+        ...state.autonomous_execution_runway,
+        status: "blocked",
+        action: "stand-down",
+        can_auto_paper: false,
+        should_refresh_route: false,
+        should_refresh_chart: false,
+        should_protect_first: false,
+        route_vetoed: false,
+        chart_refresh_required: false,
+        next_tick_seconds: 9,
+        next_action: "Stand down until route and chart blockers clear.",
+      },
+      autonomous_execution_heartbeat: {
+        ...state.autonomous_execution_heartbeat,
+        status: "blocked",
+        primary_action: "pause",
+        should_refresh_routes: false,
+        should_protect_first: false,
+        route_vetoed: false,
+        next_tick_seconds: 9,
+        next_action: "Heartbeat blocks fresh paper pressure.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("cycle");
+    expect(plan.label).toBe("execution blocked");
+    expect(plan.action).toBe("loop");
+    expect(plan.delayMs).toBeGreaterThanOrEqual(20_000);
+    expect(plan.reason).toContain("execution blockers clear");
+  });
+
   test("GIVEN loop impact evidence WHEN Auto watch plans THEN impact can refresh, protect, tighten, or continue cadence", () => {
     const state = getWeb3TradingState("base", 0);
     const loopImpact = state.autonomous_loop_impact_auditor;
     const quietMinuteLoop = {
-      ...state,
+      ...withClearExecutionLane(state),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         max_trades_next_minute: 0,
@@ -2169,7 +2450,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN lagging profit benchmark evidence WHEN Auto watch plans THEN it tightens cadence before another paper action", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withClearExecutionLane(state),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         max_trades_next_minute: 0,
@@ -2222,7 +2503,7 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN missed hot-tape alpha WHEN Auto watch plans THEN it refreshes evidence for retarget review", () => {
     const state = getWeb3TradingState("base", 0);
     const plan = chooseAutoWatchPlan({
-      ...state,
+      ...withClearExecutionLane(state),
       autonomous_profit_velocity_governor: {
         ...state.autonomous_profit_velocity_governor,
         max_trades_next_minute: 0,

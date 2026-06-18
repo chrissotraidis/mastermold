@@ -386,7 +386,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
     }
     const timer = window.setTimeout(() => {
       if (!autoWatchPrimed) setAutoWatchPrimed(true);
-      if (autoPlan.mode === "refresh" && shouldRecordChartProof(state)) {
+      if (autoPlan.action === "route-refresh" || autoPlan.action === "chart-proof") {
+        runNowDecision();
+      } else if (autoPlan.mode === "refresh" && shouldRecordChartProof(state)) {
         runAutonomousLoopTick();
       } else if (autoPlan.mode === "refresh") {
         refreshRead();
@@ -718,6 +720,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           Provider intake: {marketIntake.next_provider} {marketIntake.next_lane.replaceAll("-", " ")} · {marketIntake.provider_budget_status.replaceAll("-", " ")} at {marketIntake.provider_budget_utilization_pct}% · {marketIntake.can_feed_trade_loop ? "can feed the next paper loop" : "refresh or defer before fresh paper size"}.
         </p>
         <p className="mt-1 text-xs leading-5 text-outline">
+          Execution runway: {executionRunway.action.replaceAll("-", " ")} · {state.autonomous_execution_heartbeat.status.replaceAll("-", " ")} heartbeat · {executionRunway.can_auto_paper ? "paper lane clear" : "proof/protect gate before paper"}.
+        </p>
+        <p className="mt-1 text-xs leading-5 text-outline">
           Impact gate: {loopImpact.summary} Source refresh: {state.market_source.label} read refreshes first; smart ticks can attach chart proof before the backend loop owns trade and protect actions.
         </p>
         <span className="sr-only" aria-label="Autonomous chart proof action receipt">
@@ -727,7 +732,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           Proof plus tick refreshes the chart gate when needed, sends that receipt with the backend autonomous loop tick, then lets the server choose refresh, paper fill, protect, cooldown, or stand down. Live signing remains locked.
         </span>
         <span className="sr-only" aria-label="Auto watch smart tick receipt">
-          Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets loop impact, provider intake, and profit benchmark evidence choose whether to continue, tighten, retarget, protect, harvest, refresh, defer, cool down, or block the next backend tick. Current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; provider intake {marketIntake.status}; intake lane {marketIntake.next_lane}; provider budget {marketIntake.provider_budget_status}; can feed loop {marketIntake.can_feed_trade_loop ? "yes" : "no"}; profit benchmark {state.autonomous_profit_benchmark.status}; risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}; alpha feedback {state.autonomous_alpha_feedback_loop.action}; next cadence {loopImpact.next_cadence_seconds} seconds.
+          Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets execution runway, heartbeat, loop impact, provider intake, and profit benchmark evidence choose whether to continue, tighten, retarget, protect, harvest, refresh, defer, cool down, or block the next backend tick. Current execution runway {executionRunway.status}; runway action {executionRunway.action}; heartbeat {state.autonomous_execution_heartbeat.status}; heartbeat action {state.autonomous_execution_heartbeat.primary_action}; paper lane {executionRunway.can_auto_paper ? "clear" : "gated"}; current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; provider intake {marketIntake.status}; intake lane {marketIntake.next_lane}; provider budget {marketIntake.provider_budget_status}; can feed loop {marketIntake.can_feed_trade_loop ? "yes" : "no"}; profit benchmark {state.autonomous_profit_benchmark.status}; risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}; alpha feedback {state.autonomous_alpha_feedback_loop.action}; next cadence {Math.min(loopImpact.next_cadence_seconds, executionRunway.next_tick_seconds, state.autonomous_execution_heartbeat.next_tick_seconds)} seconds.
         </span>
 
         <section className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:mt-3 sm:p-3" aria-label="Web3 operator focus deck">
@@ -8117,7 +8122,9 @@ function sampleChartSummary(
   return `${symbol} chart proof is hold-only at ${confidence}/100 confidence.`;
 }
 
-export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | "sprint" | "minute" | "refresh"; delayMs: number; label: string; reason: string } {
+type AutoWatchPlanAction = "loop" | "source-refresh" | "route-refresh" | "chart-proof";
+
+export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | "sprint" | "minute" | "refresh"; delayMs: number; label: string; reason: string; action?: AutoWatchPlanAction } {
   const throttle = state.autonomous_loop_throttle;
   const throttleDelay = Math.max(3_000, Math.min(45_000, throttle.cadence_seconds * 1_000));
   const loopImpact = state.autonomous_loop_impact_auditor;
@@ -8130,6 +8137,8 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   const alphaFeedback = state.autonomous_alpha_feedback_loop;
   const profitThesis = state.autonomous_profit_thesis_verifier;
   const marketIntake = state.autonomous_market_intake_plan;
+  const executionRunway = state.autonomous_execution_runway;
+  const executionHeartbeat = state.autonomous_execution_heartbeat;
   const hasReadyProtectLane = tickPlan.items.some((item) => item.action === "protect-now" && item.status === "ready");
   const hasReadyQueueSell = actionQueueExecution.selected_side === "sell" && actionQueueExecution.paper_trade_ready;
   const hasProtectMinuteLane = hasReadyProtectLane || hasReadyQueueSell;
@@ -8139,6 +8148,13 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   const liveIntakeActive = state.market_source.status !== "sample" && marketIntake.status !== "sample";
   const marketIntakeAllowsMinute = !liveIntakeActive || marketIntake.can_feed_trade_loop || (profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane);
   const intakeDelay = Math.max(2_000, Math.min(60_000, marketIntake.next_request_seconds * 1_000 || throttleDelay));
+  const executionDelay = Math.max(
+    2_000,
+    Math.min(
+      45_000,
+      Math.min(executionRunway.next_tick_seconds || 45, executionHeartbeat.next_tick_seconds || 45, tickGovernor.next_tick_seconds || 45) * 1_000,
+    ),
+  );
   const benchmarkDelay = Math.max(
     4_000,
     Math.min(
@@ -8243,6 +8259,51 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
       delayMs: Math.max(2_000, Math.min(15_000, tickGovernor.next_tick_seconds * 1_000 || throttleDelay)),
       label: "auto refresh",
       reason: `${state.autonomous_data_freshness_gate.next_action} Auto watch will refresh read-only ${state.market_source.label} evidence before another paper action.`,
+    };
+  }
+  if (executionRunway.should_protect_first || executionRunway.action === "protect" || executionHeartbeat.should_protect_first || executionHeartbeat.status === "protect") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(2_000, Math.min(18_000, executionDelay)),
+      label: "execution protect",
+      reason: `${executionRunway.next_action} ${executionHeartbeat.next_action} Auto watch protects or trims paper exposure before fresh buys; live signing remains locked by the execution boundary.`,
+      action: "loop",
+    };
+  }
+  if (executionRunway.should_refresh_route || executionRunway.action === "refresh-route" || executionHeartbeat.should_refresh_routes || executionRunway.route_vetoed) {
+    return {
+      mode: "refresh",
+      delayMs: Math.max(2_000, Math.min(18_000, executionDelay)),
+      label: "execution route refresh",
+      reason: `${executionRunway.next_action} Auto watch refreshes read-only route proof before another paper tick so slippage, landing cost, and route vetoes are current.`,
+      action: "route-refresh",
+    };
+  }
+  if (executionRunway.should_refresh_chart || executionRunway.action === "refresh-candles" || executionRunway.chart_refresh_required) {
+    return {
+      mode: "refresh",
+      delayMs: Math.max(2_000, Math.min(18_000, executionDelay)),
+      label: "execution chart refresh",
+      reason: `${executionRunway.next_action} Auto watch records chart proof before another paper tick so fresh exposure uses current candle evidence.`,
+      action: "chart-proof",
+    };
+  }
+  if (executionHeartbeat.status === "blocked" || executionRunway.status === "blocked") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(20_000, executionDelay),
+      label: "execution blocked",
+      reason: `${executionRunway.next_action} ${executionHeartbeat.next_action} Auto watch keeps the loop in review mode until execution blockers clear.`,
+      action: "loop",
+    };
+  }
+  if (executionHeartbeat.status === "pause" || executionHeartbeat.status === "cooldown" || executionRunway.action === "stand-down") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(12_000, Math.min(45_000, executionDelay)),
+      label: executionHeartbeat.status === "cooldown" ? "execution cooldown" : "execution pause",
+      reason: `${executionHeartbeat.next_action} Auto watch pauses fresh paper pressure until the execution heartbeat clears.`,
+      action: "loop",
     };
   }
   if (canRunMinuteLoop) {

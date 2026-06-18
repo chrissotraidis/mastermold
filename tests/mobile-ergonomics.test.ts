@@ -606,7 +606,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("feedback can tighten, retarget, or press Auto watch");
     expect(web3Workspace).toContain("Provider intake:");
     expect(web3Workspace).toContain("refresh or defer before fresh paper size");
-    expect(web3Workspace).toContain("loop impact, provider intake, and profit benchmark evidence");
+    expect(web3Workspace).toContain("Execution runway:");
+    expect(web3Workspace).toContain("proof/protect gate before paper");
+    expect(web3Workspace).toContain("execution runway, heartbeat, loop impact, provider intake, and profit benchmark evidence");
+    expect(web3Workspace).toContain("heartbeat {state.autonomous_execution_heartbeat.status}");
+    expect(web3Workspace).toContain("paper lane {executionRunway.can_auto_paper ? \"clear\" : \"gated\"}");
     expect(web3Workspace).toContain("profit benchmark {state.autonomous_profit_benchmark.status}");
     expect(web3Workspace).toContain("provider budget {marketIntake.provider_budget_status}");
     expect(web3Workspace).toContain("risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}");
