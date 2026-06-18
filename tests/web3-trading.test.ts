@@ -132,6 +132,33 @@ function withOpenProfitSafety(state: Web3TradingState): Web3TradingState {
       should_protect_first: false,
       next_action: "Profit integrity is clear for the lane under test.",
     },
+    autonomous_wallet_performance_governor: {
+      ...state.autonomous_wallet_performance_governor,
+      status: "press",
+      fresh_buy_permission: "open",
+      protective_sell_only: false,
+      make_money_score: Math.max(72, state.autonomous_wallet_performance_governor.make_money_score),
+      wallet_score: Math.max(72, state.autonomous_wallet_performance_governor.wallet_score),
+      window_pnl_usd: Math.max(12, state.autonomous_wallet_performance_governor.window_pnl_usd),
+      equity_slope_usd_per_tick: Math.max(4, state.autonomous_wallet_performance_governor.equity_slope_usd_per_tick),
+      max_drawdown_pct: Math.min(2.5, state.autonomous_wallet_performance_governor.max_drawdown_pct),
+      next_trade_cap: Math.max(2, state.autonomous_wallet_performance_governor.next_trade_cap),
+      next_size_multiplier: Math.max(0.85, state.autonomous_wallet_performance_governor.next_size_multiplier),
+      cadence_seconds: 6,
+      next_action: "Wallet performance is clear for the lane under test.",
+    },
+    autonomous_fill_ledger_digest: {
+      ...state.autonomous_fill_ledger_digest,
+      status: "profitable",
+      next_fill_permission: "press",
+      last_fill_verdict: "press",
+      last_fill_profit_score: Math.max(76, state.autonomous_fill_ledger_digest.last_fill_profit_score),
+      last_fill_edge_usd: Math.max(8, state.autonomous_fill_ledger_digest.last_fill_edge_usd),
+      last_fill_quality_score: Math.max(76, state.autonomous_fill_ledger_digest.last_fill_quality_score),
+      last_fill_shortfall_usd: 0,
+      recommended_discipline: "press-winners",
+      next_action: "Fill ledger is clear for the lane under test.",
+    },
   };
 }
 
@@ -1969,6 +1996,84 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(plan.delayMs).toBeGreaterThanOrEqual(12_000);
     expect(plan.reason).toContain("Cooldown until paper PnL quality repairs");
     expect(plan.reason).toContain("will not press fresh entries");
+  });
+
+  test("GIVEN wallet performance is protect-only WHEN Auto watch plans THEN it routes protection before fresh entries", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...withOpenProfitSafety(state),
+      autonomous_wallet_performance_governor: {
+        ...state.autonomous_wallet_performance_governor,
+        status: "protect",
+        fresh_buy_permission: "blocked",
+        protective_sell_only: true,
+        make_money_score: 34,
+        window_pnl_usd: -72,
+        max_drawdown_pct: 9.4,
+        cadence_seconds: 5,
+        next_action: "Protect the wallet curve before any fresh paper buy.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("minute");
+    expect(plan.label).toBe("wallet protect minute");
+    expect(plan.action).toBe("loop");
+    expect(plan.reason).toContain("Protect the wallet curve");
+    expect(plan.reason).toContain("before fresh buys");
+  });
+
+  test("GIVEN wallet performance blocks fresh buys WHEN Auto watch plans THEN it cools down the loop", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...withOpenProfitSafety(state),
+      autonomous_action_queue_execution: {
+        ...state.autonomous_action_queue_execution,
+        selected_side: "buy",
+        paper_trade_ready: false,
+        paper_trade: null,
+      },
+      autonomous_wallet_performance_governor: {
+        ...state.autonomous_wallet_performance_governor,
+        status: "cooldown",
+        fresh_buy_permission: "blocked",
+        protective_sell_only: false,
+        make_money_score: 39,
+        window_pnl_usd: -44,
+        cadence_seconds: 8,
+        next_action: "Cooldown until the wallet curve repairs.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("cycle");
+    expect(plan.label).toBe("wallet cooldown");
+    expect(plan.action).toBe("loop");
+    expect(plan.delayMs).toBeGreaterThanOrEqual(12_000);
+    expect(plan.reason).toContain("Cooldown until the wallet curve repairs");
+    expect(plan.reason).toContain("make-money score 39/100");
+  });
+
+  test("GIVEN the last fill audit cools down WHEN Auto watch plans THEN it stops fresh paper cadence", () => {
+    const state = getWeb3TradingState("base", 0);
+    const plan = chooseAutoWatchPlan({
+      ...withOpenProfitSafety(state),
+      autonomous_fill_ledger_digest: {
+        ...state.autonomous_fill_ledger_digest,
+        status: "cooldown",
+        next_fill_permission: "cooldown",
+        last_fill_verdict: "tighten",
+        last_fill_profit_score: 31,
+        last_fill_quality_score: 42,
+        last_fill_shortfall_usd: 18,
+        next_action: "Cool down after the last fill shortfall.",
+      },
+    } satisfies Web3TradingState);
+
+    expect(plan.mode).toBe("cycle");
+    expect(plan.label).toBe("fill cooldown");
+    expect(plan.action).toBe("loop");
+    expect(plan.delayMs).toBeGreaterThanOrEqual(12_000);
+    expect(plan.reason).toContain("Cool down after the last fill shortfall");
+    expect(plan.reason).toContain("quality 42/100");
   });
 
   test("GIVEN stale live market evidence WHEN Auto watch plans THEN it refreshes read-only evidence instead of pausing", () => {

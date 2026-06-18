@@ -1904,6 +1904,8 @@ function QuickAutopilotMissionPanel({
   const profitObjective = state.autonomous_profit_objective;
   const dailyProfitLock = state.autonomous_daily_profit_lock;
   const profitIntegrity = state.autonomous_profit_integrity_circuit;
+  const walletPerformance = state.autonomous_wallet_performance_governor;
+  const fillLedger = state.autonomous_fill_ledger_digest;
   const profitVelocity = state.autonomous_profit_velocity_governor;
   const allocation = state.autonomous_profit_allocation_plan;
   const route = state.autonomous_route_refresh_execution;
@@ -2005,6 +2007,10 @@ function QuickAutopilotMissionPanel({
             <div className="flex flex-wrap justify-end gap-2">
               <Chip tone={missionTone}>{command.status.replaceAll("-", " ")}</Chip>
               <Chip tone={dailyLockTone(dailyProfitLock.loop_permission)}>{dailyProfitLock.loop_permission.replaceAll("-", " ")}</Chip>
+              <Chip tone={walletPerformance.protective_sell_only || walletPerformance.fresh_buy_permission === "blocked" ? "critical" : walletPerformance.fresh_buy_permission === "open" ? "engine" : "caution"}>
+                wallet {walletPerformance.fresh_buy_permission}
+              </Chip>
+              <Chip tone={fillAuditTone(fillLedger.last_fill_verdict)}>fill {fillLedger.next_fill_permission.replaceAll("-", " ")}</Chip>
               <Chip tone={liveTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
               <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "watch running" : autoWatchPlan.label}</Chip>
             </div>
@@ -2066,14 +2072,14 @@ function QuickAutopilotMissionPanel({
             <ProfitMetric label="Edge" value={formatCompactSignedCurrency(command.expected_edge_per_minute_usd)} detail={`${command.command_score}/100 command`} tone={command.expected_edge_per_minute_usd > 0 ? "engine" : "neutral"} />
             <ProfitMetric label="Integrity" value={`${profitIntegrity.integrity_score}/100`} detail={profitIntegrity.permission.replaceAll("-", " ")} tone={profitIntegrity.permission === "scale" || profitIntegrity.permission === "trade" ? "engine" : profitIntegrity.permission === "stand-down" || profitIntegrity.permission === "cooldown" ? "critical" : "caution"} />
             <ProfitMetric label="Route" value={route.status.replaceAll("-", " ")} detail={route.selected_symbol ?? "proof"} tone={route.status === "ready" ? "engine" : route.status === "blocked" ? "critical" : "caution"} />
-            <ProfitMetric label="Candle" value={candle.status} detail={candle.symbol ?? state.autonomous_candle_conviction.target_symbol ?? "target"} tone={candle.status === "ready" ? "engine" : candle.status === "blocked" ? "critical" : "caution"} />
-            <ProfitMetric label="Wallet" value={formatCompactCurrency(wallet.equity_usd)} detail={`${formatCompactCurrency(wallet.exposure_usd)} exposure`} tone={wallet.window_pnl_usd >= 0 ? "engine" : "critical"} />
+            <ProfitMetric label="Fill audit" value={fillLedger.next_fill_permission.replaceAll("-", " ")} detail={`${fillLedger.last_fill_profit_score}/100 last`} tone={fillAuditTone(fillLedger.last_fill_verdict)} />
+            <ProfitMetric label="Wallet gate" value={walletPerformance.fresh_buy_permission} detail={`${formatCompactCurrency(wallet.equity_usd)} equity`} tone={walletPerformance.protective_sell_only || walletPerformance.fresh_buy_permission === "blocked" ? "critical" : walletPerformance.fresh_buy_permission === "open" ? "engine" : "caution"} />
           </dl>
           <p className="mt-2 line-clamp-2 text-xs leading-5 text-on-surface-variant">
-            {autoWatch ? `Auto watch is handing ${autoWatchPlan.label} authority to the backend every ${autoWatchPlan.delayMs / 1000}s with daily lock ${dailyProfitLock.loop_permission.replaceAll("-", " ")} and integrity ${profitIntegrity.permission.replaceAll("-", " ")}.` : autoWatchPlan.reason}
+            {autoWatch ? `Auto watch is handing ${autoWatchPlan.label} authority to the backend every ${autoWatchPlan.delayMs / 1000}s with daily lock ${dailyProfitLock.loop_permission.replaceAll("-", " ")}, wallet ${walletPerformance.fresh_buy_permission}, fill ${fillLedger.next_fill_permission.replaceAll("-", " ")}, and integrity ${profitIntegrity.permission.replaceAll("-", " ")}.` : autoWatchPlan.reason}
           </p>
           <span className="sr-only" aria-label="Autopilot mission receipt">
-            Autopilot mission control: selected {leaderAction} {leaderSymbol}; command {command.status}; command score {command.command_score}; expected edge per minute {formatSignedCurrency(command.expected_edge_per_minute_usd)}; profit target {formatCurrency(profitObjective.target_net_pnl_usd)} at {profitObjective.progress_pct} percent; daily profit lock {dailyProfitLock.loop_permission} with {formatSignedCurrency(dailyProfitLock.current_net_pnl_usd)} session PnL; profit integrity {profitIntegrity.permission} at {profitIntegrity.integrity_score}/100; profit velocity {profitVelocity.status} with {profitVelocity.max_trades_next_minute} max trades next minute; auto watch plan {autoWatchPlan.label}; route proof {route.status}; candle proof {candle.status}; queue execution {queueExecution.status}; paper ledger trades {state.paper_account.trade_count}; wallet equity {formatCurrency(wallet.equity_usd)}; wallet window PnL {formatSignedCurrency(wallet.window_pnl_usd)}; live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+            Autopilot mission control: selected {leaderAction} {leaderSymbol}; command {command.status}; command score {command.command_score}; expected edge per minute {formatSignedCurrency(command.expected_edge_per_minute_usd)}; profit target {formatCurrency(profitObjective.target_net_pnl_usd)} at {profitObjective.progress_pct} percent; daily profit lock {dailyProfitLock.loop_permission} with {formatSignedCurrency(dailyProfitLock.current_net_pnl_usd)} session PnL; wallet gate {walletPerformance.fresh_buy_permission}; wallet protective sell only {walletPerformance.protective_sell_only ? "yes" : "no"}; wallet make-money score {walletPerformance.make_money_score}; fill ledger permission {fillLedger.next_fill_permission}; last fill verdict {fillLedger.last_fill_verdict}; last fill score {fillLedger.last_fill_profit_score}; profit integrity {profitIntegrity.permission} at {profitIntegrity.integrity_score}/100; profit velocity {profitVelocity.status} with {profitVelocity.max_trades_next_minute} max trades next minute; auto watch plan {autoWatchPlan.label}; route proof {route.status}; candle proof {candle.status}; queue execution {queueExecution.status}; paper ledger trades {state.paper_account.trade_count}; wallet equity {formatCurrency(wallet.equity_usd)}; wallet window PnL {formatSignedCurrency(wallet.window_pnl_usd)}; live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
           </span>
         </div>
       </div>
@@ -8164,6 +8170,8 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   const profitThesis = state.autonomous_profit_thesis_verifier;
   const dailyProfitLock = state.autonomous_daily_profit_lock;
   const profitIntegrity = state.autonomous_profit_integrity_circuit;
+  const walletPerformance = state.autonomous_wallet_performance_governor;
+  const fillLedger = state.autonomous_fill_ledger_digest;
   const marketIntake = state.autonomous_market_intake_plan;
   const executionRunway = state.autonomous_execution_runway;
   const executionHeartbeat = state.autonomous_execution_heartbeat;
@@ -8175,6 +8183,8 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   const nextMinuteBudget = Math.max(tickPlan.next_minute_trade_budget_usd, hasReadyQueueSell ? actionQueueExecution.paper_size_usd : 0);
   const profitLockDelay = Math.max(3_000, Math.min(45_000, dailyProfitLock.review_after_seconds * 1_000 || throttleDelay));
   const integrityDelay = Math.max(3_000, Math.min(45_000, profitIntegrity.cadence_seconds * 1_000 || throttleDelay));
+  const walletDelay = Math.max(3_000, Math.min(45_000, walletPerformance.cadence_seconds * 1_000 || throttleDelay));
+  const fillDelay = Math.max(3_000, Math.min(45_000, state.autonomous_profit_learning.cadence_seconds * 1_000 || throttleDelay));
   const liveIntakeActive = state.market_source.status !== "sample" && marketIntake.status !== "sample";
   const marketIntakeAllowsMinute = !liveIntakeActive || marketIntake.can_feed_trade_loop || (profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane);
   const intakeDelay = Math.max(2_000, Math.min(60_000, marketIntake.next_request_seconds * 1_000 || throttleDelay));
@@ -8263,6 +8273,69 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
       delayMs: Math.max(3_000, Math.min(18_000, integrityDelay)),
       label: "integrity protect",
       reason: `${profitIntegrity.next_action} Auto watch runs protection before fresh size because profit integrity is ${profitIntegrity.integrity_score}/100.`,
+      action: "loop",
+    };
+  }
+  if (walletPerformance.protective_sell_only || walletPerformance.status === "protect") {
+    if (hasProtectMinuteLane) {
+      return {
+        mode: "minute",
+        delayMs: Math.max(2_000, Math.min(18_000, tickGovernor.next_tick_seconds * 1_000 || walletDelay)),
+        label: "wallet protect minute",
+        reason: `${walletPerformance.next_action} Auto watch uses ${queuedActionLabel} for wallet-curve protection before fresh buys: ${formatCompactCurrency(nextMinuteBudget)} paper budget, ${formatCompactSignedCurrency(walletPerformance.window_pnl_usd)} window PnL, ${walletPerformance.max_drawdown_pct.toFixed(1)}% drawdown.`,
+        action: "loop",
+      };
+    }
+    return {
+      mode: "cycle",
+      delayMs: walletDelay,
+      label: "wallet protect",
+      reason: `${walletPerformance.next_action} Auto watch blocks fresh paper buys because the wallet curve is ${walletPerformance.status} and fresh-buy permission is ${walletPerformance.fresh_buy_permission}.`,
+      action: "loop",
+    };
+  }
+  if (walletPerformance.fresh_buy_permission === "blocked" || walletPerformance.status === "cooldown") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(12_000, walletDelay),
+      label: "wallet cooldown",
+      reason: `${walletPerformance.next_action} Auto watch slows the loop until wallet performance repairs: make-money score ${walletPerformance.make_money_score}/100, ${formatCompactSignedCurrency(walletPerformance.window_pnl_usd)} window PnL.`,
+      action: "loop",
+    };
+  }
+  if (fillLedger.next_fill_permission === "protect-only" || fillLedger.status === "protecting" || fillLedger.last_fill_verdict === "protect") {
+    if (hasProtectMinuteLane) {
+      return {
+        mode: "minute",
+        delayMs: Math.max(2_000, Math.min(18_000, tickGovernor.next_tick_seconds * 1_000 || fillDelay)),
+        label: "fill protect minute",
+        reason: `${fillLedger.next_action} Auto watch follows the last-fill audit before fresh buys: ${fillLedger.last_fill_profit_score}/100 score, ${formatCompactSignedCurrency(fillLedger.last_fill_edge_usd)} edge, ${formatCompactCurrency(fillLedger.last_fill_shortfall_usd)} shortfall.`,
+        action: "loop",
+      };
+    }
+    return {
+      mode: "cycle",
+      delayMs: fillDelay,
+      label: "fill protect",
+      reason: `${fillLedger.next_action} Auto watch keeps fresh entries paused until a protective paper lane is ready; last fill permission is ${fillLedger.next_fill_permission.replaceAll("-", " ")}.`,
+      action: "loop",
+    };
+  }
+  if (fillLedger.next_fill_permission === "cooldown" || fillLedger.status === "cooldown") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(12_000, fillDelay),
+      label: "fill cooldown",
+      reason: `${fillLedger.next_action} Auto watch cools down after the last fill audit: ${fillLedger.last_fill_profit_score}/100 score, quality ${fillLedger.last_fill_quality_score}/100, ${formatCompactCurrency(fillLedger.last_fill_shortfall_usd)} shortfall.`,
+      action: "loop",
+    };
+  }
+  if (fillLedger.last_fill_verdict === "tighten" || fillLedger.next_fill_permission === "wait") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(8_000, Math.min(30_000, fillDelay)),
+      label: "fill discipline",
+      reason: `${fillLedger.next_action} Auto watch tightens fresh cadence until the fill ledger clears; last fill verdict is ${fillLedger.last_fill_verdict} at ${fillLedger.last_fill_profit_score}/100.`,
       action: "loop",
     };
   }
