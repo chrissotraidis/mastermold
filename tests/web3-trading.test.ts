@@ -2008,7 +2008,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(queueMove?.action).toBe("sell");
     expect(queueMove?.tone).toBe("engine");
     expect(queueMove?.budgetUsd).toBeGreaterThan(0);
-    expect(moves.length).toBeLessThanOrEqual(7);
+    expect(moves.length).toBeLessThanOrEqual(8);
   });
 
   test("GIVEN chart tape evidence WHEN next moves are built THEN the chart execution contract is visible in the compact operator timeline", () => {
@@ -2021,6 +2021,23 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(chartMove?.detail).toBe(state.autonomous_price_action_execution_contract.summary);
     expect(chartMove?.etaSeconds).toBe(state.autonomous_price_action_execution_contract.review_after_seconds);
     expect(chartMove?.budgetUsd).toBe(state.autonomous_price_action_execution_contract.paper_notional_usd);
+  });
+
+  test("GIVEN profit benchmark evidence WHEN next moves are built THEN the agent compares wallet alpha before the long desk", () => {
+    const state = getWeb3TradingState("base", 0);
+    const moves = buildAutonomousNextMoves(state);
+    const benchmarkMove = moves.find((move) => move.id === "profit-benchmark");
+
+    expect(benchmarkMove?.label).toContain("Benchmark");
+    expect(benchmarkMove?.action).toBe(state.autonomous_alpha_feedback_loop.action.replaceAll("-", " "));
+    expect(benchmarkMove?.detail).toContain(state.autonomous_profit_benchmark.conclusion);
+    expect(benchmarkMove?.detail).toContain(state.autonomous_alpha_feedback_loop.summary);
+    expect(benchmarkMove?.etaSeconds).toBe(Math.min(
+      state.autonomous_alpha_feedback_loop.review_after_seconds,
+      state.autonomous_profit_thesis_verifier.review_after_seconds,
+    ));
+    expect(benchmarkMove?.score).toBe(state.autonomous_profit_benchmark.benchmark_score);
+    expect(benchmarkMove?.budgetUsd).toBe(state.autonomous_profit_thesis_verifier.chase_budget_usd);
   });
 
   test("GIVEN launch timing state WHEN next moves are built THEN the fresh-entry decision is visible before the long desk", () => {

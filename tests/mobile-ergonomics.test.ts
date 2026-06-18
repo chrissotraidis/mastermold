@@ -597,6 +597,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("seven point price-action chart");
     expect(web3Workspace).toContain("volume bars · buy-flow shade");
     expect(web3Workspace).toContain("chart {chartTape.status.replaceAll(\"-\", \" \")}");
+    expect(web3Workspace).toContain("First-screen autonomous profit benchmark");
+    expect(web3Workspace).toContain("First-screen autonomous profit benchmark receipt");
+    expect(web3Workspace).toContain("Agent alpha {formatCompactSignedCurrency(benchmark.cash_alpha_usd)} vs cash");
+    expect(web3Workspace).toContain("equity solid · cash dash · hot tape dots");
+    expect(web3Workspace).toContain("Autonomous operator next eight moves");
+    expect(web3Workspace).toContain("profit benchmark {state.autonomous_profit_benchmark.status}");
+    expect(web3Workspace).toContain("profit alpha {formatSignedCurrency(state.autonomous_profit_benchmark.cash_alpha_usd)}");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved for later review.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved from the Paper form.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved to review the mobile Paper flow.");

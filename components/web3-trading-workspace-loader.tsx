@@ -578,7 +578,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
             <p className="mt-1 break-words text-sm font-semibold text-on-surface">
               {state.autonomous_market_evidence_fusion.leader_symbol ?? "Desk"} · {state.autonomous_market_evidence_fusion.leader_action?.replace("-", " ") ?? state.autonomous_market_evidence_fusion.status}
             </p>
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+            <p className="mt-1 line-clamp-1 text-xs leading-5 text-on-surface-variant sm:line-clamp-2">
               {quickNotice}
             </p>
           </div>
@@ -618,7 +618,10 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           {state.market_source.label} · {state.autonomous_market_evidence_fusion.can_trade ? "trade ok" : tradeBlocked ? "trade blocked" : "refresh"} · {autoWatch ? "watch on" : "watch off"} · {wakePlan.auto_watch_label} · intake {marketIntake.status} · allocator {profitAllocation.status}
         </p>
 
-        <QuickFirstScreenPriceActionRail state={state} />
+        <div className="mt-3 grid gap-2 xl:grid-cols-2" aria-label="First-screen autonomous chart and profit benchmark">
+          <QuickFirstScreenPriceActionRail state={state} />
+          <QuickFirstScreenProfitBenchmarkStrip state={state} />
+        </div>
 
         <QuickAutonomousNextMoves items={nextMoves} state={state} />
 
@@ -979,7 +982,7 @@ function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState })
   const zeroY = yFor(0);
 
   return (
-    <section className="mt-3 grid min-w-0 gap-2 rounded-md border border-engine/25 bg-void/30 p-2 sm:p-3 lg:grid-cols-[minmax(0,1fr)_18rem]" aria-label="First-screen autonomous price-action chart tape">
+    <section className="grid min-w-0 gap-2 rounded-md border border-engine/25 bg-void/30 p-2 sm:p-3 xl:grid-cols-[minmax(0,1fr)_10rem] 2xl:grid-cols-[minmax(0,1fr)_12rem]" aria-label="First-screen autonomous price-action chart tape">
       <div className="min-w-0">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
@@ -1000,7 +1003,7 @@ function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState })
           </div>
         </div>
         <svg
-          className="mt-2 h-28 w-full overflow-visible"
+          className="mt-2 h-24 w-full overflow-visible"
           viewBox={`0 0 ${width} ${height}`}
           role="img"
           aria-label={`${tape.leader_symbol ?? "Leader"} first-screen seven point price-action chart`}
@@ -1033,7 +1036,7 @@ function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState })
         </svg>
       </div>
 
-      <div className="grid min-w-0 grid-cols-2 gap-1 self-stretch">
+      <div className="grid min-w-0 grid-cols-4 gap-1 self-stretch xl:grid-cols-2">
         <MiniProofStat label="Hot" value={`${tape.hot_count}`} />
         <MiniProofStat label="Refresh" value={`${tape.refresh_count}`} />
         <MiniProofStat label="Protect" value={`${tape.protect_count}`} />
@@ -1049,6 +1052,147 @@ function QuickFirstScreenPriceActionRail({ state }: { state: Web3TradingState })
       </span>
     </section>
   );
+}
+
+function QuickFirstScreenProfitBenchmarkStrip({ state }: { state: Web3TradingState }) {
+  const wallet = state.autonomous_wallet_telemetry;
+  const benchmark = state.autonomous_profit_benchmark;
+  const feedback = state.autonomous_alpha_feedback_loop;
+  const thesis = state.autonomous_profit_thesis_verifier;
+  const pulse = state.autonomous_make_money_pulse;
+  const points = wallet.curve.length > 0
+    ? wallet.curve.slice(-7)
+    : [{
+      id: "current",
+      label: "now",
+      recorded_at: "",
+      cycle: 0,
+      action: "current" as const,
+      equity_usd: wallet.equity_usd,
+      cash_usd: wallet.cash_usd,
+      exposure_usd: wallet.exposure_usd,
+      realized_pnl_usd: wallet.realized_pnl_usd,
+      unrealized_pnl_usd: wallet.unrealized_pnl_usd,
+      drawdown_pct: wallet.max_drawdown_pct,
+      filled_count: wallet.fill_count,
+      blocked_count: wallet.blocked_count,
+    }];
+  const width = 560;
+  const height = 112;
+  const pad = { left: 24, right: 20, top: 18, bottom: 24 };
+  const forecastEquity = points[points.length - 1].equity_usd + wallet.slope_usd_per_tick * 2;
+  const values = [
+    ...points.map((point) => point.equity_usd),
+    forecastEquity,
+    benchmark.cash_baseline_usd,
+    benchmark.selected_coin_baseline_usd,
+    benchmark.hot_coin_baseline_usd,
+  ];
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const range = Math.max(1, maxValue - minValue);
+  const xFor = (index: number, count = points.length) => pad.left + (count <= 1 ? 0 : (index / (count - 1)) * (width - pad.left - pad.right));
+  const yFor = (value: number) => Math.round(pad.top + (1 - ((value - minValue) / range)) * (height - pad.top - pad.bottom));
+  const equityPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.equity_usd)}`).join(" ");
+  const cashY = yFor(benchmark.cash_baseline_usd);
+  const hotY = yFor(benchmark.hot_coin_baseline_usd);
+  const lastPoint = points[points.length - 1];
+  const lastX = xFor(points.length - 1);
+  const lastY = yFor(lastPoint.equity_usd);
+  const forecastX = width - pad.right;
+  const forecastY = yFor(forecastEquity);
+  const benchmarkTone = profitBenchmarkTone(benchmark);
+  const feedbackTone = alphaFeedbackTone(feedback.status);
+  const thesisTone = profitThesisTone(thesis.status);
+
+  return (
+    <section className="grid min-w-0 gap-2 rounded-md border border-engine/20 bg-void/20 p-2 sm:p-3 xl:grid-cols-[minmax(0,1fr)_10rem] 2xl:grid-cols-[minmax(0,1fr)_12rem]" aria-label="First-screen autonomous profit benchmark">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Profit benchmark</p>
+            <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+              Agent alpha {formatCompactSignedCurrency(benchmark.cash_alpha_usd)} vs cash
+            </p>
+            <p className="mt-1 line-clamp-1 text-xs leading-5 text-on-surface-variant sm:line-clamp-2">
+              {benchmark.conclusion}
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Chip tone={benchmarkTone}>{benchmark.status.replaceAll("-", " ")}</Chip>
+            <Chip tone={feedbackTone}>feedback {feedback.status}</Chip>
+            <Chip tone={thesisTone}>thesis {thesis.status}</Chip>
+            <Chip tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"}>
+              {state.execution_gate.live_execution_enabled ? "live gated" : "paper benchmark"}
+            </Chip>
+          </div>
+        </div>
+        <svg
+          className={cn("mt-2 h-20 w-full", benchmark.cash_alpha_usd >= 0 ? "text-engine" : "text-critical")}
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label="First-screen autonomous profit benchmark chart"
+        >
+          <rect width={width} height={height} rx="8" className="fill-surface-dim" opacity="0.26" />
+          <line x1={pad.left} x2={width - pad.right} y1={cashY} y2={cashY} stroke="currentColor" strokeDasharray="7 7" strokeOpacity="0.3" strokeWidth="2" />
+          <line x1={pad.left} x2={width - pad.right} y1={hotY} y2={hotY} className="stroke-caution" strokeDasharray="3 7" strokeOpacity="0.34" strokeWidth="2" />
+          <path d={equityPath} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={`M ${lastX} ${lastY} L ${forecastX} ${forecastY}`} fill="none" stroke="currentColor" strokeDasharray="8 8" strokeOpacity="0.48" strokeWidth="3" strokeLinecap="round" />
+          {points.slice(1).map((point, index) => (
+            <circle
+              key={point.id}
+              cx={xFor(index + 1)}
+              cy={yFor(point.equity_usd)}
+              r={point.blocked_count > point.filled_count ? "3.5" : "4.5"}
+              className={point.blocked_count > point.filled_count ? "fill-caution" : point.action === "stand-down" ? "fill-critical" : "fill-engine"}
+              opacity="0.82"
+            />
+          ))}
+          <circle cx={lastX} cy={lastY} r="5.5" className={benchmark.cash_alpha_usd >= 0 ? "fill-engine" : "fill-critical"} />
+          <text x={pad.left} y="14" className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">
+            equity solid · cash dash · hot tape dots
+          </text>
+          <text x={pad.left} y={height - 7} className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">
+            {points.length} ticks · forecast dash · {benchmark.hot_coin_symbol ?? "no hot coin"} comparison
+          </text>
+        </svg>
+      </div>
+
+      <div className="grid min-w-0 grid-cols-4 gap-1 self-stretch xl:grid-cols-2">
+        <MiniProofStat label="Benchmark" value={`${benchmark.benchmark_score}/100`} />
+        <MiniProofStat label="Risk alpha" value={formatCompactSignedCurrency(benchmark.risk_adjusted_alpha_usd)} />
+        <MiniProofStat label="Hot gap" value={formatCompactCurrency(benchmark.opportunity_gap_usd)} />
+        <MiniProofStat label="Cash alpha" value={formatCompactSignedCurrency(benchmark.cash_alpha_usd)} />
+        <MiniProofStat label="Size bias" value={`${feedback.size_bias}x`} />
+        <MiniProofStat label="Chase" value={`${thesis.chase_urgency_score}/100`} />
+        <MiniProofStat label="Budget" value={formatCompactCurrency(thesis.chase_budget_usd)} />
+        <MiniProofStat label="Review" value={`${Math.min(feedback.review_after_seconds, thesis.review_after_seconds, pulse.reaction_seconds)}s`} />
+      </div>
+
+      <span className="sr-only" aria-label="First-screen autonomous profit benchmark receipt">
+        First-screen autonomous profit benchmark status {benchmark.status}; score {benchmark.benchmark_score}; agent equity {formatCurrency(benchmark.agent_equity_usd)}; cash baseline {formatCurrency(benchmark.cash_baseline_usd)}; cash alpha {formatSignedCurrency(benchmark.cash_alpha_usd)}; risk adjusted alpha {formatSignedCurrency(benchmark.risk_adjusted_alpha_usd)}; hot coin {benchmark.hot_coin_symbol ?? "none"}; hot baseline {formatCurrency(benchmark.hot_coin_baseline_usd)}; hot alpha {formatSignedCurrency(benchmark.hot_coin_alpha_usd)}; opportunity gap {formatCurrency(benchmark.opportunity_gap_usd)}; alpha feedback {feedback.status}; feedback action {feedback.action}; size bias {feedback.size_bias}x; missed alpha {formatCurrency(feedback.missed_alpha_usd)}; profit thesis {thesis.status}; thesis action {thesis.action}; target {thesis.target_symbol ?? "none"}; chase urgency {thesis.chase_urgency_score}; chase budget {formatCurrency(thesis.chase_budget_usd)}; expected net edge {formatSignedCurrency(thesis.expected_net_edge_usd)}; live execution {state.execution_gate.live_execution_enabled ? "armed by credentials" : "locked"}; benchmark controls {benchmark.controls.join(" ")} {feedback.controls.join(" ")} {thesis.controls.join(" ")}
+      </span>
+    </section>
+  );
+}
+
+function profitBenchmarkTone(benchmark: Web3TradingState["autonomous_profit_benchmark"]): QuickChipTone {
+  if (benchmark.cash_alpha_usd >= 0 && benchmark.risk_adjusted_alpha_usd >= 0) return "engine";
+  if (benchmark.status === "protecting-capital" || benchmark.status === "learning" || benchmark.status === "lagging-selected") return "caution";
+  return "critical";
+}
+
+function alphaFeedbackTone(status: Web3TradingState["autonomous_alpha_feedback_loop"]["status"]): QuickChipTone {
+  if (status === "press") return "engine";
+  if (status === "protect" || status === "tighten" || status === "retarget") return "caution";
+  if (status === "idle") return "critical";
+  return "neutral";
+}
+
+function profitThesisTone(status: Web3TradingState["autonomous_profit_thesis_verifier"]["status"]): QuickChipTone {
+  if (status === "validated" || status === "probing") return "engine";
+  if (status === "protect" || status === "tighten" || status === "retarget" || status === "learning") return "caution";
+  return "critical";
 }
 
 function QuickTradingCommandDeck({
@@ -5932,7 +6076,7 @@ function QuickAutonomousNextMoves({ items, state }: { items: AutonomousNextMove[
         </div>
       </div>
 
-      <div className="mt-3 grid gap-1" aria-label="Autonomous operator next seven moves">
+      <div className="mt-3 grid gap-1" aria-label="Autonomous operator next eight moves">
         {items.map((item, index) => (
           <div key={item.id} className={cn("grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 rounded-md border px-2 py-2", nextMoveToneClass(item.tone))}>
             <div className="flex h-7 w-7 items-center justify-center rounded-md border border-current/25 bg-void/25 font-mono text-[10px] font-semibold">
@@ -5963,7 +6107,7 @@ function QuickAutonomousNextMoves({ items, state }: { items: AutonomousNextMove[
       </div>
 
       <span className="sr-only" aria-label="Autonomous next moves receipt">
-        Next moves are built from the read-only freshness gate, source quality, chart-tape execution contract, command execution, action queue, execution runway, autonomous launch timing, protective trigger opportunity, loop throttle, and wallet feedback. Leader {leader?.label ?? "none"} action {leader?.action ?? "none"}; chart contract {state.autonomous_price_action_execution_contract.status}; chart boundary {state.autonomous_price_action_execution_contract.execution_boundary}; launch timing {state.autonomous_launch_timing.status}; trigger opportunity {state.autonomous_trigger_opportunity.status}; live execution stays {state.execution_gate.live_execution_enabled ? "armed by credentials" : "locked"}.
+        Next moves are built from the read-only freshness gate, source quality, chart-tape execution contract, profit benchmark, command execution, action queue, execution runway, autonomous launch timing, protective trigger opportunity, loop throttle, and wallet feedback. Leader {leader?.label ?? "none"} action {leader?.action ?? "none"}; chart contract {state.autonomous_price_action_execution_contract.status}; chart boundary {state.autonomous_price_action_execution_contract.execution_boundary}; profit benchmark {state.autonomous_profit_benchmark.status}; profit alpha {formatSignedCurrency(state.autonomous_profit_benchmark.cash_alpha_usd)}; profit thesis {state.autonomous_profit_thesis_verifier.status}; launch timing {state.autonomous_launch_timing.status}; trigger opportunity {state.autonomous_trigger_opportunity.status}; live execution stays {state.execution_gate.live_execution_enabled ? "armed by credentials" : "locked"}.
       </span>
     </section>
   );
@@ -7520,6 +7664,9 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
   const queueExecution = state.autonomous_action_queue_execution;
   const runway = state.autonomous_execution_runway;
   const chartContract = state.autonomous_price_action_execution_contract;
+  const profitBenchmark = state.autonomous_profit_benchmark;
+  const profitThesis = state.autonomous_profit_thesis_verifier;
+  const alphaFeedback = state.autonomous_alpha_feedback_loop;
   const activeRunwayStep = runway.steps.find((step) => step.id === runway.next_step_id) ?? runway.steps[0] ?? null;
   const throttle = state.autonomous_loop_throttle;
   const walletFeedback = state.autonomous_loop_feedback;
@@ -7570,6 +7717,17 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
       tone: priceActionExecutionContractTone(chartContract.status),
     });
   }
+
+  moves.push({
+    id: "profit-benchmark",
+    label: profitBenchmark.hot_coin_symbol ? `Benchmark ${profitBenchmark.hot_coin_symbol}` : "Profit benchmark",
+    action: alphaFeedback.action.replaceAll("-", " "),
+    detail: `${profitBenchmark.conclusion} ${alphaFeedback.summary}`,
+    etaSeconds: boundedSeconds(Math.min(alphaFeedback.review_after_seconds, profitThesis.review_after_seconds)),
+    score: profitBenchmark.benchmark_score,
+    budgetUsd: Math.max(0, profitThesis.chase_budget_usd),
+    tone: profitBenchmarkTone(profitBenchmark),
+  });
 
   moves.push({
     id: "command",
@@ -7695,7 +7853,7 @@ export function buildAutonomousNextMoves(state: Web3TradingState): AutonomousNex
     if (!deduped.has(move.id)) deduped.set(move.id, move);
   }
 
-  return Array.from(deduped.values()).slice(0, 7);
+  return Array.from(deduped.values()).slice(0, 8);
 }
 
 function boundedSeconds(value: number) {
