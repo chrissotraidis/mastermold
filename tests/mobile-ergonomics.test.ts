@@ -551,6 +551,7 @@ describe("mobile ergonomics source contracts", () => {
   test("GIVEN Paper trading opens on mobile WHEN source copy is checked THEN it names the simulator workflow plainly", () => {
     const paperPage = source("app/paper/page.tsx");
     const paperWorkspace = source("components/paper-workspace.tsx");
+    const web3Workspace = source("components/web3-trading-workspace-loader.tsx");
 
     expect(paperPage).toContain("Try a market call with simulator dollars");
     expect(paperPage).toContain("compare the result after the close date");
@@ -571,6 +572,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperWorkspace).toContain("mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4");
     expect(paperWorkspace).toContain("text-base font-semibold text-on-surface sm:text-lg");
     expect(paperWorkspace).toContain("Paper trades use this simulator balance only. No connected account is touched.");
+    expect(web3Workspace).toContain("Paper execution priority");
+    expect(web3Workspace).toContain("Redeploy protect");
+    expect(web3Workspace).toContain("Fresh entry");
+    expect(web3Workspace).toContain("Paper execution priority receipt");
+    expect(web3Workspace).toContain("Protect-first redeploy sell applied before released cash can chase again.");
+    expect(web3Workspace).toContain('live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}');
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved for later review.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved from the Paper form.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved to review the mobile Paper flow.");

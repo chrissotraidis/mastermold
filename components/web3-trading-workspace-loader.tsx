@@ -1085,11 +1085,14 @@ function QuickTradingCommandDeck({
         <QuickProfitRedeployAutopilotStrip state={state} />
 
         <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_13rem]">
-          <QuickWalletNetWorthChart
-            wallet={wallet}
-            sessionRun={sessionRun}
-            loopFeedback={state.autonomous_loop_feedback}
-          />
+          <div className="grid min-w-0 content-start gap-2">
+            <QuickWalletNetWorthChart
+              wallet={wallet}
+              sessionRun={sessionRun}
+              loopFeedback={state.autonomous_loop_feedback}
+            />
+            <QuickPaperExecutionPriorityTape state={state} />
+          </div>
 
           <div className="grid gap-2">
             <QuickAutonomousDecisionOwner state={state} compact />
@@ -3729,6 +3732,160 @@ function QuickWalletNetWorthChart({
       </dl>
     </div>
   );
+}
+
+type QuickPaperExecutionPriorityItem = {
+  id: string;
+  label: string;
+  symbol: string;
+  side: Web3TradingState["trade_tape"][number]["side"];
+  sizeUsd: number;
+  detail: string;
+  priority: "redeploy-protect" | "portfolio-protect" | "fresh-entry" | "observe";
+  tone: QuickChipTone;
+};
+
+function QuickPaperExecutionPriorityTape({ state }: { state: Web3TradingState }) {
+  const trades = state.trade_tape.slice(0, 5);
+  const items = trades.map(classifyQuickPaperExecutionPriority);
+  const redeployProtectUsd = items
+    .filter((item) => item.priority === "redeploy-protect")
+    .reduce((sum, item) => sum + item.sizeUsd, 0);
+  const protectUsd = items
+    .filter((item) => item.priority === "redeploy-protect" || item.priority === "portfolio-protect")
+    .reduce((sum, item) => sum + item.sizeUsd, 0);
+  const freshRiskUsd = items
+    .filter((item) => item.priority === "fresh-entry")
+    .reduce((sum, item) => sum + item.sizeUsd, 0);
+  const visibleItems = items.slice(0, 3);
+  const hiddenItemCount = Math.max(0, items.length - visibleItems.length);
+  const lastItem = items[0] ?? null;
+  const wallet = state.autonomous_wallet_telemetry;
+  const netRiskBias = freshRiskUsd - protectUsd;
+
+  return (
+    <section className="min-w-0 self-start rounded-md border border-outline-variant/25 bg-void/20 p-2 sm:p-3" aria-label="Paper execution priority tape">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Paper execution priority</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {lastItem ? `${lastItem.label} · ${lastItem.symbol}` : "Waiting for fills"}
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+            Recent durable fills are classified as protect/redeploy, portfolio release, or fresh-entry risk before the wallet curve is judged.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={redeployProtectUsd > 0 ? "caution" : "neutral"}>redeploy {formatCompactCurrency(redeployProtectUsd)}</Chip>
+          <Chip tone={protectUsd >= freshRiskUsd && protectUsd > 0 ? "engine" : freshRiskUsd > 0 ? "caution" : "neutral"}>
+            net {formatCompactSignedCurrency(-netRiskBias)}
+          </Chip>
+          <Chip tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"}>
+            {state.execution_gate.live_execution_enabled ? "live boundary" : "paper only"}
+          </Chip>
+        </div>
+      </div>
+
+      {visibleItems.length > 0 ? (
+        <div className="mt-2 grid gap-1.5">
+          {visibleItems.map((item) => (
+            <div key={item.id} className={cn("grid min-w-0 gap-1 rounded-md border p-2 sm:grid-cols-[minmax(0,1fr)_auto]", permissionToneClass(item.tone))}>
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className={cn("h-2 w-2 shrink-0 rounded-full", profitAuthorityBarClass(item.tone))} aria-hidden="true" />
+                  <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                  <p className="truncate text-xs font-semibold text-on-surface">
+                    {item.side} {item.symbol}
+                  </p>
+                </div>
+                <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-on-surface-variant">{item.detail}</p>
+              </div>
+              <p className="font-mono text-[11px] text-outline sm:text-right">{formatCompactCurrency(item.sizeUsd)}</p>
+            </div>
+          ))}
+          {hiddenItemCount > 0 ? (
+            <p className="rounded-md border border-outline-variant/20 bg-surface-dim/20 px-2 py-1 text-[11px] leading-4 text-on-surface-variant">
+              +{hiddenItemCount} older paper fills retained in the tape receipt.
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="mt-2 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2 text-xs leading-5 text-on-surface-variant">
+          No paper-ledger fills yet. Run a bounded tick or minute session to build the execution tape.
+        </p>
+      )}
+
+      <dl className="mt-2 grid grid-cols-3 gap-1" aria-label="Execution priority wallet effect">
+        <MiniProofStat label="Protect" value={formatCompactCurrency(protectUsd)} />
+        <MiniProofStat label="Fresh risk" value={formatCompactCurrency(freshRiskUsd)} />
+        <MiniProofStat label="Wallet" value={formatCompactSignedCurrency(wallet.window_pnl_usd)} />
+      </dl>
+      <span className="sr-only" aria-label="Paper execution priority receipt">
+        Paper execution priority tape: {items.length} recent fills; redeploy protect {formatCurrency(redeployProtectUsd)}; portfolio protect {formatCurrency(protectUsd)}; fresh-entry risk {formatCurrency(freshRiskUsd)}; latest {lastItem ? `${lastItem.label} ${lastItem.side} ${lastItem.symbol}` : "none"}; wallet equity {formatCurrency(wallet.equity_usd)}; wallet window PnL {formatSignedCurrency(wallet.window_pnl_usd)}; live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+      </span>
+    </section>
+  );
+}
+
+function classifyQuickPaperExecutionPriority(trade: Web3TradingState["trade_tape"][number]): QuickPaperExecutionPriorityItem {
+  const id = trade.id.toLowerCase();
+  const reason = trade.reason.toLowerCase();
+  if (id.startsWith("paper-profit-redeploy-protect") || reason.includes("profit redeploy protect-first")) {
+    return {
+      id: trade.id,
+      label: "Redeploy protect",
+      symbol: trade.symbol,
+      side: trade.side,
+      sizeUsd: trade.size_usd,
+      detail: "Protect-first redeploy sell applied before released cash can chase again.",
+      priority: "redeploy-protect",
+      tone: "caution",
+    };
+  }
+  if (
+    trade.side === "sell" ||
+    id.includes("position-risk") ||
+    id.includes("watchlist-rotation-sell") ||
+    id.includes("command-sell")
+  ) {
+    return {
+      id: trade.id,
+      label: "Portfolio release",
+      symbol: trade.symbol,
+      side: trade.side,
+      sizeUsd: trade.size_usd,
+      detail: "Paper sell reduces exposure before the next fresh-entry decision.",
+      priority: "portfolio-protect",
+      tone: "engine",
+    };
+  }
+  if (
+    id.includes("launch") ||
+    id.includes("buy") ||
+    id.includes("opportunity") ||
+    trade.side === "buy"
+  ) {
+    return {
+      id: trade.id,
+      label: "Fresh entry",
+      symbol: trade.symbol,
+      side: trade.side,
+      sizeUsd: trade.size_usd,
+      detail: "Paper buy adds risk and must earn it back through wallet feedback.",
+      priority: "fresh-entry",
+      tone: "caution",
+    };
+  }
+  return {
+    id: trade.id,
+    label: "Observed fill",
+    symbol: trade.symbol,
+    side: trade.side,
+    sizeUsd: trade.size_usd,
+    detail: "Paper fill is tracked for attribution before the next action.",
+    priority: "observe",
+    tone: "neutral",
+  };
 }
 
 function QuickRotationDirectorPanel({ state }: { state: Web3TradingState }) {
