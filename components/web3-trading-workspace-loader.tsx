@@ -444,6 +444,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
   const actionQueue = state.autonomous_action_queue;
   const actionQueueExecution = state.autonomous_action_queue_execution;
   const wakePlan = state.autonomous_wake_plan;
+  const loopImpact = state.autonomous_loop_impact_auditor;
   const scalpExit = state.autonomous_scalp_exit_autopilot;
   const exitLadder = state.position_exit_ladder;
   const trapRadar = state.autonomous_trap_radar;
@@ -497,6 +498,17 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
       tone: autoWatch ? "text-engine" : "text-outline",
     },
     {
+      label: "Impact",
+      value: loopImpact.status.replace("-", " "),
+      tone: loopImpact.status === "compound" || loopImpact.status === "continue"
+        ? "text-engine"
+        : loopImpact.status === "blocked" || loopImpact.status === "cooldown"
+          ? "text-critical"
+          : loopImpact.status === "idle"
+            ? "text-outline"
+            : "text-caution",
+    },
+    {
       label: "Refresh",
       value: wakePlan.should_refresh_first || autoWatchPlan.mode === "refresh" ? "first" : "current",
       tone: wakePlan.should_refresh_first || autoWatchPlan.mode === "refresh" ? "text-caution" : "text-engine",
@@ -542,6 +554,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "auto watch on" : "auto watch off"}</Chip>
             <Chip tone={!autoWatchPrimed && autoWatch ? "caution" : autoWatchPlan.mode === "sprint" || autoWatchPlan.mode === "minute" ? "engine" : "caution"}>
               {!autoWatchPrimed && autoWatch ? "auto refresh" : autoWatchPlan.label}
+            </Chip>
+            <Chip tone={loopImpactTone(loopImpact.status)}>
+              impact {loopImpact.status.replace("-", " ")}
             </Chip>
             <Chip tone={wakePlan.can_auto_watch_run ? wakePlan.status === "minute" || wakePlan.status === "sprint" ? "engine" : "caution" : "critical"}>
               {wakePlan.auto_watch_label}
@@ -648,7 +663,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           Auto decision: {!autoWatchPrimed && autoWatch ? `Refresh ${state.market_source.label} before the backend loop tick chooses the next local paper action.` : autoWatchPlan.reason}
         </p>
         <p className="mt-1 text-xs leading-5 text-outline">
-          Source refresh: {state.market_source.label} read refreshes first; smart ticks can attach chart proof before the backend loop owns trade and protect actions.
+          Impact gate: {loopImpact.summary} Source refresh: {state.market_source.label} read refreshes first; smart ticks can attach chart proof before the backend loop owns trade and protect actions.
         </p>
         <span className="sr-only" aria-label="Autonomous chart proof action receipt">
           Chart proof records read-only OHLCV or sample price-action evidence into the autonomous candle memory. Auto watch and Proof plus tick can use it when the freshness gate asks for candle evidence; it cannot sign, submit, custody funds, or guarantee profit.
@@ -657,7 +672,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           Proof plus tick refreshes the chart gate when needed, sends that receipt with the backend autonomous loop tick, then lets the server choose refresh, paper fill, protect, cooldown, or stand down. Live signing remains locked.
         </span>
         <span className="sr-only" aria-label="Auto watch smart tick receipt">
-          Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, so a chart-proof wake can immediately hand the refreshed evidence to the backend loop instead of waiting for a separate later tick.
+          Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets loop impact choose whether to continue, tighten, protect, harvest, refresh, cool down, or block the next backend tick. Current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; next cadence {loopImpact.next_cadence_seconds} seconds.
         </span>
 
         <section className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:mt-3 sm:p-3" aria-label="Web3 operator focus deck">
@@ -6957,6 +6972,8 @@ function sampleChartSummary(
 export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | "sprint" | "minute" | "refresh"; delayMs: number; label: string; reason: string } {
   const throttle = state.autonomous_loop_throttle;
   const throttleDelay = Math.max(3_000, Math.min(45_000, throttle.cadence_seconds * 1_000));
+  const loopImpact = state.autonomous_loop_impact_auditor;
+  const impactDelay = Math.max(2_000, Math.min(60_000, loopImpact.next_cadence_seconds * 1_000));
   const profitVelocity = state.autonomous_profit_velocity_governor;
   const tickPlan = state.autonomous_tick_plan;
   const tickGovernor = state.autonomous_tick_governor;
@@ -6977,12 +6994,62 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
       (profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane)
     )
   );
+  if (canRunMinuteLoop && profitVelocity.loop_permission === "protect-only" && hasProtectMinuteLane) {
+    return {
+      mode: "minute",
+      delayMs: Math.max(2_000, Math.min(20_000, tickGovernor.next_tick_seconds * 1_000 || impactDelay)),
+      label: "auto protect minute",
+      reason: `${profitVelocity.loop_permission.replace("-", " ")} overrides ${loopImpact.status} impact for ready protection: ${profitVelocity.max_trades_next_minute} trades/min max, ${queuedActionLabel}, ${formatCompactCurrency(nextMinuteBudget)} paper budget, ${formatCompactSignedCurrency(profitVelocity.expected_profit_per_minute_usd)}/min modeled edge. Backend loop tick owns the protective action.`,
+    };
+  }
+  if (loopImpact.must_refresh_proof || loopImpact.status === "refresh") {
+    return {
+      mode: "refresh",
+      delayMs: Math.max(2_000, Math.min(18_000, impactDelay)),
+      label: "impact refresh",
+      reason: `${loopImpact.next_action} Auto watch refreshes route/chart proof before another paper action because loop impact is ${loopImpact.status}.`,
+    };
+  }
+  if (loopImpact.status === "blocked") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(30_000, Math.min(60_000, impactDelay)),
+      label: "impact blocked",
+      reason: `${loopImpact.next_action} Auto watch will not increase frequency while loop impact blocks the next paper action.`,
+    };
+  }
+  if (loopImpact.status === "cooldown") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(20_000, Math.min(60_000, impactDelay)),
+      label: "impact cooldown",
+      reason: `${loopImpact.next_action} Auto watch slows the backend loop until the last paper impact repairs.`,
+    };
+  }
+  if (loopImpact.status === "protect" || loopImpact.status === "harvest") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(3_000, Math.min(18_000, impactDelay || throttleDelay)),
+      label: loopImpact.status === "harvest" ? "impact harvest" : "impact protect",
+      reason: `${loopImpact.next_action} Auto watch routes the next backend tick through ${loopImpact.action.replace("-", " ")} before fresh exposure.`,
+    };
+  }
+  if (loopImpact.must_reduce_frequency || loopImpact.status === "tighten") {
+    return {
+      mode: "cycle",
+      delayMs: Math.max(10_000, Math.min(30_000, impactDelay || throttleDelay)),
+      label: "impact tighten",
+      reason: `${loopImpact.next_action} Auto watch cuts cadence because the latest paper loop impact is ${loopImpact.impact_score}/100.`,
+    };
+  }
   if (canRunMinuteLoop) {
     return {
       mode: "minute",
-      delayMs: Math.max(2_000, Math.min(20_000, tickGovernor.next_tick_seconds * 1_000)),
+      delayMs: loopImpact.status === "compound" || loopImpact.status === "continue"
+        ? Math.max(2_000, Math.min(12_000, impactDelay, tickGovernor.next_tick_seconds * 1_000 || impactDelay))
+        : Math.max(2_000, Math.min(20_000, tickGovernor.next_tick_seconds * 1_000)),
       label: profitVelocity.loop_permission === "multi-fill" ? "auto minute" : profitVelocity.loop_permission === "protect-only" ? "auto protect minute" : "auto single minute",
-      reason: `${profitVelocity.loop_permission.replace("-", " ")} from profit velocity: ${profitVelocity.max_trades_next_minute} trades/min max, ${queuedActionLabel}, ${formatCompactCurrency(nextMinuteBudget)} paper budget, ${formatCompactSignedCurrency(profitVelocity.expected_profit_per_minute_usd)}/min modeled edge. Backend loop tick owns the trade/protect action.`,
+      reason: `${profitVelocity.loop_permission.replace("-", " ")} from profit velocity with ${loopImpact.status} impact: ${profitVelocity.max_trades_next_minute} trades/min max, ${queuedActionLabel}, ${formatCompactCurrency(nextMinuteBudget)} paper budget, ${formatCompactSignedCurrency(profitVelocity.expected_profit_per_minute_usd)}/min modeled edge. Backend loop tick owns the trade/protect action.`,
     };
   }
   if (tickGovernor.should_refresh_market_data || state.autonomous_data_freshness_gate.status === "refresh" || state.autonomous_data_freshness_gate.action === "fetch-candles") {
@@ -6996,9 +7063,11 @@ export function chooseAutoWatchPlan(state: Web3TradingState): { mode: "cycle" | 
   if (throttle.status === "sprint") {
     return {
       mode: "sprint",
-      delayMs: throttleDelay,
+      delayMs: loopImpact.status === "compound" || loopImpact.status === "continue"
+        ? Math.max(2_000, Math.min(throttleDelay, impactDelay))
+        : throttleDelay,
       label: "auto sprint",
-      reason: `${throttle.action.replace("-", " ")} from loop throttle: ${throttle.ticks} ticks, ${throttle.max_total_fills} fills, ${throttle.size_multiplier}x size; backend loop tick owns the trade/protect action; next check in ${throttle.cadence_seconds}s.`,
+      reason: `${throttle.action.replace("-", " ")} from loop throttle with ${loopImpact.status} impact: ${throttle.ticks} ticks, ${throttle.max_total_fills} fills, ${throttle.size_multiplier}x size; backend loop tick owns the trade/protect action; next check in ${Math.round(Math.max(2_000, Math.min(throttleDelay, impactDelay)) / 1_000)}s.`,
     };
   }
   if (throttle.status === "cycle" || throttle.status === "protect") {

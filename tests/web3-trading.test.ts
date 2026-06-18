@@ -1739,7 +1739,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(plan.label).toBe("auto protect minute");
     expect(plan.reason).toContain("1 trades/min max");
     expect(plan.reason).toContain("1 queued action");
-    expect(plan.reason).toContain("Backend loop tick owns the trade/protect action");
+    expect(plan.reason).toContain("Backend loop tick owns");
   });
 
   test("GIVEN stale live market evidence WHEN Auto watch plans THEN it refreshes read-only evidence instead of pausing", () => {
@@ -1782,12 +1782,120 @@ describe("Web3 autonomous trading subsystem", () => {
         status: "blocked",
         can_run: false,
       },
+      autonomous_loop_impact_auditor: {
+        ...state.autonomous_loop_impact_auditor,
+        status: "idle",
+        action: "observe",
+        must_refresh_proof: false,
+        must_reduce_frequency: false,
+      },
     });
 
     expect(plan.mode).toBe("refresh");
     expect(plan.label).toBe("auto refresh");
     expect(plan.reason).toContain("Fetch read-only OHLCV candles");
     expect(plan.reason).toContain("read-only DEX Screener live evidence");
+  });
+
+  test("GIVEN loop impact evidence WHEN Auto watch plans THEN impact can refresh, protect, tighten, or continue cadence", () => {
+    const state = getWeb3TradingState("base", 0);
+    const loopImpact = state.autonomous_loop_impact_auditor;
+    const quietMinuteLoop = {
+      ...state,
+      autonomous_profit_velocity_governor: {
+        ...state.autonomous_profit_velocity_governor,
+        max_trades_next_minute: 0,
+      },
+      autonomous_tick_plan: {
+        ...state.autonomous_tick_plan,
+        items: [],
+        max_actions_next_minute: 0,
+        bundle_action_count: 0,
+      },
+      autonomous_tick_governor: {
+        ...state.autonomous_tick_governor,
+        should_refresh_market_data: false,
+      },
+      autonomous_data_freshness_gate: {
+        ...state.autonomous_data_freshness_gate,
+        status: "clear",
+        action: "allow-paper",
+      },
+    } satisfies Web3TradingState;
+
+    const refreshPlan = chooseAutoWatchPlan({
+      ...quietMinuteLoop,
+      autonomous_loop_impact_auditor: {
+        ...loopImpact,
+        status: "refresh",
+        action: "refresh-proof",
+        must_refresh_proof: true,
+        next_cadence_seconds: 6,
+        next_action: "Refresh route and chart proof before the next paper loop.",
+      },
+    });
+    expect(refreshPlan.mode).toBe("refresh");
+    expect(refreshPlan.label).toBe("impact refresh");
+    expect(refreshPlan.delayMs).toBe(6_000);
+    expect(refreshPlan.reason).toContain("loop impact is refresh");
+
+    const protectPlan = chooseAutoWatchPlan({
+      ...quietMinuteLoop,
+      autonomous_loop_impact_auditor: {
+        ...loopImpact,
+        status: "protect",
+        action: "protect-wallet",
+        must_reduce_frequency: true,
+        must_refresh_proof: false,
+        next_cadence_seconds: 5,
+        next_action: "Protect wallet exposure before fresh entries.",
+      },
+    });
+    expect(protectPlan.mode).toBe("cycle");
+    expect(protectPlan.label).toBe("impact protect");
+    expect(protectPlan.reason).toContain("protect wallet");
+
+    const tightenPlan = chooseAutoWatchPlan({
+      ...quietMinuteLoop,
+      autonomous_loop_impact_auditor: {
+        ...loopImpact,
+        status: "tighten",
+        action: "tighten-size",
+        impact_score: 47,
+        must_reduce_frequency: true,
+        must_refresh_proof: false,
+        next_cadence_seconds: 9,
+        next_action: "Use a smaller paper action before increasing cadence.",
+      },
+    });
+    expect(tightenPlan.mode).toBe("cycle");
+    expect(tightenPlan.label).toBe("impact tighten");
+    expect(tightenPlan.delayMs).toBe(10_000);
+    expect(tightenPlan.reason).toContain("latest paper loop impact is 47/100");
+
+    const continuePlan = chooseAutoWatchPlan({
+      ...quietMinuteLoop,
+      autonomous_loop_throttle: {
+        ...state.autonomous_loop_throttle,
+        status: "sprint",
+        action: "run-sprint",
+        cadence_seconds: 12,
+        can_run: true,
+      },
+      autonomous_loop_impact_auditor: {
+        ...loopImpact,
+        status: "continue",
+        action: "keep-running",
+        must_reduce_frequency: false,
+        must_refresh_proof: false,
+        next_cadence_seconds: 4,
+        next_action: "Keep the paper loop running while post-loop impact stays positive.",
+      },
+    });
+    expect(continuePlan.mode).toBe("sprint");
+    expect(continuePlan.label).toBe("auto sprint");
+    expect(continuePlan.delayMs).toBe(4_000);
+    expect(continuePlan.reason).toContain("continue impact");
   });
 
   test("GIVEN a protect-only paper wallet WHEN next moves are built THEN the queue-owned sell is visible before the long desk", () => {
