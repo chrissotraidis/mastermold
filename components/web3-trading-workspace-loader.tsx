@@ -6920,6 +6920,10 @@ function QuickPromotedAutopilotPanel({
   const totalPnl = health?.total_net_pnl_usd ?? 0;
   const averagePnl = health?.average_net_pnl_usd ?? 0;
   const hitRate = health?.target_hit_rate_pct ?? 0;
+  const memoryStatus = health?.run_memory_status ?? "learning";
+  const memoryScore = health?.run_memory_score ?? 50;
+  const roundCap = health?.recommended_supervisor_round_cap ?? 0;
+  const memoryNextAction = health?.memory_next_action ?? "Collect promoted paper run evidence before expanding supervised runtime.";
 
   return (
     <section className="rounded-md border border-outline-variant/30 bg-surface-dim/15 p-2 sm:p-3" aria-label="Promoted paper autopilot health">
@@ -6935,6 +6939,7 @@ function QuickPromotedAutopilotPanel({
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone={promotedMemoryTone(memoryStatus)}>memory {memoryStatus.replaceAll("-", " ")}</Chip>
           <Chip tone={health?.profit_target_hit ? "engine" : netPnl >= 0 ? "caution" : "critical"}>{formatCompactSignedCurrency(netPnl)}</Chip>
           <Chip tone="demo">paper only</Chip>
           <Chip tone={health?.live_execution_permission === "blocked" ? "demo" : "critical"}>live locked</Chip>
@@ -6955,10 +6960,13 @@ function QuickPromotedAutopilotPanel({
           <ProfitMetric label="Total PnL" value={formatCompactSignedCurrency(totalPnl)} detail="promoted runs" tone={totalPnl > 0 ? "engine" : totalPnl < 0 ? "critical" : "neutral"} />
           <ProfitMetric label="Avg run" value={formatCompactSignedCurrency(averagePnl)} detail="paper PnL" tone={averagePnl > 0 ? "engine" : averagePnl < 0 ? "critical" : "neutral"} />
           <ProfitMetric label="Hit rate" value={`${hitRate.toFixed(0)}%`} detail="paper target" tone={hitRate >= 80 ? "engine" : hitRate > 0 ? "caution" : "neutral"} />
+          <ProfitMetric label="Memory gate" value={memoryStatus.replaceAll("-", " ")} detail={`${memoryScore}/100 score`} tone={promotedMemoryTone(memoryStatus)} />
+          <ProfitMetric label="Round cap" value={roundCap.toString()} detail="next promoted run" tone={roundCap > 1 ? "engine" : roundCap === 1 ? "caution" : "critical"} />
         </div>
       </div>
+      <p className="mt-2 text-xs leading-5 text-outline">{memoryNextAction}</p>
       <span className="sr-only" aria-label="Promoted paper autopilot health receipt">
-        Promoted paper autopilot status {status}; runner {runner}; promotion permission {health?.promotion_permission ?? "missing"}; supervisor {health?.supervisor_status ?? "not-run"}; net PnL {formatSignedCurrency(netPnl)}; posted ticks {postedTicks}; blocked ticks {blockedTicks}; run count {runCount}; total PnL {formatSignedCurrency(totalPnl)}; average run {formatSignedCurrency(averagePnl)}; target hit rate {hitRate} percent; target hit {health?.profit_target_hit ? "yes" : "no"}; loss brake {health?.loss_brake_tripped ? "tripped" : "clear"}; live execution {health?.live_execution_permission ?? "blocked"}; wallet mutation {health?.wallet_mutation_permission ?? "blocked"}.
+        Promoted paper autopilot status {status}; runner {runner}; promotion permission {health?.promotion_permission ?? "missing"}; supervisor {health?.supervisor_status ?? "not-run"}; net PnL {formatSignedCurrency(netPnl)}; posted ticks {postedTicks}; blocked ticks {blockedTicks}; run count {runCount}; total PnL {formatSignedCurrency(totalPnl)}; average run {formatSignedCurrency(averagePnl)}; target hit rate {hitRate} percent; memory status {memoryStatus}; memory score {memoryScore}; next supervisor round cap {roundCap}; memory next action {memoryNextAction}; target hit {health?.profit_target_hit ? "yes" : "no"}; loss brake {health?.loss_brake_tripped ? "tripped" : "clear"}; live execution {health?.live_execution_permission ?? "blocked"}; wallet mutation {health?.wallet_mutation_permission ?? "blocked"}.
       </span>
     </section>
   );
@@ -7673,6 +7681,13 @@ function promotedAutopilotTone(status: Web3PromotedPaperAutopilotHealth["status"
   if (status === "target-hit" || status === "completed" || status === "running") return "engine";
   if (status === "paper-guarded" || status === "not-started" || status === "absent") return "caution";
   if (status === "blocked") return "critical";
+  return "neutral";
+}
+
+function promotedMemoryTone(status: Web3PromotedPaperAutopilotHealth["run_memory_status"]): QuickChipTone {
+  if (status === "extend-paper" || status === "continue-paper") return "engine";
+  if (status === "learning" || status === "tighten-paper") return "caution";
+  if (status === "protect-paper" || status === "stand-down") return "critical";
   return "neutral";
 }
 

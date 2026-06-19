@@ -54,6 +54,10 @@ export type Web3PromotedPaperAutopilotHealth = {
   average_net_pnl_usd: number;
   target_hit_rate_pct: number;
   recent_runs: Web3PromotedPaperAutopilotHistoryEntry[];
+  run_memory_status: "learning" | "extend-paper" | "continue-paper" | "tighten-paper" | "protect-paper" | "stand-down";
+  run_memory_score: number;
+  recommended_supervisor_round_cap: number;
+  memory_next_action: string;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
 };
@@ -67,6 +71,7 @@ export type Web3PromotedPaperAutopilotHistoryEntry = {
   posted_ticks: number;
   blocked_ticks: number;
   profit_target_hit: boolean;
+  loss_brake_tripped: boolean;
 };
 
 const STATUSES: Web3PromotedPaperAutopilotReceipt["status"][] = [
@@ -125,6 +130,7 @@ export function getWeb3PromotedPaperAutopilotHealth(path = web3PromotedPaperAuto
   const totalPnl = cleanMoney(history.reduce((sum, item) => sum + item.net_pnl_usd, 0));
   const targetHits = history.filter((item) => item.profit_target_hit).length;
   const recentRuns = history.slice(-8);
+  const memory = buildRunMemoryGovernor(history);
   if (!receipt) {
     return {
       status: "absent",
@@ -143,6 +149,10 @@ export function getWeb3PromotedPaperAutopilotHealth(path = web3PromotedPaperAuto
       average_net_pnl_usd: runCount > 0 ? cleanMoney(totalPnl / runCount) : 0,
       target_hit_rate_pct: runCount > 0 ? cleanMoney(targetHits / runCount * 100) : 0,
       recent_runs: recentRuns,
+      run_memory_status: memory.status,
+      run_memory_score: memory.score,
+      recommended_supervisor_round_cap: memory.recommendedSupervisorRoundCap,
+      memory_next_action: memory.nextAction,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     };
@@ -165,6 +175,10 @@ export function getWeb3PromotedPaperAutopilotHealth(path = web3PromotedPaperAuto
     average_net_pnl_usd: runCount > 0 ? cleanMoney(totalPnl / runCount) : 0,
     target_hit_rate_pct: runCount > 0 ? cleanMoney(targetHits / runCount * 100) : 0,
     recent_runs: recentRuns,
+    run_memory_status: memory.status,
+    run_memory_score: memory.score,
+    recommended_supervisor_round_cap: memory.recommendedSupervisorRoundCap,
+    memory_next_action: memory.nextAction,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
   };
@@ -238,6 +252,7 @@ function receiptToHistoryEntry(receipt: Web3PromotedPaperAutopilotReceipt): Web3
     posted_ticks: receipt.posted_ticks,
     blocked_ticks: receipt.blocked_ticks,
     profit_target_hit: receipt.profit_target_hit,
+    loss_brake_tripped: receipt.loss_brake_tripped,
   };
 }
 
@@ -256,10 +271,72 @@ function sanitizeHistory(values: unknown[]) {
         posted_ticks: cleanCount(row.posted_ticks),
         blocked_ticks: cleanCount(row.blocked_ticks),
         profit_target_hit: row.profit_target_hit === true,
+        loss_brake_tripped: row.loss_brake_tripped === true,
       };
     })
     .filter((item): item is Web3PromotedPaperAutopilotHistoryEntry => item !== null)
     .slice(-24);
+}
+
+function buildRunMemoryGovernor(history: Web3PromotedPaperAutopilotHistoryEntry[]) {
+  const runCount = history.length;
+  if (runCount === 0) {
+    return {
+      status: "learning" as const,
+      score: 50,
+      recommendedSupervisorRoundCap: 2,
+      nextAction: "Collect at least one promoted paper run before expanding supervised runtime.",
+    };
+  }
+
+  const recent = history.slice(-6);
+  const recentPnl = cleanMoney(recent.reduce((sum, item) => sum + item.net_pnl_usd, 0));
+  const recentHitRate = cleanMoney(recent.filter((item) => item.profit_target_hit).length / recent.length * 100);
+  const latest = history[history.length - 1];
+  let lossStreak = 0;
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index].net_pnl_usd >= 0 && history[index].profit_target_hit) break;
+    lossStreak += 1;
+  }
+
+  if (latest.loss_brake_tripped || lossStreak >= 3 || recentPnl < -25) {
+    return {
+      status: "stand-down" as const,
+      score: 18,
+      recommendedSupervisorRoundCap: 0,
+      nextAction: "Stop promoted paper expansion until a fresh repeat proof repairs the run-memory drawdown.",
+    };
+  }
+  if (lossStreak >= 2 || recentHitRate < 50 || recentPnl < 0) {
+    return {
+      status: "protect-paper" as const,
+      score: 34,
+      recommendedSupervisorRoundCap: 0,
+      nextAction: "Protect paper capital; run proof-only or one manual review cycle before more supervised ticks.",
+    };
+  }
+  if (recentHitRate < 80 || recentPnl < 40) {
+    return {
+      status: "tighten-paper" as const,
+      score: 58,
+      recommendedSupervisorRoundCap: 1,
+      nextAction: "Keep promoted paper autonomy tight: one supervised round, then review the wallet curve.",
+    };
+  }
+  if (runCount >= 2 && recentHitRate >= 80 && recentPnl >= 100) {
+    return {
+      status: "extend-paper" as const,
+      score: 88,
+      recommendedSupervisorRoundCap: 4,
+      nextAction: "Run-memory is profitable; allow a larger bounded promoted paper window while keeping live execution locked.",
+    };
+  }
+  return {
+    status: "continue-paper" as const,
+    score: 74,
+    recommendedSupervisorRoundCap: 2,
+    nextAction: "Continue bounded promoted paper runs and keep collecting target-hit evidence.",
+  };
 }
 
 function cleanText(value: unknown, fallback: string, maxLength: number) {

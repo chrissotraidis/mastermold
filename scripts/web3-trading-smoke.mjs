@@ -70,6 +70,8 @@ async function main() {
   assert(typeof health.web3_promoted_paper_autopilot.run_count === "number", "Promoted paper autopilot health should expose sanitized history count.", health.web3_promoted_paper_autopilot);
   assert(typeof health.web3_promoted_paper_autopilot.total_net_pnl_usd === "number", "Promoted paper autopilot health should expose cumulative history PnL.", health.web3_promoted_paper_autopilot);
   assert(Array.isArray(health.web3_promoted_paper_autopilot.recent_runs), "Promoted paper autopilot health should expose compact recent run history.", health.web3_promoted_paper_autopilot);
+  assert(["learning", "extend-paper", "continue-paper", "tighten-paper", "protect-paper", "stand-down"].includes(health.web3_promoted_paper_autopilot.run_memory_status), "Promoted paper autopilot health should expose a known run-memory status.", health.web3_promoted_paper_autopilot);
+  assert(typeof health.web3_promoted_paper_autopilot.recommended_supervisor_round_cap === "number", "Promoted paper autopilot health should expose a memory-based supervisor round cap.", health.web3_promoted_paper_autopilot);
 
   const page = await request("/trading");
   const html = await page.text();
@@ -81,6 +83,8 @@ async function main() {
   assert(html.includes("Promoted run"), "Trading page should expose the promoted paper autopilot control.");
   assert(html.includes("Promoted paper autopilot"), "Trading page should expose persisted promoted autopilot health.");
   assert(html.includes("Promoted run memory"), "Trading page should expose promoted paper autopilot history memory.");
+  assert(html.includes("Memory gate"), "Trading page should expose the promoted autopilot memory gate.");
+  assert(html.includes("Round cap"), "Trading page should expose the memory-based promoted supervisor cap.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");

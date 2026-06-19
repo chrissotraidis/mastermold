@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
-import { writeWeb3PromotedPaperAutopilotReceipt } from "@/src/db/web3-promoted-paper-autopilot";
+import { getWeb3PromotedPaperAutopilotHealth, writeWeb3PromotedPaperAutopilotReceipt } from "@/src/db/web3-promoted-paper-autopilot";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +38,8 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
 
   const origin = new URL(request.url).origin;
   const scriptPath = join(process.cwd(), "scripts", "web3-promoted-paper-autopilot.mjs");
+  const runMemory = getWeb3PromotedPaperAutopilotHealth();
+  const supervisedRoundCap = Math.max(0, Math.min(parsed.value.max_supervisor_rounds, runMemory.recommended_supervisor_round_cap));
   const args = [
     scriptPath,
     `--base-url=${origin}`,
@@ -47,7 +49,7 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
     "--runner-id=browser-promoted-paper-autopilot",
     `--promotion-runs=${parsed.value.promotion_runs}`,
     `--promotion-ticks=${parsed.value.promotion_ticks}`,
-    `--max-supervisor-rounds=${parsed.value.max_supervisor_rounds}`,
+    `--max-supervisor-rounds=${supervisedRoundCap}`,
     `--max-ticks-per-round=${parsed.value.max_ticks_per_round}`,
     "--interval-ms=0",
     "--round-delay-ms=0",
@@ -69,6 +71,12 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
     return NextResponse.json({
       ...report,
       api_boundary: "local-paper-process",
+      requested_supervisor_rounds: parsed.value.max_supervisor_rounds,
+      memory_supervisor_round_cap: runMemory.recommended_supervisor_round_cap,
+      memory_applied_supervisor_rounds: supervisedRoundCap,
+      run_memory_status: runMemory.run_memory_status,
+      run_memory_score: runMemory.run_memory_score,
+      run_memory_next_action: runMemory.memory_next_action,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
