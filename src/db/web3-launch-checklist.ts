@@ -370,6 +370,7 @@ export function buildWeb3AutonomyLaunchChecklist(
             : "paper-operational";
   const cutoverRunway = buildCutoverRunway({
     profitProof,
+    localAccountabilityRepairHealth,
     productionSupervisor,
     providerCredentials,
     walletAccounting,
@@ -840,6 +841,7 @@ function buildResearchDecisions({
 
 function buildCutoverRunway({
   profitProof,
+  localAccountabilityRepairHealth,
   productionSupervisor,
   providerCredentials,
   walletAccounting,
@@ -850,6 +852,7 @@ function buildCutoverRunway({
   liveReviewPermitted,
 }: {
   profitProof: Web3ProfitProofReadiness;
+  localAccountabilityRepairHealth: Web3LocalAccountabilityRepairHealth;
   productionSupervisor: Web3ProductionSupervisorReadiness;
   providerCredentials: Web3ProviderCredentialsReadiness;
   walletAccounting: Web3TradingState["live_wallet_accounting_readiness"];
@@ -861,7 +864,7 @@ function buildCutoverRunway({
 }): Web3AutonomyCutoverRunwayStep[] {
   const profitStepStatus: Web3AutonomyCutoverRunwayStep["status"] = profitProof.can_satisfy_profit_gate
     ? "done"
-    : profitProof.status === "blocked" || profitProof.status === "drawdown-gated"
+    : profitProof.status === "blocked" || profitProof.status === "drawdown-gated" || localAccountabilityRepairHealth.repair_plateaued
       ? "blocked"
       : "active";
   const supervisorStatus: Web3AutonomyCutoverRunwayStep["status"] = productionSupervisor.status === "production-gated"
@@ -889,8 +892,12 @@ function buildCutoverRunway({
       command: profitProof.proof_plan.status === "needs-local-accountability"
         ? profitProof.proof_plan.local_accountability_repair_command
         : profitProof.proof_plan.safe_command,
-      evidence: `${profitProof.promoted_run_count} promoted run${profitProof.promoted_run_count === 1 ? "" : "s"}, ${formatSignedCompactValue(profitProof.promoted_total_net_pnl_usd)} total, ${profitProof.promoted_target_hit_rate_pct.toFixed(0)}% target hits.`,
-      next_action: profitProof.next_action,
+      evidence: localAccountabilityRepairHealth.status !== "absent"
+        ? `${profitProof.promoted_run_count} promoted run${profitProof.promoted_run_count === 1 ? "" : "s"}, ${formatSignedCompactValue(profitProof.promoted_total_net_pnl_usd)} total, ${profitProof.promoted_target_hit_rate_pct.toFixed(0)}% target hits; latest local repair ${localAccountabilityRepairHealth.status.replaceAll("-", " ")} at ${localAccountabilityRepairHealth.final_accountability_score}/100.`
+        : `${profitProof.promoted_run_count} promoted run${profitProof.promoted_run_count === 1 ? "" : "s"}, ${formatSignedCompactValue(profitProof.promoted_total_net_pnl_usd)} total, ${profitProof.promoted_target_hit_rate_pct.toFixed(0)}% target hits.`,
+      next_action: localAccountabilityRepairHealth.status !== "absent" && !profitProof.can_satisfy_profit_gate
+        ? localAccountabilityRepairHealth.next_action
+        : profitProof.next_action,
       blocks_live_capital: !profitProof.can_satisfy_profit_gate,
     },
     {

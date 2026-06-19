@@ -905,6 +905,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-launch-checklist.ts")).toContain("repair_actions");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("local_accountability_repair_health");
     expect(source("src/db/web3-local-accountability-repair.ts")).toContain("web3-local-accountability-repair");
+    expect(source("components/web3-trading-workspace-loader.tsx")).toContain("Local paper accountability repair health");
+    expect(source("app/settings/integrations/page.tsx")).toContain("Local paper repair health");
     expect(source("scripts/web3-local-accountability-repair.mjs")).toContain("writeLocalAccountabilityRepairReceipt");
     expect(source("scripts/web3-local-accountability-repair.mjs")).toContain("WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH");
     expect(source("docs/web3-credentials-runbook.md")).toContain("local paper accountability repair receipt");

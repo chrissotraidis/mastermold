@@ -7053,6 +7053,16 @@ describe("Web3 autonomous trading subsystem", () => {
       command: "npm run repair-accountability:web3",
       blocks_live_capital: true,
     });
+    expect(plateauChecklist.next_cutover_step).toMatchObject({
+      id: "profit-proof",
+      status: "blocked",
+      next_action: "Inspect route and fill quality before another repair cycle.",
+      blocks_live_capital: true,
+    });
+    expect(plateauChecklist.cutover_runway.find((step) => step.id === "profit-proof")).toMatchObject({
+      status: "blocked",
+      evidence: expect.stringContaining("latest local repair no progress at 46/100"),
+    });
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);
     expect(state.autonomous_daemon_handoff.runner_role).toBe("external-scheduler");

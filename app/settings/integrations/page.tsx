@@ -382,6 +382,7 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
   const remaining = checklist.remaining_work.slice(0, 6);
   const operatorInputs = checklist.operator_inputs_needed.slice(0, 8);
   const repairActions = checklist.repair_actions.slice(0, 6);
+  const repairHealth = checklist.local_accountability_repair_health;
   return (
     <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Settings Web3 launch blocker queue">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -483,6 +484,24 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
         </div>
         <p className="mt-2 text-xs leading-5 text-outline">
           Repair actions can refresh paper/readiness evidence only; they cannot create accounts, sign, submit, custody funds, or unlock live capital.
+        </p>
+      </div>
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Settings local paper repair health">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Local paper repair health</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              {repairHealth.status.replaceAll("-", " ")} · {repairHealth.final_accountability_score}/100
+            </p>
+          </div>
+          <LaunchQueueBadge
+            status={repairHealth.repair_plateaued ? "fail" : repairHealth.status === "complete" ? "pass" : "watch"}
+            label={repairHealth.receipt_fresh ? "fresh" : "stale"}
+          />
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{repairHealth.summary}</p>
+        <p className="mt-1 text-[10px] leading-4 text-outline">
+          Posted {repairHealth.attempts_posted}/{repairHealth.attempts_requested}; score delta {repairHealth.score_delta > 0 ? "+" : ""}{repairHealth.score_delta}; next: {repairHealth.next_action}
         </p>
       </div>
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
