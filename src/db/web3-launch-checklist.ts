@@ -384,7 +384,9 @@ function buildCutoverRunway({
       id: "profit-proof",
       label: "Prove paper edge",
       status: profitStepStatus,
-      command: "npm run autopilot-paper:web3",
+      command: profitProof.proof_plan.status === "needs-local-accountability"
+        ? profitProof.proof_plan.local_accountability_repair_command
+        : profitProof.proof_plan.safe_command,
       evidence: `${profitProof.promoted_run_count} promoted run${profitProof.promoted_run_count === 1 ? "" : "s"}, ${formatSignedCompactValue(profitProof.promoted_total_net_pnl_usd)} total, ${profitProof.promoted_target_hit_rate_pct.toFixed(0)}% target hits.`,
       next_action: profitProof.next_action,
       blocks_live_capital: !profitProof.can_satisfy_profit_gate,

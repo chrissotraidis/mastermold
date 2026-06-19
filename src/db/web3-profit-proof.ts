@@ -159,7 +159,7 @@ export function buildWeb3ProfitProofReadiness({
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     summary: profitProofSummary(status, readinessScore, localNet, runCount, hitRate, totalPnl),
-    next_action: blockers[0] ?? promotionRepairAction ?? profitProofNextAction(status),
+    next_action: blockers[0] ?? proofPlan.next_action ?? promotionRepairAction ?? profitProofNextAction(status),
     blockers,
     checks,
     controls: [
