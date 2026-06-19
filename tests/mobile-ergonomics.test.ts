@@ -899,10 +899,17 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Credential checklist");
     expect(settingsPage).toContain("Ignored env template");
     expect(settingsPage).toContain("Web3 credential environment template");
+    expect(settingsPage).toContain("Policy signer provider");
+    expect(settingsPage).toContain("PRIVY_APP_SECRET");
+    expect(settingsPage).toContain("TURNKEY_API_PRIVATE_KEY");
+    expect(settingsPage).toContain("MASTERMOLD_SESSION_POLICY_HASH");
     expect(settingsPage).toContain("Test: {item.test_action}");
     expect(settingsPage).toContain("acquisition.items.map");
     expect(source("src/db/web3-account-acquisition.ts")).toContain("https://dev.jup.ag/docs/swap/v2/order-and-execute");
     expect(source("src/db/web3-account-acquisition.ts")).toContain("Swap V2 /order and /execute");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("policy-signer");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("wallet private keys, session private keys");
+    expect(source("src/db/web3-account-setup.ts")).toContain("if (value === \"turnkey\") return \"turnkey-policy-wallet\"");
     expect(source("src/db/web3-signer-credential-packet.ts")).toContain("web3-signer-credential-packet");
     expect(source("src/db/web3-signer-credential-packet.ts")).toContain("PRIVY_SOLANA_WALLET_ID");
     expect(source("src/db/web3-signer-credential-packet.ts")).toContain("TURNKEY_SOLANA_WALLET_ACCOUNT");

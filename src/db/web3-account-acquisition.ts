@@ -16,6 +16,7 @@ export type Web3AccountAcquisitionItem = {
     | "jupiter"
     | "dedicated-wallet"
     | "manual-signer"
+    | "policy-signer"
     | "emergency-stop"
     | "accounting";
   label: string;
@@ -172,6 +173,30 @@ function buildAcquisitionItems(setup: Web3AccountSetupReceipt): Web3AccountAcqui
       test_action: "Build signer receipt and confirm provider dispatch, signing, and wallet mutation remain blocked.",
     },
     {
+      id: "policy-signer",
+      label: "Policy signer provider",
+      status: policySignerStatus(env.signer_provider),
+      priority: "next",
+      setup_url: "https://docs.turnkey.com/",
+      docs_url: "https://docs.privy.io/guide/server-wallets/",
+      env_targets: [
+        "PRIVY_APP_ID",
+        "PRIVY_APP_SECRET",
+        "PRIVY_SOLANA_WALLET_ID",
+        "TURNKEY_ORGANIZATION_ID",
+        "TURNKEY_API_PUBLIC_KEY",
+        "TURNKEY_API_PRIVATE_KEY",
+        "TURNKEY_SOLANA_WALLET_ACCOUNT",
+        "MASTERMOLD_SESSION_KEY_PUBLIC_KEY",
+        "MASTERMOLD_SESSION_POLICY_HASH",
+      ],
+      account_owner: "operator",
+      app_permission: "inspect-config-only",
+      next_action: policySignerNextAction(env.signer_provider),
+      security_rule: "Provider API credentials may live in ignored server env for local review; wallet private keys, session private keys, seed phrases, raw transactions, and signed payloads stay out of Mastermind.",
+      test_action: "Install signer-provider targets locally, then rebuild the signer credential packet and confirm only env target names are shown.",
+    },
+    {
       id: "emergency-stop",
       label: "Emergency stop operations",
       status: env.emergency_stop_configured ? "configured" : "blocked",
@@ -204,6 +229,29 @@ function buildAcquisitionItems(setup: Web3AccountSetupReceipt): Web3AccountAcqui
       test_action: "Build ledger receipt and confirm tax export remains paper-only until real settlement is reviewed.",
     },
   ];
+}
+
+function policySignerStatus(provider: Web3AccountSetupReceipt["environment_summary"]["signer_provider"]) {
+  if (provider === "external-wallet") return "future";
+  if (provider === "privy-server-wallet") {
+    return hasEnv("PRIVY_APP_ID") && hasEnv("PRIVY_APP_SECRET") && hasEnv("PRIVY_SOLANA_WALLET_ID") ? "configured" : "needed";
+  }
+  if (provider === "turnkey-policy-wallet") {
+    return hasEnv("TURNKEY_ORGANIZATION_ID") &&
+      hasEnv("TURNKEY_API_PUBLIC_KEY") &&
+      hasEnv("TURNKEY_API_PRIVATE_KEY") &&
+      hasEnv("TURNKEY_SOLANA_WALLET_ACCOUNT")
+      ? "configured"
+      : "needed";
+  }
+  return hasEnv("MASTERMOLD_SESSION_KEY_PUBLIC_KEY") && hasEnv("MASTERMOLD_SESSION_POLICY_HASH") ? "configured" : "needed";
+}
+
+function policySignerNextAction(provider: Web3AccountSetupReceipt["environment_summary"]["signer_provider"]) {
+  if (provider === "external-wallet") return "Keep manual external wallet as the first supervised-live signer path; configure a policy signer only after manual review asks for it.";
+  if (provider === "privy-server-wallet") return "Add Privy app id, app secret, and Solana wallet id in ignored local env, then rebuild signer readiness.";
+  if (provider === "turnkey-policy-wallet") return "Add Turnkey organization id, API key pair, and Solana wallet account in ignored local env, then rebuild signer readiness.";
+  return "Add session-key public key and policy hash only; never install a session private key.";
 }
 
 function acquisitionStatus(
@@ -240,4 +288,9 @@ function acquisitionSummary(status: Web3AccountAcquisitionReceiptStatus, missing
 
 function hashJson(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function hasEnv(name: string) {
+  const value = process.env[name];
+  return typeof value === "string" && value.trim().length > 0;
 }

@@ -870,6 +870,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.missing_required).toContain("Jupiter Swap V2 order rail");
     expect(receipt.next_external_action).toContain("Jupiter Developer Platform");
     expect(receipt.env_template).toContain("JUPITER_API_KEY=<set in ignored local env>");
+    expect(receipt.env_template).toContain("PRIVY_APP_SECRET=<set in ignored local env>");
+    expect(receipt.env_template).toContain("TURNKEY_API_PRIVATE_KEY=<set in ignored local env>");
+    expect(receipt.env_template).toContain("MASTERMOLD_SESSION_POLICY_HASH=<set in ignored local env>");
     expect(receipt.items.find((item) => item.id === "helius")).toMatchObject({
       status: "configured",
       app_permission: "inspect-config-only",
@@ -882,8 +885,56 @@ describe("Web3 autonomous trading subsystem", () => {
       test_action: expect.stringContaining("--require-jupiter-order"),
     });
     expect(receipt.items.find((item) => item.id === "dedicated-wallet")?.security_rule).toContain("Never paste the private key");
+    expect(receipt.items.find((item) => item.id === "policy-signer")).toMatchObject({
+      status: "future",
+      app_permission: "inspect-config-only",
+      env_targets: expect.arrayContaining(["PRIVY_APP_SECRET", "TURNKEY_API_PRIVATE_KEY", "MASTERMOLD_SESSION_POLICY_HASH"]),
+      test_action: expect.stringContaining("signer credential packet"),
+    });
+    expect(receipt.items.find((item) => item.id === "policy-signer")?.security_rule).toContain("wallet private keys");
     expect(receipt.controls.some((control) => control.includes("cannot create accounts"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
+  });
+
+  test("GIVEN short signer provider env aliases WHEN account setup and acquisition run THEN they normalize without leaking provider secrets", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "turnkey";
+    const turnkeyPrivateSecret = ["turnkey", "private", "secret"].join("-");
+    process.env.TURNKEY_ORGANIZATION_ID = "turnkey-org-secret";
+    process.env.TURNKEY_API_PUBLIC_KEY = "turnkey-public-secret";
+    process.env.TURNKEY_API_PRIVATE_KEY = turnkeyPrivateSecret;
+    process.env.TURNKEY_SOLANA_WALLET_ACCOUNT = "turnkey-wallet-secret";
+
+    const setupResponse = await ACCOUNT_SETUP_GET(new Request("http://localhost/api/web3-account-setup?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const setupReceipt = await json<{
+      environment_summary: { signer_provider: string };
+      checks: Array<{ id: string; status: string; detail: string }>;
+      secret_echo_permission: string;
+    }>(setupResponse);
+    expect(setupResponse.status).toBe(200);
+    expect(setupReceipt.environment_summary.signer_provider).toBe("turnkey-policy-wallet");
+    expect(setupReceipt.checks.find((check) => check.id === "manual-signer")).toMatchObject({
+      status: "watch",
+      detail: expect.stringContaining("turnkey policy wallet"),
+    });
+    expect(setupReceipt.secret_echo_permission).toBe("blocked");
+
+    const acquisitionResponse = await ACCOUNT_ACQUISITION_GET(new Request("http://localhost/api/web3-account-acquisition?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const acquisitionReceipt = await json<{
+      items: Array<{ id: string; status: string; next_action: string; env_targets: string[] }>;
+      env_template: string[];
+      secret_echo_permission: string;
+    }>(acquisitionResponse);
+    expect(acquisitionResponse.status).toBe(200);
+    expect(acquisitionReceipt.items.find((item) => item.id === "policy-signer")).toMatchObject({
+      status: "configured",
+      env_targets: expect.arrayContaining(["TURNKEY_API_PRIVATE_KEY", "TURNKEY_SOLANA_WALLET_ACCOUNT"]),
+    });
+    expect(acquisitionReceipt.env_template).toContain("TURNKEY_API_PRIVATE_KEY=<set in ignored local env>");
+    expect(acquisitionReceipt.secret_echo_permission).toBe("blocked");
+    expect(JSON.stringify(setupReceipt)).not.toContain(turnkeyPrivateSecret);
+    expect(JSON.stringify(acquisitionReceipt)).not.toContain(turnkeyPrivateSecret);
   });
 
   test("GIVEN env-backed provider checks WHEN provider health runs THEN it proves read rails without leaking secrets", async () => {

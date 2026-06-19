@@ -389,8 +389,11 @@ function accountItemEnvTargets(id: Web3ProviderAccountRunwayItem["id"]) {
 }
 
 function configuredSignerProvider(): Web3SignerSetupMode {
-  const value = process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER;
+  const value = (process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER ?? "").trim().toLowerCase();
   if (value === "privy-server-wallet" || value === "turnkey-policy-wallet" || value === "session-key-vault") return value;
+  if (value === "privy") return "privy-server-wallet";
+  if (value === "turnkey") return "turnkey-policy-wallet";
+  if (value === "session-key") return "session-key-vault";
   return "external-wallet";
 }
 
