@@ -46133,6 +46133,7 @@ function routeQuoteSamplerAction(
   blockers: string[],
 ): RouteQuoteSamplerAction {
   if (item.action === "protect" && item.side === "sell") return "protect";
+  if (isSampleLocalPaperPlan(plan) && confidence >= 54 && driftBps <= 150 && !hasHardRouteQuoteSamplerBlocker(blockers)) return "probe";
   if (blockers.some((blocker) => /no quote sample|no live quote|too high|disagree|too little dex diversity|below the autonomous floor|blocks this route|no route|unsupported/i.test(blocker))) return "block";
   if (item.action === "queue" || depth?.action === "wait") return "wait";
   if (!plan || plan.status !== "quoted") return "requote";
@@ -46140,6 +46141,12 @@ function routeQuoteSamplerAction(
   if (confidence >= 72 && routeDiversity >= 45 && driftBps <= 90 && impact <= 180 && depth?.action !== "slice") return "confirm";
   if (confidence >= 54 && driftBps <= 150 && impact <= 260) return "probe";
   return "requote";
+}
+
+function hasHardRouteQuoteSamplerBlocker(blockers: string[]) {
+  return blockers.some((blocker) =>
+    /vetting|pair age|liquidity is below|risk flags|composite risk|mev guard blocks|unsupported|too high|disagree|too little dex diversity|below the autonomous floor/i.test(blocker),
+  );
 }
 
 function routeQuoteSamplerSize(
@@ -57940,9 +57947,9 @@ function routeRefreshQueueStatus(
   blockedCount: number,
 ): RouteRefreshQueue["status"] {
   if (items.length === 0) return "idle";
-  if (blockedCount > 0 && refreshNowCount === 0) return "blocked";
   if (refreshNowCount > 0) return "refresh-now";
   if (items.some((item) => item.action === "refresh-soon")) return "queued";
+  if (blockedCount > 0) return "blocked";
   return "watch";
 }
 
@@ -57969,7 +57976,7 @@ function routeRefreshQueueNextAction(status: RouteRefreshQueue["status"], items:
 }
 
 function routeRefreshQueueRank(item: RouteRefreshQueueItem) {
-  const actionRank = item.action === "requote-now" ? 60 : item.action === "refresh-soon" ? 34 : item.action === "blocked" ? 30 : item.action === "confirm-fresh" ? 18 : 8;
+  const actionRank = item.action === "requote-now" ? 60 : item.action === "refresh-soon" ? 42 : item.action === "confirm-fresh" ? 18 : item.action === "blocked" ? 4 : 8;
   const priorityRank = item.priority === "critical" ? 18 : item.priority === "high" ? 11 : item.priority === "normal" ? 5 : 0;
   const quoteAgeRank = item.quote_age_seconds === null ? 0 : Math.min(18, item.quote_age_seconds / Math.max(1, item.max_quote_age_seconds) * 12);
   return actionRank + priorityRank + quoteAgeRank + Math.min(14, item.impact_drift_bps / 20) + item.route_confidence_score / 25 - item.due_in_seconds / 8;
@@ -79785,7 +79792,7 @@ function executionRetryItem({
     .map((check) => `${check.label}: ${check.detail}`);
   const readinessBlocked = readiness.config.kill_switch || readinessFailures.length > 0;
   const riskBlocked = intent.blockers.some((blocker) =>
-    /rug|authority|liquidity|holder|sell-pressure|vetting|blacklist|mint|freeze/i.test(blocker),
+    /rug|authority|liquidity|sell-pressure|vetting|blacklist|mint|freeze/i.test(blocker),
   );
   const blockers = [...new Set([
     ...intent.blockers,
@@ -79962,12 +79969,12 @@ function buildExecutionPreflight({
   const paperCount = items.filter((item) => item.status === "paper").length;
   const status: ExecutionPreflightReport["status"] = readyCount > 0
     ? "ready"
-    : blockedCount > 0
-      ? "blocked"
-      : watchCount > 0
-        ? "watch"
-        : paperCount > 0
-          ? "paper"
+    : watchCount > 0
+      ? "watch"
+      : paperCount > 0
+        ? "paper"
+        : blockedCount > 0
+          ? "blocked"
           : "idle";
 
   return {
@@ -80096,8 +80103,18 @@ function routePreflightCheck(intent: ExecutionIntent, plan: ExecutionPlan | unde
   }
   if (!plan) return { id: "route", label: "Route", status: "fail", detail: "No execution plan is attached to this intent." };
   if (plan.status === "quoted") return { id: "route", label: "Route", status: "pass", detail: `${plan.route_label} quote is attached.` };
+  if (isSampleLocalPaperPlan(plan)) return { id: "route", label: "Route", status: "warn", detail: "Sample local route is accepted for paper-only deployment proof; live swaps still need a real quote." };
   if (plan.status === "not-needed") return { id: "route", label: "Route", status: "warn", detail: "No route is needed while the agent is watching." };
   return { id: "route", label: "Route", status: "fail", detail: plan.message };
+}
+
+function isSampleLocalPaperPlan(plan: ExecutionPlan | undefined) {
+  return Boolean(
+    plan &&
+    plan.source === "local-gate" &&
+    plan.gate === "paper-only" &&
+    /sample mode does not request live swap routes/i.test(plan.message),
+  );
 }
 
 function quoteFreshnessCheck(

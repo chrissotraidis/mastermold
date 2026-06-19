@@ -7189,6 +7189,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.execution_gate.live_execution_enabled).toBe(false);
     expect(["blocked", "watching"]).toContain(state.autonomous_route_refresh_execution.status);
     expect(state.autonomous_route_refresh_execution.can_request_readonly_quote).toBe(false);
+    expect(state.execution_preflight.status).toBe("watch");
+    expect(state.execution_preflight.items.find((item) => item.symbol === "FARTCOIN")).toMatchObject({
+      status: "watch",
+    });
+    expect(state.execution_preflight.items.find((item) => item.symbol === "FARTCOIN")?.checks.find((check) => check.id === "route")).toMatchObject({
+      status: "warn",
+      detail: expect.stringContaining("paper-only deployment proof"),
+    });
+    expect(state.route_refresh_queue.status).toBe("queued");
+    expect(state.route_refresh_queue.items[0]).toMatchObject({
+      symbol: "FARTCOIN",
+      action: "refresh-soon",
+    });
     expect(state.autonomous_route_refresh_execution.local_rehearsal_ready).toBe(true);
     expect(state.autonomous_route_refresh_execution.local_rehearsal).toMatchObject({
       mode: "sample-route-rehearsal",
@@ -7199,28 +7212,14 @@ describe("Web3 autonomous trading subsystem", () => {
       wallet_mutation_permission: "blocked",
     });
     expect(state.autonomous_route_refresh_execution.local_rehearsal?.summary).toContain("paper repair");
-    expect(state.autonomous_profit_accountability.repair_plan.status).toBe("preflight-repair");
+    expect(state.autonomous_capital_allocator.blockers).not.toContain("Preflight blocks all deployable routes.");
+    expect(state.autonomous_profit_accountability.repair_plan.status).toBe("blocked");
     expect(state.autonomous_profit_accountability.repair_plan.route_refresh_required).toBe(false);
     expect(state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_ready).toBe(true);
     expect(state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_summary).toContain("paper repair");
-    expect(state.autonomous_profit_accountability.repair_plan.blocking_reason).toBeTruthy();
-    expect(state.autonomous_profit_accountability.repair_plan.can_run_local_paper).toBe(true);
-    expect(state.autonomous_profit_accountability.repair_plan.request).toMatchObject({
-      endpoint: "/api/web3-trading",
-      method: "POST",
-      body: {
-        source: "sample",
-        account: "persistent",
-        advance: true,
-        autonomous_session: {
-          action: "run",
-          policy_mode: "manual",
-          ticks: 1,
-          protect_book: true,
-          max_total_fills: 1,
-        },
-      },
-    });
+    expect(state.autonomous_profit_accountability.repair_plan.blocking_reason).toBe("No deploy or release budget is available for this cycle.");
+    expect(state.autonomous_profit_accountability.repair_plan.can_run_local_paper).toBe(false);
+    expect(state.autonomous_profit_accountability.repair_plan.request).toBeNull();
     expect(state.autonomous_profit_accountability.repair_plan.live_execution_permission).toBe("blocked");
     expect(state.autonomous_profit_accountability.repair_plan.wallet_mutation_permission).toBe("blocked");
   });
