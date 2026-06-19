@@ -101,6 +101,23 @@ export type Web3AutonomyLaunchOperatorInput = {
   secret_handling: string;
 };
 
+export type Web3AutonomyLaunchRepairAction = {
+  id:
+    | "repair-execution-quality"
+    | "repair-paper-accountability"
+    | "refresh-supervisor-proof"
+    | "rehearse-route-order"
+    | "scope-operator-inputs"
+    | "run-web3-verifier";
+  label: string;
+  status: "ready" | "active" | "blocked" | "review";
+  surface: "trading-cockpit" | "settings" | "terminal";
+  command: string | null;
+  detail: string;
+  next_action: string;
+  blocks_live_capital: boolean;
+};
+
 export type Web3AutonomyLaunchChecklist = {
   mode: "web3-autonomy-launch-checklist";
   status: Web3AutonomyLaunchChecklistStatus;
@@ -122,6 +139,7 @@ export type Web3AutonomyLaunchChecklist = {
   provider_credentials_readiness: Web3ProviderCredentialsReadiness;
   research_decisions: Web3AutonomyLaunchResearchDecision[];
   operator_inputs_needed: Web3AutonomyLaunchOperatorInput[];
+  repair_actions: Web3AutonomyLaunchRepairAction[];
   controls: string[];
   items: Web3AutonomyLaunchChecklistItem[];
   remaining_work: Web3AutonomyLaunchRemainingWorkItem[];
@@ -381,6 +399,16 @@ export function buildWeb3AutonomyLaunchChecklist(
     settlementPass,
     liveReviewPermitted,
   });
+  const repairActions = buildRepairActions({
+    items,
+    operatorInputsNeeded,
+    productionSupervisor,
+    profitProof,
+    routePass,
+    routeProofRefreshable,
+    adapterOrderReady: adapter.swap_v2_order_ready,
+    liveReviewPermitted,
+  });
 
   return {
     mode: "web3-autonomy-launch-checklist",
@@ -403,9 +431,11 @@ export function buildWeb3AutonomyLaunchChecklist(
     provider_credentials_readiness: providerCredentials,
     research_decisions: researchDecisions,
     operator_inputs_needed: operatorInputsNeeded,
+    repair_actions: repairActions,
     controls: [
       "This checklist is a launch-readiness contract; it does not sign, submit, custody funds, or unlock real-capital trading.",
       "The operator input packet names only public wallet scope, server-env targets, hash-only receipts, or external review decisions; private keys and seed phrases stay out of this app.",
+      "The launch repair queue turns raw blockers into safe cockpit, Settings, or terminal actions; it can refresh evidence and paper proof, but it cannot create external accounts or authorize live capital.",
       "Paper scale requires current paper profit proof, market freshness, promoted-run memory that is not protecting, and a clear kill switch.",
       "Live review requires every signer, relay, settlement, custody, route, process-supervision, provider-credential, wallet-accounting, profit-proof, and live-boundary proof to pass before a separate executor review.",
       "Real-capital autonomy stays blocked unless this checklist reaches manual live review and an external reviewed executor is deliberately enabled.",
@@ -568,6 +598,120 @@ function buildOperatorInputsNeeded({
       secret_handling: "Approval is an external decision record; it must not include private keys, seed phrases, or raw transaction payloads.",
     },
   ];
+}
+
+function buildRepairActions({
+  items,
+  operatorInputsNeeded,
+  productionSupervisor,
+  profitProof,
+  routePass,
+  routeProofRefreshable,
+  adapterOrderReady,
+  liveReviewPermitted,
+}: {
+  items: Web3AutonomyLaunchChecklistItem[];
+  operatorInputsNeeded: Web3AutonomyLaunchOperatorInput[];
+  productionSupervisor: Web3ProductionSupervisorReadiness;
+  profitProof: Web3ProfitProofReadiness;
+  routePass: boolean;
+  routeProofRefreshable: boolean;
+  adapterOrderReady: boolean;
+  liveReviewPermitted: boolean;
+}): Web3AutonomyLaunchRepairAction[] {
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const executionQuality = itemById.get("execution-quality");
+  const routeProof = itemById.get("route-proof");
+  const openOperatorInputs = operatorInputsNeeded.filter((item) => item.status !== "ready");
+  const supervisorFreshEnough = productionSupervisor.status === "production-gated" && productionSupervisor.receipt_fresh;
+  const proofPlan = profitProof.proof_plan;
+  const needsProfitRepair = !profitProof.can_satisfy_profit_gate || proofPlan.status !== "complete";
+
+  const actions: Web3AutonomyLaunchRepairAction[] = [];
+
+  if (executionQuality && executionQuality.status !== "pass") {
+    actions.push({
+      id: "repair-execution-quality",
+      label: "Repair fill quality",
+      status: executionQuality.status === "fail" ? "active" : "review",
+      surface: "trading-cockpit",
+      command: null,
+      detail: executionQuality.detail,
+      next_action: "Use the cockpit Auto Watch or protected paper tick controls to collect cleaner paper fills; keep fresh buys blocked until fill quality clears.",
+      blocks_live_capital: true,
+    });
+  }
+
+  if (needsProfitRepair) {
+    actions.push({
+      id: "repair-paper-accountability",
+      label: "Repair paper accountability",
+      status: proofPlan.status === "blocked" || proofPlan.status === "drawdown-gated" ? "blocked" : "active",
+      surface: "terminal",
+      command: proofPlan.status === "needs-local-accountability"
+        ? proofPlan.local_accountability_repair_command
+        : proofPlan.safe_command,
+      detail: `${profitProof.status.replaceAll("-", " ")} profit proof with ${formatSignedCompactValue(profitProof.local_paper_net_pnl_usd)} local paper net and ${profitProof.local_paper_accountability_score}/100 accountability.`,
+      next_action: proofPlan.next_action,
+      blocks_live_capital: true,
+    });
+  }
+
+  if (!supervisorFreshEnough || !productionSupervisor.can_satisfy_process_gate) {
+    actions.push({
+      id: "refresh-supervisor-proof",
+      label: "Refresh supervisor proof",
+      status: productionSupervisor.status === "blocked" ? "blocked" : "active",
+      surface: "terminal",
+      command: "npm run supervise:web3 -- --base-url=http://localhost:4010 --rounds=1 --ticks-per-round=1 --target-net-pnl=1 --max-drawdown=250 --json",
+      detail: productionSupervisor.summary,
+      next_action: productionSupervisor.next_action,
+      blocks_live_capital: true,
+    });
+  }
+
+  if (!(routePass && adapterOrderReady)) {
+    actions.push({
+      id: "rehearse-route-order",
+      label: "Rehearse route/order",
+      status: routeProofRefreshable ? "active" : "blocked",
+      surface: "terminal",
+      command: "npm run landing-drill:web3",
+      detail: routeProof?.detail ?? "Route/order proof is missing from the launch checklist.",
+      next_action: routeProof?.blocker ?? "Run the read-only landing drill after provider and route evidence are available.",
+      blocks_live_capital: true,
+    });
+  }
+
+  if (openOperatorInputs.length > 0) {
+    actions.push({
+      id: "scope-operator-inputs",
+      label: "Scope operator inputs",
+      status: openOperatorInputs.some((item) => item.status === "blocked") ? "blocked" : "active",
+      surface: "settings",
+      command: null,
+      detail: `${openOperatorInputs.length} operator input${openOperatorInputs.length === 1 ? "" : "s"} remain: ${openOperatorInputs.slice(0, 4).map((item) => item.label).join(", ")}.`,
+      next_action: "Open Settings or the cockpit operator packet, then provide only public wallet scope, server-env credentials, hash-only proof, or external review decisions.",
+      blocks_live_capital: true,
+    });
+  }
+
+  actions.push({
+    id: "run-web3-verifier",
+    label: "Run Web3 verifier",
+    status: liveReviewPermitted ? "review" : "ready",
+    surface: "terminal",
+    command: "npm run verify:web3 -- --base-url=http://localhost:4010",
+    detail: liveReviewPermitted
+      ? "Verifier should still pass before external live-executor review."
+      : "Non-strict verifier checks redaction, public-wallet restore, provider health, DEX receipt, Jupiter rehearsal boundary, and live locks.",
+    next_action: liveReviewPermitted
+      ? "Run strict and non-strict verification before any external live review."
+      : "Run this after each credential, wallet, signer, route, or launch-readiness change.",
+    blocks_live_capital: true,
+  });
+
+  return actions.slice(0, 6);
 }
 
 function buildResearchDecisions({

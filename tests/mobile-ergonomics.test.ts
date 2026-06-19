@@ -600,6 +600,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Private keys and seed phrases stay out of the app");
     expect(web3Workspace).toContain("operatorInputDotClass");
     expect(web3Workspace).toContain("operatorInputTextClass");
+    expect(web3Workspace).toContain("Web3 launch repair queue");
+    expect(web3Workspace).toContain("Launch repair queue");
+    expect(web3Workspace).toContain("Safe next actions for fill quality, paper proof, supervisor freshness, route rehearsal, and verification");
+    expect(web3Workspace).toContain("repairActions.map");
+    expect(web3Workspace).toContain("openRepairActions");
+    expect(web3Workspace).toContain("repairActionDotClass");
+    expect(web3Workspace).toContain("repairActionTextClass");
+    expect(web3Workspace).toContain("Repair actions refresh paper evidence only");
     expect(web3Workspace).toContain("Signer handoff receipt");
     expect(web3Workspace).toContain("Build signer receipt");
     expect(web3Workspace).toContain("private key storage blocked");
@@ -888,6 +896,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("hard blockers, review gates, and the next cutover step");
     expect(source("docs/web3-credentials-runbook.md")).toContain("restores the original public wallet/risk scope");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("operator_inputs_needed");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("repair_actions");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("buildRepairActions");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("repair-execution-quality");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("refresh-supervisor-proof");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("run-web3-verifier");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("dedicated-trading-wallet");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("jupiter-route-order-key");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("signer-custody-choice");

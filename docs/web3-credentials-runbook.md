@@ -46,7 +46,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 ## In-App Flow
 
 1. Open `/trading`.
-2. Review `Launch checklist`, `Operator input packet`, and `Researched stack decisions` to see the selected provider, market, execution, signer, risk, storage rules, and live-cutover path.
+2. Review `Launch checklist`, `Operator input packet`, `Launch repair queue`, and `Researched stack decisions` to see the selected provider, market, execution, signer, risk, storage rules, repair actions, and live-cutover path.
 3. Select the `Wiring` focus in the operator focus deck.
 4. Use `Web3 credential setup`.
 5. Enter or rely on server environment values for Helius/Solana RPC and Jupiter. API key fields are session-only in the browser form and are not saved to browser storage.
@@ -81,6 +81,8 @@ The Settings page also includes a `Web3 trading credentials` runway card. It sho
 When `HELIUS_API_KEY` is set, the app can derive the Helius mainnet RPC endpoint for read-only wallet accounting even if `SOLANA_RPC_URL` is omitted. When the resolved Solana RPC endpoint is Helius, live wallet accounting also attempts an aggregate DAS asset-index proof. That proof records asset counts, fungible counts, priced-asset counts, and priced value only; it does not store raw wallet holdings, authorize signing, or unlock live execution.
 
 The launch checklist now separates provider readiness into a read-provider rail and a signer-provider rail. `HELIUS_API_KEY` or `SOLANA_RPC_URL` plus `JUPITER_API_KEY` can make the read rail ready for wallet, route, and order rehearsal evidence, but signer/custody credentials, policy hashes, user approval, settlement, and manual live review are still separate gates.
+
+The trading cockpit launch checklist also includes a `Launch repair queue`. It converts raw blockers into the next safe repair action for fill quality, paper accountability, production-supervisor freshness, route/order rehearsal, operator input scope, and the Node verifier. Queue commands such as `npm run repair-accountability:web3`, `npm run supervise:web3 -- --base-url=http://localhost:4010 --rounds=1 --ticks-per-round=1 --target-net-pnl=1 --max-drawdown=250 --json`, `npm run landing-drill:web3`, and `npm run verify:web3 -- --base-url=http://localhost:4010` refresh paper or readiness evidence only. They cannot create external accounts, sign transactions, submit swaps, custody funds, or unlock live capital.
 
 Live DEX dry-run reads also expose a read-only wallet activity history receipt when a public wallet and Solana RPC are scoped. It uses `getSignaturesForAddress` to summarize recent signatures, slots, block times, and failure counts with signature previews and hashes only. It does not return raw transaction bodies, sign, submit, decode full swaps, or mutate balances.
 

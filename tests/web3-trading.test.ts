@@ -6771,6 +6771,27 @@ describe("Web3 autonomous trading subsystem", () => {
       storage: "external-operator-review",
       secret_handling: expect.stringContaining("private keys"),
     });
+    expect(launchChecklist.repair_actions.map((item) => item.id)).toEqual(expect.arrayContaining([
+      "run-web3-verifier",
+      "scope-operator-inputs",
+    ]));
+    expect(launchChecklist.repair_actions.find((item) => item.id === "run-web3-verifier")).toMatchObject({
+      label: "Run Web3 verifier",
+      status: expect.stringMatching(/ready|review/),
+      surface: "terminal",
+      command: "npm run verify:web3 -- --base-url=http://localhost:4010",
+      blocks_live_capital: true,
+    });
+    expect(launchChecklist.repair_actions.find((item) => item.id === "scope-operator-inputs")).toMatchObject({
+      label: "Scope operator inputs",
+      surface: "settings",
+      blocks_live_capital: true,
+    });
+    expect(launchChecklist.repair_actions.some((item) =>
+      item.command === "npm run landing-drill:web3" ||
+      item.command === "npm run repair-accountability:web3" ||
+      item.command?.includes("npm run supervise:web3"),
+    )).toBe(true);
     expect(launchChecklist.items.find((item) => item.id === "process-supervision")?.blocker).toContain("supervise:web3");
     expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("public wallet key");
     expect(launchChecklist.items.find((item) => item.id === "wallet-accounting")?.blocker).toContain("wallet holdings");
@@ -6799,6 +6820,7 @@ describe("Web3 autonomous trading subsystem", () => {
     ]));
     expect(launchChecklist.controls.some((control) => control.includes("launch-readiness contract"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("operator input packet"))).toBe(true);
+    expect(launchChecklist.controls.some((control) => control.includes("launch repair queue"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("private keys and seed phrases stay out"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("process-supervision"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("does not sign"))).toBe(true);
