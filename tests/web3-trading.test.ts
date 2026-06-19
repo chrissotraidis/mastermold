@@ -6969,12 +6969,16 @@ describe("Web3 autonomous trading subsystem", () => {
               meta: {
                 err: null,
                 preTokenBalances: [
-                  { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", uiTokenAmount: { uiAmount: 500, decimals: 6 } },
-                  { mint: "TokenLive111", uiTokenAmount: { uiAmount: 0, decimals: 6 } },
+                  { owner: "11111111111111111111111111111111", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", uiTokenAmount: { uiAmount: 500, decimals: 6 } },
+                  { owner: "11111111111111111111111111111111", mint: "TokenLive111", uiTokenAmount: { uiAmount: 0, decimals: 6 } },
+                  { owner: "OtherWallet111111111111111111111111111111", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", uiTokenAmount: { uiAmount: 7_500, decimals: 6 } },
+                  { owner: "OtherWallet111111111111111111111111111111", mint: "TokenLive111", uiTokenAmount: { uiAmount: 10, decimals: 6 } },
                 ],
                 postTokenBalances: [
-                  { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", uiTokenAmount: { uiAmount: 0, decimals: 6 } },
-                  { mint: "TokenLive111", uiTokenAmount: { uiAmount: tokenBalance, decimals: 6 } },
+                  { owner: "11111111111111111111111111111111", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", uiTokenAmount: { uiAmount: 0, decimals: 6 } },
+                  { owner: "11111111111111111111111111111111", mint: "TokenLive111", uiTokenAmount: { uiAmount: tokenBalance, decimals: 6 } },
+                  { owner: "OtherWallet111111111111111111111111111111", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", uiTokenAmount: { uiAmount: 0, decimals: 6 } },
+                  { owner: "OtherWallet111111111111111111111111111111", mint: "TokenLive111", uiTokenAmount: { uiAmount: 312_500, decimals: 6 } },
                 ],
               },
             },
@@ -7021,6 +7025,15 @@ describe("Web3 autonomous trading subsystem", () => {
       wallet_mutation_permission: "blocked",
     });
     expect(state.signature_confirmation_poll?.status).toBe("confirmed");
+    expect(state.settlement_fill_reconciliation).toMatchObject({
+      wallet_owner: "11111111111111111111111111111111",
+      wallet_owner_verified: true,
+      owner_matched_balance_count: 4,
+      unscoped_balance_count: 0,
+      input_usd: 500,
+      output_usd: null,
+      fill_amount: tokenBalance,
+    });
     expect(state.settlement_fill_reconciliation?.mirror_apply_request).toMatchObject({
       action: "apply",
       max_fill_usd: 500,

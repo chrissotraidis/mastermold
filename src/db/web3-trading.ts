@@ -8442,6 +8442,8 @@ export type SettlementFillReconciliationReport = {
   requested: boolean;
   status: "blocked" | "pending" | "reconciled" | "ambiguous" | "failed";
   signature: string | null;
+  wallet_owner: string | null;
+  wallet_owner_verified: boolean;
   slot: string | null;
   block_time: string | null;
   commitment: "confirmed" | "finalized";
@@ -8457,6 +8459,8 @@ export type SettlementFillReconciliationReport = {
   estimated_fill_price_usd: number | null;
   mirror_apply_request: PortfolioMirrorApplyRequest | null;
   token_delta_count: number;
+  owner_matched_balance_count: number;
+  unscoped_balance_count: number;
   max_fill_usd: number;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -15575,6 +15579,11 @@ function buildWeb3TradingState({
         href: "https://solana.com/docs/rpc/http/getsignaturestatuses",
       },
       {
+        label: "Solana transaction details",
+        use: "Owner-scoped token balance metadata for reconciling confirmed signed fills before local portfolio mirroring.",
+        href: "https://solana.com/docs/rpc/http/gettransaction",
+      },
+      {
         label: "Solana transaction expiration",
         use: "lastValidBlockHeight and blockhash expiration model for lifecycle expiry handling.",
         href: "https://solana.com/developers/guides/advanced/confirmation",
@@ -20231,11 +20240,13 @@ async function applySettlementFillReconciliation(
   const signature = request.signature ?? storedSignature;
   const commitment = request.commitment ?? "confirmed";
   const maxFillUsd = Math.max(10, Math.min(10_000, request.max_fill_usd ?? 1_000));
+  const walletOwner = state.execution_readiness.config.wallet_public_key;
   const blockers = [
     request.action !== "reconcile" ? "fill_reconcile.action must be reconcile." : null,
     !storedSignature ? "Fill reconciliation requires a stored relayed signature." : null,
     request.signature && storedSignature && request.signature !== storedSignature ? "Requested signature does not match the latest audited relay signature." : null,
     !signature ? "Fill reconciliation requires a transaction signature." : null,
+    !walletOwner || !isLikelySolanaPublicKey(walletOwner) ? "Fill reconciliation requires a scoped wallet public key before reading settlement deltas." : null,
     state.signed_transaction_relay.status !== "confirmed" && latest?.status !== "confirmed" ? "Fill reconciliation requires confirmed signature evidence first." : null,
     !isConfirmationStatus(state.signed_transaction_relay.confirmation_status ?? latest?.confirmation_status) ? "Fill reconciliation requires confirmed or finalized confirmation metadata." : null,
     !solanaRpcUrl() ? "SOLANA_RPC_URL is required for getTransaction fill reconciliation." : null,
@@ -20247,6 +20258,7 @@ async function applySettlementFillReconciliation(
       settlement_fill_reconciliation: settlementFillReconciliationReport({
         status: "blocked",
         signature,
+        walletOwner,
         commitment,
         maxFillUsd,
         blockers,
@@ -20254,7 +20266,7 @@ async function applySettlementFillReconciliation(
     };
   }
 
-  const result = await fetchSettlementFillDetails(fetchImpl, signature!, commitment, maxFillUsd);
+  const result = await fetchSettlementFillDetails(fetchImpl, signature!, commitment, maxFillUsd, walletOwner!);
   return {
     ...state,
     settlement_fill_reconciliation: result,
@@ -20266,6 +20278,7 @@ async function fetchSettlementFillDetails(
   signature: string,
   commitment: "confirmed" | "finalized",
   maxFillUsd: number,
+  walletOwner: string,
 ): Promise<SettlementFillReconciliationReport> {
   try {
     const response = await solanaRpc(fetchImpl, solanaRpcUrl()!, "getTransaction", [
@@ -20281,6 +20294,7 @@ async function fetchSettlementFillDetails(
       return settlementFillReconciliationReport({
         status: "pending",
         signature,
+        walletOwner,
         commitment,
         maxFillUsd,
         blockers: ["getTransaction did not return transaction details yet."],
@@ -20291,6 +20305,7 @@ async function fetchSettlementFillDetails(
       return settlementFillReconciliationReport({
         status: "ambiguous",
         signature,
+        walletOwner,
         commitment,
         maxFillUsd,
         slot: stringOrNumber(transaction.slot),
@@ -20302,6 +20317,7 @@ async function fetchSettlementFillDetails(
       return settlementFillReconciliationReport({
         status: "failed",
         signature,
+        walletOwner,
         commitment,
         maxFillUsd,
         slot: stringOrNumber(transaction.slot),
@@ -20309,8 +20325,8 @@ async function fetchSettlementFillDetails(
         blockers: ["Landed transaction metadata contains an execution error."],
       });
     }
-    const deltas = tokenBalanceDeltas(meta);
-    const nonZero = deltas.filter((delta) => Math.abs(delta.delta) > 0);
+    const balanceScope = tokenBalanceDeltas(meta, walletOwner);
+    const nonZero = balanceScope.deltas.filter((delta) => Math.abs(delta.delta) > 0);
     const sorted = [...nonZero].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
     const input = sorted.find((delta) => delta.delta < 0) ?? null;
     const output = sorted.find((delta) => delta.delta > 0) ?? null;
@@ -20328,12 +20344,15 @@ async function fetchSettlementFillDetails(
       !usdcDelta ? "No USDC balance delta was found, so USD fill notional is not proven." : null,
       !tokenDelta ? "No non-USDC token delta was found for the memecoin leg." : null,
       !fillSide ? "Could not infer buy/sell side from the USDC token delta." : null,
+      balanceScope.ownerMatchedBalanceCount === 0 ? "getTransaction token balances did not include the scoped wallet owner." : null,
+      balanceScope.unscopedBalanceCount > 0 ? "getTransaction included token balances without owner metadata; unscoped deltas were ignored." : null,
       fillUsd !== null && fillUsd > maxFillUsd ? `Inferred fill ${formatCompactValue(fillUsd)} exceeds the ${formatCompactValue(maxFillUsd)} reconciliation cap.` : null,
       nonZero.length > 4 ? "More than four token balance deltas were found; fill is too complex for automatic mirror sizing." : null,
     ].filter((item): item is string => Boolean(item));
     return settlementFillReconciliationReport({
       status: blockers.length > 0 ? "ambiguous" : "reconciled",
       signature,
+      walletOwner,
       commitment,
       maxFillUsd,
       slot: stringOrNumber(transaction.slot),
@@ -20357,12 +20376,15 @@ async function fetchSettlementFillDetails(
           }
         : null,
       tokenDeltaCount: nonZero.length,
+      ownerMatchedBalanceCount: balanceScope.ownerMatchedBalanceCount,
+      unscopedBalanceCount: balanceScope.unscopedBalanceCount,
       blockers,
     });
   } catch (error) {
     return settlementFillReconciliationReport({
       status: "failed",
       signature,
+      walletOwner,
       commitment,
       maxFillUsd,
       blockers: [error instanceof Error ? error.message : "getTransaction fill reconciliation failed."],
@@ -20563,20 +20585,32 @@ function autonomousSettlementWatchdogNextAction(
   return blockers[0] ?? "Clear settlement blockers before allowing autonomous mirror accounting.";
 }
 
-function tokenBalanceDeltas(meta: Record<string, any>) {
+function tokenBalanceDeltas(meta: Record<string, any>, walletOwner: string) {
   const byMint = new Map<string, number>();
+  let ownerMatchedBalanceCount = 0;
+  let unscopedBalanceCount = 0;
   const add = (balance: any, sign: 1 | -1) => {
     if (!balance || typeof balance !== "object") return;
+    const owner = typeof balance.owner === "string" ? balance.owner : null;
+    if (owner !== walletOwner) {
+      if (!owner) unscopedBalanceCount += 1;
+      return;
+    }
     const mint = typeof balance.mint === "string" ? balance.mint : null;
     const amount = tokenBalanceUiAmount(balance);
     if (!mint || amount === null) return;
+    ownerMatchedBalanceCount += 1;
     byMint.set(mint, (byMint.get(mint) ?? 0) + sign * amount);
   };
   const pre = Array.isArray(meta.preTokenBalances) ? meta.preTokenBalances : [];
   const post = Array.isArray(meta.postTokenBalances) ? meta.postTokenBalances : [];
   pre.forEach((balance) => add(balance, -1));
   post.forEach((balance) => add(balance, 1));
-  return [...byMint.entries()].map(([mint, delta]) => ({ mint, delta: roundMetric(delta) }));
+  return {
+    deltas: [...byMint.entries()].map(([mint, delta]) => ({ mint, delta: roundMetric(delta) })),
+    ownerMatchedBalanceCount,
+    unscopedBalanceCount,
+  };
 }
 
 function tokenBalanceUiAmount(balance: any) {
@@ -20597,6 +20631,7 @@ function tokenBalanceUiAmount(balance: any) {
 function settlementFillReconciliationReport({
   status,
   signature,
+  walletOwner = null,
   commitment,
   maxFillUsd,
   blockers,
@@ -20614,9 +20649,12 @@ function settlementFillReconciliationReport({
   estimatedFillPriceUsd = null,
   mirrorApplyRequest = null,
   tokenDeltaCount = 0,
+  ownerMatchedBalanceCount = 0,
+  unscopedBalanceCount = 0,
 }: {
   status: SettlementFillReconciliationReport["status"];
   signature: string | null;
+  walletOwner?: string | null;
   commitment: "confirmed" | "finalized";
   maxFillUsd: number;
   blockers: string[];
@@ -20634,12 +20672,16 @@ function settlementFillReconciliationReport({
   estimatedFillPriceUsd?: number | null;
   mirrorApplyRequest?: PortfolioMirrorApplyRequest | null;
   tokenDeltaCount?: number;
+  ownerMatchedBalanceCount?: number;
+  unscopedBalanceCount?: number;
 }): SettlementFillReconciliationReport {
   return {
     mode: "settlement-fill-reconciliation",
     requested: true,
     status,
     signature,
+    wallet_owner: walletOwner,
+    wallet_owner_verified: ownerMatchedBalanceCount > 0 && unscopedBalanceCount === 0 && blockers.length === 0,
     slot,
     block_time: blockTime,
     commitment,
@@ -20662,6 +20704,8 @@ function settlementFillReconciliationReport({
           filled_quantity: mirrorApplyRequest.filled_quantity === undefined ? undefined : roundMetric(mirrorApplyRequest.filled_quantity),
         },
     token_delta_count: tokenDeltaCount,
+    owner_matched_balance_count: ownerMatchedBalanceCount,
+    unscoped_balance_count: unscopedBalanceCount,
     max_fill_usd: maxFillUsd,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -20671,7 +20715,8 @@ function settlementFillReconciliationReport({
     next_action: settlementFillNextAction(status, blockers),
     controls: [
       "Reads Solana getTransaction metadata for the latest audited confirmed signature only.",
-      "Uses token balance deltas as fill evidence and blocks when deltas are missing, ambiguous, complex, failed, or over cap.",
+      "Infers fill side and notional only from token balance deltas owned by the scoped wallet public key.",
+      "Ownerless, other-owner, missing, ambiguous, complex, failed, or over-cap deltas stay blocked.",
       "Does not sign, submit, rebroadcast, store transaction bodies, or mutate a wallet.",
       "Portfolio mirror apply remains a separate idempotent step after fill price and quantity are reviewed.",
     ],
