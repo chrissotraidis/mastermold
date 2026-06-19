@@ -767,6 +767,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("live chat sends the question plus visible app context");
     expect(settingsPage).toContain("selected chat service");
     expect(settingsPage).not.toContain("selected chat provider");
+    expect(settingsPage).toContain("Web3 trading credentials");
+    expect(settingsPage).toContain("Secure setup state for the autonomous Web3 paper desk");
+    expect(settingsPage).toContain("Open Web3 wiring");
+    expect(settingsPage).toContain("live execution blocked");
+    expect(settingsPage).toContain("wallet mutation blocked");
+    expect(settingsPage).toContain("secret echo blocked");
+    expect(settingsPage.indexOf("<Web3CredentialsRunwayCard")).toBeLessThan(
+      settingsPage.indexOf("<ConnectionChecks"),
+    );
     expect(settingsPage).toContain("cannot sign transactions");
     expect(settingsPage).toContain("Check account access first, then import a holdings snapshot only when you press import.");
     expect(settingsPage).toContain("Connection checks");

@@ -1,4 +1,5 @@
-import { Database, ExternalLink, LockKeyhole, PlugZap, RefreshCw, ShieldCheck } from "lucide-react";
+import { Database, ExternalLink, KeyRound, LockKeyhole, PlugZap, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { BrainInitializationPanel } from "@/components/brain-initialization-panel";
 import { PageHeader } from "@/components/page-header";
@@ -13,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { getBrainStateAfterDueScheduleCheck } from "@/src/db/brain";
 import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/integrations";
 import { getPortfolio } from "@/src/db/portfolio";
+import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
+import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
 
 const statusLabels: Record<IntegrationStatusJson["status"], string> = {
   connected: "Test passed",
@@ -31,7 +34,12 @@ type SettingsIntegrationStatus = Omit<IntegrationStatusJson, "id" | "service"> &
 export default async function IntegrationsSettingsPage() {
   const integrations = getIntegrationStatuses().map(toSettingsIntegrationStatus);
   const portfolio = getPortfolio();
-  const brainState = toPublicBrainState(await getBrainStateAfterDueScheduleCheck({ trigger: "settings-open" }));
+  const [brainStateRaw, web3State] = await Promise.all([
+    getBrainStateAfterDueScheduleCheck({ trigger: "settings-open" }),
+    getWeb3TradingStateAsync({ advance: false }),
+  ]);
+  const brainState = toPublicBrainState(brainStateRaw);
+  const web3AccountReceipt = buildWeb3AccountSetupReceipt(web3State);
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -45,6 +53,10 @@ export default async function IntegrationsSettingsPage() {
 
         <div className="mb-8">
           <ManualHoldingsPanel holdings={portfolio.manual_holdings} />
+        </div>
+
+        <div className="mb-8">
+          <Web3CredentialsRunwayCard receipt={web3AccountReceipt} />
         </div>
 
         <div className="mb-8">
@@ -77,6 +89,94 @@ export default async function IntegrationsSettingsPage() {
         </Card>
       </div>
     </AppShell>
+  );
+}
+
+function Web3CredentialsRunwayCard({ receipt }: { receipt: Web3AccountSetupReceipt }) {
+  const requiredConfigured = receipt.environment_summary.required_configured_count;
+  const requiredTotal = receipt.environment_summary.required_account_count;
+  const liveReady = receipt.status === "live-review-blocked";
+  const primaryItems = receipt.items.filter((item) =>
+    ["helius-read-rail", "jupiter-execution-rail", "dedicated-trading-wallet", "external-signer", "emergency-stop", "tax-ledger"].includes(item.id),
+  );
+
+  return (
+    <section aria-labelledby="web3-credential-runway-title">
+      <Card className="border-engine/30 bg-engine/[0.045]">
+        <CardHeader className="space-y-4 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-engine/30 bg-engine/10 text-engine">
+                <WalletCards aria-hidden="true" className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <CardTitle as="h2" id="web3-credential-runway-title" className="text-xl text-on-surface">
+                  Web3 trading credentials
+                </CardTitle>
+                <p className="mt-1 text-sm leading-6 text-outline">
+                  Secure setup state for the autonomous Web3 paper desk before any live-capital review.
+                </p>
+              </div>
+            </div>
+            <StatusBadge status={liveReady ? "connected" : requiredConfigured > 0 ? "stubbed" : "credential_gated"} />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 p-5 pt-0">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SettingsMetric label="Required rails" value={`${requiredConfigured}/${requiredTotal}`} />
+            <SettingsMetric label="Current gate" value={receipt.status.replaceAll("-", " ")} />
+            <SettingsMetric label="Signer posture" value={receipt.environment_summary.signer_provider.replaceAll("-", " ")} />
+          </div>
+
+          <p className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-sm leading-6 text-on-surface-variant">
+            {receipt.summary} {receipt.next_action}
+          </p>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {primaryItems.map((item) => (
+              <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-on-surface">{item.label}</p>
+                    <p className="mt-1 text-xs leading-5 text-outline">{item.next_action}</p>
+                  </div>
+                  <CredentialStateBadge configured={item.configured} status={item.status} />
+                </div>
+                {item.env_targets.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {item.env_targets.map((target) => (
+                      <span key={target} className="rounded-md border border-outline-variant/35 bg-void/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                        {target}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/trading"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/40 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15"
+            >
+              <KeyRound aria-hidden="true" className="size-4" />
+              Open Web3 wiring
+            </Link>
+            <Badge variant="outline" className="border-outline-variant/40 bg-surface-dim/45 text-outline">
+              live execution blocked
+            </Badge>
+            <Badge variant="outline" className="border-outline-variant/40 bg-surface-dim/45 text-outline">
+              wallet mutation blocked
+            </Badge>
+          </div>
+
+          <p className="sr-only" aria-label="Web3 credentials security boundary">
+            Web3 trading credentials status {receipt.status}; live execution blocked; wallet mutation blocked; private key storage blocked; seed phrase storage blocked; secret echo blocked.
+          </p>
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
@@ -262,6 +362,22 @@ function PortfolioImportStatusCard({ portfolio }: { portfolio: ReturnType<typeof
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function CredentialStateBadge({ configured, status }: { configured: boolean; status: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "shrink-0 border text-xs",
+        configured && "border-engine/35 bg-engine/10 text-engine",
+        !configured && status === "blocked" && "border-critical/35 bg-critical/10 text-critical",
+        !configured && status !== "blocked" && "border-caution/40 bg-caution/10 text-caution",
+      )}
+    >
+      {configured ? "Configured" : status.replaceAll("-", " ")}
+    </Badge>
   );
 }
 

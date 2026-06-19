@@ -63,6 +63,8 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 16. Review the Wiring focus `Production worker review` panel after `npm run supervise:web3` writes a sanitized paper-supervisor receipt. It checks receipt freshness, circuit state, profit target, drawdown brake, and the live-boundary process gate, but it cannot install a process manager or authorize live capital from inside the app.
 17. Use the Wiring focus `Run stop drill` control to record a local dry-run emergency-stop receipt. The drill halts browser Auto Watch and verifies ops target status, but it does not send webhooks, stop external processes by itself, sign, submit, or mutate wallets.
 
+The Settings page also includes a `Web3 trading credentials` runway card. It shows the same account-setup receipt as configured/missing status for Helius/Solana, Jupiter, dedicated wallet, signer posture, emergency-stop ops, and accounting targets, then links back to `/trading` for provider tests and dry-run receipts. This Settings card is read-only: it does not accept API keys, persist secrets, create external accounts, sign, submit, or mutate wallets.
+
 ## Researched Default Stack
 
 - Provider stack: Helius/Solana RPC first for read-only wallet and chain data, plus Helius DAS `getAssetsByOwner` for wallet-held asset visibility, with secrets kept in server env or one-shot test inputs.
