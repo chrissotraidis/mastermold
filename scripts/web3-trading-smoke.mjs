@@ -3,6 +3,7 @@ import { buildSupervisorReceipt, runWeb3DaemonSupervisor } from "./web3-daemon-s
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 import { buildLiveLandingDrillReport } from "./web3-live-landing-drill.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
+import { buildPaperPromotionGuardReport } from "./web3-paper-promotion-guard.mjs";
 import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
 import { buildSettlementReconciliationReport } from "./web3-settlement-reconciliation.mjs";
 
@@ -4895,6 +4896,26 @@ async function main() {
   assert(repeatRun.hit_rate_met === true && repeatRun.drawdown_met === true && repeatRun.deployed_alpha_met === true && repeatRun.consistency_met === true, "Autonomous repeat proof should disclose each promotion threshold result.", repeatRun);
   assert(Array.isArray(repeatRun.proof_gate_blockers) && repeatRun.proof_gate_blockers.length === 0, "Autonomous repeat proof should not carry blockers when the proof gate passes.", repeatRun);
   assert(repeatRun.runs.every((report) => report.mode === "web3-autonomous-forward-suite" && report.scenario_count === 3), "Autonomous repeat proof should rerun the multi-regime suite by default.", repeatRun.runs);
+  const promotionGuard = buildPaperPromotionGuardReport({
+    config: {
+      baseUrl,
+      scenario: "all",
+      source: "sample",
+      minNetPnlUsd: 0,
+      minHitRatePct: 100,
+      minDeployedAlphaUsd: 0,
+      maxDrawdownUsd: 1_000,
+      minConsistencyScore: 80,
+    },
+    repeatProof: repeatRun,
+  });
+  assert(promotionGuard.mode === "web3-paper-promotion-guard", "Paper promotion guard should publish a dedicated report mode.", promotionGuard);
+  assert(promotionGuard.paper_only === true && promotionGuard.live_execution_permission === "blocked", "Paper promotion guard must not grant live execution.", promotionGuard);
+  assert(["scale-paper", "selective-paper", "protect-paper", "blocked"].includes(promotionGuard.status), "Paper promotion guard should publish a known promotion posture.", promotionGuard);
+  assert(promotionGuard.promotion_permission !== "blocked" && promotionGuard.can_start_supervised_paper === true, "Passing repeat proof should permit bounded supervised paper autonomy.", promotionGuard);
+  assert(promotionGuard.recommended_paper_size_multiplier > 0 && promotionGuard.recommended_supervisor_rounds > 0, "Promotion guard should recommend bounded paper size and supervised rounds.", promotionGuard);
+  assert(promotionGuard.full_wallet_hot_coin_alpha_usd < 0 ? promotionGuard.status === "selective-paper" : promotionGuard.status !== "blocked", "Negative full-wallet hot-coin alpha should keep promotion selective instead of scaling blindly.", promotionGuard);
+  assert(promotionGuard.controls.some((control) => control.includes("cannot sign")), "Promotion guard should disclose the paper-only execution boundary.", promotionGuard);
   const blockedRepeatGate = buildForwardRepeatReport({
     config: {
       baseUrl,
@@ -4914,6 +4935,21 @@ async function main() {
   });
   assert(blockedRepeatGate.proof_gate_status === "blocked" && blockedRepeatGate.target_met === false, "Autonomous repeat proof should block promotion when deployed-alpha thresholds are not met.", blockedRepeatGate);
   assert(blockedRepeatGate.proof_gate_blockers.some((blocker) => blocker.includes("deployed alpha")), "Autonomous repeat proof should explain deployed-alpha gate failures.", blockedRepeatGate);
+  const blockedPromotionGuard = buildPaperPromotionGuardReport({
+    config: {
+      baseUrl,
+      scenario: "all",
+      source: "sample",
+      minNetPnlUsd: 500,
+      minHitRatePct: 100,
+      minDeployedAlphaUsd: 9_999,
+      maxDrawdownUsd: 1,
+      minConsistencyScore: 99,
+    },
+    repeatProof: blockedRepeatGate,
+  });
+  assert(blockedPromotionGuard.status === "blocked" && blockedPromotionGuard.exit_code === 1, "Paper promotion guard should block autonomy when repeat proof gates fail.", blockedPromotionGuard);
+  assert(blockedPromotionGuard.can_start_supervised_paper === false && blockedPromotionGuard.recommended_paper_size_multiplier === 0, "Blocked promotion guard should not allow supervised paper expansion.", blockedPromotionGuard);
   const livePreflight = buildLiveCapitalPreflightReport({
     config: {
       baseUrl,
