@@ -8429,6 +8429,41 @@ export type ManagedSubmitReceiptRequest = {
   reference_id?: string;
 };
 
+export type ManagedSubmitStatusPollRequest = {
+  action: "poll";
+  provider: ManagedSubmitReceiptRequest["provider"];
+  provider_status_id: string;
+  request_id?: string;
+  payload_hash?: string;
+  result?: {
+    status: "pending" | "confirmed" | "failed";
+    transaction_signature?: string;
+    confirmation_status?: "processed" | "confirmed" | "finalized";
+    slot?: string;
+    reason?: string;
+  };
+};
+
+export type ManagedSubmitStatusPollReport = {
+  mode: "managed-submit-status-poll";
+  requested: boolean;
+  status: "blocked" | "pending" | "confirmed" | "failed";
+  provider: ManagedSubmitStatusPollRequest["provider"];
+  provider_status_id: string;
+  request_id: string | null;
+  payload_hash: string | null;
+  signature: string | null;
+  confirmation_status: ExecutionAuditEntry["confirmation_status"];
+  slot: string | null;
+  audit_entry_id: string | null;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  blockers: string[];
+  summary: string;
+  next_action: string;
+  controls: string[];
+};
+
 export type SignatureConfirmationPollRequest = {
   action: "poll";
   signature?: string;
@@ -9332,6 +9367,7 @@ export type Web3TradingState = {
   signed_transaction_relay: SignedTransactionRelay;
   autonomous_order_handoff: AutonomousOrderHandoff;
   portfolio_mirror_apply?: PortfolioMirrorApplyReport;
+  managed_submit_status_poll?: ManagedSubmitStatusPollReport;
   signature_confirmation_poll?: SignatureConfirmationPollReport;
   settlement_fill_reconciliation?: SettlementFillReconciliationReport;
   autonomous_settlement_watchdog?: AutonomousSettlementWatchdogReport;
@@ -9492,6 +9528,7 @@ export type TradingStateInput = {
   execution?: ExecutionUpdate;
   signer_request?: AutonomousSignerRequestRelayRequest;
   managed_submit?: ManagedSubmitReceiptRequest;
+  managed_submit_poll?: ManagedSubmitStatusPollRequest;
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
   fill_reconcile?: SettlementFillReconciliationRequest;
@@ -13112,7 +13149,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: configuredState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.managed_submit_poll, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
@@ -13148,7 +13185,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: fallbackState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.managed_submit_poll, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -13189,7 +13226,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
     monitorDecision: liveState.autonomous_monitor,
   });
-  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
+  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.managed_submit_poll, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
 }
 
 async function maybeApplyRouteRefreshRequest({
@@ -18012,6 +18049,7 @@ async function finalizeExecutionAudit(
   drill: boolean,
   signerRequest: AutonomousSignerRequestRelayRequest | undefined,
   managedSubmit: ManagedSubmitReceiptRequest | undefined,
+  managedSubmitPoll: ManagedSubmitStatusPollRequest | undefined,
   relay: SignedTransactionRelayRequest | undefined,
   confirmationPoll: SignatureConfirmationPollRequest | undefined,
   fillReconcile: SettlementFillReconciliationRequest | undefined,
@@ -18036,9 +18074,12 @@ async function finalizeExecutionAudit(
     }
     : current;
   const auditState = attachExecutionAuditState(state, execution_audit);
-  const confirmationState = confirmationPoll
-    ? await applySignatureConfirmationPoll(auditState, confirmationPoll, fetchImpl)
+  const managedSubmitPollState = managedSubmitPoll
+    ? applyManagedSubmitStatusPoll(auditState, managedSubmitPoll)
     : auditState;
+  const confirmationState = confirmationPoll
+    ? await applySignatureConfirmationPoll(managedSubmitPollState, confirmationPoll, fetchImpl)
+    : managedSubmitPollState;
   const fillState = fillReconcile
     ? await applySettlementFillReconciliation(confirmationState, fillReconcile, fetchImpl)
     : confirmationState;
@@ -20229,6 +20270,192 @@ function managedSubmitReceiptReason(
   if (status === "confirmed") return `${request.provider.replaceAll("-", " ")} managed submit confirmed with provider status ${request.provider_status_id}.`;
   if (status === "relay-failed") return `${request.provider.replaceAll("-", " ")} managed submit failed with provider status ${request.provider_status_id}.`;
   return `${request.provider.replaceAll("-", " ")} managed submit recorded as ${request.status}; poll provider status or Solana confirmation next.`;
+}
+
+function applyManagedSubmitStatusPoll(
+  state: Web3TradingState,
+  request: ManagedSubmitStatusPollRequest,
+): Web3TradingState {
+  const managedLabel = managedSubmitAuditLabel(request.provider, request.provider_status_id);
+  const matching = state.execution_audit.entries.find((entry) => entry.signer_session_label === managedLabel) ?? null;
+  const result = request.result;
+  const blockers = managedSubmitStatusPollBlockers(request, matching);
+  const reportStatus: ManagedSubmitStatusPollReport["status"] = blockers.length > 0
+    ? "blocked"
+    : result?.status === "confirmed"
+      ? "confirmed"
+      : result?.status === "failed"
+        ? "failed"
+        : "pending";
+  const baseReport = managedSubmitStatusPollReport({
+    request,
+    matching,
+    status: reportStatus,
+    auditEntryId: null,
+    blockers,
+  });
+
+  if (blockers.length > 0 || !result) {
+    return {
+      ...state,
+      managed_submit_status_poll: baseReport,
+    };
+  }
+
+  const now = new Date().toISOString();
+  const entryStatus: ExecutionAuditEntry["status"] = result.status === "confirmed"
+    ? "confirmed"
+    : result.status === "failed"
+      ? "relay-failed"
+      : "relayed";
+  const entry: ExecutionAuditEntry = {
+    ...(matching ?? {
+      id: `web3-managed-submit-poll-seed-${Date.parse(now)}`,
+      created_at: now,
+      nonce: "web3-managed-submit-poll-seed",
+      plan_id: null,
+      symbol: null,
+      side: null,
+      attempt: 0,
+      max_attempts: 3,
+      retry_window_seconds: 60,
+      next_retry_at: null,
+      request_id: request.request_id ?? null,
+      router: null,
+      relay_path: state.live_execution_arming.transaction_path,
+      transaction_ready: false,
+      payload_hash: request.payload_hash ?? null,
+      payload_bytes: null,
+      simulated_signature: null,
+      signer_session_label: managedLabel,
+      signer_network: null,
+      kill_switch: state.execution_readiness.config.kill_switch,
+    }),
+    id: `web3-managed-submit-poll-${Date.parse(now)}`,
+    created_at: now,
+    nonce: `web3-managed-submit-poll-${Date.parse(now)}`,
+    status: entryStatus,
+    attempt: (matching?.attempt ?? 0) + 1,
+    retry_window_seconds: result.status === "pending" ? 60 : 0,
+    next_retry_at: result.status === "pending" ? new Date(Date.parse(now) + 15_000).toISOString() : null,
+    request_id: request.request_id ?? matching?.request_id ?? null,
+    payload_hash: request.payload_hash ?? matching?.payload_hash ?? null,
+    payload_bytes: null,
+    relay_signature: result.transaction_signature ?? matching?.relay_signature ?? null,
+    relay_slot: result.slot ?? matching?.relay_slot ?? null,
+    confirmation_status: result.confirmation_status ?? (result.status === "confirmed" ? "confirmed" : null),
+    signer_session_label: managedLabel,
+    reason: managedSubmitStatusPollReason(request, result, entryStatus),
+  };
+  store().appendWeb3ExecutionAudit({
+    id: entry.id,
+    created_at: entry.created_at,
+    data: entry,
+  } satisfies Web3ExecutionAuditRow);
+  const current = readExecutionAudit();
+  const report = {
+    ...baseReport,
+    status: reportStatus,
+    audit_entry_id: entry.id,
+    signature: entry.relay_signature,
+    slot: entry.relay_slot,
+    confirmation_status: entry.confirmation_status,
+    summary: managedSubmitStatusPollSummary(reportStatus, []),
+    next_action: managedSubmitStatusPollNextAction(reportStatus, []),
+  };
+  return {
+    ...attachExecutionAuditState(state, {
+      entries: [entry, ...current.entries.filter((item) => item.id !== entry.id)].slice(0, 25),
+      latest: entry,
+    }),
+    managed_submit_status_poll: report,
+  };
+}
+
+function managedSubmitStatusPollBlockers(
+  request: ManagedSubmitStatusPollRequest,
+  matching: ExecutionAuditEntry | null,
+) {
+  const result = request.result;
+  const blockers = [
+    request.action !== "poll" ? "managed_submit_poll.action must be poll." : null,
+    !matching ? "Managed submit status polling requires a matching managed-submit audit entry." : null,
+    matching && request.request_id && matching.request_id && request.request_id !== matching.request_id
+      ? "Managed submit poll request id does not match the audited provider submission." : null,
+    matching && request.payload_hash && matching.payload_hash && request.payload_hash !== matching.payload_hash
+      ? "Managed submit poll payload hash does not match the audited provider submission." : null,
+    result?.status === "confirmed" && !result.transaction_signature ? "Confirmed managed submit poll requires a transaction signature." : null,
+    result?.status === "pending" && result.transaction_signature ? "Pending managed submit poll must not include a final transaction signature." : null,
+  ].filter((item): item is string => Boolean(item));
+  return [...new Set(blockers)].slice(0, 8);
+}
+
+function managedSubmitStatusPollReport({
+  request,
+  matching,
+  status,
+  auditEntryId,
+  blockers,
+}: {
+  request: ManagedSubmitStatusPollRequest;
+  matching: ExecutionAuditEntry | null;
+  status: ManagedSubmitStatusPollReport["status"];
+  auditEntryId: string | null;
+  blockers: string[];
+}): ManagedSubmitStatusPollReport {
+  return {
+    mode: "managed-submit-status-poll",
+    requested: true,
+    status,
+    provider: request.provider,
+    provider_status_id: request.provider_status_id,
+    request_id: request.request_id ?? matching?.request_id ?? null,
+    payload_hash: request.payload_hash ?? matching?.payload_hash ?? null,
+    signature: request.result?.transaction_signature ?? matching?.relay_signature ?? null,
+    confirmation_status: request.result?.confirmation_status ?? matching?.confirmation_status ?? null,
+    slot: request.result?.slot ?? matching?.relay_slot ?? null,
+    audit_entry_id: auditEntryId,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    blockers,
+    summary: managedSubmitStatusPollSummary(status, blockers),
+    next_action: managedSubmitStatusPollNextAction(status, blockers),
+    controls: [
+      "Accepts only provider status evidence for an already audited managed-submit request.",
+      "Matches provider status id, request id, and payload hash before mutating local lifecycle state.",
+      "Stores signature, slot, confirmation status, reason, and hash metadata only.",
+      "Does not store raw transaction bytes, signed payloads, credentials, private keys, or provider secrets.",
+      "Does not call a mutating chain or custody endpoint; provider submission must happen outside this app boundary.",
+    ],
+  };
+}
+
+function managedSubmitStatusPollSummary(status: ManagedSubmitStatusPollReport["status"], blockers: string[]) {
+  if (status === "confirmed") return "Provider-managed submit evidence confirms the transaction and the local lifecycle is landed.";
+  if (status === "failed") return "Provider-managed submit evidence reports a failed transaction lifecycle.";
+  if (status === "pending") return "Provider-managed submit remains pending; local lifecycle stays in submitted/confirming status.";
+  return blockers[0] ?? "Provider-managed submit status polling is blocked.";
+}
+
+function managedSubmitStatusPollNextAction(status: ManagedSubmitStatusPollReport["status"], blockers: string[]) {
+  if (status === "confirmed") return "Run settlement fill reconciliation and guarded portfolio mirror review for the confirmed signature.";
+  if (status === "failed") return "Rebuild or stand down before any replacement order; do not reuse stale provider status evidence.";
+  if (status === "pending") return "Poll the provider again, or poll Solana confirmation once a signature is available.";
+  return blockers[0] ?? "Record a matching managed-submit receipt before polling provider status.";
+}
+
+function managedSubmitStatusPollReason(
+  request: ManagedSubmitStatusPollRequest,
+  result: NonNullable<ManagedSubmitStatusPollRequest["result"]>,
+  status: ExecutionAuditEntry["status"],
+) {
+  if (status === "confirmed") return `${request.provider.replaceAll("-", " ")} status poll confirmed provider status ${request.provider_status_id}.`;
+  if (status === "relay-failed") return result.reason ?? `${request.provider.replaceAll("-", " ")} status poll failed provider status ${request.provider_status_id}.`;
+  return result.reason ?? `${request.provider.replaceAll("-", " ")} status poll is still pending for provider status ${request.provider_status_id}.`;
+}
+
+function managedSubmitAuditLabel(provider: ManagedSubmitReceiptRequest["provider"], providerStatusId: string) {
+  return `${provider}:managed-submit:${providerStatusId}`;
 }
 
 async function runSignedTransactionRelay(

@@ -15,6 +15,7 @@ import {
   type AutonomousSettlementWatchdogRequest,
   type ExecutionUpdate,
   type ManagedSubmitReceiptRequest,
+  type ManagedSubmitStatusPollRequest,
   type OnchainEventIngestRequest,
   type PortfolioMirrorApplyRequest,
   type PortfolioSweepRequest,
@@ -43,6 +44,7 @@ type TradingRequest = {
   execution?: ExecutionUpdate;
   signer_request?: AutonomousSignerRequestRelayRequest;
   managed_submit?: ManagedSubmitReceiptRequest;
+  managed_submit_poll?: ManagedSubmitStatusPollRequest;
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
   fill_reconcile?: SettlementFillReconciliationRequest;
@@ -118,6 +120,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
   const execution = record.execution === undefined ? undefined : parseExecutionUpdate(record.execution);
   const signerRequest = record.signer_request === undefined ? undefined : parseAutonomousSignerRequestRelayRequest(record.signer_request);
   const managedSubmit = record.managed_submit === undefined ? undefined : parseManagedSubmitReceiptRequest(record.managed_submit);
+  const managedSubmitPoll = record.managed_submit_poll === undefined ? undefined : parseManagedSubmitStatusPollRequest(record.managed_submit_poll);
   const relay = record.relay === undefined ? undefined : parseSignedRelayRequest(record.relay);
   const confirmationPoll = record.confirmation_poll === undefined ? undefined : parseSignatureConfirmationPollRequest(record.confirmation_poll);
   const fillReconcile = record.fill_reconcile === undefined ? undefined : parseSettlementFillReconciliationRequest(record.fill_reconcile);
@@ -173,6 +176,10 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
 
   if (managedSubmit && !managedSubmit.ok) {
     return { ok: false, error: managedSubmit.error };
+  }
+
+  if (managedSubmitPoll && !managedSubmitPoll.ok) {
+    return { ok: false, error: managedSubmitPoll.error };
   }
 
   if (relay && !relay.ok) {
@@ -253,6 +260,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       execution: execution?.value,
       signer_request: signerRequest?.value,
       managed_submit: managedSubmit?.value,
+      managed_submit_poll: managedSubmitPoll?.value,
       relay: relay?.value,
       confirmation_poll: confirmationPoll?.value,
       fill_reconcile: fillReconcile?.value,
@@ -386,6 +394,97 @@ function parseManagedSubmitReceiptRequest(value: unknown):
       confirmation_status: record.confirmation_status === "processed" || record.confirmation_status === "confirmed" || record.confirmation_status === "finalized" ? record.confirmation_status : undefined,
       slot: typeof record.slot === "string" ? record.slot.trim() : undefined,
       reference_id: typeof record.reference_id === "string" ? record.reference_id.trim() : undefined,
+    },
+  };
+}
+
+function parseManagedSubmitStatusPollRequest(value: unknown):
+  | { ok: true; value: ManagedSubmitStatusPollRequest }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "managed_submit_poll must be an object." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.action !== "poll") {
+    return { ok: false, error: "managed_submit_poll.action must be poll." };
+  }
+  if (
+    record.provider !== "privy-server-wallet" &&
+    record.provider !== "turnkey-policy-wallet" &&
+    record.provider !== "session-key-vault"
+  ) {
+    return { ok: false, error: "managed_submit_poll.provider is invalid." };
+  }
+  if (typeof record.provider_status_id !== "string" || record.provider_status_id.trim().length < 3 || record.provider_status_id.trim().length > 180) {
+    return { ok: false, error: "managed_submit_poll.provider_status_id must be a string from 3 to 180 characters." };
+  }
+  if (record.request_id !== undefined && (typeof record.request_id !== "string" || record.request_id.trim().length < 3 || record.request_id.trim().length > 180)) {
+    return { ok: false, error: "managed_submit_poll.request_id must be a string from 3 to 180 characters when provided." };
+  }
+  if (record.payload_hash !== undefined && (typeof record.payload_hash !== "string" || !/^[0-9a-f]{64}$/i.test(record.payload_hash.trim()))) {
+    return { ok: false, error: "managed_submit_poll.payload_hash must be a 64-character hex hash when provided." };
+  }
+
+  const result = record.result === undefined ? undefined : parseManagedSubmitStatusPollResult(record.result);
+  if (result && !result.ok) return result;
+
+  return {
+    ok: true,
+    value: {
+      action: "poll",
+      provider: record.provider,
+      provider_status_id: record.provider_status_id.trim(),
+      request_id: typeof record.request_id === "string" ? record.request_id.trim() : undefined,
+      payload_hash: typeof record.payload_hash === "string" ? record.payload_hash.trim().toLowerCase() : undefined,
+      result: result?.value,
+    },
+  };
+}
+
+function parseManagedSubmitStatusPollResult(value: unknown):
+  | { ok: true; value: NonNullable<ManagedSubmitStatusPollRequest["result"]> }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "managed_submit_poll.result must be an object when provided." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (
+    record.status !== "pending" &&
+    record.status !== "confirmed" &&
+    record.status !== "failed"
+  ) {
+    return { ok: false, error: "managed_submit_poll.result.status must be pending, confirmed, or failed." };
+  }
+  if (record.transaction_signature !== undefined) {
+    if (typeof record.transaction_signature !== "string" || !/^[1-9A-HJ-NP-Za-km-z]{32,120}$/.test(record.transaction_signature.trim())) {
+      return { ok: false, error: "managed_submit_poll.result.transaction_signature must look like a base58 Solana transaction signature." };
+    }
+  }
+  if (
+    record.confirmation_status !== undefined &&
+    record.confirmation_status !== "processed" &&
+    record.confirmation_status !== "confirmed" &&
+    record.confirmation_status !== "finalized"
+  ) {
+    return { ok: false, error: "managed_submit_poll.result.confirmation_status must be processed, confirmed, or finalized." };
+  }
+  if (record.slot !== undefined && (typeof record.slot !== "string" || record.slot.trim().length < 1 || record.slot.trim().length > 40)) {
+    return { ok: false, error: "managed_submit_poll.result.slot must be a string from 1 to 40 characters." };
+  }
+  if (record.reason !== undefined && (typeof record.reason !== "string" || record.reason.trim().length < 1 || record.reason.trim().length > 240)) {
+    return { ok: false, error: "managed_submit_poll.result.reason must be a string from 1 to 240 characters." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      status: record.status,
+      transaction_signature: typeof record.transaction_signature === "string" ? record.transaction_signature.trim() : undefined,
+      confirmation_status: record.confirmation_status === "processed" || record.confirmation_status === "confirmed" || record.confirmation_status === "finalized" ? record.confirmation_status : undefined,
+      slot: typeof record.slot === "string" ? record.slot.trim() : undefined,
+      reason: typeof record.reason === "string" ? record.reason.trim() : undefined,
     },
   };
 }
