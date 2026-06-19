@@ -175,7 +175,7 @@ function promotionSupervisedRounds(status) {
 
 function promotionTicksPerRound(status) {
   if (status === "scale-paper") return 2;
-  if (status === "selective-paper") return 1;
+  if (status === "selective-paper") return 2;
   if (status === "protect-paper") return 1;
   return 0;
 }

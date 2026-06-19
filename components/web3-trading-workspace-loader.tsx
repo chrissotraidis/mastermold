@@ -276,7 +276,7 @@ export function Web3TradingWorkspaceLoader({
           promotion_runs: proofPlan.suggested_next_runs,
           promotion_ticks: 2,
           max_supervisor_rounds: proofPlan.suggested_next_runs,
-          max_ticks_per_round: 1,
+          max_ticks_per_round: 2,
         }),
       });
       const payload = (await response.json()) as PromotedPaperAutopilotReceipt | { error: string; detail?: string };

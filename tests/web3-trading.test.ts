@@ -5694,6 +5694,53 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
+    const promotedReadyProfitProof = buildWeb3ProfitProofReadiness({
+      promotedHealth: {
+        status: "target-hit",
+        updated_at: new Date().toISOString(),
+        runner_id: "promoted-ready-local-watch-test",
+        summary: "Promoted paper proof recovered.",
+        promotion_permission: "selective-paper",
+        supervisor_status: "completed",
+        net_pnl_usd: 33,
+        posted_ticks: 2,
+        blocked_ticks: 0,
+        profit_target_hit: true,
+        loss_brake_tripped: false,
+        run_count: 4,
+        total_net_pnl_usd: 99,
+        average_net_pnl_usd: 24.75,
+        target_hit_rate_pct: 75,
+        recent_runs: [
+          { finished_at: new Date().toISOString(), status: "target-hit", promotion_permission: "selective-paper", supervisor_status: "completed", net_pnl_usd: 33, posted_ticks: 2, blocked_ticks: 0, profit_target_hit: true, loss_brake_tripped: false },
+          { finished_at: new Date().toISOString(), status: "completed", promotion_permission: "selective-paper", supervisor_status: "completed", net_pnl_usd: 0, posted_ticks: 1, blocked_ticks: 0, profit_target_hit: false, loss_brake_tripped: false },
+          { finished_at: new Date().toISOString(), status: "target-hit", promotion_permission: "selective-paper", supervisor_status: "completed", net_pnl_usd: 33, posted_ticks: 2, blocked_ticks: 0, profit_target_hit: true, loss_brake_tripped: false },
+          { finished_at: new Date().toISOString(), status: "target-hit", promotion_permission: "selective-paper", supervisor_status: "completed", net_pnl_usd: 33, posted_ticks: 2, blocked_ticks: 0, profit_target_hit: true, loss_brake_tripped: false },
+        ],
+        run_memory_status: "tighten-paper",
+        run_memory_score: 58,
+        recommended_supervisor_round_cap: 1,
+        memory_next_action: "Keep promoted paper autonomy tight: one supervised round, then review the wallet curve.",
+        promotion_repair_items: [],
+        live_execution_permission: "blocked",
+        wallet_mutation_permission: "blocked",
+      },
+    });
+    expect(promotedReadyProfitProof).toMatchObject({
+      status: "profitable-paper",
+      promoted_recent_positive_count: 3,
+      promoted_recent_loss_count: 1,
+      can_satisfy_profit_gate: false,
+    });
+    expect(promotedReadyProfitProof.proof_plan).toMatchObject({
+      status: "needs-local-accountability",
+      remaining_promoted_runs: 0,
+      suggested_next_runs: 0,
+      observed_recent_positive_runs: 3,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(promotedReadyProfitProof.proof_plan.next_action).toContain("local paper accountability");
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);
     expect(state.autonomous_daemon_handoff.runner_role).toBe("external-scheduler");

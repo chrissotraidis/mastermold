@@ -18,7 +18,7 @@ export type Web3ProfitProofReadinessCheck = {
 
 export type Web3ProfitProofRunPlan = {
   mode: "promoted-paper-proof-plan";
-  status: "complete" | "needs-runs" | "needs-hit-rate" | "drawdown-gated" | "blocked";
+  status: "complete" | "needs-runs" | "needs-hit-rate" | "needs-local-accountability" | "drawdown-gated" | "blocked";
   required_promoted_runs: number;
   remaining_promoted_runs: number;
   required_target_hit_rate_pct: number;
@@ -114,6 +114,7 @@ export function buildWeb3ProfitProofReadiness({
     totalPnl,
     recentPositiveCount,
     requiredRecentPositiveRuns,
+    localMakingMoney,
     lossBrakeTripped,
     memoryProtecting,
     recommendedSupervisorRoundCap: promotedHealth?.recommended_supervisor_round_cap ?? 0,
@@ -175,6 +176,7 @@ function buildProfitProofRunPlan(evidence: {
   totalPnl: number;
   recentPositiveCount: number;
   requiredRecentPositiveRuns: number;
+  localMakingMoney: boolean;
   lossBrakeTripped: boolean;
   memoryProtecting: boolean;
   recommendedSupervisorRoundCap: number;
@@ -183,8 +185,14 @@ function buildProfitProofRunPlan(evidence: {
   const requiredPromotedRuns = 3;
   const requiredHitRate = 70;
   const remainingRuns = Math.max(0, requiredPromotedRuns - evidence.runCount);
+  const promotedEvidenceReady = evidence.runCount >= requiredPromotedRuns &&
+    evidence.hitRate >= requiredHitRate &&
+    evidence.totalPnl > 0 &&
+    evidence.recentPositiveCount >= evidence.requiredRecentPositiveRuns;
   const suggestedNextRuns = evidence.repeatable
     ? 0
+    : promotedEvidenceReady && !evidence.localMakingMoney
+      ? 0
     : Math.max(1, Math.min(Math.max(remainingRuns, 1), Math.max(1, evidence.recommendedSupervisorRoundCap || 2)));
   const status: Web3ProfitProofRunPlan["status"] = evidence.repeatable
     ? "complete"
@@ -194,7 +202,9 @@ function buildProfitProofRunPlan(evidence: {
         ? "blocked"
         : remainingRuns > 0
           ? "needs-runs"
-          : "needs-hit-rate";
+          : promotedEvidenceReady && !evidence.localMakingMoney
+            ? "needs-local-accountability"
+            : "needs-hit-rate";
   const nextAction = evidence.promotionRepairAction ?? profitProofRunPlanNextAction(status, suggestedNextRuns, remainingRuns);
 
   return {
@@ -312,6 +322,7 @@ function profitProofRunPlanSummary(
   if (status === "complete") return `Proof plan is complete: ${runCount} promoted runs, ${hitRate.toFixed(0)}% target hits, ${formatSignedCompactValue(totalPnl)} total.`;
   if (status === "drawdown-gated") return "Proof plan is drawdown-gated; stop expansion until paper loss protection clears.";
   if (status === "blocked") return "Proof plan is blocked because promoted memory is protecting the desk.";
+  if (status === "needs-local-accountability") return `Proof plan has enough promoted evidence at ${hitRate.toFixed(0)}% target hits and ${formatSignedCompactValue(totalPnl)} total, but local paper accountability is not strong enough yet.`;
   if (status === "needs-hit-rate") return `Proof plan has enough runs but needs 70%+ target hits and positive total PnL; current hit rate is ${hitRate.toFixed(0)}%.`;
   return `Proof plan needs ${remainingRuns} more promoted paper run${remainingRuns === 1 ? "" : "s"} before live review can trust the sample.`;
 }
@@ -319,6 +330,7 @@ function profitProofRunPlanSummary(
 function profitProofRunPlanNextAction(status: Web3ProfitProofRunPlan["status"], suggestedNextRuns: number, remainingRuns: number) {
   if (status === "complete") return "Keep collecting promoted paper proof while the other live-capital gates are cleared.";
   if (status === "drawdown-gated" || status === "blocked") return "Run proof-only review or stand down until promoted memory no longer protects the desk.";
+  if (status === "needs-local-accountability") return "Run local paper accountability cycles until the paper wallet has profitable 70/100+ accountability before claiming the profit gate.";
   if (status === "needs-hit-rate") return "Run a smaller promoted paper proof window and require target-hit recovery before scaling.";
   return `Run ${suggestedNextRuns} promoted paper proof ${suggestedNextRuns === 1 ? "window" : "windows"} now; ${remainingRuns} total promoted run${remainingRuns === 1 ? "" : "s"} remain.`;
 }

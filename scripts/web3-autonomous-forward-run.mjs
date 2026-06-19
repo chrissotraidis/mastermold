@@ -465,6 +465,30 @@ export function buildForwardSuiteReport({
   const deployedHotCoinAlpha = roundMoney(netPnl - deployedHotCoinBaselinePnl);
   const targetGap = roundMoney(netPnl - config.minNetPnlUsd);
   const targetMet = targetGap >= 0;
+  const targetMetCount = scenarios.filter((report) => report.target_met).length;
+  const pnlValues = scenarios.map((report) => Number(report.net_pnl_usd ?? 0));
+  const maxDrawdown = maxCumulativeDrawdown(pnlValues);
+  const hitRatePct = roundMoney((profitableCount / Math.max(1, scenarios.length)) * 100);
+  const targetHitRatePct = roundMoney((targetMetCount / Math.max(1, scenarios.length)) * 100);
+  const consistencyScore = roundMoney(
+    (profitableCount / Math.max(1, scenarios.length)) * 55
+    + (targetMetCount / Math.max(1, scenarios.length)) * 25
+    + (deployedHotCoinAlpha >= Number(config.minDeployedAlphaUsd ?? 0) ? 15 : 0)
+    + (maxDrawdown <= Math.max(25, Math.abs(netPnl) * 0.25) ? 5 : 0),
+  );
+  const netTargetMet = targetGap >= 0;
+  const hitRateMet = hitRatePct >= Number(config.minHitRatePct ?? 100);
+  const drawdownMet = maxDrawdown <= Number(config.maxDrawdownUsd ?? 1_000);
+  const deployedAlphaMet = deployedHotCoinAlpha >= Number(config.minDeployedAlphaUsd ?? 0);
+  const consistencyMet = consistencyScore >= Number(config.minConsistencyScore ?? 80);
+  const proofGateBlockers = [
+    netTargetMet ? null : `net target gap is ${formatCurrency(targetGap)}`,
+    hitRateMet ? null : `hit rate ${hitRatePct}% is below ${roundMoney(config.minHitRatePct)}%`,
+    drawdownMet ? null : `drawdown ${formatCurrency(-maxDrawdown)} exceeds ${formatCurrency(-Number(config.maxDrawdownUsd ?? 1_000))}`,
+    deployedAlphaMet ? null : `deployed alpha ${formatCurrency(deployedHotCoinAlpha)} is below ${formatCurrency(config.minDeployedAlphaUsd ?? 0)}`,
+    consistencyMet ? null : `consistency score ${consistencyScore}/100 is below ${roundMoney(config.minConsistencyScore)}/100`,
+  ].filter(Boolean);
+  const proofGatePassed = proofGateBlockers.length === 0;
   const worstScenario = [...scenarios].sort((a, b) => a.net_pnl_usd - b.net_pnl_usd)[0] ?? null;
   const bestScenario = [...scenarios].sort((a, b) => b.net_pnl_usd - a.net_pnl_usd)[0] ?? null;
   const verdict = targetMet && profitableCount === scenarios.length
@@ -493,9 +517,27 @@ export function buildForwardSuiteReport({
     blocked_ticks: blockedTicks,
     trade_count_delta: tradeCountDelta,
     net_pnl_usd: netPnl,
+    average_net_pnl_usd: roundMoney(netPnl / Math.max(1, scenarios.length)),
     min_net_pnl_usd: roundMoney(config.minNetPnlUsd),
     target_gap_usd: targetGap,
     target_met: targetMet,
+    net_target_met: netTargetMet,
+    target_met_count: targetMetCount,
+    hit_rate_pct: hitRatePct,
+    target_hit_rate_pct: targetHitRatePct,
+    minimum_hit_rate_pct: roundMoney(config.minHitRatePct),
+    hit_rate_met: hitRateMet,
+    max_cumulative_drawdown_usd: maxDrawdown,
+    maximum_drawdown_usd: roundMoney(config.maxDrawdownUsd),
+    drawdown_met: drawdownMet,
+    minimum_deployed_hot_coin_alpha_usd: roundMoney(config.minDeployedAlphaUsd),
+    deployed_alpha_met: deployedAlphaMet,
+    minimum_consistency_score: roundMoney(config.minConsistencyScore),
+    consistency_score: consistencyScore,
+    consistency_met: consistencyMet,
+    proof_gate_status: proofGatePassed ? "passed" : "blocked",
+    proof_gate_blockers: proofGateBlockers,
+    promotion_permission: proofGatePassed ? "paper-promote" : "blocked",
     verdict,
     hot_coin_baseline_pnl_usd: hotCoinBaselinePnl,
     hot_coin_alpha_usd: hotCoinAlpha,

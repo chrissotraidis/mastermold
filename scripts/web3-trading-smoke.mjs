@@ -5017,6 +5017,8 @@ async function main() {
   assert(forwardRun.advanced_scenario_count >= 1 && forwardRun.traded_scenario_count >= 1, "Autonomous forward suite should disclose which regimes actually moved paper capital.", forwardRun);
   assert(["base", "breakout", "rug-risk"].every((scenario) => forwardRun.scenarios.some((report) => report.scenario === scenario)), "Autonomous forward suite should include all sample regimes.", forwardRun);
   assert(typeof forwardRun.net_pnl_usd === "number" && typeof forwardRun.target_met === "boolean", "Autonomous forward suite should quantify aggregate paper PnL and target status.", forwardRun);
+  assert(forwardRun.proof_gate_status === "passed" && forwardRun.promotion_permission === "paper-promote", "Autonomous forward suite should expose promotion-gate fields for one-window proof gaps.", forwardRun);
+  assert(forwardRun.hit_rate_pct === 100 && forwardRun.consistency_score >= 80 && forwardRun.proof_gate_blockers.length === 0, "Autonomous forward suite should pass hit-rate and consistency gates when every scenario is profitable.", forwardRun);
   assert(typeof forwardRun.hot_coin_baseline_pnl_usd === "number" && typeof forwardRun.hot_coin_alpha_usd === "number", "Autonomous forward suite should compare agent PnL against the best visible coin baseline.", forwardRun);
   assert(["beat-hot-coin-suite", "lagged-hot-coin-suite"].includes(forwardRun.hot_coin_baseline_verdict), "Autonomous forward suite should publish a known hot-coin baseline verdict.", forwardRun);
   assert(typeof forwardRun.deployed_notional_usd === "number" && forwardRun.deployed_notional_usd > 0, "Autonomous forward suite should disclose how much paper capital it actually deployed.", forwardRun);
@@ -5064,8 +5066,25 @@ async function main() {
   assert(["scale-paper", "selective-paper", "protect-paper", "blocked"].includes(promotionGuard.status), "Paper promotion guard should publish a known promotion posture.", promotionGuard);
   assert(promotionGuard.promotion_permission !== "blocked" && promotionGuard.can_start_supervised_paper === true, "Passing repeat proof should permit bounded supervised paper autonomy.", promotionGuard);
   assert(promotionGuard.recommended_paper_size_multiplier > 0 && promotionGuard.recommended_supervisor_rounds > 0, "Promotion guard should recommend bounded paper size and supervised rounds.", promotionGuard);
+  assert(promotionGuard.status !== "selective-paper" || promotionGuard.recommended_ticks_per_round >= 2, "Selective promoted paper windows should use enough ticks to realize paper PnL.", promotionGuard);
   assert(promotionGuard.full_wallet_hot_coin_alpha_usd < 0 ? promotionGuard.status === "selective-paper" : promotionGuard.status !== "blocked", "Negative full-wallet hot-coin alpha should keep promotion selective instead of scaling blindly.", promotionGuard);
   assert(promotionGuard.controls.some((control) => control.includes("cannot sign")), "Promotion guard should disclose the paper-only execution boundary.", promotionGuard);
+  const oneWindowPromotionGuard = buildPaperPromotionGuardReport({
+    config: {
+      baseUrl,
+      scenario: "all",
+      source: "sample",
+      minNetPnlUsd: 0,
+      minHitRatePct: 100,
+      minDeployedAlphaUsd: 0,
+      maxDrawdownUsd: 1_000,
+      minConsistencyScore: 80,
+    },
+    repeatProof: forwardRun,
+  });
+  assert(oneWindowPromotionGuard.promotion_permission !== "blocked" && oneWindowPromotionGuard.can_start_supervised_paper === true, "One-window forward-suite proof should feed the promotion guard when all regimes pass.", oneWindowPromotionGuard);
+  assert(oneWindowPromotionGuard.items.find((item) => item.id === "hit-rate")?.status === "pass" && oneWindowPromotionGuard.items.find((item) => item.id === "consistency")?.status === "pass", "One-window promotion guard should not invent hit-rate or consistency failures.", oneWindowPromotionGuard);
+  assert(oneWindowPromotionGuard.status !== "selective-paper" || oneWindowPromotionGuard.recommended_ticks_per_round >= 2, "One-window selective promotion should request a two-tick paper proof window.", oneWindowPromotionGuard);
   const oneRunPromotionGuardArgs = parsePaperPromotionGuardArgs(["--runs=1"], {});
   assert(oneRunPromotionGuardArgs.runs === 1, "Paper promotion guard should support exact one-run proof gaps.", oneRunPromotionGuardArgs);
   const oneRunAutopilotArgs = parsePromotedPaperAutopilotArgs(["--promotion-runs=1"], {});

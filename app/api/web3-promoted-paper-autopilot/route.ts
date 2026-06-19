@@ -135,7 +135,7 @@ function parseAutopilotRequest(value: unknown):
   const promotionRuns = record.promotion_runs === undefined ? null : boundedInteger(record.promotion_runs, 2, 0, 6);
   const promotionTicks = boundedInteger(record.promotion_ticks, 2, 1, 8);
   const maxSupervisorRounds = boundedInteger(record.max_supervisor_rounds, 2, 0, 6);
-  const maxTicksPerRound = boundedInteger(record.max_ticks_per_round, 1, 1, 4);
+  const maxTicksPerRound = boundedInteger(record.max_ticks_per_round, 2, 1, 4);
 
   return {
     ok: true,
