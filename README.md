@@ -133,7 +133,7 @@ evidence, fill price, filled quantity, handoff notional, and idempotency all rec
 it never grants live execution or wallet mutation permission. `verify:web3` is a Node-only
 operator check for machines without Bun: against a running app, it proves health receipts,
 execution input validation, public-wallet dry-run scope save, credential validate-only
-redaction, deterministic DEX discovery receipt boundaries, one-shot Jupiter rehearsal
+redaction, text-only `/api/web3-wallet-ownership` receipt boundaries, deterministic DEX discovery receipt boundaries, one-shot Jupiter rehearsal
 redaction, private-field rejection, and the live execution/wallet mutation locks. Add
 `--require-jupiter-order` after a `JUPITER_API_KEY`
 or `WEB3_VERIFY_JUPITER_API_KEY` is available to fail closed until quote and unsigned-order
@@ -153,8 +153,10 @@ Jupiter order rehearsal, risk caps, kill switch, signer/custody, settlement, pro
 and manual review. It reports blockers and next actions while still refusing signing,
 transaction submission, account creation, private-key storage, and wallet mutation.
 The Settings credential console can also detect or connect a browser Solana wallet only
-far enough to read the public address into the dry-run scope. It does not request
-signatures, store wallet secrets, or mutate balances.
+far enough to read the public address into the dry-run scope, then optionally prove wallet
+ownership with a text-only signature whose message and signature are stored only as hashes.
+It does not request transaction signatures, store wallet secrets, submit transactions, or
+mutate balances.
 
 ## Architecture: the engine and the app
 

@@ -14,6 +14,7 @@ import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
+import { POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3CredentialsSetupReadiness } from "@/src/db/web3-credentials";
@@ -179,6 +180,33 @@ afterEach(() => {
 async function json<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
+
+function base58Encode(bytes: Uint8Array) {
+  const digits = [0];
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let index = 0; index < digits.length; index += 1) {
+      carry += digits[index] << 8;
+      digits[index] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  for (const byte of bytes) {
+    if (byte === 0) digits.push(0);
+    else break;
+  }
+  return digits.reverse().map((digit) => BASE58_ALPHABET[digit]).join("");
+}
+
+function bytesToBase64ForTest(bytes: ArrayBuffer) {
+  return Buffer.from(bytes).toString("base64");
+}
+
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 function withClearExecutionLane(state: Web3TradingState): Web3TradingState {
   return {
@@ -1090,6 +1118,102 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("Private keys"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
     expect(JSON.stringify(receipt)).not.toContain("test-jupiter-secret");
+  });
+
+  test("GIVEN a browser wallet signs the ownership challenge WHEN the ownership route verifies it THEN it returns a hash-only blocked receipt", async () => {
+    const keyPair = await globalThis.crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]) as CryptoKeyPair;
+    const rawPublicKey = await globalThis.crypto.subtle.exportKey("raw", keyPair.publicKey);
+    const walletPublicKey = base58Encode(new Uint8Array(rawPublicKey));
+    const message = [
+      "Mastermind Web3 wallet ownership challenge",
+      `Wallet: ${walletPublicKey}`,
+      "Purpose: prove public wallet control only",
+      "No transaction signing or wallet mutation is authorized.",
+      "Issued: 2026-06-19T00:00:00.000Z",
+    ].join("\n");
+    const signature = await globalThis.crypto.subtle.sign({ name: "Ed25519" }, keyPair.privateKey, new TextEncoder().encode(message));
+    const signatureBase64 = bytesToBase64ForTest(signature);
+
+    const response = await WALLET_OWNERSHIP_POST(new Request("http://localhost/api/web3-wallet-ownership", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        wallet_public_key: walletPublicKey,
+        message,
+        signature_base64: signatureBase64,
+        provider: "test-browser-wallet",
+      }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      wallet_public_key_preview: string;
+      challenge_hash: string;
+      signature_hash: string;
+      signature_verified: boolean;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      transaction_signing_permission: string;
+      private_key_storage: string;
+      secret_echo_permission: string;
+      message_storage: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-wallet-ownership-receipt");
+    expect(receipt.status).toBe("verified");
+    expect(receipt.signature_verified).toBe(true);
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.challenge_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.signature_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.wallet_public_key_preview).toBe(`${walletPublicKey.slice(0, 8)}...${walletPublicKey.slice(-4)}`);
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.transaction_signing_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.message_storage).toBe("hash-only");
+    expect(receipt.controls.some((control) => control.includes("text-only"))).toBe(true);
+    expect(JSON.stringify(receipt)).not.toContain(message);
+    expect(JSON.stringify(receipt)).not.toContain(signatureBase64);
+
+    const invalidSignature = await WALLET_OWNERSHIP_POST(new Request("http://localhost/api/web3-wallet-ownership", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        wallet_public_key: walletPublicKey,
+        message,
+        signature_base64: bytesToBase64ForTest(new Uint8Array(64).fill(7).buffer),
+        provider: "test-browser-wallet",
+      }),
+    }));
+    const invalidReceipt = await json<{
+      status: string;
+      signature_verified: boolean;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+    }>(invalidSignature);
+    expect(invalidSignature.status).toBe(200);
+    expect(invalidReceipt.status).toBe("invalid");
+    expect(invalidReceipt.signature_verified).toBe(false);
+    expect(invalidReceipt.live_execution_permission).toBe("blocked");
+    expect(invalidReceipt.wallet_mutation_permission).toBe("blocked");
+
+    const malformedChallenge = await WALLET_OWNERSHIP_POST(new Request("http://localhost/api/web3-wallet-ownership", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        wallet_public_key: walletPublicKey,
+        message: `Unsafe challenge for ${walletPublicKey}`,
+        signature_base64: signatureBase64,
+        provider: "test-browser-wallet",
+      }),
+    }));
+    expect(malformedChallenge.status).toBe(422);
   });
 
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {

@@ -9,6 +9,7 @@ import type { Web3DexDiscoveryReceipt } from "@/src/db/web3-dex-discovery";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import type { Web3TradingState } from "@/src/db/web3-trading";
+import type { Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
 
 type SettingsWeb3CredentialConsoleProps = {
   walletPublicKeyPreview: string | null;
@@ -54,6 +55,7 @@ type BrowserSolanaProvider = {
   isConnected?: boolean;
   publicKey?: { toString: () => string };
   connect?: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: { toString: () => string } } | void>;
+  signMessage?: (message: Uint8Array, display?: "utf8" | "hex") => Promise<Uint8Array | { signature: Uint8Array }>;
 };
 
 export function SettingsWeb3CredentialConsole({
@@ -79,13 +81,14 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"credentials" | "dex" | "jupiter" | "preflight" | "scope" | "wallet" | null>(null);
+  const [busy, setBusy] = useState<"credentials" | "dex" | "jupiter" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [browserWallet, setBrowserWallet] = useState<BrowserWalletReceipt | null>(null);
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
   const [dexReceipt, setDexReceipt] = useState<Web3DexDiscoveryReceipt | null>(null);
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveCapitalPreflightReceipt | null>(null);
+  const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
 
   function updateDraft(field: keyof Draft, value: string) {
@@ -263,6 +266,56 @@ export function SettingsWeb3CredentialConsole({
     }
   }
 
+  async function proveWalletOwnership() {
+    setBusy("ownership");
+    setMessage("Requesting a text-only wallet ownership signature. This is not a transaction and cannot move funds...");
+    try {
+      const provider = getBrowserSolanaProvider();
+      if (!provider || typeof provider.signMessage !== "function") {
+        throw new Error("No browser wallet with message signing is available.");
+      }
+      let publicKey = provider.publicKey?.toString() ?? null;
+      if ((!publicKey || !isLikelySolanaPublicKey(publicKey)) && typeof provider.connect === "function") {
+        const result = await provider.connect();
+        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? null;
+      }
+      if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
+        throw new Error("Connect a valid public Solana wallet before proving ownership.");
+      }
+      const challenge = buildWalletOwnershipChallenge(publicKey);
+      const signed = await provider.signMessage(new TextEncoder().encode(challenge), "utf8");
+      const signatureBytes = signed instanceof Uint8Array ? signed : signed.signature;
+      if (!(signatureBytes instanceof Uint8Array)) {
+        throw new Error("Wallet did not return a valid message signature.");
+      }
+      const response = await fetch("/api/web3-wallet-ownership", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          wallet_public_key: publicKey,
+          message: challenge,
+          signature_base64: bytesToBase64(signatureBytes),
+          provider: browserWalletProviderName(provider),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as Web3WalletOwnershipReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Wallet ownership proof failed.");
+      }
+      setDraft((current) => ({
+        ...current,
+        wallet_public_key: publicKey,
+        signer_mode: "external-wallet",
+      }));
+      setOwnershipReceipt(payload);
+      setMessage(payload.summary);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Wallet ownership proof failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function savePublicScope() {
     const wallet = draft.wallet_public_key.trim();
     if (!wallet || !isLikelySolanaPublicKey(wallet)) {
@@ -429,6 +482,15 @@ export function SettingsWeb3CredentialConsole({
           </button>
           <button
             type="button"
+            onClick={() => void proveWalletOwnership()}
+            disabled={disabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-violet/45 bg-violet/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-violet transition hover:bg-violet/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <ShieldCheck className={cn("size-3.5 shrink-0", busy === "ownership" && "animate-pulse")} aria-hidden="true" />
+            {busy === "ownership" ? "Proving" : "Prove ownership"}
+          </button>
+          <button
+            type="button"
             onClick={testCredentials}
             disabled={disabled}
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
@@ -512,8 +574,8 @@ export function SettingsWeb3CredentialConsole({
         />
         <ConsoleMetric
           label="Wallet sync"
-          value={browserWallet?.status === "connected" ? "browser connected" : credentialResult?.can_support_readonly_wallet_sync ? "ready" : "gated"}
-          tone={browserWallet?.status === "connected" || credentialResult?.can_support_readonly_wallet_sync ? "engine" : "caution"}
+          value={ownershipReceipt?.signature_verified ? "ownership proved" : browserWallet?.status === "connected" ? "browser connected" : credentialResult?.can_support_readonly_wallet_sync ? "ready" : "gated"}
+          tone={ownershipReceipt?.signature_verified || browserWallet?.status === "connected" || credentialResult?.can_support_readonly_wallet_sync ? "engine" : "caution"}
         />
         <ConsoleMetric
           label="Jupiter order"
@@ -573,6 +635,33 @@ export function SettingsWeb3CredentialConsole({
           <p className="mt-2 text-xs leading-5 text-on-surface-variant">{browserWallet.next_action}</p>
           <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
             checked {formatConsoleTime(browserWallet.checked_at)} · private key storage {browserWallet.private_key_storage}
+          </p>
+        </div>
+      ) : null}
+
+      {ownershipReceipt ? (
+        <div className="mt-3 rounded-md border border-violet/25 bg-violet/[0.04] p-2" aria-label="Settings wallet ownership receipt">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Wallet ownership receipt</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{ownershipReceipt.status}</p>
+            </div>
+            <Badge variant="outline" className={cn(
+              "border-outline-variant/35 bg-void/25 text-outline",
+              ownershipReceipt.signature_verified && "border-engine/35 bg-engine/10 text-engine",
+            )}>
+              {ownershipReceipt.signature_verified ? "verified" : "not verified"}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <ConsoleMetric label="Wallet" value={ownershipReceipt.wallet_public_key_preview} tone={ownershipReceipt.signature_verified ? "engine" : "caution"} />
+            <ConsoleMetric label="Message" value={ownershipReceipt.message_storage} tone="neutral" />
+            <ConsoleMetric label="Tx signing" value={ownershipReceipt.transaction_signing_permission} tone="neutral" />
+            <ConsoleMetric label="Submit" value={ownershipReceipt.transaction_submission_permission} tone="neutral" />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">{ownershipReceipt.next_action}</p>
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+            receipt {ownershipReceipt.receipt_hash.slice(0, 10)} · challenge {ownershipReceipt.challenge_hash.slice(0, 10)} · signature {ownershipReceipt.signature_hash.slice(0, 10)}
           </p>
         </div>
       ) : null}
@@ -674,7 +763,7 @@ export function SettingsWeb3CredentialConsole({
       ) : null}
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
-        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; browser wallet detection requests public address only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
+        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
       </p>
     </section>
   );
@@ -824,6 +913,22 @@ function buildBrowserWalletReceipt({
     private_key_storage: "blocked",
     next_action: nextAction,
   };
+}
+
+function buildWalletOwnershipChallenge(walletPublicKey: string) {
+  return [
+    "Mastermind Web3 wallet ownership challenge",
+    `Wallet: ${walletPublicKey}`,
+    "Purpose: prove public wallet control only",
+    "No transaction signing or wallet mutation is authorized.",
+    `Issued: ${new Date().toISOString()}`,
+  ].join("\n");
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return window.btoa(binary);
 }
 
 const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";

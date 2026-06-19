@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { webcrypto } from "node:crypto";
+
 const DEFAULT_BASE_URL = "http://localhost:4010";
 const DEFAULT_WALLET = "11111111111111111111111111111111";
 const CANARY_JUPITER_KEY = "codex-jupiter-canary-never-echo";
@@ -191,6 +193,55 @@ async function verifyAccountSetupReceipt() {
   record("account-setup-receipt", "pass", `status ${json.status}`);
 }
 
+async function verifyWalletOwnershipReceipt() {
+  const subtle = globalThis.crypto?.subtle ?? webcrypto.subtle;
+  const keyPair = await subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  const rawPublicKey = await subtle.exportKey("raw", keyPair.publicKey);
+  const proofWalletPublicKey = base58Encode(new Uint8Array(rawPublicKey));
+  const message = [
+    "Mastermind Web3 wallet ownership challenge",
+    `Wallet: ${proofWalletPublicKey}`,
+    "Purpose: prove public wallet control only",
+    "No transaction signing or wallet mutation is authorized.",
+    "Issued: 2026-06-19T00:00:00.000Z",
+  ].join("\n");
+  const signature = await subtle.sign({ name: "Ed25519" }, keyPair.privateKey, new TextEncoder().encode(message));
+  const signatureBase64 = Buffer.from(signature).toString("base64");
+
+  const { response, json, text } = await postJson("/api/web3-wallet-ownership", {
+    wallet_public_key: proofWalletPublicKey,
+    message,
+    signature_base64: signatureBase64,
+    provider: "readiness-local-ed25519",
+  });
+  assert(response.status === 200, "Wallet ownership proof should return a receipt.", { status: response.status, json });
+  assert(json.mode === "web3-wallet-ownership-receipt", "Wallet ownership proof should expose the expected receipt mode.", json);
+  assert(json.status === "verified", "Wallet ownership proof should verify the generated Ed25519 challenge.", json);
+  assert(json.signature_verified === true, "Wallet ownership proof should mark the signature verified.", json);
+  assert(json.live_execution_permission === "blocked", "Wallet ownership proof must keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Wallet ownership proof must keep wallet mutation blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "Wallet ownership proof must keep transaction submission blocked.", json);
+  assert(json.transaction_signing_permission === "blocked", "Wallet ownership proof must keep transaction signing blocked.", json);
+  assert(json.private_key_storage === "blocked", "Wallet ownership proof must block private-key storage.", json);
+  assert(json.message_storage === "hash-only", "Wallet ownership proof should store only message hash evidence.", json);
+  assert(typeof json.receipt_hash === "string" && json.receipt_hash.length === 64, "Wallet ownership proof should include a receipt hash.", json);
+  assert(!text.includes(message), "Wallet ownership proof response should not return the raw challenge message.", json);
+  assert(!text.includes(signatureBase64), "Wallet ownership proof response should not return the raw signature.", json);
+
+  const invalid = await postJson("/api/web3-wallet-ownership", {
+    wallet_public_key: proofWalletPublicKey,
+    message,
+    signature_base64: Buffer.from(new Uint8Array(64).fill(5)).toString("base64"),
+    provider: "readiness-local-ed25519",
+  });
+  assert(invalid.response.status === 200, "Invalid wallet ownership signature should return an invalid receipt, not authority.", invalid.json);
+  assert(invalid.json.status === "invalid", "Invalid wallet ownership signature should be marked invalid.", invalid.json);
+  assert(invalid.json.signature_verified === false, "Invalid wallet ownership signature should not verify.", invalid.json);
+  assert(invalid.json.live_execution_permission === "blocked", "Invalid ownership receipt must keep live execution blocked.", invalid.json);
+  assert(invalid.json.wallet_mutation_permission === "blocked", "Invalid ownership receipt must keep wallet mutation blocked.", invalid.json);
+  record("wallet-ownership-receipt", "pass", "text-only Ed25519 proof verifies with hash-only output");
+}
+
 async function verifyCredentialValidateOnly() {
   const { response, json } = await postJson("/api/web3-credentials/test", {
     provider: "helius",
@@ -253,6 +304,29 @@ function assertDexDiscoveryBoundary(json, label) {
   assert(Array.isArray(json.source_checks), `${label} should include source checks.`, json);
   assert(Array.isArray(json.top_candidates), `${label} should include top candidates.`, json);
 }
+
+function base58Encode(bytes) {
+  const digits = [0];
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let index = 0; index < digits.length; index += 1) {
+      carry += digits[index] << 8;
+      digits[index] = carry % 58;
+      carry = Math.floor(carry / 58);
+    }
+    while (carry > 0) {
+      digits.push(carry % 58);
+      carry = Math.floor(carry / 58);
+    }
+  }
+  for (const byte of bytes) {
+    if (byte === 0) digits.push(0);
+    else break;
+  }
+  return digits.reverse().map((digit) => BASE58_ALPHABET[digit]).join("");
+}
+
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 async function verifyDexDiscoveryReceipt() {
   const { response, json } = await requestJson("/api/web3-dex-discovery?source=sample&account=persistent");
@@ -352,6 +426,7 @@ async function main() {
   await verifyRejectedExecutionInputs();
   await verifyPublicScopeSave();
   await verifyAccountSetupReceipt();
+  await verifyWalletOwnershipReceipt();
   await verifyCredentialValidateOnly();
   await verifyProviderHealthReceipt();
   await verifyDexDiscoveryReceipt();
