@@ -180,6 +180,8 @@ async function main() {
   assert(html.includes("Test credentials"), "Trading page should expose a Web3 credential test action.");
   assert(html.includes("Apply dry-run profile"), "Trading page should let Web3 credentials apply only to dry-run mode.");
   assert(html.includes("Provider, wallet, route, signer policy"), "Trading page should summarize the Web3 credential setup purpose.");
+  assert(html.includes("API keys are session-only"), "Trading page should disclose that API keys are not saved in browser storage.");
+  assert(html.includes("does not save secrets in browser storage"), "Trading page should expose an accessible credential-storage boundary receipt.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");

@@ -7,6 +7,7 @@ This runbook covers the Mastermind Web3 credentials setup flow. The goal of this
 - The app may test Solana RPC, wallet public-key scope, Jupiter quote readiness, Jupiter unsigned order readiness, signer mode, and risk caps.
 - The app may apply those values to the existing Web3 dry-run execution profile.
 - The app must not store private keys, sign transactions, submit transactions, custody funds, or mutate wallet balances.
+- Browser storage may keep non-secret preferences like wallet public key, signer mode, and risk caps, but must not store Helius or Jupiter API keys.
 - Live-capital execution remains blocked until the launch checklist reaches manual live review and an external reviewed executor is deliberately enabled.
 
 ## Local Environment
@@ -36,7 +37,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 2. Review `Launch checklist` and `Researched stack decisions` to see the selected provider, market, execution, signer, risk, and live-cutover path.
 3. Select the `Wiring` focus in the operator focus deck.
 4. Use `Web3 credential setup`.
-5. Enter or rely on server environment values for Helius/Solana RPC and Jupiter.
+5. Enter or rely on server environment values for Helius/Solana RPC and Jupiter. API key fields are session-only in the browser form and are not saved to browser storage.
 6. Enter a Solana wallet public address only. Never enter a private key.
 7. Keep signer mode on `Manual external wallet` for the first live path.
 8. Set conservative caps, for example `$250` max trade, `$1,000` daily cap, and `150` bps max slippage.
@@ -75,7 +76,7 @@ Useful request fields:
 - `require_manual_confirmation`
 - `test_mode`: `network` or `validate-only`
 
-The response is redacted. It returns host-level endpoint information only and never returns API keys, private keys, unsigned transaction bytes, signed transaction bytes, or wallet secrets.
+The response is redacted. It returns host-level endpoint information only and never returns API keys, private keys, unsigned transaction bytes, signed transaction bytes, or wallet secrets. The browser form also scrubs Helius and Jupiter API key fields from its saved draft.
 
 ## Done Criteria For This Gate
 

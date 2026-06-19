@@ -988,7 +988,7 @@ export function Web3TradingWorkspaceLoader({
           Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets execution runway, heartbeat, loop impact, provider intake, and profit benchmark evidence choose whether to continue, tighten, retarget, protect, harvest, refresh, defer, cool down, or block the next backend tick. Current execution runway {executionRunway.status}; runway action {executionRunway.action}; heartbeat {state.autonomous_execution_heartbeat.status}; heartbeat action {state.autonomous_execution_heartbeat.primary_action}; paper lane {executionRunway.can_auto_paper ? "clear" : "gated"}; current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; provider intake {marketIntake.status}; intake lane {marketIntake.next_lane}; provider budget {marketIntake.provider_budget_status}; can feed loop {marketIntake.can_feed_trade_loop ? "yes" : "no"}; profit benchmark {state.autonomous_profit_benchmark.status}; risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}; alpha feedback {state.autonomous_alpha_feedback_loop.action}; next cadence {Math.min(loopImpact.next_cadence_seconds, executionRunway.next_tick_seconds, state.autonomous_execution_heartbeat.next_tick_seconds)} seconds.
         </span>
         <span className="sr-only" aria-label="Web3 credential setup availability">
-          Web3 credential setup is available under the Wiring focus. It exposes Test credentials and Apply dry-run profile for Provider, wallet, route, signer policy, Helius RPC, Jupiter, and risk caps while live trading remains blocked.
+          Web3 credential setup is available under the Wiring focus. It exposes Test credentials and Apply dry-run profile for Provider, wallet, route, signer policy, Helius RPC, Jupiter, and risk caps while live trading remains blocked. API keys are session-only and the form does not save secrets in browser storage.
         </span>
 
         <section className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:mt-3 sm:p-3" aria-label="Web3 operator focus deck">
@@ -1394,13 +1394,15 @@ function QuickWeb3CredentialsSetupPanel({
     const saved = window.localStorage.getItem(storageKey);
     const parsed = saved ? parseCredentialsDraft(saved) : null;
     if (parsed) {
-      setDraft({
+      const hydratedDraft = {
         ...parsed,
         wallet_public_key: parsed.wallet_public_key || state.execution_readiness.config.wallet_public_key || "",
         max_trade_usd: parsed.max_trade_usd || String(state.execution_readiness.config.max_trade_usd),
         daily_spend_cap_usd: parsed.daily_spend_cap_usd || String(state.execution_readiness.config.daily_spend_cap_usd),
         max_slippage_bps: parsed.max_slippage_bps || String(state.execution_readiness.config.max_slippage_bps),
-      });
+      };
+      setDraft(hydratedDraft);
+      window.localStorage.setItem(storageKey, JSON.stringify(storedCredentialsDraft(hydratedDraft)));
     }
     setLoaded(true);
   }, [state.execution_readiness.config.daily_spend_cap_usd, state.execution_readiness.config.max_slippage_bps, state.execution_readiness.config.max_trade_usd, state.execution_readiness.config.wallet_public_key]);
@@ -1408,9 +1410,11 @@ function QuickWeb3CredentialsSetupPanel({
   function updateDraft(field: keyof Web3CredentialsDraft, value: string | boolean) {
     const next = { ...draft, [field]: value };
     setDraft(next);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    window.localStorage.setItem(storageKey, JSON.stringify(storedCredentialsDraft(next)));
     setResult(null);
-    setMessage("Saved in this browser. Test credentials before applying the dry-run profile.");
+    setMessage(field === "helius_api_key" || field === "jupiter_api_key"
+      ? "Secret value is held only in this page session. It is not saved in browser storage."
+      : "Saved non-secret settings in this browser. Test credentials before applying the dry-run profile.");
   }
 
   async function testCredentials() {
@@ -1456,6 +1460,9 @@ function QuickWeb3CredentialsSetupPanel({
           </p>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-outline">
             Use a wallet public address only, never a private key. Manual approval required is the default first live-review posture.
+          </p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-outline">
+            API keys are session-only in this form and never saved in browser storage; leave them blank to use server environment values.
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
@@ -1596,7 +1603,7 @@ function QuickWeb3CredentialsSetupPanel({
       ) : null}
 
       <p className="sr-only" aria-label="Web3 credential setup receipt">
-        Web3 credential setup tests Helius or Solana RPC, Jupiter quote and order readiness, wallet public key scope, signer mode, and risk caps. It never asks for private keys and cannot enable live trading.
+        Web3 credential setup tests Helius or Solana RPC, Jupiter quote and order readiness, wallet public key scope, signer mode, and risk caps. It never asks for private keys, keeps API keys session-only, does not save secrets in browser storage, and cannot enable live trading.
       </p>
     </section>
   );
@@ -1635,10 +1642,10 @@ function parseCredentialsDraft(raw: string): Web3CredentialsDraft | null {
   try {
     const parsed = JSON.parse(raw) as Partial<Web3CredentialsDraft>;
     return {
-      helius_api_key: typeof parsed.helius_api_key === "string" ? parsed.helius_api_key : "",
+      helius_api_key: "",
       rpc_url: typeof parsed.rpc_url === "string" ? parsed.rpc_url : "",
       ws_url: typeof parsed.ws_url === "string" ? parsed.ws_url : "",
-      jupiter_api_key: typeof parsed.jupiter_api_key === "string" ? parsed.jupiter_api_key : "",
+      jupiter_api_key: "",
       wallet_public_key: typeof parsed.wallet_public_key === "string" ? parsed.wallet_public_key : "",
       signer_mode: parsed.signer_mode === "privy-server-wallet" || parsed.signer_mode === "turnkey-policy-wallet" || parsed.signer_mode === "session-key-vault" ? parsed.signer_mode : "external-wallet",
       max_trade_usd: typeof parsed.max_trade_usd === "string" ? parsed.max_trade_usd : "",
@@ -1649,6 +1656,14 @@ function parseCredentialsDraft(raw: string): Web3CredentialsDraft | null {
   } catch {
     return null;
   }
+}
+
+function storedCredentialsDraft(draft: Web3CredentialsDraft): Web3CredentialsDraft {
+  return {
+    ...draft,
+    helius_api_key: "",
+    jupiter_api_key: "",
+  };
 }
 
 function credentialSetupDotClass(status: Web3CredentialsSetupReadiness["checks"][number]["status"]) {
