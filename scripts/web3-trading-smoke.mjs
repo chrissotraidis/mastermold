@@ -5161,6 +5161,34 @@ async function main() {
   assert(daemonSettlementBody.settlement_watchdog?.action === "run", "Daemon tick body should request the settlement watchdog when confirmed relay evidence exists.", daemonSettlementBody);
   assert(daemonSettlementBody.settlement_watchdog.apply_mirror === true, "Daemon settlement watchdog should explicitly request guarded mirror apply.", daemonSettlementBody);
   assert(daemonSettlementBody.settlement_watchdog.max_fill_usd > 0, "Daemon settlement watchdog should carry a bounded fill cap.", daemonSettlementBody);
+  const daemonMarketRefreshBody = buildDaemonTickBody({
+    ...tick.payload,
+    autonomous_daemon_handoff: {
+      ...tick.payload.autonomous_daemon_handoff,
+      market_worker: {
+        ...tick.payload.autonomous_daemon_handoff.market_worker,
+        status: "refresh-first",
+        lane: "route-quotes",
+        provider: "jupiter-quote-api",
+        endpoint: "/swap/v1/quote-readonly",
+        action: "poll",
+        read_only: true,
+        route_refresh_first: true,
+        can_feed_paper_loop: false,
+      },
+    },
+  }, {
+    scenario: "breakout",
+    source: "live-dex",
+    runnerId: "smoke-market-worker-runner",
+  }, "smoke-market-worker-request");
+  assert(daemonMarketRefreshBody.route_refresh?.action === "request-quote", "Daemon tick body should request read-only route refreshes when the market worker marks route quotes refresh-first.", daemonMarketRefreshBody);
+  const daemonSampleMarketBody = buildDaemonTickBody(tick.payload, {
+    scenario: "breakout",
+    source: "sample",
+    runnerId: "smoke-sample-worker-runner",
+  }, "smoke-sample-market-worker-request");
+  assert(daemonSampleMarketBody.route_refresh === undefined, "Daemon tick body should not request live route refreshes while the market worker is sample-only.", daemonSampleMarketBody);
 
   const summary = {
     baseUrl,

@@ -65,6 +65,7 @@ export async function runWeb3AutonomousDaemon(input = {}) {
 
     const requestId = `${config.runnerId}:${Date.now()}:${index + 1}`;
     const body = buildDaemonTickBody(state, config, requestId);
+    const marketWorkerRefreshRequested = Boolean(body.route_refresh);
     if (config.dryRun) {
       events.push({
         tick: index + 1,
@@ -74,6 +75,7 @@ export async function runWeb3AutonomousDaemon(input = {}) {
         next_wake_seconds: handoff.next_wake_seconds,
         market_worker: handoff.market_worker?.status ?? "missing",
         market_worker_lane: handoff.market_worker?.lane ?? "none",
+        market_worker_route_refresh_requested: marketWorkerRefreshRequested,
       });
       if (index < config.maxTicks - 1) await waitForNextTick(config, handoff);
       continue;
@@ -96,6 +98,7 @@ export async function runWeb3AutonomousDaemon(input = {}) {
       market_worker: nextHandoff?.market_worker?.status ?? "missing",
       market_worker_lane: nextHandoff?.market_worker?.lane ?? "none",
       market_worker_can_feed_loop: Boolean(nextHandoff?.market_worker?.can_feed_paper_loop),
+      market_worker_route_refresh_requested: marketWorkerRefreshRequested,
       settlement_watchdog: payload.autonomous_settlement_watchdog?.status ?? "not-requested",
       settlement_action: payload.autonomous_settlement_watchdog?.action ?? "none",
       next_action: payload.autonomous_loop_tick?.next_action ?? nextHandoff?.summary ?? "No next action returned.",
@@ -122,6 +125,7 @@ export async function runWeb3AutonomousDaemon(input = {}) {
 
 export function buildDaemonTickBody(state, config, requestId) {
   const handoff = state.autonomous_daemon_handoff;
+  const marketWorkerRefresh = buildDaemonMarketWorkerRequest(state);
   const settlementWatchdog = buildDaemonSettlementWatchdogRequest(state);
   return {
     scenario: state.scenario ?? config.scenario,
@@ -131,6 +135,7 @@ export function buildDaemonTickBody(state, config, requestId) {
     daemon: true,
     advance: false,
     autonomous_loop: { action: "tick" },
+    ...(marketWorkerRefresh ? { route_refresh: marketWorkerRefresh } : {}),
     ...(settlementWatchdog ? { settlement_watchdog: settlementWatchdog } : {}),
     daemon_lease: {
       lease_id: handoff.lease_id,
@@ -139,6 +144,16 @@ export function buildDaemonTickBody(state, config, requestId) {
       issued_at: new Date().toISOString(),
     },
   };
+}
+
+export function buildDaemonMarketWorkerRequest(state) {
+  const worker = state?.autonomous_daemon_handoff?.market_worker;
+  if (!worker || worker.read_only !== true) return null;
+  if (worker.lane !== "route-quotes") return null;
+  if (worker.status === "blocked" || worker.status === "sample-only" || worker.status === "throttled") return null;
+  if (worker.action !== "poll" && worker.status !== "refresh-first" && worker.can_feed_paper_loop !== true) return null;
+  if (!worker.route_refresh_first && worker.can_feed_paper_loop !== true && worker.status !== "ready") return null;
+  return { action: "request-quote" };
 }
 
 export function buildDaemonSettlementWatchdogRequest(state) {
