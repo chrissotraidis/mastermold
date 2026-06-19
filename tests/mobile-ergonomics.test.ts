@@ -518,7 +518,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewReadiness).toContain("It can explain saved or sample reads");
     expect(reviewReadiness).toContain("Use it for today's decision");
     expect(reviewReadiness).toContain("Do not treat it as live account advice yet");
-    expect(reviewReadiness).toContain("Next missing foundation: daily market reader");
+    expect(reviewReadiness).toContain("Autonomous trading status");
+    expect(reviewReadiness).toContain("What is actually left");
+    expect(reviewReadiness).toContain("Live capital locked");
+    expect(reviewReadiness).toContain("Production trader");
     expect(reviewReadiness).toContain("Chat context saves what the app can remember");
     expect(reviewReadiness).toContain("Imported holdings are one-time snapshots.");
     expect(reviewReadiness).toContain('label: "Money shown"');

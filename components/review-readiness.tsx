@@ -759,6 +759,8 @@ export function ReviewReadiness({ surface }: ReviewReadinessProps) {
 
       <ReviewVerdictCard />
 
+      <AutonomousTradingStatusCard />
+
       <TrustBoundaryCard />
 
       <ForwardProofCard />
@@ -959,13 +961,13 @@ function TrustBoundaryCard() {
     {
       title: "Web3 trading is paper-only learning",
       body:
-        "The trading agent can run memecoin discovery, autonomous capital allocator paper budgets, autonomous trade arbiter paper decisions, bounded sell-first trade batch plans, arbiter paper execution bridge fills, autonomous loop director intensity and cadence controls, autonomous portfolio sentinel paper surveillance, portfolio-wide position surveillance matrix rows, portfolio tape-guard rows, on-chain event inbox recommendations, wallet event reactor intents, microstructure tape, smart-money estimates, liquidity-depth sizing, route quote sampling, execution landing supervisor path selection, autonomous session supervision, autonomous order handoff planning, pre-submit rehearsal, local custody policy envelope planning, alpha-decay timing, position-command timing, profit-lock automation actions, tape-change memory, paper fills, dry-run order plans, and adaptive learning, but it cannot sign, submit, move funds, create session keys, grant wallet authority, or store private keys.",
+        "The Web3 agent can monitor memecoin tape, score routes and candle proof, run bounded local paper ticks, update a paper wallet curve, and rehearse settlement checks. It cannot sign, submit, move funds, create wallet authority, or store private keys.",
       tone: "border-violet/30 bg-violet/[0.06]",
     },
     {
-      title: "Next missing foundation: daily market reader",
+      title: "What is actually left",
       body:
-        "Still missing: scheduled market/news reading, broader connected-portfolio coverage, source notes for every daily call, and forward scoring.",
+        "Still missing for real-money autonomy: production signer/custody policy, always-on market and route workers, real wallet accounting, audited live submit/settlement, and out-of-sample profit proof.",
       tone: "border-critical/30 bg-critical/[0.06]",
     },
   ];
@@ -985,6 +987,62 @@ function TrustBoundaryCard() {
         </div>
       ))}
     </section>
+  );
+}
+
+function AutonomousTradingStatusCard() {
+  const rows: Array<{
+    label: string;
+    value: string;
+    detail: string;
+    tone: string;
+  }> = [
+    {
+      label: "Built",
+      value: "Autonomous paper desk",
+      detail:
+        "Memecoin discovery, signal/noise charts, route and candle proof, bounded backend ticks, paper fills, wallet net-worth curve, daemon receipts, and settlement watchdog rehearsal are wired for local review.",
+      tone: "text-engine",
+    },
+    {
+      label: "Safe boundary",
+      value: "Live capital locked",
+      detail:
+        "The app does not store private keys or raw signed transactions. Live swaps remain blocked unless external signer, RPC/API, wallet approval, kill switch, submit, confirmation, and mirror checks all clear.",
+      tone: "text-caution",
+    },
+    {
+      label: "Not done",
+      value: "Production trader",
+      detail:
+        "The remaining work is not more dashboard labels; it is real infrastructure: persistent workers, provider credentials, custody policy, audited order submission, real fill accounting, and long-run profit proof.",
+      tone: "text-critical",
+    },
+  ];
+
+  return (
+    <Card className="border-violet/30 bg-surface-high/40">
+      <CardHeader className="grid gap-4 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
+        <div className="flex size-11 items-center justify-center rounded-md border border-violet/30 bg-violet/10 text-violet">
+          <Cpu aria-hidden="true" className="size-5" />
+        </div>
+        <div>
+          <CardTitle as="h2" className="text-xl text-on-surface">Autonomous trading status</CardTitle>
+          <CardDescription className="mt-2 text-sm leading-6 text-on-surface-variant">
+            The Web3 subsystem is now a working local paper-trading cockpit and copilot. The real-money agent is still intentionally gated until custody, execution, accounting, and proof are production-grade.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 p-5 pt-0 lg:grid-cols-3">
+        {rows.map((row) => (
+          <div key={row.label} className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-4">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">{row.label}</p>
+            <p className={`mt-1 text-sm font-semibold ${row.tone}`}>{row.value}</p>
+            <p className="mt-2 text-sm leading-6 text-on-surface-variant">{row.detail}</p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
