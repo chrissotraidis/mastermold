@@ -18,6 +18,7 @@ export type Web3AccountAcquisitionItem = {
     | "manual-signer"
     | "policy-signer"
     | "emergency-stop"
+    | "production-worker"
     | "accounting";
   label: string;
   status: "configured" | "needed" | "blocked" | "future";
@@ -213,6 +214,27 @@ function buildAcquisitionItems(setup: Web3AccountSetupReceipt): Web3AccountAcqui
       test_action: "Run stop drill and confirm external dispatch is still blocked in local dry-run mode.",
     },
     {
+      id: "production-worker",
+      label: "Production worker operations",
+      status: productionWorkerTargetsConfigured() ? "configured" : "needed",
+      priority: "next",
+      setup_url: "https://pm2.keymetrics.io/docs/usage/quick-start/",
+      docs_url: "https://nodejs.org/api/process.html",
+      env_targets: [
+        "MASTERMOLD_WEB3_PROCESS_MANAGER",
+        "MASTERMOLD_WEB3_WORKER_OWNER",
+        "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+        "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+      ],
+      account_owner: "operator",
+      app_permission: "inspect-config-only",
+      next_action: productionWorkerTargetsConfigured()
+        ? "Externally verify restart policy, alert delivery, worker ownership, and secret scope before manual live review."
+        : "Choose a process manager, worker owner, alert route, and restart-policy runbook before supervised live review.",
+      security_rule: "Worker ops targets stay server-side and are reported only as configured or missing; Mastermind cannot start workers or dispatch alert webhooks.",
+      test_action: "Install production-worker targets locally, then rebuild live ops and supervised-live runway receipts.",
+    },
+    {
       id: "accounting",
       label: "Tax/accounting evidence",
       status: env.tax_ledger_configured ? "configured" : "future",
@@ -229,6 +251,15 @@ function buildAcquisitionItems(setup: Web3AccountSetupReceipt): Web3AccountAcqui
       test_action: "Build ledger receipt and confirm tax export remains paper-only until real settlement is reviewed.",
     },
   ];
+}
+
+function productionWorkerTargetsConfigured() {
+  return [
+    "MASTERMOLD_WEB3_PROCESS_MANAGER",
+    "MASTERMOLD_WEB3_WORKER_OWNER",
+    "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+    "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+  ].every((name) => hasEnv(name));
 }
 
 function policySignerStatus(provider: Web3AccountSetupReceipt["environment_summary"]["signer_provider"]) {

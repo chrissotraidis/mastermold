@@ -903,6 +903,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("PRIVY_APP_SECRET");
     expect(settingsPage).toContain("TURNKEY_API_PRIVATE_KEY");
     expect(settingsPage).toContain("MASTERMOLD_SESSION_POLICY_HASH");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("Production worker operations");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("MASTERMOLD_WEB3_PROCESS_MANAGER");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("MASTERMOLD_WEB3_ALERT_WEBHOOK_URL");
     expect(settingsPage).toContain("Test: {item.test_action}");
     expect(settingsPage).toContain("acquisition.items.map");
     expect(source("src/db/web3-account-acquisition.ts")).toContain("https://dev.jup.ag/docs/swap/v2/order-and-execute");
@@ -927,6 +930,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Emergency stop contact");
     expect(settingsConsole).toContain("Accounting export path");
     expect(settingsConsole).toContain("Signer provider targets");
+    expect(settingsConsole).toContain("Production worker targets");
+    expect(settingsConsole).toContain("Process manager");
+    expect(settingsConsole).toContain("Worker owner");
+    expect(settingsConsole).toContain("Alert webhook");
+    expect(settingsConsole).toContain("Restart policy URL");
     expect(settingsConsole).toContain("Privy app secret");
     expect(settingsConsole).toContain("Turnkey API private key");
     expect(settingsConsole).toContain("Provider API credential, never wallet key");
@@ -936,6 +944,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("autonomous_signer_provider");
     expect(settingsConsole).toContain("turnkey_api_private_key");
     expect(settingsConsole).toContain("tax_ledger_export_path");
+    expect(settingsConsole).toContain("production_process_manager");
+    expect(settingsConsole).toContain("production_alert_webhook_url");
     expect(source("app/api/web3-local-credentials/route.ts")).toContain("installWeb3LocalCredentials");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("web3-local-credential-install");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_ALLOW_LOCAL_CREDENTIAL_INSTALL");
@@ -1119,6 +1129,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-operator-wallet gate");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-jupiter-order gate");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-dex-live gate");
+    expect(source("components/review-readiness.tsx")).toContain("production-worker target setup");
     expect(settingsPage).toContain("Open Web3 wiring");
     expect(settingsPage).toContain("live execution blocked");
     expect(settingsPage).toContain("wallet mutation blocked");

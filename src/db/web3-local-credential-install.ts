@@ -48,6 +48,10 @@ type CredentialInput = {
   emergency_stop_webhook_url?: unknown;
   emergency_stop_contact?: unknown;
   tax_ledger_export_path?: unknown;
+  production_process_manager?: unknown;
+  production_worker_owner?: unknown;
+  production_alert_webhook_url?: unknown;
+  production_restart_policy_url?: unknown;
 };
 
 type CredentialTarget = {
@@ -69,7 +73,11 @@ type CredentialTarget = {
     | "MASTERMOLD_SESSION_POLICY_HASH"
     | "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL"
     | "MASTERMOLD_EMERGENCY_STOP_CONTACT"
-    | "MASTERMOLD_TAX_LEDGER_EXPORT_PATH";
+    | "MASTERMOLD_TAX_LEDGER_EXPORT_PATH"
+    | "MASTERMOLD_WEB3_PROCESS_MANAGER"
+    | "MASTERMOLD_WEB3_WORKER_OWNER"
+    | "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL"
+    | "MASTERMOLD_WEB3_RESTART_POLICY_URL";
   kind: "key" | "http-url" | "ws-url" | "contact" | "path" | "signer-provider";
 };
 
@@ -91,6 +99,10 @@ const CREDENTIAL_TARGETS: CredentialTarget[] = [
   { field: "emergency_stop_webhook_url", env: "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL", kind: "http-url" },
   { field: "emergency_stop_contact", env: "MASTERMOLD_EMERGENCY_STOP_CONTACT", kind: "contact" },
   { field: "tax_ledger_export_path", env: "MASTERMOLD_TAX_LEDGER_EXPORT_PATH", kind: "path" },
+  { field: "production_process_manager", env: "MASTERMOLD_WEB3_PROCESS_MANAGER", kind: "contact" },
+  { field: "production_worker_owner", env: "MASTERMOLD_WEB3_WORKER_OWNER", kind: "contact" },
+  { field: "production_alert_webhook_url", env: "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL", kind: "http-url" },
+  { field: "production_restart_policy_url", env: "MASTERMOLD_WEB3_RESTART_POLICY_URL", kind: "http-url" },
 ];
 
 export function buildWeb3LocalCredentialInstallHealth(request?: Request): Web3LocalCredentialInstallReceipt {
@@ -211,7 +223,7 @@ function invalidReceipt(rejectedFields: string[], summary: string): Web3LocalCre
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     secret_echo_permission: "blocked",
-    next_action: "Submit only allowlisted provider, signer-provider, emergency-stop, or accounting targets; never submit wallet private keys or seed phrases.",
+    next_action: "Submit only allowlisted provider, signer-provider, emergency-stop, production-worker, or accounting targets; never submit wallet private keys or seed phrases.",
     summary,
   };
 }
@@ -296,6 +308,14 @@ function nextInstallAction(missing: string[], installed: string[]) {
     return "Add an emergency-stop contact or webhook, then run the local stop drill and live ops packet.";
   }
   if (missing.includes("MASTERMOLD_TAX_LEDGER_EXPORT_PATH")) return "Add an accounting export target, then rebuild the live ops packet.";
+  if ([
+    "MASTERMOLD_WEB3_PROCESS_MANAGER",
+    "MASTERMOLD_WEB3_WORKER_OWNER",
+    "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+    "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+  ].some((key) => missing.includes(key))) {
+    return "Add production worker process, owner, alert, and restart-policy targets, then rebuild the live ops packet.";
+  }
   if (installed.length > 0) return "Run Test credentials, Rehearse Jupiter, and npm run verify:web3 after the local server reads the updated environment.";
   return "Scope a dedicated public wallet and prove ownership; live execution remains blocked.";
 }

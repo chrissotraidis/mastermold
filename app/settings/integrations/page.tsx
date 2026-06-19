@@ -960,6 +960,12 @@ function SettingsJupiterOrderPacketPanel({ packet }: { packet: Web3JupiterOrderP
 function SettingsLiveOpsPacketPanel({ packet }: { packet: Web3LiveOpsPacket }) {
   const openCount = packet.missing_required.length;
   const primaryTone = packet.status === "manual-review-needed" ? "watch" : packet.status === "blocked" ? "fail" : "watch";
+  const workerTargetCount = [
+    packet.process_manager_configured,
+    packet.worker_owner_configured,
+    packet.alert_route_configured,
+    packet.restart_policy_configured,
+  ].filter(Boolean).length;
   return (
     <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Web3 live ops packet">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -973,7 +979,7 @@ function SettingsLiveOpsPacketPanel({ packet }: { packet: Web3LiveOpsPacket }) {
         <LaunchQueueBadge status={primaryTone} label={openCount > 0 ? `${openCount} open` : "review"} />
       </div>
 
-      <div className="mt-3 grid gap-2 md:grid-cols-3">
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Supervisor</p>
           <p className="mt-1 text-xs font-semibold text-on-surface">
@@ -999,6 +1005,15 @@ function SettingsLiveOpsPacketPanel({ packet }: { packet: Web3LiveOpsPacket }) {
           </p>
           <p className="mt-1 text-[11px] leading-4 text-outline">
             Boundary {packet.accounting_boundary}; settlement {packet.settlement_status.replaceAll("-", " ")}; mirror {packet.portfolio_mirror_status.replaceAll("-", " ")}.
+          </p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Worker ops</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">
+            {packet.production_ops_targets_configured ? "Review targets configured" : `${workerTargetCount}/4 targets set`}
+          </p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            Process {packet.process_manager_configured ? "set" : "missing"} · owner {packet.worker_owner_configured ? "set" : "missing"} · alert {packet.alert_route_configured ? "set" : "missing"} · restart {packet.restart_policy_configured ? "set" : "missing"}.
           </p>
         </div>
       </div>

@@ -67,6 +67,10 @@ let prevYellowstoneGrpcToken: string | undefined;
 let prevEmergencyStopWebhookUrl: string | undefined;
 let prevEmergencyStopContact: string | undefined;
 let prevTaxLedgerExportPath: string | undefined;
+let prevWeb3ProcessManager: string | undefined;
+let prevWeb3WorkerOwner: string | undefined;
+let prevWeb3AlertWebhookUrl: string | undefined;
+let prevWeb3RestartPolicyUrl: string | undefined;
 let prevLocalCredentialInstallEnvPath: string | undefined;
 let prevFetch: typeof globalThis.fetch;
 
@@ -98,6 +102,10 @@ beforeEach(() => {
   prevEmergencyStopWebhookUrl = process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL;
   prevEmergencyStopContact = process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT;
   prevTaxLedgerExportPath = process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
+  prevWeb3ProcessManager = process.env.MASTERMOLD_WEB3_PROCESS_MANAGER;
+  prevWeb3WorkerOwner = process.env.MASTERMOLD_WEB3_WORKER_OWNER;
+  prevWeb3AlertWebhookUrl = process.env.MASTERMOLD_WEB3_ALERT_WEBHOOK_URL;
+  prevWeb3RestartPolicyUrl = process.env.MASTERMOLD_WEB3_RESTART_POLICY_URL;
   prevLocalCredentialInstallEnvPath = process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH;
   prevFetch = globalThis.fetch;
   const testRoot = mkdtempSync(join(tmpdir(), "mm-web3-"));
@@ -128,6 +136,10 @@ beforeEach(() => {
   delete process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL;
   delete process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT;
   delete process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
+  delete process.env.MASTERMOLD_WEB3_PROCESS_MANAGER;
+  delete process.env.MASTERMOLD_WEB3_WORKER_OWNER;
+  delete process.env.MASTERMOLD_WEB3_ALERT_WEBHOOK_URL;
+  delete process.env.MASTERMOLD_WEB3_RESTART_POLICY_URL;
   delete process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH;
   __resetStoreForTests();
 });
@@ -187,6 +199,14 @@ afterEach(() => {
   else process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = prevEmergencyStopContact;
   if (prevTaxLedgerExportPath === undefined) delete process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
   else process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = prevTaxLedgerExportPath;
+  if (prevWeb3ProcessManager === undefined) delete process.env.MASTERMOLD_WEB3_PROCESS_MANAGER;
+  else process.env.MASTERMOLD_WEB3_PROCESS_MANAGER = prevWeb3ProcessManager;
+  if (prevWeb3WorkerOwner === undefined) delete process.env.MASTERMOLD_WEB3_WORKER_OWNER;
+  else process.env.MASTERMOLD_WEB3_WORKER_OWNER = prevWeb3WorkerOwner;
+  if (prevWeb3AlertWebhookUrl === undefined) delete process.env.MASTERMOLD_WEB3_ALERT_WEBHOOK_URL;
+  else process.env.MASTERMOLD_WEB3_ALERT_WEBHOOK_URL = prevWeb3AlertWebhookUrl;
+  if (prevWeb3RestartPolicyUrl === undefined) delete process.env.MASTERMOLD_WEB3_RESTART_POLICY_URL;
+  else process.env.MASTERMOLD_WEB3_RESTART_POLICY_URL = prevWeb3RestartPolicyUrl;
   if (prevLocalCredentialInstallEnvPath === undefined) delete process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH;
   else process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH = prevLocalCredentialInstallEnvPath;
   globalThis.fetch = prevFetch;
@@ -503,6 +523,10 @@ describe("Web3 autonomous trading subsystem", () => {
         emergency_stop_webhook_url: "https://ops.example.test/live-stop-canary",
         emergency_stop_contact: "ops-canary@example.test",
         tax_ledger_export_path: "/tmp/mastermold-tax-canary.csv",
+        production_process_manager: "pm2-live-canary",
+        production_worker_owner: "worker-owner-canary@example.test",
+        production_alert_webhook_url: "https://ops.example.test/alert-canary",
+        production_restart_policy_url: "https://ops.example.test/restart-canary",
       }),
     }));
     const receipt = await json<{
@@ -525,11 +549,19 @@ describe("Web3 autonomous trading subsystem", () => {
       "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL",
       "MASTERMOLD_EMERGENCY_STOP_CONTACT",
       "MASTERMOLD_TAX_LEDGER_EXPORT_PATH",
+      "MASTERMOLD_WEB3_PROCESS_MANAGER",
+      "MASTERMOLD_WEB3_WORKER_OWNER",
+      "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+      "MASTERMOLD_WEB3_RESTART_POLICY_URL",
     ]));
     expect(receipt.configured_keys).toEqual(expect.arrayContaining([
       "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL",
       "MASTERMOLD_EMERGENCY_STOP_CONTACT",
       "MASTERMOLD_TAX_LEDGER_EXPORT_PATH",
+      "MASTERMOLD_WEB3_PROCESS_MANAGER",
+      "MASTERMOLD_WEB3_WORKER_OWNER",
+      "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+      "MASTERMOLD_WEB3_RESTART_POLICY_URL",
     ]));
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");
@@ -538,9 +570,17 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(envText).toContain("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL=https://ops.example.test/live-stop-canary");
     expect(envText).toContain("MASTERMOLD_EMERGENCY_STOP_CONTACT=ops-canary@example.test");
     expect(envText).toContain("MASTERMOLD_TAX_LEDGER_EXPORT_PATH=/tmp/mastermold-tax-canary.csv");
+    expect(envText).toContain("MASTERMOLD_WEB3_PROCESS_MANAGER=pm2-live-canary");
+    expect(envText).toContain("MASTERMOLD_WEB3_WORKER_OWNER=worker-owner-canary@example.test");
+    expect(envText).toContain("MASTERMOLD_WEB3_ALERT_WEBHOOK_URL=https://ops.example.test/alert-canary");
+    expect(envText).toContain("MASTERMOLD_WEB3_RESTART_POLICY_URL=https://ops.example.test/restart-canary");
     expect(receiptText).not.toContain("live-stop-canary");
     expect(receiptText).not.toContain("ops-canary@example.test");
     expect(receiptText).not.toContain("mastermold-tax-canary");
+    expect(receiptText).not.toContain("pm2-live-canary");
+    expect(receiptText).not.toContain("worker-owner-canary");
+    expect(receiptText).not.toContain("alert-canary");
+    expect(receiptText).not.toContain("restart-canary");
   });
 
   test("GIVEN signer provider targets WHEN the local installer runs THEN it allowlists provider credentials but rejects wallet secrets", async () => {
@@ -1287,6 +1327,10 @@ describe("Web3 autonomous trading subsystem", () => {
     process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL = "https://ops.example.test/live-stop-secret";
     process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = "ops-secret@example.test";
     process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = "/tmp/mastermold-tax-ledger-secret";
+    process.env.MASTERMOLD_WEB3_PROCESS_MANAGER = "pm2-live-canary";
+    process.env.MASTERMOLD_WEB3_WORKER_OWNER = "worker-canary@example.test";
+    process.env.MASTERMOLD_WEB3_ALERT_WEBHOOK_URL = "https://ops.example.test/alert-canary";
+    process.env.MASTERMOLD_WEB3_RESTART_POLICY_URL = "https://ops.example.test/restart-canary";
 
     const rejected = await LIVE_OPS_PACKET_GET(new Request("http://localhost/api/web3-live-ops-packet?cycles=99"));
     expect(rejected.status).toBe(422);
@@ -1305,6 +1349,11 @@ describe("Web3 autonomous trading subsystem", () => {
       emergency_stop_contact_configured: boolean;
       accounting_export_configured: boolean;
       accounting_boundary: string;
+      process_manager_configured: boolean;
+      worker_owner_configured: boolean;
+      alert_route_configured: boolean;
+      restart_policy_configured: boolean;
+      production_ops_targets_configured: boolean;
       manual_live_review_required: boolean;
       external_process_manager_required: boolean;
       missing_required: string[];
@@ -1322,7 +1371,7 @@ describe("Web3 autonomous trading subsystem", () => {
 
     expect(response.status).toBe(200);
     expect(packet.mode).toBe("web3-live-ops-packet");
-    expect(["missing-supervisor", "stale-supervisor", "missing-emergency-stop", "accounting-needed", "manual-review-needed", "blocked"]).toContain(packet.status);
+    expect(["missing-supervisor", "stale-supervisor", "missing-emergency-stop", "accounting-needed", "process-review-needed", "manual-review-needed", "blocked"]).toContain(packet.status);
     expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(packet.production_supervisor_score).toBeGreaterThanOrEqual(0);
     expect(packet.emergency_stop_configured).toBe(true);
@@ -1330,6 +1379,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.emergency_stop_contact_configured).toBe(true);
     expect(packet.accounting_export_configured).toBe(true);
     expect(packet.accounting_boundary).toBe("paper-only");
+    expect(packet.process_manager_configured).toBe(true);
+    expect(packet.worker_owner_configured).toBe(true);
+    expect(packet.alert_route_configured).toBe(true);
+    expect(packet.restart_policy_configured).toBe(true);
+    expect(packet.production_ops_targets_configured).toBe(true);
     expect(packet.manual_live_review_required).toBe(true);
     expect(packet.external_process_manager_required).toBe(true);
     expect(packet.safe_commands).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
@@ -1354,6 +1408,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(packet)).not.toContain("live-stop-secret");
     expect(JSON.stringify(packet)).not.toContain("ops-secret@example.test");
     expect(JSON.stringify(packet)).not.toContain("tax-ledger-secret");
+    expect(JSON.stringify(packet)).not.toContain("pm2-live-canary");
+    expect(JSON.stringify(packet)).not.toContain("worker-canary@example.test");
+    expect(JSON.stringify(packet)).not.toContain("alert-canary");
+    expect(JSON.stringify(packet)).not.toContain("restart-canary");
   });
 
   test("GIVEN supervised live is reviewed WHEN the runway route runs THEN it consolidates blocked launch lanes without secrets", async () => {
@@ -1361,6 +1419,10 @@ describe("Web3 autonomous trading subsystem", () => {
     process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL = "https://ops.example.test/supervised-stop-secret";
     process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = "supervised-secret@example.test";
     process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = "/tmp/mastermold-supervised-tax-secret";
+    process.env.MASTERMOLD_WEB3_PROCESS_MANAGER = "pm2-supervised-canary";
+    process.env.MASTERMOLD_WEB3_WORKER_OWNER = "supervised-worker-canary@example.test";
+    process.env.MASTERMOLD_WEB3_ALERT_WEBHOOK_URL = "https://ops.example.test/supervised-alert-canary";
+    process.env.MASTERMOLD_WEB3_RESTART_POLICY_URL = "https://ops.example.test/supervised-restart-canary";
 
     const rejected = await SUPERVISED_LIVE_RUNWAY_GET(new Request("http://localhost/api/web3-supervised-live-runway?account=bad-account"));
     expect(rejected.status).toBe(422);

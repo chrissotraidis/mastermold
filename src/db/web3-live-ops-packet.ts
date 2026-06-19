@@ -9,6 +9,7 @@ export type Web3LiveOpsPacketStatus =
   | "stale-supervisor"
   | "missing-emergency-stop"
   | "accounting-needed"
+  | "process-review-needed"
   | "manual-review-needed"
   | "blocked";
 
@@ -47,6 +48,11 @@ export type Web3LiveOpsPacket = {
   accounting_boundary: Web3AccountingLedgerReceipt["accounting_boundary"];
   settlement_status: Web3AccountingLedgerReceipt["settlement_summary"]["settlement_status"];
   portfolio_mirror_status: Web3AccountingLedgerReceipt["settlement_summary"]["mirror_status"];
+  process_manager_configured: boolean;
+  worker_owner_configured: boolean;
+  alert_route_configured: boolean;
+  restart_policy_configured: boolean;
+  production_ops_targets_configured: boolean;
   manual_live_review_required: true;
   external_process_manager_required: true;
   missing_required: string[];
@@ -76,12 +82,18 @@ export function buildWeb3LiveOpsPacket(input: {
   const generatedAt = (input.now ?? new Date()).toISOString();
   const emergencyStopConfigured = input.emergencyStop.ops_target_configured;
   const accountingExportConfigured = hasEnv("MASTERMOLD_TAX_LEDGER_EXPORT_PATH");
+  const processManagerConfigured = hasEnv("MASTERMOLD_WEB3_PROCESS_MANAGER");
+  const workerOwnerConfigured = hasEnv("MASTERMOLD_WEB3_WORKER_OWNER");
+  const alertRouteConfigured = hasEnv("MASTERMOLD_WEB3_ALERT_WEBHOOK_URL");
+  const restartPolicyConfigured = hasEnv("MASTERMOLD_WEB3_RESTART_POLICY_URL");
+  const productionOpsTargetsConfigured = processManagerConfigured && workerOwnerConfigured && alertRouteConfigured && restartPolicyConfigured;
   const liveExecutionFlagSet = hasEnv("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION");
   const liveApprovalFlagSet = hasEnv("MASTERMOLD_LIVE_OPERATOR_APPROVAL");
   const status = liveOpsPacketStatus({
     productionSupervisor: input.productionSupervisor,
     emergencyStopConfigured,
     accountingExportConfigured,
+    productionOpsTargetsConfigured,
     liveExecutionFlagSet,
     liveApprovalFlagSet,
   });
@@ -90,7 +102,10 @@ export function buildWeb3LiveOpsPacket(input: {
     input.productionSupervisor.paper_supervision_evidence && !input.productionSupervisor.receipt_fresh ? "Fresh production-supervisor receipt under 15 minutes" : null,
     !emergencyStopConfigured ? "Emergency-stop webhook or contact" : null,
     !accountingExportConfigured ? "Reviewed accounting/export target" : null,
-    "External process manager, restart policy, and alert routing review",
+    !processManagerConfigured ? "External process manager target" : null,
+    !workerOwnerConfigured ? "Production worker owner" : null,
+    !alertRouteConfigured ? "Production alert route" : null,
+    !restartPolicyConfigured ? "Restart policy review URL" : null,
     "Manual live-executor approval",
     liveExecutionFlagSet || liveApprovalFlagSet ? "Revoke live execution flags until manual review completes" : null,
   ].filter((item): item is string => Boolean(item));
@@ -104,6 +119,7 @@ export function buildWeb3LiveOpsPacket(input: {
     productionSupervisor: input.productionSupervisor,
     emergencyStop: input.emergencyStop,
     accountingExportConfigured,
+    productionOpsTargetsConfigured,
   });
   const receiptBase = {
     mode: "web3-live-ops-packet" as const,
@@ -125,6 +141,11 @@ export function buildWeb3LiveOpsPacket(input: {
     accounting_boundary: input.accounting.accounting_boundary,
     settlement_status: input.accounting.settlement_summary.settlement_status,
     portfolio_mirror_status: input.accounting.settlement_summary.mirror_status,
+    process_manager_configured: processManagerConfigured,
+    worker_owner_configured: workerOwnerConfigured,
+    alert_route_configured: alertRouteConfigured,
+    restart_policy_configured: restartPolicyConfigured,
+    production_ops_targets_configured: productionOpsTargetsConfigured,
     manual_live_review_required: true as const,
     external_process_manager_required: true as const,
     missing_required: missingRequired,
@@ -142,6 +163,7 @@ export function buildWeb3LiveOpsPacket(input: {
     controls: [
       "This packet consolidates live-ops review evidence only; it cannot create process managers, send webhooks, or approve live trading.",
       "Emergency-stop targets are reported as configured/missing booleans only; raw webhook URLs and contact values are never returned.",
+      "Production worker process, owner, alert, and restart-policy targets are reported only as configured/missing booleans.",
       "Accounting export remains paper-only until settlement reconciliation, portfolio mirror review, and CPA-reviewed handling exist.",
       "Live execution, wallet mutation, transaction submission, external dispatch, private-key storage, seed-phrase storage, and secret echo remain blocked.",
     ],
@@ -159,6 +181,7 @@ function liveOpsPacketStatus(input: {
   productionSupervisor: Web3ProductionSupervisorReadiness;
   emergencyStopConfigured: boolean;
   accountingExportConfigured: boolean;
+  productionOpsTargetsConfigured: boolean;
   liveExecutionFlagSet: boolean;
   liveApprovalFlagSet: boolean;
 }): Web3LiveOpsPacketStatus {
@@ -167,6 +190,7 @@ function liveOpsPacketStatus(input: {
   if (!input.productionSupervisor.receipt_fresh) return "stale-supervisor";
   if (!input.emergencyStopConfigured) return "missing-emergency-stop";
   if (!input.accountingExportConfigured) return "accounting-needed";
+  if (!input.productionOpsTargetsConfigured) return "process-review-needed";
   return "manual-review-needed";
 }
 
@@ -174,6 +198,7 @@ function buildLiveOpsSteps(input: {
   productionSupervisor: Web3ProductionSupervisorReadiness;
   emergencyStop: Web3EmergencyStopDrillReceipt;
   accountingExportConfigured: boolean;
+  productionOpsTargetsConfigured: boolean;
 }): Web3LiveOpsPacketStep[] {
   return [
     {
@@ -211,9 +236,13 @@ function buildLiveOpsSteps(input: {
     {
       id: "review-process-manager",
       label: "Review process manager",
-      status: "active",
-      detail: "The app can read sanitized receipts, but it cannot install production process supervision by itself.",
-      next_action: "Document process manager, restart policy, alerts, secret scope, and owner outside the app.",
+      status: input.productionOpsTargetsConfigured ? "review" : "active",
+      detail: input.productionOpsTargetsConfigured
+        ? "Process, owner, alert, and restart-policy targets are configured as redacted review evidence."
+        : "The app can read sanitized receipts, but it cannot install production process supervision by itself.",
+      next_action: input.productionOpsTargetsConfigured
+        ? "Externally verify process manager, restart behavior, alert delivery, secret scope, and owner before manual live approval."
+        : "Document process manager, restart policy, alerts, secret scope, and owner outside the app.",
     },
     {
       id: "manual-live-review",
@@ -227,6 +256,7 @@ function buildLiveOpsSteps(input: {
 
 function liveOpsSummary(status: Web3LiveOpsPacketStatus, productionSupervisor: Web3ProductionSupervisorReadiness) {
   if (status === "manual-review-needed") return "Live-ops inputs are configured enough for external review, but this app still cannot unlock real-capital execution.";
+  if (status === "process-review-needed") return "Live-ops review still needs production-worker process, owner, alert, and restart-policy targets.";
   if (status === "accounting-needed") return "Live-ops review still needs accounting/export handling before real fills can become authoritative.";
   if (status === "missing-emergency-stop") return "Live-ops review still needs an emergency-stop owner or channel.";
   if (status === "stale-supervisor") return "Live-ops review has paper-supervisor evidence, but the receipt is stale.";
@@ -236,6 +266,7 @@ function liveOpsSummary(status: Web3LiveOpsPacketStatus, productionSupervisor: W
 
 function liveOpsNextAction(status: Web3LiveOpsPacketStatus, missingRequired: string[]) {
   if (status === "manual-review-needed") return "Prepare external process-manager, alerting, signer revocation, and manual live-executor review materials.";
+  if (status === "process-review-needed") return "Add production worker process, owner, alert, and restart-policy targets in ignored server env.";
   return missingRequired[0] ?? "Keep live execution blocked while refreshing live-ops evidence.";
 }
 

@@ -43,6 +43,10 @@ type Draft = {
   emergency_stop_webhook_url: string;
   emergency_stop_contact: string;
   tax_ledger_export_path: string;
+  production_process_manager: string;
+  production_worker_owner: string;
+  production_alert_webhook_url: string;
+  production_restart_policy_url: string;
   wallet_public_key: string;
   signer_mode: Web3SignerSetupMode;
   max_trade_usd: string;
@@ -102,6 +106,10 @@ export function SettingsWeb3CredentialConsole({
     emergency_stop_webhook_url: "",
     emergency_stop_contact: "",
     tax_ledger_export_path: "",
+    production_process_manager: "",
+    production_worker_owner: "",
+    production_alert_webhook_url: "",
+    production_restart_policy_url: "",
     wallet_public_key: defaultWalletPublicKey,
     signer_mode: "external-wallet",
     max_trade_usd: String(maxTradeUsd),
@@ -177,8 +185,12 @@ export function SettingsWeb3CredentialConsole({
       draft.emergency_stop_webhook_url,
       draft.emergency_stop_contact,
       draft.tax_ledger_export_path,
+      draft.production_process_manager,
+      draft.production_worker_owner,
+      draft.production_alert_webhook_url,
+      draft.production_restart_policy_url,
     ].some((value) => value.trim().length > 0)) {
-      setMessage("Enter a provider, emergency-stop, or accounting value before installing local env targets.");
+      setMessage("Enter a provider, emergency-stop, production-worker, or accounting value before installing local env targets.");
       return;
     }
     setBusy("install");
@@ -205,6 +217,10 @@ export function SettingsWeb3CredentialConsole({
           emergency_stop_webhook_url: draft.emergency_stop_webhook_url,
           emergency_stop_contact: draft.emergency_stop_contact,
           tax_ledger_export_path: draft.tax_ledger_export_path,
+          production_process_manager: draft.production_process_manager,
+          production_worker_owner: draft.production_worker_owner,
+          production_alert_webhook_url: draft.production_alert_webhook_url,
+          production_restart_policy_url: draft.production_restart_policy_url,
         }),
       });
       const payload = (await response.json().catch(() => null)) as Web3LocalCredentialInstallReceipt | { error: string } | null;
@@ -230,6 +246,10 @@ export function SettingsWeb3CredentialConsole({
         emergency_stop_webhook_url: "",
         emergency_stop_contact: "",
         tax_ledger_export_path: "",
+        production_process_manager: "",
+        production_worker_owner: "",
+        production_alert_webhook_url: "",
+        production_restart_policy_url: "",
       }));
       setMessage(payload.summary);
     } catch (error) {
@@ -495,6 +515,12 @@ export function SettingsWeb3CredentialConsole({
     "MASTERMOLD_SESSION_KEY_PUBLIC_KEY",
     "MASTERMOLD_SESSION_POLICY_HASH",
   ].filter((key) => localInstallReceipt?.configured_keys.includes(key) === true).length;
+  const productionOpsTargetCount = [
+    "MASTERMOLD_WEB3_PROCESS_MANAGER",
+    "MASTERMOLD_WEB3_WORKER_OWNER",
+    "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+    "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+  ].filter((key) => localInstallReceipt?.configured_keys.includes(key) === true).length;
   const dexLiveReady = dexReceipt?.status === "live-ready" || dexReceipt?.status === "live-watch";
   const commandWallet = operatorWalletReady ? trimmedWallet : "<public-solana-address>";
   const operatorWalletCommand = `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${commandWallet} --require-operator-wallet`;
@@ -631,6 +657,48 @@ export function SettingsWeb3CredentialConsole({
         </p>
       </div>
 
+      <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Production worker local ops targets">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Production worker targets</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              Redacted live-ops evidence for worker owner, alerts, and restart review
+            </p>
+          </div>
+          <BoundaryBadge label="review only" />
+        </div>
+        <div className="mt-2 grid gap-2 lg:grid-cols-2">
+          <ConsoleInput
+            label="Process manager"
+            value={draft.production_process_manager}
+            placeholder="pm2, systemd, docker, hosted worker"
+            onChange={(value) => updateDraft("production_process_manager", value)}
+          />
+          <ConsoleInput
+            label="Worker owner"
+            value={draft.production_worker_owner}
+            placeholder="Ops owner, email, or escalation channel"
+            onChange={(value) => updateDraft("production_worker_owner", value)}
+          />
+          <ConsoleInput
+            label="Alert webhook"
+            type="password"
+            value={draft.production_alert_webhook_url}
+            placeholder="HTTPS alert target"
+            onChange={(value) => updateDraft("production_alert_webhook_url", value)}
+          />
+          <ConsoleInput
+            label="Restart policy URL"
+            value={draft.production_restart_policy_url}
+            placeholder="HTTPS runbook or deployment policy"
+            onChange={(value) => updateDraft("production_restart_policy_url", value)}
+          />
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-outline">
+          These targets are local review inputs only. Mastermind does not start workers, dispatch alert webhooks, approve live execution, sign, submit, or mutate wallets.
+        </p>
+      </div>
+
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Local Web3 credential installer">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
@@ -650,13 +718,14 @@ export function SettingsWeb3CredentialConsole({
           </button>
         </div>
         <p className="mt-2 text-[11px] leading-4 text-outline">
-          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, signer-provider, emergency-stop, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps live execution blocked.
+          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, signer-provider, emergency-stop, production-worker, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps live execution blocked.
         </p>
         {localInstallReceipt ? (
-          <div className="mt-2 grid gap-2 sm:grid-cols-3" aria-label="Local Web3 credential install receipt">
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-5" aria-label="Local Web3 credential install receipt">
             <ConsoleMetric label="Install" value={localInstallReceipt.status} tone={localInstallReceipt.status === "installed" ? "engine" : localInstallReceipt.status === "invalid" || localInstallReceipt.status === "blocked" ? "critical" : "neutral"} />
             <ConsoleMetric label="Configured" value={String(localInstallReceipt.configured_keys.length)} tone={localInstallReceipt.configured_keys.length >= 4 ? "engine" : "caution"} />
             <ConsoleMetric label="Signer targets" value={`${signerTargetCount}/10`} tone={signerTargetCount > 0 ? "engine" : "neutral"} />
+            <ConsoleMetric label="Worker targets" value={`${productionOpsTargetCount}/4`} tone={productionOpsTargetCount === 4 ? "engine" : productionOpsTargetCount > 0 ? "caution" : "neutral"} />
             <ConsoleMetric label="Missing" value={formatMissingTargets(localInstallReceipt.missing_keys)} tone={localInstallReceipt.missing_keys.length === 0 ? "engine" : "caution"} />
           </div>
         ) : null}
@@ -982,8 +1051,8 @@ export function SettingsWeb3CredentialConsole({
       ) : null}
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
-        Settings Web3 credential console keeps API keys session only; no browser storage for Helius, Jupiter, Privy, Turnkey, or signer-provider keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
-        Local credential installer can write known provider, signer-provider, emergency-stop, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
+        Settings Web3 credential console keeps API keys session only; no browser storage for Helius, Jupiter, Privy, Turnkey, signer-provider, or production alert keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
+        Local credential installer can write known provider, signer-provider, emergency-stop, production-worker, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
       </p>
     </section>
   );
@@ -996,6 +1065,7 @@ function isSessionSensitiveDraftField(field: keyof Draft) {
     "privy_app_secret",
     "turnkey_api_private_key",
     "emergency_stop_webhook_url",
+    "production_alert_webhook_url",
   ].includes(field);
 }
 
