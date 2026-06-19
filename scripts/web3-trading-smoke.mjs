@@ -73,6 +73,18 @@ async function main() {
   assert(["learning", "extend-paper", "continue-paper", "tighten-paper", "protect-paper", "stand-down"].includes(health.web3_promoted_paper_autopilot.run_memory_status), "Promoted paper autopilot health should expose a known run-memory status.", health.web3_promoted_paper_autopilot);
   assert(typeof health.web3_promoted_paper_autopilot.recommended_supervisor_round_cap === "number", "Promoted paper autopilot health should expose a memory-based supervisor round cap.", health.web3_promoted_paper_autopilot);
 
+  const launchChecklistResponse = await request("/api/web3-launch-checklist?scenario=breakout&source=sample&account=persistent");
+  const launchChecklist = await readJson(launchChecklistResponse);
+  assert(launchChecklistResponse.status === 200, "Web3 launch checklist endpoint should return a readiness contract.", { status: launchChecklistResponse.status, launchChecklist });
+  assert(launchChecklist.mode === "web3-autonomy-launch-checklist", "Web3 launch checklist should expose the expected mode.", launchChecklist);
+  assert(["paper-operational", "paper-scale-ready", "paper-memory-gated", "live-gated", "manual-live-review", "blocked"].includes(launchChecklist.status), "Web3 launch checklist should return a known status.", launchChecklist);
+  assert(typeof launchChecklist.readiness_score === "number", "Web3 launch checklist should expose a numeric readiness score.", launchChecklist);
+  assert(typeof launchChecklist.paper_scale_permitted === "boolean", "Web3 launch checklist should expose paper-scale permission.", launchChecklist);
+  assert(typeof launchChecklist.live_review_permitted === "boolean", "Web3 launch checklist should expose live-review permission.", launchChecklist);
+  assert(launchChecklist.real_capital_blocked === true, "Web3 launch checklist should keep real capital blocked in the default local build.", launchChecklist);
+  assert(Array.isArray(launchChecklist.items), "Web3 launch checklist should expose proof items.", launchChecklist);
+  assert(["paper-profit", "promoted-memory", "market-feed", "route-proof", "execution-quality", "custody-policy", "signer", "relay", "settlement", "kill-switch", "live-boundary"].every((id) => launchChecklist.items.some((item) => item.id === id)), "Web3 launch checklist should cover paper, market, execution, custody, settlement, and live-boundary proofs.", launchChecklist);
+
   const page = await request("/trading");
   const html = await page.text();
   assert(page.status === 200, "Trading page should render.", { status: page.status });
@@ -85,6 +97,10 @@ async function main() {
   assert(html.includes("Promoted run memory"), "Trading page should expose promoted paper autopilot history memory.");
   assert(html.includes("Memory gate"), "Trading page should expose the promoted autopilot memory gate.");
   assert(html.includes("Round cap"), "Trading page should expose the memory-based promoted supervisor cap.");
+  assert(html.includes("Launch checklist"), "Trading page should expose the Web3 autonomy launch checklist.");
+  assert(html.includes("Web3 autonomy launch checklist"), "Trading page should render the launch checklist as a first-screen cockpit surface.");
+  assert(html.includes("Web3 launch checklist receipt"), "Trading page should expose an accessible launch checklist receipt.");
+  assert(html.includes("real-cap blocked"), "Trading page should make the real-capital boundary visible in the launch checklist.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");

@@ -6,6 +6,7 @@ import { Activity, CandlestickChart, LineChart, Pause, Play, RefreshCw, RotateCc
 
 import { Chip } from "@/components/sentinel";
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
+import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
@@ -609,6 +610,7 @@ export function Web3TradingWorkspaceLoader({
   const daemonHandoff = state.autonomous_daemon_handoff;
   const marketIngestion = state.market_ingestion_plan;
   const marketIntake = state.autonomous_market_intake_plan;
+  const launchChecklist = buildWeb3AutonomyLaunchChecklist(state, promotedAutopilotHealth);
   const sprintTapeItems = state.autonomous_market_evidence_fusion.items.slice(0, 2);
   const holdingSentryItems = state.autonomous_portfolio_mark_board.items.slice(0, 2);
   const priceActionItems = buildQuickPriceActionTape(state);
@@ -934,6 +936,7 @@ export function Web3TradingWorkspaceLoader({
                 autoWatch={autoWatch}
                 autoWatchPlan={autoWatchPlan}
               />
+              <QuickLaunchChecklistPanel checklist={launchChecklist} />
               <QuickPromotedAutopilotPanel health={promotedAutopilotHealth} />
               <QuickDaemonSupervisorPanel health={supervisorHealth} />
               <QuickDaemonHandoffPanel handoff={daemonHandoff} />
@@ -6972,6 +6975,67 @@ function QuickPromotedAutopilotPanel({
   );
 }
 
+function QuickLaunchChecklistPanel({
+  checklist,
+}: {
+  checklist: Web3AutonomyLaunchChecklist;
+}) {
+  const tone = launchChecklistTone(checklist.status);
+  const topItems = checklist.items.slice(0, 6);
+  const liveItems = checklist.items.slice(6);
+
+  return (
+    <section className="rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:p-3" aria-label="Web3 autonomy launch checklist">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Launch checklist</p>
+          <p className="mt-1 break-words text-sm font-semibold text-on-surface">
+            {checklist.status.replaceAll("-", " ")} - {checklist.readiness_score}/100
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+            {checklist.summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{checklist.paper_scale_permitted ? "paper scale" : "paper gated"}</Chip>
+          <Chip tone={checklist.live_review_permitted ? "critical" : "demo"}>{checklist.live_review_permitted ? "manual live review" : "real-cap blocked"}</Chip>
+          <Chip tone={checklist.hard_blocker_count > 0 ? "critical" : checklist.watch_count > 0 ? "caution" : "engine"}>{checklist.hard_blocker_count} blockers</Chip>
+        </div>
+      </div>
+
+      <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.7fr)]">
+        <div className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/15 p-2" aria-label="Launch checklist proof rows">
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+            {topItems.map((item) => (
+              <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                  <span className={cn("h-2 w-2 shrink-0 rounded-full", launchChecklistItemDotClass(item.status))} />
+                </div>
+                <p className={cn("mt-1 truncate text-xs font-semibold", launchChecklistItemTextClass(item.status))}>{item.status} · {item.score}/100</p>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-outline">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-1" aria-label="Launch checklist live-capital boundary">
+          <ProfitMetric label="Paper scale" value={checklist.paper_scale_permitted ? "permitted" : "gated"} detail={checklist.next_action} tone={checklist.paper_scale_permitted ? "engine" : "caution"} />
+          <ProfitMetric label="Live review" value={checklist.live_review_permitted ? "ready" : "blocked"} detail={checklist.real_capital_blocked ? "no fund movement" : "manual only"} tone={checklist.live_review_permitted ? "critical" : "demo"} />
+          <ProfitMetric label="Watch gates" value={checklist.watch_count.toString()} detail="needs review" tone={checklist.watch_count > 0 ? "caution" : "engine"} />
+          <ProfitMetric label="Hard blockers" value={checklist.hard_blocker_count.toString()} detail={checklist.hard_blockers[0] ?? "none"} tone={checklist.hard_blocker_count > 0 ? "critical" : "engine"} />
+          {liveItems.slice(0, 2).map((item) => (
+            <ProfitMetric key={item.id} label={item.label} value={item.status} detail={item.detail} tone={item.status === "pass" ? "engine" : item.status === "watch" ? "caution" : "critical"} />
+          ))}
+        </div>
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">{checklist.next_action}</p>
+      <span className="sr-only" aria-label="Web3 launch checklist receipt">
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; controls {checklist.controls.join(" ")}
+      </span>
+    </section>
+  );
+}
+
 function PromotedAutopilotHistoryChart({
   runs,
 }: {
@@ -7689,6 +7753,26 @@ function promotedMemoryTone(status: Web3PromotedPaperAutopilotHealth["run_memory
   if (status === "learning" || status === "tighten-paper") return "caution";
   if (status === "protect-paper" || status === "stand-down") return "critical";
   return "neutral";
+}
+
+function launchChecklistTone(status: Web3AutonomyLaunchChecklist["status"]): QuickChipTone {
+  if (status === "manual-live-review") return "critical";
+  if (status === "paper-scale-ready") return "engine";
+  if (status === "paper-operational" || status === "live-gated") return "caution";
+  if (status === "paper-memory-gated" || status === "blocked") return "critical";
+  return "neutral";
+}
+
+function launchChecklistItemDotClass(status: Web3AutonomyLaunchChecklist["items"][number]["status"]) {
+  if (status === "pass") return "bg-engine";
+  if (status === "watch") return "bg-caution";
+  return "bg-critical";
+}
+
+function launchChecklistItemTextClass(status: Web3AutonomyLaunchChecklist["items"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
+  return "text-critical";
 }
 
 function supervisorStatusTextClass(status: Web3DaemonSupervisorHealth["status"]) {

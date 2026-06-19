@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
+import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import {
   getWeb3TradingStateAsync,
   getWeb3TradingState,
@@ -5422,6 +5423,28 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(state.autonomous_live_autonomy_readiness.controls.some((control) => control.includes("final transition gate"))).toBe(true);
     expect(state.autonomous_live_autonomy_readiness.controls.some((control) => control.includes("cannot move funds"))).toBe(true);
+    const launchChecklist = buildWeb3AutonomyLaunchChecklist(state);
+    expect(launchChecklist.mode).toBe("web3-autonomy-launch-checklist");
+    expect(["paper-operational", "paper-scale-ready", "paper-memory-gated", "live-gated", "manual-live-review", "blocked"]).toContain(launchChecklist.status);
+    expect(launchChecklist.real_capital_blocked).toBe(true);
+    expect(launchChecklist.live_review_permitted).toBe(false);
+    expect(launchChecklist.readiness_score).toBeGreaterThanOrEqual(0);
+    expect(launchChecklist.readiness_score).toBeLessThanOrEqual(100);
+    expect(launchChecklist.items.map((item) => item.id)).toEqual([
+      "paper-profit",
+      "promoted-memory",
+      "market-feed",
+      "route-proof",
+      "execution-quality",
+      "custody-policy",
+      "signer",
+      "relay",
+      "settlement",
+      "kill-switch",
+      "live-boundary",
+    ]);
+    expect(launchChecklist.controls.some((control) => control.includes("launch-readiness contract"))).toBe(true);
+    expect(launchChecklist.controls.some((control) => control.includes("does not sign"))).toBe(true);
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);
     expect(state.autonomous_daemon_handoff.runner_role).toBe("external-scheduler");
