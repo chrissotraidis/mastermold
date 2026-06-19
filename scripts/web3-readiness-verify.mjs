@@ -181,6 +181,36 @@ async function verifyCredentialValidateOnly() {
   record("credential-validate-only", "pass", `plan ${json.credential_plan?.status ?? "unknown"}`);
 }
 
+async function verifyProviderHealthReceipt() {
+  const { response, json } = await requestJson("/api/web3-provider-health?source=sample&account=persistent");
+  assert(response.status === 200, "Provider health receipt should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-provider-health-receipt", "Provider health should expose the expected receipt mode.", json);
+  assert(json.live_execution_permission === "blocked", "Provider health must keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Provider health must keep wallet mutation blocked.", json);
+  assert(json.secret_echo_permission === "blocked", "Provider health must block secret echo.", json);
+  assert(json.private_key_storage === "blocked", "Provider health must block private key storage.", json);
+  assert(json.transaction_body_storage === "blocked", "Provider health must block transaction body storage.", json);
+  assert(json.rpc_endpoint === null || !String(json.rpc_endpoint).includes("?"), "Provider health should redact RPC query strings.", json);
+
+  const summary = json.provider_summary ?? {};
+  const readRailConfigured = summary.helius_configured === true || summary.solana_rpc_configured === true;
+  if (readRailConfigured) {
+    assert(summary.rpc_healthy === true, "Configured Solana read rail should pass RPC health.", json);
+    assert(summary.latest_blockhash_ready === true, "Configured Solana read rail should return latest blockhash evidence.", json);
+    assert(typeof summary.confirmed_slot === "number", "Configured Solana read rail should return a confirmed slot.", json);
+    assert(summary.wallet_scoped === true, "Provider health should see the saved public wallet scope.", summary);
+    assert(summary.wallet_valid === true, "Provider health should validate the saved public wallet scope.", summary);
+    record(
+      "provider-health-read-rail",
+      "pass",
+      `${json.rpc_provider ?? "provider"} ${json.status}; quote ${summary.jupiter_quote_ready ? "ready" : "not-ready"}`,
+    );
+    return;
+  }
+
+  record("provider-health-read-rail", "warn", "read rail not configured on the running app");
+}
+
 async function verifyJupiterRehearsalBoundary() {
   const { response, json } = await postJson("/api/web3-jupiter-rehearsal?source=sample&account=persistent", {
     jupiter_api_key: CANARY_JUPITER_KEY,
@@ -218,6 +248,7 @@ async function main() {
   await verifyPublicScopeSave();
   await verifyAccountSetupReceipt();
   await verifyCredentialValidateOnly();
+  await verifyProviderHealthReceipt();
   await verifyJupiterRehearsalBoundary();
   await verifyJupiterPrivateFieldRejection();
 
