@@ -96,6 +96,7 @@ npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
 npm run verify:web3 -- --base-url=http://localhost:4010
 npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet
 npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
+npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live
 ```
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
@@ -132,12 +133,16 @@ evidence, fill price, filled quantity, handoff notional, and idempotency all rec
 it never grants live execution or wallet mutation permission. `verify:web3` is a Node-only
 operator check for machines without Bun: against a running app, it proves health receipts,
 execution input validation, public-wallet dry-run scope save, credential validate-only
-redaction, one-shot Jupiter rehearsal redaction, private-field rejection, and the live
-execution/wallet mutation locks. Add `--require-jupiter-order` after a `JUPITER_API_KEY`
+redaction, deterministic DEX discovery receipt boundaries, one-shot Jupiter rehearsal
+redaction, private-field rejection, and the live execution/wallet mutation locks. Add
+`--require-jupiter-order` after a `JUPITER_API_KEY`
 or `WEB3_VERIFY_JUPITER_API_KEY` is available to fail closed until quote and unsigned-order
 readiness are both proven without returning transaction bytes. Add `--require-operator-wallet`
 with `--wallet=<public-solana-address>` or `WEB3_VERIFY_WALLET_PUBLIC_KEY` to fail closed
 until the sample all-ones wallet has been replaced by a dedicated public trading wallet.
+Add `--require-dex-live` to fail closed until the live DEX scanner returns current live
+candidate and pair evidence with no failed discovery sources while execution, transaction
+submission, wallet mutation, private-key storage, and secret echo remain blocked.
 `/api/web3-dex-discovery?source=live-dex` is the compact read-only scanner receipt for
 current public DEX Screener discovery evidence: profiles, boosts, ads, paid orders, pair
 mapping, top symbols, and scanner intake status. It is paper-only evidence and still blocks

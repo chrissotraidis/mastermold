@@ -4270,19 +4270,27 @@ async function main() {
     "Order rehearsal should include held-position watchlist market refresh evidence.",
     orderRehearsal.payload.discovery_tape,
   );
+  const protectiveSellPlans = orderRehearsal.payload.execution_plans?.filter((plan) =>
+    plan.side === "sell" &&
+    plan.output_mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" &&
+    ["watchlist", "solana-rpc"].includes(plan.input_amount_source) &&
+    Number.isInteger(plan.input_token_decimals) &&
+    plan.input_token_decimals >= 5 &&
+    plan.input_token_decimals <= 9
+  ) ?? [];
   assert(
-    orderRehearsal.payload.execution_plans?.some((plan) =>
-      plan.side === "sell" &&
-      plan.source === "jupiter" &&
-      plan.output_mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" &&
-      ["watchlist", "solana-rpc"].includes(plan.input_amount_source) &&
-      Number.isInteger(plan.input_token_decimals) &&
-      plan.input_token_decimals >= 5 &&
-      plan.input_token_decimals <= 9
-    ),
-    "Order rehearsal should quote at least one decimal-aware held-position protective sell route to USDC.",
+    protectiveSellPlans.length > 0,
+    "Order rehearsal should include at least one decimal-aware held-position protective sell plan to USDC.",
     orderRehearsal.payload.execution_plans,
   );
+  const quotedProtectiveSell = protectiveSellPlans.find((plan) => plan.source === "jupiter" && plan.status === "quoted");
+  if (!quotedProtectiveSell) {
+    assert(
+      protectiveSellPlans.some((plan) => plan.status === "blocked" && plan.gate === "paper-only"),
+      "Order rehearsal should safely block a protective sell when current live DEX liquidity does not produce a Jupiter quote.",
+      protectiveSellPlans,
+    );
+  }
   assert(orderRehearsal.payload.execution_gate.live_execution_enabled === false, "Order rehearsal must not enable live execution.", orderRehearsal.payload.execution_gate);
   assert(orderRehearsal.payload.autonomous_live_autonomy_readiness.can_trade_real_capital === false, "Order rehearsal must not permit real-capital trading.", orderRehearsal.payload.autonomous_live_autonomy_readiness);
 

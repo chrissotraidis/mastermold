@@ -212,9 +212,11 @@ export function SettingsWeb3CredentialConsole({
   const trimmedWallet = draft.wallet_public_key.trim();
   const operatorWalletReady = isLikelySolanaPublicKey(trimmedWallet) && trimmedWallet !== SAMPLE_SYSTEM_WALLET;
   const jupiterKeyReady = jupiterConfigured || draft.jupiter_api_key.trim().length > 0;
+  const dexLiveReady = dexReceipt?.status === "live-ready" || dexReceipt?.status === "live-watch";
   const commandWallet = operatorWalletReady ? trimmedWallet : "<public-solana-address>";
   const operatorWalletCommand = `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${commandWallet} --require-operator-wallet`;
-  const combinedStrictCommand = `${operatorWalletCommand} --require-jupiter-order`;
+  const dexLiveCommand = "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live";
+  const combinedStrictCommand = `${operatorWalletCommand} --require-jupiter-order --require-dex-live`;
 
   return (
     <section className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Settings Web3 credential action console">
@@ -339,11 +341,12 @@ export function SettingsWeb3CredentialConsole({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Strict verifier runway</p>
-            <p className="mt-1 text-sm font-semibold text-on-surface">Operator wallet and Jupiter order gates</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">Operator wallet, Jupiter order, and live DEX gates</p>
           </div>
           <div className="flex flex-wrap gap-1.5">
             <GateBadge label="operator wallet" ready={operatorWalletReady} />
             <GateBadge label="Jupiter order" ready={jupiterKeyReady} />
+            <GateBadge label="live DEX" ready={dexLiveReady} />
           </div>
         </div>
         <div className="mt-3 grid gap-2">
@@ -353,13 +356,18 @@ export function SettingsWeb3CredentialConsole({
             ready={operatorWalletReady}
           />
           <VerifierCommand
-            label="Wallet + order gate"
+            label="Live DEX gate"
+            command={dexLiveCommand}
+            ready={dexLiveReady}
+          />
+          <VerifierCommand
+            label="Wallet + order + DEX gate"
             command={combinedStrictCommand}
-            ready={operatorWalletReady && jupiterKeyReady}
+            ready={operatorWalletReady && jupiterKeyReady && dexLiveReady}
           />
         </div>
         <p className="mt-2 text-xs leading-5 text-outline">
-          These commands use only a public wallet and local environment keys. They fail closed before live review if the sample wallet, Jupiter order proof, secret redaction, or live-boundary locks are not clean.
+          These commands use only a public wallet, local environment keys, and read-only DEX discovery. They fail closed before live review if the sample wallet, live scanner evidence, Jupiter order proof, secret redaction, or live-boundary locks are not clean.
         </p>
       </div>
 

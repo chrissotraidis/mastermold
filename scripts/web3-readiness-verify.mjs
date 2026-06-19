@@ -10,6 +10,7 @@ const baseUrl = (config.baseUrl || process.env.WEB3_VERIFY_BASE_URL || DEFAULT_B
 const walletPublicKey = config.wallet || process.env.WEB3_VERIFY_WALLET_PUBLIC_KEY || DEFAULT_WALLET;
 const requireJupiterOrder = config.requireJupiterOrder || process.env.WEB3_VERIFY_REQUIRE_JUPITER_ORDER === "1";
 const requireOperatorWallet = config.requireOperatorWallet || process.env.WEB3_VERIFY_REQUIRE_OPERATOR_WALLET === "1";
+const requireDexLive = config.requireDexLive || process.env.WEB3_VERIFY_REQUIRE_DEX_LIVE === "1";
 const strictJupiterKey = process.env.WEB3_VERIFY_JUPITER_API_KEY || process.env.JUPITER_API_KEY || "";
 const secretValues = [
   { label: "jupiter canary", value: CANARY_JUPITER_KEY },
@@ -28,6 +29,7 @@ function parseArgs(args) {
     if (arg.startsWith("--wallet=")) parsed.wallet = arg.slice("--wallet=".length);
     if (arg === "--require-jupiter-order") parsed.requireJupiterOrder = true;
     if (arg === "--require-operator-wallet") parsed.requireOperatorWallet = true;
+    if (arg === "--require-dex-live") parsed.requireDexLive = true;
     if (arg === "--json") parsed.json = true;
   }
   return parsed;
@@ -239,6 +241,48 @@ async function verifyProviderHealthReceipt() {
   record("provider-health-read-rail", "warn", "read rail not configured on the running app");
 }
 
+function assertDexDiscoveryBoundary(json, label) {
+  assert(json.mode === "web3-dex-discovery-receipt", `${label} should expose the expected receipt mode.`, json);
+  assert(json.provider === "DEX Screener", `${label} should identify the DEX Screener provider.`, json);
+  assert(json.live_execution_permission === "blocked", `${label} must keep live execution blocked.`, json);
+  assert(json.wallet_mutation_permission === "blocked", `${label} must keep wallet mutation blocked.`, json);
+  assert(json.secret_echo_permission === "blocked", `${label} must block secret echo.`, json);
+  assert(json.private_key_storage === "blocked", `${label} must block private key storage.`, json);
+  assert(json.transaction_submission_permission === "blocked", `${label} must block transaction submission.`, json);
+  assert(typeof json.receipt_hash === "string" && json.receipt_hash.length >= 16, `${label} should include a receipt hash.`, json);
+  assert(Array.isArray(json.source_checks), `${label} should include source checks.`, json);
+  assert(Array.isArray(json.top_candidates), `${label} should include top candidates.`, json);
+}
+
+async function verifyDexDiscoveryReceipt() {
+  const { response, json } = await requestJson("/api/web3-dex-discovery?source=sample&account=persistent");
+  assert(response.status === 200, "Sample DEX discovery receipt should return 200.", { status: response.status, json });
+  assertDexDiscoveryBoundary(json, "Sample DEX discovery receipt");
+  assert(json.status === "sample-only", "Sample DEX discovery receipt should remain sample-only.", json);
+  assert(json.source_summary?.market_source_mode === "sample", "Sample DEX discovery should report sample market-source mode.", json.source_summary);
+  assert(json.source_summary?.tokens_considered > 0, "Sample DEX discovery should include deterministic candidates.", json.source_summary);
+  assert(json.source_summary?.pairs_mapped > 0, "Sample DEX discovery should include deterministic pair mapping.", json.source_summary);
+  record("dex-discovery-receipt", "pass", `sample receipt ${json.status}; ${json.source_summary?.pairs_mapped ?? 0} pairs mapped`);
+}
+
+async function verifyStrictDexLiveReadiness() {
+  if (!requireDexLive) {
+    record("dex-live-strict", "skipped", "run with --require-dex-live after local network access is ready");
+    return;
+  }
+
+  const { response, json } = await requestJson("/api/web3-dex-discovery?source=live-dex&account=persistent");
+  assert(response.status === 200, "Strict live DEX discovery should return a receipt.", { status: response.status, json });
+  assertDexDiscoveryBoundary(json, "Strict live DEX discovery");
+  assert(["live-ready", "live-watch"].includes(json.status), "Strict live DEX discovery must use current live scanner evidence, not sample or fallback.", json);
+  assert(json.source_summary?.market_source_status === "live", "Strict live DEX discovery should report live market-source status.", json.source_summary);
+  assert(json.source_summary?.tokens_considered > 0, "Strict live DEX discovery should consider live candidates.", json.source_summary);
+  assert(json.source_summary?.pairs_mapped > 0, "Strict live DEX discovery should map live token pairs.", json.source_summary);
+  assert(json.source_summary?.failed_source_count === 0, "Strict live DEX discovery should have no failed discovery sources.", json.source_summary);
+  assert(json.source_summary?.live_candidate_count > 0, "Strict live DEX discovery should include live candidates.", json.source_summary);
+  record("dex-live-strict", "pass", `${json.status}; ${json.source_summary.pairs_mapped} live pairs mapped`);
+}
+
 async function verifyJupiterRehearsalBoundary() {
   const { response, json } = await postJson("/api/web3-jupiter-rehearsal?source=sample&account=persistent", {
     jupiter_api_key: CANARY_JUPITER_KEY,
@@ -310,6 +354,8 @@ async function main() {
   await verifyAccountSetupReceipt();
   await verifyCredentialValidateOnly();
   await verifyProviderHealthReceipt();
+  await verifyDexDiscoveryReceipt();
+  await verifyStrictDexLiveReadiness();
   await verifyJupiterRehearsalBoundary();
   await verifyJupiterPrivateFieldRejection();
   await verifyStrictJupiterOrderReadiness();
@@ -320,6 +366,7 @@ async function main() {
     wallet_scope: walletPublicKey === DEFAULT_WALLET ? "sample-system-wallet" : "operator-public-wallet",
     strict_operator_wallet_required: requireOperatorWallet,
     strict_jupiter_order_required: requireJupiterOrder,
+    strict_dex_live_required: requireDexLive,
     checked_at: new Date().toISOString(),
     result: "pass",
     checks: results,
