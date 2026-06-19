@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Activity, CandlestickChart, KeyRound, LineChart, Pause, Play, RefreshCw, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 
 import { Chip } from "@/components/sentinel";
+import type { Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import type { Web3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import type { Web3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
@@ -16,7 +17,7 @@ import type { Web3SignerHandoffReceipt } from "@/src/db/web3-signer-handoff";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
-type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "signer-handoff" | "accounting-ledger" | "emergency-stop";
+type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "account-setup" | "signer-handoff" | "accounting-ledger" | "emergency-stop";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
 type Web3CredentialsDraft = {
   helius_api_key: string;
@@ -115,6 +116,7 @@ export function Web3TradingWorkspaceLoader({
   const [quickNotice, setQuickNotice] = useState("Quick agent controls are armed for bounded paper sessions.");
   const [lastActionOutcome, setLastActionOutcome] = useState<QuickAgentActionOutcome | null>(null);
   const [lastPromotedAutopilot, setLastPromotedAutopilot] = useState<PromotedPaperAutopilotReceipt | null>(null);
+  const [accountSetupReceipt, setAccountSetupReceipt] = useState<Web3AccountSetupReceipt | null>(null);
   const [signerHandoffReceipt, setSignerHandoffReceipt] = useState<Web3SignerHandoffReceipt | null>(null);
   const [accountingLedgerReceipt, setAccountingLedgerReceipt] = useState<Web3AccountingLedgerReceipt | null>(null);
   const [emergencyStopReceipt, setEmergencyStopReceipt] = useState<Web3EmergencyStopDrillReceipt | null>(null);
@@ -373,6 +375,31 @@ export function Web3TradingWorkspaceLoader({
       setQuickNotice(payload.summary);
     } catch (error) {
       setQuickNotice(error instanceof Error ? error.message : "The signer handoff receipt could not be built.");
+    } finally {
+      setQuickBusy(null);
+    }
+  }
+
+  async function buildAccountSetupReceipt() {
+    if (!state || quickBusy) return;
+    setQuickBusy("account-setup");
+    setQuickNotice("Building a redacted account setup receipt from local provider configuration and wallet gates.");
+    try {
+      const params = new URLSearchParams({
+        scenario: state.scenario,
+        source: state.market_source.mode,
+        account: state.paper_account.mode,
+        cycles: String(state.paper_account.cycle),
+      });
+      const response = await fetch(`/api/web3-account-setup?${params.toString()}`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as Web3AccountSetupReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "The account setup receipt could not be built.");
+      }
+      setAccountSetupReceipt(payload);
+      setQuickNotice(payload.summary);
+    } catch (error) {
+      setQuickNotice(error instanceof Error ? error.message : "The account setup receipt could not be built.");
     } finally {
       setQuickBusy(null);
     }
@@ -1237,6 +1264,15 @@ export function Web3TradingWorkspaceLoader({
           {focusMode === "wiring" ? (
             <div className="mt-2 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" aria-label="Autonomous wiring focus">
               <div className="xl:col-span-2">
+                <QuickAccountSetupReceiptPanel
+                  receipt={accountSetupReceipt}
+                  state={state}
+                  busy={quickBusy === "account-setup"}
+                  disabled={quickDisabled}
+                  onBuild={buildAccountSetupReceipt}
+                />
+              </div>
+              <div className="xl:col-span-2">
                 <QuickWeb3CredentialsSetupPanel
                   state={state}
                   busy={quickBusy}
@@ -1563,6 +1599,154 @@ function QuickWalletTransactionIntelligencePanel({
 
       <p className="sr-only" aria-label="Wallet transaction intelligence receipt">
         Wallet transaction intelligence status {intelligence.status}; decoded {intelligence.decoded_transaction_count}; swaps {intelligence.swap_transaction_count}; transfers {intelligence.transfer_transaction_count}; failed {intelligence.failed_transaction_count}; raw transaction storage {intelligence.raw_transaction_storage}; wallet mutation {intelligence.wallet_mutation_permission}; live execution {intelligence.live_execution_permission}.
+      </p>
+    </section>
+  );
+}
+
+function QuickAccountSetupReceiptPanel({
+  receipt,
+  state,
+  busy,
+  disabled,
+  onBuild,
+}: {
+  receipt: Web3AccountSetupReceipt | null;
+  state: Web3TradingState;
+  busy: boolean;
+  disabled: boolean;
+  onBuild: () => void;
+}) {
+  const status = receipt?.status ?? "not-built";
+  const tone = receipt ? accountSetupTone(receipt.status) : "demo";
+  const walletScoped = receipt?.wallet_summary.wallet_scoped ?? Boolean(state.autonomous_custody_mandate.wallet_public_key);
+  const configuredCount = receipt?.environment_summary.required_configured_count ?? 0;
+  const requiredCount = receipt?.environment_summary.required_account_count ?? 3;
+  const checks = receipt?.checks ?? accountSetupPlaceholderChecks(state);
+  const items = receipt?.items ?? [];
+  const requiredItems = items.filter((item) => item.priority === "required-now");
+  const nextItems = items.filter((item) => item.priority === "next");
+  const visibleItems = (requiredItems.length > 0 ? requiredItems : items).slice(0, 6);
+
+  return (
+    <section className="min-w-0 rounded-md border border-violet/25 bg-violet/[0.035] p-2 sm:p-3" aria-label="Web3 account setup receipt">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Account setup receipt</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">Provider accounts, wallet scope, and ops gates</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            {receipt?.summary ?? "Build a redacted account setup receipt that detects local Helius/Solana, Jupiter, wallet, signer, emergency-stop, and accounting setup without creating third-party accounts or echoing secrets."}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone={configuredCount === requiredCount ? "engine" : "caution"}>{configuredCount}/{requiredCount} required</Chip>
+          <Chip tone={receipt?.external_signup_permission === "blocked" ? "demo" : receipt ? "critical" : "demo"}>signup external</Chip>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+        <div className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2">
+          <p className="text-xs leading-5 text-outline">
+            {receipt?.next_action ?? "Build the receipt before entering credentials to see which external accounts still need to be created or connected."}
+          </p>
+          <button
+            type="button"
+            onClick={onBuild}
+            disabled={disabled || busy}
+            className="mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-violet/40 bg-violet/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-violet transition hover:bg-violet/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {busy ? "Building" : "Build account receipt"}
+          </button>
+          {receipt ? (
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px] leading-4 text-outline">
+              <span>Receipt {receipt.receipt_hash.slice(0, 10)}</span>
+              <span>Missing {receipt.environment_summary.missing_required.length}</span>
+              <span>Optional feeds {receipt.environment_summary.optional_market_feed_count}</span>
+              <span>Wallet {receipt.wallet_summary.wallet_public_key_preview ?? "missing"}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6">
+          <ProfitMetric
+            label="Helius/RPC"
+            value={receipt?.environment_summary.helius_read_rail_configured ? "set" : "missing"}
+            detail={receipt?.environment_summary.solana_rpc_configured ? "read rail" : "no read rail"}
+            tone={receipt?.environment_summary.helius_read_rail_configured ? "engine" : receipt ? "critical" : "neutral"}
+          />
+          <ProfitMetric
+            label="Jupiter"
+            value={receipt?.environment_summary.jupiter_configured ? "set" : "missing"}
+            detail="order rehearsal"
+            tone={receipt?.environment_summary.jupiter_configured ? "engine" : receipt ? "critical" : "neutral"}
+          />
+          <ProfitMetric
+            label="Wallet"
+            value={walletScoped ? "scoped" : "missing"}
+            detail={receipt?.wallet_summary.wallet_public_key_preview ?? "public key"}
+            tone={walletScoped ? "engine" : "critical"}
+          />
+          <ProfitMetric
+            label="Signer"
+            value={(receipt?.environment_summary.signer_provider ?? state.autonomous_signer_ops.active_provider).replaceAll("-", " ")}
+            detail={receipt?.wallet_summary.signer_scope.replaceAll("-", " ") ?? state.autonomous_custody_mandate.signer_scope.replaceAll("-", " ")}
+            tone="caution"
+          />
+          <ProfitMetric
+            label="Ops"
+            value={receipt?.environment_summary.emergency_stop_configured ? "set" : "gated"}
+            detail="emergency stop"
+            tone={receipt?.environment_summary.emergency_stop_configured ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Boundary"
+            value={receipt?.live_execution_permission ?? "blocked"}
+            detail="live execution"
+            tone="demo"
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
+          {checks.map((check) => (
+            <div key={check.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{check.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", accountSetupCheckDotClass(check.status))} />
+              </div>
+              <p className={cn("mt-1 text-xs font-semibold", accountSetupCheckTextClass(check.status))}>{check.status}</p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{check.detail}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
+          {visibleItems.length > 0 ? visibleItems.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", accountSetupItemDotClass(item.status))} />
+              </div>
+              <p className={cn("mt-1 text-xs font-semibold", accountSetupItemTextClass(item.status))}>{item.status.replaceAll("-", " ")}</p>
+              <p className="mt-0.5 font-mono text-[10px] uppercase tracking-telemetry text-outline">
+                {item.env_targets.length > 0 ? item.env_targets.join(" / ") : item.lane.replaceAll("-", " ")}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{item.next_action}</p>
+            </div>
+          )) : nextItems.slice(0, 4).map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+              <p className="mt-1 text-xs leading-5 text-outline">{item.next_action}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="sr-only" aria-label="Web3 account setup receipt status">
+        Account setup status {status}; required accounts {configuredCount} of {requiredCount}; external signup permission blocked; live execution blocked; wallet mutation blocked; private key storage blocked; seed phrase storage blocked; secret echo blocked.
       </p>
     </section>
   );
@@ -2432,6 +2616,66 @@ function providerAccountItemTextClass(status: Web3CredentialsSetupReadiness["pro
   if (status === "configured") return "text-engine";
   if (status === "optional" || status === "future") return "text-caution";
   return "text-critical";
+}
+
+function accountSetupTone(status: Web3AccountSetupReceipt["status"]): QuickChipTone {
+  if (status === "dry-run-ready" || status === "live-review-blocked") return "engine";
+  if (status === "ops-gated" || status === "missing-wallet") return "caution";
+  if (status === "missing-read-rail" || status === "missing-execution-rail") return "critical";
+  return "neutral";
+}
+
+function accountSetupCheckDotClass(status: Web3AccountSetupReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "bg-engine";
+  if (status === "watch") return "bg-caution";
+  return "bg-critical";
+}
+
+function accountSetupCheckTextClass(status: Web3AccountSetupReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
+  return "text-critical";
+}
+
+function accountSetupItemDotClass(status: Web3AccountSetupReceipt["items"][number]["status"]) {
+  if (status === "configured") return "bg-engine";
+  if (status === "optional" || status === "future") return "bg-caution";
+  return "bg-critical";
+}
+
+function accountSetupItemTextClass(status: Web3AccountSetupReceipt["items"][number]["status"]) {
+  if (status === "configured") return "text-engine";
+  if (status === "optional" || status === "future") return "text-caution";
+  return "text-critical";
+}
+
+function accountSetupPlaceholderChecks(state: Web3TradingState): Web3AccountSetupReceipt["checks"] {
+  return [
+    {
+      id: "helius-read-rail",
+      label: "Helius read rail",
+      status: "watch",
+      detail: "Build the account receipt to detect local Helius or Solana RPC configuration.",
+    },
+    {
+      id: "jupiter-execution-rail",
+      label: "Jupiter execution rail",
+      status: "watch",
+      detail: "Build the account receipt to detect local Jupiter rehearsal configuration.",
+    },
+    {
+      id: "dedicated-wallet",
+      label: "Dedicated wallet",
+      status: state.autonomous_custody_mandate.wallet_public_key ? "pass" : "fail",
+      detail: state.autonomous_custody_mandate.wallet_public_key ? "A public wallet is already scoped." : "A public trading wallet address is still needed.",
+    },
+    {
+      id: "secret-boundary",
+      label: "Secret boundary",
+      status: "pass",
+      detail: "The account setup receipt never echoes keys, private keys, or seed phrases.",
+    },
+  ];
 }
 
 function accountingCheckDotClass(status: Web3AccountingLedgerReceipt["checks"][number]["status"]) {

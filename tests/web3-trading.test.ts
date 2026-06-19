@@ -5,6 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
+import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
@@ -411,6 +412,86 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(readiness)).not.toContain("private-token");
     expect(JSON.stringify(readiness)).not.toContain("test-yellowstone-token");
     expect(JSON.stringify(readiness)).not.toContain("stop-secret");
+  });
+
+  test("GIVEN local provider env WHEN the account setup route runs THEN it reports missing accounts without leaking secrets", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.BIRDEYE_API_KEY = "test-birdeye-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";
+
+    const rejected = await ACCOUNT_SETUP_GET(new Request("http://localhost/api/web3-account-setup?source=bad-source"));
+    expect(rejected.status).toBe(422);
+
+    const response = await ACCOUNT_SETUP_GET(new Request("http://localhost/api/web3-account-setup?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      account_creation_permission: string;
+      external_signup_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      environment_summary: {
+        helius_read_rail_configured: boolean;
+        jupiter_configured: boolean;
+        signer_provider: string;
+        optional_market_feed_count: number;
+        required_configured_count: number;
+        required_account_count: number;
+        missing_required: string[];
+      };
+      wallet_summary: { wallet_scoped: boolean; wallet_public_key_preview: string | null };
+      items: Array<{ id: string; status: string; configured: boolean; env_targets: string[] }>;
+      checks: Array<{ id: string; status: string; detail: string }>;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-account-setup-receipt");
+    expect(receipt.status).toBe("missing-execution-rail");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.account_creation_permission).toBe("operator-external-only");
+    expect(receipt.external_signup_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.environment_summary.helius_read_rail_configured).toBe(true);
+    expect(receipt.environment_summary.jupiter_configured).toBe(false);
+    expect(receipt.environment_summary.signer_provider).toBe("external-wallet");
+    expect(receipt.environment_summary.optional_market_feed_count).toBe(1);
+    expect(receipt.environment_summary.required_account_count).toBe(3);
+    expect(receipt.environment_summary.required_configured_count).toBe(1);
+    expect(receipt.environment_summary.missing_required).toContain("Jupiter execution rail");
+    expect(receipt.environment_summary.missing_required).toContain("Dedicated public trading wallet");
+    expect(receipt.items.find((item) => item.id === "helius-read-rail")).toMatchObject({
+      status: "configured",
+      configured: true,
+      env_targets: ["HELIUS_API_KEY", "SOLANA_RPC_URL", "SOLANA_WS_URL"],
+    });
+    expect(receipt.items.find((item) => item.id === "jupiter-execution-rail")).toMatchObject({
+      status: "needed",
+      configured: false,
+      env_targets: ["JUPITER_API_KEY"],
+    });
+    expect(receipt.checks.map((check) => check.id)).toEqual([
+      "helius-read-rail",
+      "jupiter-execution-rail",
+      "dedicated-wallet",
+      "manual-signer",
+      "emergency-stop",
+      "accounting",
+      "live-boundary",
+      "secret-boundary",
+    ]);
+    expect(receipt.checks.find((check) => check.id === "secret-boundary")).toMatchObject({ status: "pass" });
+    expect(receipt.controls.some((control) => control.includes("does not create third-party accounts"))).toBe(true);
+    expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
+    expect(JSON.stringify(receipt)).not.toContain("test-birdeye-secret");
   });
 
   test("GIVEN emergency-stop ops are configured WHEN the drill route runs THEN it records a blocked no-secrets receipt", async () => {
