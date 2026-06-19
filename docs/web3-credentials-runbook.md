@@ -24,6 +24,18 @@ JUPITER_API_KEY=...
 MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER=external-wallet
 ```
 
+Optional provider and operations targets can be added after the required Helius/Jupiter/wallet rail is healthy:
+
+```bash
+BIRDEYE_API_KEY=...                         # optional paid market enrichment
+PUMPFUN_FEED_URL=...                        # optional launch-feed provider URL
+YELLOWSTONE_GRPC_ENDPOINT=...               # optional low-latency read stream
+YELLOWSTONE_GRPC_TOKEN=...                  # optional stream token
+MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL=...   # future supervised-live ops
+MASTERMOLD_EMERGENCY_STOP_CONTACT=...       # future supervised-live ops
+MASTERMOLD_TAX_LEDGER_EXPORT_PATH=...       # future reviewed fill/accounting export
+```
+
 Keep these live-execution flags unset unless doing a separate manual live review:
 
 ```bash
@@ -64,7 +76,7 @@ When `HELIUS_API_KEY` is set, live DEX dry-run reads can also expose a read-only
 
 The credential setup response now includes a credential vault plan with four explicit levels: read-only wallet sync, dry-run order rehearsal, supervised live review, and autonomous live trading. Only the first two levels can become ready in the app today. Supervised live and autonomous live stay blocked until signer custody, worker operations, emergency stop, settlement/accounting proof, long-horizon profit proof, and manual live review are separately completed. The plan also labels each input by storage rule: server environment, one-shot session input, browser-safe non-secret, future signer vault, or never-store. Private keys and seed phrases are always `never-store`.
 
-The response also includes a provider account runway. It turns the researched stack into app-visible setup lanes: Helius/Solana read rail, Jupiter execution rehearsal rail, dedicated trading wallet, manual external signer, public DEX discovery fallback, future paid market feeds, future low-latency stream provider, emergency-stop operations, and tax/accounting ledger. This runway tracks which external accounts or provider keys are configured, needed, optional, future, or blocked; it does not create third-party accounts, transmit secrets, or grant live trading authority.
+The response also includes a provider account runway. It turns the researched stack into app-visible setup lanes: Helius/Solana read rail, Jupiter execution rehearsal rail, dedicated trading wallet, manual external signer, public DEX discovery fallback, future paid market feeds, future low-latency stream provider, emergency-stop operations, and tax/accounting ledger. This runway tracks which external accounts or provider keys are configured, needed, optional, future, or blocked; it does not create third-party accounts, transmit secrets, or grant live trading authority. Optional provider values are reported only as configured/missing status, never as raw secret values.
 
 ## API
 

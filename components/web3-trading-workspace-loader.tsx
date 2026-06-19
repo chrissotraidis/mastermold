@@ -1759,6 +1759,9 @@ function QuickWeb3CredentialsSetupPanel({
                 <Chip tone={result.provider_account_runway.configured_required_count === result.provider_account_runway.required_account_count ? "engine" : "caution"}>
                   {result.provider_account_runway.configured_required_count}/{result.provider_account_runway.required_account_count} required
                 </Chip>
+                <Chip tone={result.provider_account_runway.configured_optional_count > 0 ? "caution" : "demo"}>
+                  {result.provider_account_runway.configured_optional_count}/{result.provider_account_runway.optional_account_count} optional
+                </Chip>
               </div>
             </div>
             <div className="mt-3 grid gap-1 sm:grid-cols-2 xl:grid-cols-5">

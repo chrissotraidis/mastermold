@@ -105,6 +105,8 @@ export type Web3ProviderAccountRunway = {
   primary_stack: string[];
   required_account_count: number;
   configured_required_count: number;
+  optional_account_count: number;
+  configured_optional_count: number;
   missing_required: string[];
   items: Web3ProviderAccountRunwayItem[];
   summary: string;
@@ -182,6 +184,11 @@ export function buildWeb3CredentialsSetupReadiness(
   const walletPublicKey = normalizeWallet(request.wallet_public_key);
   const walletValid = Boolean(walletPublicKey && isLikelySolanaPublicKey(walletPublicKey));
   const jupiterConfigured = Boolean(text(request.jupiter_api_key) || process.env.JUPITER_API_KEY);
+  const birdeyeConfigured = Boolean(text(process.env.BIRDEYE_API_KEY));
+  const pumpfunFeedConfigured = Boolean(text(process.env.PUMPFUN_FEED_URL) || text(process.env.PUMP_FUN_FEED_URL));
+  const yellowstoneConfigured = Boolean(text(process.env.YELLOWSTONE_GRPC_ENDPOINT) || text(process.env.YELLOWSTONE_GRPC_TOKEN));
+  const emergencyStopConfigured = Boolean(text(process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL) || text(process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT));
+  const taxLedgerConfigured = Boolean(text(process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH));
   const signerMode = normalizeSignerMode(request.signer_mode);
   const maxTradeUsd = boundedNumber(request.max_trade_usd, 250, 1, 1_000_000);
   const dailySpendCapUsd = boundedNumber(request.daily_spend_cap_usd, 1_000, 1, 10_000_000);
@@ -262,6 +269,11 @@ export function buildWeb3CredentialsSetupReadiness(
     requireManualConfirmation,
     canSupportReadonlyWalletSync,
     canSupportRouteOrderRehearsal,
+    birdeyeConfigured,
+    pumpfunFeedConfigured,
+    yellowstoneConfigured,
+    emergencyStopConfigured,
+    taxLedgerConfigured,
   });
 
   return {
@@ -312,6 +324,13 @@ export function buildWeb3CredentialsSetupReadiness(
       "SOLANA_RPC_URL",
       "SOLANA_WS_URL",
       "JUPITER_API_KEY",
+      "BIRDEYE_API_KEY",
+      "PUMPFUN_FEED_URL",
+      "YELLOWSTONE_GRPC_ENDPOINT",
+      "YELLOWSTONE_GRPC_TOKEN",
+      "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL",
+      "MASTERMOLD_EMERGENCY_STOP_CONTACT",
+      "MASTERMOLD_TAX_LEDGER_EXPORT_PATH",
       "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
       "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
       "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
@@ -329,6 +348,11 @@ function buildProviderAccountRunway(input: {
   requireManualConfirmation: boolean;
   canSupportReadonlyWalletSync: boolean;
   canSupportRouteOrderRehearsal: boolean;
+  birdeyeConfigured: boolean;
+  pumpfunFeedConfigured: boolean;
+  yellowstoneConfigured: boolean;
+  emergencyStopConfigured: boolean;
+  taxLedgerConfigured: boolean;
 }): Web3ProviderAccountRunway {
   const heliusConfigured = Boolean(input.heliusApiKey || isHeliusEndpoint(input.rpcUrl ?? ""));
   const externalSignerReady = input.signerMode === "external-wallet" && input.requireManualConfirmation;
@@ -401,33 +425,39 @@ function buildProviderAccountRunway(input: {
       label: "Birdeye market feed",
       lane: "market-discovery",
       priority: "later",
-      status: "future",
+      status: input.birdeyeConfigured ? "configured" : "future",
       account_action: "Provision only after the paper loop proves it needs paid trend, volume, or wallet-flow coverage.",
       storage_rule: "Server env secret if added.",
       unlocks: "Higher-coverage market ranking, token profiles, and historical trend enrichment.",
-      next_action: "Defer until the current Helius/Jupiter dry-run rail is green.",
+      next_action: input.birdeyeConfigured
+        ? "Keep Birdeye as an enrichment lane; Helius/Jupiter remain the required execution rehearsal stack."
+        : "Defer until the current Helius/Jupiter dry-run rail is green.",
     },
     {
       id: "pumpfun-launch-feed",
       label: "Pump.fun launch feed",
       lane: "market-discovery",
       priority: "later",
-      status: "future",
+      status: input.pumpfunFeedConfigured ? "configured" : "future",
       account_action: "Select a supported launch-feed source before building a production sniping worker.",
       storage_rule: "Server env secret if the selected provider requires one.",
       unlocks: "Launch timing, bonding-curve and migration context, and first-buyer source evidence.",
-      next_action: "Research and choose the concrete launch feed after read-only wallet and route evidence are stable.",
+      next_action: input.pumpfunFeedConfigured
+        ? "Use the configured launch feed only as read-only market evidence until route and signer gates pass."
+        : "Research and choose the concrete launch feed after read-only wallet and route evidence are stable.",
     },
     {
       id: "yellowstone-grpc-stream",
       label: "Yellowstone gRPC stream",
       lane: "read-data",
       priority: "later",
-      status: input.wsUrl ? "optional" : "future",
+      status: input.yellowstoneConfigured ? "configured" : input.wsUrl ? "optional" : "future",
       account_action: "Add only when the local paper daemon needs lower-latency subscription evidence than HTTP polling.",
       storage_rule: "Server env endpoint/token only.",
       unlocks: "Low-latency program/account subscriptions for production monitoring workers.",
-      next_action: input.wsUrl
+      next_action: input.yellowstoneConfigured
+        ? "Keep gRPC as a read-only stream candidate; do not grant signing or custody from stream evidence."
+        : input.wsUrl
         ? "Use WebSocket first; defer gRPC until latency tests show a need."
         : "Defer until the supervised worker exists.",
     },
@@ -436,25 +466,30 @@ function buildProviderAccountRunway(input: {
       label: "Emergency stop ops",
       lane: "operations",
       priority: "next",
-      status: "blocked",
+      status: input.emergencyStopConfigured ? "configured" : "blocked",
       account_action: "Define the external kill-switch owner, alert channel, and revocation process before any live executor is enabled.",
       storage_rule: "Server-side ops policy and audited environment flags; never browser-only.",
       unlocks: "Fail-closed live-review posture and operator intervention during stuck or unsafe trading loops.",
-      next_action: "Implement and review this before supervised live trading.",
+      next_action: input.emergencyStopConfigured
+        ? "Drill the emergency stop before any supervised live review."
+        : "Implement and review this before supervised live trading.",
     },
     {
       id: "tax-ledger",
       label: "Tax/accounting ledger",
       lane: "accounting",
       priority: "later",
-      status: "future",
+      status: input.taxLedgerConfigured ? "configured" : "future",
       account_action: "Choose the export/accounting workflow before real fills are mirrored as authoritative records.",
       storage_rule: "Persist only reviewed transaction/fill/tax evidence; never store private keys.",
       unlocks: "Cost-basis, realized PnL, fees, and audit exports for real trades.",
-      next_action: "Defer until settlement reconciliation is complete for supervised fills.",
+      next_action: input.taxLedgerConfigured
+        ? "Use the ledger path only after confirmed settlement and reviewed fill reconciliation."
+        : "Defer until settlement reconciliation is complete for supervised fills.",
     },
   ];
   const requiredNow = items.filter((item) => item.priority === "required-now");
+  const optionalOrLater = items.filter((item) => item.priority !== "required-now");
   const missingRequired = requiredNow
     .filter((item) => item.status !== "configured")
     .map((item) => item.label);
@@ -477,6 +512,8 @@ function buildProviderAccountRunway(input: {
     ],
     required_account_count: requiredNow.length,
     configured_required_count: requiredNow.length - missingRequired.length,
+    optional_account_count: optionalOrLater.length,
+    configured_optional_count: optionalOrLater.filter((item) => item.status === "configured").length,
     missing_required: missingRequired,
     items,
     summary: providerAccountRunwaySummary(status, missingRequired),

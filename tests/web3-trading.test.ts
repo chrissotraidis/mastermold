@@ -42,6 +42,14 @@ let prevTurnkeyOrganizationId: string | undefined;
 let prevTurnkeyApiPublicKey: string | undefined;
 let prevTurnkeyApiPrivateKey: string | undefined;
 let prevTurnkeySolanaWalletAccount: string | undefined;
+let prevBirdeyeApiKey: string | undefined;
+let prevPumpfunFeedUrl: string | undefined;
+let prevPumpFunFeedUrl: string | undefined;
+let prevYellowstoneGrpcEndpoint: string | undefined;
+let prevYellowstoneGrpcToken: string | undefined;
+let prevEmergencyStopWebhookUrl: string | undefined;
+let prevEmergencyStopContact: string | undefined;
+let prevTaxLedgerExportPath: string | undefined;
 let prevFetch: typeof globalThis.fetch;
 
 beforeEach(() => {
@@ -63,6 +71,14 @@ beforeEach(() => {
   prevTurnkeyApiPublicKey = process.env.TURNKEY_API_PUBLIC_KEY;
   prevTurnkeyApiPrivateKey = process.env.TURNKEY_API_PRIVATE_KEY;
   prevTurnkeySolanaWalletAccount = process.env.TURNKEY_SOLANA_WALLET_ACCOUNT;
+  prevBirdeyeApiKey = process.env.BIRDEYE_API_KEY;
+  prevPumpfunFeedUrl = process.env.PUMPFUN_FEED_URL;
+  prevPumpFunFeedUrl = process.env.PUMP_FUN_FEED_URL;
+  prevYellowstoneGrpcEndpoint = process.env.YELLOWSTONE_GRPC_ENDPOINT;
+  prevYellowstoneGrpcToken = process.env.YELLOWSTONE_GRPC_TOKEN;
+  prevEmergencyStopWebhookUrl = process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL;
+  prevEmergencyStopContact = process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT;
+  prevTaxLedgerExportPath = process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
   prevFetch = globalThis.fetch;
   const testRoot = mkdtempSync(join(tmpdir(), "mm-web3-"));
   process.env.MASTERMOLD_DB = join(testRoot, "db.sqlite");
@@ -83,6 +99,14 @@ beforeEach(() => {
   delete process.env.TURNKEY_API_PUBLIC_KEY;
   delete process.env.TURNKEY_API_PRIVATE_KEY;
   delete process.env.TURNKEY_SOLANA_WALLET_ACCOUNT;
+  delete process.env.BIRDEYE_API_KEY;
+  delete process.env.PUMPFUN_FEED_URL;
+  delete process.env.PUMP_FUN_FEED_URL;
+  delete process.env.YELLOWSTONE_GRPC_ENDPOINT;
+  delete process.env.YELLOWSTONE_GRPC_TOKEN;
+  delete process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL;
+  delete process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT;
+  delete process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
   __resetStoreForTests();
 });
 
@@ -123,6 +147,22 @@ afterEach(() => {
   else process.env.TURNKEY_API_PRIVATE_KEY = prevTurnkeyApiPrivateKey;
   if (prevTurnkeySolanaWalletAccount === undefined) delete process.env.TURNKEY_SOLANA_WALLET_ACCOUNT;
   else process.env.TURNKEY_SOLANA_WALLET_ACCOUNT = prevTurnkeySolanaWalletAccount;
+  if (prevBirdeyeApiKey === undefined) delete process.env.BIRDEYE_API_KEY;
+  else process.env.BIRDEYE_API_KEY = prevBirdeyeApiKey;
+  if (prevPumpfunFeedUrl === undefined) delete process.env.PUMPFUN_FEED_URL;
+  else process.env.PUMPFUN_FEED_URL = prevPumpfunFeedUrl;
+  if (prevPumpFunFeedUrl === undefined) delete process.env.PUMP_FUN_FEED_URL;
+  else process.env.PUMP_FUN_FEED_URL = prevPumpFunFeedUrl;
+  if (prevYellowstoneGrpcEndpoint === undefined) delete process.env.YELLOWSTONE_GRPC_ENDPOINT;
+  else process.env.YELLOWSTONE_GRPC_ENDPOINT = prevYellowstoneGrpcEndpoint;
+  if (prevYellowstoneGrpcToken === undefined) delete process.env.YELLOWSTONE_GRPC_TOKEN;
+  else process.env.YELLOWSTONE_GRPC_TOKEN = prevYellowstoneGrpcToken;
+  if (prevEmergencyStopWebhookUrl === undefined) delete process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL;
+  else process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL = prevEmergencyStopWebhookUrl;
+  if (prevEmergencyStopContact === undefined) delete process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT;
+  else process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = prevEmergencyStopContact;
+  if (prevTaxLedgerExportPath === undefined) delete process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
+  else process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = prevTaxLedgerExportPath;
   globalThis.fetch = prevFetch;
   __resetStoreForTests();
 });
@@ -276,6 +316,8 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "dry-run-ready",
       configured_required_count: 3,
       required_account_count: 3,
+      configured_optional_count: 1,
+      optional_account_count: 7,
       missing_required: [],
     });
     expect(readiness.provider_account_runway.primary_stack).toEqual([
@@ -305,6 +347,67 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "pass",
       detail: expect.stringContaining("Helius DAS returned 9 wallet assets"),
     });
+  });
+
+  test("GIVEN optional provider and ops env targets WHEN Web3 credentials are checked THEN the account runway tracks them without leaking secrets", () => {
+    process.env.BIRDEYE_API_KEY = "test-birdeye-secret";
+    process.env.PUMPFUN_FEED_URL = "https://launch-feed.example.test/private-token";
+    process.env.YELLOWSTONE_GRPC_ENDPOINT = "https://yellowstone.example.test";
+    process.env.YELLOWSTONE_GRPC_TOKEN = "test-yellowstone-token";
+    process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL = "https://ops.example.test/stop-secret";
+    process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = "/tmp/mastermold-tax-ledger";
+
+    const readiness = buildWeb3CredentialsSetupReadiness({
+      provider: "custom-rpc",
+      rpc_url: "https://mainnet.helius-rpc.com/?api-key=test-key",
+      ws_url: "wss://mainnet.helius-rpc.com/?api-key=test-key",
+      jupiter_api_key: "test-jupiter-key",
+      wallet_public_key: "11111111111111111111111111111111",
+      signer_mode: "external-wallet",
+      max_trade_usd: 250,
+      daily_spend_cap_usd: 1_000,
+      max_slippage_bps: 150,
+      require_manual_confirmation: true,
+    }, {
+      rpc_healthy: true,
+      wallet_balance_sol: 0.42,
+      helius_das_ready: true,
+      wallet_asset_count: 9,
+      wallet_fungible_asset_count: 4,
+      wallet_priced_asset_count: 3,
+      wallet_priced_value_usd: 123.45,
+      jupiter_quote_ready: true,
+      jupiter_order_ready: true,
+    });
+
+    expect(readiness.provider_account_runway).toMatchObject({
+      status: "dry-run-ready",
+      configured_required_count: 3,
+      optional_account_count: 7,
+      configured_optional_count: 6,
+    });
+    expect(readiness.provider_account_runway.items.find((item) => item.id === "birdeye-discovery")).toMatchObject({
+      status: "configured",
+      lane: "market-discovery",
+    });
+    expect(readiness.provider_account_runway.items.find((item) => item.id === "pumpfun-launch-feed")).toMatchObject({
+      status: "configured",
+    });
+    expect(readiness.provider_account_runway.items.find((item) => item.id === "yellowstone-grpc-stream")).toMatchObject({
+      status: "configured",
+    });
+    expect(readiness.provider_account_runway.items.find((item) => item.id === "emergency-stop")).toMatchObject({
+      status: "configured",
+      lane: "operations",
+    });
+    expect(readiness.provider_account_runway.items.find((item) => item.id === "tax-ledger")).toMatchObject({
+      status: "configured",
+      lane: "accounting",
+    });
+    expect(JSON.stringify(readiness)).not.toContain("test-birdeye-secret");
+    expect(JSON.stringify(readiness)).not.toContain("private-token");
+    expect(JSON.stringify(readiness)).not.toContain("test-yellowstone-token");
+    expect(JSON.stringify(readiness)).not.toContain("stop-secret");
   });
 
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {
