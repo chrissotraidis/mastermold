@@ -815,6 +815,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Signer/custody choice");
     expect(settingsPage).toContain("Manual live approval");
     expect(settingsPage).toContain("private keys and seed phrases stay out of the app");
+    expect(settingsPage).toContain("Settings Web3 launch repair queue");
+    expect(settingsPage).toContain("Launch repair queue");
+    expect(settingsPage).toContain("Safe repair actions for proof, route, supervision, and verification");
+    expect(settingsPage).toContain("repairActions.map");
+    expect(settingsPage).toContain("repairActionBadgeStatus");
+    expect(settingsPage).toContain("Repair actions can refresh paper/readiness evidence only");
     expect(settingsPage).toContain("Next cutover step");
     expect(settingsPage).toContain("Settings shows this queue for planning only");
     expect(settingsPage).toContain("buildWeb3AutonomyLaunchChecklist");

@@ -381,6 +381,7 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
   const nextStep = checklist.next_cutover_step;
   const remaining = checklist.remaining_work.slice(0, 6);
   const operatorInputs = checklist.operator_inputs_needed.slice(0, 8);
+  const repairActions = checklist.repair_actions.slice(0, 6);
   return (
     <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Settings Web3 launch blocker queue">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -450,6 +451,40 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
           This packet is the handoff list for credentials and approvals; private keys and seed phrases stay out of the app.
         </p>
       </div>
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2" aria-label="Settings Web3 launch repair queue">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Launch repair queue</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              Safe repair actions for proof, route, supervision, and verification
+            </p>
+          </div>
+          <LaunchQueueBadge
+            status={repairActions.some((item) => item.status === "blocked") ? "fail" : repairActions.some((item) => item.status === "active" || item.status === "review") ? "watch" : "pass"}
+            label={`${repairActions.filter((item) => item.status !== "ready").length} repair`}
+          />
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {repairActions.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                  <p className="mt-0.5 text-[11px] leading-4 text-outline">{item.detail}</p>
+                </div>
+                <LaunchQueueBadge status={repairActionBadgeStatus(item.status)} label={item.status} />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.command ?? item.next_action}</p>
+              <p className="mt-1 text-[10px] leading-4 text-outline">
+                Surface: {item.surface.replaceAll("-", " ")} · evidence repair only
+              </p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs leading-5 text-outline">
+          Repair actions can refresh paper/readiness evidence only; they cannot create accounts, sign, submit, custody funds, or unlock live capital.
+        </p>
+      </div>
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Next cutover step</p>
         <p className="mt-1 text-xs font-semibold text-on-surface">{nextStep.label} · {nextStep.status}</p>
@@ -465,6 +500,12 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
 function operatorInputBadgeStatus(status: Web3AutonomyLaunchChecklist["operator_inputs_needed"][number]["status"]) {
   if (status === "ready") return "pass";
   if (status === "review") return "watch";
+  return "fail";
+}
+
+function repairActionBadgeStatus(status: Web3AutonomyLaunchChecklist["repair_actions"][number]["status"]) {
+  if (status === "ready") return "pass";
+  if (status === "active" || status === "review") return "watch";
   return "fail";
 }
 
