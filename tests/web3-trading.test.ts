@@ -7012,6 +7012,20 @@ describe("Web3 autonomous trading subsystem", () => {
       command: "npm run repair-accountability:web3",
       next_action: expect.stringContaining("local paper accountability"),
     });
+    const liveDexPromotedReadyChecklist = buildWeb3AutonomyLaunchChecklist({
+      ...state,
+      market_source: {
+        ...state.market_source,
+        mode: "live-dex",
+      },
+    }, promotedReadyHealth);
+    expect(liveDexPromotedReadyChecklist.cutover_runway.find((step) => step.id === "profit-proof")).toMatchObject({
+      status: "active",
+      command: "npm run repair-accountability:web3 -- --source=live-dex",
+    });
+    expect(liveDexPromotedReadyChecklist.repair_actions.find((item) => item.id === "repair-paper-accountability")).toMatchObject({
+      command: "npm run repair-accountability:web3 -- --source=live-dex",
+    });
     const repairReceiptPath = process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
     if (!repairReceiptPath) throw new Error("Expected WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH in test setup.");
     writeFileSync(repairReceiptPath, `${JSON.stringify({
@@ -10131,6 +10145,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.transaction_lifecycle.status).toBe("blocked");
     expect(state.transaction_lifecycle.items.every((item) => item.stage !== "awaiting-signature")).toBe(true);
     expect(state.discovery_tape.sources[0]).toMatchObject({ status: "failed" });
+    expect(state.discovery_tape.sources.some((source) =>
+      source.id === "portfolio-watch" &&
+      source.status === "failed" &&
+      source.detail.includes("Held-position DEX refresh is blocked")
+    )).toBe(true);
     expect(state.autonomy_policy.stand_down).toBe(true);
     expect(state.autonomy_policy.orders.every((order) => order.decision !== "press")).toBe(true);
     expect(state.situation_monitor.regime).toBe("stand-down");

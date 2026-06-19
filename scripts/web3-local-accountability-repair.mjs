@@ -18,7 +18,7 @@ export function parseLocalAccountabilityRepairArgs(argv = [], env = process.env)
   return {
     baseUrl: normalizeBaseUrl(flags.get("base-url") ?? env.WEB3_TRADING_BASE_URL ?? DEFAULT_BASE_URL),
     scenario: normalizeChoice(flags.get("scenario") ?? env.WEB3_ACCOUNTABILITY_REPAIR_SCENARIO ?? "breakout", ["base", "breakout", "rug-risk"], "breakout"),
-    source: normalizeChoice(flags.get("source") ?? env.WEB3_ACCOUNTABILITY_REPAIR_SOURCE ?? "sample", ["sample"], "sample"),
+    source: normalizeChoice(flags.get("source") ?? env.WEB3_ACCOUNTABILITY_REPAIR_SOURCE ?? "sample", ["sample", "live-dex"], "sample"),
     runnerId: normalizeLeaseText(flags.get("runner-id") ?? env.WEB3_ACCOUNTABILITY_REPAIR_RUNNER_ID ?? DEFAULT_RUNNER_ID, DEFAULT_RUNNER_ID, 80),
     maxAttempts: boundedInteger(flags.get("attempts") ?? env.WEB3_ACCOUNTABILITY_REPAIR_ATTEMPTS, 3, 1, 10),
     targetScore: boundedInteger(flags.get("target-score") ?? env.WEB3_ACCOUNTABILITY_REPAIR_TARGET_SCORE, 70, 1, 100),
@@ -34,7 +34,7 @@ export async function runWeb3LocalAccountabilityRepair(input = {}) {
     ...input,
     baseUrl: normalizeBaseUrl(input.baseUrl ?? DEFAULT_BASE_URL),
     scenario: normalizeChoice(input.scenario ?? "breakout", ["base", "breakout", "rug-risk"], "breakout"),
-    source: normalizeChoice(input.source ?? "sample", ["sample"], "sample"),
+    source: normalizeChoice(input.source ?? "sample", ["sample", "live-dex"], "sample"),
     runnerId: normalizeLeaseText(input.runnerId ?? DEFAULT_RUNNER_ID, DEFAULT_RUNNER_ID, 80),
     maxAttempts: boundedInteger(input.maxAttempts, 3, 1, 10),
     targetScore: boundedInteger(input.targetScore, 70, 1, 100),
@@ -156,9 +156,9 @@ export function buildLocalAccountabilityRepairReport({ config, startedAt, initia
     next_action: localAccountabilityRepairNextAction(status, finalPlan, blockers, targetScore),
     controls: [
       "Consumes only the backend-authored local paper accountability repair plan from /api/web3-trading.",
-      "Allows read-only route refresh and bounded autonomous_session paper requests; it does not build trade bodies locally.",
+      "Allows read-only route refresh for sample or live-dex, and bounded autonomous_session paper requests only in local sample mode; it does not build trade bodies locally.",
       "Stops after one preflight diagnostic tick if accountability does not improve, instead of repeating low-signal churn.",
-      "Refuses non-sample sources, live execution permission, wallet mutation permission, private keys, signed transactions, and real-capital authority.",
+      "Refuses live-dex autonomous sessions, live execution permission, wallet mutation permission, private keys, signed transactions, and real-capital authority.",
     ],
   };
 }
@@ -166,13 +166,20 @@ export function buildLocalAccountabilityRepairReport({ config, startedAt, initia
 function buildRepairRequestBody(plan, config) {
   const body = plan.request?.body;
   if (!body || typeof body !== "object") throw new Error("Repair plan did not include a request body.");
-  if (body.source !== "sample" || body.account !== "persistent") {
-    throw new Error("Refusing local accountability repair outside sample persistent paper mode.");
+  if (body.account !== "persistent") {
+    throw new Error("Refusing local accountability repair outside persistent paper mode.");
+  }
+  const requestedSource = normalizeChoice(config.source ?? body.source ?? "sample", ["sample", "live-dex"], "sample");
+  if (requestedSource === "live-dex" && (!body.route_refresh || body.autonomous_session)) {
+    throw new Error("Refusing live-dex accountability repair unless the backend repair plan is read-only route refresh.");
+  }
+  if (body.source !== "sample" && body.source !== "live-dex") {
+    throw new Error("Refusing local accountability repair outside sample or read-only live-dex mode.");
   }
   return {
     ...body,
     scenario: body.scenario ?? config.scenario,
-    source: "sample",
+    source: requestedSource,
     account: "persistent",
   };
 }

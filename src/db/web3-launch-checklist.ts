@@ -371,6 +371,7 @@ export function buildWeb3AutonomyLaunchChecklist(
   const cutoverRunway = buildCutoverRunway({
     profitProof,
     localAccountabilityRepairHealth,
+    marketSourceMode: state.market_source.mode,
     productionSupervisor,
     providerCredentials,
     walletAccounting,
@@ -409,6 +410,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     productionSupervisor,
     profitProof,
     localAccountabilityRepairHealth,
+    marketSourceMode: state.market_source.mode,
     routePass,
     routeProofRefreshable,
     adapterOrderReady: adapter.swap_v2_order_ready,
@@ -613,6 +615,7 @@ function buildRepairActions({
   productionSupervisor,
   profitProof,
   localAccountabilityRepairHealth,
+  marketSourceMode,
   routePass,
   routeProofRefreshable,
   adapterOrderReady,
@@ -623,6 +626,7 @@ function buildRepairActions({
   productionSupervisor: Web3ProductionSupervisorReadiness;
   profitProof: Web3ProfitProofReadiness;
   localAccountabilityRepairHealth: Web3LocalAccountabilityRepairHealth;
+  marketSourceMode: Web3TradingState["market_source"]["mode"];
   routePass: boolean;
   routeProofRefreshable: boolean;
   adapterOrderReady: boolean;
@@ -661,7 +665,7 @@ function buildRepairActions({
       status: repairPlateaued || proofPlan.status === "blocked" || proofPlan.status === "drawdown-gated" ? "blocked" : "active",
       surface: "terminal",
       command: proofPlan.status === "needs-local-accountability"
-        ? proofPlan.local_accountability_repair_command
+        ? localAccountabilityRepairCommand(marketSourceMode)
         : proofPlan.safe_command,
       detail: repairReceiptVisible
         ? `${profitProof.status.replaceAll("-", " ")} profit proof with ${formatSignedCompactValue(profitProof.local_paper_net_pnl_usd)} local paper net and ${profitProof.local_paper_accountability_score}/100 accountability. Last repair ${localAccountabilityRepairHealth.status.replaceAll("-", " ")}${repairReceiptStale ? " (stale)" : ""}: ${localAccountabilityRepairHealth.summary}`
@@ -726,6 +730,12 @@ function buildRepairActions({
   });
 
   return actions.slice(0, 6);
+}
+
+function localAccountabilityRepairCommand(marketSourceMode: Web3TradingState["market_source"]["mode"]) {
+  return marketSourceMode === "live-dex"
+    ? "npm run repair-accountability:web3 -- --source=live-dex"
+    : "npm run repair-accountability:web3";
 }
 
 function buildResearchDecisions({
@@ -842,6 +852,7 @@ function buildResearchDecisions({
 function buildCutoverRunway({
   profitProof,
   localAccountabilityRepairHealth,
+  marketSourceMode,
   productionSupervisor,
   providerCredentials,
   walletAccounting,
@@ -853,6 +864,7 @@ function buildCutoverRunway({
 }: {
   profitProof: Web3ProfitProofReadiness;
   localAccountabilityRepairHealth: Web3LocalAccountabilityRepairHealth;
+  marketSourceMode: Web3TradingState["market_source"]["mode"];
   productionSupervisor: Web3ProductionSupervisorReadiness;
   providerCredentials: Web3ProviderCredentialsReadiness;
   walletAccounting: Web3TradingState["live_wallet_accounting_readiness"];
@@ -890,7 +902,7 @@ function buildCutoverRunway({
       label: "Prove paper edge",
       status: profitStepStatus,
       command: profitProof.proof_plan.status === "needs-local-accountability"
-        ? profitProof.proof_plan.local_accountability_repair_command
+        ? localAccountabilityRepairCommand(marketSourceMode)
         : profitProof.proof_plan.safe_command,
       evidence: localAccountabilityRepairHealth.status !== "absent"
         ? `${profitProof.promoted_run_count} promoted run${profitProof.promoted_run_count === 1 ? "" : "s"}, ${formatSignedCompactValue(profitProof.promoted_total_net_pnl_usd)} total, ${profitProof.promoted_target_hit_rate_pct.toFixed(0)}% target hits; latest local repair ${localAccountabilityRepairHealth.status.replaceAll("-", " ")} at ${localAccountabilityRepairHealth.final_accountability_score}/100.`

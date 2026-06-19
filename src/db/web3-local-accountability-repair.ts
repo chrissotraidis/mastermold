@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 export type Web3LocalAccountabilityRepairStatus =
   | "absent"
@@ -56,7 +56,15 @@ export function web3LocalAccountabilityRepairReceiptPath() {
   return process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH || join(process.cwd(), "data", "web3-local-accountability-repair.json");
 }
 
-export function getWeb3LocalAccountabilityRepairReceipt(path = web3LocalAccountabilityRepairReceiptPath()): Web3LocalAccountabilityRepairReceipt | null {
+export function getWeb3LocalAccountabilityRepairReceipt(path?: string): Web3LocalAccountabilityRepairReceipt | null {
+  if (path) return readWeb3LocalAccountabilityRepairReceipt(path);
+  const receipts = web3LocalAccountabilityRepairReceiptCandidatePaths()
+    .map((candidate) => readWeb3LocalAccountabilityRepairReceipt(candidate))
+    .filter((receipt): receipt is Web3LocalAccountabilityRepairReceipt => Boolean(receipt));
+  return receipts.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0] ?? null;
+}
+
+function readWeb3LocalAccountabilityRepairReceipt(path: string): Web3LocalAccountabilityRepairReceipt | null {
   try {
     if (!existsSync(path)) return null;
     return sanitizeWeb3LocalAccountabilityRepairReceipt(JSON.parse(readFileSync(path, "utf8")));
@@ -65,8 +73,18 @@ export function getWeb3LocalAccountabilityRepairReceipt(path = web3LocalAccounta
   }
 }
 
+export function web3LocalAccountabilityRepairReceiptCandidatePaths() {
+  if (process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH) {
+    return [process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH];
+  }
+  const cwdPath = web3LocalAccountabilityRepairReceiptPath();
+  const parentWorkspacePath = resolve(process.cwd(), "..", "..", "data", "web3-local-accountability-repair.json");
+  const repoPath = join(dirname(process.cwd()), "data", "web3-local-accountability-repair.json");
+  return [...new Set([cwdPath, parentWorkspacePath, repoPath])];
+}
+
 export function getWeb3LocalAccountabilityRepairHealth(
-  path = web3LocalAccountabilityRepairReceiptPath(),
+  path?: string,
 ): Web3LocalAccountabilityRepairHealth {
   const receipt = getWeb3LocalAccountabilityRepairReceipt(path);
   if (!receipt) {

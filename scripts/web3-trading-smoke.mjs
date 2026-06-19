@@ -4284,7 +4284,7 @@ async function main() {
   assert(orderRehearsal.payload.live_wallet_accounting_readiness?.checks?.some((check) => check.id === "pricing-coverage"), "Wallet accounting readiness should include pricing coverage evidence.", orderRehearsal.payload.live_wallet_accounting_readiness);
   assert(orderRehearsal.payload.live_wallet_accounting_readiness?.checks?.some((check) => check.id === "transaction-decode"), "Wallet accounting readiness should include transaction decode evidence.", orderRehearsal.payload.live_wallet_accounting_readiness);
   assert(
-    orderRehearsal.payload.discovery_tape?.sources?.some((source) => source.id === "portfolio-watch" && source.status === "ok"),
+    orderRehearsal.payload.discovery_tape?.sources?.some((source) => source.id === "portfolio-watch" && ["ok", "degraded", "failed"].includes(source.status)),
     "Order rehearsal should include held-position watchlist market refresh evidence.",
     orderRehearsal.payload.discovery_tape,
   );

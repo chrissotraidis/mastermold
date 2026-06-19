@@ -82167,6 +82167,7 @@ function sampleDiscoveryTape(market: MemecoinMarket[]): DiscoveryTape {
 }
 
 function fallbackDiscoveryTape(status: "fallback", detail: string | undefined): DiscoveryTape {
+  const fallbackDetail = detail ?? "Live discovery was unavailable; sample tape is being used.";
   return {
     status,
     tokens_considered: 0,
@@ -82177,7 +82178,14 @@ function fallbackDiscoveryTape(status: "fallback", detail: string | undefined): 
         label: "DEX Screener discovery",
         status: "failed",
         count: 0,
-        detail: detail ?? "Live discovery was unavailable; sample tape is being used.",
+        detail: fallbackDetail,
+      },
+      {
+        id: "portfolio-watch",
+        label: "Held coin watch",
+        status: "failed",
+        count: HELD_POSITION_DEX_WATCHLIST.length,
+        detail: `Held-position DEX refresh is blocked until live discovery recovers: ${fallbackDetail}`,
       },
     ],
     top_candidates: [],
