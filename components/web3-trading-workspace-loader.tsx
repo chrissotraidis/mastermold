@@ -6,6 +6,7 @@ import { Activity, CandlestickChart, KeyRound, LineChart, Pause, Play, RefreshCw
 
 import { Chip } from "@/components/sentinel";
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
+import type { Web3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import type { Web3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
@@ -13,7 +14,7 @@ import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-pa
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
-type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal";
+type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "emergency-stop";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
 type Web3CredentialsDraft = {
   helius_api_key: string;
@@ -111,6 +112,7 @@ export function Web3TradingWorkspaceLoader({
   const [quickNotice, setQuickNotice] = useState("Quick agent controls are armed for bounded paper sessions.");
   const [lastActionOutcome, setLastActionOutcome] = useState<QuickAgentActionOutcome | null>(null);
   const [lastPromotedAutopilot, setLastPromotedAutopilot] = useState<PromotedPaperAutopilotReceipt | null>(null);
+  const [emergencyStopReceipt, setEmergencyStopReceipt] = useState<Web3EmergencyStopDrillReceipt | null>(null);
   const [focusMode, setFocusMode] = useState<OperatorFocusMode>("cockpit");
   const [mounted, setMounted] = useState(false);
   const [WorkspaceComponent, setWorkspaceComponent] = useState<ComponentType<{ initialState: Web3TradingState }> | null>(null);
@@ -312,6 +314,33 @@ export function Web3TradingWorkspaceLoader({
       if (nextHealth) setSupervisorHealth(nextHealth);
     } catch (reason: unknown) {
       setQuickNotice(reason instanceof Error ? reason.message : "The promoted paper autopilot could not run.");
+    } finally {
+      setQuickBusy(null);
+    }
+  }
+
+  async function runEmergencyStopDrill() {
+    setQuickBusy("emergency-stop");
+    setQuickNotice("Recording a dry-run emergency stop and halting browser Auto Watch...");
+    try {
+      const response = await fetch("/api/web3-emergency-stop/drill", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          reason: "operator wiring emergency-stop drill",
+          operator_ack: true,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as Web3EmergencyStopDrillReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Emergency-stop drill failed.");
+      }
+      setAutoWatch(false);
+      setAutoWatchPrimed(false);
+      setEmergencyStopReceipt(payload);
+      setQuickNotice(payload.summary);
+    } catch (error) {
+      setQuickNotice(error instanceof Error ? error.message : "Emergency-stop drill failed.");
     } finally {
       setQuickBusy(null);
     }
@@ -1159,6 +1188,14 @@ export function Web3TradingWorkspaceLoader({
                 <QuickWalletTransactionIntelligencePanel intelligence={state.wallet_transaction_intelligence} readiness={state.live_wallet_accounting_readiness} />
               </div>
               <div className="xl:col-span-2">
+                <QuickEmergencyStopDrillPanel
+                  receipt={emergencyStopReceipt}
+                  busy={quickBusy === "emergency-stop"}
+                  disabled={quickDisabled}
+                  onRun={runEmergencyStopDrill}
+                />
+              </div>
+              <div className="xl:col-span-2">
                 <QuickLiveAutonomyReadinessAudit readiness={liveAutonomyReadiness} />
               </div>
               <div className="xl:col-span-2">
@@ -1445,6 +1482,90 @@ function QuickWalletTransactionIntelligencePanel({
 
       <p className="sr-only" aria-label="Wallet transaction intelligence receipt">
         Wallet transaction intelligence status {intelligence.status}; decoded {intelligence.decoded_transaction_count}; swaps {intelligence.swap_transaction_count}; transfers {intelligence.transfer_transaction_count}; failed {intelligence.failed_transaction_count}; raw transaction storage {intelligence.raw_transaction_storage}; wallet mutation {intelligence.wallet_mutation_permission}; live execution {intelligence.live_execution_permission}.
+      </p>
+    </section>
+  );
+}
+
+function QuickEmergencyStopDrillPanel({
+  receipt,
+  busy,
+  disabled,
+  onRun,
+}: {
+  receipt: Web3EmergencyStopDrillReceipt | null;
+  busy: boolean;
+  disabled: boolean;
+  onRun: () => void;
+}) {
+  const status = receipt?.status ?? "not-run";
+  const tone: QuickChipTone = receipt?.status === "drill-recorded"
+    ? "engine"
+    : receipt?.status === "missing-ops-target"
+      ? "caution"
+      : receipt?.status === "blocked"
+        ? "critical"
+        : "demo";
+
+  return (
+    <section className="min-w-0 rounded-md border border-critical/25 bg-critical/[0.035] p-2 sm:p-3" aria-label="Emergency stop drill">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Emergency stop drill</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">Dry-run stop receipt for live ops review</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            {receipt?.summary ?? "Record a local emergency-stop receipt that halts browser Auto Watch, verifies ops target status, and keeps live execution plus wallet mutation blocked."}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone={receipt?.ops_target_configured ? "engine" : "caution"}>
+            {receipt?.ops_target_configured ? "ops target set" : "ops target missing"}
+          </Chip>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+        <div className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2">
+          <p className="text-xs leading-5 text-outline">
+            {receipt?.next_action ?? "Use this before supervised-live review to prove the local stop path is visible and no secret-bearing external dispatch is attempted."}
+          </p>
+          <button
+            type="button"
+            onClick={onRun}
+            disabled={disabled || busy}
+            className="mt-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {busy ? "Recording" : "Run stop drill"}
+          </button>
+        </div>
+        <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+          {(receipt?.surfaces ?? emergencyStopPlaceholderSurfaces()).map((surface) => (
+            <div key={surface.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{surface.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", emergencyStopSurfaceDotClass(surface.status))} />
+              </div>
+              <p className={cn("mt-1 text-xs font-semibold", emergencyStopSurfaceTextClass(surface.status))}>
+                {surface.status.replaceAll("-", " ")}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{surface.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {receipt ? (
+        <div className="mt-2 flex flex-wrap gap-2 text-[11px] leading-4 text-outline">
+          <span>Receipt {receipt.receipt_hash.slice(0, 10)}</span>
+          <span>External dispatch {receipt.external_dispatch_permission}</span>
+          <span>Live execution {receipt.live_execution_permission}</span>
+          <span>Wallet mutation {receipt.wallet_mutation_permission}</span>
+        </div>
+      ) : null}
+      <p className="sr-only" aria-label="Emergency stop drill receipt">
+        Emergency stop drill status {status}; external dispatch blocked; live execution blocked; wallet mutation blocked.
       </p>
     </section>
   );
@@ -1917,6 +2038,59 @@ function providerAccountItemTextClass(status: Web3CredentialsSetupReadiness["pro
   if (status === "configured") return "text-engine";
   if (status === "optional" || status === "future") return "text-caution";
   return "text-critical";
+}
+
+function emergencyStopSurfaceDotClass(status: Web3EmergencyStopDrillReceipt["surfaces"][number]["status"]) {
+  if (status === "halted") return "bg-engine";
+  if (status === "dry-run") return "bg-caution";
+  return "bg-critical";
+}
+
+function emergencyStopSurfaceTextClass(status: Web3EmergencyStopDrillReceipt["surfaces"][number]["status"]) {
+  if (status === "halted") return "text-engine";
+  if (status === "dry-run") return "text-caution";
+  return "text-critical";
+}
+
+function emergencyStopPlaceholderSurfaces(): Web3EmergencyStopDrillReceipt["surfaces"] {
+  return [
+    {
+      id: "browser-auto-watch",
+      label: "Browser Auto Watch",
+      status: "dry-run",
+      detail: "Run the drill to stop browser-local Auto Watch and record a local receipt.",
+    },
+    {
+      id: "paper-daemon",
+      label: "Paper daemon",
+      status: "dry-run",
+      detail: "External paper workers require a separate supervisor stop outside this browser.",
+    },
+    {
+      id: "live-execution-flags",
+      label: "Live flags",
+      status: "blocked",
+      detail: "Live execution stays blocked in the app.",
+    },
+    {
+      id: "signer-boundary",
+      label: "Signer boundary",
+      status: "blocked",
+      detail: "No signature request or signer secret can be created by the drill.",
+    },
+    {
+      id: "submit-relay",
+      label: "Submit relay",
+      status: "blocked",
+      detail: "No transaction relay is dispatched.",
+    },
+    {
+      id: "wallet-mutation",
+      label: "Wallet mutation",
+      status: "blocked",
+      detail: "Wallet balances cannot be changed.",
+    },
+  ];
 }
 
 function QuickOperatorWalletSparkline({ wallet }: { wallet: Web3TradingState["autonomous_wallet_telemetry"] }) {

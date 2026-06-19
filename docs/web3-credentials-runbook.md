@@ -56,6 +56,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 9. Press `Test credentials`.
 10. Press `Apply dry-run profile` only after provider, wallet, and route evidence is acceptable.
 11. Run `npm run landing-drill:web3` to confirm the landing path is still safely blocked before live signing/submission.
+12. Use the Wiring focus `Run stop drill` control to record a local dry-run emergency-stop receipt. The drill halts browser Auto Watch and verifies ops target status, but it does not send webhooks, stop external processes by itself, sign, submit, or mutate wallets.
 
 ## Researched Default Stack
 
@@ -77,6 +78,14 @@ When `HELIUS_API_KEY` is set, live DEX dry-run reads can also expose a read-only
 The credential setup response now includes a credential vault plan with four explicit levels: read-only wallet sync, dry-run order rehearsal, supervised live review, and autonomous live trading. Only the first two levels can become ready in the app today. Supervised live and autonomous live stay blocked until signer custody, worker operations, emergency stop, settlement/accounting proof, long-horizon profit proof, and manual live review are separately completed. The plan also labels each input by storage rule: server environment, one-shot session input, browser-safe non-secret, future signer vault, or never-store. Private keys and seed phrases are always `never-store`.
 
 The response also includes a provider account runway. It turns the researched stack into app-visible setup lanes: Helius/Solana read rail, Jupiter execution rehearsal rail, dedicated trading wallet, manual external signer, public DEX discovery fallback, future paid market feeds, future low-latency stream provider, emergency-stop operations, and tax/accounting ledger. This runway tracks which external accounts or provider keys are configured, needed, optional, future, or blocked; it does not create third-party accounts, transmit secrets, or grant live trading authority. Optional provider values are reported only as configured/missing status, never as raw secret values.
+
+The Wiring focus also exposes:
+
+```text
+POST /api/web3-emergency-stop/drill
+```
+
+That route records a dry-run emergency-stop receipt only after `operator_ack` is true. It returns whether an emergency-stop webhook/contact is configured, which local surfaces would be halted or blocked, and a receipt hash. It never returns raw webhook URLs, contact details, API keys, private keys, transaction bytes, signed payloads, or wallet authority, and it never dispatches the external webhook from this local drill.
 
 ## API
 

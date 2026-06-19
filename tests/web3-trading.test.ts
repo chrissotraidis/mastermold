@@ -5,6 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
+import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3CredentialsSetupReadiness } from "@/src/db/web3-credentials";
@@ -408,6 +409,70 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(readiness)).not.toContain("private-token");
     expect(JSON.stringify(readiness)).not.toContain("test-yellowstone-token");
     expect(JSON.stringify(readiness)).not.toContain("stop-secret");
+  });
+
+  test("GIVEN emergency-stop ops are configured WHEN the drill route runs THEN it records a blocked no-secrets receipt", async () => {
+    process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL = "https://ops.example.test/stop-secret";
+    process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = "ops@example.test";
+
+    const rejected = await EMERGENCY_STOP_POST(new Request("http://localhost/api/web3-emergency-stop/drill", {
+      method: "POST",
+      body: JSON.stringify({ reason: "missing ack" }),
+    }));
+    expect(rejected.status).toBe(422);
+
+    const response = await EMERGENCY_STOP_POST(new Request("http://localhost/api/web3-emergency-stop/drill", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        reason: "operator wiring drill",
+        operator_ack: true,
+      }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      ops_target_configured: boolean;
+      webhook_configured: boolean;
+      contact_configured: boolean;
+      external_dispatch_attempted: boolean;
+      external_dispatch_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      surfaces: Array<{ id: string; status: string }>;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt).toMatchObject({
+      mode: "web3-emergency-stop-drill",
+      status: "drill-recorded",
+      ops_target_configured: true,
+      webhook_configured: true,
+      contact_configured: true,
+      external_dispatch_attempted: false,
+      external_dispatch_permission: "blocked",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.surfaces.map((surface) => surface.id)).toEqual([
+      "browser-auto-watch",
+      "paper-daemon",
+      "live-execution-flags",
+      "signer-boundary",
+      "submit-relay",
+      "wallet-mutation",
+    ]);
+    expect(receipt.surfaces.find((surface) => surface.id === "wallet-mutation")?.status).toBe("blocked");
+    expect(receipt.controls.some((control) => control.includes("does not send a webhook"))).toBe(true);
+    expect(JSON.stringify(receipt)).not.toContain("stop-secret");
+    expect(JSON.stringify(receipt)).not.toContain("ops@example.test");
+
+    const preview = await json<Record<string, unknown>>(EMERGENCY_STOP_GET());
+    expect(preview.mode).toBe("web3-emergency-stop-drill");
+    expect(preview.external_dispatch_permission).toBe("blocked");
   });
 
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {
