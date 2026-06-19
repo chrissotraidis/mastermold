@@ -81,6 +81,9 @@ async function main() {
   assert(health.web3_profit_proof.live_execution_permission === "blocked", "Profit-proof readiness should keep live execution blocked.", health.web3_profit_proof);
   assert(health.web3_profit_proof.wallet_mutation_permission === "blocked", "Profit-proof readiness should keep wallet mutation blocked.", health.web3_profit_proof);
   assert(Array.isArray(health.web3_profit_proof.checks) && health.web3_profit_proof.checks.some((check) => check.id === "target-hit-rate"), "Profit-proof readiness should expose target-hit evidence.", health.web3_profit_proof);
+  assert(health.web3_profit_proof.proof_plan?.mode === "promoted-paper-proof-plan", "Profit-proof readiness should expose a promoted paper proof plan.", health.web3_profit_proof);
+  assert(health.web3_profit_proof.proof_plan.live_execution_permission === "blocked", "Profit-proof plan should keep live execution blocked.", health.web3_profit_proof.proof_plan);
+  assert(health.web3_profit_proof.proof_plan.wallet_mutation_permission === "blocked", "Profit-proof plan should keep wallet mutation blocked.", health.web3_profit_proof.proof_plan);
 
   const launchChecklistResponse = await request("/api/web3-launch-checklist?scenario=breakout&source=sample&account=persistent");
   const launchChecklist = await readJson(launchChecklistResponse);
@@ -99,6 +102,8 @@ async function main() {
   assert(launchChecklist.profit_proof_readiness?.mode === "web3-profit-proof-readiness", "Web3 launch checklist should expose profit-proof readiness.", launchChecklist);
   assert(launchChecklist.profit_proof_readiness.live_execution_permission === "blocked", "Checklist profit-proof readiness should keep live execution blocked.", launchChecklist.profit_proof_readiness);
   assert(launchChecklist.profit_proof_readiness.wallet_mutation_permission === "blocked", "Checklist profit-proof readiness should keep wallet mutation blocked.", launchChecklist.profit_proof_readiness);
+  assert(launchChecklist.profit_proof_readiness.proof_plan?.safe_command === "npm run autopilot-paper:web3", "Checklist profit-proof readiness should expose the safe promoted proof command.", launchChecklist.profit_proof_readiness.proof_plan);
+  assert(typeof launchChecklist.profit_proof_readiness.proof_plan.remaining_promoted_runs === "number", "Checklist profit-proof readiness should expose remaining promoted proof runs.", launchChecklist.profit_proof_readiness.proof_plan);
   assert(launchChecklist.provider_credentials_readiness?.mode === "web3-provider-credentials-readiness", "Web3 launch checklist should expose provider credential readiness.", launchChecklist);
   assert(launchChecklist.provider_credentials_readiness.live_execution_permission === "blocked", "Provider credential readiness should keep live execution blocked.", launchChecklist.provider_credentials_readiness);
   assert(launchChecklist.provider_credentials_readiness.wallet_mutation_permission === "blocked", "Provider credential readiness should keep wallet mutation blocked.", launchChecklist.provider_credentials_readiness);
@@ -128,6 +133,8 @@ async function main() {
   assert(html.includes("Web3 launch checklist receipt"), "Trading page should expose an accessible launch checklist receipt.");
   assert(html.includes("Cutover runway"), "Trading page should expose the compact Web3 cutover runway.");
   assert(html.includes("Prove paper edge"), "Trading page should show the first Web3 cutover runway step.");
+  assert(html.includes("Proof gap"), "Trading page should expose the promoted paper proof gap.");
+  assert(html.includes("npm run autopilot-paper:web3"), "Trading page should expose the safe promoted proof command.");
   assert(html.includes("real-cap blocked"), "Trading page should make the real-capital boundary visible in the launch checklist.");
   assert(html.includes("Actually left"), "Trading page should expose what is actually left for Web3 launch readiness.");
   assert(html.includes("actual remaining gates"), "Trading page should summarize the remaining launch gates.");

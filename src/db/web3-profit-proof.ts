@@ -16,6 +16,26 @@ export type Web3ProfitProofReadinessCheck = {
   detail: string;
 };
 
+export type Web3ProfitProofRunPlan = {
+  mode: "promoted-paper-proof-plan";
+  status: "complete" | "needs-runs" | "needs-hit-rate" | "drawdown-gated" | "blocked";
+  required_promoted_runs: number;
+  remaining_promoted_runs: number;
+  required_target_hit_rate_pct: number;
+  required_positive_total_pnl: true;
+  required_recent_positive_runs: number;
+  observed_promoted_runs: number;
+  observed_target_hit_rate_pct: number;
+  observed_total_net_pnl_usd: number;
+  observed_recent_positive_runs: number;
+  suggested_next_runs: number;
+  safe_command: "npm run autopilot-paper:web3";
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  summary: string;
+  next_action: string;
+};
+
 export type Web3ProfitProofReadiness = {
   mode: "web3-profit-proof-readiness";
   status: Web3ProfitProofReadinessStatus;
@@ -33,6 +53,7 @@ export type Web3ProfitProofReadiness = {
   recommended_supervisor_round_cap: number;
   can_support_paper_scale: boolean;
   can_satisfy_profit_gate: boolean;
+  proof_plan: Web3ProfitProofRunPlan;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
   summary: string;
@@ -63,12 +84,13 @@ export function buildWeb3ProfitProofReadiness({
   const lossBrakeTripped = promotedHealth?.loss_brake_tripped === true || recent.some((run) => run.loss_brake_tripped);
   const memoryProtecting = memoryStatus === "protect-paper" || memoryStatus === "stand-down";
   const enoughSample = runCount >= 3;
+  const requiredRecentPositiveRuns = Math.min(3, recent.length || 3);
   const repeatable = localMakingMoney &&
     enoughSample &&
     totalPnl > 0 &&
     averagePnl > 0 &&
     hitRate >= 70 &&
-    recentPositiveCount >= Math.min(3, recent.length || 3) &&
+    recentPositiveCount >= requiredRecentPositiveRuns &&
     !lossBrakeTripped &&
     !memoryProtecting;
   const canSupportPaperScale = localMakingMoney && !lossBrakeTripped && memoryStatus !== "stand-down";
@@ -83,6 +105,17 @@ export function buildWeb3ProfitProofReadiness({
     hitRate,
     lossBrakeTripped,
     memoryProtecting,
+  });
+  const proofPlan = buildProfitProofRunPlan({
+    repeatable,
+    runCount,
+    hitRate,
+    totalPnl,
+    recentPositiveCount,
+    requiredRecentPositiveRuns,
+    lossBrakeTripped,
+    memoryProtecting,
+    recommendedSupervisorRoundCap: promotedHealth?.recommended_supervisor_round_cap ?? 0,
   });
   const blockers = checks
     .filter((check) => check.status === "fail")
@@ -118,6 +151,7 @@ export function buildWeb3ProfitProofReadiness({
     recommended_supervisor_round_cap: promotedHealth?.recommended_supervisor_round_cap ?? 0,
     can_support_paper_scale: canSupportPaperScale,
     can_satisfy_profit_gate: repeatable,
+    proof_plan: proofPlan,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     summary: profitProofSummary(status, readinessScore, localNet, runCount, hitRate, totalPnl),
@@ -129,6 +163,55 @@ export function buildWeb3ProfitProofReadiness({
       "Live review requires repeatable positive promoted runs, target-hit consistency, no loss brake, and a profitable local paper accountability score.",
       "This gate never signs, submits, custodies funds, changes wallet balances, or enables autonomous real-money execution.",
     ],
+  };
+}
+
+function buildProfitProofRunPlan(evidence: {
+  repeatable: boolean;
+  runCount: number;
+  hitRate: number;
+  totalPnl: number;
+  recentPositiveCount: number;
+  requiredRecentPositiveRuns: number;
+  lossBrakeTripped: boolean;
+  memoryProtecting: boolean;
+  recommendedSupervisorRoundCap: number;
+}): Web3ProfitProofRunPlan {
+  const requiredPromotedRuns = 3;
+  const requiredHitRate = 70;
+  const remainingRuns = Math.max(0, requiredPromotedRuns - evidence.runCount);
+  const suggestedNextRuns = evidence.repeatable
+    ? 0
+    : Math.max(1, Math.min(Math.max(remainingRuns, 1), Math.max(1, evidence.recommendedSupervisorRoundCap || 2)));
+  const status: Web3ProfitProofRunPlan["status"] = evidence.repeatable
+    ? "complete"
+    : evidence.lossBrakeTripped
+      ? "drawdown-gated"
+      : evidence.memoryProtecting
+        ? "blocked"
+        : remainingRuns > 0
+          ? "needs-runs"
+          : "needs-hit-rate";
+  const nextAction = profitProofRunPlanNextAction(status, suggestedNextRuns, remainingRuns);
+
+  return {
+    mode: "promoted-paper-proof-plan",
+    status,
+    required_promoted_runs: requiredPromotedRuns,
+    remaining_promoted_runs: remainingRuns,
+    required_target_hit_rate_pct: requiredHitRate,
+    required_positive_total_pnl: true,
+    required_recent_positive_runs: evidence.requiredRecentPositiveRuns,
+    observed_promoted_runs: evidence.runCount,
+    observed_target_hit_rate_pct: evidence.hitRate,
+    observed_total_net_pnl_usd: evidence.totalPnl,
+    observed_recent_positive_runs: evidence.recentPositiveCount,
+    suggested_next_runs: suggestedNextRuns,
+    safe_command: "npm run autopilot-paper:web3",
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    summary: profitProofRunPlanSummary(status, evidence.runCount, remainingRuns, evidence.hitRate, evidence.totalPnl),
+    next_action: nextAction,
   };
 }
 
@@ -205,6 +288,27 @@ function profitProofNextAction(status: Web3ProfitProofReadinessStatus) {
   if (status === "profitable-paper") return "Run more promoted paper windows until the sample reaches at least 3 runs with 70%+ target hits and positive total PnL.";
   if (status === "drawdown-gated" || status === "blocked") return "Stop expansion and repair promoted paper drawdown before any stronger autonomy claim.";
   return "Run promoted paper autopilot proof and collect repeatable target-hit evidence before live-capital review.";
+}
+
+function profitProofRunPlanSummary(
+  status: Web3ProfitProofRunPlan["status"],
+  runCount: number,
+  remainingRuns: number,
+  hitRate: number,
+  totalPnl: number,
+) {
+  if (status === "complete") return `Proof plan is complete: ${runCount} promoted runs, ${hitRate.toFixed(0)}% target hits, ${formatSignedCompactValue(totalPnl)} total.`;
+  if (status === "drawdown-gated") return "Proof plan is drawdown-gated; stop expansion until paper loss protection clears.";
+  if (status === "blocked") return "Proof plan is blocked because promoted memory is protecting the desk.";
+  if (status === "needs-hit-rate") return `Proof plan has enough runs but needs 70%+ target hits and positive total PnL; current hit rate is ${hitRate.toFixed(0)}%.`;
+  return `Proof plan needs ${remainingRuns} more promoted paper run${remainingRuns === 1 ? "" : "s"} before live review can trust the sample.`;
+}
+
+function profitProofRunPlanNextAction(status: Web3ProfitProofRunPlan["status"], suggestedNextRuns: number, remainingRuns: number) {
+  if (status === "complete") return "Keep collecting promoted paper proof while the other live-capital gates are cleared.";
+  if (status === "drawdown-gated" || status === "blocked") return "Run proof-only review or stand down until promoted memory no longer protects the desk.";
+  if (status === "needs-hit-rate") return "Run a smaller promoted paper proof window and require target-hit recovery before scaling.";
+  return `Run ${suggestedNextRuns} promoted paper proof ${suggestedNextRuns === 1 ? "window" : "windows"} now; ${remainingRuns} total promoted run${remainingRuns === 1 ? "" : "s"} remain.`;
 }
 
 function checkScore(status: Web3ProfitProofReadinessCheck["status"]) {

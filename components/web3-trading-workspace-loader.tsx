@@ -7060,6 +7060,7 @@ function QuickLaunchChecklistPanel({
   const remainingWork = checklist.remaining_work.slice(0, 4);
   const runway = checklist.cutover_runway;
   const nextStep = checklist.next_cutover_step;
+  const proofPlan = checklist.profit_proof_readiness.proof_plan;
 
   return (
     <section className="rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:p-3" aria-label="Web3 autonomy launch checklist">
@@ -7126,6 +7127,12 @@ function QuickLaunchChecklistPanel({
             </div>
           ))}
         </div>
+        <div className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Promoted paper proof gap">
+          <ProfitMetric label="Proof gap" value={`${proofPlan.remaining_promoted_runs}`} detail={`${proofPlan.required_promoted_runs} runs required`} tone={proofPlan.status === "complete" ? "engine" : proofPlan.status === "blocked" || proofPlan.status === "drawdown-gated" ? "critical" : "caution"} />
+          <ProfitMetric label="Hit target" value={`${proofPlan.observed_target_hit_rate_pct.toFixed(0)}%`} detail={`${proofPlan.required_target_hit_rate_pct}% required`} tone={proofPlan.observed_target_hit_rate_pct >= proofPlan.required_target_hit_rate_pct ? "engine" : "caution"} />
+          <ProfitMetric label="Next batch" value={`${proofPlan.suggested_next_runs}`} detail={proofPlan.safe_command} tone={proofPlan.suggested_next_runs > 0 ? "engine" : "neutral"} />
+          <ProfitMetric label="Proof PnL" value={formatCompactSignedCurrency(proofPlan.observed_total_net_pnl_usd)} detail={proofPlan.status.replaceAll("-", " ")} tone={proofPlan.observed_total_net_pnl_usd > 0 ? "engine" : proofPlan.observed_total_net_pnl_usd < 0 ? "critical" : "neutral"} />
+        </div>
       </div>
 
       <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.7fr)]">
@@ -7178,7 +7185,7 @@ function QuickLaunchChecklistPanel({
         Dry-run signer and order rehearsal only scope public-key rehearsal, simulated signer metadata, live DEX route/order evidence, caps, slippage, and kill-switch review; they cannot store keys, sign, submit, custody funds, or enable real-capital trades.
       </p>
       <span className="sr-only" aria-label="Web3 launch checklist receipt">
-        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
       </span>
     </section>
   );

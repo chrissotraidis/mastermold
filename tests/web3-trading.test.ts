@@ -5512,6 +5512,17 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
+    expect(launchChecklist.profit_proof_readiness.proof_plan).toMatchObject({
+      mode: "promoted-paper-proof-plan",
+      status: "needs-runs",
+      required_promoted_runs: 3,
+      remaining_promoted_runs: 3,
+      required_target_hit_rate_pct: 70,
+      suggested_next_runs: 2,
+      safe_command: "npm run autopilot-paper:web3",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
     expect(launchChecklist.provider_credentials_readiness).toMatchObject({
       mode: "web3-provider-credentials-readiness",
       status: "missing-wallet",
@@ -5605,6 +5616,13 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(repeatProfitChecklist.profit_proof_readiness).toMatchObject({
       status: "repeatable-paper",
       can_satisfy_profit_gate: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(repeatProfitChecklist.profit_proof_readiness.proof_plan).toMatchObject({
+      status: "complete",
+      remaining_promoted_runs: 0,
+      suggested_next_runs: 0,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
