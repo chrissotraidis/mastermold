@@ -9,7 +9,7 @@ import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
-type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "source" | "reset";
+type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
 type QuickWiringPath = {
   label: string;
@@ -42,6 +42,26 @@ type HealthPayload = {
   status: "ok";
   web3_daemon_supervisor?: Web3DaemonSupervisorHealth;
 };
+type PromotedPaperAutopilotReceipt = {
+  mode: "web3-promoted-paper-autopilot";
+  paper_only: true;
+  status: "blocked" | "target-hit" | "completed" | "running" | "paper-guarded" | "not-started";
+  promotion_status: string;
+  promotion_permission: string;
+  supervisor_status: string;
+  applied_supervisor_rounds: number;
+  applied_ticks_per_round: number;
+  posted_ticks: number;
+  blocked_ticks: number;
+  net_pnl_usd: number;
+  profit_target_hit: boolean;
+  loss_brake_tripped: boolean;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  summary: string;
+  next_action: string;
+  blockers: string[];
+};
 
 export function Web3TradingWorkspaceLoader({
   initialState,
@@ -62,6 +82,7 @@ export function Web3TradingWorkspaceLoader({
   const [quickBusy, setQuickBusy] = useState<QuickBusyState | null>(null);
   const [quickNotice, setQuickNotice] = useState("Quick agent controls are armed for bounded paper sessions.");
   const [lastActionOutcome, setLastActionOutcome] = useState<QuickAgentActionOutcome | null>(null);
+  const [lastPromotedAutopilot, setLastPromotedAutopilot] = useState<PromotedPaperAutopilotReceipt | null>(null);
   const [focusMode, setFocusMode] = useState<OperatorFocusMode>("cockpit");
   const [WorkspaceComponent, setWorkspaceComponent] = useState<ComponentType<{ initialState: Web3TradingState }> | null>(null);
   const [DiagnosticsComponent, setDiagnosticsComponent] = useState<ComponentType<{ state?: Web3TradingState }> | null>(null);
@@ -149,6 +170,24 @@ export function Web3TradingWorkspaceLoader({
     }
   }
 
+  async function loadSupervisorHealth() {
+    const response = await fetch("/api/health", { cache: "no-store" });
+    const payload = (await response.json()) as HealthPayload;
+    if (!response.ok || payload.status !== "ok") {
+      throw new Error("Supervisor health could not be loaded.");
+    }
+    return payload.web3_daemon_supervisor;
+  }
+
+  async function loadTradingStateSnapshot(scenario: Web3TradingState["scenario"] = "breakout") {
+    const response = await fetch(`/api/web3-trading?scenario=${scenario}&account=persistent&source=sample&advance=false`, { cache: "no-store" });
+    const payload = (await response.json()) as Web3TradingState | { error: string };
+    if (!response.ok || "error" in payload) {
+      throw new Error("The latest autonomous trading state could not be loaded.");
+    }
+    return payload;
+  }
+
   async function submitTradingRequest(
     busy: QuickBusyState,
     body: Record<string, unknown>,
@@ -190,6 +229,43 @@ export function Web3TradingWorkspaceLoader({
       }
     } catch (reason: unknown) {
       setQuickNotice(reason instanceof Error ? reason.message : fallbackError);
+    } finally {
+      setQuickBusy(null);
+    }
+  }
+
+  async function runPromotedPaperAutopilot() {
+    if (!state || quickBusy) return;
+    const previousState = state;
+    setQuickBusy("promoted");
+    setQuickNotice("Running repeat proof, paper-promotion guard, paper reset, and bounded supervised paper daemon rounds.");
+    try {
+      const response = await fetch("/api/web3-promoted-paper-autopilot", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario: "breakout",
+          promotion_scenario: "all",
+          source: "sample",
+          promotion_runs: 2,
+          promotion_ticks: 2,
+          max_supervisor_rounds: 2,
+          max_ticks_per_round: 1,
+        }),
+      });
+      const payload = (await response.json()) as PromotedPaperAutopilotReceipt | { error: string; detail?: string };
+      if (!response.ok || "error" in payload) {
+        throw new Error("error" in payload ? payload.detail ?? payload.error : "The promoted paper autopilot could not run.");
+      }
+      setLastPromotedAutopilot(payload);
+      const nextState = await loadTradingStateSnapshot("breakout");
+      setState(nextState);
+      setLastActionOutcome(buildQuickAgentActionOutcome("promoted", previousState, nextState, payload.summary));
+      setQuickNotice(payload.summary);
+      const nextHealth = await loadSupervisorHealth();
+      if (nextHealth) setSupervisorHealth(nextHealth);
+    } catch (reason: unknown) {
+      setQuickNotice(reason instanceof Error ? reason.message : "The promoted paper autopilot could not run.");
     } finally {
       setQuickBusy(null);
     }
@@ -708,7 +784,7 @@ export function Web3TradingWorkspaceLoader({
           onPrimaryAction={runNowDecision}
         />
 
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
           <button
             type="button"
             onClick={refreshRead}
@@ -756,6 +832,15 @@ export function Web3TradingWorkspaceLoader({
           </button>
           <button
             type="button"
+            onClick={runPromotedPaperAutopilot}
+            disabled={quickDisabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/15 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-engine transition hover:bg-engine/20 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {quickBusy === "promoted" ? "Promoting" : "Promoted run"}
+          </button>
+          <button
+            type="button"
             onClick={toggleAutoWatch}
             disabled={quickDisabled && !autoWatch}
             aria-pressed={autoWatch}
@@ -778,6 +863,11 @@ export function Web3TradingWorkspaceLoader({
         {sessionRun.requested ? (
           <p className="mt-3 line-clamp-2 border-t border-outline-variant/25 pt-3 text-xs leading-5 text-on-surface-variant">
             Last bounded cycle: {sessionRun.summary} Next: {sessionRun.next_action}
+          </p>
+        ) : null}
+        {lastPromotedAutopilot ? (
+          <p className="mt-3 line-clamp-2 border-t border-outline-variant/25 pt-3 text-xs leading-5 text-on-surface-variant">
+            Promoted paper run: {lastPromotedAutopilot.summary} Permission {lastPromotedAutopilot.promotion_permission}; supervisor {lastPromotedAutopilot.supervisor_status}; posted {lastPromotedAutopilot.posted_ticks} ticks; live and wallet mutation remain {lastPromotedAutopilot.live_execution_permission}.
           </p>
         ) : null}
 
@@ -3483,7 +3573,7 @@ function buildQuickAgentActionOutcome(
       ? "critical"
       : after.autonomous_now_decision.status === "blocked"
         ? "critical"
-        : kind === "route" || kind === "route-repair" || kind === "chart" || kind === "stand-down"
+        : kind === "route" || kind === "route-repair" || kind === "chart" || kind === "promoted" || kind === "stand-down"
           ? "caution"
           : "neutral";
   return {
@@ -3517,6 +3607,7 @@ function quickAgentActionLabel(kind: QuickAgentActionKind, state?: Web3TradingSt
   if (kind === "loop") return "Backend tick returned";
   if (kind === "session") return "Paper cycle returned";
   if (kind === "minute") return "Minute loop returned";
+  if (kind === "promoted") return "Promoted paper run returned";
   if (kind === "source") return "Market source switched";
   if (kind === "reset") return "Paper account reset";
   if (kind === "stand-down") return "Stand-down respected";
@@ -3528,6 +3619,7 @@ function quickAgentActionSummary(kind: QuickAgentActionKind, state: Web3TradingS
   if (kind === "chart") return state.autonomous_candle_refresh.summary;
   if (kind === "loop") return state.autonomous_loop_tick.summary;
   if (kind === "session" || kind === "minute") return state.autonomous_session_run.summary;
+  if (kind === "promoted") return "Repeat proof promoted into bounded supervised paper daemon rounds.";
   if (kind === "source") return state.market_source.detail;
   if (kind === "reset") return "Paper account reset; the autonomous learner is ready for a fresh rehearsal.";
   if (kind === "stand-down") return state.autonomous_now_decision.next_action;
@@ -3539,6 +3631,7 @@ function quickAgentActionNextAction(kind: QuickAgentActionKind, state: Web3Tradi
   if (kind === "chart") return state.autonomous_candle_refresh.next_action;
   if (kind === "loop") return state.autonomous_loop_tick.next_action;
   if (kind === "session" || kind === "minute") return state.autonomous_session_run.next_action;
+  if (kind === "promoted") return state.autonomous_daemon_handoff.summary;
   return state.autonomous_now_decision.next_action;
 }
 
