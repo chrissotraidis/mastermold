@@ -12,6 +12,7 @@ import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/ap
 import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
 import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
+import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
@@ -9942,6 +9943,88 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.top_candidates[0].sources).toContain("dex-latest-profiles");
     expect(receipt.controls.some((control) => control.includes("local paper decisions only"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
+  });
+
+  test("GIVEN live-capital preflight runs WHEN live DEX data is present THEN it returns gated review blockers", async () => {
+    const tokenAddress = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/token-boosts/top/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, amount: 4, totalAmount: 20, description: "top boost" }]);
+      }
+      if (url.includes("/token-boosts/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, amount: 2, totalAmount: 8, description: "fresh boost" }]);
+      }
+      if (url.includes("/token-profiles/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, description: "fresh profile" }]);
+      }
+      if (url.includes("/community-takeovers/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, description: "takeover" }]);
+      }
+      if (url.includes("/ads/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, type: "tokenAd", impressions: 10_000 }]);
+      }
+      if (url.includes("/orders/v1/solana/")) {
+        return Response.json([{ type: "tokenAd", status: "approved" }]);
+      }
+      if (url.includes("/tokens/v1/solana/")) {
+        return Response.json([
+          {
+            chainId: "solana",
+            dexId: "raydium",
+            pairAddress: "bonk-pair-live",
+            pairCreatedAt: Date.now() - 12 * 60 * 1000,
+            baseToken: { address: tokenAddress, symbol: "BONK", name: "Bonk" },
+            quoteToken: { address: "So11111111111111111111111111111111111111112", symbol: "SOL", name: "Solana" },
+            priceUsd: "0.000023",
+            marketCap: 1_800_000_000,
+            liquidity: { usd: 22_000_000 },
+            volume: { m5: 80_000, h1: 1_200_000, h24: 31_000_000 },
+            txns: { m5: { buys: 80, sells: 36 } },
+            priceChange: { m5: 3.2, h1: 9.4, h6: 18.1 },
+            boosts: { active: 3 },
+          },
+        ]);
+      }
+      return Response.json({ error: "unexpected preflight request" }, { status: 500 });
+    }) as typeof fetch;
+
+    const rejected = await LIVE_PREFLIGHT_GET(new Request("http://localhost/api/web3-live-capital-preflight?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await LIVE_PREFLIGHT_GET(new Request("http://localhost/api/web3-live-capital-preflight?scenario=breakout&source=live-dex&account=ephemeral&cycles=0"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      secret_echo_permission: string;
+      real_capital_blocked: boolean;
+      passed_gate_count: number;
+      watch_gate_count: number;
+      failed_gate_count: number;
+      gates: Array<{ id: string; status: string; next_action: string; blocks_live_capital: boolean }>;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-live-capital-preflight-receipt");
+    expect(["blocked", "blocked-as-expected"]).toContain(receipt.status);
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.real_capital_blocked).toBe(true);
+    expect(receipt.passed_gate_count + receipt.watch_gate_count + receipt.failed_gate_count).toBe(receipt.gates.length);
+    expect(["operator-wallet", "provider-read-rail", "live-dex", "jupiter-order", "risk-policy", "kill-switch", "signer-custody", "settlement", "profit-proof", "manual-live-review"].every((id) => receipt.gates.some((gate) => gate.id === id))).toBe(true);
+    expect(receipt.gates.every((gate) => gate.blocks_live_capital && gate.next_action.length > 0)).toBe(true);
+    expect(receipt.gates.find((gate) => gate.id === "live-dex")?.status).toBe("pass");
+    expect(receipt.controls.some((control) => control.includes("never asks for private keys"))).toBe(true);
   });
 
   test("GIVEN live discovery fails WHEN persistent paper advances THEN legacy entries stay blocked by readiness gate", async () => {

@@ -790,6 +790,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Test credentials");
     expect(settingsConsole).toContain("Test DEX scanner");
     expect(settingsConsole).toContain("/api/web3-dex-discovery?");
+    expect(settingsConsole).toContain("Run live preflight");
+    expect(settingsConsole).toContain("/api/web3-live-capital-preflight?");
+    expect(settingsConsole).toContain("Settings live capital preflight receipt");
+    expect(settingsConsole).toContain("Live-capital preflight receipt");
+    expect(settingsConsole).toContain("live-capital preflight receipt is review evidence only");
     expect(settingsConsole).toContain("source: \"live-dex\"");
     expect(settingsConsole).toContain("Settings DEX discovery receipt");
     expect(settingsConsole).toContain("scanner evidence only");
@@ -812,9 +817,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("strict verifier runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("read-only DEX scanner testing");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dex-discovery");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-capital-preflight");
     expect(source("README.md")).toContain("/api/web3-dex-discovery?source=live-dex");
+    expect(source("README.md")).toContain("/api/web3-live-capital-preflight?source=live-dex");
     expect(source("app/api/web3-dex-discovery/route.ts")).toContain("buildWeb3DexDiscoveryReceipt");
+    expect(source("app/api/web3-live-capital-preflight/route.ts")).toContain("buildWeb3LiveCapitalPreflightReceipt");
     expect(source("src/db/web3-dex-discovery.ts")).toContain("web3-dex-discovery-receipt");
+    expect(source("src/db/web3-live-capital-preflight.ts")).toContain("web3-live-capital-preflight-receipt");
+    expect(source("src/db/web3-live-capital-preflight.ts")).toContain("operator-wallet");
+    expect(source("src/db/web3-live-capital-preflight.ts")).toContain("jupiter-order");
+    expect(source("src/db/web3-live-capital-preflight.ts")).toContain("manual-live-review");
     expect(source("src/db/web3-dex-discovery.ts")).toContain("Discovery endpoints are budgeted as 60 requests/minute");
     expect(source("src/db/web3-dex-discovery.ts")).toContain("token-pair backfill is budgeted separately as 300 requests/minute");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyProviderHealthReceipt");
@@ -829,6 +841,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run verify:web3 gate");
     expect(source("components/review-readiness.tsx")).toContain("full credential checklist");
     expect(source("components/review-readiness.tsx")).toContain("read-only DEX scanner evidence");
+    expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("compact DEX discovery receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings now shows a strict verifier runway");
     expect(source("components/review-readiness.tsx")).toContain("configured Helius/Solana provider-health proof");

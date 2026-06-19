@@ -125,6 +125,24 @@ async function main() {
   assert(launchChecklist.research_decisions.every((decision) => decision.decision?.length > 0 && decision.evidence?.length > 0 && decision.next_action?.length > 0 && Array.isArray(decision.needs_user_input)), "Web3 researched stack decisions should include decision, evidence, next action, and needed user inputs.", launchChecklist.research_decisions);
   assert(launchChecklist.research_decisions.some((decision) => decision.id === "signer-custody" && decision.decision.includes("never collect private keys")), "Signer custody decision should keep private keys out of the app.", launchChecklist.research_decisions);
 
+  const livePreflightReceiptResponse = await request("/api/web3-live-capital-preflight?scenario=breakout&source=sample&account=persistent");
+  const livePreflightReceipt = await readJson(livePreflightReceiptResponse);
+  assert(livePreflightReceiptResponse.status === 200, "Web3 live-capital preflight endpoint should return a readiness receipt.", { status: livePreflightReceiptResponse.status, livePreflightReceipt });
+  assert(livePreflightReceipt.mode === "web3-live-capital-preflight-receipt", "Live-capital preflight should expose the expected receipt mode.", livePreflightReceipt);
+  assert(["blocked", "blocked-as-expected", "manual-live-review"].includes(livePreflightReceipt.status), "Live-capital preflight should return a known status.", livePreflightReceipt);
+  assert(livePreflightReceipt.live_execution_permission === "blocked" || livePreflightReceipt.live_execution_permission === "manual-live-executor-review", "Live-capital preflight should expose a bounded live-execution permission.", livePreflightReceipt);
+  assert(livePreflightReceipt.wallet_mutation_permission === "blocked", "Live-capital preflight should keep wallet mutation blocked.", livePreflightReceipt);
+  assert(livePreflightReceipt.transaction_submission_permission === "blocked", "Live-capital preflight should keep transaction submission blocked.", livePreflightReceipt);
+  assert(livePreflightReceipt.private_key_storage === "blocked", "Live-capital preflight should block private-key storage.", livePreflightReceipt);
+  assert(livePreflightReceipt.secret_echo_permission === "blocked", "Live-capital preflight should block secret echo.", livePreflightReceipt);
+  assert(livePreflightReceipt.real_capital_blocked === true, "Default live-capital preflight should keep real capital blocked.", livePreflightReceipt);
+  assert(typeof livePreflightReceipt.receipt_hash === "string" && livePreflightReceipt.receipt_hash.length === 64, "Live-capital preflight should include a receipt hash.", livePreflightReceipt);
+  assert(Array.isArray(livePreflightReceipt.gates), "Live-capital preflight should expose gate rows.", livePreflightReceipt);
+  assert(["operator-wallet", "provider-read-rail", "live-dex", "jupiter-order", "risk-policy", "kill-switch", "signer-custody", "settlement", "profit-proof", "manual-live-review"].every((id) => livePreflightReceipt.gates.some((gate) => gate.id === id)), "Live-capital preflight should cover wallet, provider, DEX, Jupiter, risk, signer, settlement, profit, and manual review gates.", livePreflightReceipt.gates);
+  assert(livePreflightReceipt.gates.every((gate) => gate.blocks_live_capital === true && gate.next_action.length > 0), "Every live-capital preflight gate should block live capital and expose a next action.", livePreflightReceipt.gates);
+  assert(livePreflightReceipt.passed_gate_count + livePreflightReceipt.watch_gate_count + livePreflightReceipt.failed_gate_count === livePreflightReceipt.gates.length, "Live-capital preflight gate counts should reconcile.", livePreflightReceipt);
+  assert(livePreflightReceipt.controls.some((control) => control.includes("never asks for private keys")), "Live-capital preflight should disclose the no-private-key boundary.", livePreflightReceipt.controls);
+
   const credentialSetupResponse = await request("/api/web3-credentials/test", {
     method: "POST",
     body: JSON.stringify({

@@ -147,6 +147,11 @@ submission, wallet mutation, private-key storage, and secret echo remain blocked
 current public DEX Screener discovery evidence: profiles, boosts, ads, paid orders, pair
 mapping, top symbols, and scanner intake status. It is paper-only evidence and still blocks
 live execution, transaction submission, wallet mutation, private-key storage, and secret echo.
+`/api/web3-live-capital-preflight?source=live-dex` is the compact go/no-go receipt for
+the researched real-capital path: operator wallet, provider rail, live DEX scanner,
+Jupiter order rehearsal, risk caps, kill switch, signer/custody, settlement, profit proof,
+and manual review. It reports blockers and next actions while still refusing signing,
+transaction submission, account creation, private-key storage, and wallet mutation.
 
 ## Architecture: the engine and the app
 

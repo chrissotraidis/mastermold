@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
 import type { Web3DexDiscoveryReceipt } from "@/src/db/web3-dex-discovery";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
+import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import type { Web3TradingState } from "@/src/db/web3-trading";
 
 type SettingsWeb3CredentialConsoleProps = {
@@ -57,11 +58,12 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"credentials" | "dex" | "jupiter" | "scope" | null>(null);
+  const [busy, setBusy] = useState<"credentials" | "dex" | "jupiter" | "preflight" | "scope" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
   const [dexReceipt, setDexReceipt] = useState<Web3DexDiscoveryReceipt | null>(null);
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
+  const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveCapitalPreflightReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
 
   function updateDraft(field: keyof Draft, value: string) {
@@ -152,6 +154,30 @@ export function SettingsWeb3CredentialConsole({
       setMessage(payload.summary);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "DEX scanner test failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runLivePreflight() {
+    setBusy("preflight");
+    setMessage("Building live-capital preflight receipt from wallet, provider, DEX, Jupiter, risk, signer, settlement, and profit gates...");
+    try {
+      const params = new URLSearchParams({
+        scenario,
+        source: "live-dex",
+        account,
+        cycles: String(cycles),
+      });
+      const response = await fetch(`/api/web3-live-capital-preflight?${params.toString()}`);
+      const payload = (await response.json().catch(() => null)) as Web3LiveCapitalPreflightReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Live-capital preflight failed.");
+      }
+      setPreflightReceipt(payload);
+      setMessage(payload.summary);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Live-capital preflight failed.");
     } finally {
       setBusy(null);
     }
@@ -330,6 +356,15 @@ export function SettingsWeb3CredentialConsole({
             <Zap className={cn("size-3.5 shrink-0", busy === "jupiter" && "animate-pulse")} aria-hidden="true" />
             {busy === "jupiter" ? "Rehearsing" : "Rehearse Jupiter"}
           </button>
+          <button
+            type="button"
+            onClick={runLivePreflight}
+            disabled={disabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <ShieldCheck className={cn("size-3.5 shrink-0", busy === "preflight" && "animate-pulse")} aria-hidden="true" />
+            {busy === "preflight" ? "Checking" : "Run live preflight"}
+          </button>
         </div>
       </div>
 
@@ -397,6 +432,11 @@ export function SettingsWeb3CredentialConsole({
           value={savedScope ? "dry-run saved" : "blocked"}
           tone={savedScope ? "engine" : "neutral"}
         />
+        <ConsoleMetric
+          label="Live preflight"
+          value={preflightReceipt ? `${preflightReceipt.failed_gate_count} fail / ${preflightReceipt.watch_gate_count} watch` : "blocked"}
+          tone={preflightReceipt?.status === "manual-live-review" ? "engine" : preflightReceipt ? "caution" : "neutral"}
+        />
       </div>
 
       {savedScope ? (
@@ -456,6 +496,42 @@ export function SettingsWeb3CredentialConsole({
         </div>
       ) : null}
 
+      {preflightReceipt ? (
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.035] p-2" aria-label="Settings live capital preflight receipt">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Live-capital preflight receipt</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{preflightReceipt.status.replaceAll("-", " ")}</p>
+            </div>
+            <Badge variant="outline" className="border-critical/35 bg-critical/10 text-critical">
+              real capital {preflightReceipt.real_capital_blocked ? "blocked" : "review only"}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <ConsoleMetric label="Launch score" value={`${preflightReceipt.launch_readiness_score}/100`} tone={preflightReceipt.live_review_permitted ? "engine" : "caution"} />
+            <ConsoleMetric label="Passed gates" value={String(preflightReceipt.passed_gate_count)} tone="engine" />
+            <ConsoleMetric label="Watch gates" value={String(preflightReceipt.watch_gate_count)} tone={preflightReceipt.watch_gate_count > 0 ? "caution" : "engine"} />
+            <ConsoleMetric label="Failed gates" value={String(preflightReceipt.failed_gate_count)} tone={preflightReceipt.failed_gate_count > 0 ? "caution" : "engine"} />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">{preflightReceipt.next_action}</p>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-5">
+            {preflightReceipt.gates.slice(0, 10).map((gate) => (
+              <div key={gate.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{gate.label}</p>
+                  <span className={cn("size-2 shrink-0 rounded-full", gate.status === "pass" ? "bg-engine" : gate.status === "watch" ? "bg-caution" : "bg-critical")} />
+                </div>
+                <p className={cn("mt-1 text-xs font-semibold", gate.status === "pass" ? "text-engine" : gate.status === "watch" ? "text-caution" : "text-critical")}>{gate.status}</p>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-outline">{gate.next_action}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+            receipt {preflightReceipt.receipt_hash.slice(0, 10)} · live execution {preflightReceipt.live_execution_permission} · wallet mutation {preflightReceipt.wallet_mutation_permission}
+          </p>
+        </div>
+      ) : null}
+
       {credentialChecks.length > 0 ? (
         <div className="mt-3 grid gap-1 sm:grid-cols-2 xl:grid-cols-4" aria-label="Settings Web3 credential readiness checks">
           {credentialChecks.map((check) => (
@@ -472,7 +548,7 @@ export function SettingsWeb3CredentialConsole({
       ) : null}
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
-        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live execution blocked; wallet mutation blocked.
+        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
       </p>
     </section>
   );
