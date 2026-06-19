@@ -787,6 +787,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Saved public scope");
     expect(settingsConsole).toContain("API keys are not sent in this action");
     expect(settingsConsole).toContain("valid public Solana wallet address");
+    expect(settingsConsole).toContain("Detect wallet");
+    expect(settingsConsole).toContain("Connect wallet");
+    expect(settingsConsole).toContain("Browser wallet receipt");
+    expect(settingsConsole).toContain("Settings browser wallet readiness receipt");
+    expect(settingsConsole).toContain("browser wallet detection requests public address only");
+    expect(settingsConsole).toContain("getBrowserSolanaProvider");
+    expect(settingsConsole).toContain("signing_permission: \"blocked\"");
+    expect(settingsConsole).toContain("wallet_mutation_permission: \"blocked\"");
     expect(settingsConsole).toContain("Test credentials");
     expect(settingsConsole).toContain("Test DEX scanner");
     expect(settingsConsole).toContain("/api/web3-dex-discovery?");
@@ -816,10 +824,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live");
     expect(source("docs/web3-credentials-runbook.md")).toContain("strict verifier runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("read-only DEX scanner testing");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("browser-wallet public-address detection");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dex-discovery");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-capital-preflight");
     expect(source("README.md")).toContain("/api/web3-dex-discovery?source=live-dex");
     expect(source("README.md")).toContain("/api/web3-live-capital-preflight?source=live-dex");
+    expect(source("README.md")).toContain("detect or connect a browser Solana wallet only");
     expect(source("app/api/web3-dex-discovery/route.ts")).toContain("buildWeb3DexDiscoveryReceipt");
     expect(source("app/api/web3-live-capital-preflight/route.ts")).toContain("buildWeb3LiveCapitalPreflightReceipt");
     expect(source("src/db/web3-dex-discovery.ts")).toContain("web3-dex-discovery-receipt");
@@ -841,6 +851,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run verify:web3 gate");
     expect(source("components/review-readiness.tsx")).toContain("full credential checklist");
     expect(source("components/review-readiness.tsx")).toContain("read-only DEX scanner evidence");
+    expect(source("components/review-readiness.tsx")).toContain("browser Solana wallet only far enough to read the public address");
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("compact DEX discovery receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings now shows a strict verifier runway");

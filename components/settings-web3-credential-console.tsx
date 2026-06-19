@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Save, ShieldCheck, Terminal, Zap } from "lucide-react";
+import { Activity, Save, ShieldCheck, Terminal, Wallet, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
@@ -35,6 +35,27 @@ type Draft = {
   max_slippage_bps: string;
 };
 
+type BrowserWalletReceipt = {
+  status: "connected" | "detected" | "missing" | "rejected" | "unsupported";
+  provider: string;
+  wallet_public_key_preview: string | null;
+  checked_at: string;
+  connect_permission: "operator-prompt-only" | "not-available";
+  signing_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  private_key_storage: "blocked";
+  next_action: string;
+};
+
+type BrowserSolanaProvider = {
+  isPhantom?: boolean;
+  isSolflare?: boolean;
+  isBackpack?: boolean;
+  isConnected?: boolean;
+  publicKey?: { toString: () => string };
+  connect?: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: { toString: () => string } } | void>;
+};
+
 export function SettingsWeb3CredentialConsole({
   walletPublicKeyPreview,
   defaultWalletPublicKey,
@@ -58,8 +79,9 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"credentials" | "dex" | "jupiter" | "preflight" | "scope" | null>(null);
+  const [busy, setBusy] = useState<"credentials" | "dex" | "jupiter" | "preflight" | "scope" | "wallet" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
+  const [browserWallet, setBrowserWallet] = useState<BrowserWalletReceipt | null>(null);
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
   const [dexReceipt, setDexReceipt] = useState<Web3DexDiscoveryReceipt | null>(null);
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
@@ -178,6 +200,64 @@ export function SettingsWeb3CredentialConsole({
       setMessage(payload.summary);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live-capital preflight failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function detectBrowserWallet({ requestConnect = false }: { requestConnect?: boolean } = {}) {
+    setBusy("wallet");
+    setMessage(requestConnect ? "Opening the external wallet public-key prompt..." : "Checking for a browser Solana wallet without prompting...");
+    try {
+      const provider = getBrowserSolanaProvider();
+      if (!provider) {
+        const receipt = buildBrowserWalletReceipt({
+          status: "missing",
+          provider: "none",
+          publicKey: null,
+          nextAction: "Install or unlock Phantom, Solflare, or Backpack, then connect only the public wallet address.",
+        });
+        setBrowserWallet(receipt);
+        setMessage(receipt.next_action);
+        return;
+      }
+
+      let publicKey = provider.publicKey?.toString() ?? null;
+      if (requestConnect && typeof provider.connect === "function") {
+        const result = await provider.connect();
+        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? publicKey;
+      } else if (!requestConnect && !publicKey && provider.isConnected && typeof provider.connect === "function") {
+        const result = await provider.connect({ onlyIfTrusted: true }).catch(() => null);
+        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? null;
+      }
+
+      const validPublicKey = publicKey && isLikelySolanaPublicKey(publicKey) ? publicKey : null;
+      if (validPublicKey) {
+        setDraft((current) => ({
+          ...current,
+          wallet_public_key: validPublicKey,
+          signer_mode: "external-wallet",
+        }));
+      }
+      const receipt = buildBrowserWalletReceipt({
+        status: validPublicKey ? "connected" : "detected",
+        provider: browserWalletProviderName(provider),
+        publicKey: validPublicKey,
+        nextAction: validPublicKey
+          ? "Public wallet detected. Save public scope to use it in dry-run and preflight gates; no signing was requested."
+          : "Wallet provider detected. Press Connect wallet when you are ready to share only the public address.",
+      });
+      setBrowserWallet(receipt);
+      setMessage(receipt.next_action);
+    } catch (error) {
+      const receipt = buildBrowserWalletReceipt({
+        status: "rejected",
+        provider: browserWalletProviderName(getBrowserSolanaProvider()),
+        publicKey: null,
+        nextAction: error instanceof Error && error.message ? error.message : "Wallet connection was rejected or unavailable.",
+      });
+      setBrowserWallet(receipt);
+      setMessage(receipt.next_action);
     } finally {
       setBusy(null);
     }
@@ -331,6 +411,24 @@ export function SettingsWeb3CredentialConsole({
           </button>
           <button
             type="button"
+            onClick={() => void detectBrowserWallet()}
+            disabled={disabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Wallet className={cn("size-3.5 shrink-0", busy === "wallet" && "animate-pulse")} aria-hidden="true" />
+            {busy === "wallet" ? "Checking" : "Detect wallet"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void detectBrowserWallet({ requestConnect: true })}
+            disabled={disabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-caution/45 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Wallet className={cn("size-3.5 shrink-0", busy === "wallet" && "animate-pulse")} aria-hidden="true" />
+            Connect wallet
+          </button>
+          <button
+            type="button"
             onClick={testCredentials}
             disabled={disabled}
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
@@ -414,8 +512,8 @@ export function SettingsWeb3CredentialConsole({
         />
         <ConsoleMetric
           label="Wallet sync"
-          value={credentialResult?.can_support_readonly_wallet_sync ? "ready" : "gated"}
-          tone={credentialResult?.can_support_readonly_wallet_sync ? "engine" : "caution"}
+          value={browserWallet?.status === "connected" ? "browser connected" : credentialResult?.can_support_readonly_wallet_sync ? "ready" : "gated"}
+          tone={browserWallet?.status === "connected" || credentialResult?.can_support_readonly_wallet_sync ? "engine" : "caution"}
         />
         <ConsoleMetric
           label="Jupiter order"
@@ -447,6 +545,34 @@ export function SettingsWeb3CredentialConsole({
           </p>
           <p className="mt-1 text-xs leading-5 text-outline">
             Updated {formatConsoleTime(savedScope.updatedAt)}. Helius and Jupiter keys were not sent or saved by this action.
+          </p>
+        </div>
+      ) : null}
+
+      {browserWallet ? (
+        <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings browser wallet readiness receipt">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Browser wallet receipt</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{browserWallet.status.replace("-", " ")}</p>
+            </div>
+            <Badge variant="outline" className={cn(
+              "border-outline-variant/35 bg-void/25 text-outline",
+              browserWallet.status === "connected" && "border-engine/35 bg-engine/10 text-engine",
+              browserWallet.status === "rejected" || browserWallet.status === "missing" ? "border-caution/35 bg-caution/10 text-caution" : "",
+            )}>
+              {browserWallet.provider}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <ConsoleMetric label="Public key" value={browserWallet.wallet_public_key_preview ?? "not shared"} tone={browserWallet.wallet_public_key_preview ? "engine" : "caution"} />
+            <ConsoleMetric label="Connect" value={browserWallet.connect_permission.replaceAll("-", " ")} tone={browserWallet.connect_permission === "operator-prompt-only" ? "caution" : "neutral"} />
+            <ConsoleMetric label="Signing" value={browserWallet.signing_permission} tone="neutral" />
+            <ConsoleMetric label="Wallet mutation" value={browserWallet.wallet_mutation_permission} tone="neutral" />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">{browserWallet.next_action}</p>
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+            checked {formatConsoleTime(browserWallet.checked_at)} · private key storage {browserWallet.private_key_storage}
           </p>
         </div>
       ) : null}
@@ -548,7 +674,7 @@ export function SettingsWeb3CredentialConsole({
       ) : null}
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
-        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
+        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; browser wallet detection requests public address only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
       </p>
     </section>
   );
@@ -655,6 +781,49 @@ function VerifierCommand({ label, command, ready }: { label: string; command: st
 
 function isLikelySolanaPublicKey(value: string) {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+function getBrowserSolanaProvider(): BrowserSolanaProvider | null {
+  if (typeof window === "undefined") return null;
+  const maybeWindow = window as typeof window & {
+    solana?: BrowserSolanaProvider;
+    phantom?: { solana?: BrowserSolanaProvider };
+    solflare?: BrowserSolanaProvider;
+    backpack?: BrowserSolanaProvider;
+  };
+  return maybeWindow.solana ?? maybeWindow.phantom?.solana ?? maybeWindow.solflare ?? maybeWindow.backpack ?? null;
+}
+
+function browserWalletProviderName(provider: BrowserSolanaProvider | null) {
+  if (!provider) return "none";
+  if (provider.isPhantom) return "Phantom";
+  if (provider.isSolflare) return "Solflare";
+  if (provider.isBackpack) return "Backpack";
+  return "Solana wallet";
+}
+
+function buildBrowserWalletReceipt({
+  status,
+  provider,
+  publicKey,
+  nextAction,
+}: {
+  status: BrowserWalletReceipt["status"];
+  provider: string;
+  publicKey: string | null;
+  nextAction: string;
+}): BrowserWalletReceipt {
+  return {
+    status,
+    provider,
+    wallet_public_key_preview: previewValue(publicKey),
+    checked_at: new Date().toISOString(),
+    connect_permission: provider === "none" ? "not-available" : "operator-prompt-only",
+    signing_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    private_key_storage: "blocked",
+    next_action: nextAction,
+  };
 }
 
 const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";

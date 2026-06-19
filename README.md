@@ -152,6 +152,9 @@ the researched real-capital path: operator wallet, provider rail, live DEX scann
 Jupiter order rehearsal, risk caps, kill switch, signer/custody, settlement, profit proof,
 and manual review. It reports blockers and next actions while still refusing signing,
 transaction submission, account creation, private-key storage, and wallet mutation.
+The Settings credential console can also detect or connect a browser Solana wallet only
+far enough to read the public address into the dry-run scope. It does not request
+signatures, store wallet secrets, or mutate balances.
 
 ## Architecture: the engine and the app
 
