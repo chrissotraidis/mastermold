@@ -129,6 +129,7 @@ GET /api/web3-dex-discovery
 GET /api/web3-jupiter-order-packet
 GET /api/web3-live-capital-preflight
 GET /api/web3-live-ops-packet
+GET /api/web3-ohlcv
 GET /api/web3-provider-health
 GET /api/web3-signer-credential-packet
 GET /api/web3-signer-handoff
@@ -157,6 +158,8 @@ The signer credential packet route returns a redacted signer/custody setup packe
 The wallet ownership route accepts a public Solana address, the generated Mastermind ownership challenge, and a base64 Ed25519 message signature from a browser wallet. It verifies public wallet control, returns challenge/signature hashes and a receipt hash, stores that redacted receipt in the local Web3 audit log for account-setup and launch-readiness evidence, and never stores or returns the raw message, raw signature, private keys, transaction bodies, signed transactions, transaction-signing permission, live execution, or wallet mutation authority.
 
 The DEX discovery route returns a redacted read-only scanner receipt from DEX Screener public discovery evidence. It can fetch latest token profiles, latest boosts, top boosts, community takeovers, latest ads, paid-order records, and token-pair mapping through the existing `live-dex` source path, then summarize source health, pair coverage, paid-hype count, top symbols, and scanner intake status. It returns no API keys, private keys, wallet authority, raw transaction bodies, or live execution permission; all candidates remain paper-only scanner evidence.
+
+The OHLCV route can fetch a manually supplied GeckoTerminal pool or use `auto=true` to resolve the top current Web3 scanner candidate from the server-side DEX state, then fetch read-only GeckoTerminal candles for local signal/noise scoring. The response includes only selected public candidate metadata, normalized candles, a local candle signal, and an optional paper-only decision. It cannot sign, submit, store wallet authority, or grant live execution.
 
 The live-capital preflight route returns a redacted readiness receipt that consolidates the researched launch blockers into one operator-facing gate: operator wallet, Helius/Solana/Jupiter read rail, live DEX scanner, Jupiter order rehearsal, risk caps, kill switch, signer/custody, settlement/fill proof, profit proof, and manual live review. It can report live DEX and provider evidence, but it never signs, submits, stores private keys, returns transaction bodies, creates third-party accounts, or grants wallet mutation.
 

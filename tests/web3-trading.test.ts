@@ -12154,6 +12154,104 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(body.paper_decision.blockers).toContain("Pass paper=true with cash_usd, equity_usd, and position_usd to size a local action.");
   });
 
+  test("GET /api/web3-ohlcv can auto-resolve a scanner candidate pool for candle proof", async () => {
+    let requestedUrl = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({
+        data: {
+          attributes: {
+            ohlcv_list: [
+              [1_718_000_000, 0.1, 0.102, 0.099, 0.101, 700],
+              [1_718_000_060, 0.101, 0.104, 0.1, 0.103, 800],
+              [1_718_000_120, 0.103, 0.106, 0.102, 0.105, 900],
+              [1_718_000_180, 0.105, 0.11, 0.104, 0.108, 1300],
+              [1_718_000_240, 0.108, 0.114, 0.107, 0.112, 1500],
+              [1_718_000_300, 0.112, 0.12, 0.111, 0.118, 1900],
+            ],
+          },
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+
+    const response = await OHLCV_GET(
+      new Request("http://localhost/api/web3-ohlcv?auto=true&source=sample&scenario=breakout&account=ephemeral&cycles=0&timeframe=minute&aggregate=1&limit=6&token=base&paper=true&cash_usd=1200&position_usd=0&equity_usd=5000&max_trade_usd=250"),
+    );
+    const body = await json<{
+      network: string;
+      pool: string;
+      resolution: {
+        mode: string;
+        source: string;
+        scenario: string;
+        symbol: string;
+        token_id: string;
+        pair_address: string;
+        summary: string;
+      };
+      signal: { mode: string; action: string; confidence: number };
+      paper_decision: { action: string; side: string; safeguards: string[] };
+      live_execution_permission?: string;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(requestedUrl).toContain("/networks/solana/pools/");
+    expect(requestedUrl).toContain("/ohlcv/minute?");
+    expect(body.network).toBe("solana");
+    expect(body.pool).toBe(body.resolution.pair_address);
+    expect(body.resolution.mode).toBe("auto-dex-candidate");
+    expect(body.resolution.source).toBe("sample");
+    expect(body.resolution.scenario).toBe("breakout");
+    expect(body.resolution.symbol.length).toBeGreaterThan(0);
+    expect(body.resolution.token_id.length).toBeGreaterThan(0);
+    expect(body.resolution.summary).toContain("Auto-selected");
+    expect(body.signal.mode).toBe("local-candle-signal-v1");
+    expect(["press", "probe", "hold", "trim", "exit", "avoid"]).toContain(body.signal.action);
+    expect(body.signal.confidence).toBeGreaterThanOrEqual(0);
+    expect(["paper-buy", "paper-sell", "paper-hold", "paper-block"]).toContain(body.paper_decision.action);
+    expect(body.paper_decision.safeguards).toContain("no transaction broadcast");
+  });
+
+  test("GET /api/web3-ohlcv auto mode skips unavailable scanner pools", async () => {
+    let callCount = 0;
+    globalThis.fetch = (async (_input: RequestInfo | URL) => {
+      callCount += 1;
+      if (callCount === 1) {
+        return new Response(JSON.stringify({ error: "missing" }), { status: 404, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({
+        data: {
+          attributes: {
+            ohlcv_list: [
+              [1_718_000_000, 0.2, 0.202, 0.199, 0.201, 700],
+              [1_718_000_060, 0.201, 0.204, 0.2, 0.203, 800],
+              [1_718_000_120, 0.203, 0.206, 0.202, 0.205, 900],
+              [1_718_000_180, 0.205, 0.21, 0.204, 0.208, 1300],
+              [1_718_000_240, 0.208, 0.214, 0.207, 0.212, 1500],
+              [1_718_000_300, 0.212, 0.22, 0.211, 0.218, 1900],
+            ],
+          },
+        },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+
+    const response = await OHLCV_GET(
+      new Request("http://localhost/api/web3-ohlcv?auto=true&source=sample&scenario=breakout&account=ephemeral&cycles=0&timeframe=minute&limit=6"),
+    );
+    const body = await json<{
+      resolution: { mode: string; attempt_count: number; pair_address: string };
+      candles: Array<{ close: number }>;
+      paper_decision: { safeguards: string[] };
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(callCount).toBe(2);
+    expect(body.resolution.mode).toBe("auto-dex-candidate");
+    expect(body.resolution.attempt_count).toBe(2);
+    expect(body.candles.length).toBe(6);
+    expect(body.paper_decision.safeguards).toContain("no signer request");
+  });
+
   test("GET /api/web3-ohlcv sorts candles and returns a local candle decision", async () => {
     globalThis.fetch = (async (_input: RequestInfo | URL) => {
       return new Response(JSON.stringify({

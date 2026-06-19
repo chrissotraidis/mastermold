@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import {
   applyOhlcvPaperDecisionToLedger,
+  getWeb3TradingStateAsync,
+  isTradingAccountMode,
+  isTradingMarketSource,
+  isTradingScenario,
   type MemecoinMarket,
   type OhlcvPaperLedgerApplyRequest,
   type OhlcvPaperLedgerApplyResult,
+  type TradingAccountMode,
+  type TradingMarketSource,
+  type TradingScenario,
 } from "@/src/db/web3-trading";
 
 type OhlcvProvider = "geckoterminal";
@@ -74,6 +81,7 @@ type OhlcvResponse = {
   provider: OhlcvProvider;
   status: "ok";
   source: "geckoterminal-public";
+  resolution: OhlcvPoolResolution;
   network: OhlcvNetwork;
   pool: string;
   timeframe: OhlcvTimeframe;
@@ -88,6 +96,21 @@ type OhlcvResponse = {
 };
 
 const GECKOTERMINAL_BASE_URL = "https://api.geckoterminal.com/api/v2";
+
+type OhlcvPoolResolution = {
+  mode: "manual-pool" | "auto-dex-candidate";
+  source: TradingMarketSource | "manual";
+  scenario: TradingScenario | null;
+  account: TradingAccountMode | null;
+  cycles: number | null;
+  symbol: string | null;
+  token_id: string | null;
+  token_address: string | null;
+  pair_address: string;
+  attempt_count: number;
+  scanner_status: string | null;
+  summary: string;
+};
 
 export async function POST(request: Request): Promise<NextResponse<OhlcvPaperLedgerApplyResult | { error: string }>> {
   let body: unknown;
@@ -107,46 +130,61 @@ export async function GET(request: Request): Promise<NextResponse<OhlcvResponse 
   const parsed = parseOhlcvRequest(new URL(request.url).searchParams);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
 
-  const { provider, network, pool, timeframe, aggregate, limit, token, paper } = parsed.value;
-  const url = ohlcvUrl({ network, pool, timeframe, aggregate, limit, token });
+  const resolved = await resolveOhlcvPools(parsed.value);
+  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 422 });
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        accept: "application/json",
-      },
-      cache: "no-store",
-    });
+  const { provider, timeframe, aggregate, limit, token, paper } = parsed.value;
+  let lastFailure = "";
+  for (const candidate of resolved.value.candidates) {
+    const { network, pool, resolution } = candidate;
+    const url = ohlcvUrl({ network, pool, timeframe, aggregate, limit, token });
 
-    if (!response.ok) {
-      return NextResponse.json({ error: `GeckoTerminal OHLCV request failed with ${response.status}.` }, { status: 502 });
+    try {
+      const response = await fetch(url, {
+        headers: {
+          accept: "application/json",
+        },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        lastFailure = `GeckoTerminal OHLCV request failed with ${response.status}.`;
+        if (parsed.value.auto) continue;
+        return NextResponse.json({ error: lastFailure }, { status: 502 });
+      }
+
+      const body = await response.json();
+      const candles = normalizeGeckoTerminalCandles(body).slice(-limit);
+      const signal = analyzeOhlcvCandles(candles);
+      const lastPrice = candles[candles.length - 1]?.close ?? 0;
+      return NextResponse.json({
+        provider,
+        status: "ok",
+        source: "geckoterminal-public",
+        resolution,
+        network,
+        pool,
+        timeframe,
+        aggregate,
+        limit,
+        token,
+        fetched_at: new Date().toISOString(),
+        url,
+        candles,
+        signal,
+        paper_decision: buildOhlcvPaperDecision(signal, paper, lastPrice),
+      });
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : "GeckoTerminal OHLCV request failed.";
+      if (!parsed.value.auto) {
+        return NextResponse.json({ error: lastFailure }, { status: 502 });
+      }
     }
-
-    const body = await response.json();
-    const candles = normalizeGeckoTerminalCandles(body).slice(-limit);
-    const signal = analyzeOhlcvCandles(candles);
-    const lastPrice = candles[candles.length - 1]?.close ?? 0;
-    return NextResponse.json({
-      provider,
-      status: "ok",
-      source: "geckoterminal-public",
-      network,
-      pool,
-      timeframe,
-      aggregate,
-      limit,
-      token,
-      fetched_at: new Date().toISOString(),
-      url,
-      candles,
-      signal,
-      paper_decision: buildOhlcvPaperDecision(signal, paper, lastPrice),
-    });
-  } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : "GeckoTerminal OHLCV request failed.",
-    }, { status: 502 });
   }
+
+  return NextResponse.json({
+    error: lastFailure || "No auto-resolved DEX candidate returned GeckoTerminal OHLCV candles.",
+  }, { status: 502 });
 }
 
 function parseOhlcvPaperApplyRequest(value: unknown):
@@ -229,11 +267,16 @@ function isOptionalTradingChain(value: unknown): value is MemecoinMarket["chain"
 }
 
 function parseOhlcvRequest(search: URLSearchParams):
-  | { ok: true; value: { provider: OhlcvProvider; network: OhlcvNetwork; pool: string; timeframe: OhlcvTimeframe; aggregate: number; limit: number; token: OhlcvTokenSide; paper: OhlcvPaperContext } }
+  | { ok: true; value: { provider: OhlcvProvider; network: OhlcvNetwork; pool: string; auto: boolean; scenario: TradingScenario; source: TradingMarketSource; account: TradingAccountMode; cycles: number; timeframe: OhlcvTimeframe; aggregate: number; limit: number; token: OhlcvTokenSide; paper: OhlcvPaperContext } }
   | { ok: false; error: string } {
   const provider = search.get("provider") ?? "geckoterminal";
   const network = search.get("network") ?? "";
   const pool = search.get("pool") ?? "";
+  const auto = search.get("auto") === "true";
+  const scenario = search.get("scenario") ?? "breakout";
+  const source = search.get("source") ?? "live-dex";
+  const account = search.get("account") ?? "ephemeral";
+  const cycles = Number(search.get("cycles") ?? "0");
   const timeframe = search.get("timeframe") ?? "minute";
   const aggregate = Number(search.get("aggregate") ?? "1");
   const limit = Number(search.get("limit") ?? "48");
@@ -245,8 +288,13 @@ function parseOhlcvRequest(search: URLSearchParams):
   const maxTradeUsd = parseUsdParam(search.get("max_trade_usd") ?? "750");
 
   if (provider !== "geckoterminal") return { ok: false, error: "provider must be geckoterminal." };
-  if (!isOhlcvNetwork(network)) return { ok: false, error: "network must be solana, base, eth, or ethereum." };
-  if (!isSafePoolId(pool)) return { ok: false, error: "pool must be a non-empty pool address or id without URL separators." };
+  if (!isTradingScenario(scenario)) return { ok: false, error: "scenario must be base, breakout, or rug-risk." };
+  if (!isTradingMarketSource(source)) return { ok: false, error: "source must be sample or live-dex." };
+  if (!isTradingAccountMode(account)) return { ok: false, error: "account must be ephemeral or persistent." };
+  if (!Number.isInteger(cycles) || cycles < 0 || cycles > 24) return { ok: false, error: "cycles must be an integer from 0 to 24." };
+  if (!auto && !isOhlcvNetwork(network)) return { ok: false, error: "network must be solana, base, eth, or ethereum." };
+  if (!auto && !isSafePoolId(pool)) return { ok: false, error: "pool must be a non-empty pool address or id without URL separators." };
+  if (auto && pool && !isSafePoolId(pool)) return { ok: false, error: "pool must be empty or a safe pool id when auto=true." };
   if (!isOhlcvTimeframe(timeframe)) return { ok: false, error: "timeframe must be minute, hour, or day." };
   if (!Number.isInteger(aggregate) || aggregate < 1 || aggregate > 60) {
     return { ok: false, error: "aggregate must be an integer from 1 to 60." };
@@ -264,8 +312,13 @@ function parseOhlcvRequest(search: URLSearchParams):
     ok: true,
     value: {
       provider,
-      network,
+      network: isOhlcvNetwork(network) ? network : "solana",
       pool,
+      auto,
+      scenario,
+      source,
+      account,
+      cycles,
       timeframe,
       aggregate,
       limit,
@@ -277,6 +330,89 @@ function parseOhlcvRequest(search: URLSearchParams):
         equity_usd: Math.max(equityUsd, cashUsd + positionUsd),
         max_trade_usd: maxTradeUsd,
       },
+    },
+  };
+}
+
+async function resolveOhlcvPools(input: {
+  network: OhlcvNetwork;
+  pool: string;
+  auto: boolean;
+  scenario: TradingScenario;
+  source: TradingMarketSource;
+  account: TradingAccountMode;
+  cycles: number;
+}): Promise<
+  | { ok: true; value: { candidates: Array<{ network: OhlcvNetwork; pool: string; resolution: OhlcvPoolResolution }> } }
+  | { ok: false; error: string }
+> {
+  if (!input.auto) {
+    return {
+      ok: true,
+      value: {
+        candidates: [{
+          network: input.network,
+          pool: input.pool,
+          resolution: {
+            mode: "manual-pool",
+            source: "manual",
+            scenario: null,
+            account: null,
+            cycles: null,
+            symbol: null,
+            token_id: null,
+            token_address: null,
+            pair_address: input.pool,
+            attempt_count: 1,
+            scanner_status: null,
+            summary: "Using the manually supplied GeckoTerminal pool id.",
+          },
+        }],
+      },
+    };
+  }
+
+  const state = await getWeb3TradingStateAsync({
+    scenario: input.scenario,
+    source: input.source,
+    account: input.account,
+    cycles: input.cycles,
+    advance: false,
+  });
+  const candidates = state.market
+    .filter((market) => (
+      market.chain === "solana" &&
+      isSafePoolId(market.pair_address) &&
+      market.price_usd > 0 &&
+      market.liquidity_usd > 0
+    ))
+    .slice(0, 8);
+
+  if (candidates.length === 0) {
+    return { ok: false, error: "No safe Solana DEX candidate pool is available for auto OHLCV resolution." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      candidates: candidates.map((candidate, index) => ({
+        network: "solana" as const,
+        pool: candidate.pair_address,
+        resolution: {
+          mode: "auto-dex-candidate" as const,
+          source: input.source,
+          scenario: input.scenario,
+          account: input.account,
+          cycles: input.cycles,
+          symbol: candidate.symbol,
+          token_id: candidate.id,
+          token_address: candidate.token_address,
+          pair_address: candidate.pair_address,
+          attempt_count: index + 1,
+          scanner_status: state.live_scanner_readiness.status,
+          summary: `Auto-selected ${candidate.symbol} from ${input.source} DEX scanner evidence for read-only OHLCV proof.`,
+        },
+      })),
     },
   };
 }
