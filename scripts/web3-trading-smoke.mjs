@@ -1,6 +1,7 @@
 import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
+import { buildSettlementReconciliationReport } from "./web3-settlement-reconciliation.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
 
@@ -4836,6 +4837,87 @@ async function main() {
   });
   assert(unsafeLivePreflight.status === "blocked" && unsafeLivePreflight.exit_code === 1, "Live-capital preflight should fail closed if live readiness appears without explicit allowance.", unsafeLivePreflight);
   assert(unsafeLivePreflight.blockers.some((blocker) => blocker.includes("--allow-live-ready")), "Live-capital preflight should explain missing explicit live allowance.", unsafeLivePreflight);
+  const settlementReconciliation = buildSettlementReconciliationReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      requireReconciledRelay: false,
+    },
+    state: tick.payload,
+  });
+  assert(settlementReconciliation.mode === "web3-settlement-reconciliation", "Settlement reconciliation should publish a dedicated report mode.", settlementReconciliation);
+  assert(settlementReconciliation.paper_only === true && settlementReconciliation.live_execution_permission === "blocked", "Settlement reconciliation should never grant live execution permission.", settlementReconciliation);
+  assert(["blocked-as-expected", "polling-required", "reconciled", "blocked"].includes(settlementReconciliation.status), "Settlement reconciliation should publish a known status.", settlementReconciliation);
+  assert(settlementReconciliation.status === "blocked-as-expected", "Default local settlement reconciliation should be blocked as expected without live signed relay evidence.", settlementReconciliation);
+  const unsafeRelayedSettlement = buildSettlementReconciliationReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      requireReconciledRelay: false,
+    },
+    state: {
+      ...tick.payload,
+      signed_transaction_relay: {
+        ...tick.payload.signed_transaction_relay,
+        status: "relayed",
+        latest_signature: null,
+        request_id: null,
+        payload_hash: null,
+        confirmation_status: null,
+      },
+      execution_audit: {
+        ...tick.payload.execution_audit,
+        latest: {
+          ...(tick.payload.execution_audit.latest ?? {}),
+          status: "relayed",
+          relay_signature: null,
+          request_id: null,
+          payload_hash: null,
+          confirmation_status: null,
+        },
+      },
+    },
+  });
+  assert(unsafeRelayedSettlement.status === "blocked" && unsafeRelayedSettlement.exit_code === 1, "Settlement reconciliation should fail closed when relayed status lacks signature, request id, payload hash, or lifecycle evidence.", unsafeRelayedSettlement);
+  assert(unsafeRelayedSettlement.blockers.some((blocker) => blocker.includes("signature")), "Settlement reconciliation should explain missing relay signature evidence.", unsafeRelayedSettlement);
+  const unsafeConfirmedSettlement = buildSettlementReconciliationReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      requireReconciledRelay: true,
+    },
+    state: {
+      ...tick.payload,
+      signed_transaction_relay: {
+        ...tick.payload.signed_transaction_relay,
+        status: "confirmed",
+        latest_signature: "5yntheticSignatureForSmoke",
+        request_id: "smoke-request",
+        payload_hash: "sha256:smoke",
+        confirmation_status: "confirmed",
+      },
+      execution_audit: {
+        ...tick.payload.execution_audit,
+        latest: {
+          ...(tick.payload.execution_audit.latest ?? {}),
+          status: "confirmed",
+          relay_signature: "5yntheticSignatureForSmoke",
+          request_id: "smoke-request",
+          payload_hash: "sha256:smoke",
+          confirmation_status: "confirmed",
+        },
+      },
+      transaction_lifecycle: {
+        ...tick.payload.transaction_lifecycle,
+        status: "confirming",
+        items: [],
+      },
+    },
+  });
+  assert(unsafeConfirmedSettlement.status === "blocked" && unsafeConfirmedSettlement.blockers.some((blocker) => blocker.includes("landed lifecycle")), "Settlement reconciliation should require a landed lifecycle before treating confirmation as reconciled.", unsafeConfirmedSettlement);
 
   const summary = {
     baseUrl,
@@ -4858,6 +4940,8 @@ async function main() {
     repeatGate: repeatRun.proof_gate_status,
     livePreflight: livePreflight.status,
     livePreflightPermission: livePreflight.live_execution_permission,
+    settlement: settlementReconciliation.status,
+    settlementPermission: settlementReconciliation.live_execution_permission,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

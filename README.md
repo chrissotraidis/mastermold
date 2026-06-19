@@ -91,6 +91,7 @@ npm run forward:web3 -- --base-url=http://localhost:4010 --ticks=6 --min-net-pnl
 npm run forward-suite:web3 -- --base-url=http://localhost:4010 --ticks=2 --min-net-pnl=0 --json
 npm run forward-repeat:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=3 --min-net-pnl=0 --min-hit-rate-pct=100 --min-deployed-alpha=0 --max-drawdown=1000 --min-consistency-score=80 --json
 npm run preflight-live:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=2 --json
+npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
 ```
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
@@ -110,7 +111,10 @@ alpha, and consistency thresholds all have to pass before the report grants pape
 permission. The live-capital preflight then combines the live-readiness audit, daemon
 handoff boundary, and repeat proof gate; by default it fails closed if real-capital readiness
 appears without explicit `--allow-live-ready` review, and it never signs, submits, or moves
-funds.
+funds. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
+metadata; it requires relayed transactions to keep signature/request/payload evidence and
+requires confirmed transactions to map to a landed lifecycle before any portfolio mirror
+could be treated as reconciled.
 
 ## Architecture: the engine and the app
 

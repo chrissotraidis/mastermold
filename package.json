@@ -15,6 +15,7 @@
     "forward-suite:web3": "node scripts/web3-autonomous-forward-run.mjs --scenario=all",
     "forward-repeat:web3": "node scripts/web3-autonomous-forward-run.mjs --scenario=all --runs=3",
     "preflight-live:web3": "node scripts/web3-live-capital-preflight.mjs",
+    "reconcile-settlement:web3": "node scripts/web3-settlement-reconciliation.mjs",
     "smoke:web3": "node scripts/web3-trading-smoke.mjs",
     "test": "bun run typecheck && bun test tests"
   },
