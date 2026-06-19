@@ -635,6 +635,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Price-action chart tape");
     expect(web3Workspace).toContain("Autonomous price-action chart tape receipt");
     expect(web3Workspace).toContain("First-screen autonomous price-action chart tape receipt");
+    expect(web3Workspace).toContain("Wallet net worth");
+    expect(web3Workspace).toContain("Operator wallet net worth chart with cash and exposure");
+    expect(web3Workspace).toContain("Operator wallet net worth metrics");
+    expect(web3Workspace).toContain("high-water and start lines");
     expect(web3Workspace).toContain("chart-tape execution contract");
     expect(web3Workspace).toContain("contract {contract.status.replaceAll(\"-\", \" \")}");
     expect(web3Workspace).toContain("boundary {contract.execution_boundary}");
@@ -846,7 +850,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsCredentialDoctorPanel");
     expect(settingsPage).toContain("Credential doctor receipt");
     expect(settingsPage).toContain("npm run doctor:web3 -- --json");
-    expect(settingsPage).toContain("health.checks.slice(0, 7)");
+    expect(settingsPage).toContain("health.checks.slice(0, 9)");
     expect(settingsPage).toContain("health.safe_commands.slice(0, 5)");
     expect(settingsPage).toContain("Doctor receipts are local, sanitized, and status-only");
     expect(settingsPage).toContain("SettingsSignerCredentialPacketPanel");

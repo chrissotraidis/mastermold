@@ -1538,7 +1538,7 @@ function QuickOperatorHud({
       <div className="min-w-0 rounded-md border border-engine/25 bg-void/25 p-2 sm:p-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Wallet command curve</p>
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Wallet net worth</p>
             <p className="mt-1 truncate text-xl font-semibold text-on-surface">{formatCurrency(wallet.equity_usd)}</p>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
@@ -1548,6 +1548,7 @@ function QuickOperatorHud({
           </div>
         </div>
         <QuickOperatorWalletSparkline wallet={wallet} />
+        <QuickOperatorWalletMetricRail wallet={wallet} />
       </div>
 
       <div className="grid min-w-0 grid-cols-2 gap-2">
@@ -1589,7 +1590,7 @@ function QuickOperatorHud({
         />
       </div>
       <span className="sr-only" aria-label="Autonomous operator HUD receipt">
-        Operator HUD wallet {formatCurrency(wallet.equity_usd)}, window PnL {formatSignedCurrency(wallet.window_pnl_usd)}, decision {decision.status} {decision.action} {decision.target_symbol ?? "desk"}, signal {fusion.leader_symbol ?? "none"} {fusion.fusion_score}, route {route.status}, local rehearsal {route.local_rehearsal_ready ? "accepted" : "missing"}, candle {candle.status}, profit accountability {accountability.status} {accountability.accountability_score}, live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+        Operator HUD wallet net worth {formatCurrency(wallet.equity_usd)}, cash {formatCurrency(wallet.cash_usd)}, exposure {formatCurrency(wallet.exposure_usd)}, realized PnL {formatSignedCurrency(wallet.realized_pnl_usd)}, unrealized PnL {formatSignedCurrency(wallet.unrealized_pnl_usd)}, window PnL {formatSignedCurrency(wallet.window_pnl_usd)}, drawdown {wallet.max_drawdown_pct} percent, decision {decision.status} {decision.action} {decision.target_symbol ?? "desk"}, signal {fusion.leader_symbol ?? "none"} {fusion.fusion_score}, route {route.status}, local rehearsal {route.local_rehearsal_ready ? "accepted" : "missing"}, candle {candle.status}, profit accountability {accountability.status} {accountability.accountability_score}, live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
       </span>
     </section>
   );
@@ -3180,8 +3181,8 @@ function emergencyStopPlaceholderSurfaces(): Web3EmergencyStopDrillReceipt["surf
 
 function QuickOperatorWalletSparkline({ wallet }: { wallet: Web3TradingState["autonomous_wallet_telemetry"] }) {
   const width = 420;
-  const height = 92;
-  const pad = { left: 12, right: 12, top: 12, bottom: 16 };
+  const height = 122;
+  const pad = { left: 16, right: 16, top: 18, bottom: 24 };
   const points = wallet.curve.length > 0
     ? wallet.curve
     : [{
@@ -3199,7 +3200,7 @@ function QuickOperatorWalletSparkline({ wallet }: { wallet: Web3TradingState["au
       filled_count: wallet.fill_count,
       blocked_count: wallet.blocked_count,
     }];
-  const values = points.flatMap((point) => [point.equity_usd, point.cash_usd, point.exposure_usd, wallet.high_watermark_usd]);
+  const values = points.flatMap((point) => [point.equity_usd, point.cash_usd, point.exposure_usd, wallet.high_watermark_usd, wallet.starting_cash_usd]);
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
   const range = Math.max(1, maxValue - minValue);
@@ -3208,26 +3209,65 @@ function QuickOperatorWalletSparkline({ wallet }: { wallet: Web3TradingState["au
   const equityPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.equity_usd)}`).join(" ");
   const exposurePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.exposure_usd)}`).join(" ");
   const cashPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.cash_usd)}`).join(" ");
+  const highWaterY = yFor(wallet.high_watermark_usd);
+  const startingY = yFor(wallet.starting_cash_usd);
   const lastPoint = points[points.length - 1];
   const lastX = xFor(points.length - 1);
   const lastY = yFor(lastPoint.equity_usd);
+  const markers = points.filter((point, index) => index > 0 && (point.filled_count > 0 || point.blocked_count > 0 || point.action !== "current")).slice(-6);
   const chartTone = wallet.window_pnl_usd >= 0 ? "text-engine" : "text-critical";
 
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label="Compact wallet net worth curve"
-      className={cn("mt-2 h-24 w-full", chartTone)}
+      aria-label="Operator wallet net worth chart with cash and exposure"
+      className={cn("mt-2 h-32 w-full", chartTone)}
     >
       <rect width={width} height={height} rx="8" className="fill-surface-dim" opacity="0.26" />
+      <line x1={pad.left} x2={width - pad.right} y1={highWaterY} y2={highWaterY} stroke="currentColor" strokeDasharray="5 8" strokeOpacity="0.22" strokeWidth="2" />
+      <line x1={pad.left} x2={width - pad.right} y1={startingY} y2={startingY} stroke="currentColor" strokeDasharray="10 8" strokeOpacity="0.18" strokeWidth="2" />
       <path d={exposurePath} fill="none" stroke="currentColor" strokeDasharray="2 7" strokeOpacity="0.24" strokeWidth="2" />
       <path d={cashPath} fill="none" stroke="currentColor" strokeDasharray="7 7" strokeOpacity="0.34" strokeWidth="2" />
       <path d={equityPath} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+      {markers.map((point) => (
+        <circle
+          key={point.id}
+          cx={xFor(points.indexOf(point))}
+          cy={yFor(point.equity_usd)}
+          r={point.blocked_count > point.filled_count ? "3.5" : "4.5"}
+          className={point.blocked_count > point.filled_count ? "fill-caution" : point.action === "stand-down" ? "fill-critical" : "fill-engine"}
+          opacity="0.84"
+        />
+      ))}
       <circle cx={lastX} cy={lastY} r="6" className={wallet.window_pnl_usd >= 0 ? "fill-engine" : "fill-critical"} />
-      <text x="12" y="20" className="fill-outline font-mono text-[11px] uppercase tracking-telemetry">equity · cash · exposure</text>
-      <text x="12" y={height - 8} className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">{points.length} ticks · {formatCompactCurrency(wallet.exposure_usd)} exposed</text>
+      <text x={pad.left} y="15" className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">equity solid · cash dash · exposure dots</text>
+      <text x={pad.left} y={height - 8} className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">{points.length} ticks · high-water and start lines · {formatCompactCurrency(wallet.exposure_usd)} exposed</text>
+      <text x={width - pad.right} y="15" textAnchor="end" className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">{formatCompactCurrency(maxValue)}</text>
+      <text x={width - pad.right} y={height - 8} textAnchor="end" className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">{formatCompactCurrency(minValue)}</text>
     </svg>
+  );
+}
+
+function QuickOperatorWalletMetricRail({ wallet }: { wallet: Web3TradingState["autonomous_wallet_telemetry"] }) {
+  const metrics = [
+    { label: "Cash", value: formatCompactCurrency(wallet.cash_usd), tone: "text-on-surface" },
+    { label: "Exposure", value: formatCompactCurrency(wallet.exposure_usd), tone: wallet.exposure_pct > 70 ? "text-caution" : "text-engine" },
+    { label: "Realized", value: formatCompactSignedCurrency(wallet.realized_pnl_usd), tone: wallet.realized_pnl_usd >= 0 ? "text-engine" : "text-critical" },
+    { label: "Unrealized", value: formatCompactSignedCurrency(wallet.unrealized_pnl_usd), tone: wallet.unrealized_pnl_usd >= 0 ? "text-engine" : "text-critical" },
+    { label: "Drawdown", value: `${wallet.max_drawdown_pct.toFixed(1)}%`, tone: wallet.max_drawdown_pct >= 5 ? "text-critical" : wallet.max_drawdown_pct >= 2 ? "text-caution" : "text-engine" },
+    { label: "Slope", value: formatCompactSignedCurrency(wallet.slope_usd_per_tick), tone: wallet.slope_usd_per_tick >= 0 ? "text-engine" : "text-critical" },
+  ];
+
+  return (
+    <dl className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 border-t border-outline-variant/20 pt-2 sm:grid-cols-3" aria-label="Operator wallet net worth metrics">
+      {metrics.map((metric) => (
+        <div key={metric.label} className="min-w-0">
+          <dt className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{metric.label}</dt>
+          <dd className={cn("mt-0.5 truncate text-sm font-semibold", metric.tone)}>{metric.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
