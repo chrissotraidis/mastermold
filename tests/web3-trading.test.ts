@@ -5610,6 +5610,7 @@ describe("Web3 autonomous trading subsystem", () => {
       );
       expect(launchChecklist.cutover_runway.find((step) => step.id === "route-order-rehearsal")).toMatchObject({
         status: "active",
+        command: "npm run landing-drill:web3",
         evidence: expect.stringContaining("paper rehearsal"),
         blocks_live_capital: true,
       });

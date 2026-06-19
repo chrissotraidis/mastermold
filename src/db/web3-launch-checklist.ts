@@ -429,7 +429,7 @@ function buildCutoverRunway({
       id: "route-order-rehearsal",
       label: "Rehearse order path",
       status: routeOrderStatus,
-      command: "Order rehearsal",
+      command: "npm run landing-drill:web3",
       evidence: `Route proof ${routePass ? "passes" : routePaperRehearsalReady ? "has paper rehearsal" : routeProofRefreshable ? "is refreshable" : "is blocked"}; Swap V2 order ${adapterOrderReady ? "ready" : "gated"}.`,
       next_action: routePass && adapterOrderReady
         ? "Keep rehearsing read-only quotes and dry-run orders before any live review."

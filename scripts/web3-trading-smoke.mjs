@@ -143,6 +143,7 @@ async function main() {
   assert(html.includes("actual remaining gates"), "Trading page should summarize the remaining launch gates.");
   assert(html.includes("Dry-run signer"), "Trading page should expose a safe dry-run signer setup action in the launch checklist.");
   assert(html.includes("Order rehearsal"), "Trading page should expose a safe live DEX dry-run order rehearsal action in the launch checklist.");
+  assert(html.includes("npm run landing-drill:web3"), "Trading page should expose the safe landing drill command in the launch checklist.");
   assert(html.includes("Dry-run signer and order rehearsal only scope public-key rehearsal"), "Trading page should disclose the dry-run signer and order boundary.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
