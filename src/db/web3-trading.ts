@@ -8844,6 +8844,34 @@ export type AutonomousSignerOpsItem = {
   checks: AutonomousSignerOpsCheck[];
 };
 
+export type AutonomousSignerRequestEnvelope = {
+  mode: "hash-only-signer-request";
+  status: "ready" | "blocked";
+  provider: AutonomousSignerOpsProvider;
+  signer_scope: AutonomousCustodyMandate["signer_scope"];
+  wallet_public_key: string | null;
+  policy_hash: string;
+  request_id: string | null;
+  payload_hash: string | null;
+  handoff_id: string | null;
+  plan_id: string | null;
+  symbol: string | null;
+  side: "buy" | "sell" | "hold";
+  path: AutonomousOrderHandoffItem["handoff_path"] | null;
+  notional_usd: number;
+  max_slippage_bps: number;
+  expires_at: string;
+  expires_in_seconds: number;
+  revoke_after_seconds: number;
+  requires_user_presence: boolean;
+  can_auto_sign: boolean;
+  raw_transaction_included: false;
+  signed_payload_included: false;
+  private_key_required: false;
+  blockers: string[];
+  controls: string[];
+};
+
 export type AutonomousSignerOps = {
   mode: "autonomous-signer-ops";
   status: "ready" | "signature-needed" | "setup-required" | "blocked" | "idle";
@@ -8857,6 +8885,7 @@ export type AutonomousSignerOps = {
   can_auto_sign: boolean;
   requires_user_presence: boolean;
   policy_hash: string;
+  active_request: AutonomousSignerRequestEnvelope | null;
   next_action: string;
   controls: string[];
   items: AutonomousSignerOpsItem[];
@@ -15582,6 +15611,11 @@ function buildWeb3TradingState({
         label: "Solana transaction details",
         use: "Owner-scoped token balance metadata for reconciling confirmed signed fills before local portfolio mirroring.",
         href: "https://solana.com/docs/rpc/http/gettransaction",
+      },
+      {
+        label: "Solana production signing",
+        use: "Production signing boundary for browser wallets, KMS/HSM, and managed signing backends.",
+        href: "https://solana.com/docs/core/transactions/signing-in-production",
       },
       {
         label: "Solana transaction expiration",
@@ -63373,6 +63407,14 @@ function buildAutonomousSignerOps({
   const setupCount = items.filter((item) => item.status === "setup-required").length;
   const blockedCount = items.filter((item) => item.status === "blocked").length;
   const status = autonomousSignerOpsStatus(active, orderHandoff, preSubmitRehearsal, custodyMandate, liveArming);
+  const activeRequest = buildAutonomousSignerRequestEnvelope({
+    asOf,
+    active,
+    status,
+    custodyMandate,
+    orderHandoff,
+    preSubmitRehearsal,
+  });
 
   return {
     mode: "autonomous-signer-ops",
@@ -63387,6 +63429,7 @@ function buildAutonomousSignerOps({
     can_auto_sign: active.can_auto_sign,
     requires_user_presence: active.requires_user_presence,
     policy_hash: active.policy_hash,
+    active_request: activeRequest,
     next_action: autonomousSignerOpsNextAction(status, active, liveArming),
     controls: [
       "Signer ops stores policy hashes and request metadata only; private keys and raw transaction bodies stay outside the app.",
@@ -63496,6 +63539,82 @@ function buildAutonomousSignerOpsItem({
 function autonomousSignerOpsProviderConfigured(provider: AutonomousSignerOpsProvider, custodyMandate: AutonomousCustodyMandate) {
   if (provider === "external-wallet") return Boolean(custodyMandate.wallet_public_key);
   return autonomousCustodyProviderConfigured(provider);
+}
+
+function buildAutonomousSignerRequestEnvelope({
+  asOf,
+  active,
+  status,
+  custodyMandate,
+  orderHandoff,
+  preSubmitRehearsal,
+}: {
+  asOf: string;
+  active: AutonomousSignerOpsItem;
+  status: AutonomousSignerOps["status"];
+  custodyMandate: AutonomousCustodyMandate;
+  orderHandoff: AutonomousOrderHandoff;
+  preSubmitRehearsal: PreSubmitRehearsal;
+}): AutonomousSignerRequestEnvelope | null {
+  const rehearsal = preSubmitRehearsal.items.find((item) =>
+    item.action === "request-signature" ||
+    item.action === "submit-ready" ||
+    item.action === "poll-confirmation"
+  ) ?? null;
+  if (!rehearsal) return null;
+  const handoff = orderHandoff.items.find((item) =>
+    item.id === rehearsal.handoff_id ||
+    (rehearsal.request_id && item.request_id === rehearsal.request_id) ||
+    (rehearsal.payload_hash && item.payload_hash === rehearsal.payload_hash)
+  ) ?? null;
+  const expiresInSeconds = Math.max(0, Math.round((Date.parse(custodyMandate.expires_at) - Date.parse(asOf)) / 1_000));
+  const blockers = [
+    !active.wallet_public_key ? "Signer request requires a scoped wallet public key." : null,
+    !rehearsal.request_id ? "Signer request requires a provider request id." : null,
+    !rehearsal.payload_hash ? "Signer request requires a payload hash." : null,
+    !handoff ? "Signer request requires a matching order handoff." : null,
+    handoff && !custodyMandate.allowed_paths.includes(handoff.handoff_path) ? "Signer request route is outside the active custody policy." : null,
+    handoff && handoff.side !== "hold" && !custodyMandate.allowed_sides.includes(handoff.side) ? "Signer request side is outside the active custody policy." : null,
+    handoff?.symbol && custodyMandate.allowed_symbols.length > 0 && !custodyMandate.allowed_symbols.includes(handoff.symbol) ? "Signer request symbol is outside the active custody policy." : null,
+    handoff && handoff.notional_usd > custodyMandate.per_trade_limit_usd ? "Signer request notional exceeds the per-trade policy cap." : null,
+    handoff && handoff.notional_usd > custodyMandate.remaining_cap_usd ? "Signer request notional exceeds remaining spend cap." : null,
+    rehearsal.slippage_bps > custodyMandate.max_slippage_bps ? "Signer request slippage exceeds the custody policy cap." : null,
+    expiresInSeconds <= 0 ? "Signer request policy envelope is expired." : null,
+    status === "blocked" || active.status === "blocked" ? "Signer ops are blocked for the active provider." : null,
+    status === "setup-required" || active.status === "setup-required" ? "Signer provider setup is incomplete." : null,
+  ].filter((item): item is string => Boolean(item));
+  return {
+    mode: "hash-only-signer-request",
+    status: blockers.length === 0 && (active.can_request_signature || active.can_auto_sign) ? "ready" : "blocked",
+    provider: active.provider,
+    signer_scope: active.signer_scope,
+    wallet_public_key: active.wallet_public_key,
+    policy_hash: active.policy_hash,
+    request_id: rehearsal.request_id,
+    payload_hash: rehearsal.payload_hash,
+    handoff_id: rehearsal.handoff_id,
+    plan_id: rehearsal.plan_id,
+    symbol: rehearsal.symbol,
+    side: rehearsal.side,
+    path: rehearsal.path,
+    notional_usd: handoff?.notional_usd ?? 0,
+    max_slippage_bps: Math.min(rehearsal.max_slippage_bps, custodyMandate.max_slippage_bps),
+    expires_at: custodyMandate.expires_at,
+    expires_in_seconds: expiresInSeconds,
+    revoke_after_seconds: custodyMandate.revoke_after_seconds,
+    requires_user_presence: active.requires_user_presence,
+    can_auto_sign: active.can_auto_sign,
+    raw_transaction_included: false,
+    signed_payload_included: false,
+    private_key_required: false,
+    blockers: blockers.slice(0, 6),
+    controls: [
+      "Hash-only request envelope: raw unsigned transaction bytes are not returned here.",
+      "The signer must verify request id, payload hash, wallet, route, token, side, notional cap, slippage cap, policy hash, and expiry before signing.",
+      "External wallet mode requires user presence; policy-wallet and session-key modes still require provider-side enforcement.",
+      "A signed payload must return through the separate signed relay path before submission or settlement.",
+    ],
+  };
 }
 
 function autonomousSignerOpsSignerScope(

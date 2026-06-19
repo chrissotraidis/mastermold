@@ -6859,6 +6859,21 @@ describe("Web3 autonomous trading subsystem", () => {
       can_request_signature: false,
       requires_user_presence: false,
     });
+    expect(state.autonomous_signer_ops.active_request).toMatchObject({
+      mode: "hash-only-signer-request",
+      provider: "privy-server-wallet",
+      signer_scope: "policy-wallet",
+      wallet_public_key: "11111111111111111111111111111111",
+      policy_hash: state.autonomous_custody_mandate.policy_hash,
+      request_id: "order-123",
+      payload_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      symbol: "LIVE",
+      side: "buy",
+      path: "jupiter-swap-v2",
+      raw_transaction_included: false,
+      signed_payload_included: false,
+      private_key_required: false,
+    });
     expect(["ready", "blocked"]).toContain(state.autonomous_signer_ops.status);
     expect(state.autonomous_signer_ops.items.find((item) => item.provider === "privy-server-wallet")?.checks.every((check) => check.status !== "fail")).toBe(true);
     expect(state.autonomous_live_autonomy_readiness.status).toBe("paper-only");
