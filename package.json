@@ -16,6 +16,7 @@
     "forward-suite:web3": "node scripts/web3-autonomous-forward-run.mjs --scenario=all",
     "forward-repeat:web3": "node scripts/web3-autonomous-forward-run.mjs --scenario=all --runs=3",
     "promote-paper:web3": "node scripts/web3-paper-promotion-guard.mjs",
+    "autopilot-paper:web3": "node scripts/web3-promoted-paper-autopilot.mjs",
     "preflight-live:web3": "node scripts/web3-live-capital-preflight.mjs",
     "landing-drill:web3": "node scripts/web3-live-landing-drill.mjs",
     "reconcile-settlement:web3": "node scripts/web3-settlement-reconciliation.mjs",

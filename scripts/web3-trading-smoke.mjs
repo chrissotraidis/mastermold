@@ -5,6 +5,7 @@ import { buildLiveLandingDrillReport } from "./web3-live-landing-drill.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
 import { buildPaperPromotionGuardReport } from "./web3-paper-promotion-guard.mjs";
 import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
+import { buildPromotedPaperAutopilotReport } from "./web3-promoted-paper-autopilot.mjs";
 import { buildSettlementReconciliationReport } from "./web3-settlement-reconciliation.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
@@ -4916,6 +4917,38 @@ async function main() {
   assert(promotionGuard.recommended_paper_size_multiplier > 0 && promotionGuard.recommended_supervisor_rounds > 0, "Promotion guard should recommend bounded paper size and supervised rounds.", promotionGuard);
   assert(promotionGuard.full_wallet_hot_coin_alpha_usd < 0 ? promotionGuard.status === "selective-paper" : promotionGuard.status !== "blocked", "Negative full-wallet hot-coin alpha should keep promotion selective instead of scaling blindly.", promotionGuard);
   assert(promotionGuard.controls.some((control) => control.includes("cannot sign")), "Promotion guard should disclose the paper-only execution boundary.", promotionGuard);
+  const promotedAutopilotReceipt = buildPromotedPaperAutopilotReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      promotionScenario: "all",
+      source: "sample",
+      runnerId: "synthetic-promoted-autopilot",
+      maxSupervisorRounds: 2,
+    },
+    startedAt: new Date(0).toISOString(),
+    promotion: promotionGuard,
+    resetReceipt: { paper_account: { cycle: 0 } },
+    supervisor: {
+      mode: "web3-daemon-supervisor",
+      status: "completed",
+      round: 2,
+      requested_rounds: 2,
+      ticks_per_round: 1,
+      posted_ticks: 2,
+      blocked_ticks: 0,
+      net_pnl_usd: 22,
+      target_net_pnl_usd: 65.65,
+      max_drawdown_limit_usd: 118.17,
+      profit_target_hit: false,
+      loss_brake_tripped: false,
+      next_action: "Review the receipt before extending runtime.",
+    },
+  });
+  assert(promotedAutopilotReceipt.mode === "web3-promoted-paper-autopilot", "Promoted paper autopilot should publish a dedicated receipt mode.", promotedAutopilotReceipt);
+  assert(promotedAutopilotReceipt.paper_only === true && promotedAutopilotReceipt.live_execution_permission === "blocked", "Promoted paper autopilot must stay paper-only.", promotedAutopilotReceipt);
+  assert(promotedAutopilotReceipt.status === "completed" && promotedAutopilotReceipt.applied_supervisor_rounds === 2, "Promoted paper autopilot should apply bounded supervisor rounds when promotion passes.", promotedAutopilotReceipt);
+  assert(promotedAutopilotReceipt.promotion_permission === promotionGuard.promotion_permission && promotedAutopilotReceipt.posted_ticks === 2, "Promoted paper autopilot should connect promotion permission to posted supervisor ticks.", promotedAutopilotReceipt);
   const blockedRepeatGate = buildForwardRepeatReport({
     config: {
       baseUrl,
@@ -4950,6 +4983,22 @@ async function main() {
   });
   assert(blockedPromotionGuard.status === "blocked" && blockedPromotionGuard.exit_code === 1, "Paper promotion guard should block autonomy when repeat proof gates fail.", blockedPromotionGuard);
   assert(blockedPromotionGuard.can_start_supervised_paper === false && blockedPromotionGuard.recommended_paper_size_multiplier === 0, "Blocked promotion guard should not allow supervised paper expansion.", blockedPromotionGuard);
+  const blockedPromotedAutopilot = buildPromotedPaperAutopilotReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      promotionScenario: "all",
+      source: "sample",
+      runnerId: "synthetic-blocked-promoted-autopilot",
+      maxSupervisorRounds: 2,
+    },
+    startedAt: new Date(0).toISOString(),
+    promotion: blockedPromotionGuard,
+    resetReceipt: null,
+    supervisor: null,
+  });
+  assert(blockedPromotedAutopilot.status === "blocked" && blockedPromotedAutopilot.exit_code === 1, "Promoted paper autopilot should not start supervisor when promotion is blocked.", blockedPromotedAutopilot);
+  assert(blockedPromotedAutopilot.applied_supervisor_rounds === 0 && blockedPromotedAutopilot.posted_ticks === 0, "Blocked promoted autopilot should not post paper ticks.", blockedPromotedAutopilot);
   const livePreflight = buildLiveCapitalPreflightReport({
     config: {
       baseUrl,
