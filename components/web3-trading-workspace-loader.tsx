@@ -10,7 +10,7 @@ import type { Web3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledge
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import type { Web3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
-import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import type { Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import type { Web3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import type { Web3ProviderHealthReceipt } from "@/src/db/web3-provider-health";
@@ -107,6 +107,7 @@ export function Web3TradingWorkspaceLoader({
   const [supervisorHealth, setSupervisorHealth] = useState<Web3DaemonSupervisorHealth | undefined>(initialSupervisorHealth);
   const [productionSupervisorReadiness, setProductionSupervisorReadiness] = useState<Web3ProductionSupervisorReadiness | undefined>(initialLaunchChecklist?.production_supervisor_readiness);
   const [promotedAutopilotHealth, setPromotedAutopilotHealth] = useState<Web3PromotedPaperAutopilotHealth | undefined>(initialPromotedAutopilotHealth);
+  const [launchChecklist, setLaunchChecklist] = useState<Web3AutonomyLaunchChecklist | undefined>(initialLaunchChecklist);
   const [error, setError] = useState<string | null>(null);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [loadingControls, setLoadingControls] = useState(false);
@@ -188,6 +189,27 @@ export function Web3TradingWorkspaceLoader({
       window.clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (!state) return;
+    const controller = new AbortController();
+    const source = state.market_source.mode;
+    fetch(`/api/web3-launch-checklist?account=persistent&source=${source}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as Web3AutonomyLaunchChecklist | { error: string };
+        if (!response.ok || "error" in payload) throw new Error("The Web3 launch checklist could not be refreshed.");
+        setLaunchChecklist(payload);
+        setProductionSupervisorReadiness(payload.production_supervisor_readiness);
+      })
+      .catch((reason: unknown) => {
+        if (controller.signal.aborted) return;
+        setError((current) => current ?? (reason instanceof Error ? reason.message : "The Web3 launch checklist could not be refreshed."));
+      });
+    return () => controller.abort();
+  }, [state, supervisorHealth?.updated_at, promotedAutopilotHealth?.updated_at]);
 
   async function openControls() {
     setControlsOpen(true);
@@ -293,6 +315,10 @@ export function Web3TradingWorkspaceLoader({
 
   async function runPromotedPaperAutopilot() {
     if (!state || quickBusy) return;
+    if (!launchChecklist) {
+      setQuickNotice("Launch checklist is still loading; retry promoted paper proof after the readiness packet refreshes.");
+      return;
+    }
     const previousState = state;
     const proofPlan = launchChecklist.profit_proof_readiness.proof_plan;
     if (proofPlan.suggested_next_runs <= 0) {
@@ -813,6 +839,14 @@ export function Web3TradingWorkspaceLoader({
     );
   }
 
+  if (!launchChecklist) {
+    return (
+      <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm leading-6 text-on-surface-variant">
+        Loading Web3 launch checklist...
+      </div>
+    );
+  }
+
   const nextSource: TradingMarketSource = state.market_source.mode === "live-dex" ? "sample" : "live-dex";
   const tradeBlocked = state.autonomous_market_evidence_fusion.status === "blocked" ||
     state.autonomous_profit_run_guard.status === "blocked" ||
@@ -857,9 +891,6 @@ export function Web3TradingWorkspaceLoader({
   const daemonHandoff = state.autonomous_daemon_handoff;
   const marketIngestion = state.market_ingestion_plan;
   const marketIntake = state.autonomous_market_intake_plan;
-  const launchChecklist = !mounted && initialLaunchChecklist
-    ? initialLaunchChecklist
-    : buildWeb3AutonomyLaunchChecklist(state, promotedAutopilotHealth, supervisorHealth);
   const productionReadiness = productionSupervisorReadiness ?? launchChecklist.production_supervisor_readiness;
   const promotedProofPlan = launchChecklist.profit_proof_readiness.proof_plan;
   const promotedProofLabel = promotedProofPlan.status === "blocked" ? "Proof review" : "Promoted run";

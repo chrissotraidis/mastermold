@@ -1,7 +1,7 @@
 /// <reference types="bun" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
@@ -42,6 +42,7 @@ let prevRpcUrl: string | undefined;
 let prevNextPublicRpcUrl: string | undefined;
 let prevPromotedAutopilotPath: string | undefined;
 let prevPromotedAutopilotHistoryPath: string | undefined;
+let prevLocalAccountabilityRepairPath: string | undefined;
 let prevLiveExecution: string | undefined;
 let prevLiveApproval: string | undefined;
 let prevSignerProvider: string | undefined;
@@ -71,6 +72,7 @@ beforeEach(() => {
   prevNextPublicRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
   prevPromotedAutopilotPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH;
   prevPromotedAutopilotHistoryPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
+  prevLocalAccountabilityRepairPath = process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
   prevLiveExecution = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   prevLiveApproval = process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
   prevSignerProvider = process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER;
@@ -94,6 +96,7 @@ beforeEach(() => {
   process.env.MASTERMOLD_DB = join(testRoot, "db.sqlite");
   process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH = join(testRoot, "promoted-autopilot.json");
   process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = join(testRoot, "promoted-autopilot-history.json");
+  process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH = join(testRoot, "local-accountability-repair.json");
   delete process.env.JUPITER_API_KEY;
   delete process.env.JUPITER_TRIGGER_JWT;
   delete process.env.HELIUS_API_KEY;
@@ -137,6 +140,8 @@ afterEach(() => {
   else process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH = prevPromotedAutopilotPath;
   if (prevPromotedAutopilotHistoryPath === undefined) delete process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
   else process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = prevPromotedAutopilotHistoryPath;
+  if (prevLocalAccountabilityRepairPath === undefined) delete process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
+  else process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH = prevLocalAccountabilityRepairPath;
   if (prevLiveExecution === undefined) delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   else process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION = prevLiveExecution;
   if (prevLiveApproval === undefined) delete process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
@@ -6650,6 +6655,15 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
+    expect(launchChecklist.local_accountability_repair_health).toMatchObject({
+      mode: "web3-local-accountability-repair",
+      status: "absent",
+      receipt_fresh: false,
+      can_satisfy_local_accountability: false,
+      repair_plateaued: false,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
     expect(launchChecklist.profit_proof_readiness.proof_plan).toMatchObject({
       mode: "promoted-paper-proof-plan",
       status: "needs-runs",
@@ -6997,6 +7011,47 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "active",
       command: "npm run repair-accountability:web3",
       next_action: expect.stringContaining("local paper accountability"),
+    });
+    const repairReceiptPath = process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
+    if (!repairReceiptPath) throw new Error("Expected WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH in test setup.");
+    writeFileSync(repairReceiptPath, `${JSON.stringify({
+      mode: "web3-local-accountability-repair",
+      paper_only: true,
+      status: "no-progress",
+      updated_at: new Date().toISOString(),
+      target_score: 70,
+      attempts_requested: 3,
+      attempts_posted: 1,
+      initial_accountability_score: 46,
+      final_accountability_score: 46,
+      score_delta: 0,
+      initial_making_money: false,
+      final_making_money: false,
+      final_repair_status: "blocked",
+      final_repair_action: "Inspect route and fill quality before another repair cycle.",
+      final_blocking_reason: "Local accountability score did not improve.",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      blockers: ["Local accountability score did not improve after posted paper repair attempts."],
+      summary: "Local paper accountability stayed at 46/100 after 1 posted repair attempt.",
+      next_action: "Inspect route and fill quality before another repair cycle.",
+      controls: ["Sanitized local paper-only receipt; no secrets or transaction payloads are exposed."],
+    })}\n`);
+    const plateauChecklist = buildWeb3AutonomyLaunchChecklist(state, promotedReadyHealth);
+    expect(plateauChecklist.local_accountability_repair_health).toMatchObject({
+      status: "no-progress",
+      receipt_fresh: true,
+      repair_plateaued: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(plateauChecklist.controls.some((control) => control.includes("stalled repair loops"))).toBe(true);
+    expect(plateauChecklist.repair_actions.find((item) => item.id === "repair-paper-accountability")).toMatchObject({
+      status: "blocked",
+      detail: expect.stringContaining("Last repair no progress"),
+      next_action: "Inspect route and fill quality before another repair cycle.",
+      command: "npm run repair-accountability:web3",
+      blocks_live_capital: true,
     });
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);

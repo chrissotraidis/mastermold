@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_BASE_URL = "http://localhost:4010";
 const DEFAULT_RUNNER_ID = "local-accountability-repair";
+const DEFAULT_STATUS_PATH = join(process.cwd(), "data", "web3-local-accountability-repair.json");
 
 export function parseLocalAccountabilityRepairArgs(argv = [], env = process.env) {
   const flags = new Map();
@@ -19,6 +22,7 @@ export function parseLocalAccountabilityRepairArgs(argv = [], env = process.env)
     runnerId: normalizeLeaseText(flags.get("runner-id") ?? env.WEB3_ACCOUNTABILITY_REPAIR_RUNNER_ID ?? DEFAULT_RUNNER_ID, DEFAULT_RUNNER_ID, 80),
     maxAttempts: boundedInteger(flags.get("attempts") ?? env.WEB3_ACCOUNTABILITY_REPAIR_ATTEMPTS, 3, 1, 10),
     targetScore: boundedInteger(flags.get("target-score") ?? env.WEB3_ACCOUNTABILITY_REPAIR_TARGET_SCORE, 70, 1, 100),
+    statusPath: String(flags.get("status-path") ?? env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH ?? DEFAULT_STATUS_PATH),
     failOnBlocked: booleanFlag(flags.get("fail-on-blocked") ?? env.WEB3_ACCOUNTABILITY_REPAIR_FAIL_ON_BLOCKED, false),
     json: booleanFlag(flags.get("json") ?? env.WEB3_ACCOUNTABILITY_REPAIR_JSON, false),
   };
@@ -34,6 +38,7 @@ export async function runWeb3LocalAccountabilityRepair(input = {}) {
     runnerId: normalizeLeaseText(input.runnerId ?? DEFAULT_RUNNER_ID, DEFAULT_RUNNER_ID, 80),
     maxAttempts: boundedInteger(input.maxAttempts, 3, 1, 10),
     targetScore: boundedInteger(input.targetScore, 70, 1, 100),
+    statusPath: String(input.statusPath ?? DEFAULT_STATUS_PATH),
     failOnBlocked: Boolean(input.failOnBlocked),
   };
   const startedAt = new Date().toISOString();
@@ -290,10 +295,72 @@ function uniqueText(values) {
   return [...new Set(values.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim()))];
 }
 
+export function sanitizeLocalAccountabilityRepairReceipt(report) {
+  if (!report || typeof report !== "object") return null;
+  if (report.mode !== "web3-local-accountability-repair" || report.paper_only !== true) return null;
+  if (report.live_execution_permission !== "blocked" || report.wallet_mutation_permission !== "blocked") return null;
+  const allowedStatuses = new Set(["complete", "blocked", "improved", "no-progress", "not-run"]);
+  const status = allowedStatuses.has(report.status) ? report.status : "blocked";
+  const controls = Array.isArray(report.controls) ? report.controls : [];
+  const blockers = Array.isArray(report.blockers) ? report.blockers : [];
+  return {
+    mode: "web3-local-accountability-repair",
+    paper_only: true,
+    status,
+    updated_at: safeIso(report.finished_at ?? report.updated_at),
+    target_score: boundedInteger(report.target_score, 70, 1, 100),
+    attempts_requested: boundedInteger(report.attempts_requested, 0, 0, 100),
+    attempts_posted: boundedInteger(report.attempts_posted, 0, 0, 100),
+    initial_accountability_score: boundedInteger(report.initial_accountability_score, 0, 0, 100),
+    final_accountability_score: boundedInteger(report.final_accountability_score, 0, 0, 100),
+    score_delta: cleanNumber(report.score_delta),
+    initial_making_money: report.initial_making_money === true,
+    final_making_money: report.final_making_money === true,
+    final_repair_status: safeText(report.final_repair_status, "missing", 80),
+    final_repair_action: report.final_repair_action ? safeText(report.final_repair_action, "", 260) : null,
+    final_blocking_reason: report.final_blocking_reason ? safeText(report.final_blocking_reason, "", 260) : null,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    blockers: blockers.map((item) => safeText(item, "", 260)).filter(Boolean).slice(0, 8),
+    summary: safeText(report.summary, "Local paper accountability repair receipt was written.", 260),
+    next_action: safeText(report.next_action, "Inspect the local paper repair plan before another repair attempt.", 260),
+    controls: [
+      ...controls.map((item) => safeText(item, "", 260)).filter(Boolean),
+      "This persisted receipt is sanitized paper-only evidence; it contains no provider keys, private keys, raw transactions, signed payloads, or wallet authority.",
+    ].slice(0, 8),
+  };
+}
+
+export function writeLocalAccountabilityRepairReceipt(report, statusPath = DEFAULT_STATUS_PATH) {
+  const receipt = sanitizeLocalAccountabilityRepairReceipt(report);
+  if (!receipt) return null;
+  const dir = dirname(statusPath);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(statusPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  return receipt;
+}
+
+function safeIso(value) {
+  const parsed = Date.parse(String(value ?? ""));
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : new Date().toISOString();
+}
+
+function safeText(value, fallback, maxLength) {
+  const text = typeof value === "string" ? value.trim() : "";
+  return (text || fallback).slice(0, maxLength);
+}
+
+function cleanNumber(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.round(parsed * 100) / 100;
+}
+
 async function main() {
   const config = parseLocalAccountabilityRepairArgs(process.argv.slice(2), process.env);
   try {
     const report = await runWeb3LocalAccountabilityRepair(config);
+    writeLocalAccountabilityRepairReceipt(report, config.statusPath);
     if (config.json) {
       console.log(JSON.stringify(report, null, 2));
       return;

@@ -3,6 +3,7 @@ import type { Web3DaemonSupervisorHealth } from "./web3-daemon-supervisor";
 import { buildWeb3ProductionSupervisorReadiness, type Web3ProductionSupervisorReadiness } from "./web3-production-supervisor";
 import { buildWeb3ProfitProofReadiness, type Web3ProfitProofReadiness } from "./web3-profit-proof";
 import { buildWeb3ProviderCredentialsReadiness, type Web3ProviderCredentialsReadiness } from "./web3-provider-credentials";
+import { getWeb3LocalAccountabilityRepairHealth, type Web3LocalAccountabilityRepairHealth } from "./web3-local-accountability-repair";
 import type { Web3TradingState } from "./web3-trading";
 
 export type Web3AutonomyLaunchChecklistStatus =
@@ -136,6 +137,7 @@ export type Web3AutonomyLaunchChecklist = {
   cutover_runway: Web3AutonomyCutoverRunwayStep[];
   production_supervisor_readiness: Web3ProductionSupervisorReadiness;
   profit_proof_readiness: Web3ProfitProofReadiness;
+  local_accountability_repair_health: Web3LocalAccountabilityRepairHealth;
   provider_credentials_readiness: Web3ProviderCredentialsReadiness;
   research_decisions: Web3AutonomyLaunchResearchDecision[];
   operator_inputs_needed: Web3AutonomyLaunchOperatorInput[];
@@ -164,6 +166,7 @@ export function buildWeb3AutonomyLaunchChecklist(
   const walletAccounting = state.live_wallet_accounting_readiness;
   const productionSupervisor = buildWeb3ProductionSupervisorReadiness(supervisorHealth);
   const profitProof = buildWeb3ProfitProofReadiness({ paperProfit, promotedHealth });
+  const localAccountabilityRepairHealth = getWeb3LocalAccountabilityRepairHealth();
   const providerCredentials = buildWeb3ProviderCredentialsReadiness({ custody, signer });
   const killSwitchFail = state.execution_readiness.checks.some((check) => check.id === "kill-switch" && check.status === "fail");
   const memoryStatus = promotedHealth?.run_memory_status ?? "learning";
@@ -404,6 +407,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     operatorInputsNeeded,
     productionSupervisor,
     profitProof,
+    localAccountabilityRepairHealth,
     routePass,
     routeProofRefreshable,
     adapterOrderReady: adapter.swap_v2_order_ready,
@@ -428,6 +432,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     cutover_runway: cutoverRunway,
     production_supervisor_readiness: productionSupervisor,
     profit_proof_readiness: profitProof,
+    local_accountability_repair_health: localAccountabilityRepairHealth,
     provider_credentials_readiness: providerCredentials,
     research_decisions: researchDecisions,
     operator_inputs_needed: operatorInputsNeeded,
@@ -436,6 +441,7 @@ export function buildWeb3AutonomyLaunchChecklist(
       "This checklist is a launch-readiness contract; it does not sign, submit, custody funds, or unlock real-capital trading.",
       "The operator input packet names only public wallet scope, server-env targets, hash-only receipts, or external review decisions; private keys and seed phrases stay out of this app.",
       "The launch repair queue turns raw blockers into safe cockpit, Settings, or terminal actions; it can refresh evidence and paper proof, but it cannot create external accounts or authorize live capital.",
+      "Local accountability repair health is read from a sanitized paper-only receipt when available; stalled repair loops are shown as review blockers instead of hidden terminal churn.",
       "Paper scale requires current paper profit proof, market freshness, promoted-run memory that is not protecting, and a clear kill switch.",
       "Live review requires every signer, relay, settlement, custody, route, process-supervision, provider-credential, wallet-accounting, profit-proof, and live-boundary proof to pass before a separate executor review.",
       "Real-capital autonomy stays blocked unless this checklist reaches manual live review and an external reviewed executor is deliberately enabled.",
@@ -605,6 +611,7 @@ function buildRepairActions({
   operatorInputsNeeded,
   productionSupervisor,
   profitProof,
+  localAccountabilityRepairHealth,
   routePass,
   routeProofRefreshable,
   adapterOrderReady,
@@ -614,6 +621,7 @@ function buildRepairActions({
   operatorInputsNeeded: Web3AutonomyLaunchOperatorInput[];
   productionSupervisor: Web3ProductionSupervisorReadiness;
   profitProof: Web3ProfitProofReadiness;
+  localAccountabilityRepairHealth: Web3LocalAccountabilityRepairHealth;
   routePass: boolean;
   routeProofRefreshable: boolean;
   adapterOrderReady: boolean;
@@ -626,6 +634,9 @@ function buildRepairActions({
   const supervisorFreshEnough = productionSupervisor.status === "production-gated" && productionSupervisor.receipt_fresh;
   const proofPlan = profitProof.proof_plan;
   const needsProfitRepair = !profitProof.can_satisfy_profit_gate || proofPlan.status !== "complete";
+  const repairReceiptVisible = localAccountabilityRepairHealth.status !== "absent";
+  const repairReceiptStale = repairReceiptVisible && !localAccountabilityRepairHealth.receipt_fresh;
+  const repairPlateaued = localAccountabilityRepairHealth.repair_plateaued;
 
   const actions: Web3AutonomyLaunchRepairAction[] = [];
 
@@ -646,13 +657,15 @@ function buildRepairActions({
     actions.push({
       id: "repair-paper-accountability",
       label: "Repair paper accountability",
-      status: proofPlan.status === "blocked" || proofPlan.status === "drawdown-gated" ? "blocked" : "active",
+      status: repairPlateaued || proofPlan.status === "blocked" || proofPlan.status === "drawdown-gated" ? "blocked" : "active",
       surface: "terminal",
       command: proofPlan.status === "needs-local-accountability"
         ? proofPlan.local_accountability_repair_command
         : proofPlan.safe_command,
-      detail: `${profitProof.status.replaceAll("-", " ")} profit proof with ${formatSignedCompactValue(profitProof.local_paper_net_pnl_usd)} local paper net and ${profitProof.local_paper_accountability_score}/100 accountability.`,
-      next_action: proofPlan.next_action,
+      detail: repairReceiptVisible
+        ? `${profitProof.status.replaceAll("-", " ")} profit proof with ${formatSignedCompactValue(profitProof.local_paper_net_pnl_usd)} local paper net and ${profitProof.local_paper_accountability_score}/100 accountability. Last repair ${localAccountabilityRepairHealth.status.replaceAll("-", " ")}${repairReceiptStale ? " (stale)" : ""}: ${localAccountabilityRepairHealth.summary}`
+        : `${profitProof.status.replaceAll("-", " ")} profit proof with ${formatSignedCompactValue(profitProof.local_paper_net_pnl_usd)} local paper net and ${profitProof.local_paper_accountability_score}/100 accountability.`,
+      next_action: repairReceiptVisible ? localAccountabilityRepairHealth.next_action : proofPlan.next_action,
       blocks_live_capital: true,
     });
   }
