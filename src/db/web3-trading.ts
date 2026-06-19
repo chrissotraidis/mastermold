@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { deriveHeliusMainnetRpcUrl } from "./web3-credentials";
 import { store, type Web3ExecutionAuditRow, type Web3ExecutionConfigRow, type Web3PaperLedgerRow } from "./store";
 
 export type TradingScenario = "base" | "breakout" | "rug-risk";
@@ -20655,7 +20656,7 @@ function signedRelayBlockers(
   if (state.live_execution_arming.submit_ready !== true) blockers.push(state.live_execution_arming.next_action);
   if (route === "not-configured") blockers.push("No Jupiter or Solana relay path is configured.");
   if (route === "jupiter-swap-v2" && !process.env.JUPITER_API_KEY) blockers.push("JUPITER_API_KEY is required for Jupiter signed execution.");
-  if (route === "solana-rpc" && !solanaRpcUrl()) blockers.push("SOLANA_RPC_URL is required for Solana RPC relay.");
+  if (route === "solana-rpc" && !solanaRpcUrl()) blockers.push("HELIUS_API_KEY or SOLANA_RPC_URL is required for Solana RPC relay.");
   return [...new Set(blockers)];
 }
 
@@ -20672,7 +20673,7 @@ async function applySignatureConfirmationPoll(
     !storedSignature ? "Confirmation polling requires a stored relayed signature." : null,
     request.signature && storedSignature && request.signature !== storedSignature ? "Requested signature does not match the latest audited relay signature." : null,
     !signature ? "Confirmation polling requires a transaction signature." : null,
-    !solanaRpcUrl() ? "SOLANA_RPC_URL is required for signature confirmation polling." : null,
+    !solanaRpcUrl() ? "HELIUS_API_KEY or SOLANA_RPC_URL is required for signature confirmation polling." : null,
   ].filter((item): item is string => Boolean(item));
 
   if (blockers.length > 0) {
@@ -20774,7 +20775,7 @@ async function pollSolanaSignatureStatus(
       status: "blocked",
       slot: null,
       confirmationStatus: null,
-      blockers: ["SOLANA_RPC_URL is required for signature confirmation polling."],
+      blockers: ["HELIUS_API_KEY or SOLANA_RPC_URL is required for signature confirmation polling."],
       reason: "Solana RPC endpoint is not configured.",
     };
   }
@@ -20881,7 +20882,7 @@ function signatureConfirmationNextAction(status: SignatureConfirmationPollReport
   if (status === "confirmed") return "Reconcile provider fill details before any portfolio mirror apply.";
   if (status === "pending") return "Poll again until confirmed, finalized, failed, or expired.";
   if (status === "failed") return blockers[0] ?? "Investigate the failed signature before another live action.";
-  return blockers[0] ?? "Store a relayed signature and configure SOLANA_RPC_URL before polling.";
+  return blockers[0] ?? "Store a relayed signature and configure HELIUS_API_KEY or SOLANA_RPC_URL before polling.";
 }
 
 async function applySettlementFillReconciliation(
@@ -20903,7 +20904,7 @@ async function applySettlementFillReconciliation(
     !walletOwner || !isLikelySolanaPublicKey(walletOwner) ? "Fill reconciliation requires a scoped wallet public key before reading settlement deltas." : null,
     state.signed_transaction_relay.status !== "confirmed" && latest?.status !== "confirmed" ? "Fill reconciliation requires confirmed signature evidence first." : null,
     !isConfirmationStatus(state.signed_transaction_relay.confirmation_status ?? latest?.confirmation_status) ? "Fill reconciliation requires confirmed or finalized confirmation metadata." : null,
-    !solanaRpcUrl() ? "SOLANA_RPC_URL is required for getTransaction fill reconciliation." : null,
+    !solanaRpcUrl() ? "HELIUS_API_KEY or SOLANA_RPC_URL is required for getTransaction fill reconciliation." : null,
   ].filter((item): item is string => Boolean(item));
 
   if (blockers.length > 0) {
@@ -21573,7 +21574,7 @@ function rpcErrorMessage(value: Record<string, any>) {
 }
 
 function solanaRpcUrl() {
-  return process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || null;
+  return process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || deriveHeliusMainnetRpcUrl(process.env.HELIUS_API_KEY ?? "") || null;
 }
 
 function isHeliusRpcEndpoint(value: string) {
@@ -22315,7 +22316,7 @@ async function buildReadOnlyWalletHoldingsAdapter(
         rpc_configured: false,
         asset_index_status: "not-configured",
         summary: "Wallet holdings were not read because Solana RPC is not configured.",
-        next_action: "Configure SOLANA_RPC_URL for read-only wallet balance monitoring.",
+        next_action: "Configure HELIUS_API_KEY or SOLANA_RPC_URL for read-only wallet balance monitoring.",
         blockers: ["Solana RPC endpoint is not configured."],
       },
       portfolio: null,
@@ -22675,7 +22676,7 @@ function buildLiveWalletAccountingReadiness({
     mirrorHealthy;
   const blockers = [
     !walletScoped ? "Configure a valid public wallet key before live wallet accounting can be trusted." : null,
-    !walletHoldings.rpc_configured ? "Configure SOLANA_RPC_URL so the app can read wallet token accounts directly." : null,
+    !walletHoldings.rpc_configured ? "Configure HELIUS_API_KEY or SOLANA_RPC_URL so the app can read wallet token accounts directly." : null,
     walletHoldings.asset_index_status === "blocked" ? "Helius DAS asset index proof is blocked; retry the read-only wallet asset snapshot before trusting provider coverage." : null,
     walletHoldings.status === "blocked" ? walletHoldings.blockers[0] ?? "Read-only wallet holdings scan is blocked." : null,
     walletHoldings.status === "idle" && walletScoped && walletHoldings.rpc_configured ? "Run a live DEX/RPC wallet holdings sync before trusting wallet PnL." : null,
@@ -62708,7 +62709,7 @@ function buildLiveExecutionArming({
 }): LiveExecutionArming {
   const hasWallet = Boolean(readiness.checks.find((check) => check.id === "wallet" && check.status === "pass"));
   const apiKeyConfigured = Boolean(process.env.JUPITER_API_KEY);
-  const rpcConfigured = Boolean(process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
+  const rpcConfigured = Boolean(solanaRpcUrl());
   const liveEnvEnabled = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true";
   const operatorApproval = process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL === "I_UNDERSTAND_REAL_FUNDS";
   const edgeReady = executionEdge.items.some((item) => item.action === "execute-paper" || item.action === "tighten-exit");
@@ -62754,7 +62755,7 @@ function buildLiveExecutionArming({
       status: rpcConfigured ? "pass" : "fail",
       detail: rpcConfigured
         ? "Solana RPC is configured for status/submit fallback checks."
-        : "SOLANA_RPC_URL is missing, so transaction status and fallback submit are unavailable.",
+        : "HELIUS_API_KEY or SOLANA_RPC_URL is missing, so transaction status and fallback submit are unavailable.",
     },
     {
       id: "operator-approval",

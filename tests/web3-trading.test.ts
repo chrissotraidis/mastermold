@@ -6731,8 +6731,10 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN dry-run readiness WHEN Jupiter v2 order returns an unsigned transaction THEN the plan records order metadata only", async () => {
     process.env.JUPITER_API_KEY = "test-key";
     const previousRpcUrl = process.env.SOLANA_RPC_URL;
-    const rpcUrl = "https://mainnet.helius-rpc.com/?api-key=test";
-    process.env.SOLANA_RPC_URL = rpcUrl;
+    const previousHeliusKey = process.env.HELIUS_API_KEY;
+    delete process.env.SOLANA_RPC_URL;
+    process.env.HELIUS_API_KEY = "test-helius-wallet-accounting";
+    const rpcUrl = "https://mainnet.helius-rpc.com/?api-key=test-helius-wallet-accounting";
     const requestedUrls: string[] = [];
     const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -6965,6 +6967,8 @@ describe("Web3 autonomous trading subsystem", () => {
     } finally {
       if (previousRpcUrl === undefined) delete process.env.SOLANA_RPC_URL;
       else process.env.SOLANA_RPC_URL = previousRpcUrl;
+      if (previousHeliusKey === undefined) delete process.env.HELIUS_API_KEY;
+      else process.env.HELIUS_API_KEY = previousHeliusKey;
     }
     const plan = state.execution_plans.find((item) => item.symbol === "LIVE");
     const sellPlan = state.execution_plans.find((item) => item.symbol === "BONK" && item.side === "sell");
