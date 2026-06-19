@@ -785,6 +785,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Rehearse Jupiter");
     expect(settingsConsole).toContain("no browser storage for Helius or Jupiter keys");
     expect(settingsConsole).toContain("unsigned transaction return withheld");
+    expect(source("package.json")).toContain("\"verify:web3\": \"node scripts/web3-readiness-verify.mjs\"");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
+    expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run verify:web3 gate");
     expect(settingsPage).toContain("Open Web3 wiring");
     expect(settingsPage).toContain("live execution blocked");
     expect(settingsPage).toContain("wallet mutation blocked");

@@ -22,6 +22,7 @@
     "landing-drill:web3": "node scripts/web3-live-landing-drill.mjs",
     "reconcile-settlement:web3": "node scripts/web3-settlement-reconciliation.mjs",
     "guard-mirror:web3": "node scripts/web3-portfolio-mirror-guard.mjs",
+    "verify:web3": "node scripts/web3-readiness-verify.mjs",
     "smoke:web3": "node scripts/web3-trading-smoke.mjs",
     "test": "bun run typecheck && bun test tests"
   },

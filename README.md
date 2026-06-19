@@ -93,6 +93,7 @@ npm run forward-repeat:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs
 npm run preflight-live:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=2 --json
 npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
 npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
+npm run verify:web3 -- --base-url=http://localhost:4010
 ```
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
@@ -126,7 +127,11 @@ and bounded autonomous handoff notional before a future reviewed mirror writer c
 the fill as audit-ready. The Web3 trading API also accepts a guarded `portfolio_mirror`
 apply request for the persistent paper mirror; it still blocks unless confirmed settlement
 evidence, fill price, filled quantity, handoff notional, and idempotency all reconcile, and
-it never grants live execution or wallet mutation permission.
+it never grants live execution or wallet mutation permission. `verify:web3` is a Node-only
+operator check for machines without Bun: against a running app, it proves health receipts,
+execution input validation, public-wallet dry-run scope save, credential validate-only
+redaction, one-shot Jupiter rehearsal redaction, private-field rejection, and the live
+execution/wallet mutation locks.
 
 ## Architecture: the engine and the app
 
@@ -301,6 +306,7 @@ ref/                         integration plan + the TradingAgents study clone (u
 bun install
 bun run dev            # http://localhost:3000 (or set the port)
 bun run test           # typecheck + the full Bun test suite
+npm run verify:web3    # Node-only Web3 credential/readiness gate against localhost:4010
 ```
 
 To see the app with a saved scan, point it at the bundled fixtures and use a local DB:

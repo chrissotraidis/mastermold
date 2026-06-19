@@ -1,0 +1,242 @@
+#!/usr/bin/env node
+
+const DEFAULT_BASE_URL = "http://localhost:4010";
+const DEFAULT_WALLET = "11111111111111111111111111111111";
+const CANARY_JUPITER_KEY = "codex-jupiter-canary-never-echo";
+const CANARY_SECRET = "codex-private-key-canary-never-echo";
+
+const config = parseArgs(process.argv.slice(2));
+const baseUrl = (config.baseUrl || process.env.WEB3_VERIFY_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
+const walletPublicKey = config.wallet || process.env.WEB3_VERIFY_WALLET_PUBLIC_KEY || DEFAULT_WALLET;
+const secretValues = [
+  { label: "jupiter canary", value: CANARY_JUPITER_KEY },
+  { label: "private-field canary", value: CANARY_SECRET },
+  { label: "helius env", value: process.env.HELIUS_API_KEY },
+  { label: "jupiter env", value: process.env.JUPITER_API_KEY },
+].filter((item) => typeof item.value === "string" && item.value.length > 0);
+
+const results = [];
+
+function parseArgs(args) {
+  const parsed = {};
+  for (const arg of args) {
+    if (arg.startsWith("--base-url=")) parsed.baseUrl = arg.slice("--base-url=".length);
+    if (arg.startsWith("--wallet=")) parsed.wallet = arg.slice("--wallet=".length);
+    if (arg === "--json") parsed.json = true;
+  }
+  return parsed;
+}
+
+function redacted(value) {
+  let text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  for (const secret of secretValues) {
+    text = text.split(secret.value).join(`[redacted:${secret.label}]`);
+  }
+  return text;
+}
+
+function fail(message, detail) {
+  const suffix = detail === undefined ? "" : `\n${redacted(detail).slice(0, 4000)}`;
+  throw new Error(`${message}${suffix}`);
+}
+
+function assert(condition, message, detail) {
+  if (!condition) fail(message, detail);
+}
+
+function assertNoLeak(label, value) {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  for (const secret of secretValues) {
+    assert(!text.includes(secret.value), `${label} leaked ${secret.label}.`);
+  }
+  assert(!/api-key=[A-Za-z0-9_-]{16,}/i.test(text), `${label} leaked an API-key query value.`);
+}
+
+function record(name, status, detail = "") {
+  results.push({ name, status, detail });
+}
+
+async function requestJson(path, init = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: {
+      ...(init.body === undefined ? {} : { "content-type": "application/json" }),
+      ...init.headers,
+    },
+    signal: AbortSignal.timeout(25_000),
+  });
+  const text = await response.text();
+  assertNoLeak(`${path} response`, text);
+  let json;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    fail(`${path} should return JSON.`, text);
+  }
+  return { response, json, text };
+}
+
+async function postJson(path, body) {
+  return requestJson(path, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+async function verifyHealth() {
+  const { response, json } = await requestJson("/api/health");
+  assert(response.status === 200, "Health endpoint should return 200.", { status: response.status, json });
+  assert(json.status === "ok", "Health endpoint should report ok.", json);
+  assert(json.web3_daemon_supervisor?.live_execution_permission === "blocked", "Daemon health should keep live execution blocked.", json.web3_daemon_supervisor);
+  assert(json.web3_daemon_supervisor?.wallet_mutation_permission === "blocked", "Daemon health should keep wallet mutation blocked.", json.web3_daemon_supervisor);
+  assert(json.web3_production_supervisor?.live_execution_permission === "blocked", "Production supervisor should keep live execution blocked.", json.web3_production_supervisor);
+  assert(json.web3_production_supervisor?.wallet_mutation_permission === "blocked", "Production supervisor should keep wallet mutation blocked.", json.web3_production_supervisor);
+  record("health", "pass", "live and wallet mutation locks are blocked");
+}
+
+async function verifyRejectedExecutionInputs() {
+  const invalidWallet = await postJson("/api/web3-trading", {
+    source: "sample",
+    account: "persistent",
+    execution: {
+      mode: "dry-run",
+      wallet_public_key: "not-a-wallet",
+    },
+  });
+  assert(invalidWallet.response.status === 422, "Malformed public wallet scope should be rejected.", {
+    status: invalidWallet.response.status,
+    json: invalidWallet.json,
+  });
+  assert(/public Solana address/i.test(invalidWallet.json?.error ?? ""), "Malformed wallet rejection should name public address validation.", invalidWallet.json);
+
+  const privateField = await postJson("/api/web3-trading", {
+    source: "sample",
+    account: "persistent",
+    execution: {
+      mode: "dry-run",
+      private_key: CANARY_SECRET,
+    },
+  });
+  assert(privateField.response.status === 422, "Private-key-shaped execution fields should be rejected.", {
+    status: privateField.response.status,
+    json: privateField.json,
+  });
+  assert(/private keys|seed phrases|secret/i.test(privateField.json?.error ?? ""), "Private-field rejection should explain the secret boundary.", privateField.json);
+  record("execution-input-validation", "pass", "malformed wallet and private-field requests are rejected");
+}
+
+async function verifyPublicScopeSave() {
+  const { response, json } = await postJson("/api/web3-trading", {
+    source: "sample",
+    account: "persistent",
+    execution: {
+      mode: "dry-run",
+      wallet_public_key: walletPublicKey,
+      max_trade_usd: 250,
+      daily_spend_cap_usd: 1000,
+      max_slippage_bps: 150,
+      kill_switch: false,
+      signer_simulation_enabled: true,
+      signer_session_label: "Readiness verifier",
+      signer_network: "devnet",
+    },
+  });
+  assert(response.status === 200, "Public wallet scope save should return 200.", { status: response.status, json });
+  assert(json.execution_readiness?.config?.wallet_public_key === walletPublicKey, "Public wallet scope should persist into execution readiness.", json.execution_readiness);
+  assert(json.execution_readiness?.config?.mode === "dry-run", "Execution readiness should remain dry-run.", json.execution_readiness);
+  assert(json.execution_gate?.live_execution_enabled === false, "Public scope save must not enable live execution.", json.execution_gate);
+  assert(json.autonomous_live_autonomy_readiness?.can_trade_real_capital === false, "Public scope save must not permit real-capital trading.", json.autonomous_live_autonomy_readiness);
+  record("public-scope-save", "pass", "public wallet and dry-run caps saved without live authority");
+}
+
+async function verifyAccountSetupReceipt() {
+  const { response, json } = await requestJson("/api/web3-account-setup?source=sample&account=persistent");
+  assert(response.status === 200, "Account setup receipt should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-account-setup-receipt", "Account setup receipt should expose the expected mode.", json);
+  assert(json.wallet_summary?.wallet_scoped === true, "Account setup receipt should see the saved public wallet scope.", json.wallet_summary);
+  assert(json.live_execution_permission === "blocked", "Account setup receipt should block live execution.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Account setup receipt should block wallet mutation.", json);
+  assert(json.private_key_storage === "blocked", "Account setup receipt should block private key storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Account setup receipt should block secret echo.", json);
+  record("account-setup-receipt", "pass", `status ${json.status}`);
+}
+
+async function verifyCredentialValidateOnly() {
+  const { response, json } = await postJson("/api/web3-credentials/test", {
+    provider: "helius",
+    wallet_public_key: walletPublicKey,
+    max_trade_usd: 250,
+    daily_spend_cap_usd: 1000,
+    max_slippage_bps: 150,
+    require_manual_confirmation: true,
+    test_mode: "validate-only",
+  });
+  assert(response.status === 200, "Validate-only credential test should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-credentials-setup-readiness", "Credential test should expose the readiness contract.", json);
+  assert(json.network_tested === false, "Validate-only credential test should not call external providers.", json);
+  assert(json.live_execution_permission === "blocked", "Credential test should block live execution.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Credential test should block wallet mutation.", json);
+  assert(json.credential_plan?.levels?.some((level) => level.id === "autonomous-live" && level.status === "blocked"), "Credential plan should keep autonomous-live blocked.", json.credential_plan);
+  assert(json.credential_plan?.items?.some((item) => item.id === "private-key" && item.storage === "never-store" && item.status === "blocked"), "Credential plan should keep private keys never-store.", json.credential_plan);
+  record("credential-validate-only", "pass", `plan ${json.credential_plan?.status ?? "unknown"}`);
+}
+
+async function verifyJupiterRehearsalBoundary() {
+  const { response, json } = await postJson("/api/web3-jupiter-rehearsal?source=sample&account=persistent", {
+    jupiter_api_key: CANARY_JUPITER_KEY,
+    wallet_public_key: walletPublicKey,
+    max_slippage_bps: 150,
+  });
+  assert(response.status === 200, "Jupiter rehearsal should return a redacted receipt even when order access is gated.", { status: response.status, json });
+  assert(json.mode === "web3-jupiter-rehearsal-receipt", "Jupiter rehearsal should expose the expected receipt mode.", json);
+  assert(json.key_source === "one-shot", "Jupiter rehearsal should mark the canary key as one-shot.", json);
+  assert(json.one_shot_key_used === true, "Jupiter rehearsal should record one-shot key use without echoing the key.", json);
+  assert(json.secret_echo_permission === "blocked", "Jupiter rehearsal should block secret echo.", json);
+  assert(json.unsigned_transaction_return === "withheld", "Jupiter rehearsal should withhold unsigned transaction bytes.", json);
+  assert(json.transaction_body_storage === "blocked", "Jupiter rehearsal should block transaction body storage.", json);
+  assert(json.execute_permission === "blocked", "Jupiter rehearsal should block execute permission.", json);
+  assert(json.live_execution_permission === "blocked", "Jupiter rehearsal should block live execution.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Jupiter rehearsal should block wallet mutation.", json);
+  record("jupiter-rehearsal-boundary", "pass", `status ${json.status}`);
+}
+
+async function verifyJupiterPrivateFieldRejection() {
+  const { response, json } = await postJson("/api/web3-jupiter-rehearsal?source=sample&account=persistent", {
+    jupiter_api_key: CANARY_JUPITER_KEY,
+    wallet_public_key: walletPublicKey,
+    seed_phrase: CANARY_SECRET,
+    max_slippage_bps: 150,
+  });
+  assert(response.status === 422, "Jupiter rehearsal should reject seed/private fields before testing.", { status: response.status, json });
+  assert(/Private keys|seed phrases|secret/i.test(json?.error ?? ""), "Jupiter rehearsal rejection should explain the secret boundary.", json);
+  record("jupiter-private-field-rejection", "pass", "seed/private fields are rejected");
+}
+
+async function main() {
+  await verifyHealth();
+  await verifyRejectedExecutionInputs();
+  await verifyPublicScopeSave();
+  await verifyAccountSetupReceipt();
+  await verifyCredentialValidateOnly();
+  await verifyJupiterRehearsalBoundary();
+  await verifyJupiterPrivateFieldRejection();
+
+  const report = {
+    mode: "web3-readiness-verify",
+    base_url: baseUrl,
+    wallet_scope: walletPublicKey === DEFAULT_WALLET ? "sample-system-wallet" : "operator-public-wallet",
+    checked_at: new Date().toISOString(),
+    result: "pass",
+    checks: results,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
+  };
+  assertNoLeak("final report", report);
+  console.log(JSON.stringify(report, null, 2));
+}
+
+main().catch((error) => {
+  console.error(redacted(error instanceof Error ? error.message : String(error)));
+  process.exit(1);
+});

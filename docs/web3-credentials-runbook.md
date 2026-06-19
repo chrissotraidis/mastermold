@@ -63,6 +63,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 16. Use the Wiring focus `Build ledger receipt` control to create a redacted local accounting receipt from the paper ledger, wallet-readiness state, settlement status, and mirror gates.
 17. Review the Wiring focus `Production worker review` panel after `npm run supervise:web3` writes a sanitized paper-supervisor receipt. It checks receipt freshness, circuit state, profit target, drawdown brake, and the live-boundary process gate, but it cannot install a process manager or authorize live capital from inside the app.
 18. Use the Wiring focus `Run stop drill` control to record a local dry-run emergency-stop receipt. The drill halts browser Auto Watch and verifies ops target status, but it does not send webhooks, stop external processes by itself, sign, submit, or mutate wallets.
+19. Run `npm run verify:web3 -- --base-url=http://localhost:4010` against the local app. This Node-only gate does not require Bun; it checks health receipts, malformed wallet rejection, private-field rejection, public-wallet dry-run scope save, account setup redaction, validate-only credential readiness, one-shot Jupiter rehearsal redaction, unsigned-transaction withholding, and live-execution/wallet-mutation locks.
 
 The Settings page also includes a `Web3 trading credentials` runway card. It shows the same account-setup receipt as configured/missing status for Helius/Solana, Jupiter, dedicated wallet, signer posture, emergency-stop ops, and accounting targets, then links back to `/trading` for provider tests and dry-run receipts. It also shows an external setup packet with official setup/docs links, required env names, and the next external operator action. Settings now includes a `Credential action console` for session-only Helius/Jupiter/wallet tests. That console can call the same credentials test and Jupiter rehearsal routes, and it can save only public wallet scope plus dry-run risk caps into the Web3 trading state. It does not save Helius or Jupiter keys to browser storage, does not send keys when saving public scope, does not accept private keys or seed phrases, and cannot create external accounts, sign, submit, execute, or mutate wallets.
 
@@ -114,6 +115,16 @@ The accounting route returns a redacted paper-ledger receipt with aggregate port
 That route records a dry-run emergency-stop receipt only after `operator_ack` is true. It returns whether an emergency-stop webhook/contact is configured, which local surfaces would be halted or blocked, and a receipt hash. It never returns raw webhook URLs, contact details, API keys, private keys, transaction bytes, signed payloads, or wallet authority, and it never dispatches the external webhook from this local drill.
 
 The production worker review surface is loaded from `/api/health` as `web3_production_supervisor`. It is derived from the sanitized daemon-supervisor receipt only, never exposes local receipt paths or secrets, and always keeps `can_satisfy_process_gate`, live execution, and wallet mutation blocked until an external process-manager and live-executor review exists.
+
+## Local Verification
+
+Run the fast Web3 readiness verifier after changing credential, wallet, signer, Jupiter, or launch-readiness code:
+
+```bash
+npm run verify:web3 -- --base-url=http://localhost:4010
+```
+
+The verifier talks only to the running local app plus the existing Jupiter rehearsal route. It sends canary secrets to prove that responses do not echo one-shot keys or private-field values, saves only a public wallet and dry-run caps, and fails if any checked receipt grants live execution or wallet mutation. Use `--wallet=<public-solana-address>` to verify against a dedicated public trading wallet; never pass a private key or seed phrase.
 
 ## API
 
