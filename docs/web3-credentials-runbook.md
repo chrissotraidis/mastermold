@@ -128,6 +128,8 @@ npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
 
 The verifier talks only to the running local app plus the existing provider-health and Jupiter rehearsal routes. It sends canary secrets to prove that responses do not echo one-shot keys or private-field values, saves only a public wallet and dry-run caps, verifies configured Helius/Solana RPC health and latest-blockhash evidence, and fails if any checked receipt grants live execution or wallet mutation. Use `--wallet=<public-solana-address>` to verify against a dedicated public trading wallet; never pass a private key or seed phrase. The strict `--require-operator-wallet` mode refuses the sample all-ones wallet and requires `--wallet` or `WEB3_VERIFY_WALLET_PUBLIC_KEY` before any public scope is saved. The strict `--require-jupiter-order` mode requires `JUPITER_API_KEY` or `WEB3_VERIFY_JUPITER_API_KEY` in local env, then fails closed until Jupiter quote and unsigned order readiness are both proven while transaction bytes remain withheld.
 
+The Settings `Credential action console` also shows a strict verifier runway. It builds the operator-wallet command and the combined wallet-plus-Jupiter-order command from the public wallet field, marks the sample wallet as gated, and marks the Jupiter order gate as gated until a session key or server `JUPITER_API_KEY` is visible.
+
 ## API
 
 The setup UI posts to:

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Save, ShieldCheck, Zap } from "lucide-react";
+import { Activity, Save, ShieldCheck, Terminal, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
@@ -14,6 +14,7 @@ type SettingsWeb3CredentialConsoleProps = {
   maxTradeUsd: number;
   dailySpendCapUsd: number;
   maxSlippageBps: number;
+  jupiterConfigured: boolean;
   scenario: string;
   source: string;
   account: string;
@@ -38,6 +39,7 @@ export function SettingsWeb3CredentialConsole({
   maxTradeUsd,
   dailySpendCapUsd,
   maxSlippageBps,
+  jupiterConfigured,
   scenario,
   source,
   account,
@@ -181,6 +183,12 @@ export function SettingsWeb3CredentialConsole({
 
   const credentialChecks = credentialResult?.checks ?? [];
   const disabled = busy !== null;
+  const trimmedWallet = draft.wallet_public_key.trim();
+  const operatorWalletReady = isLikelySolanaPublicKey(trimmedWallet) && trimmedWallet !== SAMPLE_SYSTEM_WALLET;
+  const jupiterKeyReady = jupiterConfigured || draft.jupiter_api_key.trim().length > 0;
+  const commandWallet = operatorWalletReady ? trimmedWallet : "<public-solana-address>";
+  const operatorWalletCommand = `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${commandWallet} --require-operator-wallet`;
+  const combinedStrictCommand = `${operatorWalletCommand} --require-jupiter-order`;
 
   return (
     <section className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Settings Web3 credential action console">
@@ -291,6 +299,34 @@ export function SettingsWeb3CredentialConsole({
       <p className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 text-xs leading-5 text-on-surface-variant" aria-live="polite">
         {message}
       </p>
+
+      <div className="mt-3 rounded-md border border-engine/25 bg-surface-dim/25 p-3" aria-label="Strict Web3 verifier runway">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Strict verifier runway</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">Operator wallet and Jupiter order gates</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <GateBadge label="operator wallet" ready={operatorWalletReady} />
+            <GateBadge label="Jupiter order" ready={jupiterKeyReady} />
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2">
+          <VerifierCommand
+            label="Wallet gate"
+            command={operatorWalletCommand}
+            ready={operatorWalletReady}
+          />
+          <VerifierCommand
+            label="Wallet + order gate"
+            command={combinedStrictCommand}
+            ready={operatorWalletReady && jupiterKeyReady}
+          />
+        </div>
+        <p className="mt-2 text-xs leading-5 text-outline">
+          These commands use only a public wallet and local environment keys. They fail closed before live review if the sample wallet, Jupiter order proof, secret redaction, or live-boundary locks are not clean.
+        </p>
+      </div>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <ConsoleMetric
@@ -427,9 +463,50 @@ function BoundaryBadge({ label }: { label: string }) {
   );
 }
 
+function GateBadge({ label, ready }: { label: string; ready: boolean }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "border-outline-variant/40 bg-void/25 text-outline",
+        ready && "border-engine/35 bg-engine/10 text-engine",
+      )}
+    >
+      {ready ? "ready" : "gated"} · {label}
+    </Badge>
+  );
+}
+
+function VerifierCommand({ label, command, ready }: { label: string; command: string; ready: boolean }) {
+  return (
+    <div className="rounded-md border border-outline-variant/25 bg-void/25 p-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+        <Badge
+          variant="outline"
+          className={cn(
+            "border-outline-variant/35 bg-surface-dim/35 text-outline",
+            ready && "border-engine/35 bg-engine/10 text-engine",
+          )}
+        >
+          {ready ? "ready" : "missing input"}
+        </Badge>
+      </div>
+      <div className="mt-2 flex items-start gap-2 rounded-md border border-outline-variant/20 bg-black/20 p-2">
+        <Terminal aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-engine" />
+        <code className="min-w-0 break-all font-mono text-[11px] leading-5 text-on-surface-variant">
+          {command}
+        </code>
+      </div>
+    </div>
+  );
+}
+
 function isLikelySolanaPublicKey(value: string) {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
+
+const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";
 
 function previewValue(value: string | null | undefined) {
   if (!value) return null;
