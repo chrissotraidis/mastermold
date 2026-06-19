@@ -4751,7 +4751,11 @@ async function main() {
   assert(typeof forwardRun.net_pnl_usd === "number" && typeof forwardRun.target_met === "boolean", "Autonomous forward suite should quantify aggregate paper PnL and target status.", forwardRun);
   assert(typeof forwardRun.hot_coin_baseline_pnl_usd === "number" && typeof forwardRun.hot_coin_alpha_usd === "number", "Autonomous forward suite should compare agent PnL against the best visible coin baseline.", forwardRun);
   assert(["beat-hot-coin-suite", "lagged-hot-coin-suite"].includes(forwardRun.hot_coin_baseline_verdict), "Autonomous forward suite should publish a known hot-coin baseline verdict.", forwardRun);
+  assert(typeof forwardRun.deployed_notional_usd === "number" && forwardRun.deployed_notional_usd > 0, "Autonomous forward suite should disclose how much paper capital it actually deployed.", forwardRun);
+  assert(typeof forwardRun.deployed_hot_coin_baseline_pnl_usd === "number" && typeof forwardRun.deployed_hot_coin_alpha_usd === "number", "Autonomous forward suite should compare deployed paper capital against the same-notional hot-coin baseline.", forwardRun);
+  assert(["beat-deployed-hot-coin-suite", "lagged-deployed-hot-coin-suite"].includes(forwardRun.deployed_hot_coin_baseline_verdict), "Autonomous forward suite should publish a known deployed-notional hot-coin verdict.", forwardRun);
   assert(forwardRun.scenarios.every((report) => typeof report.hot_coin_alpha_usd === "number" && typeof report.agent_return_pct === "number"), "Every forward scenario should expose visible-market alpha metrics.", forwardRun.scenarios);
+  assert(forwardRun.scenarios.every((report) => typeof report.deployed_notional_usd === "number" && typeof report.deployed_hot_coin_alpha_usd === "number"), "Every forward scenario should expose same-notional deployed alpha metrics.", forwardRun.scenarios);
   assert(forwardRun.scenarios.find((report) => report.scenario === "breakout")?.events?.[0]?.next_action?.includes("FARTCOIN"), "Breakout forward run should scout the visible momentum leader instead of defaulting to the safest large cap.", forwardRun.scenarios);
   assert(["all-profitable", "mixed-target-met", "flat-target-met", "profitable-below-target", "not-profitable"].includes(forwardRun.verdict), "Autonomous forward suite should publish a known profit verdict.", forwardRun);
 
@@ -4767,6 +4771,8 @@ async function main() {
     forwardTradedScenarios: forwardRun.traded_scenario_count,
     forwardHotCoinAlpha: forwardRun.hot_coin_alpha_usd,
     forwardHotCoinVerdict: forwardRun.hot_coin_baseline_verdict,
+    forwardDeployedAlpha: forwardRun.deployed_hot_coin_alpha_usd,
+    forwardDeployedVerdict: forwardRun.deployed_hot_coin_baseline_verdict,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

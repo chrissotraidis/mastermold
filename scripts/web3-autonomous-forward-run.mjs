@@ -136,7 +136,8 @@ export function buildForwardRunReport({
   const netPnl = roundMoney(endEquity - startEquity);
   const startTrades = Number(baseline.paper_account?.trade_count ?? 0);
   const endTrades = Number(final.paper_account?.trade_count ?? startTrades);
-  const visibleBaseline = buildVisibleMarketBaseline({ baseline, final, startEquity, netPnl });
+  const deployedNotional = forwardDeployedNotional({ baseline, final });
+  const visibleBaseline = buildVisibleMarketBaseline({ baseline, final, startEquity, netPnl, deployedNotional });
   const postedEvents = daemonRun.events.filter((event) => event.status === "posted");
   const advancedEvents = postedEvents.filter((event) => event.paper_advanced);
   const blockedEvents = daemonRun.events.filter((event) => event.status === "blocked");
@@ -178,6 +179,10 @@ export function buildForwardRunReport({
     hot_coin_baseline_return_pct: visibleBaseline.best_return_pct,
     hot_coin_baseline_pnl_usd: visibleBaseline.best_wallet_pnl_usd,
     hot_coin_alpha_usd: visibleBaseline.best_coin_alpha_usd,
+    deployed_notional_usd: visibleBaseline.deployed_notional_usd,
+    deployed_hot_coin_baseline_pnl_usd: visibleBaseline.best_deployed_pnl_usd,
+    deployed_hot_coin_alpha_usd: visibleBaseline.best_deployed_alpha_usd,
+    deployed_hot_coin_baseline_verdict: visibleBaseline.deployed_verdict,
     cold_coin_baseline_symbol: visibleBaseline.worst_symbol,
     cold_coin_baseline_return_pct: visibleBaseline.worst_return_pct,
     cold_coin_baseline_pnl_usd: visibleBaseline.worst_wallet_pnl_usd,
@@ -200,7 +205,15 @@ export function buildForwardRunReport({
   };
 }
 
-function buildVisibleMarketBaseline({ baseline, final, startEquity, netPnl }) {
+function forwardDeployedNotional({ baseline, final }) {
+  const baselineTradeIds = new Set((baseline.trade_tape ?? []).map((trade) => trade.id).filter(Boolean));
+  return roundMoney((final.trade_tape ?? [])
+    .filter((trade) => !baselineTradeIds.has(trade.id))
+    .filter((trade) => trade.side === "buy" && trade.status === "paper-filled")
+    .reduce((sum, trade) => sum + Number(trade.size_usd ?? 0), 0));
+}
+
+function buildVisibleMarketBaseline({ baseline, final, startEquity, netPnl, deployedNotional }) {
   const endById = new Map((final.market ?? []).map((token) => [token.id, token]));
   const rows = (baseline.market ?? [])
     .flatMap((startToken) => {
@@ -214,12 +227,14 @@ function buildVisibleMarketBaseline({ baseline, final, startEquity, netPnl }) {
         token_id: startToken.id,
         return_pct: roundMoney(returnPct),
         wallet_pnl_usd: roundMoney(startEquity * (returnPct / 100)),
+        deployed_pnl_usd: roundMoney(deployedNotional * (returnPct / 100)),
       }];
     })
     .sort((a, b) => b.return_pct - a.return_pct);
   const best = rows[0] ?? null;
   const worst = rows[rows.length - 1] ?? null;
   const bestCoinAlpha = roundMoney(netPnl - (best?.wallet_pnl_usd ?? 0));
+  const bestDeployedAlpha = roundMoney(netPnl - (best?.deployed_pnl_usd ?? 0));
   const agentReturnPct = startEquity > 0 ? roundMoney((netPnl / startEquity) * 100) : 0;
   const verdict = best
     ? bestCoinAlpha >= 0
@@ -232,18 +247,29 @@ function buildVisibleMarketBaseline({ baseline, final, startEquity, netPnl }) {
       : netPnl === 0
         ? "flat-vs-cash"
         : "lost-vs-cash";
+  const deployedVerdict = best
+    ? bestDeployedAlpha >= 0
+      ? "beat-deployed-hot-coin"
+      : netPnl > 0
+        ? "profitable-but-lagged-deployed-hot-coin"
+        : "lagged-deployed-hot-coin"
+    : verdict;
 
   return {
     agent_return_pct: agentReturnPct,
     cash_alpha_usd: roundMoney(netPnl),
+    deployed_notional_usd: roundMoney(deployedNotional),
     best_symbol: best?.symbol ?? null,
     best_return_pct: best?.return_pct ?? 0,
     best_wallet_pnl_usd: best?.wallet_pnl_usd ?? 0,
     best_coin_alpha_usd: bestCoinAlpha,
+    best_deployed_pnl_usd: best?.deployed_pnl_usd ?? 0,
+    best_deployed_alpha_usd: bestDeployedAlpha,
     worst_symbol: worst?.symbol ?? null,
     worst_return_pct: worst?.return_pct ?? 0,
     worst_wallet_pnl_usd: worst?.wallet_pnl_usd ?? 0,
     verdict,
+    deployed_verdict: deployedVerdict,
   };
 }
 
@@ -260,6 +286,9 @@ export function buildForwardSuiteReport({
   const profitableCount = scenarios.filter((report) => report.net_pnl_usd > 0).length;
   const hotCoinBaselinePnl = roundMoney(scenarios.reduce((sum, report) => sum + Number(report.hot_coin_baseline_pnl_usd ?? 0), 0));
   const hotCoinAlpha = roundMoney(netPnl - hotCoinBaselinePnl);
+  const deployedNotional = roundMoney(scenarios.reduce((sum, report) => sum + Number(report.deployed_notional_usd ?? 0), 0));
+  const deployedHotCoinBaselinePnl = roundMoney(scenarios.reduce((sum, report) => sum + Number(report.deployed_hot_coin_baseline_pnl_usd ?? 0), 0));
+  const deployedHotCoinAlpha = roundMoney(netPnl - deployedHotCoinBaselinePnl);
   const targetGap = roundMoney(netPnl - config.minNetPnlUsd);
   const targetMet = targetGap >= 0;
   const worstScenario = [...scenarios].sort((a, b) => a.net_pnl_usd - b.net_pnl_usd)[0] ?? null;
@@ -297,6 +326,10 @@ export function buildForwardSuiteReport({
     hot_coin_baseline_pnl_usd: hotCoinBaselinePnl,
     hot_coin_alpha_usd: hotCoinAlpha,
     hot_coin_baseline_verdict: hotCoinAlpha >= 0 ? "beat-hot-coin-suite" : "lagged-hot-coin-suite",
+    deployed_notional_usd: deployedNotional,
+    deployed_hot_coin_baseline_pnl_usd: deployedHotCoinBaselinePnl,
+    deployed_hot_coin_alpha_usd: deployedHotCoinAlpha,
+    deployed_hot_coin_baseline_verdict: deployedHotCoinAlpha >= 0 ? "beat-deployed-hot-coin-suite" : "lagged-deployed-hot-coin-suite",
     profitable_scenario_count: profitableCount,
     advanced_scenario_count: scenarios.filter((report) => report.advanced_ticks > 0).length,
     traded_scenario_count: scenarios.filter((report) => report.trade_count_delta > 0).length,
