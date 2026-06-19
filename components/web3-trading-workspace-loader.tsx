@@ -1156,6 +1156,9 @@ export function Web3TradingWorkspaceLoader({
                 />
               </div>
               <div className="xl:col-span-2">
+                <QuickWalletTransactionIntelligencePanel intelligence={state.wallet_transaction_intelligence} readiness={state.live_wallet_accounting_readiness} />
+              </div>
+              <div className="xl:col-span-2">
                 <QuickLiveAutonomyReadinessAudit readiness={liveAutonomyReadiness} />
               </div>
               <div className="xl:col-span-2">
@@ -1366,6 +1369,83 @@ function QuickOperatorHud({
       <span className="sr-only" aria-label="Autonomous operator HUD receipt">
         Operator HUD wallet {formatCurrency(wallet.equity_usd)}, window PnL {formatSignedCurrency(wallet.window_pnl_usd)}, decision {decision.status} {decision.action} {decision.target_symbol ?? "desk"}, signal {fusion.leader_symbol ?? "none"} {fusion.fusion_score}, route {route.status}, local rehearsal {route.local_rehearsal_ready ? "accepted" : "missing"}, candle {candle.status}, profit accountability {accountability.status} {accountability.accountability_score}, live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
       </span>
+    </section>
+  );
+}
+
+function QuickWalletTransactionIntelligencePanel({
+  intelligence,
+  readiness,
+}: {
+  intelligence: Web3TradingState["wallet_transaction_intelligence"];
+  readiness: Web3TradingState["live_wallet_accounting_readiness"];
+}) {
+  const statusTone: QuickChipTone = intelligence.status === "ready"
+    ? "engine"
+    : intelligence.status === "blocked"
+      ? "critical"
+      : intelligence.status === "not-configured" || intelligence.status === "missing-wallet"
+        ? "caution"
+        : "neutral";
+  const decodeCheck = readiness.checks.find((check) => check.id === "transaction-decode");
+  return (
+    <section className="min-w-0 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:p-3" aria-label="Wallet transaction intelligence">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Wallet transaction intelligence</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">Read-only decoded wallet activity</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            {intelligence.summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={statusTone}>{intelligence.status.replace("-", " ")}</Chip>
+          <Chip tone={readiness.transaction_intelligence_status === "ready" ? "engine" : readiness.transaction_intelligence_status === "blocked" ? "critical" : "caution"}>
+            accounting {readiness.transaction_intelligence_status.replace("-", " ")}
+          </Chip>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-4 xl:grid-cols-8">
+        <ProfitMetric label="Decoded" value={intelligence.decoded_transaction_count.toString()} detail="recent txs" tone={intelligence.decoded_transaction_count > 0 ? "engine" : "neutral"} />
+        <ProfitMetric label="Swaps" value={intelligence.swap_transaction_count.toString()} detail="swap-like" tone={intelligence.swap_transaction_count > 0 ? "engine" : "neutral"} />
+        <ProfitMetric label="Transfers" value={intelligence.transfer_transaction_count.toString()} detail="transfer-like" tone={intelligence.transfer_transaction_count > 0 ? "caution" : "neutral"} />
+        <ProfitMetric label="Failed" value={intelligence.failed_transaction_count.toString()} detail="recent errors" tone={intelligence.failed_transaction_count > 0 ? "critical" : "neutral"} />
+        <ProfitMetric label="Token moves" value={intelligence.token_transfer_count.toString()} detail="parsed transfers" tone="neutral" />
+        <ProfitMetric label="Native moves" value={intelligence.native_transfer_count.toString()} detail="SOL transfers" tone="neutral" />
+        <ProfitMetric label="Fee est." value={`${intelligence.estimated_fee_sol.toFixed(6)} SOL`} detail="visible fees" tone="neutral" />
+        <ProfitMetric label="Raw tx" value={intelligence.raw_transaction_storage} detail="storage rule" tone="demo" />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+        <p className="rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2 text-xs leading-5 text-outline">
+          {decodeCheck?.detail ?? intelligence.next_action}
+        </p>
+        <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+          {intelligence.items.length > 0 ? intelligence.items.slice(0, 3).map((item) => (
+            <div key={item.signature_hash} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.signature_preview}</p>
+                <span className={cn("rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-telemetry", transactionClassName(item.classified_action))}>
+                  {item.classified_action}
+                </span>
+              </div>
+              <p className="mt-1 truncate text-xs font-semibold text-on-surface">{item.type.toLowerCase().replaceAll("_", " ")}</p>
+              <p className="mt-0.5 text-[11px] leading-4 text-outline">
+                {item.source ?? "unknown"} · {item.wallet_role.replace("-", " ")} · {item.token_transfer_count} token moves
+              </p>
+            </div>
+          )) : (
+            <p className="rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2 text-xs leading-5 text-on-surface-variant sm:col-span-2 lg:col-span-3">
+              No decoded wallet transactions have been fetched yet.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <p className="sr-only" aria-label="Wallet transaction intelligence receipt">
+        Wallet transaction intelligence status {intelligence.status}; decoded {intelligence.decoded_transaction_count}; swaps {intelligence.swap_transaction_count}; transfers {intelligence.transfer_transaction_count}; failed {intelligence.failed_transaction_count}; raw transaction storage {intelligence.raw_transaction_storage}; wallet mutation {intelligence.wallet_mutation_permission}; live execution {intelligence.live_execution_permission}.
+      </p>
     </section>
   );
 }
@@ -1664,6 +1744,42 @@ function QuickWeb3CredentialsSetupPanel({
               ))}
             </div>
           </div>
+
+          <div className="mt-3 rounded-md border border-engine/20 bg-engine/[0.035] p-3" aria-label="Provider account runway">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Provider account runway</p>
+                <p className="mt-1 text-xs leading-5 text-on-surface-variant">{result.provider_account_runway.summary}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{result.provider_account_runway.next_action}</p>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Chip tone={providerAccountRunwayTone(result.provider_account_runway.status)}>
+                  {result.provider_account_runway.status.replaceAll("-", " ")}
+                </Chip>
+                <Chip tone={result.provider_account_runway.configured_required_count === result.provider_account_runway.required_account_count ? "engine" : "caution"}>
+                  {result.provider_account_runway.configured_required_count}/{result.provider_account_runway.required_account_count} required
+                </Chip>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-1 sm:grid-cols-2 xl:grid-cols-5">
+              {result.provider_account_runway.items.map((item) => (
+                <article key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                    <span className={cn("h-2 w-2 shrink-0 rounded-full", providerAccountItemDotClass(item.status))} />
+                  </div>
+                  <p className={cn("mt-1 text-xs font-semibold", providerAccountItemTextClass(item.status))}>
+                    {item.status.replace("-", " ")}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-telemetry text-outline">
+                    {item.priority.replace("-", " ")} · {item.lane.replace("-", " ")}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{item.account_action}</p>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.unlocks}</p>
+                </article>
+              ))}
+            </div>
+          </div>
         </>
       ) : null}
 
@@ -1764,6 +1880,12 @@ function credentialPlanTone(status: Web3CredentialsSetupReadiness["credential_pl
   return "critical";
 }
 
+function providerAccountRunwayTone(status: Web3CredentialsSetupReadiness["provider_account_runway"]["status"]) {
+  if (status === "dry-run-ready") return "engine";
+  if (status === "read-rail-ready") return "caution";
+  return "critical";
+}
+
 function credentialLevelClass(status: Web3CredentialsSetupReadiness["credential_plan"]["levels"][number]["status"]) {
   if (status === "ready") return "border-engine/40 bg-engine/10 text-engine";
   if (status === "partial") return "border-caution/40 bg-caution/10 text-caution";
@@ -1778,6 +1900,18 @@ function credentialItemDotClass(status: Web3CredentialsSetupReadiness["credentia
 
 function credentialItemTextClass(status: Web3CredentialsSetupReadiness["credential_plan"]["items"][number]["status"]) {
   if (status === "ready") return "text-engine";
+  if (status === "optional" || status === "future") return "text-caution";
+  return "text-critical";
+}
+
+function providerAccountItemDotClass(status: Web3CredentialsSetupReadiness["provider_account_runway"]["items"][number]["status"]) {
+  if (status === "configured") return "bg-engine";
+  if (status === "optional" || status === "future") return "bg-caution";
+  return "bg-critical";
+}
+
+function providerAccountItemTextClass(status: Web3CredentialsSetupReadiness["provider_account_runway"]["items"][number]["status"]) {
+  if (status === "configured") return "text-engine";
   if (status === "optional" || status === "future") return "text-caution";
   return "text-critical";
 }
@@ -9216,6 +9350,13 @@ function actionToneClass(action: Web3TradingState["autonomous_market_evidence_fu
   if (action === "protect" || action === "reject") return "text-critical";
   if (action === "refresh-route" || action === "refresh-candles") return "text-caution";
   return "text-outline";
+}
+
+function transactionClassName(action: Web3TradingState["wallet_transaction_intelligence"]["items"][number]["classified_action"]) {
+  if (action === "failure") return "border-critical/35 bg-critical/[0.08] text-critical";
+  if (action === "swap") return "border-engine/30 bg-engine/[0.07] text-engine";
+  if (action === "transfer" || action === "mint" || action === "burn") return "border-caution/35 bg-caution/[0.08] text-caution";
+  return "border-outline-variant/25 bg-surface-dim/20 text-outline";
 }
 
 function markActionToneClass(action: Web3TradingState["autonomous_portfolio_mark_board"]["items"][number]["action"]) {

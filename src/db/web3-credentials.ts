@@ -77,6 +77,41 @@ export type Web3CredentialPlan = {
   controls: string[];
 };
 
+export type Web3ProviderAccountRunwayItem = {
+  id:
+    | "helius-read-rail"
+    | "jupiter-execution-rail"
+    | "dexscreener-discovery"
+    | "birdeye-discovery"
+    | "pumpfun-launch-feed"
+    | "yellowstone-grpc-stream"
+    | "dedicated-trading-wallet"
+    | "external-signer"
+    | "emergency-stop"
+    | "tax-ledger";
+  label: string;
+  lane: "read-data" | "market-discovery" | "execution" | "custody" | "operations" | "accounting";
+  priority: "required-now" | "next" | "later";
+  status: "configured" | "needed" | "optional" | "future" | "blocked";
+  account_action: string;
+  storage_rule: string;
+  unlocks: string;
+  next_action: string;
+};
+
+export type Web3ProviderAccountRunway = {
+  mode: "web3-provider-account-runway";
+  status: "dry-run-ready" | "read-rail-ready" | "needs-provider-accounts" | "live-blocked";
+  primary_stack: string[];
+  required_account_count: number;
+  configured_required_count: number;
+  missing_required: string[];
+  items: Web3ProviderAccountRunwayItem[];
+  summary: string;
+  next_action: string;
+  controls: string[];
+};
+
 export type Web3CredentialsSetupReadiness = {
   mode: "web3-credentials-setup-readiness";
   status: "configured" | "partial" | "blocked";
@@ -114,6 +149,7 @@ export type Web3CredentialsSetupReadiness = {
   blockers: string[];
   checks: Web3CredentialsSetupCheck[];
   credential_plan: Web3CredentialPlan;
+  provider_account_runway: Web3ProviderAccountRunway;
   controls: string[];
   env_targets: string[];
 };
@@ -216,6 +252,17 @@ export function buildWeb3CredentialsSetupReadiness(
     canSupportRouteOrderRehearsal,
     canSupportManualLiveReview,
   });
+  const providerAccountRunway = buildProviderAccountRunway({
+    heliusApiKey,
+    rpcUrl,
+    wsUrl,
+    walletValid,
+    jupiterConfigured,
+    signerMode,
+    requireManualConfirmation,
+    canSupportReadonlyWalletSync,
+    canSupportRouteOrderRehearsal,
+  });
 
   return {
     mode: "web3-credentials-setup-readiness",
@@ -254,18 +301,190 @@ export function buildWeb3CredentialsSetupReadiness(
     blockers: blockers.slice(0, 6),
     checks,
     credential_plan: credentialPlan,
+    provider_account_runway: providerAccountRunway,
     controls: [
       "Credential setup validates provider, wallet, route, and risk-policy readiness only; it never signs, submits, stores private keys, or moves funds.",
       "API keys are accepted only as test inputs or server environment values and are never returned in the response.",
       "Manual live review remains required even when every setup check passes.",
     ],
     env_targets: [
+      "HELIUS_API_KEY",
       "SOLANA_RPC_URL",
       "SOLANA_WS_URL",
       "JUPITER_API_KEY",
       "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
       "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
       "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+    ],
+  };
+}
+
+function buildProviderAccountRunway(input: {
+  heliusApiKey: string;
+  rpcUrl: string | null;
+  wsUrl: string | null;
+  walletValid: boolean;
+  jupiterConfigured: boolean;
+  signerMode: Web3SignerSetupMode;
+  requireManualConfirmation: boolean;
+  canSupportReadonlyWalletSync: boolean;
+  canSupportRouteOrderRehearsal: boolean;
+}): Web3ProviderAccountRunway {
+  const heliusConfigured = Boolean(input.heliusApiKey || isHeliusEndpoint(input.rpcUrl ?? ""));
+  const externalSignerReady = input.signerMode === "external-wallet" && input.requireManualConfirmation;
+  const items: Web3ProviderAccountRunwayItem[] = [
+    {
+      id: "helius-read-rail",
+      label: "Helius read rail",
+      lane: "read-data",
+      priority: "required-now",
+      status: heliusConfigured || input.rpcUrl ? "configured" : "needed",
+      account_action: "Create or use a Helius account, then place HELIUS_API_KEY in the ignored server environment.",
+      storage_rule: "Server env or one-shot session input only; never render the key back to the browser.",
+      unlocks: "Solana RPC, wallet balance, DAS asset visibility, signature history, and decoded wallet activity context.",
+      next_action: heliusConfigured || input.rpcUrl
+        ? "Run the network credential test and keep Helius as the primary read provider."
+        : "Add HELIUS_API_KEY or a custom Solana RPC URL before wallet intelligence can be trusted.",
+    },
+    {
+      id: "jupiter-execution-rail",
+      label: "Jupiter execution rail",
+      lane: "execution",
+      priority: "required-now",
+      status: input.jupiterConfigured ? "configured" : "needed",
+      account_action: "Provision a Jupiter API key for quote and unsigned Swap V2 order rehearsal.",
+      storage_rule: "Server env or one-shot session input only.",
+      unlocks: "Route proof, cost checks, unsigned order rehearsal, and later signer-bound swap envelopes.",
+      next_action: input.jupiterConfigured
+        ? "Run quote/order rehearsal and keep live submission blocked."
+        : "Add JUPITER_API_KEY before the app can prove the order-rehearsal rail.",
+    },
+    {
+      id: "dedicated-trading-wallet",
+      label: "Dedicated trading wallet",
+      lane: "custody",
+      priority: "required-now",
+      status: input.walletValid ? "configured" : "needed",
+      account_action: "Create a dedicated Solana trading wallet and enter only its public address here.",
+      storage_rule: "Public address may be saved as browser non-secret state; private key and seed phrase are never accepted.",
+      unlocks: "Read-only wallet accounting, wallet-aware risk caps, and later external-wallet approval scope.",
+      next_action: input.walletValid
+        ? "Keep this wallet scoped for read-only monitoring and dry-run rehearsal."
+        : "Enter a public Solana wallet address before account-specific reads can run.",
+    },
+    {
+      id: "external-signer",
+      label: "Manual external signer",
+      lane: "custody",
+      priority: "next",
+      status: externalSignerReady ? "configured" : "needed",
+      account_action: "Use a wallet/provider approval surface for the first supervised live review; do not paste signer secrets into Master Mold.",
+      storage_rule: "Signer credentials stay outside the app in the wallet/provider policy surface.",
+      unlocks: "Human-reviewed signature prompts for a future one-off supervised live path.",
+      next_action: externalSignerReady
+        ? "Keep manual approval required until an audited policy signer is chosen."
+        : "Switch signer mode to manual external wallet and require manual approval for first live review.",
+    },
+    {
+      id: "dexscreener-discovery",
+      label: "DEX Screener discovery",
+      lane: "market-discovery",
+      priority: "next",
+      status: "optional",
+      account_action: "Use public DEX Screener discovery as a low-friction fallback; evaluate paid/API terms before production dependence.",
+      storage_rule: "No secret required for public reads; any paid key should live in server env.",
+      unlocks: "Pair discovery, trending-token context, liquidity checks, and cross-provider sanity checks.",
+      next_action: "Keep as a secondary discovery lane behind Helius/Jupiter-backed wallet and route evidence.",
+    },
+    {
+      id: "birdeye-discovery",
+      label: "Birdeye market feed",
+      lane: "market-discovery",
+      priority: "later",
+      status: "future",
+      account_action: "Provision only after the paper loop proves it needs paid trend, volume, or wallet-flow coverage.",
+      storage_rule: "Server env secret if added.",
+      unlocks: "Higher-coverage market ranking, token profiles, and historical trend enrichment.",
+      next_action: "Defer until the current Helius/Jupiter dry-run rail is green.",
+    },
+    {
+      id: "pumpfun-launch-feed",
+      label: "Pump.fun launch feed",
+      lane: "market-discovery",
+      priority: "later",
+      status: "future",
+      account_action: "Select a supported launch-feed source before building a production sniping worker.",
+      storage_rule: "Server env secret if the selected provider requires one.",
+      unlocks: "Launch timing, bonding-curve and migration context, and first-buyer source evidence.",
+      next_action: "Research and choose the concrete launch feed after read-only wallet and route evidence are stable.",
+    },
+    {
+      id: "yellowstone-grpc-stream",
+      label: "Yellowstone gRPC stream",
+      lane: "read-data",
+      priority: "later",
+      status: input.wsUrl ? "optional" : "future",
+      account_action: "Add only when the local paper daemon needs lower-latency subscription evidence than HTTP polling.",
+      storage_rule: "Server env endpoint/token only.",
+      unlocks: "Low-latency program/account subscriptions for production monitoring workers.",
+      next_action: input.wsUrl
+        ? "Use WebSocket first; defer gRPC until latency tests show a need."
+        : "Defer until the supervised worker exists.",
+    },
+    {
+      id: "emergency-stop",
+      label: "Emergency stop ops",
+      lane: "operations",
+      priority: "next",
+      status: "blocked",
+      account_action: "Define the external kill-switch owner, alert channel, and revocation process before any live executor is enabled.",
+      storage_rule: "Server-side ops policy and audited environment flags; never browser-only.",
+      unlocks: "Fail-closed live-review posture and operator intervention during stuck or unsafe trading loops.",
+      next_action: "Implement and review this before supervised live trading.",
+    },
+    {
+      id: "tax-ledger",
+      label: "Tax/accounting ledger",
+      lane: "accounting",
+      priority: "later",
+      status: "future",
+      account_action: "Choose the export/accounting workflow before real fills are mirrored as authoritative records.",
+      storage_rule: "Persist only reviewed transaction/fill/tax evidence; never store private keys.",
+      unlocks: "Cost-basis, realized PnL, fees, and audit exports for real trades.",
+      next_action: "Defer until settlement reconciliation is complete for supervised fills.",
+    },
+  ];
+  const requiredNow = items.filter((item) => item.priority === "required-now");
+  const missingRequired = requiredNow
+    .filter((item) => item.status !== "configured")
+    .map((item) => item.label);
+  const status: Web3ProviderAccountRunway["status"] = input.canSupportRouteOrderRehearsal
+    ? "dry-run-ready"
+    : input.canSupportReadonlyWalletSync
+      ? "read-rail-ready"
+      : missingRequired.length > 0
+        ? "needs-provider-accounts"
+        : "live-blocked";
+
+  return {
+    mode: "web3-provider-account-runway",
+    status,
+    primary_stack: [
+      "Helius/Solana RPC for read-only chain and wallet intelligence",
+      "Jupiter for quote and unsigned order rehearsal",
+      "Dedicated Solana trading wallet with manual external-wallet approval first",
+      "DEX Screener/public discovery as fallback market context before paid feed expansion",
+    ],
+    required_account_count: requiredNow.length,
+    configured_required_count: requiredNow.length - missingRequired.length,
+    missing_required: missingRequired,
+    items,
+    summary: providerAccountRunwaySummary(status, missingRequired),
+    next_action: providerAccountRunwayNextAction(status, items),
+    controls: [
+      "This runway tracks external accounts and provider setup; it does not create third-party accounts or transmit credentials by itself.",
+      "Only public wallet addresses and non-secret risk preferences may be persisted in the browser.",
+      "Private keys, seed phrases, signed transactions, custody authority, and live execution remain blocked.",
     ],
   };
 }
@@ -463,6 +682,24 @@ function buildCredentialPlan(input: {
       "Live execution remains blocked even when read-only and dry-run credentials are ready.",
     ],
   };
+}
+
+function providerAccountRunwaySummary(status: Web3ProviderAccountRunway["status"], missingRequired: string[]) {
+  if (status === "dry-run-ready") return "Provider accounts are ready for read-only wallet monitoring and dry-run Jupiter order rehearsal; live custody remains blocked.";
+  if (status === "read-rail-ready") return "Provider accounts are ready for read-only wallet monitoring; Jupiter rehearsal and live-ops accounts still need work.";
+  if (missingRequired.length > 0) return `Provider account runway is missing ${missingRequired.join(", ")}.`;
+  return "Provider account runway still blocks live execution until signer, emergency stop, accounting, and production operations are reviewed.";
+}
+
+function providerAccountRunwayNextAction(
+  status: Web3ProviderAccountRunway["status"],
+  items: Web3ProviderAccountRunwayItem[],
+) {
+  if (status === "dry-run-ready") return "Run quote/order rehearsal, then keep live execution behind signer, settlement, emergency-stop, and accounting review.";
+  const missing = items.find((item) => item.priority === "required-now" && item.status !== "configured");
+  if (missing) return missing.next_action;
+  const next = items.find((item) => item.priority === "next" && item.status !== "configured");
+  return next?.next_action ?? "Keep the provider runway in paper/dry-run mode until live ops are reviewed.";
 }
 
 function credentialPlanSummary(status: Web3CredentialPlan["status"], walletAssetsReady: boolean) {

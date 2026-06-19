@@ -60,7 +60,11 @@ The launch checklist now separates provider readiness into a read-provider rail 
 
 Live DEX dry-run reads also expose a read-only wallet activity history receipt when a public wallet and Solana RPC are scoped. It uses `getSignaturesForAddress` to summarize recent signatures, slots, block times, and failure counts with signature previews and hashes only. It does not return raw transaction bodies, sign, submit, decode full swaps, or mutate balances.
 
+When `HELIUS_API_KEY` is set, live DEX dry-run reads can also expose a read-only wallet transaction intelligence receipt from Helius Enhanced Transactions address history. It classifies recent decoded wallet transactions into swap, transfer, mint, burn, failure, or other buckets, counts token/native transfers, estimates visible fees, and hashes signatures. This is context for wallet monitoring and PnL review only. Helius marks Enhanced Transactions as deprecated for new parser coverage, so settlement-critical fills still need standard RPC reconciliation through `getTransaction`/confirmation evidence before live PnL is trusted.
+
 The credential setup response now includes a credential vault plan with four explicit levels: read-only wallet sync, dry-run order rehearsal, supervised live review, and autonomous live trading. Only the first two levels can become ready in the app today. Supervised live and autonomous live stay blocked until signer custody, worker operations, emergency stop, settlement/accounting proof, long-horizon profit proof, and manual live review are separately completed. The plan also labels each input by storage rule: server environment, one-shot session input, browser-safe non-secret, future signer vault, or never-store. Private keys and seed phrases are always `never-store`.
+
+The response also includes a provider account runway. It turns the researched stack into app-visible setup lanes: Helius/Solana read rail, Jupiter execution rehearsal rail, dedicated trading wallet, manual external signer, public DEX discovery fallback, future paid market feeds, future low-latency stream provider, emergency-stop operations, and tax/accounting ledger. This runway tracks which external accounts or provider keys are configured, needed, optional, future, or blocked; it does not create third-party accounts, transmit secrets, or grant live trading authority.
 
 ## API
 
@@ -86,9 +90,11 @@ Useful request fields:
 
 The response is redacted. It returns host-level endpoint information only and never returns API keys, private keys, unsigned transaction bytes, signed transaction bytes, or wallet secrets. The browser form also scrubs Helius and Jupiter API key fields from its saved draft.
 
-The response also returns `credential_plan`, which should be used by the UI and reviewers to see which mode is actually available. `ready-for-read-only` means provider and wallet scope can support read-only accounting. `ready-for-dry-run` means route/order rehearsal can be tested. Neither status grants live signing or wallet mutation.
+The response also returns `credential_plan` and `provider_account_runway`, which should be used by the UI and reviewers to see which mode is actually available and which provider accounts are still missing. `ready-for-read-only` means provider and wallet scope can support read-only accounting. `ready-for-dry-run` means route/order rehearsal can be tested. Neither status grants live signing or wallet mutation.
 
 Reference: Helius documents `getAssetsByOwner` as the DAS method for retrieving Solana wallet-owned assets with pagination: https://www.helius.dev/docs/api-reference/das/getassetsbyowner
+
+Reference: Helius documents Enhanced Transactions address history at `GET /v0/addresses/{address}/transactions` and notes that Enhanced Transactions are deprecated for new parser coverage: https://www.helius.dev/docs/enhanced-transactions/overview
 
 ## Done Criteria For This Gate
 

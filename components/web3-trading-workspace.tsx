@@ -6324,6 +6324,72 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
             </div>
           </Panel>
 
+          <Panel tint="observe" className="p-4 sm:p-5">
+            <PanelHeader
+              as="h2"
+              icon={Activity}
+              title="Wallet transaction intelligence"
+              right={<Chip tone={walletTransactionTone(state.wallet_transaction_intelligence.status)}>{state.wallet_transaction_intelligence.status.replace("-", " ")}</Chip>}
+            />
+            <div className="relative z-10 grid gap-3 lg:grid-cols-[0.78fr_1.22fr]">
+              <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-4">
+                <p className="text-sm leading-6 text-on-surface-variant">{state.wallet_transaction_intelligence.summary}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <MiniStat label="Decoded" value={state.wallet_transaction_intelligence.decoded_transaction_count.toString()} valueClassName={cn("text-sm leading-5", state.wallet_transaction_intelligence.decoded_transaction_count > 0 ? "text-engine" : "text-outline")} />
+                  <MiniStat label="Swaps" value={state.wallet_transaction_intelligence.swap_transaction_count.toString()} valueClassName="text-sm leading-5" />
+                  <MiniStat label="Transfers" value={state.wallet_transaction_intelligence.transfer_transaction_count.toString()} valueClassName="text-sm leading-5" />
+                  <MiniStat label="Failed" value={state.wallet_transaction_intelligence.failed_transaction_count.toString()} valueClassName={cn("text-sm leading-5", state.wallet_transaction_intelligence.failed_transaction_count > 0 ? "text-critical" : "text-outline")} />
+                  <MiniStat label="Token moves" value={state.wallet_transaction_intelligence.token_transfer_count.toString()} valueClassName="text-sm leading-5" />
+                  <MiniStat label="Fee est." value={`${state.wallet_transaction_intelligence.estimated_fee_sol.toFixed(6)} SOL`} valueClassName="text-sm leading-5" />
+                  <MiniStat label="Provider" value={state.wallet_transaction_intelligence.provider_configured ? "Helius" : "missing"} valueClassName={cn("text-sm leading-5", state.wallet_transaction_intelligence.provider_configured ? "text-engine" : "text-caution")} />
+                  <MiniStat label="Raw tx" value={state.wallet_transaction_intelligence.raw_transaction_storage} valueClassName="text-sm leading-5 text-demo" />
+                </div>
+                <p className="mt-3 rounded-md border border-outline-variant/40 bg-void/30 px-3 py-2 text-xs leading-5 text-outline">
+                  {state.wallet_transaction_intelligence.next_action}
+                </p>
+                {state.wallet_transaction_intelligence.recent_types.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {state.wallet_transaction_intelligence.recent_types.slice(0, 5).map((type) => (
+                      <span key={type} className="rounded-md border border-outline-variant/40 bg-void/30 px-2 py-1 font-mono text-[10px] uppercase tracking-telemetry text-outline">
+                        {type}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2">
+                {state.wallet_transaction_intelligence.items.length > 0 ? (
+                  state.wallet_transaction_intelligence.items.slice(0, 6).map((item) => (
+                    <article key={item.signature_hash} className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-display text-base font-semibold text-on-surface">{item.signature_preview}</p>
+                          <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                            {item.type.toLowerCase().replaceAll("_", " ")} · {item.source ?? "unknown source"} · {item.wallet_role.replace("-", " ")}
+                          </p>
+                        </div>
+                        <span className={cn("rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-telemetry", walletTransactionActionClass(item.classified_action))}>
+                          {item.classified_action}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <MiniStat label="Hash" value={shortHash(item.signature_hash)} valueClassName="text-sm leading-5 break-words" />
+                        <MiniStat label="Time" value={item.timestamp ? item.timestamp.slice(0, 10) : "none"} valueClassName="text-sm leading-5" />
+                        <MiniStat label="Tokens" value={item.token_transfer_count.toString()} valueClassName="text-sm leading-5" />
+                        <MiniStat label="Fee" value={`${item.fee_sol.toFixed(6)} SOL`} valueClassName="text-sm leading-5" />
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-sm leading-6 text-outline">
+                    No decoded wallet transactions have been fetched yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          </Panel>
+
           <Panel tint="act" className="p-4 sm:p-5">
             <PanelHeader
               as="h2"
@@ -17673,6 +17739,20 @@ function walletActivityTone(status: Web3TradingState["wallet_activity_history"][
   if (status === "blocked") return "critical";
   if (status === "not-configured" || status === "missing-wallet") return "caution";
   return "neutral";
+}
+
+function walletTransactionTone(status: Web3TradingState["wallet_transaction_intelligence"]["status"]) {
+  if (status === "ready") return "engine";
+  if (status === "blocked") return "critical";
+  if (status === "not-configured" || status === "missing-wallet") return "caution";
+  return "neutral";
+}
+
+function walletTransactionActionClass(action: Web3TradingState["wallet_transaction_intelligence"]["items"][number]["classified_action"]) {
+  if (action === "failure") return "border-critical/40 bg-critical/10 text-critical";
+  if (action === "swap") return "border-engine/40 bg-engine/10 text-engine";
+  if (action === "transfer") return "border-caution/40 bg-caution/10 text-caution";
+  return "border-outline-variant/50 bg-surface-high/40 text-outline";
 }
 
 function onchainEventActionClass(action: string) {

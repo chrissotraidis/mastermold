@@ -271,7 +271,32 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "blocked",
       storage: "never-store",
     });
+    expect(readiness.provider_account_runway).toMatchObject({
+      mode: "web3-provider-account-runway",
+      status: "dry-run-ready",
+      configured_required_count: 3,
+      required_account_count: 3,
+      missing_required: [],
+    });
+    expect(readiness.provider_account_runway.primary_stack).toEqual([
+      "Helius/Solana RPC for read-only chain and wallet intelligence",
+      "Jupiter for quote and unsigned order rehearsal",
+      "Dedicated Solana trading wallet with manual external-wallet approval first",
+      "DEX Screener/public discovery as fallback market context before paid feed expansion",
+    ]);
+    expect(readiness.provider_account_runway.items.find((item) => item.id === "helius-read-rail")).toMatchObject({
+      status: "configured",
+      lane: "read-data",
+      priority: "required-now",
+      storage_rule: expect.stringContaining("Server env"),
+    });
+    expect(readiness.provider_account_runway.items.find((item) => item.id === "emergency-stop")).toMatchObject({
+      status: "blocked",
+      lane: "operations",
+      priority: "next",
+    });
     expect(JSON.stringify(readiness)).not.toContain("test-key");
+    expect(JSON.stringify(readiness)).not.toContain("test-jupiter-key");
     expect(readiness.checks.find((check) => check.id === "live-boundary")).toMatchObject({
       status: "pass",
       detail: expect.stringContaining("real-capital execution remains blocked"),
@@ -716,6 +741,14 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
       signature_count: 0,
+    });
+    expect(breakout.wallet_transaction_intelligence).toMatchObject({
+      mode: "read-only-wallet-transaction-intelligence",
+      status: "missing-wallet",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      raw_transaction_storage: "blocked",
+      decoded_transaction_count: 0,
     });
     expect(["follow", "probe", "defensive", "exit", "idle"]).toContain(breakout.smart_money_sentinel.status);
     expect(breakout.smart_money_sentinel.items.length).toBeGreaterThan(0);
@@ -6915,6 +6948,36 @@ describe("Web3 autonomous trading subsystem", () => {
           });
         }
       }
+      if (url.includes("/v0/addresses/11111111111111111111111111111111/transactions")) {
+        return Response.json([
+          {
+            signature: "5EnhancedTxSig111111111111111111111111111111111111111",
+            type: "SWAP",
+            source: "JUPITER",
+            timestamp: 1_781_893_210,
+            fee: 5_000,
+            feePayer: "11111111111111111111111111111111",
+            tokenTransfers: [
+              { fromUserAccount: "11111111111111111111111111111111", mint: "So11111111111111111111111111111111111111112", tokenAmount: 1.2 },
+              { toUserAccount: "11111111111111111111111111111111", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", tokenAmount: 100_000 },
+            ],
+            nativeTransfers: [],
+          },
+          {
+            signature: "5EnhancedTxSig222222222222222222222222222222222222222",
+            type: "TRANSFER",
+            source: "SYSTEM_PROGRAM",
+            timestamp: 1_781_893_111,
+            fee: 5_000,
+            feePayer: "OtherFeePayer11111111111111111111111111",
+            tokenTransfers: [],
+            nativeTransfers: [
+              { fromUserAccount: "11111111111111111111111111111111", toUserAccount: "OtherWallet111111111111111111111111111", amount: 1_000_000 },
+            ],
+            transactionError: { InstructionError: [0, "Custom"] },
+          },
+        ]);
+      }
       if (url.includes("/token-boosts/top/v1")) {
         return Response.json([
           { chainId: "solana", tokenAddress: "TokenLive111", amount: 6, totalAmount: 9 },
@@ -7080,6 +7143,36 @@ describe("Web3 autonomous trading subsystem", () => {
       memo_present: false,
     });
     expect(JSON.stringify(state.wallet_activity_history)).not.toContain("5WalletActivitySig1111111111111111111111111111111111111");
+    expect(state.wallet_transaction_intelligence).toMatchObject({
+      mode: "read-only-wallet-transaction-intelligence",
+      status: "ready",
+      provider: "helius-enhanced-transactions",
+      provider_configured: true,
+      decoded_transaction_count: 2,
+      swap_transaction_count: 1,
+      transfer_transaction_count: 0,
+      failed_transaction_count: 1,
+      token_transfer_count: 2,
+      native_transfer_count: 1,
+      estimated_fee_sol: 0.00001,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      raw_transaction_storage: "blocked",
+    });
+    expect(state.wallet_transaction_intelligence.items[0]).toMatchObject({
+      signature_preview: "5Enhan...111111",
+      signature_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      type: "SWAP",
+      source: "JUPITER",
+      classified_action: "swap",
+      wallet_role: "fee-payer",
+    });
+    expect(state.wallet_transaction_intelligence.items[1]).toMatchObject({
+      classified_action: "failure",
+      wallet_role: "participant",
+    });
+    expect(JSON.stringify(state.wallet_transaction_intelligence)).not.toContain("5EnhancedTxSig111111111111111111111111111111111111111");
+    expect(JSON.stringify(state.wallet_transaction_intelligence)).not.toContain("test-helius-wallet-accounting");
     expect(state.live_wallet_accounting_readiness).toMatchObject({
       mode: "live-wallet-accounting-readiness",
       status: "pricing-gapped",
@@ -7096,6 +7189,10 @@ describe("Web3 autonomous trading subsystem", () => {
       priced_wallet_mint_count: 2,
       unpriced_token_account_count: 1,
       portfolio_applied: true,
+      transaction_intelligence_status: "ready",
+      decoded_transaction_count: 2,
+      swap_transaction_count: 1,
+      failed_transaction_count: 1,
       can_trust_live_pnl: false,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
@@ -7107,6 +7204,7 @@ describe("Web3 autonomous trading subsystem", () => {
       "holdings-sync",
       "pricing-coverage",
       "portfolio-application",
+      "transaction-decode",
       "settlement-evidence",
       "mirror-evidence",
       "mutation-boundary",

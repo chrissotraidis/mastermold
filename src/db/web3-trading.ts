@@ -8442,6 +8442,43 @@ export type WalletActivityHistory = {
   items: WalletActivityHistoryItem[];
 };
 
+export type WalletTransactionIntelligenceItem = {
+  signature_preview: string;
+  signature_hash: string;
+  type: string;
+  source: string | null;
+  timestamp: string | null;
+  fee_sol: number;
+  token_transfer_count: number;
+  native_transfer_count: number;
+  classified_action: "swap" | "transfer" | "mint" | "burn" | "failure" | "other";
+  wallet_role: "fee-payer" | "participant" | "unknown";
+};
+
+export type WalletTransactionIntelligence = {
+  mode: "read-only-wallet-transaction-intelligence";
+  status: "missing-wallet" | "not-configured" | "ready" | "empty" | "blocked";
+  wallet_public_key: string | null;
+  provider: "helius-enhanced-transactions";
+  provider_configured: boolean;
+  decoded_transaction_count: number;
+  swap_transaction_count: number;
+  transfer_transaction_count: number;
+  failed_transaction_count: number;
+  token_transfer_count: number;
+  native_transfer_count: number;
+  estimated_fee_sol: number;
+  recent_types: string[];
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  raw_transaction_storage: "blocked";
+  summary: string;
+  next_action: string;
+  blockers: string[];
+  controls: string[];
+  items: WalletTransactionIntelligenceItem[];
+};
+
 export type ExecutionGate = {
   mode: ExecutionMode;
   live_execution_enabled: false;
@@ -8656,6 +8693,7 @@ export type LiveWalletAccountingReadinessCheck = {
     | "holdings-sync"
     | "pricing-coverage"
     | "portfolio-application"
+    | "transaction-decode"
     | "settlement-evidence"
     | "mirror-evidence"
     | "mutation-boundary";
@@ -8682,6 +8720,11 @@ export type LiveWalletAccountingReadiness = {
   unpriced_token_account_count: number;
   total_value_usd: number;
   portfolio_applied: boolean;
+  transaction_intelligence_status: WalletTransactionIntelligence["status"];
+  decoded_transaction_count: number;
+  swap_transaction_count: number;
+  transfer_transaction_count: number;
+  failed_transaction_count: number;
   settlement_status: SettlementFillReconciliationReport["status"] | "not-run";
   mirror_status: PortfolioMirrorApplyReport["status"] | "not-run";
   can_trust_live_pnl: boolean;
@@ -9296,6 +9339,7 @@ export type Web3TradingState = {
   portfolio: TradingPortfolio;
   wallet_holdings_adapter: WalletHoldingsAdapter;
   wallet_activity_history: WalletActivityHistory;
+  wallet_transaction_intelligence: WalletTransactionIntelligence;
   live_wallet_accounting_readiness: LiveWalletAccountingReadiness;
   position_watch: PositionWatch[];
   position_exit_ladder: PositionExitLadderEngine;
@@ -13303,6 +13347,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     const fallbackFetchImpl = input.fetchImpl ?? fetch;
     const fallbackWalletHoldings = await buildReadOnlyWalletHoldingsAdapter(applyScenario(baseMarket, scenario, cycles), executionConfig, fallbackFetchImpl, live.discovery);
     const fallbackWalletActivityHistory = await fetchReadOnlyWalletActivityHistory(executionConfig, fallbackFetchImpl);
+    const fallbackWalletTransactionIntelligence = await fetchReadOnlyWalletTransactionIntelligence(executionConfig, fallbackFetchImpl);
     const fallbackState = buildWeb3TradingState({
       scenario,
       cycles,
@@ -13320,6 +13365,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       portfolioOverride: fallbackWalletHoldings.portfolio ?? undefined,
       walletHoldingsAdapter: fallbackWalletHoldings.report,
       walletActivityHistory: fallbackWalletActivityHistory,
+      walletTransactionIntelligence: fallbackWalletTransactionIntelligence,
     });
     applyOnchainEventSignals(fallbackState, parseLedgerData(readLedger()?.data).onchain_events);
     const requestedAdvanceMode = persistentPaperAdvanceMode(input, fallbackState, daemonRequested);
@@ -13339,6 +13385,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
   const fetchImpl = input.fetchImpl ?? fetch;
   const walletHoldings = await buildReadOnlyWalletHoldingsAdapter(live.market, executionConfig, fetchImpl, live.discovery);
   const walletActivityHistory = await fetchReadOnlyWalletActivityHistory(executionConfig, fetchImpl);
+  const walletTransactionIntelligence = await fetchReadOnlyWalletTransactionIntelligence(executionConfig, fetchImpl);
   const liveState = buildWeb3TradingState({
     scenario,
     cycles,
@@ -13356,6 +13403,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     portfolioOverride: walletHoldings.portfolio ?? undefined,
     walletHoldingsAdapter: walletHoldings.report,
     walletActivityHistory,
+    walletTransactionIntelligence,
   });
   applyOnchainEventSignals(liveState, parseLedgerData(readLedger()?.data).onchain_events);
   const requestedAdvanceMode = persistentPaperAdvanceMode(input, liveState, daemonRequested);
@@ -13408,6 +13456,7 @@ function buildWeb3TradingState({
   portfolioOverride,
   walletHoldingsAdapter,
   walletActivityHistory,
+  walletTransactionIntelligence,
 }: {
   scenario: TradingScenario;
   cycles: number;
@@ -13419,12 +13468,17 @@ function buildWeb3TradingState({
   portfolioOverride?: TradingPortfolio;
   walletHoldingsAdapter?: WalletHoldingsAdapter;
   walletActivityHistory?: WalletActivityHistory;
+  walletTransactionIntelligence?: WalletTransactionIntelligence;
 }): Web3TradingState {
   const signals = market.map(scoreMarket).sort((a, b) => b.score - a.score);
   const portfolio = portfolioOverride ?? buildPortfolio(market);
   const wallet_holdings_adapter = walletHoldingsAdapter ?? idleWalletHoldingsAdapter(executionConfig.wallet_public_key);
   const wallet_activity_history = walletActivityHistory ?? idleWalletActivityHistory(executionConfig.wallet_public_key);
-  const live_wallet_accounting_readiness = buildLiveWalletAccountingReadiness({ walletHoldings: wallet_holdings_adapter });
+  const wallet_transaction_intelligence = walletTransactionIntelligence ?? idleWalletTransactionIntelligence(executionConfig.wallet_public_key);
+  const live_wallet_accounting_readiness = buildLiveWalletAccountingReadiness({
+    walletHoldings: wallet_holdings_adapter,
+    transactionIntelligence: wallet_transaction_intelligence,
+  });
   const strategy_lab = buildStrategyLab();
   const discovery_tape = discoveryTape ?? sampleDiscoveryTape(market);
   const trend_catalyst = buildTrendCatalystIntelligence(market, discovery_tape);
@@ -15591,6 +15645,7 @@ function buildWeb3TradingState({
     portfolio: appliedPortfolio,
     wallet_holdings_adapter,
     wallet_activity_history,
+    wallet_transaction_intelligence,
     live_wallet_accounting_readiness,
     position_watch,
     position_exit_ladder,
@@ -21755,6 +21810,217 @@ function walletActivityHistoryControls() {
   ];
 }
 
+type HeliusEnhancedTransactionRow = {
+  signature?: string;
+  type?: string;
+  source?: string;
+  timestamp?: number;
+  fee?: number;
+  feePayer?: string;
+  tokenTransfers?: unknown[];
+  nativeTransfers?: unknown[];
+  transactionError?: unknown;
+  error?: unknown;
+  description?: string;
+};
+
+async function fetchReadOnlyWalletTransactionIntelligence(
+  executionConfig: ExecutionConfig,
+  fetchImpl: FetchLike,
+): Promise<WalletTransactionIntelligence> {
+  const wallet = executionConfig.wallet_public_key;
+  const apiKey = typeof process.env.HELIUS_API_KEY === "string" ? process.env.HELIUS_API_KEY.trim() : "";
+  if (!wallet || !isLikelySolanaPublicKey(wallet)) {
+    return idleWalletTransactionIntelligence(wallet);
+  }
+  if (!apiKey) {
+    return {
+      ...idleWalletTransactionIntelligence(wallet),
+      status: "not-configured",
+      provider_configured: false,
+      summary: "Wallet transaction intelligence is waiting for HELIUS_API_KEY.",
+      next_action: "Configure HELIUS_API_KEY to decode recent wallet swaps/transfers in read-only mode.",
+      blockers: ["HELIUS_API_KEY is not configured."],
+    };
+  }
+
+  const url = heliusAddressTransactionsUrl(wallet, apiKey);
+  try {
+    const response = await fetchImpl(url, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+    const parsed = await safeJson(response);
+    if (!response.ok) {
+      throw new Error(`Helius enhanced wallet transaction read failed with ${response.status}.`);
+    }
+    const rows = Array.isArray(parsed) ? parsed as HeliusEnhancedTransactionRow[] : [];
+    const items = rows
+      .filter((row) => typeof row.signature === "string" && row.signature.length > 0)
+      .slice(0, 10)
+      .map((row) => walletTransactionIntelligenceItem(row, wallet));
+    const swapCount = items.filter((item) => item.classified_action === "swap").length;
+    const transferCount = items.filter((item) => item.classified_action === "transfer").length;
+    const failedCount = items.filter((item) => item.classified_action === "failure").length;
+    const tokenTransferCount = items.reduce((sum, item) => sum + item.token_transfer_count, 0);
+    const nativeTransferCount = items.reduce((sum, item) => sum + item.native_transfer_count, 0);
+    const estimatedFeeSol = roundTo(items.reduce((sum, item) => sum + item.fee_sol, 0), 9);
+    const recentTypes = uniqueNonEmpty(items.map((item) => item.type)).slice(0, 6);
+    return {
+      mode: "read-only-wallet-transaction-intelligence",
+      status: items.length > 0 ? "ready" : "empty",
+      wallet_public_key: wallet,
+      provider: "helius-enhanced-transactions",
+      provider_configured: true,
+      decoded_transaction_count: items.length,
+      swap_transaction_count: swapCount,
+      transfer_transaction_count: transferCount,
+      failed_transaction_count: failedCount,
+      token_transfer_count: tokenTransferCount,
+      native_transfer_count: nativeTransferCount,
+      estimated_fee_sol: estimatedFeeSol,
+      recent_types: recentTypes,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      raw_transaction_storage: "blocked",
+      summary: items.length > 0
+        ? `Decoded ${items.length} recent wallet transaction${items.length === 1 ? "" : "s"} through Helius; ${swapCount} swap-like, ${transferCount} transfer-like, ${failedCount} failed.`
+        : "Helius returned no recent decoded wallet transactions for this public key.",
+      next_action: items.length > 0
+        ? "Use decoded transaction classes as read-only PnL/accounting context; still reconcile fills before trusting live PnL."
+        : "Keep read-only wallet monitoring armed; no decoded transaction history was returned.",
+      blockers: [],
+      controls: walletTransactionIntelligenceControls(),
+      items,
+    };
+  } catch (error) {
+    return {
+      ...idleWalletTransactionIntelligence(wallet),
+      status: "blocked",
+      provider_configured: true,
+      summary: error instanceof Error ? error.message : "Helius enhanced wallet transaction read failed.",
+      next_action: "Retry the read-only Helius transaction decoder before trusting wallet transaction classification.",
+      blockers: [error instanceof Error ? error.message : "Helius enhanced wallet transaction read failed."],
+    };
+  }
+}
+
+function idleWalletTransactionIntelligence(wallet: string | null): WalletTransactionIntelligence {
+  const providerConfigured = Boolean(process.env.HELIUS_API_KEY);
+  return {
+    mode: "read-only-wallet-transaction-intelligence",
+    status: wallet ? providerConfigured ? "empty" : "not-configured" : "missing-wallet",
+    wallet_public_key: wallet,
+    provider: "helius-enhanced-transactions",
+    provider_configured: providerConfigured,
+    decoded_transaction_count: 0,
+    swap_transaction_count: 0,
+    transfer_transaction_count: 0,
+    failed_transaction_count: 0,
+    token_transfer_count: 0,
+    native_transfer_count: 0,
+    estimated_fee_sol: 0,
+    recent_types: [],
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    raw_transaction_storage: "blocked",
+    summary: wallet
+      ? providerConfigured
+        ? "Wallet transaction intelligence has not fetched decoded Helius history for this state."
+        : "Wallet transaction intelligence is waiting for HELIUS_API_KEY."
+      : "Wallet transaction intelligence is waiting for a public wallet key.",
+    next_action: wallet
+      ? providerConfigured
+        ? "Run a live DEX/RPC read to decode recent wallet transaction classes."
+        : "Configure HELIUS_API_KEY to decode recent wallet swaps/transfers in read-only mode."
+      : "Scope a public wallet key before decoding wallet transaction history.",
+    blockers: wallet ? providerConfigured ? [] : ["HELIUS_API_KEY is not configured."] : ["Public wallet key is not configured."],
+    controls: walletTransactionIntelligenceControls(),
+    items: [],
+  };
+}
+
+function walletTransactionIntelligenceItem(
+  row: HeliusEnhancedTransactionRow,
+  wallet: string,
+): WalletTransactionIntelligenceItem {
+  const signature = row.signature ?? "";
+  const type = normalizeEnhancedTransactionType(row.type);
+  const source = typeof row.source === "string" && row.source.length > 0 ? row.source : null;
+  const tokenTransfers = Array.isArray(row.tokenTransfers) ? row.tokenTransfers : [];
+  const nativeTransfers = Array.isArray(row.nativeTransfers) ? row.nativeTransfers : [];
+  const failed = row.transactionError !== null && row.transactionError !== undefined || row.error !== null && row.error !== undefined;
+  return {
+    signature_preview: redactSignature(signature),
+    signature_hash: createHash("sha256").update(signature).digest("hex"),
+    type,
+    source,
+    timestamp: typeof row.timestamp === "number" ? new Date(row.timestamp * 1_000).toISOString() : null,
+    fee_sol: typeof row.fee === "number" && Number.isFinite(row.fee) ? roundTo(row.fee / 1_000_000_000, 9) : 0,
+    token_transfer_count: tokenTransfers.length,
+    native_transfer_count: nativeTransfers.length,
+    classified_action: classifyWalletTransaction(type, failed, tokenTransfers.length, nativeTransfers.length),
+    wallet_role: walletTransactionRole(row, wallet, tokenTransfers, nativeTransfers),
+  };
+}
+
+function heliusAddressTransactionsUrl(wallet: string, apiKey: string) {
+  const url = new URL(`https://mainnet.helius-rpc.com/v0/addresses/${encodeURIComponent(wallet)}/transactions`);
+  url.searchParams.set("api-key", apiKey);
+  url.searchParams.set("limit", "10");
+  return url.toString();
+}
+
+function normalizeEnhancedTransactionType(value: unknown) {
+  const type = typeof value === "string" ? value.trim().toUpperCase() : "";
+  return type || "UNKNOWN";
+}
+
+function classifyWalletTransaction(
+  type: string,
+  failed: boolean,
+  tokenTransfers: number,
+  nativeTransfers: number,
+): WalletTransactionIntelligenceItem["classified_action"] {
+  if (failed) return "failure";
+  if (type.includes("SWAP")) return "swap";
+  if (type.includes("TRANSFER") || tokenTransfers > 0 || nativeTransfers > 0) return "transfer";
+  if (type.includes("MINT")) return "mint";
+  if (type.includes("BURN")) return "burn";
+  return "other";
+}
+
+function walletTransactionRole(
+  row: HeliusEnhancedTransactionRow,
+  wallet: string,
+  tokenTransfers: unknown[],
+  nativeTransfers: unknown[],
+): WalletTransactionIntelligenceItem["wallet_role"] {
+  if (row.feePayer === wallet) return "fee-payer";
+  const lowerWallet = wallet.toLowerCase();
+  const transferText = JSON.stringify([...tokenTransfers, ...nativeTransfers]).toLowerCase();
+  if (transferText.includes(lowerWallet)) return "participant";
+  return "unknown";
+}
+
+function walletTransactionIntelligenceControls() {
+  return [
+    "Uses Helius enhanced address transactions as a read-only classifier for recent swaps, transfers, failures, and fees.",
+    "The Helius Enhanced Transactions API is deprecated for new parser coverage, so this receipt is context only; settlement-critical fills still need standard RPC reconciliation.",
+    "Raw transaction bodies, full signatures, signed payloads, private keys, approvals, and wallet mutation are never returned or stored.",
+  ];
+}
+
+function uniqueNonEmpty(values: string[]) {
+  return [...new Set(values.filter((value) => value.length > 0))];
+}
+
+function roundTo(value: number, digits: number) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
 function redactSignature(signature: string) {
   if (signature.length <= 16) return signature;
   return `${signature.slice(0, 6)}...${signature.slice(-6)}`;
@@ -22819,6 +23085,7 @@ function attachLiveWalletAccountingReadiness(state: Web3TradingState): Web3Tradi
     ...state,
     live_wallet_accounting_readiness: buildLiveWalletAccountingReadiness({
       walletHoldings: state.wallet_holdings_adapter,
+      transactionIntelligence: state.wallet_transaction_intelligence,
       settlement: state.settlement_fill_reconciliation,
       mirror: state.portfolio_mirror_apply,
     }),
@@ -22827,10 +23094,12 @@ function attachLiveWalletAccountingReadiness(state: Web3TradingState): Web3Tradi
 
 function buildLiveWalletAccountingReadiness({
   walletHoldings,
+  transactionIntelligence,
   settlement,
   mirror,
 }: {
   walletHoldings: WalletHoldingsAdapter;
+  transactionIntelligence?: WalletTransactionIntelligence;
   settlement?: SettlementFillReconciliationReport;
   mirror?: PortfolioMirrorApplyReport;
 }): LiveWalletAccountingReadiness {
@@ -22840,6 +23109,8 @@ function buildLiveWalletAccountingReadiness({
   const portfolioApplied = walletHoldings.portfolio_applied && walletHoldings.matched_position_count > 0;
   const settlementStatus = settlement?.status ?? "not-run";
   const mirrorStatus = mirror?.status ?? "not-run";
+  const transactionStatus = transactionIntelligence?.status ?? "not-configured";
+  const transactionDecodeHealthy = transactionStatus === "ready" || transactionStatus === "empty" || transactionStatus === "not-configured" || transactionStatus === "missing-wallet";
   const settlementHealthy = settlementStatus === "not-run" || settlementStatus === "pending" || settlementStatus === "reconciled";
   const mirrorHealthy = mirrorStatus === "not-run" || mirrorStatus === "idle" || mirrorStatus === "applied" || mirrorStatus === "duplicate";
   const canTrustLivePnl = walletScoped &&
@@ -22847,6 +23118,7 @@ function buildLiveWalletAccountingReadiness({
     walletHoldings.status === "synced" &&
     pricingClean &&
     portfolioApplied &&
+    transactionDecodeHealthy &&
     settlementHealthy &&
     mirrorHealthy;
   const blockers = [
@@ -22858,6 +23130,7 @@ function buildLiveWalletAccountingReadiness({
     walletHoldings.unpriced_token_account_count > 0 ? `Price or explicitly review ${walletHoldings.unpriced_token_account_count} unpriced wallet token account${walletHoldings.unpriced_token_account_count === 1 ? "" : "s"} before trusting live PnL.` : null,
     walletHoldings.status === "synced" && walletHoldings.priced_wallet_mint_count > 0 && !portfolioApplied ? "Apply priced wallet holdings into the local portfolio mirror before trusting live PnL." : null,
     walletHoldings.status === "empty" ? "Wallet scan completed, but no priced held memecoin position is available for autonomous PnL accounting." : null,
+    transactionStatus === "blocked" ? transactionIntelligence?.next_action ?? "Resolve wallet transaction decode blockers before trusting wallet transaction classification." : null,
     settlementStatus === "ambiguous" || settlementStatus === "failed" || settlementStatus === "blocked" ? settlement?.next_action ?? "Resolve settlement reconciliation before trusting live PnL." : null,
     mirrorStatus === "blocked" ? mirror?.next_action ?? "Resolve portfolio mirror blockers before trusting live PnL." : null,
   ].filter((item): item is string => Boolean(item));
@@ -22903,6 +23176,14 @@ function buildLiveWalletAccountingReadiness({
       detail: portfolioApplied
         ? `${walletHoldings.matched_position_count} priced wallet position${walletHoldings.matched_position_count === 1 ? "" : "s"} applied to the local portfolio.`
         : "Priced wallet holdings have not produced a trusted portfolio mirror.",
+    },
+    {
+      id: "transaction-decode",
+      label: "Transaction decode",
+      status: transactionStatus === "ready" || transactionStatus === "empty" ? "pass" : transactionStatus === "blocked" ? "fail" : "watch",
+      detail: transactionIntelligence
+        ? `${transactionStatus.replaceAll("-", " ")}; ${transactionIntelligence.decoded_transaction_count} decoded transaction${transactionIntelligence.decoded_transaction_count === 1 ? "" : "s"}, ${transactionIntelligence.swap_transaction_count} swap-like, ${transactionIntelligence.failed_transaction_count} failed.`
+        : "Helius enhanced transaction decode has not run for this wallet.",
     },
     {
       id: "settlement-evidence",
@@ -22962,6 +23243,11 @@ function buildLiveWalletAccountingReadiness({
     unpriced_token_account_count: walletHoldings.unpriced_token_account_count,
     total_value_usd: walletHoldings.total_value_usd,
     portfolio_applied: walletHoldings.portfolio_applied,
+    transaction_intelligence_status: transactionStatus,
+    decoded_transaction_count: transactionIntelligence?.decoded_transaction_count ?? 0,
+    swap_transaction_count: transactionIntelligence?.swap_transaction_count ?? 0,
+    transfer_transaction_count: transactionIntelligence?.transfer_transaction_count ?? 0,
+    failed_transaction_count: transactionIntelligence?.failed_transaction_count ?? 0,
     settlement_status: settlementStatus,
     mirror_status: mirrorStatus,
     can_trust_live_pnl: canTrustLivePnl,
@@ -22973,6 +23259,7 @@ function buildLiveWalletAccountingReadiness({
     controls: [
       "This readiness receipt is read-only accounting evidence; it never signs, submits, approves, transfers, or mutates wallet funds.",
       "Helius DAS asset index proof is aggregate-only provider coverage for wallet-held assets and does not store raw wallet holdings.",
+      "Helius transaction intelligence is a redacted read-only classifier for recent wallet swaps/transfers/failures; raw transaction bodies and full signatures are not stored.",
       "Live PnL is trusted only when a valid wallet, RPC scan, full pricing coverage, and local portfolio mirror all pass.",
       "Settlement and portfolio-mirror evidence can strengthen accounting after an externally signed, confirmed transaction, but still cannot unlock real-capital autonomy.",
     ],
