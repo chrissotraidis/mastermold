@@ -4036,6 +4036,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_profit_accountability.repair_plan.recommended_ticks).toBeLessThanOrEqual(3);
     expect(state.autonomous_profit_accountability.repair_plan.recommended_max_total_fills).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_profit_accountability.repair_plan.recommended_max_total_fills).toBeLessThanOrEqual(3);
+    expect(typeof state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_ready).toBe("boolean");
+    expect(state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_summary === null || typeof state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_summary === "string").toBe(true);
+    expect(state.autonomous_profit_accountability.repair_plan.blocking_reason === null || typeof state.autonomous_profit_accountability.repair_plan.blocking_reason === "string").toBe(true);
     expect(state.autonomous_profit_accountability.repair_plan.live_execution_permission).toBe("blocked");
     expect(state.autonomous_profit_accountability.repair_plan.wallet_mutation_permission).toBe("blocked");
     if (state.autonomous_profit_accountability.repair_plan.request) {
@@ -7191,8 +7194,12 @@ describe("Web3 autonomous trading subsystem", () => {
       wallet_mutation_permission: "blocked",
     });
     expect(state.autonomous_route_refresh_execution.local_rehearsal?.summary).toContain("paper repair");
-    expect(state.autonomous_profit_accountability.repair_plan.status).toBe("refresh-first");
-    expect(state.autonomous_profit_accountability.repair_plan.request?.body.route_refresh).toEqual({ action: "request-quote" });
+    expect(state.autonomous_profit_accountability.repair_plan.status).toBe("blocked");
+    expect(state.autonomous_profit_accountability.repair_plan.route_refresh_required).toBe(false);
+    expect(state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_ready).toBe(true);
+    expect(state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_summary).toContain("paper repair");
+    expect(state.autonomous_profit_accountability.repair_plan.blocking_reason).toBeTruthy();
+    expect(state.autonomous_profit_accountability.repair_plan.request).toBeNull();
     expect(state.autonomous_profit_accountability.repair_plan.live_execution_permission).toBe("blocked");
     expect(state.autonomous_profit_accountability.repair_plan.wallet_mutation_permission).toBe("blocked");
   });

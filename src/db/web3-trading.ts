@@ -6822,6 +6822,9 @@ export type AutonomousProfitAccountabilityRepairPlan = {
   recommended_max_protective_sells: number;
   recommended_size_multiplier: number;
   route_refresh_required: boolean;
+  local_route_rehearsal_ready: boolean;
+  local_route_rehearsal_summary: string | null;
+  blocking_reason: string | null;
   can_run_local_paper: boolean;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -13136,6 +13139,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       burstFillExecution: configuredState.autonomous_burst_fill_execution,
       directive: configuredState.autonomous_trading_directive,
       sessionRun: configuredState.autonomous_session_run,
+      routeRefreshExecution: configuredState.autonomous_route_refresh_execution,
     });
     configuredState.autonomous_loop_feedback = buildAutonomousLoopFeedback({
       daemonMemory: configuredState.paper_daemon_memory,
@@ -15280,6 +15284,7 @@ function buildWeb3TradingState({
     burstFillExecution: autonomous_burst_fill_execution,
     directive: autonomous_trading_directive,
     sessionRun: autonomous_session_run,
+    routeRefreshExecution: autonomous_route_refresh_execution,
   });
   const autonomous_loop_feedback = buildAutonomousLoopFeedback({
     daemonMemory: paper_daemon_memory,
@@ -17728,6 +17733,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     burstFillExecution: autonomous_burst_fill_execution,
     directive: autonomous_trading_directive,
     sessionRun: state.autonomous_session_run,
+    routeRefreshExecution: autonomous_route_refresh_execution,
   });
   const autonomous_loop_feedback = buildAutonomousLoopFeedback({
     daemonMemory: paper_daemon_memory,
@@ -18506,6 +18512,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     burstFillExecution: autonomous_burst_fill_execution,
     directive: state.autonomous_trading_directive,
     sessionRun: state.autonomous_session_run,
+    routeRefreshExecution: state.autonomous_route_refresh_execution,
   });
   const autonomous_loop_feedback = buildAutonomousLoopFeedback({
     daemonMemory: state.paper_daemon_memory,
@@ -25274,6 +25281,7 @@ function applyPersistentLedger(
     burstFillExecution: autonomous_burst_fill_execution,
     directive: autonomous_trading_directive,
     sessionRun: state.autonomous_session_run,
+    routeRefreshExecution: autonomous_route_refresh_execution,
   });
   const autonomous_loop_feedback = buildAutonomousLoopFeedback({
     daemonMemory: paper_daemon_memory,
@@ -52466,6 +52474,7 @@ function buildAutonomousProfitAccountability({
   burstFillExecution,
   directive,
   sessionRun,
+  routeRefreshExecution,
 }: {
   walletTelemetry: AutonomousWalletTelemetry;
   performance: PerformanceScorecard;
@@ -52476,6 +52485,7 @@ function buildAutonomousProfitAccountability({
   burstFillExecution: AutonomousBurstFillExecution;
   directive: AutonomousTradingDirective;
   sessionRun: AutonomousSessionRunReport;
+  routeRefreshExecution?: AutonomousRouteRefreshExecution;
 }): AutonomousProfitAccountability {
   const makingMoney = walletTelemetry.net_pnl_usd > 0 || walletTelemetry.window_pnl_usd > 0 || performance.net_pnl_usd > 0;
   const walletScore = clamp(Math.round(
@@ -52628,6 +52638,7 @@ function buildAutonomousProfitAccountability({
     dailyProfitLock,
     burstOutcomeFeedback,
     directive,
+    routeRefreshExecution,
     items,
   });
 
@@ -52674,6 +52685,7 @@ function buildAutonomousProfitAccountabilityRepairPlan({
   dailyProfitLock,
   burstOutcomeFeedback,
   directive,
+  routeRefreshExecution,
   items,
 }: {
   status: AutonomousProfitAccountability["status"];
@@ -52686,6 +52698,7 @@ function buildAutonomousProfitAccountabilityRepairPlan({
   dailyProfitLock: AutonomousDailyProfitLock;
   burstOutcomeFeedback: AutonomousBurstOutcomeFeedback;
   directive: AutonomousTradingDirective;
+  routeRefreshExecution?: AutonomousRouteRefreshExecution;
   items: AutonomousProfitAccountabilityItem[];
 }): AutonomousProfitAccountabilityRepairPlan {
   const targetScore = 70;
@@ -52695,7 +52708,8 @@ function buildAutonomousProfitAccountabilityRepairPlan({
     score: 0,
   };
   const scoreGap = Math.max(0, targetScore - accountabilityScore);
-  const routeRefreshRequired = directive.read_only_refresh_required ||
+  const localRouteRehearsalReady = routeRefreshExecution?.local_rehearsal_ready === true;
+  const routeRefreshPressure = directive.read_only_refresh_required ||
     action === "refresh-proof" ||
     /route|quote|preflight/i.test([
       profitRunGuard.stop_reason,
@@ -52703,6 +52717,7 @@ function buildAutonomousProfitAccountabilityRepairPlan({
       burstOutcomeFeedback.next_action,
       directive.next_action,
     ].filter(Boolean).join(" "));
+  const routeRefreshRequired = routeRefreshPressure && !localRouteRehearsalReady;
   const complete = makingMoney && accountabilityScore >= targetScore;
   const hardBlocked = status === "blocked" ||
     profitRunGuard.status === "blocked" ||
@@ -52727,6 +52742,12 @@ function buildAutonomousProfitAccountabilityRepairPlan({
     ? 0
     : Math.max(1, Math.min(2, dailyProfitLock.max_next_fills || recommendedMaxTotalFills || 1));
   const canRunLocalPaper = !complete && !hardBlocked && !routeRefreshRequired && recommendedMaxTotalFills > 0;
+  const blockingReason = hardBlocked
+    ? profitRunGuard.stop_reason ??
+      dailyProfitLock.stop_reason ??
+      profitRunGuard.next_action ??
+      dailyProfitLock.next_action
+    : null;
   const planStatus: AutonomousProfitAccountabilityRepairPlan["status"] = complete
     ? "complete"
     : routeRefreshRequired
@@ -52779,12 +52800,15 @@ function buildAutonomousProfitAccountabilityRepairPlan({
     recommended_max_protective_sells: recommendedProtectiveSells,
     recommended_size_multiplier: roundMetric(Math.max(0, Math.min(1, nextSizeMultiplier || (protectFirst ? 0.2 : 0.35)))),
     route_refresh_required: routeRefreshRequired,
+    local_route_rehearsal_ready: localRouteRehearsalReady,
+    local_route_rehearsal_summary: routeRefreshExecution?.local_rehearsal?.summary ?? null,
+    blocking_reason: blockingReason,
     can_run_local_paper: canRunLocalPaper,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     request,
-    summary: autonomousProfitAccountabilityRepairSummary(planStatus, accountabilityScore, targetScore, weakest.label, weakest.score),
-    next_action: autonomousProfitAccountabilityRepairNextAction(planStatus, recommendedTicks, recommendedMaxTotalFills, weakest.label),
+    summary: autonomousProfitAccountabilityRepairSummary(planStatus, accountabilityScore, targetScore, weakest.label, weakest.score, localRouteRehearsalReady, blockingReason),
+    next_action: autonomousProfitAccountabilityRepairNextAction(planStatus, recommendedTicks, recommendedMaxTotalFills, weakest.label, localRouteRehearsalReady, blockingReason),
     controls: [
       "Repairs the local paper-accountability score by targeting the weakest evidence row before any higher-frequency paper loop can scale.",
       "Uses read-only route refresh first when route or preflight proof is stale, then bounded paper sessions with explicit tick and fill caps.",
@@ -55167,11 +55191,16 @@ function autonomousProfitAccountabilityRepairSummary(
   targetScore: number,
   weakestLabel: string,
   weakestScore: number,
+  localRouteRehearsalReady: boolean,
+  blockingReason: string | null,
 ) {
   if (status === "complete") return `Local paper accountability clears review at ${score}/100 against the ${targetScore}/100 target.`;
   if (status === "refresh-first") return `Local paper accountability is ${score}/100; refresh route proof before repairing ${weakestLabel.toLowerCase()} at ${weakestScore}/100.`;
   if (status === "protect-first") return `Local paper accountability is ${score}/100; repair ${weakestLabel.toLowerCase()} with a protect-first paper session before any fresh buy.`;
-  if (status === "blocked") return `Local paper accountability is ${score}/100, but the repair loop is blocked until the run guard or daily lock clears.`;
+  if (status === "blocked") {
+    const routeNote = localRouteRehearsalReady ? " Local route rehearsal is ready; " : " ";
+    return `Local paper accountability is ${score}/100.${routeNote}${blockingReason ?? "The repair loop is blocked until the run guard or daily lock clears."}`;
+  }
   return `Local paper accountability is ${score}/100; run a bounded paper session to repair ${weakestLabel.toLowerCase()} at ${weakestScore}/100.`;
 }
 
@@ -55180,11 +55209,15 @@ function autonomousProfitAccountabilityRepairNextAction(
   ticks: number,
   fills: number,
   weakestLabel: string,
+  localRouteRehearsalReady: boolean,
+  blockingReason: string | null,
 ) {
   if (status === "complete") return "Keep collecting paper accountability evidence while live-wallet gates remain blocked.";
   if (status === "refresh-first") return "Request read-only route proof, then rerun the accountability repair plan before spending more paper capital.";
   if (status === "protect-first") return `Run ${ticks} protect-first paper tick with at most ${fills} fill, then rescore ${weakestLabel.toLowerCase()}.`;
-  if (status === "blocked") return "Stand down from local repair until the profit run guard and daily lock permit paper movement again.";
+  if (status === "blocked") return localRouteRehearsalReady
+    ? `${blockingReason ?? "Run guard or daily lock still blocks paper movement."} Keep the route rehearsal, then repair preflight/profit-lock evidence before another paper session.`
+    : "Stand down from local repair until the profit run guard and daily lock permit paper movement again.";
   return `Run ${ticks} bounded paper tick${ticks === 1 ? "" : "s"} with at most ${fills} fill${fills === 1 ? "" : "s"}, then rescore ${weakestLabel.toLowerCase()}.`;
 }
 
@@ -71419,6 +71452,7 @@ function attachPaperDaemonTick(
     burstFillExecution: state.autonomous_burst_fill_execution,
     directive: autonomousTradingDirective,
     sessionRun: state.autonomous_session_run,
+    routeRefreshExecution: autonomousRouteRefreshExecution,
   });
   const autonomousLoopFeedback = buildAutonomousLoopFeedback({
     daemonMemory: paperDaemonMemory,
@@ -72285,6 +72319,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     burstFillExecution: state.autonomous_burst_fill_execution,
     directive: autonomousTradingDirective,
     sessionRun: state.autonomous_session_run,
+    routeRefreshExecution: autonomousRouteRefreshExecution,
   });
   const autonomousLoopFeedback = buildAutonomousLoopFeedback({
     daemonMemory: paperDaemonMemory,
