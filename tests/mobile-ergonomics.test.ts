@@ -796,6 +796,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 trading credentials");
     expect(settingsPage).toContain("Secure setup state for the autonomous Web3 paper desk");
     expect(settingsPage).toContain("SettingsWeb3CredentialConsole");
+    expect(settingsPage).toContain("Secure credential handoff");
+    expect(settingsPage).toContain("Next input:");
+    expect(settingsPage).toContain("buildWeb3CredentialHandoffRows");
+    expect(settingsPage).toContain("Helius read checks can be local server-env evidence");
+    expect(settingsPage).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(settingsPage).toContain("Live credential queue");
     expect(settingsPage).toContain("What is left before supervised trading review");
     expect(settingsPage).toContain("buildWeb3CredentialActionQueue");

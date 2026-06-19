@@ -128,6 +128,10 @@ function Web3CredentialsRunwayCard({
     "";
   const credentialQueue = buildWeb3CredentialActionQueue(receipt, acquisition, state);
   const queueReadyCount = credentialQueue.filter((item) => item.status === "ready").length;
+  const handoffRows = buildWeb3CredentialHandoffRows(credentialQueue);
+  const nextMissing = credentialQueue.find((item) => item.status === "missing" || item.status === "blocked") ??
+    credentialQueue.find((item) => item.status === "review") ??
+    credentialQueue[0];
 
   return (
     <section aria-labelledby="web3-credential-runway-title">
@@ -151,6 +155,39 @@ function Web3CredentialsRunwayCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0">
+          <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Secure Web3 credential handoff">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Secure credential handoff</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  Next input: {nextMissing.label}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-outline">
+                  Helius read checks can be local server-env evidence; Jupiter, wallet ownership, signer, stop, and accounting inputs still need explicit review before live capital.
+                </p>
+              </div>
+              <CredentialStateBadge configured={queueReadyCount === credentialQueue.length} status={`${credentialQueue.length - queueReadyCount} open`} />
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              {handoffRows.map((item) => (
+                <div key={item.label} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{item.label}</p>
+                  <p className="mt-1 text-xs font-semibold text-on-surface">{item.value}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-outline">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Verification path</p>
+              <p className="mt-1 break-words text-[11px] leading-4 text-on-surface-variant">
+                Run <code className="rounded bg-black/20 px-1 py-0.5">npm run verify:web3 -- --base-url=http://localhost:4010</code> after each credential change; add strict wallet, Jupiter, and live-DEX flags only after those rows are ready.
+              </p>
+            </div>
+            <p className="sr-only" aria-label="Secure Web3 credential handoff boundary">
+              Secure credential handoff shows configured or missing status only; Helius and Jupiter secrets stay out of browser storage; private keys and seed phrases are never accepted; live execution and wallet mutation remain blocked.
+            </p>
+          </div>
+
           <div className="rounded-md border border-engine/25 bg-surface-dim/35 p-3" aria-label="Live Web3 credential queue">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
@@ -560,6 +597,36 @@ type CredentialQueueItem = {
   action: string;
   storage: string;
 };
+
+type CredentialHandoffRow = {
+  label: string;
+  value: string;
+  detail: string;
+};
+
+function buildWeb3CredentialHandoffRows(queue: CredentialQueueItem[]): CredentialHandoffRow[] {
+  const ready = queue.filter((item) => item.status === "ready");
+  const missing = queue.filter((item) => item.status === "missing" || item.status === "blocked");
+  const review = queue.filter((item) => item.status === "review");
+  const next = missing[0] ?? review[0] ?? ready[0];
+  return [
+    {
+      label: "Ready now",
+      value: `${ready.length}/${queue.length} lanes`,
+      detail: ready.length > 0 ? ready.map((item) => item.label).slice(0, 3).join(", ") : "No live-review credential lane is ready yet.",
+    },
+    {
+      label: "Needs input",
+      value: `${missing.length} missing`,
+      detail: next ? `${next.label}: ${next.action}` : "All setup inputs are present; run strict verification before any review.",
+    },
+    {
+      label: "Review only",
+      value: `${review.length} review`,
+      detail: review.length > 0 ? review.map((item) => item.label).slice(0, 3).join(", ") : "No review-only lanes are waiting.",
+    },
+  ];
+}
 
 function buildWeb3CredentialActionQueue(
   receipt: Web3AccountSetupReceipt,
