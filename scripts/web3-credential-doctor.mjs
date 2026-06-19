@@ -41,11 +41,12 @@ export async function runWeb3CredentialDoctor(input = {}) {
     failOnBlocked: Boolean(input.failOnBlocked),
   };
   const supervisorRepair = config.refreshSupervisor ? await refreshSupervisorEvidence(config) : null;
-  const [accountSetup, providerHealth, launchChecklist, livePreflight, health] = await Promise.all([
+  const [accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, health] = await Promise.all([
     fetchReceipt(config, "/api/web3-account-setup"),
     fetchReceipt(config, "/api/web3-provider-health"),
     fetchReceipt(config, "/api/web3-launch-checklist"),
     fetchReceipt(config, "/api/web3-live-capital-preflight"),
+    fetchReceipt(config, "/api/web3-market-monitor-history"),
     fetchReceipt(config, "/api/health"),
   ]);
   const receipt = buildWeb3CredentialDoctorReceipt({
@@ -54,6 +55,7 @@ export async function runWeb3CredentialDoctor(input = {}) {
     providerHealth,
     launchChecklist,
     livePreflight,
+    monitorHistory,
     health,
     supervisorRepair,
   });
@@ -72,10 +74,11 @@ export function buildWeb3CredentialDoctorReceipt({
   providerHealth,
   launchChecklist,
   livePreflight,
+  monitorHistory,
   health,
   supervisorRepair,
 }) {
-  const checks = buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, health, supervisorRepair })
+  const checks = buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, health, supervisorRepair })
     .map(redactCredentialDoctorCheck);
   const blockers = checks
     .filter((check) => check.status === "fail")
@@ -132,7 +135,7 @@ export function buildWeb3CredentialDoctorReceipt({
   };
 }
 
-function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, health, supervisorRepair }) {
+function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, health, supervisorRepair }) {
   const env = accountSetup?.environment_summary ?? {};
   const wallet = accountSetup?.wallet_summary ?? {};
   const productionSupervisor = health?.web3_production_supervisor ?? {};
@@ -200,6 +203,22 @@ function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchCheck
       storage: "public-read-only-market-data",
     },
     {
+      id: "market-monitor-history",
+      label: "Market monitor tape",
+      status: monitorHistory?.status === "active"
+        ? "pass"
+        : monitorHistory?.status === "degraded"
+          ? "watch"
+          : "fail",
+      detail: monitorHistory?.mode === "web3-market-monitor-history"
+        ? `Monitor history is ${monitorHistory.status}; ${monitorHistory.run_count ?? 0} recent run${monitorHistory.run_count === 1 ? "" : "s"}, latest ${monitorHistory.latest_symbol ?? "none"}.`
+        : "Monitor history receipt is missing.",
+      next_action: monitorHistory?.status === "active"
+        ? "Keep running npm run monitor:web3 so live DEX and candle proof stay fresh."
+        : "Run npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json before trusting autonomous market freshness.",
+      storage: "local-sanitized-monitor-history",
+    },
+    {
       id: "live-boundary",
       label: "Live boundary",
       status: livePreflight?.real_capital_blocked === true || livePreflight?.live_execution_permission === "blocked" ? "pass" : "fail",
@@ -243,6 +262,7 @@ function buildSafeCommands(accountSetup, launchChecklist) {
   const commands = [
     "npm run verify:web3 -- --base-url=http://localhost:4010",
     "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live",
+    "npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json",
   ];
   if (walletPreview && !accountSetup?.wallet_summary?.wallet_is_sample) {
     commands.push("npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --wallet=<public-solana-address>");

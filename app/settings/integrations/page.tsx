@@ -1163,7 +1163,7 @@ function SettingsLiveOpsPacketPanel({ packet }: { packet: Web3LiveOpsPacket }) {
 }
 
 function SettingsCredentialDoctorPanel({ health }: { health: Web3CredentialDoctorHealth }) {
-  const topChecks = health.checks.slice(0, 7);
+  const topChecks = health.checks.slice(0, 8);
   return (
     <div className="rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3" aria-label="Web3 credential doctor receipt">
       <div className="flex flex-wrap items-start justify-between gap-2">
