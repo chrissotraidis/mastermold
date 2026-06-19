@@ -639,6 +639,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Operator wallet net worth chart with cash and exposure");
     expect(web3Workspace).toContain("Operator wallet net worth metrics");
     expect(web3Workspace).toContain("high-water and start lines");
+    expect(web3Workspace).toContain("Autonomy mode ladder");
+    expect(web3Workspace).toContain("Mode ladder");
+    expect(web3Workspace).toContain("Dry-run orders");
+    expect(web3Workspace).toContain("Autonomous live");
     expect(web3Workspace).toContain("chart-tape execution contract");
     expect(web3Workspace).toContain("contract {contract.status.replaceAll(\"-\", \" \")}");
     expect(web3Workspace).toContain("boundary {contract.execution_boundary}");

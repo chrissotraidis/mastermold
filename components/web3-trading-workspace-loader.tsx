@@ -1035,6 +1035,12 @@ export function Web3TradingWorkspaceLoader({
           {state.market_source.label} · {state.autonomous_market_evidence_fusion.can_trade ? "trade ok" : tradeBlocked ? "trade blocked" : "refresh"} · {autoWatch ? "watch on" : "watch off"} · {wakePlan.auto_watch_label} · intake {marketIntake.status} · allocator {profitAllocation.status}
         </p>
 
+        <QuickAutonomyModeRail
+          state={state}
+          checklist={launchChecklist}
+          autoWatchPlan={autoWatchPlan}
+        />
+
         <QuickOperatorHud
           state={state}
           autoWatch={autoWatch}
@@ -1591,6 +1597,120 @@ function QuickOperatorHud({
       </div>
       <span className="sr-only" aria-label="Autonomous operator HUD receipt">
         Operator HUD wallet net worth {formatCurrency(wallet.equity_usd)}, cash {formatCurrency(wallet.cash_usd)}, exposure {formatCurrency(wallet.exposure_usd)}, realized PnL {formatSignedCurrency(wallet.realized_pnl_usd)}, unrealized PnL {formatSignedCurrency(wallet.unrealized_pnl_usd)}, window PnL {formatSignedCurrency(wallet.window_pnl_usd)}, drawdown {wallet.max_drawdown_pct} percent, decision {decision.status} {decision.action} {decision.target_symbol ?? "desk"}, signal {fusion.leader_symbol ?? "none"} {fusion.fusion_score}, route {route.status}, local rehearsal {route.local_rehearsal_ready ? "accepted" : "missing"}, candle {candle.status}, profit accountability {accountability.status} {accountability.accountability_score}, live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+      </span>
+    </section>
+  );
+}
+
+function QuickAutonomyModeRail({
+  state,
+  checklist,
+  autoWatchPlan,
+}: {
+  state: Web3TradingState;
+  checklist: Web3AutonomyLaunchChecklist;
+  autoWatchPlan: AutoWatchPlan;
+}) {
+  const operatorInputs = checklist.operator_inputs_needed;
+  const jupiterInput = operatorInputs.find((input) => input.id === "jupiter-route-order-key");
+  const walletInput = operatorInputs.find((input) => input.id === "dedicated-trading-wallet");
+  const ownershipInput = operatorInputs.find((input) => input.id === "wallet-ownership-proof");
+  const signerInput = operatorInputs.find((input) => input.id === "signer-custody-choice");
+  const route = state.autonomous_route_refresh_execution;
+  const adapter = state.autonomous_execution_adapter_readiness;
+  const liveReadiness = state.autonomous_live_autonomy_readiness;
+  const paperCanRun = state.autonomous_now_decision.can_auto_watch_run ||
+    state.autonomous_now_decision.can_auto_paper ||
+    state.autonomous_execution_runway.can_auto_paper ||
+    state.paper_account.trade_count > 0;
+  const dryRunEvidenceReady = route.local_rehearsal_ready && adapter.quote_request_ready;
+  const dryRunBlockedByCredential = [jupiterInput, walletInput, ownershipInput].some((input) => input && input.status !== "ready");
+  const supervisedLiveReady = checklist.live_review_permitted;
+  const stages: Array<{
+    id: string;
+    label: string;
+    value: string;
+    detail: string;
+    tone: QuickChipTone;
+    dot: string;
+  }> = [
+    {
+      id: "copilot",
+      label: "Copilot",
+      value: "ready",
+      detail: `${state.autonomous_market_evidence_fusion.leader_symbol ?? "Desk"} ${state.autonomous_market_evidence_fusion.status.replaceAll("-", " ")}`,
+      tone: "engine",
+      dot: "bg-engine",
+    },
+    {
+      id: "paper-autonomy",
+      label: "Paper autonomy",
+      value: paperCanRun ? autoWatchPlan.label : "gated",
+      detail: `${state.paper_account.trade_count} fills · ${state.autonomous_profit_accountability.accountability_score}/100 proof`,
+      tone: paperCanRun ? "engine" : checklist.paper_scale_permitted ? "caution" : "neutral",
+      dot: paperCanRun ? "bg-engine" : checklist.paper_scale_permitted ? "bg-caution" : "bg-outline",
+    },
+    {
+      id: "dry-run-order",
+      label: "Dry-run orders",
+      value: dryRunEvidenceReady ? "route proof" : dryRunBlockedByCredential ? "credential gated" : route.status.replaceAll("-", " "),
+      detail: dryRunEvidenceReady
+        ? "quote and local rehearsal evidence present"
+        : jupiterInput?.status !== "ready"
+          ? "needs Jupiter order key"
+          : walletInput?.status !== "ready"
+            ? "needs dedicated public wallet"
+            : ownershipInput?.status !== "ready"
+              ? "needs wallet ownership proof"
+              : route.next_action,
+      tone: dryRunEvidenceReady ? "engine" : dryRunBlockedByCredential ? "caution" : routeRefreshTone(route.status),
+      dot: dryRunEvidenceReady ? "bg-engine" : dryRunBlockedByCredential ? "bg-caution" : route.status === "blocked" ? "bg-critical" : "bg-outline",
+    },
+    {
+      id: "supervised-live",
+      label: "Supervised live",
+      value: supervisedLiveReady ? "review ready" : "blocked",
+      detail: signerInput?.status === "ready" ? checklist.next_cutover_step.next_action : signerInput?.next_action ?? checklist.next_action,
+      tone: supervisedLiveReady ? "critical" : "demo",
+      dot: supervisedLiveReady ? "bg-critical" : "bg-outline",
+    },
+    {
+      id: "autonomous-live",
+      label: "Autonomous live",
+      value: liveReadiness.can_run_unattended ? "review" : "locked",
+      detail: liveReadiness.can_trade_real_capital ? "external live review still required" : liveReadiness.blockers[0] ?? "no real-capital authority",
+      tone: "demo",
+      dot: "bg-outline",
+    },
+  ];
+
+  return (
+    <section className="mt-3 border-y border-outline-variant/25 py-2" aria-label="Autonomy mode ladder">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Mode ladder</p>
+          <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+            {checklist.next_operator_action ? `Next gate: ${checklist.next_operator_action.label}` : checklist.next_cutover_step.label}
+          </p>
+        </div>
+        <Chip tone={checklist.hard_blocker_count > 0 ? "critical" : checklist.watch_count > 0 ? "caution" : "engine"}>
+          {checklist.hard_blocker_count} hard blockers
+        </Chip>
+      </div>
+      <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        {stages.map((stage) => (
+          <div key={stage.id} className="min-w-0 border-l border-outline-variant/30 pl-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", stage.dot)} />
+              <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{stage.label}</p>
+            </div>
+            <p className={cn("mt-1 truncate text-sm font-semibold", sourceTimingTextClass(stage.tone))}>{stage.value}</p>
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{stage.detail}</p>
+          </div>
+        ))}
+      </div>
+      <span className="sr-only" aria-label="Autonomy mode ladder receipt">
+        Autonomy mode ladder: copilot ready; paper autonomy {paperCanRun ? "ready" : "gated"}; dry-run orders {dryRunEvidenceReady ? "ready" : "gated"}; supervised live {supervisedLiveReady ? "review ready" : "blocked"}; autonomous live {liveReadiness.can_run_unattended ? "review" : "locked"}; next operator gate {checklist.next_operator_action ? `${checklist.next_operator_action.label}: ${checklist.next_operator_action.next_action}` : checklist.next_cutover_step.next_action}; hard blockers {checklist.hard_blocker_count}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}.
       </span>
     </section>
   );
