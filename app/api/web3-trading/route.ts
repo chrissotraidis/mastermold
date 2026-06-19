@@ -895,6 +895,10 @@ function parseExecutionUpdate(value: unknown):
 
   const record = value as Record<string, unknown>;
   const update: ExecutionUpdate = {};
+  const forbiddenSecretField = Object.keys(record).find((key) => /private|seed|mnemonic|secret/i.test(key));
+  if (forbiddenSecretField) {
+    return { ok: false, error: "execution must not include private keys, seed phrases, mnemonics, or secret-bearing fields." };
+  }
 
   if (record.mode !== undefined) {
     if (typeof record.mode !== "string" || !isExecutionMode(record.mode)) {
@@ -913,6 +917,13 @@ function parseExecutionUpdate(value: unknown):
   if (record.wallet_public_key !== undefined) {
     if (record.wallet_public_key !== null && typeof record.wallet_public_key !== "string") {
       return { ok: false, error: "execution.wallet_public_key must be a string or null." };
+    }
+    if (
+      typeof record.wallet_public_key === "string" &&
+      record.wallet_public_key.trim().length > 0 &&
+      !isLikelySolanaPublicKey(record.wallet_public_key.trim())
+    ) {
+      return { ok: false, error: "execution.wallet_public_key must be a valid public Solana address." };
     }
     update.wallet_public_key = record.wallet_public_key;
   }
@@ -959,6 +970,10 @@ function parseExecutionUpdate(value: unknown):
   }
 
   return { ok: true, value: update };
+}
+
+function isLikelySolanaPublicKey(value: string) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
 function parseSignedRelayRequest(value: unknown):

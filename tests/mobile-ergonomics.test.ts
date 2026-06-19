@@ -777,6 +777,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsWeb3CredentialConsole");
     expect(settingsConsole).toContain("Credential action console");
     expect(settingsConsole).toContain("Session-only provider tests");
+    expect(settingsConsole).toContain("Save public scope");
+    expect(settingsConsole).toContain("Saved public scope");
+    expect(settingsConsole).toContain("API keys are not sent in this action");
+    expect(settingsConsole).toContain("valid public Solana wallet address");
     expect(settingsConsole).toContain("Test credentials");
     expect(settingsConsole).toContain("Rehearse Jupiter");
     expect(settingsConsole).toContain("no browser storage for Helius or Jupiter keys");

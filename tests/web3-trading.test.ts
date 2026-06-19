@@ -497,6 +497,108 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(receipt)).not.toContain("test-birdeye-secret");
   });
 
+  test("GIVEN Settings saves public wallet scope WHEN account setup is rebuilt THEN dry-run wallet readiness is scoped without secrets", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-secret";
+
+    const malformedWallet = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        scenario: "breakout",
+        source: "sample",
+        account: "persistent",
+        cycles: 0,
+        advance: false,
+        execution: {
+          mode: "dry-run",
+          wallet_public_key: "not-a-wallet",
+        },
+      }),
+    }));
+    expect(malformedWallet.status).toBe(422);
+
+    const forbiddenSecret = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        scenario: "breakout",
+        source: "sample",
+        account: "persistent",
+        cycles: 0,
+        advance: false,
+        execution: {
+          mode: "dry-run",
+          wallet_public_key: "11111111111111111111111111111111",
+          private_key: "never-accept-this",
+        },
+      }),
+    }));
+    expect(forbiddenSecret.status).toBe(422);
+
+    const saveScope = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        scenario: "breakout",
+        source: "sample",
+        account: "persistent",
+        cycles: 0,
+        advance: false,
+        execution: {
+          mode: "dry-run",
+          kill_switch: false,
+          wallet_public_key: "11111111111111111111111111111111",
+          signer_simulation_enabled: true,
+          signer_session_label: "settings-external-wallet",
+          signer_network: "devnet",
+          max_trade_usd: 250,
+          daily_spend_cap_usd: 1000,
+          max_slippage_bps: 150,
+        },
+      }),
+    }));
+    const state = await json<Web3TradingState>(saveScope);
+    expect(saveScope.status).toBe(200);
+    expect(state.execution_readiness.config.wallet_public_key).toBe("11111111111111111111111111111111");
+    expect(state.execution_readiness.config.max_trade_usd).toBe(250);
+    expect(state.execution_readiness.config.daily_spend_cap_usd).toBe(1000);
+    expect(state.execution_readiness.config.max_slippage_bps).toBe(150);
+    expect(state.execution_readiness.config.kill_switch).toBe(false);
+    expect(state.execution_gate.live_execution_enabled).toBe(false);
+
+    const response = await ACCOUNT_SETUP_GET(new Request("http://localhost/api/web3-account-setup?scenario=breakout&source=sample&account=persistent&cycles=0"));
+    const receipt = await json<{
+      status: string;
+      environment_summary: {
+        required_configured_count: number;
+        missing_required: string[];
+      };
+      wallet_summary: {
+        wallet_scoped: boolean;
+        wallet_public_key_preview: string | null;
+      };
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      secret_echo_permission: string;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.status).toBe("dry-run-ready");
+    expect(receipt.environment_summary.required_configured_count).toBe(3);
+    expect(receipt.environment_summary.missing_required).toEqual([]);
+    expect(receipt.wallet_summary.wallet_scoped).toBe(true);
+    expect(receipt.wallet_summary.wallet_public_key_preview).toBe("11111111...1111");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
+    expect(JSON.stringify(receipt)).not.toContain("test-jupiter-secret");
+    expect(JSON.stringify(receipt)).not.toContain("never-accept-this");
+  });
+
   test("GIVEN missing Jupiter setup WHEN account acquisition runs THEN it returns external-only setup actions without leaking secrets", async () => {
     process.env.HELIUS_API_KEY = "test-helius-secret";
     process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";

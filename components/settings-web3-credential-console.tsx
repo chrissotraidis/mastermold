@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, ShieldCheck, Zap } from "lucide-react";
+import { Activity, Save, ShieldCheck, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
+import type { Web3TradingState } from "@/src/db/web3-trading";
 
 type SettingsWeb3CredentialConsoleProps = {
   walletPublicKeyPreview: string | null;
@@ -53,10 +54,11 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"credentials" | "jupiter" | null>(null);
+  const [busy, setBusy] = useState<"credentials" | "jupiter" | "scope" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
+  const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
 
   function updateDraft(field: keyof Draft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -122,6 +124,56 @@ export function SettingsWeb3CredentialConsole({
       setMessage(payload.narrative);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Jupiter rehearsal failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function savePublicScope() {
+    const wallet = draft.wallet_public_key.trim();
+    if (!wallet || !isLikelySolanaPublicKey(wallet)) {
+      setMessage("Enter a valid public Solana wallet address before saving public scope.");
+      return;
+    }
+    const maxTrade = Math.max(1, Number(draft.max_trade_usd) || maxTradeUsd);
+    const dailyCap = Math.max(maxTrade, Number(draft.daily_spend_cap_usd) || dailySpendCapUsd);
+    const slippage = Math.max(1, Math.min(2_000, Math.trunc(Number(draft.max_slippage_bps) || maxSlippageBps)));
+    setBusy("scope");
+    setMessage("Saving public wallet scope and dry-run risk caps. API keys are not sent in this action...");
+    try {
+      const response = await fetch("/api/web3-trading", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario,
+          source,
+          account,
+          cycles,
+          advance: false,
+          execution: {
+            mode: "dry-run",
+            kill_switch: false,
+            wallet_public_key: wallet,
+            signer_simulation_enabled: true,
+            signer_session_label: `settings-${draft.signer_mode}`,
+            signer_network: "devnet",
+            max_trade_usd: maxTrade,
+            daily_spend_cap_usd: dailyCap,
+            max_slippage_bps: slippage,
+          },
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as Web3TradingState | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Public scope could not be saved.");
+      }
+      setSavedScope({
+        walletPreview: previewValue(payload.execution_readiness.config.wallet_public_key),
+        updatedAt: payload.execution_readiness.config.updated_at,
+      });
+      setMessage("Public wallet scope and dry-run caps are saved for Web3 rehearsal. Live execution remains blocked by the launch checklist.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Public scope could not be saved.");
     } finally {
       setBusy(null);
     }
@@ -208,6 +260,15 @@ export function SettingsWeb3CredentialConsole({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            onClick={savePublicScope}
+            disabled={disabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-caution/45 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Save className={cn("size-3.5 shrink-0", busy === "scope" && "animate-pulse")} aria-hidden="true" />
+            {busy === "scope" ? "Saving" : "Save public scope"}
+          </button>
+          <button
+            type="button"
             onClick={testCredentials}
             disabled={disabled}
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
@@ -249,10 +310,22 @@ export function SettingsWeb3CredentialConsole({
         />
         <ConsoleMetric
           label="Execution"
-          value="blocked"
-          tone="neutral"
+          value={savedScope ? "dry-run saved" : "blocked"}
+          tone={savedScope ? "engine" : "neutral"}
         />
       </div>
+
+      {savedScope ? (
+        <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.045] p-2" aria-label="Saved Web3 public scope receipt">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Saved public scope</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            Wallet {savedScope.walletPreview ?? "scoped"} is saved for dry-run rehearsal.
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">
+            Updated {formatConsoleTime(savedScope.updatedAt)}. Helius and Jupiter keys were not sent or saved by this action.
+          </p>
+        </div>
+      ) : null}
 
       {jupiterReceipt ? (
         <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2" aria-label="Settings Jupiter rehearsal receipt">
@@ -352,4 +425,25 @@ function BoundaryBadge({ label }: { label: string }) {
       {label}
     </Badge>
   );
+}
+
+function isLikelySolanaPublicKey(value: string) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+function previewValue(value: string | null | undefined) {
+  if (!value) return null;
+  if (value.length <= 12) return value;
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
+}
+
+function formatConsoleTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "just now";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
 }
