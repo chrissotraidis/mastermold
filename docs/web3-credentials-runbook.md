@@ -57,10 +57,11 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 10. Press `Apply dry-run profile` only after provider, wallet, and route evidence is acceptable.
 11. Run `npm run landing-drill:web3` to confirm the landing path is still safely blocked before live signing/submission.
 12. Use the Wiring focus `Build account receipt` control to create a redacted setup receipt from local provider-account configuration and current wallet gates. It reports whether Helius/Solana, Jupiter, a dedicated public wallet, signer posture, emergency stop, and accounting targets are configured or missing without creating external accounts or echoing secrets.
-13. Use the Wiring focus `Build signer receipt` control to create a redacted signer handoff receipt from custody, hash-only request, pre-submit, relay, and live-boundary state. It never stores private keys, raw transaction bodies, unsigned payloads, signed payloads, or wallet authority.
-14. Use the Wiring focus `Build ledger receipt` control to create a redacted local accounting receipt from the paper ledger, wallet-readiness state, settlement status, and mirror gates.
-15. Review the Wiring focus `Production worker review` panel after `npm run supervise:web3` writes a sanitized paper-supervisor receipt. It checks receipt freshness, circuit state, profit target, drawdown brake, and the live-boundary process gate, but it cannot install a process manager or authorize live capital from inside the app.
-16. Use the Wiring focus `Run stop drill` control to record a local dry-run emergency-stop receipt. The drill halts browser Auto Watch and verifies ops target status, but it does not send webhooks, stop external processes by itself, sign, submit, or mutate wallets.
+13. Use the Wiring focus `Test provider health` control to create a redacted provider-health receipt. It performs read-only Solana RPC, latest-blockhash, Helius DAS, Jupiter quote, and Jupiter order-gate checks from server environment values without returning API keys, raw wallet holdings, transaction bodies, signatures, or wallet authority.
+14. Use the Wiring focus `Build signer receipt` control to create a redacted signer handoff receipt from custody, hash-only request, pre-submit, relay, and live-boundary state. It never stores private keys, raw transaction bodies, unsigned payloads, signed payloads, or wallet authority.
+15. Use the Wiring focus `Build ledger receipt` control to create a redacted local accounting receipt from the paper ledger, wallet-readiness state, settlement status, and mirror gates.
+16. Review the Wiring focus `Production worker review` panel after `npm run supervise:web3` writes a sanitized paper-supervisor receipt. It checks receipt freshness, circuit state, profit target, drawdown brake, and the live-boundary process gate, but it cannot install a process manager or authorize live capital from inside the app.
+17. Use the Wiring focus `Run stop drill` control to record a local dry-run emergency-stop receipt. The drill halts browser Auto Watch and verifies ops target status, but it does not send webhooks, stop external processes by itself, sign, submit, or mutate wallets.
 
 ## Researched Default Stack
 
@@ -88,11 +89,14 @@ The Wiring focus also exposes:
 ```text
 GET /api/web3-account-setup
 GET /api/web3-accounting-ledger
+GET /api/web3-provider-health
 GET /api/web3-signer-handoff
 POST /api/web3-emergency-stop/drill
 ```
 
 The account setup route returns a redacted receipt with provider-account status for Helius/Solana reads, Jupiter execution rehearsal, the dedicated public wallet, signer posture, emergency-stop ops, accounting, and optional market-feed lanes. It detects whether expected local env targets are configured but never returns their values. It does not create third-party accounts, submit signup forms, store secrets, sign, submit, custody funds, or mutate wallets; external account creation remains operator-owned outside the app.
+
+The provider health route returns a redacted receipt from live read-only provider checks. It can derive Helius mainnet RPC from `HELIUS_API_KEY`, test Solana `getHealth`, `getLatestBlockhash`, and `getSlot`, test Helius DAS `getAssetsByOwner` only when a public wallet is scoped, and test Jupiter quote/order readiness. It returns endpoint host/path, status booleans, aggregate wallet counts, and a receipt hash only; API keys, private keys, raw holdings, unsigned transactions, signed transactions, signatures, and wallet authority are never returned. Live execution and wallet mutation remain blocked even when all provider checks pass.
 
 The signer handoff route returns a redacted receipt with wallet scope, signer provider, policy hash preview, request id, payload-hash preview, provider adapter status, pre-submit rehearsal state, relay boundary, and live-autonomy boundary. It always reports provider dispatch, live execution, wallet mutation, private-key storage, transaction-body storage, unsigned-transaction storage, and signed-payload storage as blocked. It never returns API keys, private keys, seed phrases, raw transaction bodies, unsigned payloads, signed payloads, full signatures, or wallet authority.
 

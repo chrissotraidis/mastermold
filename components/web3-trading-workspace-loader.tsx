@@ -13,11 +13,12 @@ import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/d
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import type { Web3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
+import type { Web3ProviderHealthReceipt } from "@/src/db/web3-provider-health";
 import type { Web3SignerHandoffReceipt } from "@/src/db/web3-signer-handoff";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
-type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "account-setup" | "signer-handoff" | "accounting-ledger" | "emergency-stop";
+type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "account-setup" | "provider-health" | "signer-handoff" | "accounting-ledger" | "emergency-stop";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
 type Web3CredentialsDraft = {
   helius_api_key: string;
@@ -117,6 +118,7 @@ export function Web3TradingWorkspaceLoader({
   const [lastActionOutcome, setLastActionOutcome] = useState<QuickAgentActionOutcome | null>(null);
   const [lastPromotedAutopilot, setLastPromotedAutopilot] = useState<PromotedPaperAutopilotReceipt | null>(null);
   const [accountSetupReceipt, setAccountSetupReceipt] = useState<Web3AccountSetupReceipt | null>(null);
+  const [providerHealthReceipt, setProviderHealthReceipt] = useState<Web3ProviderHealthReceipt | null>(null);
   const [signerHandoffReceipt, setSignerHandoffReceipt] = useState<Web3SignerHandoffReceipt | null>(null);
   const [accountingLedgerReceipt, setAccountingLedgerReceipt] = useState<Web3AccountingLedgerReceipt | null>(null);
   const [emergencyStopReceipt, setEmergencyStopReceipt] = useState<Web3EmergencyStopDrillReceipt | null>(null);
@@ -400,6 +402,31 @@ export function Web3TradingWorkspaceLoader({
       setQuickNotice(payload.summary);
     } catch (error) {
       setQuickNotice(error instanceof Error ? error.message : "The account setup receipt could not be built.");
+    } finally {
+      setQuickBusy(null);
+    }
+  }
+
+  async function buildProviderHealthReceipt() {
+    if (!state || quickBusy) return;
+    setQuickBusy("provider-health");
+    setQuickNotice("Testing read-only Helius/Solana and Jupiter provider health without exposing secrets.");
+    try {
+      const params = new URLSearchParams({
+        scenario: state.scenario,
+        source: state.market_source.mode,
+        account: state.paper_account.mode,
+        cycles: String(state.paper_account.cycle),
+      });
+      const response = await fetch(`/api/web3-provider-health?${params.toString()}`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as Web3ProviderHealthReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "The provider health receipt could not be built.");
+      }
+      setProviderHealthReceipt(payload);
+      setQuickNotice(payload.summary);
+    } catch (error) {
+      setQuickNotice(error instanceof Error ? error.message : "The provider health receipt could not be built.");
     } finally {
       setQuickBusy(null);
     }
@@ -1273,6 +1300,15 @@ export function Web3TradingWorkspaceLoader({
                 />
               </div>
               <div className="xl:col-span-2">
+                <QuickProviderHealthReceiptPanel
+                  receipt={providerHealthReceipt}
+                  state={state}
+                  busy={quickBusy === "provider-health"}
+                  disabled={quickDisabled}
+                  onBuild={buildProviderHealthReceipt}
+                />
+              </div>
+              <div className="xl:col-span-2">
                 <QuickWeb3CredentialsSetupPanel
                   state={state}
                   busy={quickBusy}
@@ -1747,6 +1783,127 @@ function QuickAccountSetupReceiptPanel({
 
       <p className="sr-only" aria-label="Web3 account setup receipt status">
         Account setup status {status}; required accounts {configuredCount} of {requiredCount}; external signup permission blocked; live execution blocked; wallet mutation blocked; private key storage blocked; seed phrase storage blocked; secret echo blocked.
+      </p>
+    </section>
+  );
+}
+
+function QuickProviderHealthReceiptPanel({
+  receipt,
+  state,
+  busy,
+  disabled,
+  onBuild,
+}: {
+  receipt: Web3ProviderHealthReceipt | null;
+  state: Web3TradingState;
+  busy: boolean;
+  disabled: boolean;
+  onBuild: () => void;
+}) {
+  const status = receipt?.status ?? "not-tested";
+  const tone = receipt ? providerHealthTone(receipt.status) : "demo";
+  const walletScoped = receipt?.provider_summary.wallet_scoped ?? Boolean(state.autonomous_custody_mandate.wallet_public_key);
+  const checks = receipt?.checks ?? providerHealthPlaceholderChecks(state);
+
+  return (
+    <section className="min-w-0 rounded-md border border-engine/25 bg-engine/[0.04] p-2 sm:p-3" aria-label="Web3 provider health receipt">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Provider health receipt</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">Read-only Helius/Solana and Jupiter proof</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            {receipt?.summary ?? "Build a redacted network receipt that tests Solana RPC health, latest blockhash, Helius DAS when a wallet is scoped, Jupiter quote, and Jupiter order gating without returning API keys or transaction bodies."}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone={receipt?.provider_summary.rpc_healthy ? "engine" : receipt ? "critical" : "demo"}>
+            {receipt?.provider_summary.rpc_healthy ? "rpc healthy" : "rpc untested"}
+          </Chip>
+          <Chip tone={receipt?.live_execution_permission === "blocked" ? "demo" : receipt ? "critical" : "demo"}>live blocked</Chip>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+        <div className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2">
+          <p className="text-xs leading-5 text-outline">
+            {receipt?.next_action ?? "Use this after account setup to prove whether the server-side read rail is actually reachable before order rehearsal."}
+          </p>
+          <button
+            type="button"
+            onClick={onBuild}
+            disabled={disabled || busy}
+            className="mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/40 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Activity className={cn("h-3.5 w-3.5 shrink-0", busy && "animate-pulse")} aria-hidden="true" />
+            {busy ? "Testing" : "Test provider health"}
+          </button>
+          {receipt ? (
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px] leading-4 text-outline">
+              <span>Receipt {receipt.receipt_hash.slice(0, 10)}</span>
+              <span>Endpoint {receipt.rpc_endpoint ?? "missing"}</span>
+              <span>Slot {receipt.provider_summary.confirmed_slot ?? "unknown"}</span>
+              <span>Wallet {receipt.wallet_public_key_preview ?? "missing"}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6">
+          <ProfitMetric
+            label="RPC"
+            value={receipt?.provider_summary.rpc_healthy ? "healthy" : "untested"}
+            detail={receipt?.rpc_provider.replaceAll("-", " ") ?? "server env"}
+            tone={receipt?.provider_summary.rpc_healthy ? "engine" : receipt ? "critical" : "neutral"}
+          />
+          <ProfitMetric
+            label="Blockhash"
+            value={receipt?.provider_summary.latest_blockhash_ready ? "ready" : "missing"}
+            detail={receipt?.provider_summary.confirmed_slot ? `slot ${receipt.provider_summary.confirmed_slot}` : "confirmed slot"}
+            tone={receipt?.provider_summary.latest_blockhash_ready ? "engine" : receipt ? "critical" : "neutral"}
+          />
+          <ProfitMetric
+            label="Jupiter quote"
+            value={receipt?.provider_summary.jupiter_quote_ready ? "ready" : "gated"}
+            detail="SOL to USDC"
+            tone={receipt?.provider_summary.jupiter_quote_ready ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Jupiter order"
+            value={receipt?.provider_summary.jupiter_order_ready ? "ready" : "gated"}
+            detail={receipt?.provider_summary.jupiter_configured ? "key set" : "key missing"}
+            tone={receipt?.provider_summary.jupiter_order_ready ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Wallet"
+            value={walletScoped ? "scoped" : "missing"}
+            detail={receipt?.wallet_public_key_preview ?? "public key"}
+            tone={walletScoped ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="DAS"
+            value={receipt?.provider_summary.helius_das_ready ? `${receipt.provider_summary.wallet_asset_count ?? 0}` : "gated"}
+            detail="wallet assets"
+            tone={receipt?.provider_summary.helius_das_ready ? "engine" : "caution"}
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-1 sm:grid-cols-2 xl:grid-cols-3">
+        {checks.map((check) => (
+          <div key={check.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{check.label}</p>
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", providerHealthCheckDotClass(check.status))} />
+            </div>
+            <p className={cn("mt-1 text-xs font-semibold", providerHealthCheckTextClass(check.status))}>{check.status}</p>
+            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{check.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="sr-only" aria-label="Web3 provider health receipt status">
+        Provider health status {status}; RPC {receipt?.provider_summary.rpc_healthy ? "healthy" : "not healthy"}; blockhash {receipt?.provider_summary.latest_blockhash_ready ? "ready" : "missing"}; Jupiter quote {receipt?.provider_summary.jupiter_quote_ready ? "ready" : "gated"}; Jupiter order {receipt?.provider_summary.jupiter_order_ready ? "ready" : "gated"}; live execution blocked; wallet mutation blocked; secret echo blocked.
       </p>
     </section>
   );
@@ -2674,6 +2831,54 @@ function accountSetupPlaceholderChecks(state: Web3TradingState): Web3AccountSetu
       label: "Secret boundary",
       status: "pass",
       detail: "The account setup receipt never echoes keys, private keys, or seed phrases.",
+    },
+  ];
+}
+
+function providerHealthTone(status: Web3ProviderHealthReceipt["status"]): QuickChipTone {
+  if (status === "quote-ready" || status === "order-gated") return "engine";
+  if (status === "read-rail-ready" || status === "wallet-gated") return "caution";
+  if (status === "provider-gated" || status === "blocked") return "critical";
+  return "neutral";
+}
+
+function providerHealthCheckDotClass(status: Web3ProviderHealthReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "bg-engine";
+  if (status === "watch") return "bg-caution";
+  return "bg-critical";
+}
+
+function providerHealthCheckTextClass(status: Web3ProviderHealthReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
+  return "text-critical";
+}
+
+function providerHealthPlaceholderChecks(state: Web3TradingState): Web3ProviderHealthReceipt["checks"] {
+  return [
+    {
+      id: "rpc-url",
+      label: "Solana RPC",
+      status: "watch",
+      detail: "Test provider health to verify the server-side Helius/Solana read rail.",
+    },
+    {
+      id: "wallet-scope",
+      label: "Wallet scope",
+      status: state.autonomous_custody_mandate.wallet_public_key ? "pass" : "watch",
+      detail: state.autonomous_custody_mandate.wallet_public_key ? "A public wallet is scoped." : "Wallet-specific provider checks wait for a public wallet.",
+    },
+    {
+      id: "jupiter-quote",
+      label: "Jupiter quote",
+      status: "watch",
+      detail: "Test provider health to verify the read-only Jupiter quote route.",
+    },
+    {
+      id: "live-boundary",
+      label: "Live boundary",
+      status: "pass",
+      detail: "Provider health cannot sign, submit, or mutate wallets.",
     },
   ];
 }

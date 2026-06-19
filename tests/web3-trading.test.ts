@@ -8,6 +8,7 @@ import { GET, POST } from "@/app/api/web3-trading/route";
 import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
+import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
@@ -492,6 +493,106 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("does not create third-party accounts"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
     expect(JSON.stringify(receipt)).not.toContain("test-birdeye-secret");
+  });
+
+  test("GIVEN env-backed provider checks WHEN provider health runs THEN it proves read rails without leaking secrets", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("lite-api.jup.ag")) {
+        return new Response(JSON.stringify({ outAmount: "1000000", routePlan: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.includes("helius-rpc.com")) {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { method?: string };
+        if (body.method === "getHealth") {
+          return new Response(JSON.stringify({ jsonrpc: "2.0", id: "test", result: "ok" }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (body.method === "getLatestBlockhash") {
+          return new Response(JSON.stringify({
+            jsonrpc: "2.0",
+            id: "test",
+            result: { value: { blockhash: "abc123", lastValidBlockHeight: 123 } },
+          }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (body.method === "getSlot") {
+          return new Response(JSON.stringify({ jsonrpc: "2.0", id: "test", result: 456789 }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+      }
+      return new Response(JSON.stringify({ error: "unexpected provider test request" }), { status: 500 });
+    }) as typeof fetch;
+
+    const rejected = await PROVIDER_HEALTH_GET(new Request("http://localhost/api/web3-provider-health?account=nope"));
+    expect(rejected.status).toBe(422);
+
+    const response = await PROVIDER_HEALTH_GET(new Request("http://localhost/api/web3-provider-health?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      rpc_endpoint: string | null;
+      rpc_provider: string;
+      provider_summary: {
+        helius_configured: boolean;
+        rpc_healthy: boolean;
+        latest_blockhash_ready: boolean;
+        confirmed_slot: number | null;
+        jupiter_configured: boolean;
+        jupiter_quote_ready: boolean;
+        jupiter_order_ready: boolean;
+      };
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      secret_echo_permission: string;
+      private_key_storage: string;
+      transaction_body_storage: string;
+      checks: Array<{ id: string; status: string; detail: string }>;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-provider-health-receipt");
+    expect(receipt.status).toBe("wallet-gated");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.rpc_provider).toBe("helius");
+    expect(receipt.rpc_endpoint).toBe("https://mainnet.helius-rpc.com");
+    expect(receipt.provider_summary.helius_configured).toBe(true);
+    expect(receipt.provider_summary.rpc_healthy).toBe(true);
+    expect(receipt.provider_summary.latest_blockhash_ready).toBe(true);
+    expect(receipt.provider_summary.confirmed_slot).toBe(456789);
+    expect(receipt.provider_summary.jupiter_configured).toBe(false);
+    expect(receipt.provider_summary.jupiter_quote_ready).toBe(true);
+    expect(receipt.provider_summary.jupiter_order_ready).toBe(false);
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.transaction_body_storage).toBe("blocked");
+    expect(receipt.checks.map((check) => check.id)).toEqual([
+      "rpc-url",
+      "rpc-health",
+      "blockhash",
+      "wallet-scope",
+      "helius-das",
+      "jupiter-quote",
+      "jupiter-order",
+      "secret-boundary",
+      "live-boundary",
+    ]);
+    expect(receipt.checks.find((check) => check.id === "secret-boundary")).toMatchObject({ status: "pass" });
+    expect(receipt.controls.some((control) => control.includes("read-only network checks"))).toBe(true);
+    expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
   });
 
   test("GIVEN emergency-stop ops are configured WHEN the drill route runs THEN it records a blocked no-secrets receipt", async () => {
