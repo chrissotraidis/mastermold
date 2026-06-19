@@ -108,7 +108,9 @@ export function writeWeb3PromotedPaperAutopilotReceipt(value: unknown, path = we
   if (!receipt) return null;
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(receipt, null, 2)}\n`);
-  appendWeb3PromotedPaperAutopilotHistory(receipt);
+  if (isPromotedPaperEvidenceReceipt(receipt)) {
+    appendWeb3PromotedPaperAutopilotHistory(receipt);
+  }
   return receipt;
 }
 
@@ -275,7 +277,21 @@ function sanitizeHistory(values: unknown[]) {
       };
     })
     .filter((item): item is Web3PromotedPaperAutopilotHistoryEntry => item !== null)
+    .filter(isPromotedPaperEvidenceEntry)
     .slice(-24);
+}
+
+function isPromotedPaperEvidenceReceipt(receipt: Web3PromotedPaperAutopilotReceipt) {
+  return isPromotedPaperEvidenceEntry(receiptToHistoryEntry(receipt));
+}
+
+function isPromotedPaperEvidenceEntry(entry: Web3PromotedPaperAutopilotHistoryEntry) {
+  return entry.supervisor_status !== "not-run" ||
+    entry.posted_ticks > 0 ||
+    entry.blocked_ticks > 0 ||
+    entry.net_pnl_usd !== 0 ||
+    entry.profit_target_hit ||
+    entry.loss_brake_tripped;
 }
 
 function buildRunMemoryGovernor(history: Web3PromotedPaperAutopilotHistoryEntry[]) {

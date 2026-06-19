@@ -672,6 +672,8 @@ export function Web3TradingWorkspaceLoader({
   const marketIngestion = state.market_ingestion_plan;
   const marketIntake = state.autonomous_market_intake_plan;
   const launchChecklist = buildWeb3AutonomyLaunchChecklist(state, promotedAutopilotHealth, supervisorHealth);
+  const promotedProofPlan = launchChecklist.profit_proof_readiness.proof_plan;
+  const promotedProofLabel = promotedProofPlan.status === "blocked" ? "Proof review" : "Promoted run";
   const sprintTapeItems = state.autonomous_market_evidence_fusion.items.slice(0, 2);
   const holdingSentryItems = state.autonomous_portfolio_mark_board.items.slice(0, 2);
   const priceActionItems = buildQuickPriceActionTape(state);
@@ -919,7 +921,7 @@ export function Web3TradingWorkspaceLoader({
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/15 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-engine transition hover:bg-engine/20 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
           >
             <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            {quickBusy === "promoted" ? "Promoting" : "Promoted run"}
+            {quickBusy === "promoted" ? "Reviewing" : promotedProofLabel}
           </button>
           <button
             type="button"
@@ -949,7 +951,7 @@ export function Web3TradingWorkspaceLoader({
         ) : null}
         {lastPromotedAutopilot ? (
           <p className="mt-3 line-clamp-2 border-t border-outline-variant/25 pt-3 text-xs leading-5 text-on-surface-variant">
-            Promoted paper run: {lastPromotedAutopilot.summary} Permission {lastPromotedAutopilot.promotion_permission}; supervisor {lastPromotedAutopilot.supervisor_status}; posted {lastPromotedAutopilot.posted_ticks} ticks; live and wallet mutation remain {lastPromotedAutopilot.live_execution_permission}.
+            Promoted paper {lastPromotedAutopilot.posted_ticks > 0 || lastPromotedAutopilot.applied_supervisor_rounds > 0 ? "run" : "review"}: {lastPromotedAutopilot.summary} Permission {lastPromotedAutopilot.promotion_permission}; supervisor {lastPromotedAutopilot.supervisor_status}; posted {lastPromotedAutopilot.posted_ticks} ticks; {lastPromotedAutopilot.posted_ticks > 0 || lastPromotedAutopilot.applied_supervisor_rounds > 0 ? "counted as proof evidence" : "not counted as profit proof evidence"}; live and wallet mutation remain {lastPromotedAutopilot.live_execution_permission}.
           </p>
         ) : null}
 

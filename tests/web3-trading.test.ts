@@ -10,6 +10,11 @@ import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForP
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
 import {
+  getWeb3PromotedPaperAutopilotHealth,
+  getWeb3PromotedPaperAutopilotHistory,
+  writeWeb3PromotedPaperAutopilotReceipt,
+} from "@/src/db/web3-promoted-paper-autopilot";
+import {
   getWeb3TradingStateAsync,
   getWeb3TradingState,
   scoreMarket,
@@ -22,6 +27,8 @@ let prevDb: string | undefined;
 let prevJupiterKey: string | undefined;
 let prevJupiterTriggerJwt: string | undefined;
 let prevRpcUrl: string | undefined;
+let prevPromotedAutopilotPath: string | undefined;
+let prevPromotedAutopilotHistoryPath: string | undefined;
 let prevLiveExecution: string | undefined;
 let prevLiveApproval: string | undefined;
 let prevSignerProvider: string | undefined;
@@ -39,6 +46,8 @@ beforeEach(() => {
   prevJupiterKey = process.env.JUPITER_API_KEY;
   prevJupiterTriggerJwt = process.env.JUPITER_TRIGGER_JWT;
   prevRpcUrl = process.env.SOLANA_RPC_URL;
+  prevPromotedAutopilotPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH;
+  prevPromotedAutopilotHistoryPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
   prevLiveExecution = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   prevLiveApproval = process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
   prevSignerProvider = process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER;
@@ -50,7 +59,10 @@ beforeEach(() => {
   prevTurnkeyApiPrivateKey = process.env.TURNKEY_API_PRIVATE_KEY;
   prevTurnkeySolanaWalletAccount = process.env.TURNKEY_SOLANA_WALLET_ACCOUNT;
   prevFetch = globalThis.fetch;
-  process.env.MASTERMOLD_DB = join(mkdtempSync(join(tmpdir(), "mm-web3-")), "db.sqlite");
+  const testRoot = mkdtempSync(join(tmpdir(), "mm-web3-"));
+  process.env.MASTERMOLD_DB = join(testRoot, "db.sqlite");
+  process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH = join(testRoot, "promoted-autopilot.json");
+  process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = join(testRoot, "promoted-autopilot-history.json");
   delete process.env.JUPITER_API_KEY;
   delete process.env.JUPITER_TRIGGER_JWT;
   delete process.env.SOLANA_RPC_URL;
@@ -76,6 +88,10 @@ afterEach(() => {
   else process.env.JUPITER_TRIGGER_JWT = prevJupiterTriggerJwt;
   if (prevRpcUrl === undefined) delete process.env.SOLANA_RPC_URL;
   else process.env.SOLANA_RPC_URL = prevRpcUrl;
+  if (prevPromotedAutopilotPath === undefined) delete process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH;
+  else process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH = prevPromotedAutopilotPath;
+  if (prevPromotedAutopilotHistoryPath === undefined) delete process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
+  else process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = prevPromotedAutopilotHistoryPath;
   if (prevLiveExecution === undefined) delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   else process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION = prevLiveExecution;
   if (prevLiveApproval === undefined) delete process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
@@ -5786,6 +5802,95 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.research_sources.some((source) => source.label === "Birdeye trades and traders")).toBe(true);
     expect(state.research_sources.some((source) => source.label === "Helius enhanced transactions")).toBe(true);
     expect(state.research_sources.some((source) => source.label === "Helius webhooks")).toBe(true);
+  });
+
+  test("GIVEN promoted autopilot guard reviews with no supervised ticks WHEN health is rebuilt THEN they do not poison proof memory", () => {
+    writeWeb3PromotedPaperAutopilotReceipt({
+      mode: "web3-promoted-paper-autopilot",
+      paper_only: true,
+      status: "target-hit",
+      runner_id: "proof-memory-test",
+      scenario: "breakout",
+      promotion_scenario: "all",
+      source: "sample",
+      started_at: "2026-06-19T10:00:00.000Z",
+      finished_at: "2026-06-19T10:01:00.000Z",
+      promotion_status: "scale-paper",
+      promotion_permission: "selective-paper",
+      supervisor_status: "completed",
+      applied_supervisor_rounds: 1,
+      applied_ticks_per_round: 2,
+      posted_ticks: 2,
+      blocked_ticks: 0,
+      net_pnl_usd: 33,
+      profit_target_hit: true,
+      loss_brake_tripped: false,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      summary: "Promoted paper autopilot hit target.",
+      next_action: "Continue collecting promoted proof.",
+      blockers: [],
+    });
+    writeWeb3PromotedPaperAutopilotReceipt({
+      mode: "web3-promoted-paper-autopilot",
+      paper_only: true,
+      status: "blocked",
+      runner_id: "proof-memory-test",
+      scenario: "breakout",
+      promotion_scenario: "all",
+      source: "sample",
+      started_at: "2026-06-19T10:02:00.000Z",
+      finished_at: "2026-06-19T10:02:05.000Z",
+      promotion_status: "protect-paper",
+      promotion_permission: "blocked",
+      supervisor_status: "not-run",
+      applied_supervisor_rounds: 0,
+      applied_ticks_per_round: 0,
+      posted_ticks: 0,
+      blocked_ticks: 0,
+      net_pnl_usd: 0,
+      profit_target_hit: false,
+      loss_brake_tripped: false,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      summary: "Promoted paper autopilot reviewed the guard without running ticks.",
+      next_action: "Run proof-only review or stand down.",
+      blockers: ["Supervisor round cap is zero."],
+    });
+
+    const history = getWeb3PromotedPaperAutopilotHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      status: "target-hit",
+      supervisor_status: "completed",
+      net_pnl_usd: 33,
+      profit_target_hit: true,
+    });
+
+    const health = getWeb3PromotedPaperAutopilotHealth();
+    expect(health).toMatchObject({
+      status: "blocked",
+      run_count: 1,
+      total_net_pnl_usd: 33,
+      target_hit_rate_pct: 100,
+      run_memory_status: "tighten-paper",
+      recommended_supervisor_round_cap: 1,
+    });
+
+    const proof = buildWeb3ProfitProofReadiness({ promotedHealth: health });
+    expect(proof).toMatchObject({
+      status: "profitable-paper",
+      promoted_recent_positive_count: 1,
+      promoted_recent_loss_count: 0,
+      can_satisfy_profit_gate: false,
+    });
+    expect(proof.proof_plan).toMatchObject({
+      status: "needs-runs",
+      remaining_promoted_runs: 2,
+      suggested_next_runs: 1,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
   });
 
   test("GIVEN mocked DEX Screener payloads WHEN live mode is requested THEN the agent trades from live market telemetry", async () => {
