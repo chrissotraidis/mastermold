@@ -2,7 +2,7 @@
 
 import type { ComponentType } from "react";
 import { useEffect, useState } from "react";
-import { Activity, CandlestickChart, LineChart, Pause, Play, RefreshCw, RotateCcw, ShieldCheck, Zap } from "lucide-react";
+import { Activity, CandlestickChart, KeyRound, LineChart, Pause, Play, RefreshCw, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 
 import { Chip } from "@/components/sentinel";
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
@@ -11,7 +11,7 @@ import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-pa
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
-type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset";
+type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
 type QuickWiringPath = {
   label: string;
@@ -206,7 +206,7 @@ export function Web3TradingWorkspaceLoader({
     if (!state || quickBusy) return;
     const previousState = state;
     setQuickBusy(busy);
-    setQuickNotice(busy === "loop" ? "Asking the backend loop throttle for the next autonomous paper step." : busy === "session" ? "Running a bounded autonomous paper cycle." : busy === "minute" ? "Running the next-minute high-frequency paper plan." : busy === "source" ? "Switching the read-only market feed." : busy === "reset" ? "Resetting the local paper account." : busy === "chart" ? "Recording fresh chart proof for the autonomous candle gate." : busy === "route" ? "Refreshing read-only route proof for the selected paper action." : busy === "route-repair" ? "Route quote is blocked; repairing the read-only market and route evidence first." : "Refreshing the autonomous market read.");
+    setQuickNotice(busy === "loop" ? "Asking the backend loop throttle for the next autonomous paper step." : busy === "session" ? "Running a bounded autonomous paper cycle." : busy === "minute" ? "Running the next-minute high-frequency paper plan." : busy === "source" ? "Switching the read-only market feed." : busy === "reset" ? "Resetting the local paper account." : busy === "chart" ? "Recording fresh chart proof for the autonomous candle gate." : busy === "route" ? "Refreshing read-only route proof for the selected paper action." : busy === "route-repair" ? "Route quote is blocked; repairing the read-only market and route evidence first." : busy === "dry-run-setup" ? "Preparing a local dry-run signer rehearsal; no wallet keys, submits, or real-capital movement." : "Refreshing the autonomous market read.");
     try {
       const requestBody = body.daemon === true && body.daemon_lease === undefined
         ? { ...body, daemon_lease: buildDaemonLeaseRequest(previousState) }
@@ -234,6 +234,8 @@ export function Web3TradingWorkspaceLoader({
         setQuickNotice(payload.autonomous_candle_refresh.summary);
       } else if (busy === "route" || busy === "route-repair") {
         setQuickNotice(payload.autonomous_route_refresh_execution.next_action);
+      } else if (busy === "dry-run-setup") {
+        setQuickNotice(payload.autonomous_signer_ops.next_action);
       } else {
         setQuickNotice(payload.autonomous_market_evidence_fusion.next_action);
       }
@@ -301,6 +303,29 @@ export function Web3TradingWorkspaceLoader({
       account: state.paper_account.mode,
       advance: false,
     }, "The read-only market feed could not be switched.");
+  }
+
+  function prepareDryRunSignerSetup() {
+    if (!state) return;
+    const config = state.execution_readiness.config;
+    void submitTradingRequest("dry-run-setup", {
+      scenario: state.scenario,
+      cycles: state.paper_account.cycle,
+      source: state.market_source.mode,
+      account: state.paper_account.mode,
+      advance: false,
+      execution: {
+        mode: "dry-run",
+        kill_switch: false,
+        wallet_public_key: config.wallet_public_key ?? "11111111111111111111111111111111",
+        signer_simulation_enabled: true,
+        signer_session_label: config.signer_session_label || "browser-dry-run-rehearsal",
+        signer_network: config.signer_network || "devnet",
+        max_trade_usd: Math.max(10, Math.min(500, config.max_trade_usd || 250)),
+        daily_spend_cap_usd: Math.max(25, Math.min(2_500, config.daily_spend_cap_usd || 1_000)),
+        max_slippage_bps: Math.max(1, Math.min(250, config.max_slippage_bps || 150)),
+      },
+    }, "The dry-run signer rehearsal could not be prepared.");
   }
 
   async function runAutonomousLoopTick() {
@@ -779,7 +804,12 @@ export function Web3TradingWorkspaceLoader({
         </p>
 
         <div className="mt-3">
-          <QuickLaunchChecklistPanel checklist={launchChecklist} />
+          <QuickLaunchChecklistPanel
+            checklist={launchChecklist}
+            busy={quickBusy}
+            disabled={quickDisabled}
+            onDryRunSetup={prepareDryRunSignerSetup}
+          />
         </div>
 
         <div className="mt-3 grid gap-2 xl:grid-cols-2" aria-label="First-screen autonomous chart and profit benchmark">
@@ -3592,7 +3622,7 @@ function buildQuickAgentActionOutcome(
       ? "critical"
       : after.autonomous_now_decision.status === "blocked"
         ? "critical"
-        : kind === "route" || kind === "route-repair" || kind === "chart" || kind === "promoted" || kind === "stand-down"
+        : kind === "route" || kind === "route-repair" || kind === "chart" || kind === "promoted" || kind === "stand-down" || kind === "dry-run-setup"
           ? "caution"
           : "neutral";
   return {
@@ -3629,6 +3659,7 @@ function quickAgentActionLabel(kind: QuickAgentActionKind, state?: Web3TradingSt
   if (kind === "promoted") return "Promoted paper run returned";
   if (kind === "source") return "Market source switched";
   if (kind === "reset") return "Paper account reset";
+  if (kind === "dry-run-setup") return "Dry-run signer prepared";
   if (kind === "stand-down") return "Stand-down respected";
   return "Market read refreshed";
 }
@@ -3641,6 +3672,7 @@ function quickAgentActionSummary(kind: QuickAgentActionKind, state: Web3TradingS
   if (kind === "promoted") return "Repeat proof promoted into bounded supervised paper daemon rounds.";
   if (kind === "source") return state.market_source.detail;
   if (kind === "reset") return "Paper account reset; the autonomous learner is ready for a fresh rehearsal.";
+  if (kind === "dry-run-setup") return state.autonomous_signer_ops.summary;
   if (kind === "stand-down") return state.autonomous_now_decision.next_action;
   return state.autonomous_market_evidence_fusion.next_action;
 }
@@ -3651,6 +3683,7 @@ function quickAgentActionNextAction(kind: QuickAgentActionKind, state: Web3Tradi
   if (kind === "loop") return state.autonomous_loop_tick.next_action;
   if (kind === "session" || kind === "minute") return state.autonomous_session_run.next_action;
   if (kind === "promoted") return state.autonomous_daemon_handoff.summary;
+  if (kind === "dry-run-setup") return state.autonomous_signer_ops.next_action;
   return state.autonomous_now_decision.next_action;
 }
 
@@ -6980,8 +7013,14 @@ function QuickPromotedAutopilotPanel({
 
 function QuickLaunchChecklistPanel({
   checklist,
+  busy,
+  disabled,
+  onDryRunSetup,
 }: {
   checklist: Web3AutonomyLaunchChecklist;
+  busy: QuickBusyState | null;
+  disabled: boolean;
+  onDryRunSetup: () => void;
 }) {
   const tone = launchChecklistTone(checklist.status);
   const topItems = checklist.items.slice(0, 6);
@@ -7003,6 +7042,16 @@ function QuickLaunchChecklistPanel({
           <Chip tone={tone}>{checklist.paper_scale_permitted ? "paper scale" : "paper gated"}</Chip>
           <Chip tone={checklist.live_review_permitted ? "critical" : "demo"}>{checklist.live_review_permitted ? "manual live review" : "real-cap blocked"}</Chip>
           <Chip tone={checklist.hard_blocker_count > 0 ? "critical" : checklist.watch_count > 0 ? "caution" : "engine"}>{checklist.hard_blocker_count} blockers</Chip>
+          <button
+            type="button"
+            onClick={onDryRunSetup}
+            disabled={disabled}
+            title="Prepare local dry-run signer scope without connecting wallet keys or enabling live swaps."
+            className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md border border-engine/40 bg-engine/10 px-2 py-1 font-mono text-[10px] uppercase tracking-telemetry text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {busy === "dry-run-setup" ? "Preparing" : "Dry-run signer"}
+          </button>
         </div>
       </div>
 
@@ -7052,8 +7101,11 @@ function QuickLaunchChecklistPanel({
         </div>
       ) : null}
       <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">{checklist.next_action}</p>
+      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">
+        Dry-run signer setup only scopes a public-key rehearsal, simulated signer metadata, caps, slippage, and kill-switch review; it cannot store keys, sign, submit, custody funds, or enable real-capital trades.
+      </p>
       <span className="sr-only" aria-label="Web3 launch checklist receipt">
-        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; dry-run signer setup available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
       </span>
     </section>
   );

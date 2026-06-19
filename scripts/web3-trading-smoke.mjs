@@ -109,6 +109,8 @@ async function main() {
   assert(html.includes("real-cap blocked"), "Trading page should make the real-capital boundary visible in the launch checklist.");
   assert(html.includes("Actually left"), "Trading page should expose what is actually left for Web3 launch readiness.");
   assert(html.includes("actual remaining gates"), "Trading page should summarize the remaining launch gates.");
+  assert(html.includes("Dry-run signer"), "Trading page should expose a safe dry-run signer setup action in the launch checklist.");
+  assert(html.includes("Dry-run signer setup only scopes a public-key rehearsal"), "Trading page should disclose the dry-run signer boundary.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");
@@ -4086,6 +4088,33 @@ async function main() {
   assert(routeRefresh.response.status === 200, "Read-only route refresh request should be accepted.", routeRefresh.payload);
   assert(routeRefresh.payload.autonomous_route_refresh_execution?.execution_boundary === "read-only-route-refresh", "Route refresh request must stay read-only.", routeRefresh.payload.autonomous_route_refresh_execution);
   assert(routeRefresh.payload.execution_gate?.live_execution_enabled === false, "Route refresh request must not enable live execution.", routeRefresh.payload.execution_gate);
+
+  const dryRunSignerSetup = await postTrading({
+    scenario: "base",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    execution: {
+      mode: "dry-run",
+      kill_switch: false,
+      wallet_public_key: "11111111111111111111111111111111",
+      signer_simulation_enabled: true,
+      signer_session_label: "smoke-dry-run-rehearsal",
+      signer_network: "devnet",
+      max_trade_usd: 100,
+      daily_spend_cap_usd: 500,
+      max_slippage_bps: 150,
+    },
+  });
+  assert(dryRunSignerSetup.response.status === 200, "Dry-run signer setup should be accepted.", dryRunSignerSetup.payload);
+  assert(dryRunSignerSetup.payload.execution_readiness.config.mode === "dry-run", "Dry-run signer setup should switch to dry-run mode.", dryRunSignerSetup.payload.execution_readiness.config);
+  assert(dryRunSignerSetup.payload.execution_readiness.config.kill_switch === false, "Dry-run signer setup should clear only the dry-run kill-switch rehearsal.", dryRunSignerSetup.payload.execution_readiness.config);
+  assert(dryRunSignerSetup.payload.execution_readiness.config.wallet_public_key === "11111111111111111111111111111111", "Dry-run signer setup should scope a public wallet key.", dryRunSignerSetup.payload.execution_readiness.config);
+  assert(dryRunSignerSetup.payload.execution_readiness.config.signer_simulation_enabled === true, "Dry-run signer setup should enable signer simulation metadata.", dryRunSignerSetup.payload.execution_readiness.config);
+  assert(dryRunSignerSetup.payload.autonomous_custody_mandate.wallet_public_key === "11111111111111111111111111111111", "Dry-run signer setup should flow wallet scope into custody mandate.", dryRunSignerSetup.payload.autonomous_custody_mandate);
+  assert(dryRunSignerSetup.payload.autonomous_signer_ops.controls.some((control) => control.includes("private keys")), "Dry-run signer setup should keep private keys outside the app.", dryRunSignerSetup.payload.autonomous_signer_ops);
+  assert(dryRunSignerSetup.payload.execution_gate.live_execution_enabled === false, "Dry-run signer setup must not enable live execution.", dryRunSignerSetup.payload.execution_gate);
+  assert(dryRunSignerSetup.payload.autonomous_live_autonomy_readiness.can_trade_real_capital === false, "Dry-run signer setup must not permit real-capital trading.", dryRunSignerSetup.payload.autonomous_live_autonomy_readiness);
 
   const reset = await postTrading({
     scenario: "base",
