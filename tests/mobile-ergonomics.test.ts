@@ -775,6 +775,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 trading credentials");
     expect(settingsPage).toContain("Secure setup state for the autonomous Web3 paper desk");
     expect(settingsPage).toContain("SettingsWeb3CredentialConsole");
+    expect(settingsPage).toContain("Credential checklist");
+    expect(settingsPage).toContain("Ignored env template");
+    expect(settingsPage).toContain("Web3 credential environment template");
+    expect(settingsPage).toContain("Test: {item.test_action}");
+    expect(settingsPage).toContain("acquisition.items.map");
     expect(settingsConsole).toContain("Credential action console");
     expect(settingsConsole).toContain("Session-only provider tests");
     expect(settingsConsole).toContain("Save public scope");
@@ -802,6 +807,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyStrictJupiterOrderReadiness");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-jupiter-order");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run verify:web3 gate");
+    expect(source("components/review-readiness.tsx")).toContain("full credential checklist");
     expect(source("components/review-readiness.tsx")).toContain("Settings now shows a strict verifier runway");
     expect(source("components/review-readiness.tsx")).toContain("configured Helius/Solana provider-health proof");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-operator-wallet gate");
@@ -812,6 +818,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("secret echo blocked");
     expect(settingsPage).toContain("External setup packet");
     expect(settingsPage).toContain("Web3 external account setup packet");
+    expect(settingsPage).toContain("storage rules");
+    expect(settingsPage).toContain("setup links");
     expect(settingsPage).toContain("in app signup blocked");
     expect(settingsPage).toContain("setup_url");
     expect(settingsPage).toContain("https://developers.jup.ag/portal");

@@ -107,9 +107,6 @@ function Web3CredentialsRunwayCard({
   const requiredConfigured = receipt.environment_summary.required_configured_count;
   const requiredTotal = receipt.environment_summary.required_account_count;
   const liveReady = receipt.status === "live-review-blocked";
-  const primaryItems = receipt.items.filter((item) =>
-    ["helius-read-rail", "jupiter-execution-rail", "dedicated-trading-wallet", "external-signer", "emergency-stop", "tax-ledger"].includes(item.id),
-  );
   const scopedWallet = state.autonomous_custody_mandate.wallet_public_key ??
     state.live_wallet_accounting_readiness.wallet_public_key ??
     state.execution_readiness.config.wallet_public_key ??
@@ -151,19 +148,40 @@ function Web3CredentialsRunwayCard({
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">External setup packet</p>
-                <p className="mt-1 text-sm font-semibold text-on-surface">{acquisition.summary}</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">Credential checklist</p>
                 <p className="mt-1 text-xs leading-5 text-outline">{acquisition.next_external_action}</p>
               </div>
               <CredentialStateBadge configured={acquisition.status === "ready-for-order-rehearsal"} status={acquisition.status} />
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {acquisition.items.slice(0, 4).map((item) => (
+            <p className="mt-2 rounded-md border border-outline-variant/35 bg-surface-dim/45 p-2 text-xs leading-5 text-on-surface-variant">
+              {acquisition.summary} Setup links, storage rules, env names, and tests stay visible here so the next credential action is not hidden in the deeper trading cockpit.
+            </p>
+            <div className="mt-3 grid gap-2">
+              {acquisition.items.map((item) => (
                 <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/35 bg-surface-dim/45 p-2">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                        {item.priority.replace("-", " ")} · {item.account_owner} owned
+                      </p>
+                    </div>
                     <CredentialStateBadge configured={item.status === "configured"} status={item.status} />
                   </div>
-                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{item.security_rule}</p>
+                  <p className="mt-2 text-[11px] leading-4 text-outline">{item.next_action}</p>
+                  <p className="mt-1 text-[11px] leading-4 text-outline">{item.security_rule}</p>
+                  {item.env_targets.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {item.env_targets.map((target) => (
+                        <span key={target} className="rounded-md border border-outline-variant/35 bg-void/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                          {target}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <p className="mt-2 rounded-md border border-outline-variant/25 bg-void/20 p-2 text-[11px] leading-4 text-on-surface-variant">
+                    Test: {item.test_action}
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <a
                       href={item.setup_url}
@@ -187,6 +205,20 @@ function Web3CredentialsRunwayCard({
                 </div>
               ))}
             </div>
+            <div className="mt-3 rounded-md border border-outline-variant/35 bg-void/20 p-2" aria-label="Web3 credential environment template">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Ignored env template</p>
+              <div className="mt-2 grid gap-1">
+                {acquisition.env_template.length > 0 ? acquisition.env_template.map((target) => (
+                  <code key={target} className="break-all rounded-md border border-outline-variant/25 bg-black/20 px-2 py-1 font-mono text-[11px] leading-5 text-on-surface-variant">
+                    {target}
+                  </code>
+                )) : (
+                  <p className="rounded-md border border-outline-variant/25 bg-black/20 px-2 py-1 text-xs leading-5 text-outline">
+                    No server env slots are currently required by the visible checklist.
+                  </p>
+                )}
+              </div>
+            </div>
             <p className="sr-only" aria-label="Web3 external account setup security boundary">
               External account setup is operator owned; in app signup blocked; private key storage blocked; seed phrase storage blocked; live execution blocked; wallet mutation blocked; secret echo blocked.
             </p>
@@ -204,29 +236,6 @@ function Web3CredentialsRunwayCard({
             account={state.paper_account.mode}
             cycles={state.paper_account.cycle}
           />
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            {primaryItems.map((item) => (
-              <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-on-surface">{item.label}</p>
-                    <p className="mt-1 text-xs leading-5 text-outline">{item.next_action}</p>
-                  </div>
-                  <CredentialStateBadge configured={item.configured} status={item.status} />
-                </div>
-                {item.env_targets.length > 0 ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {item.env_targets.map((target) => (
-                      <span key={target} className="rounded-md border border-outline-variant/35 bg-void/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
-                        {target}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
