@@ -18,6 +18,9 @@ tsconfig.tsbuildinfo
 *.db-journal
 *.db-wal
 
+# Local Web3 readiness receipts (sanitized but machine/run-specific)
+data/web3-*.json
+
 # Local preview launch config (machine-specific paths)
 .claude/launch.json
 

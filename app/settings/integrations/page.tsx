@@ -17,6 +17,7 @@ import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/int
 import { getPortfolio } from "@/src/db/portfolio";
 import { buildWeb3AccountAcquisitionReceipt, type Web3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
 import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
+import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
@@ -46,6 +47,7 @@ export default async function IntegrationsSettingsPage() {
   const brainState = toPublicBrainState(brainStateRaw);
   const web3AccountReceipt = buildWeb3AccountSetupReceipt(web3State);
   const web3AcquisitionReceipt = buildWeb3AccountAcquisitionReceipt(web3State);
+  const web3CredentialDoctor = getWeb3CredentialDoctorHealth();
   const web3LaunchChecklist = buildWeb3AutonomyLaunchChecklist(
     web3State,
     getWeb3PromotedPaperAutopilotHealth(),
@@ -70,6 +72,7 @@ export default async function IntegrationsSettingsPage() {
           <Web3CredentialsRunwayCard
             receipt={web3AccountReceipt}
             acquisition={web3AcquisitionReceipt}
+            credentialDoctor={web3CredentialDoctor}
             launchChecklist={web3LaunchChecklist}
             state={web3State}
           />
@@ -111,11 +114,13 @@ export default async function IntegrationsSettingsPage() {
 function Web3CredentialsRunwayCard({
   receipt,
   acquisition,
+  credentialDoctor,
   launchChecklist,
   state,
 }: {
   receipt: Web3AccountSetupReceipt;
   acquisition: Web3AccountAcquisitionReceipt;
+  credentialDoctor: Web3CredentialDoctorHealth;
   launchChecklist: Web3AutonomyLaunchChecklist;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
@@ -187,6 +192,8 @@ function Web3CredentialsRunwayCard({
               Secure credential handoff shows configured or missing status only; Helius and Jupiter secrets stay out of browser storage; private keys and seed phrases are never accepted; live execution and wallet mutation remain blocked.
             </p>
           </div>
+
+          <SettingsCredentialDoctorPanel health={credentialDoctor} />
 
           <div className="rounded-md border border-engine/25 bg-surface-dim/35 p-3" aria-label="Live Web3 credential queue">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -563,6 +570,62 @@ function repairActionBadgeStatus(status: Web3AutonomyLaunchChecklist["repair_act
   if (status === "ready") return "pass";
   if (status === "active" || status === "review") return "watch";
   return "fail";
+}
+
+function SettingsCredentialDoctorPanel({ health }: { health: Web3CredentialDoctorHealth }) {
+  const topChecks = health.checks.slice(0, 6);
+  return (
+    <div className="rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3" aria-label="Web3 credential doctor receipt">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Credential doctor receipt</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {health.status.replaceAll("-", " ")} - {health.ready_count}/{Math.max(health.checks.length, health.ready_count + health.watch_count + health.blocked_count)} passing
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{health.summary}</p>
+        </div>
+        <LaunchQueueBadge
+          status={health.status === "absent" || health.blocked_count > 0 ? "fail" : health.watch_count > 0 ? "watch" : "pass"}
+          label={health.receipt_fresh ? "fresh" : health.status === "absent" ? "not run" : "stale"}
+        />
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {topChecks.length > 0 ? topChecks.map((item) => (
+          <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-outline">{item.detail}</p>
+              </div>
+              <LaunchQueueBadge status={item.status} label={item.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{item.storage}</p>
+          </div>
+        )) : (
+          <p className="rounded-md border border-caution/25 bg-caution/[0.035] p-2 text-xs leading-5 text-on-surface-variant">
+            Run <code className="rounded bg-black/20 px-1 py-0.5">npm run doctor:web3 -- --json</code> to write a sanitized credential doctor receipt.
+          </p>
+        )}
+      </div>
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe commands</p>
+        <div className="mt-2 grid gap-1">
+          {health.safe_commands.slice(0, 4).map((command) => (
+            <code key={command} className="break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {command}
+            </code>
+          ))}
+        </div>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Doctor receipts are local, sanitized, and status-only; they cannot create accounts, store secrets, sign, submit, custody funds, mutate wallets, or unlock live capital.
+      </p>
+      <p className="sr-only" aria-label="Web3 credential doctor security boundary">
+        Web3 credential doctor live execution blocked; wallet mutation blocked; transaction submission blocked; private key storage blocked; seed phrase storage blocked; secret echo blocked.
+      </p>
+    </div>
+  );
 }
 
 function LaunchQueueBadge({

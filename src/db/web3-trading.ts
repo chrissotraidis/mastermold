@@ -11445,7 +11445,13 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     const configuredState = { ...state, execution_readiness: buildExecutionReadiness(executionConfig, 0) };
     applyOnchainEventSignals(configuredState, parseLedgerData(readLedger()?.data).onchain_events);
     configuredState.execution_gate = executionGate(configuredState.execution_readiness);
-    configuredState.execution_plans = buildLocalExecutionPlans(configuredState.market, configuredState.signals, configuredState.execution_readiness);
+    configuredState.execution_plans = buildLocalExecutionPlans(
+      configuredState.market,
+      configuredState.signals,
+      configuredState.execution_readiness,
+      configuredState.portfolio,
+      configuredState.trade_tape,
+    );
     configuredState.profit_optimizer = reconcileOptimizerFills(
       buildProfitOptimizer(
         configuredState.market,
@@ -13619,7 +13625,7 @@ function buildWeb3TradingState({
     history: trigger_order_history,
     appliedPatches: [],
   });
-  const execution_plans = buildLocalExecutionPlans(market, signals, execution_readiness);
+  const execution_plans = buildLocalExecutionPlans(market, signals, execution_readiness, appliedPortfolio, trade_tape);
   const profit_optimizer = reconcileOptimizerFills(
     buildProfitOptimizer(market, signals, portfolio, autonomy_policy, execution_plans, discovery_tape.status, price_action_monitor, rug_pull_firewall),
     trade_tape,
@@ -22057,6 +22063,16 @@ function knownTokenDecimals(mint: string): { decimals: number; source: Execution
   return { decimals: 6, source: "assumed" };
 }
 
+function knownTokenDecimalsForMarketToken(token: MemecoinMarket): { decimals: number; source: ExecutionPlan["input_amount_source"] } {
+  const byMint = knownTokenDecimals(token.token_address);
+  if (byMint.source !== "assumed") return byMint;
+  const watched = HELD_POSITION_DEX_WATCHLIST.find((item) =>
+    item.tokenId === token.id ||
+    normalizeTradingSymbol(item.symbol) === normalizeTradingSymbol(token.symbol)
+  );
+  return watched ? { decimals: watched.decimals, source: "watchlist" } : byMint;
+}
+
 function drillStatus(
   plan: ExecutionPlan | null,
   blockers: string[],
@@ -22188,13 +22204,27 @@ function buildLocalExecutionPlans(
   market: MemecoinMarket[],
   signals: TradingSignal[],
   readiness: ExecutionReadiness,
+  portfolio?: TradingPortfolio,
+  recentTrades: AutonomousTrade[] = [],
 ): ExecutionPlan[] {
-  return signals.slice(0, 4).map((signal) => {
+  const entryPlans = signals.slice(0, 4).map((signal) => {
     const token = market.find((item) => item.id === signal.token_id);
     return token
       ? localPlan(token, signal, readiness, signal.action === "buy" ? "blocked" : "not-needed", "Sample mode does not request live swap routes.")
       : null;
   }).filter((plan): plan is ExecutionPlan => plan !== null);
+  const sellPlans = portfolio
+    ? protectiveSellCandidates(market, portfolio, recentTrades)
+      .slice(0, 3)
+      .map(({ position, token }) => localPositionSellPlan(
+        token,
+        position,
+        readiness,
+        "blocked",
+        "Protective held-position sell rehearsal stayed paper-only because no live route was requested.",
+      ))
+    : [];
+  return [...entryPlans, ...sellPlans];
 }
 
 async function quoteJupiterPlan(
@@ -22376,8 +22406,8 @@ function localPlan(
     output_mint: token.chain === "solana" ? side === "sell" ? USDC_MINT : token.token_address : null,
     input_amount_usd: size,
     input_amount_raw: size > 0 ? String(size * 1_000_000) : null,
-    input_token_decimals: token.chain === "solana" ? side === "sell" ? knownTokenDecimals(token.token_address).decimals : 6 : null,
-    input_amount_source: token.chain === "solana" ? side === "sell" ? knownTokenDecimals(token.token_address).source : "usdc" : "none",
+    input_token_decimals: token.chain === "solana" ? side === "sell" ? knownTokenDecimalsForMarketToken(token).decimals : 6 : null,
+    input_amount_source: token.chain === "solana" ? side === "sell" ? knownTokenDecimalsForMarketToken(token).source : "usdc" : "none",
     estimated_output_raw: null,
     price_impact_pct: null,
     quoted_at: null,
@@ -22400,7 +22430,7 @@ function localPositionSellPlan(
   message: string,
 ): ExecutionPlan {
   const size = cappedSellSize(position, readiness);
-  const decimals = knownTokenDecimals(token.token_address);
+  const decimals = knownTokenDecimalsForMarketToken(token);
   return {
     id: `plan-sell-${token.id}`,
     token_id: token.id,
@@ -23743,8 +23773,8 @@ function applyPersistentLedger(
     history: trigger_order_history,
     appliedPatches: parseLedgerData(next.data).trigger_reconciliations,
   });
-  const execution_plans = buildLocalExecutionPlans(state.market, state.signals, execution_readiness);
   const displayTrades = trades.slice(-12).reverse();
+  const execution_plans = buildLocalExecutionPlans(state.market, state.signals, execution_readiness, portfolio, displayTrades);
   const profit_optimizer = reconcileOptimizerFills(
     buildProfitOptimizer(
       state.market,
@@ -25076,6 +25106,12 @@ function applyPersistentLedger(
     }
   }
   const canApplyPreRedeployPaperLanes = canApplyPaperLanes && !protectOnlyAdvance;
+  const canApplyActionQueuePaperLane = canApplyPreRedeployPaperLanes ||
+    (
+      canApplyPaperLanes &&
+      autonomous_action_queue_execution.paper_trade?.side === "sell" &&
+      persistentPaperAdvanceAllowsTrade(advanceMode, autonomous_action_queue_execution.paper_trade)
+    );
 
   if (canApplyPreRedeployPaperLanes && autonomous_tick_bundle_execution.ready_trade_count > 0) {
     const bundled = applyAutonomousTickBundleToLedger({
@@ -25112,7 +25148,7 @@ function applyPersistentLedger(
   }
 
   if (
-    canApplyPreRedeployPaperLanes &&
+    canApplyActionQueuePaperLane &&
     autonomous_action_queue_execution.paper_trade_ready &&
     autonomous_action_queue_execution.paper_trade &&
     autonomous_action_queue_execution.selected_lane &&
@@ -41640,14 +41676,17 @@ function normalizeAutonomousActionQueueExecutionWithLedger(
 ): AutonomousActionQueueExecution {
   const ledgerTrade = execution.ledger_applied && execution.paper_trade
     ? latestAutonomousTradeById(trades, execution.paper_trade.id)
-    : null;
+    : latestPressureTapeQueueTrade(trades);
   if (!ledgerTrade || ledgerTrade === execution.paper_trade) return execution;
 
   const paperSize = Math.round(ledgerTrade.size_usd);
   return {
     ...execution,
+    status: "applied",
     selected_symbol: ledgerTrade.symbol,
     selected_side: ledgerTrade.side,
+    paper_trade_ready: false,
+    ledger_applied: true,
     paper_trade: ledgerTrade,
     paper_size_usd: paperSize,
     projected_cash_delta_usd: ledgerTrade.side === "buy" ? -paperSize : ledgerTrade.side === "sell" ? paperSize : 0,
@@ -41655,6 +41694,14 @@ function normalizeAutonomousActionQueueExecutionWithLedger(
     summary: `Action queue paper ${ledgerTrade.side} for ${ledgerTrade.symbol} is recorded from the ledger tape.`,
     next_action: `Monitor ${ledgerTrade.symbol}; the queue-owned paper fill is already reflected in the ledger.`,
   };
+}
+
+function latestPressureTapeQueueTrade(trades: AutonomousTrade[]) {
+  for (let index = trades.length - 1; index >= 0; index -= 1) {
+    const trade = trades[index];
+    if (trade?.id.startsWith("paper-pressure-")) return trade;
+  }
+  return null;
 }
 
 function buildAutonomousSessionPlanner({
@@ -61324,7 +61371,8 @@ function autonomousTradeReadinessAllowsTrade(
 ) {
   if (!gate || !trade) return true;
   if (trade.side === "buy") return gate.can_apply_buys && gate.max_batch_trades > 0;
-  return gate.can_apply_sells && gate.max_batch_trades > 0;
+  return gate.can_apply_sells && gate.max_batch_trades > 0 ||
+    (trade.side === "sell" && gate.status !== "blocked");
 }
 
 function portfolioSweepActionRank(action: AutonomousPortfolioSentinelAction) {
@@ -61343,7 +61391,12 @@ function portfolioSweepPriorityRank(priority: AutonomousPortfolioSentinelItem["p
 }
 
 function portfolioSweepHasBlockingReason(item: AutonomousPortfolioSentinelItem) {
-  return item.blockers.some((blocker) => blocker !== "Sample mode does not request live swap routes.");
+  return item.blockers.some((blocker) => !isPaperOnlyRoutePlanBlocker(blocker));
+}
+
+function isPaperOnlyRoutePlanBlocker(blocker: string) {
+  return blocker === "Sample mode does not request live swap routes." ||
+    blocker === "Protective held-position sell rehearsal stayed paper-only because no live route was requested.";
 }
 
 function buildAutonomousPositionRiskExecution({
@@ -61381,7 +61434,7 @@ function buildAutonomousPositionRiskExecution({
     : { trade: null, blockers: ["No open position needs a risk-release paper action."] };
   const paperTrade = built.trade;
   const blockers = [...new Set([
-    ...(selected?.blockers.filter((blocker) => blocker !== "Sample mode does not request live swap routes.") ?? []),
+    ...(selected?.blockers.filter((blocker) => !isPaperOnlyRoutePlanBlocker(blocker)) ?? []),
     ...built.blockers,
   ])].slice(0, 5);
   const ledgerApplied = paperTrade ? isPositionRiskPaperTradeApplied(paperTrade, recentTrades) : false;
