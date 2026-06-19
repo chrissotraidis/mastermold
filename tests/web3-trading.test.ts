@@ -6189,14 +6189,15 @@ describe("Web3 autonomous trading subsystem", () => {
       if (url === "https://solana-rpc.test") {
         const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
         if (body.method === "getTokenAccountsByOwner") {
-          const mint = body.params?.[1]?.mint;
+          const selector = body.params?.[1];
           return Response.json({
             jsonrpc: "2.0",
             id: body.id,
             result: {
               context: { slot: 284_001_338 },
-              value: mint === "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
-                ? [{
+              value: selector?.programId === "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+                ? [
+                  {
                     pubkey: "BonkTokenAccount111",
                     account: {
                       data: {
@@ -6204,7 +6205,7 @@ describe("Web3 autonomous trading subsystem", () => {
                         parsed: {
                           type: "account",
                           info: {
-                            mint,
+                            mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
                             tokenAmount: {
                               amount: "10000000000000",
                               decimals: 5,
@@ -6215,7 +6216,48 @@ describe("Web3 autonomous trading subsystem", () => {
                         },
                       },
                     },
-                  }]
+                  },
+                  {
+                    pubkey: "MoonTokenAccount222",
+                    account: {
+                      data: {
+                        program: "spl-token",
+                        parsed: {
+                          type: "account",
+                          info: {
+                            mint: "FomoMint111111111111111111111111111111111",
+                            tokenAmount: {
+                              amount: "50000000000",
+                              decimals: 6,
+                              uiAmount: 50_000,
+                              uiAmountString: "50000",
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  {
+                    pubkey: "UnpricedTokenAccount333",
+                    account: {
+                      data: {
+                        program: "spl-token",
+                        parsed: {
+                          type: "account",
+                          info: {
+                            mint: "NoPriceMint11111111111111111111111111111",
+                            tokenAmount: {
+                              amount: "42000000",
+                              decimals: 6,
+                              uiAmount: 42,
+                              uiAmountString: "42",
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                ]
                 : [],
             },
           });
@@ -6283,6 +6325,25 @@ describe("Web3 autonomous trading subsystem", () => {
           },
         ]);
       }
+      if (url.includes("/tokens/v1/solana/FomoMint111111111111111111111111111111111")) {
+        return Response.json([
+          {
+            chainId: "solana",
+            dexId: "raydium",
+            pairAddress: "PairMoonWallet111",
+            baseToken: { address: "FomoMint111111111111111111111111111111111", name: "Wallet Moon", symbol: "MOON" },
+            quoteToken: { address: "So11111111111111111111111111111111111111112", name: "Wrapped SOL", symbol: "SOL" },
+            priceUsd: "0.012",
+            txns: { m5: { buys: 51, sells: 22 } },
+            volume: { m5: 41_000, h1: 220_000, h24: 2_800_000 },
+            priceChange: { m5: -1.2, h1: 4.8, h6: 19.5 },
+            liquidity: { usd: 480_000 },
+            marketCap: 6_400_000,
+            pairCreatedAt: Date.now() - 19 * 60 * 60 * 1000,
+            boosts: { active: 1 },
+          },
+        ]);
+      }
       if (url.includes("lite-api.jup.ag/swap/v1/quote")) {
         return Response.json({
           outAmount: "124000000000",
@@ -6305,20 +6366,24 @@ describe("Web3 autonomous trading subsystem", () => {
       return Response.json([], { status: 404 });
     };
 
-    const state = await getWeb3TradingStateAsync({
-      source: "live-dex",
-      fetchImpl,
-      execution: {
-        mode: "dry-run",
-        kill_switch: false,
-        wallet_public_key: "11111111111111111111111111111111",
-        max_trade_usd: 500,
-        daily_spend_cap_usd: 2_500,
-        max_slippage_bps: 150,
-      },
-    });
-    if (previousRpcUrl === undefined) delete process.env.SOLANA_RPC_URL;
-    else process.env.SOLANA_RPC_URL = previousRpcUrl;
+    let state!: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
+    try {
+      state = await getWeb3TradingStateAsync({
+        source: "live-dex",
+        fetchImpl,
+        execution: {
+          mode: "dry-run",
+          kill_switch: false,
+          wallet_public_key: "11111111111111111111111111111111",
+          max_trade_usd: 500,
+          daily_spend_cap_usd: 2_500,
+          max_slippage_bps: 150,
+        },
+      });
+    } finally {
+      if (previousRpcUrl === undefined) delete process.env.SOLANA_RPC_URL;
+      else process.env.SOLANA_RPC_URL = previousRpcUrl;
+    }
     const plan = state.execution_plans.find((item) => item.symbol === "LIVE");
     const sellPlan = state.execution_plans.find((item) => item.symbol === "BONK" && item.side === "sell");
 
@@ -6335,21 +6400,41 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(requestedUrls.filter((url) => url === "https://solana-rpc.test").length).toBeGreaterThanOrEqual(2);
     expect(state.wallet_holdings_adapter).toMatchObject({
       status: "synced",
+      scan_scope: "all-spl-token-accounts",
       rpc_configured: true,
-      matched_position_count: 1,
+      matched_position_count: 2,
+      token_account_count: 3,
+      priced_wallet_mint_count: 2,
+      unpriced_token_account_count: 1,
       portfolio_applied: true,
-      total_value_usd: 2360,
+      total_value_usd: 2960,
     });
     expect(state.wallet_holdings_adapter.items.find((item) => item.symbol === "BONK")).toMatchObject({
       quantity: 100_000_000,
       decimals: 5,
       token_account: "BonkTokenAccount111",
     });
-    expect(state.portfolio.open_positions).toHaveLength(1);
-    expect(state.portfolio.open_positions[0]).toMatchObject({
+    expect(state.wallet_holdings_adapter.items.find((item) => item.symbol === "MOON")).toMatchObject({
+      quantity: 50_000,
+      decimals: 6,
+      token_account: "MoonTokenAccount222",
+      value_usd: 600,
+    });
+    expect(state.wallet_holdings_adapter.items.find((item) => item.mint === "NoPriceMint11111111111111111111111111111")).toBeUndefined();
+    expect(state.discovery_tape.sources.find((source) => source.id === "wallet-holdings")).toMatchObject({
+      status: "ok",
+      count: 3,
+    });
+    expect(state.portfolio.open_positions).toHaveLength(2);
+    expect(state.portfolio.open_positions.find((position) => position.symbol === "BONK")).toMatchObject({
       symbol: "BONK",
       quantity: 100_000_000,
       value_usd: 2360,
+    });
+    expect(state.portfolio.open_positions.find((position) => position.symbol === "MOON")).toMatchObject({
+      symbol: "MOON",
+      quantity: 50_000,
+      value_usd: 600,
     });
     expect(plan?.input_amount_usd).toBe(500);
     expect(plan).toMatchObject({

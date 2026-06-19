@@ -9,6 +9,7 @@ export type SignerSimulationNetwork = "devnet" | "localnet";
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const SPL_TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const JUPITER_QUOTE_BASE_URL = "https://lite-api.jup.ag/swap/v1/quote";
 const JUPITER_V2_BASE_URL = "https://api.jup.ag/swap/v2";
 const JUPITER_TRIGGER_BASE_URL = "https://api.jup.ag/trigger/v2";
@@ -811,7 +812,8 @@ export type DiscoverySourceId =
   | "dex-latest-profiles"
   | "dex-community-takeovers"
   | "dex-latest-ads"
-  | "portfolio-watch";
+  | "portfolio-watch"
+  | "wallet-holdings";
 
 export type DiscoverySourceStatus = "ok" | "degraded" | "failed";
 
@@ -8332,10 +8334,13 @@ export type WalletHoldingsAdapterItem = {
 export type WalletHoldingsAdapter = {
   mode: "read-only-wallet-holdings";
   status: "idle" | "blocked" | "synced" | "empty";
+  scan_scope: "all-spl-token-accounts";
   wallet_public_key: string | null;
   rpc_configured: boolean;
   matched_position_count: number;
   token_account_count: number;
+  priced_wallet_mint_count: number;
+  unpriced_token_account_count: number;
   total_value_usd: number;
   portfolio_applied: boolean;
   summary: string;
@@ -13001,11 +13006,11 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
   if (live.market.length === 0) {
     const fallbackFetchImpl = input.fetchImpl ?? fetch;
-    const fallbackWalletHoldings = await buildReadOnlyWalletHoldingsAdapter(applyScenario(baseMarket, scenario, cycles), executionConfig, fallbackFetchImpl);
+    const fallbackWalletHoldings = await buildReadOnlyWalletHoldingsAdapter(applyScenario(baseMarket, scenario, cycles), executionConfig, fallbackFetchImpl, live.discovery);
     const fallbackState = buildWeb3TradingState({
       scenario,
       cycles,
-      market: applyScenario(baseMarket, scenario, cycles),
+      market: fallbackWalletHoldings.market,
       marketSource: {
         mode: "live-dex",
         status: "fallback",
@@ -13013,7 +13018,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
         detail: live.error ?? "DEX Screener returned no usable boosted-token pairs.",
         fetched_at: new Date().toISOString(),
       },
-      discoveryTape: live.discovery ?? fallbackDiscoveryTape("fallback", live.error),
+      discoveryTape: fallbackWalletHoldings.discovery ?? live.discovery ?? fallbackDiscoveryTape("fallback", live.error),
       accountMode,
       executionConfig,
       portfolioOverride: fallbackWalletHoldings.portfolio ?? undefined,
@@ -13035,19 +13040,19 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
   }
 
   const fetchImpl = input.fetchImpl ?? fetch;
-  const walletHoldings = await buildReadOnlyWalletHoldingsAdapter(live.market, executionConfig, fetchImpl);
+  const walletHoldings = await buildReadOnlyWalletHoldingsAdapter(live.market, executionConfig, fetchImpl, live.discovery);
   const liveState = buildWeb3TradingState({
     scenario,
     cycles,
-    market: live.market,
+    market: walletHoldings.market,
     marketSource: {
       mode: "live-dex",
       status: "live",
       label: "DEX Screener live",
-      detail: `${live.market.length} live pairs mapped from ${live.discovery?.tokens_considered ?? live.market.length} discovered DEX Screener tokens.`,
+      detail: `${walletHoldings.market.length} live and wallet-priced pairs mapped from ${live.discovery?.tokens_considered ?? live.market.length} discovered DEX Screener tokens.`,
       fetched_at: live.fetchedAt,
     },
-    discoveryTape: live.discovery,
+    discoveryTape: walletHoldings.discovery ?? live.discovery,
     accountMode,
     executionConfig,
     portfolioOverride: walletHoldings.portfolio ?? undefined,
@@ -21586,11 +21591,12 @@ async function buildReadOnlyWalletHoldingsAdapter(
   market: MemecoinMarket[],
   config: ExecutionConfig,
   fetchImpl: FetchLike,
-): Promise<{ report: WalletHoldingsAdapter; portfolio: TradingPortfolio | null }> {
+  discovery?: DiscoveryTape,
+): Promise<{ report: WalletHoldingsAdapter; portfolio: TradingPortfolio | null; market: MemecoinMarket[]; discovery?: DiscoveryTape }> {
   const wallet = config.wallet_public_key;
   const endpoint = solanaRpcUrl();
   if (!wallet || !isLikelySolanaPublicKey(wallet)) {
-    return { report: idleWalletHoldingsAdapter(wallet), portfolio: null };
+    return { report: idleWalletHoldingsAdapter(wallet), portfolio: null, market, discovery };
   }
   if (!endpoint) {
     return {
@@ -21603,23 +21609,24 @@ async function buildReadOnlyWalletHoldingsAdapter(
         blockers: ["Solana RPC endpoint is not configured."],
       },
       portfolio: null,
+      market,
+      discovery,
     };
   }
 
   try {
-    const accounts = await Promise.all(
-      HELD_POSITION_DEX_WATCHLIST.map((watch) => fetchWalletTokenBalance(wallet, watch, fetchImpl)),
-    );
-    const byId = new Map(market.map((token) => [token.id, token]));
-    const byMint = new Map(market.map((token) => [token.token_address.toLowerCase(), token]));
+    const accounts = await fetchWalletTokenBalances(wallet, fetchImpl);
+    const priced = await augmentMarketWithWalletHoldings(market, accounts, fetchImpl);
+    const augmentedMarket = priced.market;
+    const byMint = new Map(augmentedMarket.map((token) => [token.token_address.toLowerCase(), token]));
     const items = accounts.flatMap((account): WalletHoldingsAdapterItem[] => {
-      if (!account || account.quantity <= 0) return [];
-      const token = byId.get(account.watch.tokenId) ?? byMint.get(account.watch.tokenAddress.toLowerCase());
+      if (account.quantity <= 0) return [];
+      const token = byMint.get(account.mint.toLowerCase());
       if (!token) return [];
       return [{
         token_id: token.id,
         symbol: token.symbol,
-        mint: account.watch.tokenAddress,
+        mint: account.mint,
         token_account: account.tokenAccount,
         quantity: account.quantity,
         decimals: account.decimals,
@@ -21644,26 +21651,32 @@ async function buildReadOnlyWalletHoldingsAdapter(
       opened_at: new Date().toISOString(),
     }));
     const portfolio = positions.length > 0 ? portfolioFromParts(0, 0, 0, positions) : null;
+    const matchedMints = new Set(items.map((item) => item.mint.toLowerCase()));
+    const unpricedTokenAccountCount = accounts.filter((account) => !matchedMints.has(account.mint.toLowerCase())).length;
+    const walletDiscovery = walletHoldingsDiscoveryTape(discovery, augmentedMarket, accounts.length, positions.length, unpricedTokenAccountCount);
     const report: WalletHoldingsAdapter = {
       mode: "read-only-wallet-holdings",
       status: positions.length > 0 ? "synced" : "empty",
+      scan_scope: "all-spl-token-accounts",
       wallet_public_key: wallet,
       rpc_configured: true,
       matched_position_count: positions.length,
-      token_account_count: accounts.filter((account) => account !== null).length,
+      token_account_count: accounts.length,
+      priced_wallet_mint_count: matchedMints.size,
+      unpriced_token_account_count: unpricedTokenAccountCount,
       total_value_usd: roundMetric(items.reduce((sum, item) => sum + item.value_usd, 0)),
       portfolio_applied: portfolio !== null,
       summary: positions.length > 0
-        ? `Read ${positions.length} watched wallet holding${positions.length === 1 ? "" : "s"} without signing authority.`
-        : "Wallet token accounts were read, but no watched memecoin balances were found.",
+        ? `Read ${positions.length} priced wallet holding${positions.length === 1 ? "" : "s"} from ${accounts.length} SPL token account${accounts.length === 1 ? "" : "s"} without signing authority.`
+        : "Wallet SPL token accounts were read, but none matched a priced Solana DEX market yet.",
       next_action: positions.length > 0
         ? "Use read-only wallet balances for position protection and dry-run route rehearsal."
-        : "Keep paper seed positions until the wallet holds a watched memecoin balance.",
+        : "Keep paper seed positions until a wallet-held token has live DEX pricing.",
       blockers: [],
       controls: walletHoldingsControls(),
       items,
     };
-    return { report, portfolio };
+    return { report, portfolio, market: augmentedMarket, discovery: walletDiscovery };
   } catch (error) {
     return {
       report: {
@@ -21675,45 +21688,132 @@ async function buildReadOnlyWalletHoldingsAdapter(
         blockers: [error instanceof Error ? error.message : "Read-only wallet holdings request failed."],
       },
       portfolio: null,
+      market,
+      discovery,
     };
   }
 }
 
-async function fetchWalletTokenBalance(
+type WalletTokenAccountBalance = {
+  mint: string;
+  quantity: number;
+  decimals: number;
+  tokenAccount: string | null;
+};
+
+async function fetchWalletTokenBalances(
   wallet: string,
-  watch: DexWatchlistToken,
   fetchImpl: FetchLike,
-): Promise<{ watch: DexWatchlistToken; quantity: number; decimals: number; tokenAccount: string | null } | null> {
+): Promise<WalletTokenAccountBalance[]> {
   const response = await solanaRpc(fetchImpl, solanaRpcUrl() ?? "", "getTokenAccountsByOwner", [
     wallet,
-    { mint: watch.tokenAddress },
+    { programId: SPL_TOKEN_PROGRAM_ID },
     { commitment: "confirmed", encoding: "jsonParsed" },
   ]);
   const rows = Array.isArray(response.result?.value) ? response.result.value : [];
-  let quantity = 0;
-  let tokenAccount: string | null = null;
-  let decimals = watch.decimals;
+  const byMint = new Map<string, WalletTokenAccountBalance>();
   for (const row of rows) {
     const parsed = row?.account?.data?.parsed?.info;
+    const mint = typeof parsed?.mint === "string" ? parsed.mint : null;
     const amount = parsed?.tokenAmount;
     const uiAmountString = typeof amount?.uiAmountString === "string" ? amount.uiAmountString : null;
     const parsedQuantity = uiAmountString ? Number(uiAmountString) : numberOrZero(amount?.uiAmount);
-    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) continue;
-    quantity += parsedQuantity;
-    decimals = typeof amount?.decimals === "number" ? amount.decimals : decimals;
-    tokenAccount = typeof row?.pubkey === "string" ? row.pubkey : tokenAccount;
+    if (!mint || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0) continue;
+    const key = mint.toLowerCase();
+    const current = byMint.get(key) ?? {
+      mint,
+      quantity: 0,
+      decimals: typeof amount?.decimals === "number" ? amount.decimals : knownTokenDecimals(mint).decimals,
+      tokenAccount: null,
+    };
+    current.quantity += parsedQuantity;
+    current.decimals = typeof amount?.decimals === "number" ? amount.decimals : current.decimals;
+    current.tokenAccount = typeof row?.pubkey === "string" ? row.pubkey : current.tokenAccount;
+    byMint.set(key, current);
   }
-  return quantity > 0 ? { watch, quantity, decimals, tokenAccount } : null;
+  return [...byMint.values()];
+}
+
+async function augmentMarketWithWalletHoldings(
+  market: MemecoinMarket[],
+  accounts: WalletTokenAccountBalance[],
+  fetchImpl: FetchLike,
+): Promise<{ market: MemecoinMarket[]; priced_mint_count: number }> {
+  const existingMints = new Set(market.map((token) => token.token_address.toLowerCase()));
+  const missing = accounts
+    .map((account) => account.mint)
+    .filter((mint) => !existingMints.has(mint.toLowerCase()));
+  if (missing.length === 0) {
+    return { market, priced_mint_count: new Set(accounts.map((account) => account.mint.toLowerCase())).size };
+  }
+  const candidates = [...new Set(missing.map((mint) => mint.toLowerCase()))].map((mint): DexDiscoveryItem => ({
+    chainId: "solana",
+    tokenAddress: accounts.find((account) => account.mint.toLowerCase() === mint)?.mint ?? mint,
+    sources: ["wallet-holdings"],
+    amount: 0,
+    totalAmount: 0,
+    adImpressions: 0,
+    paidOrderChecked: false,
+    activePaidOrderCount: 0,
+    approvedPaidOrderCount: 0,
+    paidAdOrderCount: 0,
+    paidOrderStatuses: [],
+    description: "Read-only wallet-held token pricing probe.",
+    url: null,
+  }));
+  try {
+    const pairs = await getDexScreenerPairs(fetchImpl, candidates);
+    const walletMarkets = dexPairsToMarkets(pairs, candidates, new Date().toISOString());
+    const byMint = new Map(market.map((token) => [token.token_address.toLowerCase(), token]));
+    for (const token of walletMarkets) {
+      byMint.set(token.token_address.toLowerCase(), token);
+    }
+    return {
+      market: [...byMint.values()].sort((a, b) => marketQuality(b) - marketQuality(a)).slice(0, 18),
+      priced_mint_count: walletMarkets.length,
+    };
+  } catch {
+    return { market, priced_mint_count: 0 };
+  }
+}
+
+function walletHoldingsDiscoveryTape(
+  discovery: DiscoveryTape | undefined,
+  market: MemecoinMarket[],
+  tokenAccountCount: number,
+  matchedPositionCount: number,
+  unpricedTokenAccountCount: number,
+): DiscoveryTape | undefined {
+  if (!discovery) return discovery;
+  const sources = discovery.sources.filter((source) => source.id !== "wallet-holdings");
+  sources.push({
+    id: "wallet-holdings",
+    label: "Wallet holdings",
+    status: tokenAccountCount > 0 ? "ok" : "degraded",
+    count: tokenAccountCount,
+    detail: matchedPositionCount > 0
+      ? `Read-only wallet scan priced ${matchedPositionCount} token holding${matchedPositionCount === 1 ? "" : "s"}; ${unpricedTokenAccountCount} token account${unpricedTokenAccountCount === 1 ? "" : "s"} had no mapped DEX price.`
+      : "Read-only wallet scan found no priced memecoin holdings.",
+  });
+  return {
+    ...discovery,
+    pairs_mapped: Math.max(discovery.pairs_mapped, market.length),
+    sources,
+    top_candidates: market.slice(0, 8).map((token) => discoveryCandidate(token)),
+  };
 }
 
 function idleWalletHoldingsAdapter(wallet: string | null): WalletHoldingsAdapter {
   return {
     mode: "read-only-wallet-holdings",
     status: "idle",
+    scan_scope: "all-spl-token-accounts",
     wallet_public_key: wallet,
     rpc_configured: Boolean(solanaRpcUrl()),
     matched_position_count: 0,
     token_account_count: 0,
+    priced_wallet_mint_count: 0,
+    unpriced_token_account_count: 0,
     total_value_usd: 0,
     portfolio_applied: false,
     summary: wallet ? "Read-only wallet holdings adapter is waiting for live DEX/RPC mode." : "No wallet public key is scoped for holdings reads.",
@@ -21726,8 +21826,8 @@ function idleWalletHoldingsAdapter(wallet: string | null): WalletHoldingsAdapter
 
 function walletHoldingsControls() {
   return [
-    "Reads SPL token account balances with getTokenAccountsByOwner and jsonParsed encoding.",
-    "Filters to watched memecoin mints only; it does not scan arbitrary wallet assets yet.",
+    "Reads all SPL token account balances with getTokenAccountsByOwner programId and jsonParsed encoding.",
+    "Matches wallet-held mints to priced Solana DEX markets before applying them to local portfolio state.",
     "Does not request signatures, private keys, transaction bodies, transfers, approvals, or wallet mutation.",
     "Applies balances only to local state for protection, sizing, and dry-run route rehearsal.",
   ];
@@ -86299,6 +86399,7 @@ function sourceLabelForModel(source: DiscoverySourceId) {
   if (source === "dex-community-takeovers") return "community takeover";
   if (source === "dex-latest-ads") return "ad";
   if (source === "portfolio-watch") return "portfolio watch";
+  if (source === "wallet-holdings") return "wallet holdings";
   return "sample";
 }
 

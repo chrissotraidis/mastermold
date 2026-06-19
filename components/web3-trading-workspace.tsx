@@ -16816,6 +16816,8 @@ function sourceLabel(source: string) {
   if (source === "dex-latest-profiles") return "profile";
   if (source === "dex-community-takeovers") return "cto";
   if (source === "dex-latest-ads") return "ad";
+  if (source === "portfolio-watch") return "portfolio";
+  if (source === "wallet-holdings") return "wallet";
   return "sample";
 }
 
