@@ -476,7 +476,12 @@ describe("Web3 autonomous trading subsystem", () => {
         required_account_count: number;
         missing_required: string[];
       };
-      wallet_summary: { wallet_scoped: boolean; wallet_public_key_preview: string | null };
+      wallet_summary: {
+        wallet_scoped: boolean;
+        wallet_ownership_proved: boolean;
+        wallet_ownership_receipt_hash: string | null;
+        wallet_public_key_preview: string | null;
+      };
       items: Array<{ id: string; status: string; configured: boolean; env_targets: string[] }>;
       checks: Array<{ id: string; status: string; detail: string }>;
       controls: string[];
@@ -606,6 +611,8 @@ describe("Web3 autonomous trading subsystem", () => {
       };
       wallet_summary: {
         wallet_scoped: boolean;
+        wallet_ownership_proved: boolean;
+        wallet_ownership_receipt_hash: string | null;
         wallet_public_key_preview: string | null;
       };
       live_execution_permission: string;
@@ -619,6 +626,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.environment_summary.required_configured_count).toBe(3);
     expect(receipt.environment_summary.missing_required).toEqual([]);
     expect(receipt.wallet_summary.wallet_scoped).toBe(true);
+    expect(receipt.wallet_summary.wallet_ownership_proved).toBe(false);
+    expect(receipt.wallet_summary.wallet_ownership_receipt_hash).toBeNull();
     expect(receipt.wallet_summary.wallet_public_key_preview).toBe("11111111...1111");
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");
@@ -1180,6 +1189,46 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("text-only"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain(message);
     expect(JSON.stringify(receipt)).not.toContain(signatureBase64);
+
+    const saveScope = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        scenario: "breakout",
+        source: "sample",
+        account: "persistent",
+        cycles: 0,
+        advance: false,
+        execution: {
+          mode: "dry-run",
+          wallet_public_key: walletPublicKey,
+          signer_simulation_enabled: true,
+          signer_session_label: "ownership-proof",
+          signer_network: "devnet",
+          max_trade_usd: 250,
+          daily_spend_cap_usd: 1000,
+          max_slippage_bps: 150,
+        },
+      }),
+    }));
+    expect(saveScope.status).toBe(200);
+
+    const accountSetup = await ACCOUNT_SETUP_GET(new Request("http://localhost/api/web3-account-setup?scenario=breakout&source=sample&account=persistent&cycles=0"));
+    const accountReceipt = await json<{
+      wallet_summary: {
+        wallet_scoped: boolean;
+        wallet_ownership_proved: boolean;
+        wallet_ownership_receipt_hash: string | null;
+        wallet_ownership_provider: string | null;
+      };
+      controls: string[];
+    }>(accountSetup);
+    expect(accountSetup.status).toBe(200);
+    expect(accountReceipt.wallet_summary.wallet_scoped).toBe(true);
+    expect(accountReceipt.wallet_summary.wallet_ownership_proved).toBe(true);
+    expect(accountReceipt.wallet_summary.wallet_ownership_receipt_hash).toBe(receipt.receipt_hash);
+    expect(accountReceipt.wallet_summary.wallet_ownership_provider).toBe("test-browser-wallet");
+    expect(accountReceipt.controls.some((control) => control.includes("hash-only local audit receipt"))).toBe(true);
 
     const invalidSignature = await WALLET_OWNERSHIP_POST(new Request("http://localhost/api/web3-wallet-ownership", {
       method: "POST",
@@ -6606,6 +6655,7 @@ describe("Web3 autonomous trading subsystem", () => {
       read_provider_status: "missing",
       helius_rpc_configured: false,
       jupiter_configured: false,
+      wallet_ownership_proved: false,
       can_satisfy_provider_gate: false,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
@@ -6661,6 +6711,7 @@ describe("Web3 autonomous trading subsystem", () => {
       read_provider_status: "partial",
       helius_rpc_configured: true,
       jupiter_configured: false,
+      wallet_ownership_proved: false,
       can_satisfy_provider_gate: false,
     });
     expect(envReadyChecklist.items.find((item) => item.id === "provider-credentials")?.detail).toContain("read rail partial");

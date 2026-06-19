@@ -154,7 +154,7 @@ and manual review. It reports blockers and next actions while still refusing sig
 transaction submission, account creation, private-key storage, and wallet mutation.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
-ownership with a text-only signature whose message and signature are stored only as hashes.
+ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.
 It does not request transaction signatures, store wallet secrets, submit transactions, or
 mutate balances.
 

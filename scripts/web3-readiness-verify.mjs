@@ -228,6 +228,28 @@ async function verifyWalletOwnershipReceipt() {
   assert(!text.includes(message), "Wallet ownership proof response should not return the raw challenge message.", json);
   assert(!text.includes(signatureBase64), "Wallet ownership proof response should not return the raw signature.", json);
 
+  const scoped = await postJson("/api/web3-trading", {
+    source: "sample",
+    account: "persistent",
+    execution: {
+      mode: "dry-run",
+      wallet_public_key: proofWalletPublicKey,
+      max_trade_usd: 250,
+      daily_spend_cap_usd: 1000,
+      max_slippage_bps: 150,
+      kill_switch: false,
+      signer_simulation_enabled: true,
+      signer_session_label: "Readiness ownership verifier",
+      signer_network: "devnet",
+    },
+  });
+  assert(scoped.response.status === 200, "Ownership proof wallet scope should save as dry-run public scope.", scoped.json);
+
+  const setup = await requestJson("/api/web3-account-setup?source=sample&account=persistent");
+  assert(setup.response.status === 200, "Account setup should return after wallet ownership proof.", setup.json);
+  assert(setup.json.wallet_summary?.wallet_ownership_proved === true, "Account setup should see the durable wallet ownership proof.", setup.json.wallet_summary);
+  assert(setup.json.wallet_summary?.wallet_ownership_receipt_hash === json.receipt_hash, "Account setup should link to the wallet ownership receipt hash.", setup.json.wallet_summary);
+
   const invalid = await postJson("/api/web3-wallet-ownership", {
     wallet_public_key: proofWalletPublicKey,
     message,

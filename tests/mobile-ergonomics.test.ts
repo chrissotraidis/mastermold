@@ -578,6 +578,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Paper execution priority");
     expect(web3Workspace).toContain("Account setup receipt");
     expect(web3Workspace).toContain("Build account receipt");
+    expect(web3Workspace).toContain("Ownership");
+    expect(web3Workspace).toContain("wallet_ownership_proved");
+    expect(web3Workspace).toContain("hash-only wallet ownership proof");
     expect(web3Workspace).toContain("external signup permission blocked");
     expect(web3Workspace).toContain("Provider health receipt");
     expect(web3Workspace).toContain("Test provider health");
@@ -842,6 +845,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-dex-discovery/route.ts")).toContain("buildWeb3DexDiscoveryReceipt");
     expect(source("app/api/web3-live-capital-preflight/route.ts")).toContain("buildWeb3LiveCapitalPreflightReceipt");
     expect(source("src/db/web3-wallet-ownership.ts")).toContain("web3-wallet-ownership-receipt");
+    expect(source("src/db/web3-wallet-ownership.ts")).toContain("appendWeb3ExecutionAudit");
+    expect(source("src/db/web3-wallet-ownership.ts")).toContain("getLatestWeb3WalletOwnershipReceipt");
     expect(source("src/db/web3-wallet-ownership.ts")).toContain("transaction_signing_permission: \"blocked\"");
     expect(source("src/db/web3-wallet-ownership.ts")).toContain("message_storage: \"hash-only\"");
     expect(source("src/db/web3-dex-discovery.ts")).toContain("web3-dex-discovery-receipt");

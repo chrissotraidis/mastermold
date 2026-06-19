@@ -24,6 +24,12 @@ export type Web3ProviderCredentialsReadinessCheck = {
   detail: string;
 };
 
+type Web3ProviderWalletOwnershipEvidence = {
+  proved: boolean;
+  verified_at: string | null;
+  receipt_hash: string | null;
+};
+
 export type Web3ProviderCredentialsReadiness = {
   mode: "web3-provider-credentials-readiness";
   status: Web3ProviderCredentialsReadinessStatus;
@@ -31,6 +37,9 @@ export type Web3ProviderCredentialsReadiness = {
   provider: AutonomousSignerOps["active_provider"];
   signer_scope: AutonomousCustodyMandate["signer_scope"];
   wallet_public_key: string | null;
+  wallet_ownership_proved: boolean;
+  wallet_ownership_verified_at: string | null;
+  wallet_ownership_receipt_hash: string | null;
   read_provider_status: "missing" | "partial" | "ready";
   helius_rpc_configured: boolean;
   jupiter_configured: boolean;
@@ -61,13 +70,16 @@ export type Web3ProviderCredentialsReadiness = {
 export function buildWeb3ProviderCredentialsReadiness({
   custody,
   signer,
+  walletOwnership,
 }: {
   custody: AutonomousCustodyMandate;
   signer: AutonomousSignerOps;
+  walletOwnership?: Web3ProviderWalletOwnershipEvidence;
 }): Web3ProviderCredentialsReadiness {
   const adapter = signer.provider_adapter;
   const packet = adapter.provider_request_packet;
   const walletScoped = Boolean(custody.wallet_public_key);
+  const walletOwnershipProved = walletOwnership?.proved === true;
   const heliusRpcConfigured = Boolean(process.env.HELIUS_API_KEY || process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
   const jupiterConfigured = Boolean(process.env.JUPITER_API_KEY);
   const readProviderStatus: Web3ProviderCredentialsReadiness["read_provider_status"] = heliusRpcConfigured && jupiterConfigured
@@ -108,6 +120,7 @@ export function buildWeb3ProviderCredentialsReadiness({
     custodyBounded,
     signerRequestReady,
     packetReady,
+    walletOwnershipProved,
   });
   const blockers = checks
     .filter((check) => check.status === "fail")
@@ -133,6 +146,9 @@ export function buildWeb3ProviderCredentialsReadiness({
     provider: signer.active_provider,
     signer_scope: custody.signer_scope,
     wallet_public_key: custody.wallet_public_key,
+    wallet_ownership_proved: walletOwnershipProved,
+    wallet_ownership_verified_at: walletOwnership?.verified_at ?? null,
+    wallet_ownership_receipt_hash: walletOwnership?.receipt_hash ?? null,
     read_provider_status: readProviderStatus,
     helius_rpc_configured: heliusRpcConfigured,
     jupiter_configured: jupiterConfigured,
@@ -180,6 +196,7 @@ function providerCredentialChecks(evidence: {
   custodyBounded: boolean;
   signerRequestReady: boolean;
   packetReady: boolean;
+  walletOwnershipProved: boolean;
 }): Web3ProviderCredentialsReadinessCheck[] {
   const { custody, signer } = evidence;
   const adapter = signer.provider_adapter;
@@ -189,8 +206,12 @@ function providerCredentialChecks(evidence: {
     {
       id: "wallet-scope",
       label: "Wallet scope",
-      status: evidence.walletScoped ? "pass" : "fail",
-      detail: evidence.walletScoped ? "A public wallet key scopes every provider credential and signer request." : "A public wallet key is required before provider credentials can be reviewed.",
+      status: evidence.walletOwnershipProved ? "pass" : evidence.walletScoped ? "watch" : "fail",
+      detail: evidence.walletOwnershipProved
+        ? "A hash-only ownership receipt proves control of the scoped public wallet."
+        : evidence.walletScoped
+          ? "A public wallet key is scoped, but wallet ownership proof has not been recorded yet."
+          : "A public wallet key is required before provider credentials can be reviewed.",
     },
     {
       id: "read-provider-rail",

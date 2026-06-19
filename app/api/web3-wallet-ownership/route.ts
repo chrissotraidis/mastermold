@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   buildWeb3WalletOwnershipReceipt,
+  persistWeb3WalletOwnershipReceipt,
   validateWalletOwnershipInput,
   type Web3WalletOwnershipReceipt,
 } from "@/src/db/web3-wallet-ownership";
@@ -21,5 +22,7 @@ export async function POST(request: Request): Promise<NextResponse<Web3WalletOwn
     return NextResponse.json({ error: parsed.error }, { status: 422 });
   }
 
-  return NextResponse.json(await buildWeb3WalletOwnershipReceipt(parsed.value));
+  const receipt = await buildWeb3WalletOwnershipReceipt(parsed.value);
+  persistWeb3WalletOwnershipReceipt(receipt);
+  return NextResponse.json(receipt);
 }

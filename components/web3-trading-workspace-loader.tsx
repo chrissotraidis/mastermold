@@ -1657,6 +1657,7 @@ function QuickAccountSetupReceiptPanel({
   const status = receipt?.status ?? "not-built";
   const tone = receipt ? accountSetupTone(receipt.status) : "demo";
   const walletScoped = receipt?.wallet_summary.wallet_scoped ?? Boolean(state.autonomous_custody_mandate.wallet_public_key);
+  const walletOwnershipProved = receipt?.wallet_summary.wallet_ownership_proved ?? false;
   const configuredCount = receipt?.environment_summary.required_configured_count ?? 0;
   const requiredCount = receipt?.environment_summary.required_account_count ?? 3;
   const checks = receipt?.checks ?? accountSetupPlaceholderChecks(state);
@@ -1702,6 +1703,7 @@ function QuickAccountSetupReceiptPanel({
               <span>Missing {receipt.environment_summary.missing_required.length}</span>
               <span>Optional feeds {receipt.environment_summary.optional_market_feed_count}</span>
               <span>Wallet {receipt.wallet_summary.wallet_public_key_preview ?? "missing"}</span>
+              <span>Ownership {receipt.wallet_summary.wallet_ownership_proved ? "proved" : "unproved"}</span>
             </div>
           ) : null}
         </div>
@@ -1726,6 +1728,12 @@ function QuickAccountSetupReceiptPanel({
             tone={walletScoped ? "engine" : "critical"}
           />
           <ProfitMetric
+            label="Ownership"
+            value={walletOwnershipProved ? "proved" : "unproved"}
+            detail={receipt?.wallet_summary.wallet_ownership_provider ?? "hash receipt"}
+            tone={walletOwnershipProved ? "engine" : receipt ? "caution" : "neutral"}
+          />
+          <ProfitMetric
             label="Signer"
             value={(receipt?.environment_summary.signer_provider ?? state.autonomous_signer_ops.active_provider).replaceAll("-", " ")}
             detail={receipt?.wallet_summary.signer_scope.replaceAll("-", " ") ?? state.autonomous_custody_mandate.signer_scope.replaceAll("-", " ")}
@@ -1736,12 +1744,6 @@ function QuickAccountSetupReceiptPanel({
             value={receipt?.environment_summary.emergency_stop_configured ? "set" : "gated"}
             detail="emergency stop"
             tone={receipt?.environment_summary.emergency_stop_configured ? "engine" : "caution"}
-          />
-          <ProfitMetric
-            label="Boundary"
-            value={receipt?.live_execution_permission ?? "blocked"}
-            detail="live execution"
-            tone="demo"
           />
         </div>
       </div>
@@ -1783,7 +1785,7 @@ function QuickAccountSetupReceiptPanel({
       </div>
 
       <p className="sr-only" aria-label="Web3 account setup receipt status">
-        Account setup status {status}; required accounts {configuredCount} of {requiredCount}; external signup permission blocked; live execution blocked; wallet mutation blocked; private key storage blocked; seed phrase storage blocked; secret echo blocked.
+        Account setup status {status}; required accounts {configuredCount} of {requiredCount}; hash-only wallet ownership proof {walletOwnershipProved ? "proved" : "unproved"}; external signup permission blocked; live execution blocked; wallet mutation blocked; private key storage blocked; seed phrase storage blocked; secret echo blocked.
       </p>
     </section>
   );

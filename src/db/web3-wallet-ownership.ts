@@ -1,4 +1,5 @@
 import { createHash, webcrypto } from "node:crypto";
+import { store } from "./store";
 
 export type Web3WalletOwnershipReceipt = {
   mode: "web3-wallet-ownership-receipt";
@@ -67,6 +68,25 @@ export async function buildWeb3WalletOwnershipReceipt({
     ...base,
     receipt_hash: sha256Hex(JSON.stringify(base)),
   };
+}
+
+export function persistWeb3WalletOwnershipReceipt(receipt: Web3WalletOwnershipReceipt): void {
+  store().appendWeb3ExecutionAudit({
+    id: `wallet-ownership-${receipt.receipt_hash.slice(0, 24)}`,
+    created_at: receipt.generated_at,
+    data: receipt,
+  });
+}
+
+export function getLatestWeb3WalletOwnershipReceipt(walletPublicKey?: string | null): Web3WalletOwnershipReceipt | null {
+  const expectedPreview = walletPublicKey ? previewValue(walletPublicKey) : null;
+  const receipts = store().web3ExecutionAudits(100)
+    .map((row) => row.data)
+    .filter(isWeb3WalletOwnershipReceipt);
+  return receipts.find((receipt) =>
+    receipt.signature_verified &&
+    (!expectedPreview || receipt.wallet_public_key_preview === expectedPreview)
+  ) ?? null;
 }
 
 export function validateWalletOwnershipInput(input: unknown):
@@ -176,6 +196,21 @@ function previewValue(value: string | null | undefined) {
 
 function sha256Hex(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function isWeb3WalletOwnershipReceipt(value: unknown): value is Web3WalletOwnershipReceipt {
+  if (!value || typeof value !== "object") return false;
+  const receipt = value as Partial<Web3WalletOwnershipReceipt>;
+  return receipt.mode === "web3-wallet-ownership-receipt" &&
+    typeof receipt.generated_at === "string" &&
+    typeof receipt.receipt_hash === "string" &&
+    typeof receipt.wallet_public_key_preview === "string" &&
+    receipt.live_execution_permission === "blocked" &&
+    receipt.wallet_mutation_permission === "blocked" &&
+    receipt.transaction_submission_permission === "blocked" &&
+    receipt.transaction_signing_permission === "blocked" &&
+    receipt.private_key_storage === "blocked" &&
+    receipt.message_storage === "hash-only";
 }
 
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";

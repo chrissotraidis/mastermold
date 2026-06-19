@@ -5,6 +5,7 @@ import {
   type Web3ProviderAccountRunwayItem,
   type Web3SignerSetupMode,
 } from "./web3-credentials";
+import { getLatestWeb3WalletOwnershipReceipt } from "./web3-wallet-ownership";
 import type { Web3TradingState } from "./web3-trading";
 
 export type Web3AccountSetupReceiptStatus =
@@ -58,6 +59,10 @@ export type Web3AccountSetupReceipt = {
   };
   wallet_summary: {
     wallet_scoped: boolean;
+    wallet_ownership_proved: boolean;
+    wallet_ownership_verified_at: string | null;
+    wallet_ownership_provider: string | null;
+    wallet_ownership_receipt_hash: string | null;
     wallet_public_key_preview: string | null;
     custody_status: Web3TradingState["autonomous_custody_mandate"]["status"];
     signer_scope: Web3TradingState["autonomous_custody_mandate"]["signer_scope"];
@@ -113,6 +118,7 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
     hasEnv("YELLOWSTONE_GRPC_ENDPOINT") || hasEnv("YELLOWSTONE_GRPC_TOKEN"),
   ].filter(Boolean).length;
   const walletScoped = Boolean(walletPublicKey);
+  const walletOwnership = getLatestWeb3WalletOwnershipReceipt(walletPublicKey);
   const missingRequired = [
     !heliusConfigured ? "Helius/Solana read rail" : null,
     !jupiterConfigured ? "Jupiter execution rail" : null,
@@ -188,6 +194,10 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
     },
     wallet_summary: {
       wallet_scoped: walletScoped,
+      wallet_ownership_proved: Boolean(walletOwnership),
+      wallet_ownership_verified_at: walletOwnership?.generated_at ?? null,
+      wallet_ownership_provider: walletOwnership?.provider ?? null,
+      wallet_ownership_receipt_hash: walletOwnership?.receipt_hash ?? null,
       wallet_public_key_preview: previewValue(walletPublicKey),
       custody_status: state.autonomous_custody_mandate.status,
       signer_scope: state.autonomous_custody_mandate.signer_scope,
@@ -209,7 +219,7 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
     controls: [
       "This receipt detects local provider/account setup only; it does not create third-party accounts or transmit credentials.",
       "Create Helius, Jupiter, wallet, signer, ops, and accounting accounts outside the app, then store secrets in ignored server env.",
-      "The browser may keep only public wallet scope and non-secret risk preferences.",
+      "The browser may keep only public wallet scope and non-secret risk preferences; wallet ownership evidence is stored as a hash-only local audit receipt.",
       "Private keys, seed phrases, raw transactions, signed payloads, live execution, and wallet mutation remain blocked.",
     ],
     summary: accountSetupSummary(status, requiredConfiguredCount, requiredAccountCount),
