@@ -9206,6 +9206,8 @@ function QuickLaunchChecklistPanel({
   const remainingWork = checklist.remaining_work.slice(0, 4);
   const runway = checklist.cutover_runway;
   const researchDecisions = checklist.research_decisions;
+  const operatorInputs = checklist.operator_inputs_needed;
+  const openOperatorInputs = operatorInputs.filter((item) => item.status !== "ready").length;
   const nextStep = checklist.next_cutover_step;
   const proofPlan = checklist.profit_proof_readiness.proof_plan;
 
@@ -9280,6 +9282,38 @@ function QuickLaunchChecklistPanel({
           <ProfitMetric label="Next batch" value={`${proofPlan.suggested_next_runs}`} detail={proofPlan.safe_command} tone={proofPlan.suggested_next_runs > 0 ? "engine" : "neutral"} />
           <ProfitMetric label="Proof PnL" value={formatCompactSignedCurrency(proofPlan.observed_total_net_pnl_usd)} detail={proofPlan.status.replaceAll("-", " ")} tone={proofPlan.observed_total_net_pnl_usd > 0 ? "engine" : proofPlan.observed_total_net_pnl_usd < 0 ? "critical" : "neutral"} />
         </div>
+      </div>
+
+      <div className="mt-2 rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Web3 operator input packet">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Operator input packet</p>
+            <p className="mt-1 truncate text-xs font-semibold text-on-surface">
+              Safe credentials and approvals still needed before supervised trading review
+            </p>
+          </div>
+          <Chip tone={operatorInputs.some((item) => item.status === "blocked") ? "critical" : openOperatorInputs > 0 ? "caution" : "engine"}>
+            {openOperatorInputs} open
+          </Chip>
+        </div>
+        <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
+          {operatorInputs.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", operatorInputDotClass(item.status))} />
+              </div>
+              <p className={cn("mt-1 truncate text-xs font-semibold", operatorInputTextClass(item.status))}>
+                {item.status} · {item.storage.replaceAll("-", " ")}
+              </p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+              <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-outline">{item.secret_handling}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-outline">
+          Private keys and seed phrases stay out of the app; this packet can name public wallet scope, server-env targets, hash-only receipts, future signer-vault work, and external review decisions only.
+        </p>
       </div>
 
       <div className="mt-2 rounded-md border border-engine/20 bg-engine/[0.035] p-2" aria-label="Web3 researched trading stack decisions">
@@ -9361,7 +9395,7 @@ function QuickLaunchChecklistPanel({
         Dry-run signer and order rehearsal only scope public-key rehearsal, simulated signer metadata, live DEX route/order evidence, caps, slippage, and kill-switch review; they cannot store keys, sign, submit, custody funds, or enable real-capital trades.
       </p>
       <span className="sr-only" aria-label="Web3 launch checklist receipt">
-        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; researched stack decisions {researchDecisions.map((item) => `${item.label}: ${item.status}, ${item.needs_user_input.join(", ") || item.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; operator input packet {operatorInputs.map((item) => `${item.label}: ${item.status}, storage ${item.storage}, ${item.next_action}`).join("; ")}; researched stack decisions {researchDecisions.map((item) => `${item.label}: ${item.status}, ${item.needs_user_input.join(", ") || item.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
       </span>
     </section>
   );
@@ -10155,6 +10189,18 @@ function researchDecisionDotClass(status: Web3AutonomyLaunchChecklist["research_
 function researchDecisionTextClass(status: Web3AutonomyLaunchChecklist["research_decisions"][number]["status"]) {
   if (status === "chosen") return "text-engine";
   if (status === "needs-credential" || status === "needs-review") return "text-caution";
+  return "text-critical";
+}
+
+function operatorInputDotClass(status: Web3AutonomyLaunchChecklist["operator_inputs_needed"][number]["status"]) {
+  if (status === "ready") return "bg-engine";
+  if (status === "review") return "bg-caution";
+  return "bg-critical";
+}
+
+function operatorInputTextClass(status: Web3AutonomyLaunchChecklist["operator_inputs_needed"][number]["status"]) {
+  if (status === "ready") return "text-engine";
+  if (status === "review") return "text-caution";
   return "text-critical";
 }
 

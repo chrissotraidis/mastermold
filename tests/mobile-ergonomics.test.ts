@@ -590,6 +590,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("unsigned transaction return withheld");
     expect(web3Workspace).toContain("inline-flex min-h-11 items-center justify-center gap-1.5");
     expect(web3Workspace).toContain("secret echo blocked");
+    expect(web3Workspace).toContain("Web3 operator input packet");
+    expect(web3Workspace).toContain("Operator input packet");
+    expect(web3Workspace).toContain("Safe credentials and approvals still needed before supervised trading review");
+    expect(web3Workspace).toContain("operatorInputs.map");
+    expect(web3Workspace).toContain("openOperatorInputs");
+    expect(web3Workspace).toContain("Dedicated trading wallet");
+    expect(web3Workspace).toContain("Jupiter route/order key");
+    expect(web3Workspace).toContain("Private keys and seed phrases stay out of the app");
+    expect(web3Workspace).toContain("operatorInputDotClass");
+    expect(web3Workspace).toContain("operatorInputTextClass");
     expect(web3Workspace).toContain("Signer handoff receipt");
     expect(web3Workspace).toContain("Build signer receipt");
     expect(web3Workspace).toContain("private key storage blocked");
@@ -927,6 +937,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
+    expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now shows the same operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("dedicated trading wallet");
     expect(source("components/review-readiness.tsx")).toContain("Jupiter route/order key");
     expect(source("components/review-readiness.tsx")).toContain("signer/custody choice");

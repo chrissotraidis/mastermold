@@ -46,7 +46,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 ## In-App Flow
 
 1. Open `/trading`.
-2. Review `Launch checklist` and `Researched stack decisions` to see the selected provider, market, execution, signer, risk, and live-cutover path.
+2. Review `Launch checklist`, `Operator input packet`, and `Researched stack decisions` to see the selected provider, market, execution, signer, risk, storage rules, and live-cutover path.
 3. Select the `Wiring` focus in the operator focus deck.
 4. Use `Web3 credential setup`.
 5. Enter or rely on server environment values for Helius/Solana RPC and Jupiter. API key fields are session-only in the browser form and are not saved to browser storage.
