@@ -141,6 +141,7 @@ export type Web3AutonomyLaunchChecklist = {
   provider_credentials_readiness: Web3ProviderCredentialsReadiness;
   research_decisions: Web3AutonomyLaunchResearchDecision[];
   operator_inputs_needed: Web3AutonomyLaunchOperatorInput[];
+  next_operator_action: Web3AutonomyLaunchOperatorInput | null;
   repair_actions: Web3AutonomyLaunchRepairAction[];
   controls: string[];
   items: Web3AutonomyLaunchChecklistItem[];
@@ -404,6 +405,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     settlementPass,
     liveReviewPermitted,
   });
+  const nextOperatorAction = selectNextOperatorAction(operatorInputsNeeded);
   const repairActions = buildRepairActions({
     items,
     operatorInputsNeeded,
@@ -439,6 +441,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     provider_credentials_readiness: providerCredentials,
     research_decisions: researchDecisions,
     operator_inputs_needed: operatorInputsNeeded,
+    next_operator_action: nextOperatorAction,
     repair_actions: repairActions,
     controls: [
       "This checklist is a launch-readiness contract; it does not sign, submit, custody funds, or unlock real-capital trading.",
@@ -452,6 +455,28 @@ export function buildWeb3AutonomyLaunchChecklist(
     items,
     remaining_work: remainingWork,
   };
+}
+
+function selectNextOperatorAction(operatorInputs: Web3AutonomyLaunchOperatorInput[]) {
+  const priority: Web3AutonomyLaunchOperatorInput["id"][] = [
+    "helius-solana-read-rail",
+    "jupiter-route-order-key",
+    "dedicated-trading-wallet",
+    "wallet-ownership-proof",
+    "signer-custody-choice",
+    "signer-provider-credentials",
+    "settlement-accounting-review",
+    "manual-live-approval",
+  ];
+  const byId = new Map(operatorInputs.map((item) => [item.id, item]));
+  const statuses: Web3AutonomyLaunchOperatorInput["status"][] = ["needed", "blocked", "review"];
+  for (const status of statuses) {
+    for (const id of priority) {
+      const item = byId.get(id);
+      if (item?.status === status) return item;
+    }
+  }
+  return null;
 }
 
 function buildOperatorInputsNeeded({

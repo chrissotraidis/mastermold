@@ -594,6 +594,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Operator input packet");
     expect(web3Workspace).toContain("Safe credentials and approvals still needed before supervised trading review");
     expect(web3Workspace).toContain("operatorInputs.map");
+    expect(web3Workspace).toContain("nextOperatorAction");
+    expect(web3Workspace).toContain("Next operator action");
     expect(web3Workspace).toContain("openOperatorInputs");
     expect(web3Workspace).toContain("Dedicated trading wallet");
     expect(web3Workspace).toContain("Jupiter route/order key");
@@ -821,6 +823,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Launch blocker queue");
     expect(settingsPage).toContain("Operator input packet");
     expect(settingsPage).toContain("What Mastermind still needs before supervised trading review");
+    expect(settingsPage).toContain("next_operator_action");
+    expect(settingsPage).toContain("Next operator action");
     expect(settingsPage).toContain("Dedicated trading wallet");
     expect(settingsPage).toContain("Jupiter route/order key");
     expect(settingsPage).toContain("Signer/custody choice");

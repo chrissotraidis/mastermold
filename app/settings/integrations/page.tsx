@@ -425,6 +425,7 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
   const nextStep = checklist.next_cutover_step;
   const remaining = checklist.remaining_work.slice(0, 6);
   const operatorInputs = checklist.operator_inputs_needed.slice(0, 8);
+  const nextOperatorAction = checklist.next_operator_action;
   const repairActions = checklist.repair_actions.slice(0, 6);
   const repairHealth = checklist.local_accountability_repair_health;
   return (
@@ -475,6 +476,21 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
             label={`${operatorInputs.filter((item) => item.status !== "ready").length} open`}
           />
         </div>
+        {nextOperatorAction ? (
+          <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.04] p-2" aria-label="Next Web3 operator action">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next operator action</p>
+                <p className="mt-1 text-xs font-semibold text-on-surface">{nextOperatorAction.label}</p>
+              </div>
+              <LaunchQueueBadge status={operatorInputBadgeStatus(nextOperatorAction.status)} label={nextOperatorAction.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{nextOperatorAction.next_action}</p>
+            <p className="mt-1 text-[10px] leading-4 text-outline">
+              Storage: {nextOperatorAction.storage.replaceAll("-", " ")} · {nextOperatorAction.secret_handling}
+            </p>
+          </div>
+        ) : null}
         <div className="mt-3 grid gap-2 md:grid-cols-2">
           {operatorInputs.map((item) => (
             <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2">

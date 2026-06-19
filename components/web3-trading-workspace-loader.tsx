@@ -9238,6 +9238,7 @@ function QuickLaunchChecklistPanel({
   const runway = checklist.cutover_runway;
   const researchDecisions = checklist.research_decisions;
   const operatorInputs = checklist.operator_inputs_needed;
+  const nextOperatorAction = checklist.next_operator_action;
   const openOperatorInputs = operatorInputs.filter((item) => item.status !== "ready").length;
   const repairActions = checklist.repair_actions;
   const openRepairActions = repairActions.filter((item) => item.status !== "ready").length;
@@ -9336,6 +9337,23 @@ function QuickLaunchChecklistPanel({
             {openOperatorInputs} open
           </Chip>
         </div>
+        {nextOperatorAction ? (
+          <div className="mt-2 rounded-md border border-caution/30 bg-caution/[0.04] p-2" aria-label="Next Web3 operator action">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-telemetry text-caution">Next operator action</p>
+                <p className="mt-1 truncate text-xs font-semibold text-on-surface">{nextOperatorAction.label}</p>
+              </div>
+              <Chip tone={nextOperatorAction.status === "blocked" ? "critical" : nextOperatorAction.status === "needed" ? "caution" : "engine"}>
+                {nextOperatorAction.status}
+              </Chip>
+            </div>
+            <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{nextOperatorAction.next_action}</p>
+            <p className="mt-1 text-[10px] leading-4 text-outline">
+              {nextOperatorAction.storage.replaceAll("-", " ")} · {nextOperatorAction.secret_handling}
+            </p>
+          </div>
+        ) : null}
         <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
           {operatorInputs.map((item) => (
             <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
@@ -9469,7 +9487,7 @@ function QuickLaunchChecklistPanel({
         Dry-run signer and order rehearsal only scope public-key rehearsal, simulated signer metadata, live DEX route/order evidence, caps, slippage, and kill-switch review; they cannot store keys, sign, submit, custody funds, or enable real-capital trades.
       </p>
       <span className="sr-only" aria-label="Web3 launch checklist receipt">
-        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; local accountability repair health {repairHealth.status}, fresh {repairHealth.receipt_fresh ? "yes" : "no"}, plateaued {repairHealth.repair_plateaued ? "yes" : "no"}, score {repairHealth.final_accountability_score}/100, next {repairHealth.next_action}; operator input packet {operatorInputs.map((item) => `${item.label}: ${item.status}, storage ${item.storage}, ${item.next_action}`).join("; ")}; launch repair queue {repairActions.map((item) => `${item.label}: ${item.status}, ${item.command ?? item.next_action}`).join("; ")}; researched stack decisions {researchDecisions.map((item) => `${item.label}: ${item.status}, ${item.needs_user_input.join(", ") || item.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; next operator action {nextOperatorAction ? `${nextOperatorAction.label}: ${nextOperatorAction.status}, ${nextOperatorAction.next_action}` : "none"}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; local accountability repair health {repairHealth.status}, fresh {repairHealth.receipt_fresh ? "yes" : "no"}, plateaued {repairHealth.repair_plateaued ? "yes" : "no"}, score {repairHealth.final_accountability_score}/100, next {repairHealth.next_action}; operator input packet {operatorInputs.map((item) => `${item.label}: ${item.status}, storage ${item.storage}, ${item.next_action}`).join("; ")}; launch repair queue {repairActions.map((item) => `${item.label}: ${item.status}, ${item.command ?? item.next_action}`).join("; ")}; researched stack decisions {researchDecisions.map((item) => `${item.label}: ${item.status}, ${item.needs_user_input.join(", ") || item.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
       </span>
     </section>
   );

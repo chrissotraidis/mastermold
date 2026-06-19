@@ -6734,6 +6734,11 @@ describe("Web3 autonomous trading subsystem", () => {
       decision: expect.stringContaining("never collect private keys"),
       needs_user_input: expect.arrayContaining(["Public trading wallet address"]),
     });
+    expect(launchChecklist.next_operator_action).toMatchObject({
+      id: "helius-solana-read-rail",
+      status: "needed",
+      storage: "server-env",
+    });
     process.env.HELIUS_API_KEY = "test-helius-key";
     const envReadyChecklist = buildWeb3AutonomyLaunchChecklist(state);
     expect(envReadyChecklist.provider_credentials_readiness).toMatchObject({
@@ -6757,6 +6762,11 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(envReadyChecklist.operator_inputs_needed.find((item) => item.id === "jupiter-route-order-key")).toMatchObject({
       label: "Jupiter route/order key",
+      status: "needed",
+      storage: "server-env",
+    });
+    expect(envReadyChecklist.next_operator_action).toMatchObject({
+      id: "jupiter-route-order-key",
       status: "needed",
       storage: "server-env",
     });
