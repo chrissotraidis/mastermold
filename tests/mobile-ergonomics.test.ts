@@ -811,6 +811,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("buildWeb3JupiterOrderPacket");
     expect(settingsPage).toContain("SettingsJupiterOrderPacketPanel");
     expect(settingsPage).toContain("Jupiter order packet");
+    expect(settingsPage).toContain("getWeb3JupiterRehearsalHistory");
+    expect(settingsPage).toContain("Last rehearsal proof");
+    expect(settingsPage).toContain("Jupiter rehearsal history");
     expect(settingsPage).toContain("Swap V2 order rail");
     expect(settingsPage).toContain("Jupiter API key needed");
     expect(settingsPage).toContain("POST /api/web3-jupiter-rehearsal");
@@ -1013,6 +1016,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("--require-jupiter-order");
     expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("transaction_body_storage: \"blocked\"");
     expect(source("app/api/web3-jupiter-order-packet/route.ts")).toContain("buildWeb3JupiterOrderPacket");
+    expect(source("src/db/web3-jupiter-rehearsal-history.ts")).toContain("web3-jupiter-rehearsal-history");
+    expect(source("app/api/web3-jupiter-rehearsal-history/route.ts")).toContain("getWeb3JupiterRehearsalHistory");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-jupiter-rehearsal-history");
+    expect(source("components/review-readiness.tsx")).toContain("Jupiter rehearsal now writes a sanitized proof tape");
     expect(source("src/db/web3-live-ops-packet.ts")).toContain("web3-live-ops-packet");
     expect(source("src/db/web3-live-ops-packet.ts")).toContain("configured/missing booleans only");
     expect(source("src/db/web3-live-ops-packet.ts")).toContain("external_dispatch_permission: \"blocked\"");

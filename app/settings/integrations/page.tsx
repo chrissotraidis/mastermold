@@ -23,6 +23,7 @@ import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3JupiterOrderPacket, type Web3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
+import { getWeb3JupiterRehearsalHistory, type Web3JupiterRehearsalHistory } from "@/src/db/web3-jupiter-rehearsal-history";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import {
@@ -61,6 +62,7 @@ export default async function IntegrationsSettingsPage() {
   const web3AcquisitionReceipt = buildWeb3AccountAcquisitionReceipt(web3State);
   const web3DedicatedWalletPacket = buildWeb3DedicatedWalletPacket(web3State);
   const web3JupiterOrderPacket = buildWeb3JupiterOrderPacket(web3State);
+  const web3JupiterRehearsalHistory = getWeb3JupiterRehearsalHistory();
   const web3SignerPacket = buildWeb3SignerCredentialPacket(web3State);
   const web3CredentialDoctor = getWeb3CredentialDoctorHealth();
   const web3DaemonSupervisorHealth = getWeb3DaemonSupervisorHealth();
@@ -110,6 +112,7 @@ export default async function IntegrationsSettingsPage() {
             acquisition={web3AcquisitionReceipt}
             dedicatedWalletPacket={web3DedicatedWalletPacket}
             jupiterOrderPacket={web3JupiterOrderPacket}
+            jupiterRehearsalHistory={web3JupiterRehearsalHistory}
             signerPacket={web3SignerPacket}
             liveOpsPacket={web3LiveOpsPacket}
             supervisedLiveRunway={web3SupervisedLiveRunway}
@@ -158,6 +161,7 @@ function Web3CredentialsRunwayCard({
   acquisition,
   dedicatedWalletPacket,
   jupiterOrderPacket,
+  jupiterRehearsalHistory,
   signerPacket,
   liveOpsPacket,
   supervisedLiveRunway,
@@ -170,6 +174,7 @@ function Web3CredentialsRunwayCard({
   acquisition: Web3AccountAcquisitionReceipt;
   dedicatedWalletPacket: Web3DedicatedWalletPacket;
   jupiterOrderPacket: Web3JupiterOrderPacket;
+  jupiterRehearsalHistory: Web3JupiterRehearsalHistory;
   signerPacket: Web3SignerCredentialPacket;
   liveOpsPacket: Web3LiveOpsPacket;
   supervisedLiveRunway: Web3SupervisedLiveRunway;
@@ -304,7 +309,7 @@ function Web3CredentialsRunwayCard({
 
           <SettingsDedicatedWalletPacketPanel packet={dedicatedWalletPacket} />
 
-          <SettingsJupiterOrderPacketPanel packet={jupiterOrderPacket} />
+          <SettingsJupiterOrderPacketPanel packet={jupiterOrderPacket} rehearsalHistory={jupiterRehearsalHistory} />
 
           <SettingsCredentialDoctorPanel health={credentialDoctor} />
 
@@ -946,9 +951,16 @@ function SettingsDedicatedWalletPacketPanel({ packet }: { packet: Web3DedicatedW
   );
 }
 
-function SettingsJupiterOrderPacketPanel({ packet }: { packet: Web3JupiterOrderPacket }) {
+function SettingsJupiterOrderPacketPanel({
+  packet,
+  rehearsalHistory,
+}: {
+  packet: Web3JupiterOrderPacket;
+  rehearsalHistory: Web3JupiterRehearsalHistory;
+}) {
   const openCount = packet.missing_required.length;
   const primaryTone = packet.status === "review-ready" ? "pass" : packet.status === "missing-key" || packet.status === "wallet-needed" ? "fail" : "watch";
+  const latestRuns = rehearsalHistory.recent_runs.slice(-4);
   return (
     <div className="rounded-md border border-caution/30 bg-caution/[0.035] p-3" aria-label="Web3 Jupiter order packet">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -987,6 +999,38 @@ function SettingsJupiterOrderPacketPanel({ packet }: { packet: Web3JupiterOrderP
             {packet.strict_verifier_command}
           </code>
         </div>
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Jupiter rehearsal history">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Last rehearsal proof</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">{rehearsalHistory.summary}</p>
+            <p className="mt-1 text-[11px] leading-4 text-outline">
+              Quote {rehearsalHistory.latest_quote_ready ? "ready" : "gated"} · order {rehearsalHistory.latest_order_ready ? "ready" : "gated"} · transaction bytes {rehearsalHistory.unsigned_transaction_return}.
+            </p>
+          </div>
+          <LaunchQueueBadge
+            status={rehearsalHistory.status === "order-ready" ? "pass" : rehearsalHistory.status === "absent" || rehearsalHistory.status === "blocked" ? "fail" : "watch"}
+            label={rehearsalHistory.status.replaceAll("-", " ")}
+          />
+        </div>
+        {latestRuns.length > 0 ? (
+          <div className="mt-2 grid gap-1 sm:grid-cols-2">
+            {latestRuns.map((run) => (
+              <div key={`${run.generated_at}-${run.status}`} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/25 p-2">
+                <p className="truncate text-[11px] font-semibold text-on-surface">{run.status.replaceAll("-", " ")}</p>
+                <p className="mt-0.5 truncate text-[10px] leading-4 text-outline">
+                  wallet {run.wallet_public_key_preview ?? "missing"} · key {run.key_source.replaceAll("-", " ")}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+            No redacted Jupiter rehearsal has been recorded yet.
+          </p>
+        )}
       </div>
 
       {packet.missing_required.length > 0 ? (

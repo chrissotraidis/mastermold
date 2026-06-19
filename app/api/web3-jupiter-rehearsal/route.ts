@@ -3,6 +3,7 @@ import {
   buildWeb3JupiterRehearsalReceipt,
   type Web3JupiterRehearsalReceipt,
 } from "@/src/db/web3-jupiter-rehearsal";
+import { writeWeb3JupiterRehearsalHistoryEntry } from "@/src/db/web3-jupiter-rehearsal-history";
 import {
   getWeb3TradingStateAsync,
   isTradingAccountMode,
@@ -69,9 +70,11 @@ export async function POST(request: Request): Promise<NextResponse<Web3JupiterRe
     advance: false,
   });
 
-  return NextResponse.json(await buildWeb3JupiterRehearsalReceipt(state, {
+  const receipt = await buildWeb3JupiterRehearsalReceipt(state, {
     jupiter_api_key: body.jupiter_api_key,
     wallet_public_key: body.wallet_public_key,
     max_slippage_bps: maxSlippageBps,
-  }));
+  });
+  writeWeb3JupiterRehearsalHistoryEntry(receipt);
+  return NextResponse.json(receipt);
 }

@@ -10,6 +10,7 @@ import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
+import { GET as JUPITER_REHEARSAL_HISTORY_GET } from "@/app/api/web3-jupiter-rehearsal-history/route";
 import { GET as JUPITER_ORDER_PACKET_GET } from "@/app/api/web3-jupiter-order-packet/route";
 import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
@@ -37,6 +38,7 @@ import {
   getWeb3MarketMonitorHistory,
   writeWeb3MarketMonitorHistoryEntry,
 } from "@/src/db/web3-market-monitor-history";
+import { getWeb3JupiterRehearsalHistory } from "@/src/db/web3-jupiter-rehearsal-history";
 import {
   getWeb3TradingStateAsync,
   getWeb3TradingState,
@@ -55,6 +57,7 @@ let prevNextPublicRpcUrl: string | undefined;
 let prevPromotedAutopilotPath: string | undefined;
 let prevPromotedAutopilotHistoryPath: string | undefined;
 let prevMarketMonitorHistoryPath: string | undefined;
+let prevJupiterRehearsalHistoryPath: string | undefined;
 let prevLocalAccountabilityRepairPath: string | undefined;
 let prevLiveExecution: string | undefined;
 let prevLiveApproval: string | undefined;
@@ -91,6 +94,7 @@ beforeEach(() => {
   prevPromotedAutopilotPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH;
   prevPromotedAutopilotHistoryPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
   prevMarketMonitorHistoryPath = process.env.WEB3_MARKET_MONITOR_HISTORY_PATH;
+  prevJupiterRehearsalHistoryPath = process.env.WEB3_JUPITER_REHEARSAL_HISTORY_PATH;
   prevLocalAccountabilityRepairPath = process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
   prevLiveExecution = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   prevLiveApproval = process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
@@ -121,6 +125,7 @@ beforeEach(() => {
   process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH = join(testRoot, "promoted-autopilot.json");
   process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = join(testRoot, "promoted-autopilot-history.json");
   process.env.WEB3_MARKET_MONITOR_HISTORY_PATH = join(testRoot, "web3-market-monitor-history.json");
+  process.env.WEB3_JUPITER_REHEARSAL_HISTORY_PATH = join(testRoot, "web3-jupiter-rehearsal-history.json");
   process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH = join(testRoot, "local-accountability-repair.json");
   delete process.env.JUPITER_API_KEY;
   delete process.env.JUPITER_TRIGGER_JWT;
@@ -172,6 +177,8 @@ afterEach(() => {
   else process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = prevPromotedAutopilotHistoryPath;
   if (prevMarketMonitorHistoryPath === undefined) delete process.env.WEB3_MARKET_MONITOR_HISTORY_PATH;
   else process.env.WEB3_MARKET_MONITOR_HISTORY_PATH = prevMarketMonitorHistoryPath;
+  if (prevJupiterRehearsalHistoryPath === undefined) delete process.env.WEB3_JUPITER_REHEARSAL_HISTORY_PATH;
+  else process.env.WEB3_JUPITER_REHEARSAL_HISTORY_PATH = prevJupiterRehearsalHistoryPath;
   if (prevLocalAccountabilityRepairPath === undefined) delete process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
   else process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH = prevLocalAccountabilityRepairPath;
   if (prevLiveExecution === undefined) delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
@@ -1290,6 +1297,38 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(serialized).not.toContain("raw-request-id-secret");
     expect(serialized).not.toContain("raw-unsigned-transaction-body");
     expect(serialized).not.toContain("never-accept-this");
+
+    const history = getWeb3JupiterRehearsalHistory();
+    expect(history).toMatchObject({
+      mode: "web3-jupiter-rehearsal-history",
+      paper_only: true,
+      status: "order-ready",
+      run_count: 1,
+      latest_status: "order-ready",
+      latest_order_ready: true,
+      latest_quote_ready: true,
+      transaction_body_detected_count: 1,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      transaction_body_storage: "blocked",
+      unsigned_transaction_return: "withheld",
+      secret_echo_permission: "blocked",
+    });
+    expect(history.recent_runs[0]).toMatchObject({
+      status: "order-ready",
+      wallet_public_key_preview: "11111111...1111",
+      key_source: "one-shot",
+      jupiter_order_ready: true,
+      transaction_body_detected: true,
+    });
+
+    const historyResponse = await JUPITER_REHEARSAL_HISTORY_GET();
+    const historyPayload = await json<ReturnType<typeof getWeb3JupiterRehearsalHistory>>(historyResponse);
+    expect(historyPayload.run_count).toBe(1);
+    expect(historyPayload.recent_runs[0].status).toBe("order-ready");
+    expect(JSON.stringify(historyPayload)).not.toMatch(/test-jupiter-one-shot|raw-request-id-secret|raw-unsigned-transaction-body/i);
   });
 
   test("GIVEN emergency-stop ops are configured WHEN the drill route runs THEN it records a blocked no-secrets receipt", async () => {
