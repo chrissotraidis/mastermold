@@ -804,6 +804,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsCredentialDoctorPanel");
     expect(settingsPage).toContain("Credential doctor receipt");
     expect(settingsPage).toContain("npm run doctor:web3 -- --json");
+    expect(settingsPage).toContain("health.checks.slice(0, 7)");
+    expect(settingsPage).toContain("health.safe_commands.slice(0, 5)");
     expect(settingsPage).toContain("Doctor receipts are local, sanitized, and status-only");
     expect(settingsPage).toContain("Live credential queue");
     expect(settingsPage).toContain("What is left before supervised trading review");
@@ -833,10 +835,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Next cutover step");
     expect(settingsPage).toContain("Settings shows this queue for planning only");
     expect(source("package.json")).toContain("\"doctor:web3\"");
+    expect(source("package.json")).toContain("\"doctor-repair:web3\"");
     expect(source("scripts/web3-credential-doctor.mjs")).toContain("web3-credential-doctor");
     expect(source("scripts/web3-credential-doctor.mjs")).toContain("secret_echo_permission");
+    expect(source("scripts/web3-credential-doctor.mjs")).toContain("refresh-supervisor");
+    expect(source("scripts/web3-credential-doctor.mjs")).toContain("runWeb3DaemonSupervisor");
+    expect(source("scripts/web3-credential-doctor.mjs")).toContain("Paper supervisor freshness");
     expect(source("src/db/web3-credential-doctor.ts")).toContain("getWeb3CredentialDoctorHealth");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run doctor:web3 -- --json");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run doctor-repair:web3 -- --json");
     expect(settingsPage).toContain("buildWeb3AutonomyLaunchChecklist");
     expect(settingsPage).toContain("getWeb3DaemonSupervisorHealth");
     expect(settingsPage).toContain("getWeb3PromotedPaperAutopilotHealth");

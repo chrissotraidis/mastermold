@@ -573,7 +573,7 @@ function repairActionBadgeStatus(status: Web3AutonomyLaunchChecklist["repair_act
 }
 
 function SettingsCredentialDoctorPanel({ health }: { health: Web3CredentialDoctorHealth }) {
-  const topChecks = health.checks.slice(0, 6);
+  const topChecks = health.checks.slice(0, 7);
   return (
     <div className="rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3" aria-label="Web3 credential doctor receipt">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -611,7 +611,7 @@ function SettingsCredentialDoctorPanel({ health }: { health: Web3CredentialDocto
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe commands</p>
         <div className="mt-2 grid gap-1">
-          {health.safe_commands.slice(0, 4).map((command) => (
+          {health.safe_commands.slice(0, 5).map((command) => (
             <code key={command} className="break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
               {command}
             </code>

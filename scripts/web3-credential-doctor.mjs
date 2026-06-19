@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { runWeb3DaemonSupervisor } from "./web3-daemon-supervisor.mjs";
 
 const DEFAULT_BASE_URL = "http://localhost:4010";
 const DEFAULT_STATUS_PATH = join(process.cwd(), "data", "web3-credential-doctor.json");
@@ -21,6 +22,7 @@ export function parseWeb3CredentialDoctorArgs(argv = [], env = process.env) {
     source: normalizeChoice(flags.get("source") ?? env.WEB3_CREDENTIAL_DOCTOR_SOURCE ?? "live-dex", ["sample", "live-dex"], "live-dex"),
     account: normalizeChoice(flags.get("account") ?? env.WEB3_CREDENTIAL_DOCTOR_ACCOUNT ?? "persistent", ["ephemeral", "persistent"], "persistent"),
     statusPath: String(flags.get("status-path") ?? env.WEB3_CREDENTIAL_DOCTOR_STATUS_PATH ?? DEFAULT_STATUS_PATH),
+    refreshSupervisor: booleanFlag(flags.get("refresh-supervisor") ?? env.WEB3_CREDENTIAL_DOCTOR_REFRESH_SUPERVISOR, false),
     failOnBlocked: booleanFlag(flags.get("fail-on-blocked") ?? env.WEB3_CREDENTIAL_DOCTOR_FAIL_ON_BLOCKED, false),
     json: booleanFlag(flags.get("json") ?? env.WEB3_CREDENTIAL_DOCTOR_JSON, false),
   };
@@ -35,13 +37,16 @@ export async function runWeb3CredentialDoctor(input = {}) {
     source: normalizeChoice(input.source ?? "live-dex", ["sample", "live-dex"], "live-dex"),
     account: normalizeChoice(input.account ?? "persistent", ["ephemeral", "persistent"], "persistent"),
     statusPath: String(input.statusPath ?? DEFAULT_STATUS_PATH),
+    refreshSupervisor: Boolean(input.refreshSupervisor),
     failOnBlocked: Boolean(input.failOnBlocked),
   };
-  const [accountSetup, providerHealth, launchChecklist, livePreflight] = await Promise.all([
+  const supervisorRepair = config.refreshSupervisor ? await refreshSupervisorEvidence(config) : null;
+  const [accountSetup, providerHealth, launchChecklist, livePreflight, health] = await Promise.all([
     fetchReceipt(config, "/api/web3-account-setup"),
     fetchReceipt(config, "/api/web3-provider-health"),
     fetchReceipt(config, "/api/web3-launch-checklist"),
     fetchReceipt(config, "/api/web3-live-capital-preflight"),
+    fetchReceipt(config, "/api/health"),
   ]);
   const receipt = buildWeb3CredentialDoctorReceipt({
     config,
@@ -49,6 +54,8 @@ export async function runWeb3CredentialDoctor(input = {}) {
     providerHealth,
     launchChecklist,
     livePreflight,
+    health,
+    supervisorRepair,
   });
   writeWeb3CredentialDoctorReceipt(config.statusPath, receipt);
   if (config.failOnBlocked && receipt.exit_code !== 0) {
@@ -65,8 +72,10 @@ export function buildWeb3CredentialDoctorReceipt({
   providerHealth,
   launchChecklist,
   livePreflight,
+  health,
+  supervisorRepair,
 }) {
-  const checks = buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight })
+  const checks = buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, health, supervisorRepair })
     .map(redactCredentialDoctorCheck);
   const blockers = checks
     .filter((check) => check.status === "fail")
@@ -91,6 +100,8 @@ export function buildWeb3CredentialDoctorReceipt({
     scenario: config.scenario,
     source: config.source,
     account: config.account,
+    supervisor_refresh_requested: config.refreshSupervisor,
+    supervisor_refresh_status: supervisorRepair?.status ?? "not-requested",
     generated_at: new Date().toISOString(),
     ready_count: checks.filter((check) => check.status === "pass").length,
     watch_count: watchCount,
@@ -121,9 +132,10 @@ export function buildWeb3CredentialDoctorReceipt({
   };
 }
 
-function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight }) {
+function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, health, supervisorRepair }) {
   const env = accountSetup?.environment_summary ?? {};
   const wallet = accountSetup?.wallet_summary ?? {};
+  const productionSupervisor = health?.web3_production_supervisor ?? {};
   return [
     {
       id: "helius-read-rail",
@@ -197,6 +209,22 @@ function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchCheck
       next_action: "Keep live execution, transaction submission, and wallet mutation blocked until separate supervised live review.",
       storage: "external-review-only",
     },
+    {
+      id: "paper-supervisor",
+      label: "Paper supervisor freshness",
+      status: productionSupervisor.receipt_fresh === true && productionSupervisor.paper_supervision_evidence === true
+        ? "pass"
+        : productionSupervisor.status === "missing" || productionSupervisor.status === "stale" || productionSupervisor.status === "blocked"
+          ? "fail"
+          : "watch",
+      detail: productionSupervisor.status
+        ? `${supervisorRepair ? `Refresh ${supervisorRepair.status}; ` : ""}Production supervisor is ${productionSupervisor.status}; ${productionSupervisor.summary ?? "no summary returned"}`
+        : "Production supervisor health is missing from /api/health.",
+      next_action: productionSupervisor.receipt_fresh === true
+        ? "Keep the supervised paper runner receipt fresh; it still cannot unlock live capital."
+        : "Run npm run doctor-repair:web3 -- --json or npm run supervise:web3 -- --base-url=http://localhost:4010 --rounds=1 --ticks-per-round=1 --target-net-pnl=1 --max-drawdown=250 --json.",
+      storage: "local-sanitized-supervisor-receipt",
+    },
   ];
 }
 
@@ -224,7 +252,45 @@ function buildSafeCommands(accountSetup, launchChecklist) {
   }
   const repairCommand = launchChecklist?.next_cutover_step?.command;
   if (typeof repairCommand === "string" && repairCommand.length > 0) commands.push(repairCommand);
+  const productionSupervisorCommand = launchChecklist?.cutover_runway?.find((step) => step.id === "production-supervision")?.command;
+  if (typeof productionSupervisorCommand === "string" && productionSupervisorCommand.length > 0) commands.push(productionSupervisorCommand);
+  commands.push("npm run doctor-repair:web3 -- --json");
   return Array.from(new Set(commands)).slice(0, 6);
+}
+
+async function refreshSupervisorEvidence(config) {
+  try {
+    const receipt = await runWeb3DaemonSupervisor({
+      baseUrl: config.baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      account: "persistent",
+      rounds: 1,
+      ticksPerRound: 1,
+      intervalMs: 0,
+      roundDelayMs: 0,
+      targetNetPnlUsd: 1,
+      maxDrawdownUsd: 250,
+      heartbeatWhenGated: true,
+      dryRun: false,
+    });
+    return {
+      status: receipt?.status ?? "unknown",
+      updated_at: receipt?.updated_at ?? null,
+      net_pnl_usd: typeof receipt?.net_pnl_usd === "number" ? receipt.net_pnl_usd : 0,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      updated_at: null,
+      net_pnl_usd: 0,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      error: redactSensitiveText(error instanceof Error ? error.message : String(error)),
+    };
+  }
 }
 
 async function fetchReceipt(config, path) {

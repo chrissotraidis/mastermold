@@ -27,6 +27,8 @@ export type Web3CredentialDoctorReceipt = {
   scenario: "base" | "breakout" | "rug-risk";
   source: "sample" | "live-dex";
   account: "ephemeral" | "persistent";
+  supervisor_refresh_requested: boolean;
+  supervisor_refresh_status: string;
   generated_at: string;
   ready_count: number;
   watch_count: number;
@@ -98,6 +100,8 @@ export function getWeb3CredentialDoctorHealth(path?: string): Web3CredentialDoct
       scenario: "breakout",
       source: "live-dex",
       account: "persistent",
+      supervisor_refresh_requested: false,
+      supervisor_refresh_status: "not-requested",
       generated_at: null,
       receipt_fresh: false,
       receipt_age_seconds: null,
@@ -162,6 +166,8 @@ function sanitizeWeb3CredentialDoctorReceipt(value: unknown): Web3CredentialDoct
     scenario: SCENARIOS.includes(row.scenario as Web3CredentialDoctorReceipt["scenario"]) ? row.scenario as Web3CredentialDoctorReceipt["scenario"] : "breakout",
     source: SOURCES.includes(row.source as Web3CredentialDoctorReceipt["source"]) ? row.source as Web3CredentialDoctorReceipt["source"] : "live-dex",
     account: ACCOUNTS.includes(row.account as Web3CredentialDoctorReceipt["account"]) ? row.account as Web3CredentialDoctorReceipt["account"] : "persistent",
+    supervisor_refresh_requested: row.supervisor_refresh_requested === true,
+    supervisor_refresh_status: safeText(row.supervisor_refresh_status, "not-requested", 80),
     generated_at: safeIso(row.generated_at),
     ready_count: cleanCount(row.ready_count),
     watch_count: cleanCount(row.watch_count),
