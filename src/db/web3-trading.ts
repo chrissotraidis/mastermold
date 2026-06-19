@@ -7714,6 +7714,33 @@ export type PortfolioSweepRequest = {
   continue_after_sweep?: boolean;
 };
 
+export type PortfolioMirrorApplyRequest = {
+  action: "apply";
+  max_fill_usd?: number;
+  fill_price_usd?: number;
+  filled_quantity?: number;
+};
+
+export type PortfolioMirrorApplyReport = {
+  mode: "portfolio-mirror-apply";
+  requested: boolean;
+  status: "idle" | "blocked" | "applied" | "duplicate";
+  idempotency_key: string | null;
+  trade_id: string | null;
+  symbol: string | null;
+  side: "buy" | "sell" | null;
+  fill_notional_usd: number;
+  fill_price_usd: number | null;
+  filled_quantity: number | null;
+  portfolio_mirror_permission: "blocked" | "applied" | "duplicate";
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  blockers: string[];
+  summary: string;
+  next_action: string;
+  controls: string[];
+};
+
 export type AutonomousBurstRunRequest = {
   action: "run";
   protect_book?: boolean;
@@ -9020,6 +9047,7 @@ export type Web3TradingState = {
   transaction_lifecycle: TransactionLifecycle;
   signed_transaction_relay: SignedTransactionRelay;
   autonomous_order_handoff: AutonomousOrderHandoff;
+  portfolio_mirror_apply?: PortfolioMirrorApplyReport;
   pre_submit_rehearsal: PreSubmitRehearsal;
   autonomous_execution_adapter_readiness: AutonomousExecutionAdapterReadiness;
   autonomous_custody_mandate: AutonomousCustodyMandate;
@@ -9182,6 +9210,7 @@ export type TradingStateInput = {
   route_refresh?: RouteRefreshRequest;
   onchain_events?: OnchainEventIngestRequest;
   portfolio_sweep?: PortfolioSweepRequest;
+  portfolio_mirror?: PortfolioMirrorApplyRequest;
   autonomous_burst?: AutonomousBurstRunRequest;
   autonomous_session?: AutonomousSessionRunRequest;
   autonomous_loop?: AutonomousLoopTickRequest;
@@ -12789,7 +12818,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: configuredState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
@@ -12821,7 +12850,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: fallbackState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const liveState = buildWeb3TradingState({
@@ -12859,7 +12888,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
     monitorDecision: liveState.autonomous_monitor,
   });
-  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, fetchImpl);
+  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
 }
 
 async function maybeApplyRouteRefreshRequest({
@@ -17663,6 +17692,7 @@ async function finalizeExecutionAudit(
   triggerOrder: TriggerOrderRequest | undefined,
   triggerHistory: TriggerOrderHistoryFilter | undefined,
   triggerReconcile: TriggerReconciliationPatchRequest | undefined,
+  portfolioMirror: PortfolioMirrorApplyRequest | undefined,
   fetchImpl: FetchLike,
 ): Promise<Web3TradingState> {
   let latestEntry: ExecutionAuditEntry | null = null;
@@ -17682,8 +17712,9 @@ async function finalizeExecutionAudit(
   const historyState = triggerHistory
     ? attachTriggerOrderHistory(triggerState, await syncTriggerOrderHistory(triggerState, triggerHistory, fetchImpl))
     : triggerState;
-  if (!triggerReconcile) return historyState;
-  return applyTriggerReconciliationPatch(historyState, triggerReconcile);
+  const reconciledState = triggerReconcile ? applyTriggerReconciliationPatch(historyState, triggerReconcile) : historyState;
+  if (!portfolioMirror) return reconciledState;
+  return applyPortfolioMirrorPatch(reconciledState, portfolioMirror);
 }
 
 function attachExecutionAuditState(state: Web3TradingState, execution_audit: ExecutionAudit): Web3TradingState {
@@ -18448,6 +18479,7 @@ function applyTriggerReconciliationPatch(
       positions: markedPositions,
       trades: trades.slice(-100),
       trigger_reconciliations: applied,
+      portfolio_mirror_patches: data.portfolio_mirror_patches,
       daemon_ticks: data.daemon_ticks,
       onchain_events: data.onchain_events,
       last_autonomous_session_run: data.last_autonomous_session_run,
@@ -18458,6 +18490,341 @@ function applyTriggerReconciliationPatch(
   });
 
   return attachTriggerOrderHistory(applyPersistentLedger(state, false), state.trigger_order_history);
+}
+
+function applyPortfolioMirrorPatch(
+  state: Web3TradingState,
+  request: PortfolioMirrorApplyRequest,
+): Web3TradingState {
+  const now = new Date().toISOString();
+  const current = readLedger() ?? createLedger(now);
+  const data = parseLedgerData(current.data);
+  const evidence = portfolioMirrorEvidence(state);
+  const maxFillUsd = Math.max(10, Math.min(10_000, request.max_fill_usd ?? 1_000));
+  const requestedPrice = typeof request.fill_price_usd === "number" ? request.fill_price_usd : null;
+  const requestedQuantity = typeof request.filled_quantity === "number" ? request.filled_quantity : null;
+  const filledNotional = requestedPrice !== null && requestedQuantity !== null
+    ? roundMetric(requestedPrice * requestedQuantity)
+    : 0;
+  const tradeId = evidence.idempotencyKey && evidence.symbol && evidence.side
+    ? `portfolio-mirror-${evidence.side}-${evidence.symbol}-${sanitizeMirrorKey(evidence.idempotencyKey)}`
+    : null;
+  const blockers = portfolioMirrorBlockers({
+    evidence,
+    request,
+    current,
+    data,
+    maxFillUsd,
+    requestedPrice,
+    requestedQuantity,
+    filledNotional,
+    tradeId,
+  });
+  const duplicate = evidence.idempotencyKey
+    ? data.portfolio_mirror_patches.some((patch) => patch.idempotency_key === evidence.idempotencyKey) ||
+      data.trades.some((trade) => trade.id === tradeId)
+    : false;
+
+  if (duplicate && blockers.length === 0) {
+    return {
+      ...state,
+      portfolio_mirror_apply: portfolioMirrorApplyReport({
+        status: "duplicate",
+        evidence,
+        tradeId,
+        filledNotional,
+        requestedPrice,
+        requestedQuantity,
+        blockers: ["duplicate-idempotency-key"],
+      }),
+    };
+  }
+
+  if (blockers.length > 0) {
+    return {
+      ...state,
+      portfolio_mirror_apply: portfolioMirrorApplyReport({
+        status: "blocked",
+        evidence,
+        tradeId,
+        filledNotional,
+        requestedPrice,
+        requestedQuantity,
+        blockers,
+      }),
+    };
+  }
+
+  const market = portfolioMirrorMarket(state.market, evidence.symbol!, requestedPrice!);
+  const trade: AutonomousTrade = {
+    id: tradeId!,
+    side: evidence.side!,
+    symbol: evidence.symbol!,
+    size_usd: filledNotional,
+    price_usd: requestedPrice!,
+    status: "paper-filled",
+    reason: `Confirmed signed fill mirrored from ${evidence.relaySignature}.`,
+    created_at: now,
+  };
+  const applied = applyArbiterPaperTradeToLedger(current, market, trade);
+  if (applied === current) {
+    return {
+      ...state,
+      portfolio_mirror_apply: portfolioMirrorApplyReport({
+        status: "blocked",
+        evidence,
+        tradeId,
+        filledNotional,
+        requestedPrice,
+        requestedQuantity,
+        blockers: ["portfolio-mirror-writer-noop"],
+      }),
+    };
+  }
+
+  const appliedData = parseLedgerData(applied.data);
+  store().upsertWeb3PaperLedger({
+    ...applied,
+    data: {
+      ...appliedData,
+      portfolio_mirror_patches: [
+        ...appliedData.portfolio_mirror_patches,
+        {
+          idempotency_key: evidence.idempotencyKey!,
+          trade_id: tradeId!,
+          relay_signature: evidence.relaySignature!,
+          request_id: evidence.requestId!,
+          payload_hash: evidence.payloadHash!,
+          plan_id: evidence.planId,
+          symbol: evidence.symbol!,
+          side: evidence.side!,
+          applied_at: now,
+          fill_notional_usd: filledNotional,
+          fill_price_usd: requestedPrice!,
+          filled_quantity: requestedQuantity!,
+        },
+      ].slice(-100),
+    } satisfies LedgerData,
+  });
+
+  const refreshed = applyPersistentLedger(state, "off");
+  return {
+    ...refreshed,
+    portfolio_mirror_apply: portfolioMirrorApplyReport({
+      status: "applied",
+      evidence,
+      tradeId,
+      filledNotional,
+      requestedPrice,
+      requestedQuantity,
+      blockers: [],
+    }),
+  };
+}
+
+function portfolioMirrorEvidence(state: Web3TradingState) {
+  const relay = state.signed_transaction_relay;
+  const latest = state.execution_audit.latest;
+  const relaySignature = relay.latest_signature || latest?.relay_signature || null;
+  const requestId = relay.request_id || latest?.request_id || null;
+  const payloadHash = relay.payload_hash || latest?.payload_hash || null;
+  const planId = relay.latest_plan_id || latest?.plan_id || null;
+  const lifecycle = state.transaction_lifecycle.items.find((item) =>
+    item.stage === "landed" && portfolioMirrorEvidenceMatches(item, requestId, payloadHash, planId)
+  ) ?? null;
+  const handoff = state.autonomous_order_handoff.items.find((item) =>
+    portfolioMirrorEvidenceMatches(item, requestId, payloadHash, planId)
+  ) ?? null;
+  const side = handoff?.side === "buy" || handoff?.side === "sell"
+    ? handoff.side
+    : latest?.side === "buy" || latest?.side === "sell"
+      ? latest.side
+      : relay.latest_side;
+  const symbol = handoff?.symbol || latest?.symbol || relay.latest_symbol || null;
+  const fillNotionalUsd = typeof handoff?.notional_usd === "number" ? handoff.notional_usd : null;
+  const idempotencyKey = relaySignature && requestId && payloadHash
+    ? `mirror:${relaySignature}:${requestId}:${payloadHash}`
+    : null;
+  return {
+    relay,
+    latest,
+    lifecycle,
+    handoff,
+    relaySignature,
+    requestId,
+    payloadHash,
+    planId,
+    side,
+    symbol,
+    fillNotionalUsd,
+    idempotencyKey,
+  };
+}
+
+function portfolioMirrorEvidenceMatches(
+  item: { request_id?: string | null; payload_hash?: string | null; plan_id?: string | null },
+  requestId: string | null,
+  payloadHash: string | null,
+  planId: string | null,
+) {
+  return Boolean(
+    (requestId && item.request_id === requestId) ||
+    (payloadHash && item.payload_hash === payloadHash) ||
+    (planId && item.plan_id === planId),
+  );
+}
+
+function portfolioMirrorBlockers({
+  evidence,
+  request,
+  current,
+  data,
+  maxFillUsd,
+  requestedPrice,
+  requestedQuantity,
+  filledNotional,
+  tradeId,
+}: {
+  evidence: ReturnType<typeof portfolioMirrorEvidence>;
+  request: PortfolioMirrorApplyRequest;
+  current: Web3PaperLedgerRow;
+  data: LedgerData;
+  maxFillUsd: number;
+  requestedPrice: number | null;
+  requestedQuantity: number | null;
+  filledNotional: number;
+  tradeId: string | null;
+}) {
+  const blockers: string[] = [];
+  if (request.action !== "apply") blockers.push("portfolio_mirror.action must be apply.");
+  if (evidence.relay.status !== "confirmed" && evidence.latest?.status !== "confirmed") blockers.push("Portfolio mirror requires a confirmed signed relay.");
+  if (!evidence.relaySignature) blockers.push("Portfolio mirror requires relay signature evidence.");
+  if (!evidence.requestId) blockers.push("Portfolio mirror requires original request id evidence.");
+  if (!evidence.payloadHash) blockers.push("Portfolio mirror requires payload hash evidence.");
+  if (!evidence.idempotencyKey) blockers.push("Portfolio mirror requires a deterministic idempotency key.");
+  if (!evidence.lifecycle) blockers.push("Portfolio mirror requires a landed transaction lifecycle item.");
+  if (!evidence.handoff) blockers.push("Portfolio mirror requires a matching autonomous order handoff item.");
+  if (!evidence.symbol) blockers.push("Portfolio mirror requires a fill symbol.");
+  if (evidence.side !== "buy" && evidence.side !== "sell") blockers.push("Portfolio mirror requires a buy or sell side.");
+  if (typeof requestedPrice !== "number" || !Number.isFinite(requestedPrice) || requestedPrice <= 0) blockers.push("Portfolio mirror requires positive fill_price_usd evidence.");
+  if (typeof requestedQuantity !== "number" || !Number.isFinite(requestedQuantity) || requestedQuantity <= 0) blockers.push("Portfolio mirror requires positive filled_quantity evidence.");
+  if (filledNotional <= 0) blockers.push("Portfolio mirror requires positive fill notional evidence.");
+  if (filledNotional > maxFillUsd) blockers.push(`Portfolio mirror fill $${roundMetric(filledNotional)} exceeds the $${roundMetric(maxFillUsd)} guard cap.`);
+  if (evidence.fillNotionalUsd === null || evidence.fillNotionalUsd <= 0) blockers.push("Portfolio mirror requires bounded handoff notional evidence.");
+  if (evidence.fillNotionalUsd !== null && evidence.fillNotionalUsd > maxFillUsd) blockers.push(`Handoff notional $${roundMetric(evidence.fillNotionalUsd)} exceeds the $${roundMetric(maxFillUsd)} guard cap.`);
+  if (evidence.fillNotionalUsd !== null && filledNotional > 0) {
+    const tolerance = Math.max(2, evidence.fillNotionalUsd * 0.03);
+    if (Math.abs(filledNotional - evidence.fillNotionalUsd) > tolerance) {
+      blockers.push("Provider fill price and quantity do not reconcile with the autonomous handoff notional.");
+    }
+  }
+  if (tradeId && data.trades.some((trade) => trade.id === tradeId)) blockers.push("Portfolio mirror trade id already exists.");
+  if (evidence.side === "buy" && filledNotional > current.cash_usd) blockers.push("Local paper mirror has insufficient cash for the confirmed buy fill.");
+  if (evidence.side === "sell" && evidence.symbol) {
+    const position = data.positions.find((item) => item.symbol.toUpperCase() === evidence.symbol!.toUpperCase());
+    if (!position) blockers.push("Local paper mirror has no matching position for the confirmed sell fill.");
+  }
+  return [...new Set(blockers)];
+}
+
+function portfolioMirrorApplyReport({
+  status,
+  evidence,
+  tradeId,
+  filledNotional,
+  requestedPrice,
+  requestedQuantity,
+  blockers,
+}: {
+  status: PortfolioMirrorApplyReport["status"];
+  evidence: ReturnType<typeof portfolioMirrorEvidence>;
+  tradeId: string | null;
+  filledNotional: number;
+  requestedPrice: number | null;
+  requestedQuantity: number | null;
+  blockers: string[];
+}): PortfolioMirrorApplyReport {
+  const permission = status === "applied" ? "applied" : status === "duplicate" ? "duplicate" : "blocked";
+  return {
+    mode: "portfolio-mirror-apply",
+    requested: true,
+    status,
+    idempotency_key: evidence.idempotencyKey,
+    trade_id: tradeId,
+    symbol: evidence.symbol,
+    side: evidence.side === "buy" || evidence.side === "sell" ? evidence.side : null,
+    fill_notional_usd: roundMetric(filledNotional),
+    fill_price_usd: requestedPrice,
+    filled_quantity: requestedQuantity,
+    portfolio_mirror_permission: permission,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    blockers,
+    summary: portfolioMirrorApplySummary(status, evidence, blockers, filledNotional),
+    next_action: portfolioMirrorApplyNextAction(status, blockers),
+    controls: [
+      "Applies only to the local persistent paper portfolio mirror.",
+      "Requires confirmed relay, landed lifecycle, matching handoff, idempotency key, fill price, filled quantity, and notional cap evidence.",
+      "Never signs transactions, stores signed transaction bodies, submits swaps, polls chain state, or moves wallet funds.",
+      "Duplicate idempotency keys are treated as already handled and cannot create another fill.",
+    ],
+  };
+}
+
+function portfolioMirrorApplySummary(
+  status: PortfolioMirrorApplyReport["status"],
+  evidence: ReturnType<typeof portfolioMirrorEvidence>,
+  blockers: string[],
+  filledNotional: number,
+) {
+  if (status === "applied") return `${evidence.symbol} ${evidence.side} fill mirrored into the local paper portfolio for ${formatCompactValue(filledNotional)}.`;
+  if (status === "duplicate") return "This confirmed fill was already mirrored; no duplicate portfolio update was applied.";
+  return `Portfolio mirror apply is blocked: ${blockers[0] ?? "missing confirmed fill evidence"}`;
+}
+
+function portfolioMirrorApplyNextAction(status: PortfolioMirrorApplyReport["status"], blockers: string[]) {
+  if (status === "applied") return "Continue monitoring the mirrored position and keep live execution blocked until a reviewed live writer exists.";
+  if (status === "duplicate") return "Keep polling for new settlement evidence; this idempotency key is already accounted for.";
+  return blockers[0] ?? "Wait for confirmed settlement and provider fill details before mirroring the fill.";
+}
+
+function portfolioMirrorMarket(market: MemecoinMarket[], symbol: string, priceUsd: number): MemecoinMarket[] {
+  const existing = market.find((item) => item.symbol.toUpperCase() === symbol.toUpperCase());
+  if (existing) {
+    return market.map((item) => item.symbol.toUpperCase() === symbol.toUpperCase() ? { ...item, price_usd: priceUsd } : item);
+  }
+  return [
+    ...market,
+    {
+      id: `mirror-${symbol.toLowerCase()}`,
+      chain: "solana",
+      symbol,
+      name: symbol,
+      token_address: `${symbol.toLowerCase()}-mirror-token`,
+      pair_address: `${symbol.toLowerCase()}-mirror-pair`,
+      dex: "Portfolio mirror",
+      price_usd: priceUsd,
+      market_cap_usd: 0,
+      liquidity_usd: 0,
+      volume_5m_usd: 0,
+      volume_1h_usd: 0,
+      volume_24h_usd: 0,
+      buys_5m: 0,
+      sells_5m: 0,
+      price_change_5m_pct: 0,
+      price_change_1h_pct: 0,
+      price_change_6h_pct: 0,
+      age_minutes: 0,
+      boosts: 0,
+      paid_orders: 0,
+      holder_count_estimate: 0,
+      risk_flags: ["portfolio-mirror-estimate"],
+    },
+  ];
+}
+
+function sanitizeMirrorKey(value: string) {
+  return createHash("sha256").update(value).digest("hex").slice(0, 18);
 }
 
 function buildTriggerOrderExecution(
@@ -23206,6 +23573,7 @@ type LedgerData = {
   positions: TradingPosition[];
   trades: AutonomousTrade[];
   trigger_reconciliations: TriggerLedgerReconciliationPatch[];
+  portfolio_mirror_patches: PortfolioMirrorLedgerPatch[];
   daemon_ticks: PaperDaemonMemoryTick[];
   onchain_events: OnchainEventLedgerRow[];
   last_autonomous_session_run: AutonomousSessionRunReport | null;
@@ -23231,6 +23599,21 @@ type TriggerLedgerReconciliationPatch = {
   filled_quantity: number;
 };
 
+type PortfolioMirrorLedgerPatch = {
+  idempotency_key: string;
+  trade_id: string;
+  relay_signature: string;
+  request_id: string;
+  payload_hash: string;
+  plan_id: string | null;
+  symbol: string;
+  side: "buy" | "sell";
+  applied_at: string;
+  fill_notional_usd: number;
+  fill_price_usd: number;
+  filled_quantity: number;
+};
+
 function createLedger(now: string): Web3PaperLedgerRow {
   return {
     id: "default",
@@ -23244,6 +23627,7 @@ function createLedger(now: string): Web3PaperLedgerRow {
       positions: [],
       trades: [],
       trigger_reconciliations: [],
+      portfolio_mirror_patches: [],
       daemon_ticks: [],
       onchain_events: [],
       last_autonomous_session_run: null,
@@ -23713,6 +24097,7 @@ function advanceLedger(
       positions: markedPositions,
       trades: [...trades, ...newTrades].slice(-100),
       trigger_reconciliations: data.trigger_reconciliations,
+      portfolio_mirror_patches: data.portfolio_mirror_patches,
       daemon_ticks: data.daemon_ticks,
       onchain_events: data.onchain_events,
       last_autonomous_session_run: data.last_autonomous_session_run,
@@ -77259,6 +77644,9 @@ function parseLedgerData(value: unknown): LedgerData {
     trigger_reconciliations: Array.isArray(data.trigger_reconciliations)
       ? data.trigger_reconciliations.filter(isTriggerLedgerReconciliationPatch)
       : [],
+    portfolio_mirror_patches: Array.isArray(data.portfolio_mirror_patches)
+      ? data.portfolio_mirror_patches.filter(isPortfolioMirrorLedgerPatch)
+      : [],
     daemon_ticks: Array.isArray(data.daemon_ticks)
       ? data.daemon_ticks.filter(isPaperDaemonMemoryTick)
       : [],
@@ -77455,6 +77843,23 @@ function isTriggerLedgerReconciliationPatch(value: unknown): value is TriggerLed
     typeof row.applied_at === "string" &&
     typeof row.output_usd === "number" &&
     typeof row.estimated_realized_pnl_usd === "number" &&
+    typeof row.filled_quantity === "number";
+}
+
+function isPortfolioMirrorLedgerPatch(value: unknown): value is PortfolioMirrorLedgerPatch {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Partial<PortfolioMirrorLedgerPatch>;
+  return typeof row.idempotency_key === "string" &&
+    typeof row.trade_id === "string" &&
+    typeof row.relay_signature === "string" &&
+    typeof row.request_id === "string" &&
+    typeof row.payload_hash === "string" &&
+    (row.plan_id === null || typeof row.plan_id === "string") &&
+    typeof row.symbol === "string" &&
+    (row.side === "buy" || row.side === "sell") &&
+    typeof row.applied_at === "string" &&
+    typeof row.fill_notional_usd === "number" &&
+    typeof row.fill_price_usd === "number" &&
     typeof row.filled_quantity === "number";
 }
 

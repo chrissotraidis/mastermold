@@ -13,6 +13,7 @@ import {
   type AutonomousSessionRunRequest,
   type ExecutionUpdate,
   type OnchainEventIngestRequest,
+  type PortfolioMirrorApplyRequest,
   type PortfolioSweepRequest,
   type RouteRefreshRequest,
   type SignedTransactionRelayRequest,
@@ -42,6 +43,7 @@ type TradingRequest = {
   route_refresh?: RouteRefreshRequest;
   onchain_events?: OnchainEventIngestRequest;
   portfolio_sweep?: PortfolioSweepRequest;
+  portfolio_mirror?: PortfolioMirrorApplyRequest;
   autonomous_burst?: AutonomousBurstRunRequest;
   autonomous_session?: AutonomousSessionRunRequest;
   autonomous_loop?: AutonomousLoopTickRequest;
@@ -111,6 +113,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
   const routeRefresh = record.route_refresh === undefined ? undefined : parseRouteRefreshRequest(record.route_refresh);
   const onchainEvents = record.onchain_events === undefined ? undefined : parseOnchainEventIngestRequest(record.onchain_events);
   const portfolioSweep = record.portfolio_sweep === undefined ? undefined : parsePortfolioSweepRequest(record.portfolio_sweep);
+  const portfolioMirror = record.portfolio_mirror === undefined ? undefined : parsePortfolioMirrorApplyRequest(record.portfolio_mirror);
   const autonomousBurst = record.autonomous_burst === undefined ? undefined : parseAutonomousBurstRunRequest(record.autonomous_burst);
   const autonomousSession = record.autonomous_session === undefined ? undefined : parseAutonomousSessionRunRequest(record.autonomous_session);
   const autonomousLoop = record.autonomous_loop === undefined ? undefined : parseAutonomousLoopTickRequest(record.autonomous_loop);
@@ -177,6 +180,10 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
     return { ok: false, error: portfolioSweep.error };
   }
 
+  if (portfolioMirror && !portfolioMirror.ok) {
+    return { ok: false, error: portfolioMirror.error };
+  }
+
   if (autonomousBurst && !autonomousBurst.ok) {
     return { ok: false, error: autonomousBurst.error };
   }
@@ -216,6 +223,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       route_refresh: routeRefresh?.value,
       onchain_events: onchainEvents?.value,
       portfolio_sweep: portfolioSweep?.value,
+      portfolio_mirror: portfolioMirror?.value,
       autonomous_burst: autonomousBurst?.value,
       autonomous_session: autonomousSession?.value,
       autonomous_loop: autonomousLoop?.value,
@@ -582,6 +590,42 @@ function parseOnchainEventIngestRequest(value: unknown):
         ? record.source
         : undefined,
       events: record.events,
+    },
+  };
+}
+
+function parsePortfolioMirrorApplyRequest(value: unknown):
+  | { ok: true; value: PortfolioMirrorApplyRequest }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "portfolio_mirror must be an object." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.action !== "apply") {
+    return { ok: false, error: "portfolio_mirror.action must be apply." };
+  }
+
+  const maxFillUsd = record.max_fill_usd === undefined ? undefined : Number(record.max_fill_usd);
+  const fillPriceUsd = record.fill_price_usd === undefined ? undefined : Number(record.fill_price_usd);
+  const filledQuantity = record.filled_quantity === undefined ? undefined : Number(record.filled_quantity);
+  if (maxFillUsd !== undefined && (!Number.isFinite(maxFillUsd) || maxFillUsd < 10 || maxFillUsd > 10_000)) {
+    return { ok: false, error: "portfolio_mirror.max_fill_usd must be from 10 to 10000." };
+  }
+  if (fillPriceUsd !== undefined && (!Number.isFinite(fillPriceUsd) || fillPriceUsd <= 0 || fillPriceUsd > 1_000_000)) {
+    return { ok: false, error: "portfolio_mirror.fill_price_usd must be a positive number no greater than 1000000." };
+  }
+  if (filledQuantity !== undefined && (!Number.isFinite(filledQuantity) || filledQuantity <= 0 || filledQuantity > 1_000_000_000_000)) {
+    return { ok: false, error: "portfolio_mirror.filled_quantity must be a positive number no greater than 1000000000000." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      action: "apply",
+      max_fill_usd: maxFillUsd,
+      fill_price_usd: fillPriceUsd,
+      filled_quantity: filledQuantity,
     },
   };
 }

@@ -5023,6 +5023,35 @@ async function main() {
     state: landedMirrorState,
   });
   assert(oversizedMirror.status === "blocked" && oversizedMirror.blockers.some((blocker) => blocker.includes("guard cap")), "Portfolio mirror guard should fail closed when landed fill notional exceeds the mirror cap.", oversizedMirror);
+  const invalidMirrorApply = await postTrading({
+    scenario: "breakout",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    portfolio_mirror: {
+      action: "apply",
+      max_fill_usd: 0,
+    },
+  });
+  assert(invalidMirrorApply.response.status === 422, "Portfolio mirror apply should reject invalid max fill caps at the API boundary.", invalidMirrorApply.payload);
+  assert(String(invalidMirrorApply.payload.error ?? "").includes("portfolio_mirror.max_fill_usd"), "Portfolio mirror validation should explain invalid max fill caps.", invalidMirrorApply.payload);
+  const blockedMirrorApply = await postTrading({
+    scenario: "breakout",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    portfolio_mirror: {
+      action: "apply",
+      max_fill_usd: 1_000,
+      fill_price_usd: 0.0000125,
+      filled_quantity: 20_000_000,
+    },
+  });
+  assert(blockedMirrorApply.response.status === 200, "Blocked portfolio mirror apply should return the current trading state.", blockedMirrorApply.payload);
+  assert(blockedMirrorApply.payload.portfolio_mirror_apply?.mode === "portfolio-mirror-apply", "Portfolio mirror apply should return a dedicated report.", blockedMirrorApply.payload.portfolio_mirror_apply);
+  assert(blockedMirrorApply.payload.portfolio_mirror_apply.status === "blocked", "Portfolio mirror apply should block without confirmed signed settlement evidence.", blockedMirrorApply.payload.portfolio_mirror_apply);
+  assert(blockedMirrorApply.payload.portfolio_mirror_apply.live_execution_permission === "blocked" && blockedMirrorApply.payload.portfolio_mirror_apply.wallet_mutation_permission === "blocked", "Portfolio mirror apply should not grant live or wallet mutation permission.", blockedMirrorApply.payload.portfolio_mirror_apply);
+  assert(blockedMirrorApply.payload.portfolio_mirror_apply.blockers.some((blocker) => blocker.includes("confirmed signed relay")), "Portfolio mirror apply should explain missing confirmed relay evidence.", blockedMirrorApply.payload.portfolio_mirror_apply);
 
   const summary = {
     baseUrl,
@@ -5049,6 +5078,7 @@ async function main() {
     settlementPermission: settlementReconciliation.live_execution_permission,
     portfolioMirror: portfolioMirrorGuard.status,
     portfolioMirrorPermission: portfolioMirrorGuard.portfolio_mirror_permission,
+    portfolioMirrorApply: blockedMirrorApply.payload.portfolio_mirror_apply.status,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

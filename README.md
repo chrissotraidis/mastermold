@@ -118,7 +118,10 @@ requires confirmed transactions to map to a landed lifecycle before any portfoli
 could be treated as reconciled. The portfolio mirror guard then requires that landed fill
 to also have relay signature, request id, payload hash, a deterministic idempotency key,
 and bounded autonomous handoff notional before a future reviewed mirror writer could treat
-the fill as audit-ready.
+the fill as audit-ready. The Web3 trading API also accepts a guarded `portfolio_mirror`
+apply request for the persistent paper mirror; it still blocks unless confirmed settlement
+evidence, fill price, filled quantity, handoff notional, and idempotency all reconcile, and
+it never grants live execution or wallet mutation permission.
 
 ## Architecture: the engine and the app
 
