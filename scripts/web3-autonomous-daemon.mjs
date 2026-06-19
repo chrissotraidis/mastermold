@@ -89,6 +89,8 @@ export async function runWeb3AutonomousDaemon(input = {}) {
       loop_action: payload.autonomous_loop_tick?.action ?? "unknown",
       paper_cycle: payload.paper_account?.cycle ?? null,
       equity_usd: payload.portfolio?.equity_usd ?? null,
+      settlement_watchdog: payload.autonomous_settlement_watchdog?.status ?? "not-requested",
+      settlement_action: payload.autonomous_settlement_watchdog?.action ?? "none",
       next_action: payload.autonomous_loop_tick?.next_action ?? nextHandoff?.summary ?? "No next action returned.",
     });
 
@@ -113,6 +115,7 @@ export async function runWeb3AutonomousDaemon(input = {}) {
 
 export function buildDaemonTickBody(state, config, requestId) {
   const handoff = state.autonomous_daemon_handoff;
+  const settlementWatchdog = buildDaemonSettlementWatchdogRequest(state);
   return {
     scenario: state.scenario ?? config.scenario,
     cycles: state.paper_account?.cycle ?? 0,
@@ -121,12 +124,34 @@ export function buildDaemonTickBody(state, config, requestId) {
     daemon: true,
     advance: false,
     autonomous_loop: { action: "tick" },
+    ...(settlementWatchdog ? { settlement_watchdog: settlementWatchdog } : {}),
     daemon_lease: {
       lease_id: handoff.lease_id,
       runner_id: config.runnerId,
       request_id: requestId,
       issued_at: new Date().toISOString(),
     },
+  };
+}
+
+export function buildDaemonSettlementWatchdogRequest(state) {
+  const relay = state?.signed_transaction_relay ?? {};
+  const latest = state?.execution_audit?.latest ?? null;
+  const signature = relay.latest_signature || latest?.relay_signature || null;
+  const relayStatus = relay.status ?? latest?.status ?? "idle";
+  const hasRelayToWatch = Boolean(signature) && (
+    relayStatus === "relayed" ||
+    relayStatus === "confirmed" ||
+    latest?.status === "relayed" ||
+    latest?.status === "confirmed"
+  );
+  if (!hasRelayToWatch) return null;
+  return {
+    action: "run",
+    apply_mirror: true,
+    commitment: "confirmed",
+    max_fill_usd: Math.max(10, Math.min(10_000, Number(state?.execution_readiness?.config?.max_trade_usd ?? 1_000))),
+    search_transaction_history: true,
   };
 }
 

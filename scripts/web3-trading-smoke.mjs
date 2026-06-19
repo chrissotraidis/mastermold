@@ -1,4 +1,4 @@
-import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
+import { buildDaemonTickBody, runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
 import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
@@ -4733,6 +4733,7 @@ async function main() {
   assert(daemonRun.events[0].status === "posted", "Autonomous daemon smoke run should post a leased backend tick.", daemonRun);
   assert(["acquired", "renewed", "replayed", "expired"].includes(daemonRun.events[0].lease_status), "Autonomous daemon smoke run should return a recorded non-conflicting lease status.", daemonRun);
   assert(daemonRun.events[0].active_runner_id === "implicit-daemon-runner" || daemonRun.events[0].active_runner_id === null, "Autonomous daemon smoke run should own or safely idle the lease.", daemonRun);
+  assert(daemonRun.events[0].settlement_watchdog === "not-requested", "Autonomous daemon should not request settlement watchdog without relayed signature evidence.", daemonRun);
   const forwardRun = await runWeb3AutonomousForwardRun({
     baseUrl,
     scenario: "all",
@@ -5135,6 +5136,29 @@ async function main() {
   assert(blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.live_execution_permission === "blocked" && blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.wallet_mutation_permission === "blocked", "Settlement watchdog should not grant live or wallet mutation permission.", blockedSettlementWatchdog.payload.autonomous_settlement_watchdog);
   assert(blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.poll_status === "blocked", "Settlement watchdog should expose the blocked poll status.", blockedSettlementWatchdog.payload.autonomous_settlement_watchdog);
   assert(blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.blockers.some((blocker) => blocker.includes("stored relayed signature")), "Settlement watchdog should explain missing relayed signature evidence.", blockedSettlementWatchdog.payload.autonomous_settlement_watchdog);
+  const daemonSettlementBody = buildDaemonTickBody({
+    ...tick.payload,
+    signed_transaction_relay: {
+      ...tick.payload.signed_transaction_relay,
+      status: "confirmed",
+      latest_signature: "5NfRelaySignature111111111111111111111111111111111111111",
+    },
+    execution_audit: {
+      ...tick.payload.execution_audit,
+      latest: {
+        ...(tick.payload.execution_audit.latest ?? {}),
+        status: "confirmed",
+        relay_signature: "5NfRelaySignature111111111111111111111111111111111111111",
+      },
+    },
+  }, {
+    scenario: "breakout",
+    source: "sample",
+    runnerId: "smoke-settlement-runner",
+  }, "smoke-settlement-request");
+  assert(daemonSettlementBody.settlement_watchdog?.action === "run", "Daemon tick body should request the settlement watchdog when confirmed relay evidence exists.", daemonSettlementBody);
+  assert(daemonSettlementBody.settlement_watchdog.apply_mirror === true, "Daemon settlement watchdog should explicitly request guarded mirror apply.", daemonSettlementBody);
+  assert(daemonSettlementBody.settlement_watchdog.max_fill_usd > 0, "Daemon settlement watchdog should carry a bounded fill cap.", daemonSettlementBody);
 
   const summary = {
     baseUrl,
