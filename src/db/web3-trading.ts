@@ -8416,6 +8416,19 @@ export type AutonomousSignerRequestRelayRequest = {
   request_body_hash?: string;
 };
 
+export type ManagedSubmitReceiptRequest = {
+  action: "record";
+  provider: Extract<AutonomousSignerOpsProvider, "privy-server-wallet" | "turnkey-policy-wallet" | "session-key-vault">;
+  status: "submitted" | "pending" | "confirmed" | "failed";
+  request_id: string;
+  payload_hash: string;
+  provider_status_id: string;
+  transaction_signature?: string;
+  confirmation_status?: "processed" | "confirmed" | "finalized";
+  slot?: string;
+  reference_id?: string;
+};
+
 export type SignatureConfirmationPollRequest = {
   action: "poll";
   signature?: string;
@@ -9478,6 +9491,7 @@ export type TradingStateInput = {
   drill?: boolean;
   execution?: ExecutionUpdate;
   signer_request?: AutonomousSignerRequestRelayRequest;
+  managed_submit?: ManagedSubmitReceiptRequest;
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
   fill_reconcile?: SettlementFillReconciliationRequest;
@@ -13098,7 +13112,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: configuredState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
@@ -13134,7 +13148,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: fallbackState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -13175,7 +13189,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
     monitorDecision: liveState.autonomous_monitor,
   });
-  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
+  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.managed_submit, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
 }
 
 async function maybeApplyRouteRefreshRequest({
@@ -17997,6 +18011,7 @@ async function finalizeExecutionAudit(
   state: Web3TradingState,
   drill: boolean,
   signerRequest: AutonomousSignerRequestRelayRequest | undefined,
+  managedSubmit: ManagedSubmitReceiptRequest | undefined,
   relay: SignedTransactionRelayRequest | undefined,
   confirmationPoll: SignatureConfirmationPollRequest | undefined,
   fillReconcile: SettlementFillReconciliationRequest | undefined,
@@ -18010,6 +18025,7 @@ async function finalizeExecutionAudit(
   const latestEntries: ExecutionAuditEntry[] = [];
   if (drill) latestEntries.push(runExecutionDrill(state));
   if (signerRequest) latestEntries.push(runAutonomousSignerRequest(state, signerRequest));
+  if (managedSubmit) latestEntries.push(runManagedSubmitReceipt(state, managedSubmit));
   if (relay) latestEntries.push(await runSignedTransactionRelay(state, relay, fetchImpl));
   const current = readExecutionAudit();
   const latestEntry = latestEntries.at(-1) ?? null;
@@ -20116,6 +20132,103 @@ function signerRequestBlockers(
       : null,
   ].filter((item): item is string => Boolean(item));
   return [...new Set(blockers)].slice(0, 8);
+}
+
+function runManagedSubmitReceipt(
+  state: Web3TradingState,
+  request: ManagedSubmitReceiptRequest,
+): ExecutionAuditEntry {
+  const existing = readExecutionAudit().entries;
+  const now = new Date().toISOString();
+  const activeRequest = state.autonomous_signer_ops.active_request;
+  const adapter = state.autonomous_signer_ops.provider_adapter;
+  const plan = activeRequest?.plan_id
+    ? state.execution_plans.find((item) => item.id === activeRequest.plan_id) ?? null
+    : state.execution_plans.find((item) => item.dry_run.request_id === request.request_id) ?? state.execution_plans[0] ?? null;
+  const nonce = `web3-managed-submit-${String(existing.length + 1).padStart(4, "0")}`;
+  const blockers = managedSubmitReceiptBlockers(state, request, activeRequest, adapter, plan);
+  const status: ExecutionAuditEntry["status"] = blockers.length > 0
+    ? "blocked"
+    : request.status === "failed"
+      ? "relay-failed"
+      : request.status === "confirmed"
+        ? "confirmed"
+        : "relayed";
+  const entry: ExecutionAuditEntry = {
+    id: `${nonce}-${Date.parse(now)}`,
+    created_at: now,
+    nonce,
+    plan_id: activeRequest?.plan_id ?? plan?.id ?? null,
+    symbol: activeRequest?.symbol ?? plan?.symbol ?? null,
+    side: activeRequest?.side === "buy" || activeRequest?.side === "sell" ? activeRequest.side : plan?.side ?? null,
+    status,
+    attempt: status === "blocked" ? 0 : 1,
+    max_attempts: 1,
+    retry_window_seconds: request.status === "pending" || request.status === "submitted" ? 60 : 0,
+    next_retry_at: request.status === "pending" || request.status === "submitted" ? new Date(Date.parse(now) + 15_000).toISOString() : null,
+    request_id: request.request_id,
+    router: plan?.dry_run.router ?? null,
+    relay_path: signerRequestRelayPath(activeRequest, state.live_execution_arming.transaction_path),
+    transaction_ready: Boolean(activeRequest?.payload_hash ?? plan?.dry_run.transaction_ready),
+    payload_hash: activeRequest?.payload_hash ?? request.payload_hash,
+    payload_bytes: null,
+    simulated_signature: null,
+    relay_signature: request.transaction_signature ?? null,
+    relay_slot: request.slot ?? null,
+    confirmation_status: request.confirmation_status ?? (request.status === "confirmed" ? "confirmed" : null),
+    signer_session_label: `${request.provider}:managed-submit:${request.provider_status_id}`,
+    signer_network: null,
+    kill_switch: state.execution_readiness.config.kill_switch,
+    reason: managedSubmitReceiptReason(request, status, blockers),
+  };
+  store().appendWeb3ExecutionAudit({
+    id: entry.id,
+    created_at: entry.created_at,
+    data: entry,
+  } satisfies Web3ExecutionAuditRow);
+  return entry;
+}
+
+function managedSubmitReceiptBlockers(
+  state: Web3TradingState,
+  request: ManagedSubmitReceiptRequest,
+  activeRequest: AutonomousSignerRequestEnvelope | null,
+  adapter: AutonomousSignerProviderAdapter,
+  plan: ExecutionPlan | null,
+) {
+  const packet = adapter.provider_request_packet;
+  const blockers = [
+    request.action !== "record" ? "managed_submit.action must be record." : null,
+    !activeRequest ? "Managed submit requires an active signer request." : null,
+    !plan ? "No execution plan exists for the managed submit receipt." : null,
+    request.provider !== adapter.provider ? "Managed submit provider does not match the active adapter." : null,
+    activeRequest && request.provider !== activeRequest.provider ? "Managed submit provider does not match the active signer request." : null,
+    request.request_id !== adapter.request_id ? "Managed submit request id does not match the active adapter request id." : null,
+    activeRequest && request.request_id !== activeRequest.request_id ? "Managed submit request id does not match the active signer request." : null,
+    request.payload_hash !== adapter.payload_hash ? "Managed submit payload hash does not match the active adapter payload hash." : null,
+    activeRequest && request.payload_hash !== activeRequest.payload_hash ? "Managed submit payload hash does not match the active signer request." : null,
+    packet.request_body_fields.broadcast !== "provider-managed" && request.status !== "confirmed"
+      ? "Provider packet is sign-only; managed submit receipts need a provider-managed or confirmed external submit result."
+      : null,
+    request.status === "confirmed" && !request.transaction_signature ? "Confirmed managed submit requires a transaction signature." : null,
+    request.status !== "failed" && !adapter.credential_configured ? "Managed submit provider credentials or wallet scope are not configured." : null,
+    state.execution_readiness.config.kill_switch ? "Kill switch is on; managed submit receipt refused." : null,
+    adapter.raw_transaction_included !== false || adapter.signed_payload_included !== false || adapter.private_key_required !== false
+      ? "Managed submit adapter must remain hash-only with no raw transaction, signed payload, or private-key requirement."
+      : null,
+  ].filter((item): item is string => Boolean(item));
+  return [...new Set(blockers)].slice(0, 8);
+}
+
+function managedSubmitReceiptReason(
+  request: ManagedSubmitReceiptRequest,
+  status: ExecutionAuditEntry["status"],
+  blockers: string[],
+) {
+  if (status === "blocked") return blockers[0] ?? "Managed submit receipt is blocked.";
+  if (status === "confirmed") return `${request.provider.replaceAll("-", " ")} managed submit confirmed with provider status ${request.provider_status_id}.`;
+  if (status === "relay-failed") return `${request.provider.replaceAll("-", " ")} managed submit failed with provider status ${request.provider_status_id}.`;
+  return `${request.provider.replaceAll("-", " ")} managed submit recorded as ${request.status}; poll provider status or Solana confirmation next.`;
 }
 
 async function runSignedTransactionRelay(

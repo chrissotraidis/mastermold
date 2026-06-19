@@ -14,6 +14,7 @@ import {
   type AutonomousSessionRunRequest,
   type AutonomousSettlementWatchdogRequest,
   type ExecutionUpdate,
+  type ManagedSubmitReceiptRequest,
   type OnchainEventIngestRequest,
   type PortfolioMirrorApplyRequest,
   type PortfolioSweepRequest,
@@ -41,6 +42,7 @@ type TradingRequest = {
   drill?: boolean;
   execution?: ExecutionUpdate;
   signer_request?: AutonomousSignerRequestRelayRequest;
+  managed_submit?: ManagedSubmitReceiptRequest;
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
   fill_reconcile?: SettlementFillReconciliationRequest;
@@ -115,6 +117,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
   const drill = record.drill === true;
   const execution = record.execution === undefined ? undefined : parseExecutionUpdate(record.execution);
   const signerRequest = record.signer_request === undefined ? undefined : parseAutonomousSignerRequestRelayRequest(record.signer_request);
+  const managedSubmit = record.managed_submit === undefined ? undefined : parseManagedSubmitReceiptRequest(record.managed_submit);
   const relay = record.relay === undefined ? undefined : parseSignedRelayRequest(record.relay);
   const confirmationPoll = record.confirmation_poll === undefined ? undefined : parseSignatureConfirmationPollRequest(record.confirmation_poll);
   const fillReconcile = record.fill_reconcile === undefined ? undefined : parseSettlementFillReconciliationRequest(record.fill_reconcile);
@@ -166,6 +169,10 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
 
   if (signerRequest && !signerRequest.ok) {
     return { ok: false, error: signerRequest.error };
+  }
+
+  if (managedSubmit && !managedSubmit.ok) {
+    return { ok: false, error: managedSubmit.error };
   }
 
   if (relay && !relay.ok) {
@@ -245,6 +252,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       drill,
       execution: execution?.value,
       signer_request: signerRequest?.value,
+      managed_submit: managedSubmit?.value,
       relay: relay?.value,
       confirmation_poll: confirmationPoll?.value,
       fill_reconcile: fillReconcile?.value,
@@ -306,6 +314,78 @@ function parseAutonomousSignerRequestRelayRequest(value: unknown):
       payload_hash: record.payload_hash.trim().toLowerCase(),
       policy_hash: typeof record.policy_hash === "string" ? record.policy_hash.trim().toLowerCase() : undefined,
       request_body_hash: typeof record.request_body_hash === "string" ? record.request_body_hash.trim().toLowerCase() : undefined,
+    },
+  };
+}
+
+function parseManagedSubmitReceiptRequest(value: unknown):
+  | { ok: true; value: ManagedSubmitReceiptRequest }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "managed_submit must be an object." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.action !== "record") {
+    return { ok: false, error: "managed_submit.action must be record." };
+  }
+  if (
+    record.provider !== "privy-server-wallet" &&
+    record.provider !== "turnkey-policy-wallet" &&
+    record.provider !== "session-key-vault"
+  ) {
+    return { ok: false, error: "managed_submit.provider is invalid." };
+  }
+  if (
+    record.status !== "submitted" &&
+    record.status !== "pending" &&
+    record.status !== "confirmed" &&
+    record.status !== "failed"
+  ) {
+    return { ok: false, error: "managed_submit.status must be submitted, pending, confirmed, or failed." };
+  }
+  if (typeof record.request_id !== "string" || record.request_id.trim().length < 3 || record.request_id.trim().length > 180) {
+    return { ok: false, error: "managed_submit.request_id must be a string from 3 to 180 characters." };
+  }
+  if (typeof record.payload_hash !== "string" || !/^[0-9a-f]{64}$/i.test(record.payload_hash.trim())) {
+    return { ok: false, error: "managed_submit.payload_hash must be a 64-character hex hash." };
+  }
+  if (typeof record.provider_status_id !== "string" || record.provider_status_id.trim().length < 3 || record.provider_status_id.trim().length > 180) {
+    return { ok: false, error: "managed_submit.provider_status_id must be a string from 3 to 180 characters." };
+  }
+  if (record.transaction_signature !== undefined) {
+    if (typeof record.transaction_signature !== "string" || !/^[1-9A-HJ-NP-Za-km-z]{32,120}$/.test(record.transaction_signature.trim())) {
+      return { ok: false, error: "managed_submit.transaction_signature must look like a base58 Solana transaction signature." };
+    }
+  }
+  if (
+    record.confirmation_status !== undefined &&
+    record.confirmation_status !== "processed" &&
+    record.confirmation_status !== "confirmed" &&
+    record.confirmation_status !== "finalized"
+  ) {
+    return { ok: false, error: "managed_submit.confirmation_status must be processed, confirmed, or finalized." };
+  }
+  if (record.slot !== undefined && (typeof record.slot !== "string" || record.slot.trim().length < 1 || record.slot.trim().length > 40)) {
+    return { ok: false, error: "managed_submit.slot must be a string from 1 to 40 characters." };
+  }
+  if (record.reference_id !== undefined && (typeof record.reference_id !== "string" || record.reference_id.trim().length < 1 || record.reference_id.trim().length > 180)) {
+    return { ok: false, error: "managed_submit.reference_id must be a string from 1 to 180 characters." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      action: "record",
+      provider: record.provider,
+      status: record.status,
+      request_id: record.request_id.trim(),
+      payload_hash: record.payload_hash.trim().toLowerCase(),
+      provider_status_id: record.provider_status_id.trim(),
+      transaction_signature: typeof record.transaction_signature === "string" ? record.transaction_signature.trim() : undefined,
+      confirmation_status: record.confirmation_status === "processed" || record.confirmation_status === "confirmed" || record.confirmation_status === "finalized" ? record.confirmation_status : undefined,
+      slot: typeof record.slot === "string" ? record.slot.trim() : undefined,
+      reference_id: typeof record.reference_id === "string" ? record.reference_id.trim() : undefined,
     },
   };
 }
