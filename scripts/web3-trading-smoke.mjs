@@ -1,5 +1,6 @@
 import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
+import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
 
@@ -4797,6 +4798,44 @@ async function main() {
   });
   assert(blockedRepeatGate.proof_gate_status === "blocked" && blockedRepeatGate.target_met === false, "Autonomous repeat proof should block promotion when deployed-alpha thresholds are not met.", blockedRepeatGate);
   assert(blockedRepeatGate.proof_gate_blockers.some((blocker) => blocker.includes("deployed alpha")), "Autonomous repeat proof should explain deployed-alpha gate failures.", blockedRepeatGate);
+  const livePreflight = buildLiveCapitalPreflightReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      requireRepeatProof: true,
+      allowLiveReady: false,
+      requireLiveReady: false,
+    },
+    state: tick.payload,
+    repeatProof: repeatRun,
+  });
+  assert(livePreflight.mode === "web3-live-capital-preflight", "Live-capital preflight should publish a dedicated report mode.", livePreflight);
+  assert(livePreflight.paper_only === true && livePreflight.live_execution_permission === "blocked", "Live-capital preflight must not grant live execution from local paper state.", livePreflight);
+  assert(livePreflight.daemon_can_trade_real_capital === false, "Live-capital preflight should verify daemon handoff cannot trade real capital.", livePreflight);
+  assert(livePreflight.repeat_proof_status === "passed" && livePreflight.repeat_promotion_permission === "paper-promote", "Live-capital preflight should consume the repeat proof gate before considering any stronger action.", livePreflight);
+  assert(["blocked-as-expected", "paper-only", "blocked"].includes(livePreflight.status), "Live-capital preflight should publish a known live-boundary status.", livePreflight);
+  const unsafeLivePreflight = buildLiveCapitalPreflightReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      requireRepeatProof: true,
+      allowLiveReady: false,
+      requireLiveReady: false,
+    },
+    state: {
+      ...tick.payload,
+      autonomous_live_autonomy_readiness: {
+        ...tick.payload.autonomous_live_autonomy_readiness,
+        status: "live-ready",
+        can_trade_real_capital: true,
+      },
+    },
+    repeatProof: repeatRun,
+  });
+  assert(unsafeLivePreflight.status === "blocked" && unsafeLivePreflight.exit_code === 1, "Live-capital preflight should fail closed if live readiness appears without explicit allowance.", unsafeLivePreflight);
+  assert(unsafeLivePreflight.blockers.some((blocker) => blocker.includes("--allow-live-ready")), "Live-capital preflight should explain missing explicit live allowance.", unsafeLivePreflight);
 
   const summary = {
     baseUrl,
@@ -4817,6 +4856,8 @@ async function main() {
     repeatDrawdown: repeatRun.max_cumulative_drawdown_usd,
     repeatDeployedAlpha: repeatRun.deployed_hot_coin_alpha_usd,
     repeatGate: repeatRun.proof_gate_status,
+    livePreflight: livePreflight.status,
+    livePreflightPermission: livePreflight.live_execution_permission,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,
