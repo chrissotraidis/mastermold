@@ -103,6 +103,10 @@ async function main() {
   assert(launchChecklist.provider_credentials_readiness.live_execution_permission === "blocked", "Provider credential readiness should keep live execution blocked.", launchChecklist.provider_credentials_readiness);
   assert(launchChecklist.provider_credentials_readiness.wallet_mutation_permission === "blocked", "Provider credential readiness should keep wallet mutation blocked.", launchChecklist.provider_credentials_readiness);
   assert(Array.isArray(launchChecklist.provider_credentials_readiness.checks) && launchChecklist.provider_credentials_readiness.checks.some((check) => check.id === "provider-packet"), "Provider credential readiness should expose provider packet evidence.", launchChecklist.provider_credentials_readiness);
+  assert(Array.isArray(launchChecklist.cutover_runway), "Web3 launch checklist should expose a cutover runway.", launchChecklist);
+  assert(["profit-proof", "production-supervision", "wallet-provider-scope", "route-order-rehearsal", "manual-live-review"].every((id) => launchChecklist.cutover_runway.some((step) => step.id === id)), "Web3 launch checklist should sequence the remaining live-capital cutover gates.", launchChecklist.cutover_runway);
+  assert(launchChecklist.next_cutover_step?.next_action?.length > 0, "Web3 launch checklist should expose the next concrete cutover step.", launchChecklist.next_cutover_step);
+  assert(launchChecklist.cutover_runway.every((step) => step.blocks_live_capital === true || step.status === "done"), "Cutover runway should keep live capital blocked until a step is actually complete.", launchChecklist.cutover_runway);
   assert(launchChecklist.remaining_work_count === launchChecklist.remaining_work.length, "Web3 launch checklist remaining work count should match remaining work rows.", launchChecklist);
   assert(launchChecklist.completed_proof_count + launchChecklist.remaining_work_count === launchChecklist.items.length, "Web3 launch checklist proof counts should reconcile.", launchChecklist);
   assert(launchChecklist.remaining_work.every((item) => ["required", "review"].includes(item.priority) && item.next_action.length > 0), "Web3 launch checklist remaining work rows should include priority and next action.", launchChecklist);
@@ -122,6 +126,8 @@ async function main() {
   assert(html.includes("Launch checklist"), "Trading page should expose the Web3 autonomy launch checklist.");
   assert(html.includes("Web3 autonomy launch checklist"), "Trading page should render the launch checklist as a first-screen cockpit surface.");
   assert(html.includes("Web3 launch checklist receipt"), "Trading page should expose an accessible launch checklist receipt.");
+  assert(html.includes("Cutover runway"), "Trading page should expose the compact Web3 cutover runway.");
+  assert(html.includes("Prove paper edge"), "Trading page should show the first Web3 cutover runway step.");
   assert(html.includes("real-cap blocked"), "Trading page should make the real-capital boundary visible in the launch checklist.");
   assert(html.includes("Actually left"), "Trading page should expose what is actually left for Web3 launch readiness.");
   assert(html.includes("actual remaining gates"), "Trading page should summarize the remaining launch gates.");

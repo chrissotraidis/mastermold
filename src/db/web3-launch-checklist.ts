@@ -46,6 +46,21 @@ export type Web3AutonomyLaunchRemainingWorkItem = {
   next_action: string;
 };
 
+export type Web3AutonomyCutoverRunwayStep = {
+  id:
+    | "profit-proof"
+    | "production-supervision"
+    | "wallet-provider-scope"
+    | "route-order-rehearsal"
+    | "manual-live-review";
+  label: string;
+  status: "done" | "active" | "blocked" | "review";
+  command: string | null;
+  evidence: string;
+  next_action: string;
+  blocks_live_capital: boolean;
+};
+
 export type Web3AutonomyLaunchChecklist = {
   mode: "web3-autonomy-launch-checklist";
   status: Web3AutonomyLaunchChecklistStatus;
@@ -60,6 +75,8 @@ export type Web3AutonomyLaunchChecklist = {
   hard_blocker_count: number;
   watch_count: number;
   hard_blockers: string[];
+  next_cutover_step: Web3AutonomyCutoverRunwayStep;
+  cutover_runway: Web3AutonomyCutoverRunwayStep[];
   production_supervisor_readiness: Web3ProductionSupervisorReadiness;
   profit_proof_readiness: Web3ProfitProofReadiness;
   provider_credentials_readiness: Web3ProviderCredentialsReadiness;
@@ -274,11 +291,22 @@ export function buildWeb3AutonomyLaunchChecklist(
     ? "blocked"
     : liveReviewPermitted
       ? "manual-live-review"
-      : promotedMemoryFail
-        ? "paper-memory-gated"
-        : !liveReadiness.can_trade_real_capital
-          ? paperScalePermitted ? "paper-scale-ready" : "live-gated"
-          : "paper-operational";
+        : promotedMemoryFail
+          ? "paper-memory-gated"
+          : !liveReadiness.can_trade_real_capital
+            ? paperScalePermitted ? "paper-scale-ready" : "live-gated"
+            : "paper-operational";
+  const cutoverRunway = buildCutoverRunway({
+    profitProof,
+    productionSupervisor,
+    providerCredentials,
+    walletAccounting,
+    routePass,
+    routeProofRefreshable,
+    adapterOrderReady: adapter.swap_v2_order_ready,
+    liveReviewPermitted,
+  });
+  const nextCutoverStep = cutoverRunway.find((step) => step.status !== "done") ?? cutoverRunway[cutoverRunway.length - 1];
 
   return {
     mode: "web3-autonomy-launch-checklist",
@@ -294,6 +322,8 @@ export function buildWeb3AutonomyLaunchChecklist(
     hard_blocker_count: hardBlockers.length,
     watch_count: watchCount,
     hard_blockers: hardBlockers,
+    next_cutover_step: nextCutoverStep,
+    cutover_runway: cutoverRunway,
     production_supervisor_readiness: productionSupervisor,
     profit_proof_readiness: profitProof,
     provider_credentials_readiness: providerCredentials,
@@ -306,6 +336,104 @@ export function buildWeb3AutonomyLaunchChecklist(
     items,
     remaining_work: remainingWork,
   };
+}
+
+function buildCutoverRunway({
+  profitProof,
+  productionSupervisor,
+  providerCredentials,
+  walletAccounting,
+  routePass,
+  routeProofRefreshable,
+  adapterOrderReady,
+  liveReviewPermitted,
+}: {
+  profitProof: Web3ProfitProofReadiness;
+  productionSupervisor: Web3ProductionSupervisorReadiness;
+  providerCredentials: Web3ProviderCredentialsReadiness;
+  walletAccounting: Web3TradingState["live_wallet_accounting_readiness"];
+  routePass: boolean;
+  routeProofRefreshable: boolean;
+  adapterOrderReady: boolean;
+  liveReviewPermitted: boolean;
+}): Web3AutonomyCutoverRunwayStep[] {
+  const profitStepStatus: Web3AutonomyCutoverRunwayStep["status"] = profitProof.can_satisfy_profit_gate
+    ? "done"
+    : profitProof.status === "blocked" || profitProof.status === "drawdown-gated"
+      ? "blocked"
+      : "active";
+  const supervisorStatus: Web3AutonomyCutoverRunwayStep["status"] = productionSupervisor.status === "production-gated"
+    ? "review"
+    : productionSupervisor.status === "blocked"
+      ? "blocked"
+      : "active";
+  const walletProviderReady = providerCredentials.can_satisfy_provider_gate && walletAccounting.can_trust_live_pnl;
+  const walletProviderStatus: Web3AutonomyCutoverRunwayStep["status"] = walletProviderReady
+    ? "done"
+    : providerCredentials.status === "blocked" || walletAccounting.status === "blocked"
+      ? "blocked"
+      : "active";
+  const routeOrderStatus: Web3AutonomyCutoverRunwayStep["status"] = routePass && adapterOrderReady
+    ? "done"
+    : routeProofRefreshable
+      ? "active"
+      : "blocked";
+
+  return [
+    {
+      id: "profit-proof",
+      label: "Prove paper edge",
+      status: profitStepStatus,
+      command: "npm run autopilot-paper:web3",
+      evidence: `${profitProof.promoted_run_count} promoted run${profitProof.promoted_run_count === 1 ? "" : "s"}, ${formatSignedCompactValue(profitProof.promoted_total_net_pnl_usd)} total, ${profitProof.promoted_target_hit_rate_pct.toFixed(0)}% target hits.`,
+      next_action: profitProof.next_action,
+      blocks_live_capital: !profitProof.can_satisfy_profit_gate,
+    },
+    {
+      id: "production-supervision",
+      label: "Supervise runner",
+      status: supervisorStatus,
+      command: "npm run supervise:web3",
+      evidence: `${productionSupervisor.status.replaceAll("-", " ")} supervisor, score ${productionSupervisor.readiness_score}/100.`,
+      next_action: productionSupervisor.next_action,
+      blocks_live_capital: true,
+    },
+    {
+      id: "wallet-provider-scope",
+      label: "Scope wallet/provider",
+      status: walletProviderStatus,
+      command: null,
+      evidence: `${providerCredentials.status.replaceAll("-", " ")} credentials; ${walletAccounting.status.replaceAll("-", " ")} wallet accounting.`,
+      next_action: walletProviderReady
+        ? "Keep credential and wallet evidence behind manual executor review."
+        : providerCredentials.can_satisfy_provider_gate
+          ? walletAccounting.next_action
+          : providerCredentials.next_action,
+      blocks_live_capital: !walletProviderReady,
+    },
+    {
+      id: "route-order-rehearsal",
+      label: "Rehearse order path",
+      status: routeOrderStatus,
+      command: "Order rehearsal",
+      evidence: `Route proof ${routePass ? "passes" : routeProofRefreshable ? "is refreshable" : "is blocked"}; Swap V2 order ${adapterOrderReady ? "ready" : "gated"}.`,
+      next_action: routePass && adapterOrderReady
+        ? "Keep rehearsing read-only quotes and dry-run orders before any live review."
+        : "Use the order rehearsal action to refresh read-only DEX route and dry-run order evidence.",
+      blocks_live_capital: !(routePass && adapterOrderReady),
+    },
+    {
+      id: "manual-live-review",
+      label: "Manual live review",
+      status: liveReviewPermitted ? "review" : "blocked",
+      command: null,
+      evidence: liveReviewPermitted ? "All launch gates cleared for external review." : "One or more launch gates still blocks real-capital review.",
+      next_action: liveReviewPermitted
+        ? "Move to separate live-executor review; the app still cannot self-enable real-capital trading."
+        : "Clear the earlier runway steps before requesting manual live-capital review.",
+      blocks_live_capital: true,
+    },
+  ];
 }
 
 function launchRemainingWorkRank(item: Web3AutonomyLaunchRemainingWorkItem) {

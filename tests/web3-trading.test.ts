@@ -5482,6 +5482,23 @@ describe("Web3 autonomous trading subsystem", () => {
       "profit-proof",
       "live-boundary",
     ]);
+    expect(launchChecklist.cutover_runway.map((step) => step.id)).toEqual([
+      "profit-proof",
+      "production-supervision",
+      "wallet-provider-scope",
+      "route-order-rehearsal",
+      "manual-live-review",
+    ]);
+    expect(launchChecklist.next_cutover_step).toMatchObject({
+      id: "profit-proof",
+      command: "npm run autopilot-paper:web3",
+      blocks_live_capital: true,
+    });
+    expect(launchChecklist.cutover_runway.every((step) => step.next_action.length > 0 && step.evidence.length > 0)).toBe(true);
+    expect(launchChecklist.cutover_runway.find((step) => step.id === "manual-live-review")).toMatchObject({
+      status: "blocked",
+      blocks_live_capital: true,
+    });
     expect(launchChecklist.production_supervisor_readiness).toMatchObject({
       mode: "web3-production-supervisor-readiness",
       status: "missing",
@@ -5553,6 +5570,10 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "watch",
       blocker: "Move this to external production-worker review with process manager, restart policy, alerts, and secret scope documented.",
     });
+    expect(supervisedChecklist.cutover_runway.find((step) => step.id === "production-supervision")).toMatchObject({
+      status: "review",
+      command: "npm run supervise:web3",
+    });
     const repeatProfitChecklist = buildWeb3AutonomyLaunchChecklist(state, {
       status: "target-hit",
       updated_at: new Date().toISOString(),
@@ -5589,6 +5610,9 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(repeatProfitChecklist.items.find((item) => item.id === "profit-proof")).toMatchObject({
       status: "pass",
+    });
+    expect(repeatProfitChecklist.cutover_runway.find((step) => step.id === "profit-proof")).toMatchObject({
+      status: "done",
     });
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);

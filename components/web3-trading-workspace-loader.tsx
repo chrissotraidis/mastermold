@@ -7058,6 +7058,8 @@ function QuickLaunchChecklistPanel({
   const tone = launchChecklistTone(checklist.status);
   const topItems = checklist.items.slice(0, 6);
   const remainingWork = checklist.remaining_work.slice(0, 4);
+  const runway = checklist.cutover_runway;
+  const nextStep = checklist.next_cutover_step;
 
   return (
     <section className="rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:p-3" aria-label="Web3 autonomy launch checklist">
@@ -7095,6 +7097,34 @@ function QuickLaunchChecklistPanel({
             <Activity className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {busy === "order-rehearsal" ? "Rehearsing" : "Order rehearsal"}
           </button>
+        </div>
+      </div>
+
+      <div className="mt-2 rounded-md border border-outline-variant/20 bg-surface-dim/15 p-2" aria-label="Web3 cutover runway">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Cutover runway</p>
+            <p className="mt-1 truncate text-xs font-semibold text-on-surface">
+              Next: {nextStep.label} - {nextStep.next_action}
+            </p>
+          </div>
+          <Chip tone={cutoverRunwayTone(nextStep.status)}>{nextStep.status}</Chip>
+        </div>
+        <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-5">
+          {runway.map((step, index) => (
+            <div key={step.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">
+                  {index + 1}. {step.label}
+                </p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", cutoverRunwayDotClass(step.status))} />
+              </div>
+              <p className={cn("mt-1 truncate text-xs font-semibold", cutoverRunwayTextClass(step.status))}>
+                {step.status}{step.command ? ` - ${step.command}` : ""}
+              </p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-outline">{step.evidence}</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -7148,7 +7178,7 @@ function QuickLaunchChecklistPanel({
         Dry-run signer and order rehearsal only scope public-key rehearsal, simulated signer metadata, live DEX route/order evidence, caps, slippage, and kill-switch review; they cannot store keys, sign, submit, custody funds, or enable real-capital trades.
       </p>
       <span className="sr-only" aria-label="Web3 launch checklist receipt">
-        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
       </span>
     </section>
   );
@@ -7890,6 +7920,27 @@ function launchChecklistItemDotClass(status: Web3AutonomyLaunchChecklist["items"
 function launchChecklistItemTextClass(status: Web3AutonomyLaunchChecklist["items"][number]["status"]) {
   if (status === "pass") return "text-engine";
   if (status === "watch") return "text-caution";
+  return "text-critical";
+}
+
+function cutoverRunwayTone(status: Web3AutonomyLaunchChecklist["cutover_runway"][number]["status"]): QuickChipTone {
+  if (status === "done") return "engine";
+  if (status === "review") return "critical";
+  if (status === "active") return "caution";
+  return "critical";
+}
+
+function cutoverRunwayDotClass(status: Web3AutonomyLaunchChecklist["cutover_runway"][number]["status"]) {
+  if (status === "done") return "bg-engine";
+  if (status === "review") return "bg-critical";
+  if (status === "active") return "bg-caution";
+  return "bg-critical";
+}
+
+function cutoverRunwayTextClass(status: Web3AutonomyLaunchChecklist["cutover_runway"][number]["status"]) {
+  if (status === "done") return "text-engine";
+  if (status === "review") return "text-critical";
+  if (status === "active") return "text-caution";
   return "text-critical";
 }
 
