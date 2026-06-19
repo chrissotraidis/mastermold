@@ -780,6 +780,7 @@ describe("mobile ergonomics source contracts", () => {
 
   test("GIVEN Settings connection cards render WHEN source copy is checked THEN import is explicit and read-only", () => {
     const settingsPage = source("app/settings/integrations/page.tsx");
+    const tradingPage = source("app/trading/page.tsx");
     const settingsConsole = source("components/settings-web3-credential-console.tsx");
     const input = source("components/integration-key-input.tsx");
     const integrations = source("src/db/integrations.ts");
@@ -825,6 +826,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Supervised live runway");
     expect(settingsPage).toContain("Next supervised-live action");
     expect(settingsPage).toContain("supervised-external-wallet-first");
+    expect(tradingPage).toContain("buildWeb3SupervisedLiveRunway");
+    expect(tradingPage).toContain("SupervisedLiveRunwayPanel");
+    expect(tradingPage).toContain("Supervised live runway");
+    expect(tradingPage).toContain("Open setup");
+    expect(tradingPage).toContain("Live execution, transaction submission, and wallet mutation stay blocked inside Mastermind.");
+    expect(tradingPage).toContain("Launch model: {runway.launch_model}");
+    expect(tradingPage).toContain("signing remains external-wallet-prompt-only");
     expect(settingsPage).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(settingsPage).toContain("buildWeb3DedicatedWalletPacket");
     expect(settingsPage).toContain("SettingsDedicatedWalletPacketPanel");
