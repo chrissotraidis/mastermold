@@ -17,6 +17,9 @@ import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/int
 import { getPortfolio } from "@/src/db/portfolio";
 import { buildWeb3AccountAcquisitionReceipt, type Web3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
 import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
+import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
+import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
 
 const statusLabels: Record<IntegrationStatusJson["status"], string> = {
@@ -43,6 +46,11 @@ export default async function IntegrationsSettingsPage() {
   const brainState = toPublicBrainState(brainStateRaw);
   const web3AccountReceipt = buildWeb3AccountSetupReceipt(web3State);
   const web3AcquisitionReceipt = buildWeb3AccountAcquisitionReceipt(web3State);
+  const web3LaunchChecklist = buildWeb3AutonomyLaunchChecklist(
+    web3State,
+    getWeb3PromotedPaperAutopilotHealth(),
+    getWeb3DaemonSupervisorHealth(),
+  );
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -59,7 +67,12 @@ export default async function IntegrationsSettingsPage() {
         </div>
 
         <div className="mb-8">
-          <Web3CredentialsRunwayCard receipt={web3AccountReceipt} acquisition={web3AcquisitionReceipt} state={web3State} />
+          <Web3CredentialsRunwayCard
+            receipt={web3AccountReceipt}
+            acquisition={web3AcquisitionReceipt}
+            launchChecklist={web3LaunchChecklist}
+            state={web3State}
+          />
         </div>
 
         <div className="mb-8">
@@ -98,10 +111,12 @@ export default async function IntegrationsSettingsPage() {
 function Web3CredentialsRunwayCard({
   receipt,
   acquisition,
+  launchChecklist,
   state,
 }: {
   receipt: Web3AccountSetupReceipt;
   acquisition: Web3AccountAcquisitionReceipt;
+  launchChecklist: Web3AutonomyLaunchChecklist;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
   const requiredConfigured = receipt.environment_summary.required_configured_count;
@@ -175,6 +190,8 @@ function Web3CredentialsRunwayCard({
           <p className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-sm leading-6 text-on-surface-variant">
             {receipt.summary} {receipt.next_action}
           </p>
+
+          <SettingsLaunchBlockerQueue checklist={launchChecklist} />
 
           <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Web3 external account setup packet">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -357,6 +374,78 @@ function ConnectionChecks({ integrations }: { integrations: SettingsIntegrationS
         ))}
       </div>
     </section>
+  );
+}
+
+function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaunchChecklist }) {
+  const nextStep = checklist.next_cutover_step;
+  const remaining = checklist.remaining_work.slice(0, 6);
+  return (
+    <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Settings Web3 launch blocker queue">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Launch blocker queue</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {checklist.status.replaceAll("-", " ")} · {checklist.readiness_score}/100
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">
+            {checklist.remaining_work_count} gates remain; next cutover step is {nextStep.label.toLowerCase()}.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={checklist.hard_blocker_count > 0 ? "fail" : checklist.watch_count > 0 ? "watch" : "pass"} label={`${checklist.hard_blocker_count} hard`} />
+          <LaunchQueueBadge status={checklist.live_review_permitted ? "watch" : "fail"} label={checklist.live_review_permitted ? "manual review" : "live blocked"} />
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {remaining.length > 0 ? remaining.map((item) => (
+          <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-outline">{item.detail}</p>
+              </div>
+              <LaunchQueueBadge status={item.status} label={item.priority} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+          </div>
+        )) : (
+          <p className="rounded-md border border-engine/25 bg-engine/[0.04] p-2 text-xs leading-5 text-on-surface-variant">
+            No launch blockers remain in the current local checklist; manual live review is still external to this app.
+          </p>
+        )}
+      </div>
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Next cutover step</p>
+        <p className="mt-1 text-xs font-semibold text-on-surface">{nextStep.label} · {nextStep.status}</p>
+        <p className="mt-1 text-[11px] leading-4 text-outline">{nextStep.next_action}</p>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Settings shows this queue for planning only; the app still blocks live execution, wallet mutation, private-key storage, and transaction submission.
+      </p>
+    </div>
+  );
+}
+
+function LaunchQueueBadge({
+  status,
+  label,
+}: {
+  status: "pass" | "watch" | "fail";
+  label: string;
+}) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "shrink-0 border text-xs",
+        status === "pass" && "border-engine/35 bg-engine/10 text-engine",
+        status === "watch" && "border-caution/40 bg-caution/10 text-caution",
+        status === "fail" && "border-critical/35 bg-critical/10 text-critical",
+      )}
+    >
+      {label}
+    </Badge>
   );
 }
 

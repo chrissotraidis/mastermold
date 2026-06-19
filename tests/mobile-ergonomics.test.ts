@@ -788,6 +788,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("signature evidence: hash-only");
     expect(settingsPage).toContain("signer secrets: never stored here");
     expect(settingsPage).toContain("private keys and seed phrases stay out of the app");
+    expect(settingsPage).toContain("SettingsLaunchBlockerQueue");
+    expect(settingsPage).toContain("Launch blocker queue");
+    expect(settingsPage).toContain("Next cutover step");
+    expect(settingsPage).toContain("Settings shows this queue for planning only");
+    expect(settingsPage).toContain("buildWeb3AutonomyLaunchChecklist");
+    expect(settingsPage).toContain("getWeb3DaemonSupervisorHealth");
+    expect(settingsPage).toContain("getWeb3PromotedPaperAutopilotHealth");
     expect(settingsPage).toContain("Credential checklist");
     expect(settingsPage).toContain("Ignored env template");
     expect(settingsPage).toContain("Web3 credential environment template");
@@ -852,6 +859,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("POST /api/web3-wallet-ownership");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dex-discovery");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-capital-preflight");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("launch-blocker queue");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("hard blockers, review gates, and the next cutover step");
     expect(source("README.md")).toContain("/api/web3-dex-discovery?source=live-dex");
     expect(source("README.md")).toContain("/api/web3-live-capital-preflight?source=live-dex");
     expect(source("README.md")).toContain("/api/web3-wallet-ownership");
@@ -888,6 +897,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("browser Solana wallet only far enough to read the public address");
     expect(source("components/review-readiness.tsx")).toContain("text-only wallet ownership proof");
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
+    expect(source("components/review-readiness.tsx")).toContain("hard blockers, review gates, and the next cutover step");
     expect(source("components/review-readiness.tsx")).toContain("compact DEX discovery receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings now shows a strict verifier runway");
     expect(source("components/review-readiness.tsx")).toContain("configured Helius/Solana provider-health proof");
