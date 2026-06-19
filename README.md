@@ -106,6 +106,8 @@ for local/paper monitoring and rehearsal only; live signing, transaction submiss
 fund custody remain credential-gated future work. The market monitor command calls live DEX
 discovery plus auto-resolved GeckoTerminal OHLCV, writes a local candle-proof receipt back
 to the cockpit, and keeps signing, submission, live execution, and wallet mutation blocked.
+When the public candle provider is throttled, it returns an observed/degraded receipt and
+keeps fresh paper buys blocked instead of crashing or loosening execution gates.
 The forward run resets the local paper
 ledger, runs bounded daemon ticks, compares start/end wallet equity, and reports whether
 the paper loop met the requested net-PnL target. The forward suite repeats that proof across
@@ -148,11 +150,18 @@ with `--wallet=<public-solana-address>` or `WEB3_VERIFY_WALLET_PUBLIC_KEY` to fa
 until the sample all-ones wallet has been replaced by a dedicated public trading wallet.
 Add `--require-dex-live` to fail closed until the live DEX scanner returns current live
 candidate and pair evidence with no failed discovery sources while execution, transaction
-submission, wallet mutation, private-key storage, and secret echo remain blocked.
+submission, wallet mutation, private-key storage, and secret echo remain blocked; if public
+discovery is temporarily throttled, the strict gate can fall back to auto-resolved
+GeckoTerminal OHLCV proof or a recent recorded live-dex candle proof for a Solana pool while
+preserving the same live locks.
 `/api/web3-dex-discovery?source=live-dex` is the compact read-only scanner receipt for
 current public DEX Screener discovery evidence: profiles, boosts, ads, paid orders, pair
 mapping, top symbols, and scanner intake status. It is paper-only evidence and still blocks
 live execution, transaction submission, wallet mutation, private-key storage, and secret echo.
+`/api/web3-ohlcv?auto=true&source=live-dex` is the read-only candle-proof fallback for a
+chartable Solana pool. It returns GeckoTerminal candle data, local signal/noise and paper
+sizing evidence, and explicit live-execution/wallet-mutation/transaction-submission/private-key
+blocks; it does not sign, submit, custody funds, or store wallet authority.
 `/api/web3-live-capital-preflight?source=live-dex` is the compact go/no-go receipt for
 the researched real-capital path: operator wallet, provider rail, live DEX scanner,
 Jupiter order rehearsal, risk caps, kill switch, signer/custody, settlement, profit proof,

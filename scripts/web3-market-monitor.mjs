@@ -44,22 +44,67 @@ export async function runWeb3MarketMonitor(input) {
     cycles: input.cycles,
   })}`);
 
-  const ohlcv = await requestJson(input.baseUrl, `/api/web3-ohlcv?${query({
-    auto: "true",
-    scenario: input.scenario,
-    source: input.source,
-    account: input.account,
-    cycles: input.cycles,
-    timeframe: input.timeframe,
-    aggregate: input.aggregate,
-    limit: input.limit,
-    token: "base",
-    paper: "true",
-    cash_usd: input.cashUsd,
-    position_usd: input.positionUsd,
-    equity_usd: input.equityUsd,
-    max_trade_usd: input.maxTradeUsd,
-  })}`);
+  let ohlcv = null;
+  let ohlcvError = "";
+  try {
+    ohlcv = await requestJson(input.baseUrl, `/api/web3-ohlcv?${query({
+      auto: "true",
+      scenario: input.scenario,
+      source: input.source,
+      account: input.account,
+      cycles: input.cycles,
+      timeframe: input.timeframe,
+      aggregate: input.aggregate,
+      limit: input.limit,
+      token: "base",
+      paper: "true",
+      cash_usd: input.cashUsd,
+      position_usd: input.positionUsd,
+      equity_usd: input.equityUsd,
+      max_trade_usd: input.maxTradeUsd,
+    })}`);
+  } catch (error) {
+    ohlcvError = error instanceof Error ? error.message : "GeckoTerminal candle proof is unavailable.";
+  }
+
+  if (!ohlcv) {
+    return {
+      mode: "web3-market-monitor",
+      status: "observed",
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      base_url: input.baseUrl,
+      scenario: input.scenario,
+      source: input.source,
+      account: input.account,
+      discovery_status: discovery.status,
+      scanner_status: discovery.source_summary?.scanner_status ?? "unknown",
+      selected_symbol: discovery.source_summary?.top_symbols?.[0] ?? "UNKNOWN",
+      selected_pair: null,
+      selected_attempt_count: 0,
+      candle_count: 0,
+      candle_action: "unavailable",
+      candle_confidence: 0,
+      paper_action: "paper-block",
+      paper_notional_usd: 0,
+      recorded_candle_status: "not-recorded",
+      recorded_candle_symbol: null,
+      recorded_conviction_status: "not-recorded",
+      provider_degraded: true,
+      provider_error: ohlcvError,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      secret_echo_permission: "blocked",
+      summary: `DEX discovery ${discovery.status}; candle proof unavailable from GeckoTerminal.`,
+      next_action: "Retry the monitor after the public candle provider rate limit clears; keep fresh paper buys blocked until candle proof records.",
+      controls: [
+        "Uses only public DEX discovery and GeckoTerminal OHLCV reads.",
+        "When candle proof is unavailable, records an observed/degraded receipt instead of enabling trading.",
+        "Does not request private keys, signatures, transaction bodies, live execution, or wallet mutation.",
+      ],
+    };
+  }
 
   const symbol = ohlcv.resolution?.symbol ?? "UNKNOWN";
   const lastPrice = ohlcv.candles?.at(-1)?.close ?? 0;

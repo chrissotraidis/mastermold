@@ -93,6 +93,12 @@ type OhlcvResponse = {
   candles: NormalizedOhlcvCandle[];
   signal: OhlcvCandleSignal;
   paper_decision: OhlcvPaperDecision;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  private_key_storage: "blocked";
+  secret_echo_permission: "blocked";
+  controls: string[];
 };
 
 const GECKOTERMINAL_BASE_URL = "https://api.geckoterminal.com/api/v2";
@@ -173,6 +179,16 @@ export async function GET(request: Request): Promise<NextResponse<OhlcvResponse 
         candles,
         signal,
         paper_decision: buildOhlcvPaperDecision(signal, paper, lastPrice),
+        live_execution_permission: "blocked",
+        wallet_mutation_permission: "blocked",
+        transaction_submission_permission: "blocked",
+        private_key_storage: "blocked",
+        secret_echo_permission: "blocked",
+        controls: [
+          "Reads public GeckoTerminal OHLCV candles only.",
+          "Builds local candle signal and paper sizing evidence only.",
+          "Does not request signatures, transaction bodies, private keys, live execution, or wallet mutation.",
+        ],
       });
     } catch (error) {
       lastFailure = error instanceof Error ? error.message : "GeckoTerminal OHLCV request failed.";

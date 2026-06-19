@@ -1028,6 +1028,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-market-monitor.mjs")).toContain("mode: \"web3-market-monitor\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("transaction_submission_permission: \"blocked\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("secret_echo_permission: \"blocked\"");
+    expect(source("scripts/web3-market-monitor.mjs")).toContain("provider_degraded");
+    expect(source("components/review-readiness.tsx")).toContain("observed/degraded receipt");
     expect(source("package.json")).toContain("\"verify:web3\": \"node scripts/web3-readiness-verify.mjs\"");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(source("docs/web3-credentials-runbook.md")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
@@ -1104,6 +1106,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-dex-discovery.ts")).toContain("token-pair backfill is budgeted separately as 300 requests/minute");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyProviderHealthReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyWalletOwnershipReceipt");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("recorded candle fallback");
+    expect(source("app/api/web3-ohlcv/route.ts")).toContain("live_execution_permission: \"blocked\"");
+    expect(source("README.md")).toContain("auto-resolved GeckoTerminal OHLCV proof");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("auto-resolved GeckoTerminal OHLCV proof");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-provider-health?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-wallet-ownership");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyOperatorWalletScope");
@@ -1137,6 +1145,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-operator-wallet gate");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-jupiter-order gate");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-dex-live gate");
+    expect(source("components/review-readiness.tsx")).toContain("fresh recorded live-dex candle proof");
     expect(source("components/review-readiness.tsx")).toContain("production-worker target setup");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-credential-handoff");
     expect(settingsPage).toContain("Open Web3 wiring");

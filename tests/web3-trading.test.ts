@@ -12276,7 +12276,12 @@ describe("Web3 autonomous trading subsystem", () => {
       };
       signal: { mode: string; action: string; confidence: number };
       paper_decision: { action: string; side: string; safeguards: string[] };
-      live_execution_permission?: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
     }>(response);
 
     expect(response.status).toBe(200);
@@ -12295,6 +12300,12 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(body.signal.confidence).toBeGreaterThanOrEqual(0);
     expect(["paper-buy", "paper-sell", "paper-hold", "paper-block"]).toContain(body.paper_decision.action);
     expect(body.paper_decision.safeguards).toContain("no transaction broadcast");
+    expect(body.live_execution_permission).toBe("blocked");
+    expect(body.wallet_mutation_permission).toBe("blocked");
+    expect(body.transaction_submission_permission).toBe("blocked");
+    expect(body.private_key_storage).toBe("blocked");
+    expect(body.secret_echo_permission).toBe("blocked");
+    expect(body.controls).toContain("Reads public GeckoTerminal OHLCV candles only.");
   });
 
   test("GET /api/web3-ohlcv auto mode skips unavailable scanner pools", async () => {

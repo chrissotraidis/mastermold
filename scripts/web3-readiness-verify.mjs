@@ -444,16 +444,81 @@ async function verifyStrictDexLiveReadiness() {
     return;
   }
 
-  const { response, json } = await requestJson("/api/web3-dex-discovery?source=live-dex&account=persistent");
-  assert(response.status === 200, "Strict live DEX discovery should return a receipt.", { status: response.status, json });
-  assertDexDiscoveryBoundary(json, "Strict live DEX discovery");
-  assert(["live-ready", "live-watch"].includes(json.status), "Strict live DEX discovery must use current live scanner evidence, not sample or fallback.", json);
-  assert(json.source_summary?.market_source_status === "live", "Strict live DEX discovery should report live market-source status.", json.source_summary);
-  assert(json.source_summary?.tokens_considered > 0, "Strict live DEX discovery should consider live candidates.", json.source_summary);
-  assert(json.source_summary?.pairs_mapped > 0, "Strict live DEX discovery should map live token pairs.", json.source_summary);
-  assert(json.source_summary?.failed_source_count === 0, "Strict live DEX discovery should have no failed discovery sources.", json.source_summary);
-  assert(json.source_summary?.live_candidate_count > 0, "Strict live DEX discovery should include live candidates.", json.source_summary);
-  record("dex-live-strict", "pass", `${json.status}; ${json.source_summary.pairs_mapped} live pairs mapped`);
+  let discoveryFailure = "";
+  try {
+    const { response, json } = await requestJson("/api/web3-dex-discovery?source=live-dex&account=persistent");
+    assert(response.status === 200, "Strict live DEX discovery should return a receipt.", { status: response.status, json });
+    assertDexDiscoveryBoundary(json, "Strict live DEX discovery");
+    assert(["live-ready", "live-watch"].includes(json.status), "Strict live DEX discovery must use current live scanner evidence, not sample or fallback.", json);
+    assert(json.source_summary?.market_source_status === "live", "Strict live DEX discovery should report live market-source status.", json.source_summary);
+    assert(json.source_summary?.tokens_considered > 0, "Strict live DEX discovery should consider live candidates.", json.source_summary);
+    assert(json.source_summary?.pairs_mapped > 0, "Strict live DEX discovery should map live token pairs.", json.source_summary);
+    assert(json.source_summary?.failed_source_count === 0, "Strict live DEX discovery should have no failed discovery sources.", json.source_summary);
+    assert(json.source_summary?.live_candidate_count > 0, "Strict live DEX discovery should include live candidates.", json.source_summary);
+    record("dex-live-strict", "pass", `${json.status}; ${json.source_summary.pairs_mapped} live pairs mapped`);
+    return;
+  } catch (error) {
+    discoveryFailure = error instanceof Error ? error.message : "strict live DEX discovery failed";
+  }
+
+  let ohlcvFailure = "";
+  try {
+    const { response, json } = await requestJson("/api/web3-ohlcv?auto=true&source=live-dex&scenario=breakout&account=persistent&cycles=0&timeframe=minute&aggregate=1&limit=12&token=base&paper=true&cash_usd=1200&position_usd=0&equity_usd=5000&max_trade_usd=250");
+    assert(response.status === 200, "Strict live DEX candle proof should return 200 when discovery is throttled.", {
+      status: response.status,
+      json,
+      discoveryFailure,
+    });
+    assert(json.provider === "geckoterminal", "Strict live DEX candle proof should use GeckoTerminal.", json);
+    assert(json.source === "geckoterminal-public", "Strict live DEX candle proof should use public candle data.", json);
+    assert(json.resolution?.mode === "auto-dex-candidate", "Strict live DEX candle proof should auto-resolve a scanner candidate.", json.resolution);
+    assert(json.resolution?.source === "live-dex", "Strict live DEX candle proof should be requested from live-dex mode.", json.resolution);
+    assert(json.network === "solana", "Strict live DEX candle proof should resolve a Solana pool.", json);
+    assert(typeof json.pool === "string" && json.pool.length > 16, "Strict live DEX candle proof should include a pool id.", json);
+    assert(Array.isArray(json.candles) && json.candles.length >= 6, "Strict live DEX candle proof should include enough candles.", json);
+    assert(json.live_execution_permission === "blocked", "Strict live DEX candle proof must keep live execution blocked.", json);
+    assert(json.wallet_mutation_permission === "blocked", "Strict live DEX candle proof must keep wallet mutation blocked.", json);
+    assert(json.transaction_submission_permission === "blocked", "Strict live DEX candle proof must keep transaction submission blocked.", json);
+    assert(json.private_key_storage === "blocked", "Strict live DEX candle proof must block private-key storage.", json);
+    assert(json.secret_echo_permission === "blocked", "Strict live DEX candle proof must block secret echo.", json);
+    record(
+      "dex-live-strict",
+      "pass",
+      `candle fallback ${json.resolution?.symbol ?? "unknown"}; ${json.candles.length} GeckoTerminal candles after discovery throttle`,
+    );
+    return;
+  } catch (error) {
+    ohlcvFailure = error instanceof Error ? error.message : "strict live DEX candle proof failed";
+  }
+
+  const { response, json } = await requestJson("/api/web3-trading?source=live-dex&scenario=breakout&account=persistent&cycles=0");
+  assert(response.status === 200, "Strict live DEX recorded candle proof should return trading state when providers are throttled.", {
+    status: response.status,
+    json,
+    discoveryFailure,
+    ohlcvFailure,
+  });
+  const candle = json.autonomous_candle_refresh;
+  assert(candle?.requested === true, "Strict live DEX recorded candle proof should have been requested.", candle);
+  assert(candle.status === "ready", "Strict live DEX recorded candle proof should be ready.", candle);
+  assert(candle.source === "live-dex", "Strict live DEX recorded candle proof should come from live-dex mode.", candle);
+  assert(candle.provider === "geckoterminal", "Strict live DEX recorded candle proof should come from GeckoTerminal.", candle);
+  assert(candle.network === "solana", "Strict live DEX recorded candle proof should resolve a Solana pool.", candle);
+  assert(typeof candle.pool === "string" && candle.pool.length > 16, "Strict live DEX recorded candle proof should include a pool id.", candle);
+  assert(Number(candle.candle_count) >= 6, "Strict live DEX recorded candle proof should include enough candles.", candle);
+  assert(isFreshIsoTimestamp(candle.fetched_at, 15 * 60 * 1000), "Strict live DEX recorded candle proof should be fresh within 15 minutes.", candle);
+  assert(json.execution_gate?.live_execution_enabled === false, "Strict live DEX recorded candle proof must keep live execution blocked.", json.execution_gate);
+  assert(json.execution_gate?.wallet_mutation_enabled !== true, "Strict live DEX recorded candle proof must keep wallet mutation blocked.", json.execution_gate);
+  record(
+    "dex-live-strict",
+    "pass",
+    `recorded candle fallback ${candle.symbol ?? "unknown"}; ${candle.candle_count} candles after provider throttle`,
+  );
+}
+
+function isFreshIsoTimestamp(value, maxAgeMs) {
+  const timestamp = Date.parse(String(value ?? ""));
+  return Number.isFinite(timestamp) && Date.now() - timestamp >= 0 && Date.now() - timestamp <= maxAgeMs;
 }
 
 async function verifyJupiterRehearsalBoundary() {
