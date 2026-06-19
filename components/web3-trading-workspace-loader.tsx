@@ -6915,6 +6915,11 @@ function QuickPromotedAutopilotPanel({
   const netPnl = health?.net_pnl_usd ?? 0;
   const postedTicks = health?.posted_ticks ?? 0;
   const blockedTicks = health?.blocked_ticks ?? 0;
+  const recentRuns = health?.recent_runs ?? [];
+  const runCount = health?.run_count ?? 0;
+  const totalPnl = health?.total_net_pnl_usd ?? 0;
+  const averagePnl = health?.average_net_pnl_usd ?? 0;
+  const hitRate = health?.target_hit_rate_pct ?? 0;
 
   return (
     <section className="rounded-md border border-outline-variant/30 bg-surface-dim/15 p-2 sm:p-3" aria-label="Promoted paper autopilot health">
@@ -6943,10 +6948,70 @@ function QuickPromotedAutopilotPanel({
         <ProfitMetric label="Updated" value={updatedAt} detail="local health receipt" tone={status === "absent" ? "neutral" : "engine"} />
         <ProfitMetric label="Wallet" value={health?.wallet_mutation_permission ?? "blocked"} detail="mutation permission" tone="demo" />
       </div>
+      <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.7fr)]" aria-label="Promoted paper autopilot run history">
+        <PromotedAutopilotHistoryChart runs={recentRuns} />
+        <div className="grid grid-cols-2 gap-1">
+          <ProfitMetric label="Run count" value={runCount.toString()} detail={`${recentRuns.length} shown`} tone={runCount > 0 ? "engine" : "neutral"} />
+          <ProfitMetric label="Total PnL" value={formatCompactSignedCurrency(totalPnl)} detail="promoted runs" tone={totalPnl > 0 ? "engine" : totalPnl < 0 ? "critical" : "neutral"} />
+          <ProfitMetric label="Avg run" value={formatCompactSignedCurrency(averagePnl)} detail="paper PnL" tone={averagePnl > 0 ? "engine" : averagePnl < 0 ? "critical" : "neutral"} />
+          <ProfitMetric label="Hit rate" value={`${hitRate.toFixed(0)}%`} detail="paper target" tone={hitRate >= 80 ? "engine" : hitRate > 0 ? "caution" : "neutral"} />
+        </div>
+      </div>
       <span className="sr-only" aria-label="Promoted paper autopilot health receipt">
-        Promoted paper autopilot status {status}; runner {runner}; promotion permission {health?.promotion_permission ?? "missing"}; supervisor {health?.supervisor_status ?? "not-run"}; net PnL {formatSignedCurrency(netPnl)}; posted ticks {postedTicks}; blocked ticks {blockedTicks}; target hit {health?.profit_target_hit ? "yes" : "no"}; loss brake {health?.loss_brake_tripped ? "tripped" : "clear"}; live execution {health?.live_execution_permission ?? "blocked"}; wallet mutation {health?.wallet_mutation_permission ?? "blocked"}.
+        Promoted paper autopilot status {status}; runner {runner}; promotion permission {health?.promotion_permission ?? "missing"}; supervisor {health?.supervisor_status ?? "not-run"}; net PnL {formatSignedCurrency(netPnl)}; posted ticks {postedTicks}; blocked ticks {blockedTicks}; run count {runCount}; total PnL {formatSignedCurrency(totalPnl)}; average run {formatSignedCurrency(averagePnl)}; target hit rate {hitRate} percent; target hit {health?.profit_target_hit ? "yes" : "no"}; loss brake {health?.loss_brake_tripped ? "tripped" : "clear"}; live execution {health?.live_execution_permission ?? "blocked"}; wallet mutation {health?.wallet_mutation_permission ?? "blocked"}.
       </span>
     </section>
+  );
+}
+
+function PromotedAutopilotHistoryChart({
+  runs,
+}: {
+  runs: Web3PromotedPaperAutopilotHealth["recent_runs"];
+}) {
+  const width = 520;
+  const height = 112;
+  const points = runs.length > 0 ? runs : [];
+  const cumulative = points.reduce<number[]>((acc, run) => {
+    const previous = acc[acc.length - 1] ?? 0;
+    acc.push(Math.round((previous + run.net_pnl_usd) * 100) / 100);
+    return acc;
+  }, []);
+  const min = Math.min(0, ...cumulative);
+  const max = Math.max(1, ...cumulative);
+  const range = Math.max(1, max - min);
+  const chartPoints = cumulative.map((value, index) => {
+    const x = points.length <= 1 ? 36 : 36 + (index / (points.length - 1)) * 430;
+    const y = 78 - ((value - min) / range) * 48;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const latest = cumulative[cumulative.length - 1] ?? 0;
+
+  return (
+    <div className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2" aria-label="Promoted paper autopilot PnL history chart">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">Promoted run memory</p>
+        <Chip tone={latest > 0 ? "engine" : latest < 0 ? "critical" : "neutral"}>{formatCompactSignedCurrency(latest)}</Chip>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Promoted paper autopilot cumulative PnL history" className="mt-2 h-28 w-full">
+        <rect x="0" y="0" width={width} height={height} rx="8" className="fill-surface-dim" opacity="0.16" />
+        <line x1="36" x2="466" y1="78" y2="78" className="stroke-outline" strokeWidth="1" opacity="0.22" />
+        {chartPoints ? (
+          <polyline points={chartPoints} fill="none" className={latest >= 0 ? "stroke-engine" : "stroke-critical"} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        ) : (
+          <text x="36" y="60" className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">No promoted paper run history yet</text>
+        )}
+        {cumulative.map((value, index) => {
+          const x = points.length <= 1 ? 36 : 36 + (index / (points.length - 1)) * 430;
+          const y = 78 - ((value - min) / range) * 48;
+          return (
+            <circle key={`${points[index]?.finished_at ?? index}-${index}`} cx={x} cy={y} r="4" className={points[index]?.profit_target_hit ? "fill-engine" : "fill-caution"} opacity="0.9" />
+          );
+        })}
+        <text x="36" y="98" className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">{points.length} promoted runs · paper-only memory</text>
+        <text x="390" y="98" className="fill-outline font-mono text-[9px] uppercase tracking-telemetry">latest {formatCompactSignedCurrency(latest)}</text>
+      </svg>
+    </div>
   );
 }
 

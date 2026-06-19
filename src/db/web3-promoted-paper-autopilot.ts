@@ -49,8 +49,24 @@ export type Web3PromotedPaperAutopilotHealth = {
   blocked_ticks: number;
   profit_target_hit: boolean;
   loss_brake_tripped: boolean;
+  run_count: number;
+  total_net_pnl_usd: number;
+  average_net_pnl_usd: number;
+  target_hit_rate_pct: number;
+  recent_runs: Web3PromotedPaperAutopilotHistoryEntry[];
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
+};
+
+export type Web3PromotedPaperAutopilotHistoryEntry = {
+  finished_at: string;
+  status: Exclude<Web3PromotedPaperAutopilotStatus, "absent">;
+  promotion_permission: string;
+  supervisor_status: string;
+  net_pnl_usd: number;
+  posted_ticks: number;
+  blocked_ticks: number;
+  profit_target_hit: boolean;
 };
 
 const STATUSES: Web3PromotedPaperAutopilotReceipt["status"][] = [
@@ -69,6 +85,10 @@ export function web3PromotedPaperAutopilotReceiptPath() {
   return process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH || join(process.cwd(), "data", "web3-promoted-paper-autopilot.json");
 }
 
+export function web3PromotedPaperAutopilotHistoryPath() {
+  return process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH || join(process.cwd(), "data", "web3-promoted-paper-autopilot-history.json");
+}
+
 export function getWeb3PromotedPaperAutopilotReceipt(path = web3PromotedPaperAutopilotReceiptPath()): Web3PromotedPaperAutopilotReceipt | null {
   try {
     if (!existsSync(path)) return null;
@@ -83,11 +103,28 @@ export function writeWeb3PromotedPaperAutopilotReceipt(value: unknown, path = we
   if (!receipt) return null;
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(receipt, null, 2)}\n`);
+  appendWeb3PromotedPaperAutopilotHistory(receipt);
   return receipt;
+}
+
+export function getWeb3PromotedPaperAutopilotHistory(path = web3PromotedPaperAutopilotHistoryPath()): Web3PromotedPaperAutopilotHistoryEntry[] {
+  try {
+    if (!existsSync(path)) return [];
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    if (!Array.isArray(parsed)) return [];
+    return sanitizeHistory(parsed);
+  } catch {
+    return [];
+  }
 }
 
 export function getWeb3PromotedPaperAutopilotHealth(path = web3PromotedPaperAutopilotReceiptPath()): Web3PromotedPaperAutopilotHealth {
   const receipt = getWeb3PromotedPaperAutopilotReceipt(path);
+  const history = getWeb3PromotedPaperAutopilotHistory();
+  const runCount = history.length;
+  const totalPnl = cleanMoney(history.reduce((sum, item) => sum + item.net_pnl_usd, 0));
+  const targetHits = history.filter((item) => item.profit_target_hit).length;
+  const recentRuns = history.slice(-8);
   if (!receipt) {
     return {
       status: "absent",
@@ -101,6 +138,11 @@ export function getWeb3PromotedPaperAutopilotHealth(path = web3PromotedPaperAuto
       blocked_ticks: 0,
       profit_target_hit: false,
       loss_brake_tripped: false,
+      run_count: runCount,
+      total_net_pnl_usd: totalPnl,
+      average_net_pnl_usd: runCount > 0 ? cleanMoney(totalPnl / runCount) : 0,
+      target_hit_rate_pct: runCount > 0 ? cleanMoney(targetHits / runCount * 100) : 0,
+      recent_runs: recentRuns,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     };
@@ -118,9 +160,23 @@ export function getWeb3PromotedPaperAutopilotHealth(path = web3PromotedPaperAuto
     blocked_ticks: receipt.blocked_ticks,
     profit_target_hit: receipt.profit_target_hit,
     loss_brake_tripped: receipt.loss_brake_tripped,
+    run_count: runCount,
+    total_net_pnl_usd: totalPnl,
+    average_net_pnl_usd: runCount > 0 ? cleanMoney(totalPnl / runCount) : 0,
+    target_hit_rate_pct: runCount > 0 ? cleanMoney(targetHits / runCount * 100) : 0,
+    recent_runs: recentRuns,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
   };
+}
+
+function appendWeb3PromotedPaperAutopilotHistory(receipt: Web3PromotedPaperAutopilotReceipt, path = web3PromotedPaperAutopilotHistoryPath()) {
+  const current = getWeb3PromotedPaperAutopilotHistory(path);
+  const entry = receiptToHistoryEntry(receipt);
+  const deduped = current.filter((item) => !(item.finished_at === entry.finished_at && item.supervisor_status === entry.supervisor_status));
+  const next = [...deduped, entry].slice(-24);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(next, null, 2)}\n`);
 }
 
 function sanitizeWeb3PromotedPaperAutopilotReceipt(value: unknown): Web3PromotedPaperAutopilotReceipt | null {
@@ -170,6 +226,40 @@ function web3PromotedPaperAutopilotSummary(receipt: Web3PromotedPaperAutopilotRe
   if (receipt.profit_target_hit) return `Promoted paper autopilot hit target with ${formatSignedCompactValue(receipt.net_pnl_usd)} after ${receipt.posted_ticks} posted tick${receipt.posted_ticks === 1 ? "" : "s"}.`;
   if (receipt.status === "completed") return `Promoted paper autopilot completed with ${formatSignedCompactValue(receipt.net_pnl_usd)} after ${receipt.posted_ticks} posted tick${receipt.posted_ticks === 1 ? "" : "s"}.`;
   return receipt.summary;
+}
+
+function receiptToHistoryEntry(receipt: Web3PromotedPaperAutopilotReceipt): Web3PromotedPaperAutopilotHistoryEntry {
+  return {
+    finished_at: receipt.finished_at,
+    status: receipt.status,
+    promotion_permission: receipt.promotion_permission,
+    supervisor_status: receipt.supervisor_status,
+    net_pnl_usd: receipt.net_pnl_usd,
+    posted_ticks: receipt.posted_ticks,
+    blocked_ticks: receipt.blocked_ticks,
+    profit_target_hit: receipt.profit_target_hit,
+  };
+}
+
+function sanitizeHistory(values: unknown[]) {
+  return values
+    .map((value) => {
+      if (!value || typeof value !== "object") return null;
+      const row = value as Partial<Web3PromotedPaperAutopilotHistoryEntry>;
+      if (!STATUSES.includes(row.status as Web3PromotedPaperAutopilotReceipt["status"])) return null;
+      return {
+        finished_at: cleanIso(row.finished_at),
+        status: row.status as Web3PromotedPaperAutopilotReceipt["status"],
+        promotion_permission: cleanText(row.promotion_permission, "missing", 80),
+        supervisor_status: cleanText(row.supervisor_status, "not-run", 80),
+        net_pnl_usd: cleanMoney(row.net_pnl_usd),
+        posted_ticks: cleanCount(row.posted_ticks),
+        blocked_ticks: cleanCount(row.blocked_ticks),
+        profit_target_hit: row.profit_target_hit === true,
+      };
+    })
+    .filter((item): item is Web3PromotedPaperAutopilotHistoryEntry => item !== null)
+    .slice(-24);
 }
 
 function cleanText(value: unknown, fallback: string, maxLength: number) {

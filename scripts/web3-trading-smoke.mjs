@@ -67,6 +67,9 @@ async function main() {
   assert(!("receipt_path" in health.web3_promoted_paper_autopilot), "Promoted paper autopilot health should not expose local receipt paths.", health.web3_promoted_paper_autopilot);
   assert(typeof health.web3_promoted_paper_autopilot.net_pnl_usd === "number", "Promoted paper autopilot health should expose sanitized paper PnL.", health.web3_promoted_paper_autopilot);
   assert(typeof health.web3_promoted_paper_autopilot.posted_ticks === "number", "Promoted paper autopilot health should expose sanitized posted ticks.", health.web3_promoted_paper_autopilot);
+  assert(typeof health.web3_promoted_paper_autopilot.run_count === "number", "Promoted paper autopilot health should expose sanitized history count.", health.web3_promoted_paper_autopilot);
+  assert(typeof health.web3_promoted_paper_autopilot.total_net_pnl_usd === "number", "Promoted paper autopilot health should expose cumulative history PnL.", health.web3_promoted_paper_autopilot);
+  assert(Array.isArray(health.web3_promoted_paper_autopilot.recent_runs), "Promoted paper autopilot health should expose compact recent run history.", health.web3_promoted_paper_autopilot);
 
   const page = await request("/trading");
   const html = await page.text();
@@ -77,6 +80,7 @@ async function main() {
   assert(html.includes("Autonomous trading command deck"), "Trading page should label the new first-screen command deck.");
   assert(html.includes("Promoted run"), "Trading page should expose the promoted paper autopilot control.");
   assert(html.includes("Promoted paper autopilot"), "Trading page should expose persisted promoted autopilot health.");
+  assert(html.includes("Promoted run memory"), "Trading page should expose promoted paper autopilot history memory.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");
