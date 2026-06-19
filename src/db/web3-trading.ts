@@ -8556,6 +8556,46 @@ export type AutonomousSettlementWatchdogReport = {
   controls: string[];
 };
 
+export type LiveWalletAccountingReadinessCheck = {
+  id:
+    | "wallet-scope"
+    | "rpc"
+    | "holdings-sync"
+    | "pricing-coverage"
+    | "portfolio-application"
+    | "settlement-evidence"
+    | "mirror-evidence"
+    | "mutation-boundary";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  detail: string;
+};
+
+export type LiveWalletAccountingReadiness = {
+  mode: "live-wallet-accounting-readiness";
+  status: "missing-wallet" | "rpc-gated" | "sync-required" | "pricing-gapped" | "portfolio-synced" | "settlement-ready" | "mirror-ready" | "blocked";
+  readiness_score: number;
+  wallet_public_key: string | null;
+  rpc_configured: boolean;
+  holdings_status: WalletHoldingsAdapter["status"];
+  matched_position_count: number;
+  token_account_count: number;
+  priced_wallet_mint_count: number;
+  unpriced_token_account_count: number;
+  total_value_usd: number;
+  portfolio_applied: boolean;
+  settlement_status: SettlementFillReconciliationReport["status"] | "not-run";
+  mirror_status: PortfolioMirrorApplyReport["status"] | "not-run";
+  can_trust_live_pnl: boolean;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  blockers: string[];
+  summary: string;
+  next_action: string;
+  controls: string[];
+  checks: LiveWalletAccountingReadinessCheck[];
+};
+
 export type ExecutionAuditEntry = {
   id: string;
   created_at: string;
@@ -9157,6 +9197,7 @@ export type Web3TradingState = {
   execution_plans: ExecutionPlan[];
   portfolio: TradingPortfolio;
   wallet_holdings_adapter: WalletHoldingsAdapter;
+  live_wallet_accounting_readiness: LiveWalletAccountingReadiness;
   position_watch: PositionWatch[];
   position_exit_ladder: PositionExitLadderEngine;
   liquidity_exit_sentinel: LiquidityExitSentinel;
@@ -13271,6 +13312,7 @@ function buildWeb3TradingState({
   const signals = market.map(scoreMarket).sort((a, b) => b.score - a.score);
   const portfolio = portfolioOverride ?? buildPortfolio(market);
   const wallet_holdings_adapter = walletHoldingsAdapter ?? idleWalletHoldingsAdapter(executionConfig.wallet_public_key);
+  const live_wallet_accounting_readiness = buildLiveWalletAccountingReadiness({ walletHoldings: wallet_holdings_adapter });
   const strategy_lab = buildStrategyLab();
   const discovery_tape = discoveryTape ?? sampleDiscoveryTape(market);
   const trend_catalyst = buildTrendCatalystIntelligence(market, discovery_tape);
@@ -15434,6 +15476,7 @@ function buildWeb3TradingState({
     execution_plans,
     portfolio: appliedPortfolio,
     wallet_holdings_adapter,
+    live_wallet_accounting_readiness,
     position_watch,
     position_exit_ladder,
     liquidity_exit_sentinel,
@@ -18093,8 +18136,8 @@ async function finalizeExecutionAudit(
     ? attachTriggerOrderHistory(triggerState, await syncTriggerOrderHistory(triggerState, triggerHistory, fetchImpl))
     : triggerState;
   const reconciledState = triggerReconcile ? applyTriggerReconciliationPatch(historyState, triggerReconcile) : historyState;
-  if (!portfolioMirror) return reconciledState;
-  return applyPortfolioMirrorPatch(reconciledState, portfolioMirror);
+  const mirrorState = portfolioMirror ? applyPortfolioMirrorPatch(reconciledState, portfolioMirror) : reconciledState;
+  return attachLiveWalletAccountingReadiness(mirrorState);
 }
 
 function attachExecutionAuditState(state: Web3TradingState, execution_audit: ExecutionAudit): Web3TradingState {
@@ -22408,6 +22451,177 @@ function walletHoldingsControls() {
     "Does not request signatures, private keys, transaction bodies, transfers, approvals, or wallet mutation.",
     "Applies balances only to local state for protection, sizing, and dry-run route rehearsal.",
   ];
+}
+
+function attachLiveWalletAccountingReadiness(state: Web3TradingState): Web3TradingState {
+  return {
+    ...state,
+    live_wallet_accounting_readiness: buildLiveWalletAccountingReadiness({
+      walletHoldings: state.wallet_holdings_adapter,
+      settlement: state.settlement_fill_reconciliation,
+      mirror: state.portfolio_mirror_apply,
+    }),
+  };
+}
+
+function buildLiveWalletAccountingReadiness({
+  walletHoldings,
+  settlement,
+  mirror,
+}: {
+  walletHoldings: WalletHoldingsAdapter;
+  settlement?: SettlementFillReconciliationReport;
+  mirror?: PortfolioMirrorApplyReport;
+}): LiveWalletAccountingReadiness {
+  const walletScoped = Boolean(walletHoldings.wallet_public_key && isLikelySolanaPublicKey(walletHoldings.wallet_public_key));
+  const syncFinished = walletHoldings.status === "synced" || walletHoldings.status === "empty";
+  const pricingClean = syncFinished && walletHoldings.unpriced_token_account_count === 0;
+  const portfolioApplied = walletHoldings.portfolio_applied && walletHoldings.matched_position_count > 0;
+  const settlementStatus = settlement?.status ?? "not-run";
+  const mirrorStatus = mirror?.status ?? "not-run";
+  const settlementHealthy = settlementStatus === "not-run" || settlementStatus === "pending" || settlementStatus === "reconciled";
+  const mirrorHealthy = mirrorStatus === "not-run" || mirrorStatus === "idle" || mirrorStatus === "applied" || mirrorStatus === "duplicate";
+  const canTrustLivePnl = walletScoped &&
+    walletHoldings.rpc_configured &&
+    walletHoldings.status === "synced" &&
+    pricingClean &&
+    portfolioApplied &&
+    settlementHealthy &&
+    mirrorHealthy;
+  const blockers = [
+    !walletScoped ? "Configure a valid public wallet key before live wallet accounting can be trusted." : null,
+    !walletHoldings.rpc_configured ? "Configure SOLANA_RPC_URL so the app can read wallet token accounts directly." : null,
+    walletHoldings.status === "blocked" ? walletHoldings.blockers[0] ?? "Read-only wallet holdings scan is blocked." : null,
+    walletHoldings.status === "idle" && walletScoped && walletHoldings.rpc_configured ? "Run a live DEX/RPC wallet holdings sync before trusting wallet PnL." : null,
+    walletHoldings.unpriced_token_account_count > 0 ? `Price or explicitly review ${walletHoldings.unpriced_token_account_count} unpriced wallet token account${walletHoldings.unpriced_token_account_count === 1 ? "" : "s"} before trusting live PnL.` : null,
+    walletHoldings.status === "synced" && walletHoldings.priced_wallet_mint_count > 0 && !portfolioApplied ? "Apply priced wallet holdings into the local portfolio mirror before trusting live PnL." : null,
+    walletHoldings.status === "empty" ? "Wallet scan completed, but no priced held memecoin position is available for autonomous PnL accounting." : null,
+    settlementStatus === "ambiguous" || settlementStatus === "failed" || settlementStatus === "blocked" ? settlement?.next_action ?? "Resolve settlement reconciliation before trusting live PnL." : null,
+    mirrorStatus === "blocked" ? mirror?.next_action ?? "Resolve portfolio mirror blockers before trusting live PnL." : null,
+  ].filter((item): item is string => Boolean(item));
+  const checks: LiveWalletAccountingReadinessCheck[] = [
+    {
+      id: "wallet-scope",
+      label: "Wallet scope",
+      status: walletScoped ? "pass" : "fail",
+      detail: walletScoped ? "A valid public wallet key is scoped for read-only accounting." : "No valid public wallet key is scoped.",
+    },
+    {
+      id: "rpc",
+      label: "RPC read",
+      status: walletHoldings.rpc_configured ? "pass" : "fail",
+      detail: walletHoldings.rpc_configured ? "Solana RPC is configured for read-only token-account reads." : "Solana RPC is not configured.",
+    },
+    {
+      id: "holdings-sync",
+      label: "Holdings sync",
+      status: syncFinished ? "pass" : walletHoldings.status === "blocked" ? "fail" : "watch",
+      detail: `${walletHoldings.status.replaceAll("-", " ")} across ${walletHoldings.token_account_count} token account${walletHoldings.token_account_count === 1 ? "" : "s"}.`,
+    },
+    {
+      id: "pricing-coverage",
+      label: "Pricing coverage",
+      status: pricingClean ? "pass" : walletHoldings.unpriced_token_account_count > 0 ? "watch" : "fail",
+      detail: `${walletHoldings.priced_wallet_mint_count} priced mint${walletHoldings.priced_wallet_mint_count === 1 ? "" : "s"}; ${walletHoldings.unpriced_token_account_count} unpriced account${walletHoldings.unpriced_token_account_count === 1 ? "" : "s"}.`,
+    },
+    {
+      id: "portfolio-application",
+      label: "Portfolio mirror",
+      status: portfolioApplied ? "pass" : walletHoldings.status === "empty" ? "watch" : "fail",
+      detail: portfolioApplied
+        ? `${walletHoldings.matched_position_count} priced wallet position${walletHoldings.matched_position_count === 1 ? "" : "s"} applied to the local portfolio.`
+        : "Priced wallet holdings have not produced a trusted portfolio mirror.",
+    },
+    {
+      id: "settlement-evidence",
+      label: "Settlement evidence",
+      status: settlementStatus === "reconciled" ? "pass" : settlementStatus === "ambiguous" || settlementStatus === "failed" || settlementStatus === "blocked" ? "fail" : "watch",
+      detail: settlementStatus === "not-run"
+        ? "No live fill settlement reconciliation has run in this state."
+        : `Settlement reconciliation is ${settlementStatus.replaceAll("-", " ")}.`,
+    },
+    {
+      id: "mirror-evidence",
+      label: "Mirror evidence",
+      status: mirrorStatus === "applied" || mirrorStatus === "duplicate" ? "pass" : mirrorStatus === "blocked" ? "fail" : "watch",
+      detail: mirrorStatus === "not-run"
+        ? "No guarded portfolio mirror apply has run in this state."
+        : `Portfolio mirror apply is ${mirrorStatus.replaceAll("-", " ")}.`,
+    },
+    {
+      id: "mutation-boundary",
+      label: "Mutation boundary",
+      status: "pass",
+      detail: "Wallet mutation and live execution remain blocked by this readiness receipt.",
+    },
+  ];
+  const readinessScore = Math.round(checks.reduce((sum, check) => sum + (check.status === "pass" ? 100 : check.status === "watch" ? 55 : 0), 0) / checks.length);
+  const status: LiveWalletAccountingReadiness["status"] = !walletScoped
+    ? "missing-wallet"
+    : !walletHoldings.rpc_configured
+      ? "rpc-gated"
+      : walletHoldings.status === "blocked"
+        ? "blocked"
+        : walletHoldings.unpriced_token_account_count > 0
+          ? "pricing-gapped"
+          : mirrorStatus === "applied" || mirrorStatus === "duplicate"
+            ? "mirror-ready"
+            : settlementStatus === "reconciled"
+              ? "settlement-ready"
+              : canTrustLivePnl
+                ? "portfolio-synced"
+                : "sync-required";
+
+  return {
+    mode: "live-wallet-accounting-readiness",
+    status,
+    readiness_score: readinessScore,
+    wallet_public_key: walletHoldings.wallet_public_key,
+    rpc_configured: walletHoldings.rpc_configured,
+    holdings_status: walletHoldings.status,
+    matched_position_count: walletHoldings.matched_position_count,
+    token_account_count: walletHoldings.token_account_count,
+    priced_wallet_mint_count: walletHoldings.priced_wallet_mint_count,
+    unpriced_token_account_count: walletHoldings.unpriced_token_account_count,
+    total_value_usd: walletHoldings.total_value_usd,
+    portfolio_applied: walletHoldings.portfolio_applied,
+    settlement_status: settlementStatus,
+    mirror_status: mirrorStatus,
+    can_trust_live_pnl: canTrustLivePnl,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    blockers,
+    summary: liveWalletAccountingSummary(status, walletHoldings, readinessScore),
+    next_action: blockers[0] ?? liveWalletAccountingNextAction(status),
+    controls: [
+      "This readiness receipt is read-only accounting evidence; it never signs, submits, approves, transfers, or mutates wallet funds.",
+      "Live PnL is trusted only when a valid wallet, RPC scan, full pricing coverage, and local portfolio mirror all pass.",
+      "Settlement and portfolio-mirror evidence can strengthen accounting after an externally signed, confirmed transaction, but still cannot unlock real-capital autonomy.",
+    ],
+    checks,
+  };
+}
+
+function liveWalletAccountingSummary(
+  status: LiveWalletAccountingReadiness["status"],
+  walletHoldings: WalletHoldingsAdapter,
+  readinessScore: number,
+) {
+  if (status === "missing-wallet") return `Wallet accounting is missing a valid public wallet scope at ${readinessScore}/100.`;
+  if (status === "rpc-gated") return `Wallet accounting is RPC-gated at ${readinessScore}/100.`;
+  if (status === "blocked") return `Wallet accounting is blocked at ${readinessScore}/100: ${walletHoldings.summary}`;
+  if (status === "pricing-gapped") return `Wallet accounting has pricing gaps at ${readinessScore}/100 with ${walletHoldings.unpriced_token_account_count} unpriced account${walletHoldings.unpriced_token_account_count === 1 ? "" : "s"}.`;
+  if (status === "mirror-ready") return `Wallet accounting has guarded mirror evidence and ${formatCompactValue(walletHoldings.total_value_usd)} in priced read-only holdings.`;
+  if (status === "settlement-ready") return `Wallet accounting has settlement evidence and ${formatCompactValue(walletHoldings.total_value_usd)} in priced read-only holdings.`;
+  if (status === "portfolio-synced") return `Wallet accounting is portfolio-synced with ${walletHoldings.matched_position_count} priced holding${walletHoldings.matched_position_count === 1 ? "" : "s"} worth ${formatCompactValue(walletHoldings.total_value_usd)}.`;
+  return `Wallet accounting still needs a fresh read-only sync at ${readinessScore}/100.`;
+}
+
+function liveWalletAccountingNextAction(status: LiveWalletAccountingReadiness["status"]) {
+  if (status === "portfolio-synced") return "Keep live wallet accounting in read-only review and reconcile any future confirmed fills before mirror updates.";
+  if (status === "settlement-ready") return "Review the reconciled fill and apply the guarded local portfolio mirror only if the evidence is clean.";
+  if (status === "mirror-ready") return "Continue read-only wallet/accounting checks and keep real-capital trading behind manual executor review.";
+  return "Complete wallet scope, RPC scan, pricing coverage, portfolio mirror, and settlement evidence before trusting live wallet PnL.";
 }
 
 function defaultExecutionConfig(now: string): ExecutionConfig {

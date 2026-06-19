@@ -90,7 +90,7 @@ async function main() {
   assert(typeof launchChecklist.completed_proof_count === "number", "Web3 launch checklist should expose completed proof count.", launchChecklist);
   assert(typeof launchChecklist.remaining_work_count === "number", "Web3 launch checklist should expose remaining work count.", launchChecklist);
   assert(Array.isArray(launchChecklist.items), "Web3 launch checklist should expose proof items.", launchChecklist);
-  assert(["paper-profit", "promoted-memory", "market-feed", "route-proof", "execution-quality", "custody-policy", "signer", "relay", "settlement", "kill-switch", "live-boundary"].every((id) => launchChecklist.items.some((item) => item.id === id)), "Web3 launch checklist should cover paper, market, execution, custody, settlement, and live-boundary proofs.", launchChecklist);
+  assert(["paper-profit", "promoted-memory", "market-feed", "route-proof", "execution-quality", "custody-policy", "signer", "relay", "settlement", "kill-switch", "process-supervision", "provider-credentials", "wallet-accounting", "profit-proof", "live-boundary"].every((id) => launchChecklist.items.some((item) => item.id === id)), "Web3 launch checklist should cover paper, market, execution, custody, settlement, production, wallet accounting, profit proof, and live-boundary proofs.", launchChecklist);
   assert(Array.isArray(launchChecklist.remaining_work), "Web3 launch checklist should expose structured remaining work.", launchChecklist);
   assert(launchChecklist.remaining_work_count === launchChecklist.remaining_work.length, "Web3 launch checklist remaining work count should match remaining work rows.", launchChecklist);
   assert(launchChecklist.completed_proof_count + launchChecklist.remaining_work_count === launchChecklist.items.length, "Web3 launch checklist proof counts should reconcile.", launchChecklist);
@@ -4148,6 +4148,10 @@ async function main() {
   assert(orderRehearsal.payload.autonomous_order_handoff?.mode === "autonomous-order-handoff", "Order rehearsal should expose order handoff evidence.", orderRehearsal.payload.autonomous_order_handoff);
   assert(orderRehearsal.payload.wallet_holdings_adapter?.mode === "read-only-wallet-holdings", "Order rehearsal should expose the read-only wallet holdings adapter.", orderRehearsal.payload.wallet_holdings_adapter);
   assert(orderRehearsal.payload.wallet_holdings_adapter?.controls?.some((control) => control.includes("Does not request signatures")), "Wallet holdings adapter must disclose the no-signing boundary.", orderRehearsal.payload.wallet_holdings_adapter);
+  assert(orderRehearsal.payload.live_wallet_accounting_readiness?.mode === "live-wallet-accounting-readiness", "Order rehearsal should expose live wallet accounting readiness.", orderRehearsal.payload.live_wallet_accounting_readiness);
+  assert(orderRehearsal.payload.live_wallet_accounting_readiness?.live_execution_permission === "blocked", "Wallet accounting readiness should not unlock live execution.", orderRehearsal.payload.live_wallet_accounting_readiness);
+  assert(orderRehearsal.payload.live_wallet_accounting_readiness?.wallet_mutation_permission === "blocked", "Wallet accounting readiness should keep wallet mutation blocked.", orderRehearsal.payload.live_wallet_accounting_readiness);
+  assert(orderRehearsal.payload.live_wallet_accounting_readiness?.checks?.some((check) => check.id === "pricing-coverage"), "Wallet accounting readiness should include pricing coverage evidence.", orderRehearsal.payload.live_wallet_accounting_readiness);
   assert(
     orderRehearsal.payload.discovery_tape?.sources?.some((source) => source.id === "portfolio-watch" && source.status === "ok"),
     "Order rehearsal should include held-position watchlist market refresh evidence.",

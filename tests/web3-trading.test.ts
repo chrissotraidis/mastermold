@@ -6486,6 +6486,32 @@ describe("Web3 autonomous trading subsystem", () => {
       portfolio_applied: true,
       total_value_usd: 2960,
     });
+    expect(state.live_wallet_accounting_readiness).toMatchObject({
+      mode: "live-wallet-accounting-readiness",
+      status: "pricing-gapped",
+      wallet_public_key: "11111111111111111111111111111111",
+      rpc_configured: true,
+      holdings_status: "synced",
+      matched_position_count: 2,
+      token_account_count: 3,
+      priced_wallet_mint_count: 2,
+      unpriced_token_account_count: 1,
+      portfolio_applied: true,
+      can_trust_live_pnl: false,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(state.live_wallet_accounting_readiness.checks.map((check) => check.id)).toEqual([
+      "wallet-scope",
+      "rpc",
+      "holdings-sync",
+      "pricing-coverage",
+      "portfolio-application",
+      "settlement-evidence",
+      "mirror-evidence",
+      "mutation-boundary",
+    ]);
+    expect(state.live_wallet_accounting_readiness.blockers[0]).toContain("unpriced wallet token");
     expect(state.wallet_holdings_adapter.items.find((item) => item.symbol === "BONK")).toMatchObject({
       quantity: 100_000_000,
       decimals: 5,
@@ -7586,6 +7612,15 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
+    expect(state.live_wallet_accounting_readiness).toMatchObject({
+      mode: "live-wallet-accounting-readiness",
+      settlement_status: "reconciled",
+      mirror_status: "applied",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(state.live_wallet_accounting_readiness.checks.find((check) => check.id === "settlement-evidence")?.status).toBe("pass");
+    expect(state.live_wallet_accounting_readiness.checks.find((check) => check.id === "mirror-evidence")?.status).toBe("pass");
     expect(state.trade_tape.some((trade) => trade.id === state.portfolio_mirror_apply?.trade_id)).toBe(true);
     expect(JSON.stringify(state.execution_audit.latest)).not.toContain("signed-transaction-redacted-by-engine");
 

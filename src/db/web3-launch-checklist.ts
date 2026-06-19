@@ -80,7 +80,7 @@ export function buildWeb3AutonomyLaunchChecklist(
   const signer = state.autonomous_signer_ops;
   const routeRefresh = state.autonomous_route_refresh_execution;
   const daemon = state.autonomous_daemon_handoff;
-  const walletHoldings = state.wallet_holdings_adapter;
+  const walletAccounting = state.live_wallet_accounting_readiness;
   const productionSupervisor = buildWeb3ProductionSupervisorReadiness(supervisorHealth);
   const killSwitchFail = state.execution_readiness.checks.some((check) => check.id === "kill-switch" && check.status === "fail");
   const memoryStatus = promotedHealth?.run_memory_status ?? "learning";
@@ -102,8 +102,8 @@ export function buildWeb3AutonomyLaunchChecklist(
   const processSupervisionWatch = productionSupervisor.status === "production-gated" || productionSupervisor.status === "paper-supervised";
   const providerCredentialsPass = custody.status === "armed" && signer.can_request_signature && signer.provider_adapter.credential_configured;
   const providerCredentialsWatch = custody.status === "bounded-ready" || signer.ready_count > 0 || signer.can_request_signature;
-  const walletAccountingPass = walletHoldings.status === "synced" && walletHoldings.portfolio_applied && walletHoldings.matched_position_count > 0;
-  const walletAccountingWatch = walletHoldings.rpc_configured && Boolean(walletHoldings.wallet_public_key);
+  const walletAccountingPass = walletAccounting.can_trust_live_pnl;
+  const walletAccountingWatch = walletAccounting.status !== "missing-wallet" && walletAccounting.status !== "rpc-gated" && walletAccounting.status !== "blocked";
   const profitProofPass = promotedMemoryPass && paperProfit.making_money && paperProfit.accountability_score >= 70;
   const profitProofWatch = paperProfit.net_pnl_usd >= 0 || promotedRunCount > 0;
   const liveBoundaryPass = !liveReadiness.can_trade_real_capital && !state.execution_gate.live_execution_enabled;
@@ -209,9 +209,9 @@ export function buildWeb3AutonomyLaunchChecklist(
       id: "wallet-accounting",
       label: "Wallet accounting",
       status: walletAccountingPass ? "pass" : walletAccountingWatch ? "watch" : "fail",
-      score: walletAccountingPass ? 88 : walletAccountingWatch ? 52 : 14,
-      detail: `${walletHoldings.status.replaceAll("-", " ")} wallet holdings; ${walletHoldings.matched_position_count} matched positions, ${walletHoldings.unpriced_token_account_count} unpriced accounts.`,
-      blocker: walletAccountingPass ? null : "Sync read-only wallet holdings from RPC and reconcile priced token accounts into the portfolio before trusting live PnL.",
+      score: walletAccountingPass ? 88 : walletAccountingWatch ? Math.max(42, walletAccounting.readiness_score) : Math.min(28, walletAccounting.readiness_score),
+      detail: `${walletAccounting.status.replaceAll("-", " ")}; ${walletAccounting.matched_position_count} matched positions, ${walletAccounting.unpriced_token_account_count} unpriced accounts, settlement ${walletAccounting.settlement_status.replaceAll("-", " ")}.`,
+      blocker: walletAccountingPass ? null : walletAccounting.next_action,
     },
     {
       id: "profit-proof",
