@@ -25,6 +25,7 @@ export type Web3CredentialsSetupCheck = {
     | "rpc-health"
     | "wallet"
     | "wallet-balance"
+    | "wallet-assets"
     | "jupiter-quote"
     | "jupiter-order"
     | "risk-policy"
@@ -48,6 +49,11 @@ export type Web3CredentialsSetupReadiness = {
   wallet_public_key: string | null;
   wallet_valid: boolean;
   wallet_balance_sol: number | null;
+  wallet_asset_count: number | null;
+  wallet_fungible_asset_count: number | null;
+  wallet_priced_asset_count: number | null;
+  wallet_priced_value_usd: number | null;
+  helius_das_ready: boolean;
   jupiter_configured: boolean;
   jupiter_quote_ready: boolean;
   jupiter_order_ready: boolean;
@@ -57,6 +63,7 @@ export type Web3CredentialsSetupReadiness = {
   daily_spend_cap_usd: number;
   max_slippage_bps: number;
   can_support_readonly_wallet_sync: boolean;
+  can_support_wallet_asset_snapshot: boolean;
   can_support_route_order_rehearsal: boolean;
   can_support_manual_live_review: boolean;
   live_execution_permission: "blocked";
@@ -74,6 +81,12 @@ type Web3CredentialsNetworkEvidence = {
   rpc_detail?: string;
   wallet_balance_sol?: number | null;
   wallet_balance_detail?: string;
+  wallet_asset_count?: number | null;
+  wallet_fungible_asset_count?: number | null;
+  wallet_priced_asset_count?: number | null;
+  wallet_priced_value_usd?: number | null;
+  wallet_assets_detail?: string;
+  helius_das_ready?: boolean;
   jupiter_quote_ready?: boolean;
   jupiter_quote_detail?: string;
   jupiter_order_ready?: boolean;
@@ -108,6 +121,12 @@ export function buildWeb3CredentialsSetupReadiness(
     walletValid,
     walletBalanceSol: evidence.wallet_balance_sol ?? null,
     walletBalanceDetail: evidence.wallet_balance_detail,
+    walletAssetCount: evidence.wallet_asset_count ?? null,
+    walletFungibleAssetCount: evidence.wallet_fungible_asset_count ?? null,
+    walletPricedAssetCount: evidence.wallet_priced_asset_count ?? null,
+    walletPricedValueUsd: evidence.wallet_priced_value_usd ?? null,
+    walletAssetsDetail: evidence.wallet_assets_detail,
+    heliusDasReady: evidence.helius_das_ready === true,
     jupiterConfigured,
     jupiterQuoteReady,
     jupiterQuoteDetail: evidence.jupiter_quote_detail,
@@ -122,6 +141,7 @@ export function buildWeb3CredentialsSetupReadiness(
   const blockers = checks.filter((check) => check.status === "fail").map((check) => check.detail);
   const readinessScore = Math.round(checks.reduce((sum, check) => sum + checkScore(check.status), 0) / checks.length);
   const canSupportReadonlyWalletSync = Boolean(rpcUrl && rpcHealthy && walletValid);
+  const canSupportWalletAssetSnapshot = canSupportReadonlyWalletSync && evidence.helius_das_ready === true;
   const canSupportRouteOrderRehearsal = Boolean(rpcUrl && rpcHealthy && walletValid && jupiterQuoteReady);
   const canSupportManualLiveReview = Boolean(
     canSupportRouteOrderRehearsal &&
@@ -150,6 +170,11 @@ export function buildWeb3CredentialsSetupReadiness(
     wallet_public_key: walletPublicKey,
     wallet_valid: walletValid,
     wallet_balance_sol: evidence.wallet_balance_sol ?? null,
+    wallet_asset_count: evidence.wallet_asset_count ?? null,
+    wallet_fungible_asset_count: evidence.wallet_fungible_asset_count ?? null,
+    wallet_priced_asset_count: evidence.wallet_priced_asset_count ?? null,
+    wallet_priced_value_usd: evidence.wallet_priced_value_usd ?? null,
+    helius_das_ready: evidence.helius_das_ready === true,
     jupiter_configured: jupiterConfigured,
     jupiter_quote_ready: jupiterQuoteReady,
     jupiter_order_ready: jupiterOrderReady,
@@ -159,6 +184,7 @@ export function buildWeb3CredentialsSetupReadiness(
     daily_spend_cap_usd: dailySpendCapUsd,
     max_slippage_bps: maxSlippageBps,
     can_support_readonly_wallet_sync: canSupportReadonlyWalletSync,
+    can_support_wallet_asset_snapshot: canSupportWalletAssetSnapshot,
     can_support_route_order_rehearsal: canSupportRouteOrderRehearsal,
     can_support_manual_live_review: canSupportManualLiveReview,
     live_execution_permission: "blocked",
@@ -206,6 +232,12 @@ function credentialSetupChecks(input: {
   walletValid: boolean;
   walletBalanceSol: number | null;
   walletBalanceDetail?: string;
+  walletAssetCount: number | null;
+  walletFungibleAssetCount: number | null;
+  walletPricedAssetCount: number | null;
+  walletPricedValueUsd: number | null;
+  walletAssetsDetail?: string;
+  heliusDasReady: boolean;
   jupiterConfigured: boolean;
   jupiterQuoteReady: boolean;
   jupiterQuoteDetail?: string;
@@ -249,6 +281,16 @@ function credentialSetupChecks(input: {
       detail: input.walletBalanceDetail ?? (input.walletBalanceSol !== null
         ? `${input.walletBalanceSol.toFixed(4)} SOL returned by read-only getBalance.`
         : "Run a read-only wallet balance check after RPC and wallet scope are set."),
+    },
+    {
+      id: "wallet-assets",
+      label: "Wallet assets",
+      status: input.heliusDasReady ? "pass" : input.walletValid && input.rpcUrl ? "watch" : "fail",
+      detail: input.walletAssetsDetail ?? (input.walletAssetCount !== null
+        ? `${input.walletAssetCount} total assets, ${input.walletFungibleAssetCount ?? 0} fungible tokens, ${input.walletPricedAssetCount ?? 0} priced assets, ${formatUsd(input.walletPricedValueUsd ?? 0)} priced value from read-only DAS.`
+        : input.walletValid && input.rpcUrl
+          ? "Run a read-only Helius DAS asset snapshot to prove wallet holdings visibility."
+          : "Wallet asset snapshot requires RPC and a valid public wallet key."),
     },
     {
       id: "jupiter-quote",
@@ -393,4 +435,8 @@ function isWebsocketUrl(value: string) {
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function formatUsd(value: number) {
+  return `$${value.toFixed(value >= 100 ? 0 : value >= 1 ? 2 : 4)}`;
 }

@@ -4,7 +4,7 @@ This runbook covers the Mastermind Web3 credentials setup flow. The goal of this
 
 ## Current Boundary
 
-- The app may test Solana RPC, wallet public-key scope, Jupiter quote readiness, Jupiter unsigned order readiness, signer mode, and risk caps.
+- The app may test Solana RPC, wallet public-key scope, read-only Helius DAS wallet asset visibility, Jupiter quote readiness, Jupiter unsigned order readiness, signer mode, and risk caps.
 - The app may apply those values to the existing Web3 dry-run execution profile.
 - The app must not store private keys, sign transactions, submit transactions, custody funds, or mutate wallet balances.
 - Browser storage may keep non-secret preferences like wallet public key, signer mode, and risk caps, but must not store Helius or Jupiter API keys.
@@ -47,7 +47,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 
 ## Researched Default Stack
 
-- Provider stack: Helius/Solana RPC first for read-only wallet and chain data, with secrets kept in server env or one-shot test inputs.
+- Provider stack: Helius/Solana RPC first for read-only wallet and chain data, plus Helius DAS `getAssetsByOwner` for wallet-held asset visibility, with secrets kept in server env or one-shot test inputs.
 - Market discovery: use the app's live DEX/read-only intake, chart proof, route proof, and wallet marking before adding paid discovery feeds.
 - Execution stack: use Jupiter quote/order rehearsal first; signing and submit remain out of scope until manual live review.
 - Signer custody: start with a dedicated trading wallet and manual external wallet approval; do not collect private keys in the app.
@@ -78,6 +78,8 @@ Useful request fields:
 
 The response is redacted. It returns host-level endpoint information only and never returns API keys, private keys, unsigned transaction bytes, signed transaction bytes, or wallet secrets. The browser form also scrubs Helius and Jupiter API key fields from its saved draft.
 
+Reference: Helius documents `getAssetsByOwner` as the DAS method for retrieving Solana wallet-owned assets with pagination: https://www.helius.dev/docs/api-reference/das/getassetsbyowner
+
 ## Done Criteria For This Gate
 
 The credentials gate is ready for manual live review only when:
@@ -85,6 +87,7 @@ The credentials gate is ready for manual live review only when:
 - Solana RPC health passes.
 - A valid Solana public wallet key is scoped.
 - Read-only wallet balance returns.
+- Helius DAS wallet asset snapshot returns asset counts for the scoped public wallet.
 - Jupiter quote proof passes.
 - Jupiter unsigned order proof passes, if a Jupiter API key is configured.
 - Manual external wallet approval remains required.

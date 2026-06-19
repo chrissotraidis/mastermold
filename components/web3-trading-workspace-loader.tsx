@@ -988,7 +988,7 @@ export function Web3TradingWorkspaceLoader({
           Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets execution runway, heartbeat, loop impact, provider intake, and profit benchmark evidence choose whether to continue, tighten, retarget, protect, harvest, refresh, defer, cool down, or block the next backend tick. Current execution runway {executionRunway.status}; runway action {executionRunway.action}; heartbeat {state.autonomous_execution_heartbeat.status}; heartbeat action {state.autonomous_execution_heartbeat.primary_action}; paper lane {executionRunway.can_auto_paper ? "clear" : "gated"}; current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; provider intake {marketIntake.status}; intake lane {marketIntake.next_lane}; provider budget {marketIntake.provider_budget_status}; can feed loop {marketIntake.can_feed_trade_loop ? "yes" : "no"}; profit benchmark {state.autonomous_profit_benchmark.status}; risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}; alpha feedback {state.autonomous_alpha_feedback_loop.action}; next cadence {Math.min(loopImpact.next_cadence_seconds, executionRunway.next_tick_seconds, state.autonomous_execution_heartbeat.next_tick_seconds)} seconds.
         </span>
         <span className="sr-only" aria-label="Web3 credential setup availability">
-          Web3 credential setup is available under the Wiring focus. It exposes Test credentials and Apply dry-run profile for Provider, wallet, route, signer policy, Helius RPC, Jupiter, and risk caps while live trading remains blocked. API keys are session-only and the form does not save secrets in browser storage.
+          Web3 credential setup is available under the Wiring focus. It exposes Test credentials and Apply dry-run profile for Provider, wallet, route, signer policy, Helius RPC, Helius DAS wallet assets, Jupiter, and risk caps while live trading remains blocked. API keys are session-only and the form does not save secrets in browser storage.
         </span>
 
         <section className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:mt-3 sm:p-3" aria-label="Web3 operator focus deck">
@@ -1587,6 +1587,35 @@ function QuickWeb3CredentialsSetupPanel({
         {message}
       </p>
 
+      {result ? (
+        <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-4" aria-label="Read-only wallet asset snapshot">
+          <ProfitMetric
+            label="DAS assets"
+            value={result.helius_das_ready ? `${result.wallet_asset_count ?? 0}` : "not ready"}
+            detail="Helius wallet snapshot"
+            tone={result.helius_das_ready ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Fungibles"
+            value={`${result.wallet_fungible_asset_count ?? 0}`}
+            detail="first page tokens"
+            tone={result.helius_das_ready ? "engine" : "neutral"}
+          />
+          <ProfitMetric
+            label="Priced"
+            value={`${result.wallet_priced_asset_count ?? 0}`}
+            detail={formatCurrency(result.wallet_priced_value_usd ?? 0)}
+            tone={(result.wallet_priced_asset_count ?? 0) > 0 ? "engine" : "neutral"}
+          />
+          <ProfitMetric
+            label="Wallet sync"
+            value={result.can_support_wallet_asset_snapshot ? "ready" : "gated"}
+            detail={result.can_support_readonly_wallet_sync ? "balance ok" : "needs RPC/wallet"}
+            tone={result.can_support_wallet_asset_snapshot ? "engine" : "caution"}
+          />
+        </div>
+      ) : null}
+
       {checks.length > 0 ? (
         <div className="mt-2 grid gap-1 sm:grid-cols-3 xl:grid-cols-5" aria-label="Web3 credential readiness checks">
           {checks.map((check) => (
@@ -1603,7 +1632,7 @@ function QuickWeb3CredentialsSetupPanel({
       ) : null}
 
       <p className="sr-only" aria-label="Web3 credential setup receipt">
-        Web3 credential setup tests Helius or Solana RPC, Jupiter quote and order readiness, wallet public key scope, signer mode, and risk caps. It never asks for private keys, keeps API keys session-only, does not save secrets in browser storage, and cannot enable live trading.
+        Web3 credential setup tests Helius or Solana RPC, Helius DAS wallet assets, Jupiter quote and order readiness, wallet public key scope, signer mode, and risk caps. It never asks for private keys, keeps API keys session-only, does not save secrets in browser storage, and cannot enable live trading.
       </p>
     </section>
   );

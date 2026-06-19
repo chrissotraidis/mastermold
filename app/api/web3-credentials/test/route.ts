@@ -23,6 +23,23 @@ type RpcResponse<T> = {
   error?: { code?: number; message?: string };
 };
 
+type HeliusAssetItem = {
+  interface?: string;
+  token_info?: {
+    balance?: number | string;
+    decimals?: number;
+    price_info?: {
+      price_per_token?: number;
+      total_price?: number;
+    };
+  };
+};
+
+type HeliusAssetsByOwnerResult = {
+  total?: number;
+  items?: HeliusAssetItem[];
+};
+
 export async function POST(request: Request): Promise<NextResponse<Web3CredentialsTestResponse | { error: string }>> {
   const body = (await request.json().catch(() => null)) as Web3CredentialsSetupRequest | null;
   if (!body || typeof body !== "object") {
@@ -104,6 +121,7 @@ async function testSolanaRpc(rpcUrl: string, wallet: string) {
 
   const balance = await solanaRpc<{ value: number } | number>(rpcUrl, "getBalance", [wallet, { commitment: "confirmed" }]);
   const lamports = typeof balance.result === "number" ? balance.result : balance.result?.value;
+  const assetEvidence = await testHeliusAssetsByOwner(rpcUrl, wallet);
   return {
     rpc_healthy: true,
     rpc_detail: rpcDetail,
@@ -111,6 +129,61 @@ async function testSolanaRpc(rpcUrl: string, wallet: string) {
     wallet_balance_detail: balance.ok && typeof lamports === "number"
       ? `${(lamports / LAMPORTS_PER_SOL).toFixed(4)} SOL returned by read-only getBalance.`
       : balance.detail,
+    ...assetEvidence,
+  };
+}
+
+async function testHeliusAssetsByOwner(rpcUrl: string, wallet: string) {
+  if (!isHeliusEndpoint(rpcUrl)) {
+    return {
+      helius_das_ready: false,
+      wallet_asset_count: null,
+      wallet_fungible_asset_count: null,
+      wallet_priced_asset_count: null,
+      wallet_priced_value_usd: null,
+      wallet_assets_detail: "Helius DAS asset snapshot skipped because the configured RPC endpoint is not a Helius endpoint.",
+    };
+  }
+
+  const assets = await solanaRpc<HeliusAssetsByOwnerResult>(rpcUrl, "getAssetsByOwner", {
+    ownerAddress: wallet,
+    page: 1,
+    limit: 10,
+    displayOptions: {
+      showFungible: true,
+      showNativeBalance: true,
+    },
+  });
+
+  if (!assets.ok || !assets.result) {
+    return {
+      helius_das_ready: false,
+      wallet_asset_count: null,
+      wallet_fungible_asset_count: null,
+      wallet_priced_asset_count: null,
+      wallet_priced_value_usd: null,
+      wallet_assets_detail: assets.detail,
+    };
+  }
+
+  const items = Array.isArray(assets.result.items) ? assets.result.items : [];
+  const total = typeof assets.result.total === "number" ? assets.result.total : items.length;
+  const fungible = items.filter((item) => {
+    const iface = typeof item.interface === "string" ? item.interface.toLowerCase() : "";
+    return iface.includes("fungible") || Boolean(item.token_info);
+  });
+  const priced = fungible
+    .map((item) => item.token_info?.price_info?.total_price)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+  const pricedValue = Math.round(priced.reduce((sum, value) => sum + value, 0) * 100) / 100;
+
+  return {
+    helius_das_ready: true,
+    wallet_asset_count: total,
+    wallet_fungible_asset_count: fungible.length,
+    wallet_priced_asset_count: priced.length,
+    wallet_priced_value_usd: pricedValue,
+    wallet_assets_detail: `Helius DAS returned ${total} wallet asset${total === 1 ? "" : "s"} on page 1, including ${fungible.length} fungible token${fungible.length === 1 ? "" : "s"} and ${priced.length} priced asset${priced.length === 1 ? "" : "s"}.`,
   };
 }
 
@@ -184,7 +257,7 @@ async function testJupiter({
   };
 }
 
-async function solanaRpc<T>(rpcUrl: string, method: string, params?: unknown[]) {
+async function solanaRpc<T>(rpcUrl: string, method: string, params?: unknown[] | Record<string, unknown>) {
   const response = await fetchJson(rpcUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -247,4 +320,12 @@ async function fetchJson(url: string, init: RequestInit) {
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isHeliusEndpoint(value: string) {
+  try {
+    return new URL(value).hostname.endsWith("helius-rpc.com");
+  } catch {
+    return false;
+  }
 }

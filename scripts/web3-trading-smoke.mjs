@@ -141,7 +141,11 @@ async function main() {
   assert(credentialSetup.network_tested === false, "Validate-only credential setup should not call external providers.", credentialSetup);
   assert(credentialSetup.live_execution_permission === "blocked", "Credential setup must keep live execution blocked.", credentialSetup);
   assert(credentialSetup.wallet_mutation_permission === "blocked", "Credential setup must keep wallet mutation blocked.", credentialSetup);
+  assert(credentialSetup.helius_das_ready === false, "Validate-only credential setup should not claim Helius DAS readiness.", credentialSetup);
+  assert(credentialSetup.can_support_wallet_asset_snapshot === false, "Validate-only credential setup should not claim wallet asset snapshot support.", credentialSetup);
+  assert(credentialSetup.wallet_asset_count === null, "Validate-only credential setup should not return wallet asset counts.", credentialSetup);
   assert(!JSON.stringify(credentialSetup).includes("api-key="), "Credential setup response should not expose provider secrets.", credentialSetup);
+  assert(credentialSetup.checks.some((check) => check.id === "wallet-assets"), "Credential setup should expose the Helius DAS wallet asset check.", credentialSetup);
   assert(Array.isArray(credentialSetup.checks) && credentialSetup.checks.some((check) => check.id === "live-boundary"), "Credential setup should expose the live-boundary check.", credentialSetup);
 
   const page = await request("/trading");
@@ -180,6 +184,7 @@ async function main() {
   assert(html.includes("Test credentials"), "Trading page should expose a Web3 credential test action.");
   assert(html.includes("Apply dry-run profile"), "Trading page should let Web3 credentials apply only to dry-run mode.");
   assert(html.includes("Provider, wallet, route, signer policy"), "Trading page should summarize the Web3 credential setup purpose.");
+  assert(html.includes("Helius DAS wallet assets"), "Trading page should disclose the read-only Helius DAS wallet asset check.");
   assert(html.includes("API keys are session-only"), "Trading page should disclose that API keys are not saved in browser storage.");
   assert(html.includes("does not save secrets in browser storage"), "Trading page should expose an accessible credential-storage boundary receipt.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");

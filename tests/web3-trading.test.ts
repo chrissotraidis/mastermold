@@ -229,6 +229,12 @@ describe("Web3 autonomous trading subsystem", () => {
       rpc_detail: "RPC health ok; latest blockhash returned.",
       wallet_balance_sol: 0.42,
       wallet_balance_detail: "0.4200 SOL returned by read-only getBalance.",
+      helius_das_ready: true,
+      wallet_asset_count: 9,
+      wallet_fungible_asset_count: 4,
+      wallet_priced_asset_count: 3,
+      wallet_priced_value_usd: 123.45,
+      wallet_assets_detail: "Helius DAS returned 9 wallet assets on page 1.",
       jupiter_quote_ready: true,
       jupiter_quote_detail: "Jupiter quote route returned for SOL to USDC.",
       jupiter_order_ready: true,
@@ -238,6 +244,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(readiness.status).toBe("configured");
     expect(readiness.rpc_endpoint).toBe("https://mainnet.helius-rpc.com");
     expect(readiness.websocket_endpoint).toBe("wss://mainnet.helius-rpc.com");
+    expect(readiness.can_support_wallet_asset_snapshot).toBe(true);
+    expect(readiness.helius_das_ready).toBe(true);
+    expect(readiness.wallet_asset_count).toBe(9);
+    expect(readiness.wallet_priced_value_usd).toBe(123.45);
     expect(readiness.can_support_route_order_rehearsal).toBe(true);
     expect(readiness.can_support_manual_live_review).toBe(true);
     expect(readiness.live_execution_permission).toBe("blocked");
@@ -246,6 +256,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(readiness.checks.find((check) => check.id === "live-boundary")).toMatchObject({
       status: "pass",
       detail: expect.stringContaining("real-capital execution remains blocked"),
+    });
+    expect(readiness.checks.find((check) => check.id === "wallet-assets")).toMatchObject({
+      status: "pass",
+      detail: expect.stringContaining("Helius DAS returned 9 wallet assets"),
     });
   });
 
