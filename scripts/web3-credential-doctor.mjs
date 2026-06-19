@@ -41,12 +41,13 @@ export async function runWeb3CredentialDoctor(input = {}) {
     failOnBlocked: Boolean(input.failOnBlocked),
   };
   const supervisorRepair = config.refreshSupervisor ? await refreshSupervisorEvidence(config) : null;
-  const [accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, health] = await Promise.all([
+  const [accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, jupiterRehearsalHistory, health] = await Promise.all([
     fetchReceipt(config, "/api/web3-account-setup"),
     fetchReceipt(config, "/api/web3-provider-health"),
     fetchReceipt(config, "/api/web3-launch-checklist"),
     fetchReceipt(config, "/api/web3-live-capital-preflight"),
     fetchReceipt(config, "/api/web3-market-monitor-history"),
+    fetchReceipt(config, "/api/web3-jupiter-rehearsal-history"),
     fetchReceipt(config, "/api/health"),
   ]);
   const receipt = buildWeb3CredentialDoctorReceipt({
@@ -56,6 +57,7 @@ export async function runWeb3CredentialDoctor(input = {}) {
     launchChecklist,
     livePreflight,
     monitorHistory,
+    jupiterRehearsalHistory,
     health,
     supervisorRepair,
   });
@@ -75,10 +77,11 @@ export function buildWeb3CredentialDoctorReceipt({
   launchChecklist,
   livePreflight,
   monitorHistory,
+  jupiterRehearsalHistory,
   health,
   supervisorRepair,
 }) {
-  const checks = buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, health, supervisorRepair })
+  const checks = buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, jupiterRehearsalHistory, health, supervisorRepair })
     .map(redactCredentialDoctorCheck);
   const blockers = checks
     .filter((check) => check.status === "fail")
@@ -135,7 +138,7 @@ export function buildWeb3CredentialDoctorReceipt({
   };
 }
 
-function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, health, supervisorRepair }) {
+function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, jupiterRehearsalHistory, health, supervisorRepair }) {
   const env = accountSetup?.environment_summary ?? {};
   const wallet = accountSetup?.wallet_summary ?? {};
   const productionSupervisor = health?.web3_production_supervisor ?? {};
@@ -163,6 +166,22 @@ function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchCheck
         ? "Run Rehearse Jupiter order and strict order verifier after wallet scope is ready."
         : "Add JUPITER_API_KEY in ignored server env or use one-shot session testing.",
       storage: "server-env-or-session-only",
+    },
+    {
+      id: "jupiter-rehearsal-history",
+      label: "Jupiter rehearsal tape",
+      status: jupiterRehearsalHistory?.status === "order-ready"
+        ? "pass"
+        : jupiterRehearsalHistory?.status === "gated"
+          ? "watch"
+          : "fail",
+      detail: jupiterRehearsalHistory?.mode === "web3-jupiter-rehearsal-history"
+        ? `Jupiter rehearsal history is ${jupiterRehearsalHistory.status}; latest ${jupiterRehearsalHistory.latest_status ?? "missing"}, quote ${jupiterRehearsalHistory.latest_quote_ready ? "ready" : "gated"}, order ${jupiterRehearsalHistory.latest_order_ready ? "ready" : "gated"}.`
+        : "Jupiter rehearsal history receipt is missing.",
+      next_action: jupiterRehearsalHistory?.status === "order-ready"
+        ? "Use the redacted order-ready proof for strict Jupiter verification; transaction bytes remain withheld."
+        : "Run Rehearse Jupiter after adding JUPITER_API_KEY and a dedicated public wallet; keep transaction bytes withheld.",
+      storage: "local-sanitized-jupiter-rehearsal-history",
     },
     {
       id: "dedicated-wallet",
