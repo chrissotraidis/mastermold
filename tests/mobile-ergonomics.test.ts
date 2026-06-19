@@ -807,6 +807,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Jupiter portal");
     expect(settingsPage).toContain("Swap V2 docs");
     expect(settingsPage).toContain("--require-jupiter-order");
+    expect(settingsPage).toContain("buildWeb3JupiterOrderPacket");
+    expect(settingsPage).toContain("SettingsJupiterOrderPacketPanel");
+    expect(settingsPage).toContain("Jupiter order packet");
+    expect(settingsPage).toContain("Swap V2 order rail");
+    expect(settingsPage).toContain("Jupiter API key needed");
+    expect(settingsPage).toContain("POST /api/web3-jupiter-rehearsal");
+    expect(settingsPage).toContain("Unsigned transaction return");
     expect(settingsPage).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(settingsPage).toContain("buildWeb3DedicatedWalletPacket");
     expect(settingsPage).toContain("SettingsDedicatedWalletPacketPanel");
@@ -942,6 +949,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--require-operator-wallet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("private_key_storage: \"blocked\"");
     expect(source("app/api/web3-dedicated-wallet-packet/route.ts")).toContain("buildWeb3DedicatedWalletPacket");
+    expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("web3-jupiter-order-packet");
+    expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("server-env-or-one-shot-only");
+    expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("--require-jupiter-order");
+    expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("transaction_body_storage: \"blocked\"");
+    expect(source("app/api/web3-jupiter-order-packet/route.ts")).toContain("buildWeb3JupiterOrderPacket");
     expect(source("src/db/web3-provider-credentials.ts")).toContain("demo-only and cannot satisfy operator wallet scope");
     expect(source("components/web3-trading-workspace-loader.tsx")).toContain("demo-only");
     expect(settingsPage).toContain("jupiterConfigured={receipt.environment_summary.jupiter_configured}");
@@ -958,7 +970,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("POST /api/web3-wallet-ownership");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dex-discovery");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dedicated-wallet-packet");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-jupiter-order-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Dedicated wallet packet");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Jupiter order packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-capital-preflight");
     expect(source("docs/web3-credentials-runbook.md")).toContain("launch-blocker queue");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Operator input packet");

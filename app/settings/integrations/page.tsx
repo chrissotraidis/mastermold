@@ -20,6 +20,7 @@ import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/sr
 import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
+import { buildWeb3JupiterOrderPacket, type Web3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
@@ -50,6 +51,7 @@ export default async function IntegrationsSettingsPage() {
   const web3AccountReceipt = buildWeb3AccountSetupReceipt(web3State);
   const web3AcquisitionReceipt = buildWeb3AccountAcquisitionReceipt(web3State);
   const web3DedicatedWalletPacket = buildWeb3DedicatedWalletPacket(web3State);
+  const web3JupiterOrderPacket = buildWeb3JupiterOrderPacket(web3State);
   const web3SignerPacket = buildWeb3SignerCredentialPacket(web3State);
   const web3CredentialDoctor = getWeb3CredentialDoctorHealth();
   const web3LaunchChecklist = buildWeb3AutonomyLaunchChecklist(
@@ -77,6 +79,7 @@ export default async function IntegrationsSettingsPage() {
             receipt={web3AccountReceipt}
             acquisition={web3AcquisitionReceipt}
             dedicatedWalletPacket={web3DedicatedWalletPacket}
+            jupiterOrderPacket={web3JupiterOrderPacket}
             signerPacket={web3SignerPacket}
             credentialDoctor={web3CredentialDoctor}
             launchChecklist={web3LaunchChecklist}
@@ -121,6 +124,7 @@ function Web3CredentialsRunwayCard({
   receipt,
   acquisition,
   dedicatedWalletPacket,
+  jupiterOrderPacket,
   signerPacket,
   credentialDoctor,
   launchChecklist,
@@ -129,6 +133,7 @@ function Web3CredentialsRunwayCard({
   receipt: Web3AccountSetupReceipt;
   acquisition: Web3AccountAcquisitionReceipt;
   dedicatedWalletPacket: Web3DedicatedWalletPacket;
+  jupiterOrderPacket: Web3JupiterOrderPacket;
   signerPacket: Web3SignerCredentialPacket;
   credentialDoctor: Web3CredentialDoctorHealth;
   launchChecklist: Web3AutonomyLaunchChecklist;
@@ -255,6 +260,8 @@ function Web3CredentialsRunwayCard({
           ) : null}
 
           <SettingsDedicatedWalletPacketPanel packet={dedicatedWalletPacket} />
+
+          <SettingsJupiterOrderPacketPanel packet={jupiterOrderPacket} />
 
           <SettingsCredentialDoctorPanel health={credentialDoctor} />
 
@@ -742,6 +749,115 @@ function SettingsDedicatedWalletPacketPanel({ packet }: { packet: Web3DedicatedW
       </div>
       <p className="mt-2 text-xs leading-5 text-outline">
         Dedicated wallet packet receipts are setup evidence only; signing, submission, live execution, and wallet mutation stay blocked.
+      </p>
+    </div>
+  );
+}
+
+function SettingsJupiterOrderPacketPanel({ packet }: { packet: Web3JupiterOrderPacket }) {
+  const openCount = packet.missing_required.length;
+  const primaryTone = packet.status === "review-ready" ? "pass" : packet.status === "missing-key" || packet.status === "wallet-needed" ? "fail" : "watch";
+  return (
+    <div className="rounded-md border border-caution/30 bg-caution/[0.035] p-3" aria-label="Web3 Jupiter order packet">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Jupiter order packet</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            Swap V2 order rail · {packet.status.replaceAll("-", " ")}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{packet.summary}</p>
+        </div>
+        <LaunchQueueBadge status={primaryTone} label={openCount > 0 ? `${openCount} open` : "ready"} />
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Credential scope</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">
+            {packet.jupiter_configured ? "Server key configured" : "Jupiter API key needed"}
+          </p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            Storage: {packet.key_storage.replaceAll("-", " ")}. Browser storage and secret echo stay blocked.
+          </p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Order proof</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">
+            {packet.swap_v2_order_ready ? "Order evidence ready" : "Rehearse Jupiter"}
+          </p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            Adapter {packet.adapter_status.replaceAll("-", " ")} · score {packet.adapter_readiness_score}/100 · quote {packet.quote_request_ready ? "ready" : "gated"}.
+          </p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Strict verifier</p>
+          <code className="mt-1 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+            {packet.strict_verifier_command}
+          </code>
+        </div>
+      </div>
+
+      {packet.missing_required.length > 0 ? (
+        <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.035] p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Required before order review</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {packet.missing_required.map((item) => (
+              <span key={item} className="rounded-md border border-caution/30 bg-caution/10 px-2 py-1 text-[11px] leading-4 text-caution">
+                {item}
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{packet.next_action}</p>
+        </div>
+      ) : null}
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {packet.steps.map((step) => (
+          <div key={step.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{step.label}</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-outline">{step.detail}</p>
+              </div>
+              <CredentialStateBadge configured={step.status === "done"} status={step.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{step.next_action}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe endpoints</p>
+          <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">
+            {packet.local_install_endpoint} installs ignored local env on trusted localhost; {packet.rehearsal_endpoint} builds redacted quote/order proof.
+          </p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Execution boundary</p>
+          <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">
+            Unsigned transaction return {packet.unsigned_transaction_return}; execute, signing, submission, live execution, and wallet mutation blocked.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {packet.setup_links.map((link) => (
+          <a
+            key={link.url}
+            href={link.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-semibold text-engine hover:text-engine/80"
+            title={link.detail}
+          >
+            {link.label}
+            <ExternalLink aria-hidden="true" className="size-3" />
+          </a>
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Jupiter order packet receipts are proof planning only; real order execution remains externally reviewed and blocked here.
       </p>
     </div>
   );

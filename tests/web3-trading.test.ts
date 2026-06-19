@@ -10,6 +10,7 @@ import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
+import { GET as JUPITER_ORDER_PACKET_GET } from "@/app/api/web3-jupiter-order-packet/route";
 import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wallet-packet/route";
@@ -1339,6 +1340,88 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.controls.some((control) => control.includes("sample all-ones wallet"))).toBe(true);
     expect(JSON.stringify(packet)).not.toContain("test-helius-secret");
     expect(JSON.stringify(packet)).not.toContain("test-jupiter-secret");
+  });
+
+  test("GIVEN Jupiter order setup is reviewed WHEN the order packet route runs THEN it names the missing key without execution authority", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.SOLANA_RPC_URL = "https://example-rpc.invalid";
+    delete process.env.JUPITER_API_KEY;
+
+    const rejected = await JUPITER_ORDER_PACKET_GET(new Request("http://localhost/api/web3-jupiter-order-packet?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await JUPITER_ORDER_PACKET_GET(new Request("http://localhost/api/web3-jupiter-order-packet?scenario=base&source=sample&account=ephemeral&cycles=1"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      jupiter_configured: boolean;
+      key_source: string;
+      env_targets: string[];
+      wallet_is_sample: boolean;
+      dedicated_wallet_scoped: boolean;
+      read_provider_configured: boolean;
+      quote_request_ready: boolean;
+      swap_v2_order_ready: boolean;
+      adapter_status: string;
+      adapter_readiness_score: number;
+      strict_verifier_command: string;
+      rehearsal_endpoint: string;
+      local_install_endpoint: string;
+      missing_required: string[];
+      steps: Array<{ id: string; status: string; detail: string; next_action: string }>;
+      key_storage: string;
+      browser_storage_permission: string;
+      secret_echo_permission: string;
+      unsigned_transaction_return: string;
+      transaction_body_storage: string;
+      execute_permission: string;
+      signing_permission: string;
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-jupiter-order-packet");
+    expect(["missing-key", "wallet-needed", "rehearsal-needed", "review-ready"]).toContain(packet.status);
+    expect(packet.status).toBe("missing-key");
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.jupiter_configured).toBe(false);
+    expect(packet.key_source).toBe("server-env-or-one-shot-required");
+    expect(packet.env_targets).toEqual(["JUPITER_API_KEY"]);
+    expect(packet.wallet_is_sample).toBe(true);
+    expect(packet.dedicated_wallet_scoped).toBe(false);
+    expect(packet.read_provider_configured).toBe(true);
+    expect(typeof packet.quote_request_ready).toBe("boolean");
+    expect(typeof packet.swap_v2_order_ready).toBe("boolean");
+    expect(packet.adapter_readiness_score).toBeGreaterThanOrEqual(0);
+    expect(packet.strict_verifier_command).toContain("--require-jupiter-order");
+    expect(packet.rehearsal_endpoint).toBe("POST /api/web3-jupiter-rehearsal");
+    expect(packet.local_install_endpoint).toBe("POST /api/web3-local-credentials");
+    expect(packet.missing_required).toContain("Jupiter API key for Swap V2 order rehearsal");
+    expect(packet.steps.map((step) => step.id)).toEqual([
+      "create-jupiter-key",
+      "install-server-env",
+      "scope-wallet",
+      "rehearse-order",
+      "run-strict-verifier",
+      "withhold-transaction-bytes",
+    ]);
+    expect(packet.steps.find((step) => step.id === "run-strict-verifier")?.status).toBe("blocked");
+    expect(packet.key_storage).toBe("server-env-or-one-shot-only");
+    expect(packet.browser_storage_permission).toBe("blocked");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(packet.unsigned_transaction_return).toBe("withheld");
+    expect(packet.transaction_body_storage).toBe("blocked");
+    expect(packet.execute_permission).toBe("blocked");
+    expect(packet.signing_permission).toBe("blocked");
+    expect(packet.transaction_submission_permission).toBe("blocked");
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.controls.some((control) => control.includes("never saved to browser storage"))).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain("test-helius-secret");
   });
 
   test("GIVEN a browser wallet signs the ownership challenge WHEN the ownership route verifies it THEN it returns a hash-only blocked receipt", async () => {
