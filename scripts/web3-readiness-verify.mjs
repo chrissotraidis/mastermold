@@ -23,6 +23,8 @@ const secretValues = [
 ].filter((item) => typeof item.value === "string" && item.value.length > 0);
 
 const results = [];
+let originalExecutionConfig = null;
+let shouldRestoreExecutionConfig = false;
 
 function parseArgs(args) {
   const parsed = {};
@@ -95,6 +97,67 @@ async function postJson(path, body) {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+async function snapshotExecutionConfig() {
+  const { response, json } = await requestJson("/api/web3-trading?source=sample&account=persistent");
+  assert(response.status === 200, "Execution config snapshot should return 200 before verifier mutation.", {
+    status: response.status,
+    json,
+  });
+  originalExecutionConfig = sanitizeExecutionConfig(json.execution_readiness?.config);
+  assert(originalExecutionConfig, "Execution config snapshot should include execution readiness config.", json.execution_readiness);
+  shouldRestoreExecutionConfig = true;
+  record("execution-config-snapshot", "pass", "captured original public wallet/risk scope for restore");
+}
+
+async function restoreExecutionConfig() {
+  if (!shouldRestoreExecutionConfig || !originalExecutionConfig) return;
+  const { response, json } = await postJson("/api/web3-trading", {
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    execution: originalExecutionConfig,
+  });
+  assert(response.status === 200, "Execution config restore should return 200.", {
+    status: response.status,
+    json,
+  });
+  const restored = json.execution_readiness?.config ?? {};
+  assert(restored.wallet_public_key === originalExecutionConfig.wallet_public_key, "Execution config restore should preserve the original wallet scope.", restored);
+  assert(restored.mode === originalExecutionConfig.mode, "Execution config restore should preserve the original execution mode.", restored);
+  assert(restored.kill_switch === originalExecutionConfig.kill_switch, "Execution config restore should preserve the original kill switch.", restored);
+  record("execution-config-restore", "pass", "restored original public wallet/risk scope after verifier canaries");
+  shouldRestoreExecutionConfig = false;
+}
+
+function sanitizeExecutionConfig(config) {
+  if (!config || typeof config !== "object") return null;
+  return {
+    mode: config.mode === "dry-run" ? "dry-run" : "paper",
+    kill_switch: config.kill_switch === true,
+    wallet_public_key: typeof config.wallet_public_key === "string" && config.wallet_public_key.length > 0
+      ? config.wallet_public_key
+      : null,
+    max_trade_usd: positiveNumber(config.max_trade_usd, 1_000),
+    daily_spend_cap_usd: positiveNumber(config.daily_spend_cap_usd, 2_500),
+    max_slippage_bps: positiveInteger(config.max_slippage_bps, 250),
+    signer_simulation_enabled: config.signer_simulation_enabled === true,
+    signer_session_label: typeof config.signer_session_label === "string" && config.signer_session_label.trim().length > 0
+      ? config.signer_session_label.trim()
+      : "dry-run-session",
+    signer_network: config.signer_network === "localnet" ? "localnet" : "devnet",
+  };
+}
+
+function positiveNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function positiveInteger(value, fallback) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : fallback;
 }
 
 async function verifyHealth() {
@@ -457,6 +520,7 @@ async function verifyStrictJupiterOrderReadiness() {
 }
 
 async function main() {
+  await snapshotExecutionConfig();
   await verifyHealth();
   await verifyOperatorWalletScope();
   await verifyRejectedExecutionInputs();
@@ -470,6 +534,7 @@ async function main() {
   await verifyJupiterRehearsalBoundary();
   await verifyJupiterPrivateFieldRejection();
   await verifyStrictJupiterOrderReadiness();
+  await restoreExecutionConfig();
 
   const report = {
     mode: "web3-readiness-verify",
@@ -489,7 +554,12 @@ async function main() {
   console.log(JSON.stringify(report, null, 2));
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
+  try {
+    await restoreExecutionConfig();
+  } catch (restoreError) {
+    console.error(redacted(`Restore after verifier failure also failed: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}`));
+  }
   console.error(redacted(error instanceof Error ? error.message : String(error)));
   process.exit(1);
 });
