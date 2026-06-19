@@ -111,7 +111,7 @@ function Web3CredentialsRunwayCard({
     state.live_wallet_accounting_readiness.wallet_public_key ??
     state.execution_readiness.config.wallet_public_key ??
     "";
-  const credentialQueue = buildWeb3CredentialActionQueue(receipt, acquisition);
+  const credentialQueue = buildWeb3CredentialActionQueue(receipt, acquisition, state);
   const queueReadyCount = credentialQueue.filter((item) => item.status === "ready").length;
 
   return (
@@ -374,6 +374,7 @@ type CredentialQueueItem = {
 function buildWeb3CredentialActionQueue(
   receipt: Web3AccountSetupReceipt,
   acquisition: Web3AccountAcquisitionReceipt,
+  state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>,
 ): CredentialQueueItem[] {
   const sampleWallet = receipt.wallet_summary.wallet_is_sample;
   const dedicatedWallet = receipt.wallet_summary.dedicated_wallet_scoped;
@@ -382,6 +383,12 @@ function buildWeb3CredentialActionQueue(
   const accounting = receipt.environment_summary.tax_ledger_configured;
   const jupiter = receipt.environment_summary.jupiter_configured;
   const readRail = receipt.environment_summary.helius_read_rail_configured;
+  const failedDexSources = state.discovery_tape.sources.filter((source) => source.status === "failed").length;
+  const liveDexReady = state.market_source.status === "live" &&
+    state.discovery_tape.status === "live" &&
+    state.discovery_tape.pairs_mapped > 0 &&
+    failedDexSources === 0;
+  const liveDexWatch = state.market_source.status === "live" || state.discovery_tape.pairs_mapped > 0;
 
   return [
     {
@@ -391,6 +398,20 @@ function buildWeb3CredentialActionQueue(
       detail: readRail ? "Server scope has read-provider evidence." : "Wallet and chain reads need Helius or Solana RPC.",
       action: readRail ? "Run provider health after rotating the key." : "Add HELIUS_API_KEY or SOLANA_RPC_URL in ignored local env.",
       storage: "secret: server env only",
+    },
+    {
+      id: "live-dex-scanner",
+      label: "Live DEX scanner",
+      status: liveDexReady ? "ready" : liveDexWatch ? "review" : "missing",
+      detail: liveDexReady
+        ? `${state.discovery_tape.pairs_mapped} live pair${state.discovery_tape.pairs_mapped === 1 ? "" : "s"} mapped with no failed discovery sources.`
+        : liveDexWatch
+          ? `${state.discovery_tape.pairs_mapped} pair${state.discovery_tape.pairs_mapped === 1 ? "" : "s"} mapped; ${failedDexSources} source failure${failedDexSources === 1 ? "" : "s"} still need review.`
+          : "Current Settings state is still sample or untested for live DEX discovery.",
+      action: liveDexReady
+        ? "Run the strict live DEX verifier after source changes; keep this as read-only scanner evidence."
+        : "Use Test DEX scanner or Web3 Live DEX read, then require mapped live pairs with zero failed sources.",
+      storage: "public market data: read-only",
     },
     {
       id: "jupiter-order",

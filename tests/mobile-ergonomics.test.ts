@@ -781,6 +781,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Live credential queue");
     expect(settingsPage).toContain("What is left before supervised trading review");
     expect(settingsPage).toContain("buildWeb3CredentialActionQueue");
+    expect(settingsPage).toContain("Live DEX scanner");
+    expect(settingsPage).toContain("public market data: read-only");
+    expect(settingsPage).toContain("Test DEX scanner or Web3 Live DEX read");
     expect(settingsPage).toContain("JUPITER_API_KEY in ignored local env");
     expect(settingsPage).toContain("signature evidence: hash-only");
     expect(settingsPage).toContain("signer secrets: never stored here");
