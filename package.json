@@ -17,6 +17,7 @@
     "forward-repeat:web3": "node scripts/web3-autonomous-forward-run.mjs --scenario=all --runs=3",
     "promote-paper:web3": "node scripts/web3-paper-promotion-guard.mjs",
     "autopilot-paper:web3": "node scripts/web3-promoted-paper-autopilot.mjs",
+    "monitor:web3": "node scripts/web3-market-monitor.mjs",
     "doctor:web3": "node scripts/web3-credential-doctor.mjs",
     "doctor-repair:web3": "node scripts/web3-credential-doctor.mjs --refresh-supervisor",
     "repair-accountability:web3": "node scripts/web3-local-accountability-repair.mjs",

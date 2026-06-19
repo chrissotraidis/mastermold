@@ -90,6 +90,7 @@ npm run daemon:web3 -- --base-url=http://localhost:4010 --ticks=1 --heartbeat-wh
 npm run forward:web3 -- --base-url=http://localhost:4010 --ticks=6 --min-net-pnl=0 --json
 npm run forward-suite:web3 -- --base-url=http://localhost:4010 --ticks=2 --min-net-pnl=0 --json
 npm run forward-repeat:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=3 --min-net-pnl=0 --min-hit-rate-pct=100 --min-deployed-alpha=0 --max-drawdown=1000 --min-consistency-score=80 --json
+npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json
 npm run preflight-live:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=2 --json
 npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
 npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
@@ -102,7 +103,10 @@ npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
 receipts, refuses real-capital autonomy, and exits on conflicting runners. It is intended
 for local/paper monitoring and rehearsal only; live signing, transaction submission, and
-fund custody remain credential-gated future work. The forward run resets the local paper
+fund custody remain credential-gated future work. The market monitor command calls live DEX
+discovery plus auto-resolved GeckoTerminal OHLCV, writes a local candle-proof receipt back
+to the cockpit, and keeps signing, submission, live execution, and wallet mutation blocked.
+The forward run resets the local paper
 ledger, runs bounded daemon ticks, compares start/end wallet equity, and reports whether
 the paper loop met the requested net-PnL target. The forward suite repeats that proof across
 base, breakout, and rug-risk sample regimes so reviewers can see aggregate PnL, traded

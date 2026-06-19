@@ -1021,6 +1021,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-provider-credentials.ts")).toContain("demo-only and cannot satisfy operator wallet scope");
     expect(source("components/web3-trading-workspace-loader.tsx")).toContain("demo-only");
     expect(settingsPage).toContain("jupiterConfigured={receipt.environment_summary.jupiter_configured}");
+    expect(source("package.json")).toContain("\"monitor:web3\": \"node scripts/web3-market-monitor.mjs\"");
+    expect(source("README.md")).toContain("npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json");
+    expect(source("components/review-readiness.tsx")).toContain("A read-only npm run monitor:web3 command");
+    expect(source("scripts/web3-market-monitor.mjs")).toContain("mode: \"web3-market-monitor\"");
+    expect(source("scripts/web3-market-monitor.mjs")).toContain("transaction_submission_permission: \"blocked\"");
+    expect(source("scripts/web3-market-monitor.mjs")).toContain("secret_echo_permission: \"blocked\"");
     expect(source("package.json")).toContain("\"verify:web3\": \"node scripts/web3-readiness-verify.mjs\"");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(source("docs/web3-credentials-runbook.md")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
