@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Activity, CandlestickChart, LineChart, Pause, Play, RefreshCw, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 
 import { Chip } from "@/components/sentinel";
+import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
@@ -37,9 +38,20 @@ type QuickAgentActionOutcome = {
   boundary: string;
   tone: QuickChipTone;
 };
+type HealthPayload = {
+  status: "ok";
+  web3_daemon_supervisor?: Web3DaemonSupervisorHealth;
+};
 
-export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: Web3TradingState }) {
+export function Web3TradingWorkspaceLoader({
+  initialState,
+  initialSupervisorHealth,
+}: {
+  initialState?: Web3TradingState;
+  initialSupervisorHealth?: Web3DaemonSupervisorHealth;
+}) {
   const [state, setState] = useState<Web3TradingState | undefined>(initialState);
+  const [supervisorHealth, setSupervisorHealth] = useState<Web3DaemonSupervisorHealth | undefined>(initialSupervisorHealth);
   const [error, setError] = useState<string | null>(null);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [loadingControls, setLoadingControls] = useState(false);
@@ -71,6 +83,36 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
       });
     return () => controller.abort();
   }, [state]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadHealth = async () => {
+      try {
+        const response = await fetch("/api/health", { cache: "no-store" });
+        const payload = (await response.json()) as HealthPayload;
+        if (!cancelled && response.ok && payload.web3_daemon_supervisor) {
+          setSupervisorHealth(payload.web3_daemon_supervisor);
+        }
+      } catch {
+        if (!cancelled) {
+          setSupervisorHealth((current) => current ?? {
+            status: "error",
+            updated_at: null,
+            runner_id: null,
+            summary: "Supervisor health could not be refreshed from the local health endpoint.",
+            live_execution_permission: "blocked",
+            wallet_mutation_permission: "blocked",
+          });
+        }
+      }
+    };
+    void loadHealth();
+    const interval = window.setInterval(loadHealth, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   async function openControls() {
     setControlsOpen(true);
@@ -484,7 +526,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
     { id: "cockpit", label: "Copilot", stat: formatCompactCurrency(wallet.equity_usd), tone: wallet.window_pnl_usd >= 0 ? "text-engine" : "text-critical" },
     { id: "market", label: "Market", stat: `${state.autonomous_market_evidence_fusion.max_next_fills} fills`, tone: state.autonomous_market_evidence_fusion.can_trade ? "text-engine" : "text-caution" },
     { id: "portfolio", label: "Portfolio", stat: `${state.autonomous_portfolio_mark_board.held_count} held`, tone: state.autonomous_portfolio_mark_board.release_pressure_usd > 0 ? "text-caution" : "text-engine" },
-    { id: "wiring", label: "Wiring", stat: state.execution_gate.live_execution_enabled ? "live" : "paper", tone: state.execution_gate.live_execution_enabled ? "text-engine" : "text-outline" },
+    { id: "wiring", label: "Wiring", stat: supervisorHealth ? supervisorHealth.status.replace("-", " ") : state.execution_gate.live_execution_enabled ? "live" : "paper", tone: supervisorHealth ? supervisorStatusTextClass(supervisorHealth.status) : state.execution_gate.live_execution_enabled ? "text-engine" : "text-outline" },
   ];
   const compactWiredPaths = [
     {
@@ -631,6 +673,11 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
             <Chip tone={loopThrottle.can_run ? "engine" : loopThrottle.status === "blocked" ? "critical" : "caution"}>
               {loopThrottle.status.replace("-", " ")}
             </Chip>
+            {supervisorHealth ? (
+              <Chip tone={supervisorTone(supervisorHealth.status)}>
+                supervisor {supervisorHealth.status.replace("-", " ")}
+              </Chip>
+            ) : null}
           </div>
         </div>
         <p className="mt-2 truncate font-mono text-[10px] uppercase tracking-telemetry text-outline sm:hidden">
@@ -781,6 +828,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
                 autoWatch={autoWatch}
                 autoWatchPlan={autoWatchPlan}
               />
+              <QuickDaemonSupervisorPanel health={supervisorHealth} />
               <QuickDaemonHandoffPanel handoff={daemonHandoff} />
             </div>
           ) : null}
@@ -901,6 +949,9 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
                 <QuickLiveAutonomyReadinessAudit readiness={liveAutonomyReadiness} />
               </div>
               <div className="xl:col-span-2">
+                <QuickDaemonSupervisorPanel health={supervisorHealth} />
+              </div>
+              <div className="xl:col-span-2">
                 <QuickDaemonHandoffPanel handoff={daemonHandoff} />
               </div>
               <QuickExecutionReadinessBridge
@@ -916,7 +967,7 @@ export function Web3TradingWorkspaceLoader({ initialState }: { initialState?: We
           ) : null}
 
           <span className="sr-only" aria-label="Web3 operator focus deck receipt">
-            Focus deck active {focusMode}; wallet equity {formatCurrency(wallet.equity_usd)}, command readiness {tradeReadinessGate.status}, launch timing {tradeReadinessGate.launch_timing_status}, market leader {state.autonomous_market_evidence_fusion.leader_symbol ?? "none"}, action queue leader {actionQueue.leader_symbol ?? "none"}.
+            Focus deck active {focusMode}; wallet equity {formatCurrency(wallet.equity_usd)}, command readiness {tradeReadinessGate.status}, launch timing {tradeReadinessGate.launch_timing_status}, market leader {state.autonomous_market_evidence_fusion.leader_symbol ?? "none"}, action queue leader {actionQueue.leader_symbol ?? "none"}, supervisor status {supervisorHealth?.status ?? "unknown"}.
           </span>
           <span className="sr-only" aria-label="Auto watch backend authority receipt">
             Auto watch schedules refreshes or backend autonomous loop ticks only. Manual Run minute can still rehearse a bounded next-minute paper session, but browser Auto watch does not rebuild trade sizing locally.
@@ -6686,6 +6737,51 @@ function QuickLiveAutonomyReadinessAudit({
   );
 }
 
+function QuickDaemonSupervisorPanel({
+  health,
+}: {
+  health?: Web3DaemonSupervisorHealth;
+}) {
+  const status = health?.status ?? "absent";
+  const tone = supervisorTone(status);
+  const updatedAt = health?.updated_at ? compactIsoTime(health.updated_at) : "no receipt";
+  const runner = health?.runner_id ?? "not running";
+  const summary = health?.summary ?? "No local Web3 daemon supervisor receipt has been written yet.";
+
+  return (
+    <section className="rounded-md border border-outline-variant/30 bg-surface-dim/15 p-2 sm:p-3" aria-label="Web3 daemon supervisor">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Daemon supervisor</p>
+          <p className="mt-1 break-words text-sm font-semibold text-on-surface">
+            {status === "absent" ? "No external runner receipt yet" : status.replaceAll("-", " ")}
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+            {summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone="demo">paper only</Chip>
+          <Chip tone={health?.live_execution_permission === "blocked" ? "demo" : "critical"}>live locked</Chip>
+        </div>
+      </div>
+      <div className="mt-2 grid gap-1 sm:grid-cols-4" aria-label="Web3 daemon supervisor metrics">
+        <ProfitMetric label="Runner" value={runner} detail="external paper runner" tone={status === "running" ? "engine" : "neutral"} />
+        <ProfitMetric label="Updated" value={updatedAt} detail="local health receipt" tone={status === "absent" ? "neutral" : "engine"} />
+        <ProfitMetric label="Circuit" value={status === "circuit-open" ? "open" : "closed"} detail="fail-closed guard" tone={status === "circuit-open" || status === "error" ? "critical" : "engine"} />
+        <ProfitMetric label="Wallet" value={health?.wallet_mutation_permission ?? "blocked"} detail="mutation permission" tone="demo" />
+      </div>
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Use <span className="font-mono">npm run supervise:web3</span> to run repeated leased paper ticks outside the browser; it still cannot sign, submit, custody funds, or move real capital.
+      </p>
+      <span className="sr-only" aria-label="Web3 daemon supervisor receipt">
+        Web3 daemon supervisor status {status}; runner {runner}; updated {updatedAt}; live execution permission {health?.live_execution_permission ?? "blocked"}; wallet mutation permission {health?.wallet_mutation_permission ?? "blocked"}; summary {summary}.
+      </span>
+    </section>
+  );
+}
+
 function QuickDaemonHandoffPanel({
   handoff,
 }: {
@@ -7333,6 +7429,20 @@ function daemonMarketWorkerTone(status: Web3TradingState["autonomous_daemon_hand
   return "neutral";
 }
 
+function supervisorTone(status: Web3DaemonSupervisorHealth["status"]): QuickChipTone {
+  if (status === "running" || status === "completed") return "engine";
+  if (status === "idle" || status === "absent") return "caution";
+  if (status === "circuit-open" || status === "error") return "critical";
+  return "neutral";
+}
+
+function supervisorStatusTextClass(status: Web3DaemonSupervisorHealth["status"]) {
+  if (status === "running" || status === "completed") return "text-engine";
+  if (status === "circuit-open" || status === "error") return "text-critical";
+  if (status === "idle" || status === "absent") return "text-caution";
+  return "text-outline";
+}
+
 function daemonHandoffItemTextClass(status: Web3TradingState["autonomous_daemon_handoff"]["items"][number]["status"]) {
   if (status === "pass") return "text-engine";
   if (status === "watch") return "text-caution";
@@ -7831,6 +7941,15 @@ function formatCompactSignedCurrency(value: number) {
 
 function formatPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
+function compactIsoTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function actionToneClass(action: Web3TradingState["autonomous_market_evidence_fusion"]["items"][number]["action"]) {

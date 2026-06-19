@@ -54,6 +54,7 @@ async function main() {
   assert(["absent", "running", "idle", "completed", "circuit-open", "error"].includes(health.web3_daemon_supervisor.status), "Supervisor health should return a known status.", health.web3_daemon_supervisor);
   assert(health.web3_daemon_supervisor.live_execution_permission === "blocked", "Supervisor health should keep live execution blocked.", health.web3_daemon_supervisor);
   assert(health.web3_daemon_supervisor.wallet_mutation_permission === "blocked", "Supervisor health should keep wallet mutation blocked.", health.web3_daemon_supervisor);
+  assert(!("receipt_path" in health.web3_daemon_supervisor), "Supervisor health should not expose local receipt paths.", health.web3_daemon_supervisor);
 
   const page = await request("/trading");
   const html = await page.text();
@@ -99,6 +100,8 @@ async function main() {
   assert(html.includes("Expert receipts"), "Trading page should keep deep diagnostics behind an explicit disclosure.");
   assert(html.includes("Quick agent controls are armed"), "Trading page should surface the compact autonomous trading cockpit state.");
   assert(html.includes("Quick autonomous controls"), "Trading page should expose always-visible quick autonomous controls.");
+  assert(html.includes("Daemon supervisor"), "Trading page should expose the external daemon supervisor status near the autonomous cockpit.");
+  assert(html.includes("Web3 daemon supervisor receipt"), "Trading page should expose an accessible supervisor receipt.");
   assert(html.includes("Refresh read"), "Trading page should let the operator refresh the autonomous market read from the cockpit.");
   assert(html.includes("Proof + tick") || html.includes("Run tick"), "Trading page should expose a backend autonomous loop tick control even when fresh buys are blocked.");
   assert(html.includes("Run minute"), "Trading page should expose a next-minute high-frequency paper loop from the first screen.");
