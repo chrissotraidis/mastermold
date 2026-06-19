@@ -105,7 +105,10 @@ receipts, refuses real-capital autonomy, and exits on conflicting runners. It is
 for local/paper monitoring and rehearsal only; live signing, transaction submission, and
 fund custody remain credential-gated future work. The market monitor command calls live DEX
 discovery plus auto-resolved GeckoTerminal OHLCV, writes a local candle-proof receipt back
-to the cockpit, and keeps signing, submission, live execution, and wallet mutation blocked.
+to the cockpit, appends a sanitized local monitor history at
+`data/web3-market-monitor-history.json`, exposes it through
+`/api/web3-market-monitor-history`, and keeps signing, submission, live execution, and
+wallet mutation blocked.
 When the public candle provider is throttled, it returns an observed/degraded receipt and
 keeps fresh paper buys blocked instead of crashing or loosening execution gates.
 The forward run resets the local paper

@@ -17,6 +17,7 @@ import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wal
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
+import { GET as MARKET_MONITOR_HISTORY_GET } from "@/app/api/web3-market-monitor-history/route";
 import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
@@ -32,6 +33,10 @@ import {
   getWeb3PromotedPaperAutopilotHistory,
   writeWeb3PromotedPaperAutopilotReceipt,
 } from "@/src/db/web3-promoted-paper-autopilot";
+import {
+  getWeb3MarketMonitorHistory,
+  writeWeb3MarketMonitorHistoryEntry,
+} from "@/src/db/web3-market-monitor-history";
 import {
   getWeb3TradingStateAsync,
   getWeb3TradingState,
@@ -49,6 +54,7 @@ let prevRpcUrl: string | undefined;
 let prevNextPublicRpcUrl: string | undefined;
 let prevPromotedAutopilotPath: string | undefined;
 let prevPromotedAutopilotHistoryPath: string | undefined;
+let prevMarketMonitorHistoryPath: string | undefined;
 let prevLocalAccountabilityRepairPath: string | undefined;
 let prevLiveExecution: string | undefined;
 let prevLiveApproval: string | undefined;
@@ -84,6 +90,7 @@ beforeEach(() => {
   prevNextPublicRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
   prevPromotedAutopilotPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH;
   prevPromotedAutopilotHistoryPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
+  prevMarketMonitorHistoryPath = process.env.WEB3_MARKET_MONITOR_HISTORY_PATH;
   prevLocalAccountabilityRepairPath = process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
   prevLiveExecution = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   prevLiveApproval = process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
@@ -113,6 +120,7 @@ beforeEach(() => {
   process.env.MASTERMOLD_DB = join(testRoot, "db.sqlite");
   process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH = join(testRoot, "promoted-autopilot.json");
   process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = join(testRoot, "promoted-autopilot-history.json");
+  process.env.WEB3_MARKET_MONITOR_HISTORY_PATH = join(testRoot, "web3-market-monitor-history.json");
   process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH = join(testRoot, "local-accountability-repair.json");
   delete process.env.JUPITER_API_KEY;
   delete process.env.JUPITER_TRIGGER_JWT;
@@ -162,6 +170,8 @@ afterEach(() => {
   else process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH = prevPromotedAutopilotPath;
   if (prevPromotedAutopilotHistoryPath === undefined) delete process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
   else process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = prevPromotedAutopilotHistoryPath;
+  if (prevMarketMonitorHistoryPath === undefined) delete process.env.WEB3_MARKET_MONITOR_HISTORY_PATH;
+  else process.env.WEB3_MARKET_MONITOR_HISTORY_PATH = prevMarketMonitorHistoryPath;
   if (prevLocalAccountabilityRepairPath === undefined) delete process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
   else process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH = prevLocalAccountabilityRepairPath;
   if (prevLiveExecution === undefined) delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
@@ -8044,6 +8054,79 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(proof.next_action).toContain("Repair promotion guard first: Hit rate is 0%");
     expect(proof.proof_plan.next_action).toContain("Repair promotion guard first: Hit rate is 0%");
+  });
+
+  test("GIVEN monitor receipts are written WHEN history is read THEN only safe paper rows reach the API", async () => {
+    const accepted = writeWeb3MarketMonitorHistoryEntry({
+      mode: "web3-market-monitor",
+      status: "recorded",
+      finished_at: "2026-06-19T11:00:00.000Z",
+      scenario: "breakout",
+      source: "live-dex",
+      account: "persistent",
+      discovery_status: "live",
+      scanner_status: "actionable",
+      selected_symbol: "POPCAT",
+      selected_pair: "pool-123",
+      candle_count: 24,
+      candle_action: "press",
+      candle_confidence: 78,
+      paper_action: "paper-probe",
+      paper_notional_usd: 125,
+      recorded_candle_status: "fresh",
+      recorded_conviction_status: "ready",
+      provider_degraded: false,
+      provider_error: "",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      secret_echo_permission: "blocked",
+      summary: "POPCAT read-only candle proof recorded.",
+      next_action: "Review the paper probe before the next tick.",
+    });
+    const rejected = writeWeb3MarketMonitorHistoryEntry({
+      status: "recorded",
+      finished_at: "2026-06-19T11:01:00.000Z",
+      live_execution_permission: "enabled",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      secret_echo_permission: "blocked",
+    });
+
+    expect(accepted?.selected_symbol).toBe("POPCAT");
+    expect(rejected).toBeNull();
+
+    const history = getWeb3MarketMonitorHistory();
+    expect(history).toMatchObject({
+      mode: "web3-market-monitor-history",
+      paper_only: true,
+      status: "active",
+      run_count: 1,
+      latest_symbol: "POPCAT",
+      latest_action: "paper-probe",
+      latest_confidence: 78,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(history.recent_runs[0]).toMatchObject({
+      selected_symbol: "POPCAT",
+      paper_action: "paper-probe",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+
+    const response = await MARKET_MONITOR_HISTORY_GET();
+    const payload = await json<{
+      run_count: number;
+      recent_runs: Array<{ selected_symbol: string }>;
+    }>(response);
+    expect(payload.run_count).toBe(1);
+    expect(payload.recent_runs[0].selected_symbol).toBe("POPCAT");
+    expect(JSON.stringify(payload)).not.toMatch(/enabled|api-key=/i);
   });
 
   test("GIVEN mocked DEX Screener payloads WHEN live mode is requested THEN the agent trades from live market telemetry", async () => {

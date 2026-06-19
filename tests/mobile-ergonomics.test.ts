@@ -1024,8 +1024,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("package.json")).toContain("\"monitor:web3\": \"node scripts/web3-market-monitor.mjs\"");
     expect(source("README.md")).toContain("npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-market-monitor-history");
     expect(source("components/review-readiness.tsx")).toContain("A read-only npm run monitor:web3 command");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("mode: \"web3-market-monitor\"");
+    expect(source("scripts/web3-market-monitor.mjs")).toContain("WEB3_MARKET_MONITOR_HISTORY_PATH");
+    expect(source("src/db/web3-market-monitor-history.ts")).toContain("web3-market-monitor-history");
+    expect(source("app/api/web3-market-monitor-history/route.ts")).toContain("getWeb3MarketMonitorHistory");
+    expect(source("app/trading/page.tsx")).toContain("MarketMonitorHistoryPanel");
+    expect(source("app/trading/page.tsx")).toContain("Read-only market monitor");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("transaction_submission_permission: \"blocked\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("secret_echo_permission: \"blocked\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("provider_degraded");

@@ -1,4 +1,4 @@
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -9,6 +9,7 @@ import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
+import { getWeb3MarketMonitorHistory, type Web3MarketMonitorHistory } from "@/src/db/web3-market-monitor-history";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
@@ -39,6 +40,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
   });
   const supervisorHealth = getWeb3DaemonSupervisorHealth();
   const promotedAutopilotHealth = getWeb3PromotedPaperAutopilotHealth();
+  const monitorHistory = getWeb3MarketMonitorHistory();
   const launchChecklist = buildWeb3AutonomyLaunchChecklist(initialState, promotedAutopilotHealth, supervisorHealth);
   const productionSupervisor = buildWeb3ProductionSupervisorReadiness(supervisorHealth);
   const accounting = buildWeb3AccountingLedgerReceipt(initialState);
@@ -74,6 +76,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
 
         <div className="w-full min-w-0 space-y-4">
           <SupervisedLiveRunwayPanel runway={supervisedLiveRunway} />
+          <MarketMonitorHistoryPanel history={monitorHistory} />
 
           <Web3TradingWorkspaceLoader
             initialState={initialState}
@@ -85,6 +88,99 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
       </div>
     </AppShell>
   );
+}
+
+function MarketMonitorHistoryPanel({ history }: { history: Web3MarketMonitorHistory }) {
+  const latestRuns = history.recent_runs.slice(-6);
+
+  return (
+    <section
+      aria-labelledby="trading-market-monitor-history-title"
+      className="rounded-md border border-outline/15 bg-surface/70 p-4 sm:p-5"
+    >
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_1.9fr]">
+        <div className="min-w-0">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-violet/30 bg-violet/10 text-violet">
+              <Activity aria-hidden="true" className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                Read-only market monitor
+              </p>
+              <h2 id="trading-market-monitor-history-title" className="mt-1 font-display text-lg font-semibold text-on-surface">
+                {history.run_count > 0 ? `${history.run_count} recent run${history.run_count === 1 ? "" : "s"}` : "No monitor tape yet"}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-on-surface-variant">
+                {history.summary} Signing, live execution, transaction submission, and wallet mutation remain blocked.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <MonitorStat label="Latest" value={history.latest_symbol ?? "None"} />
+            <MonitorStat label="Confidence" value={`${history.latest_confidence}/100`} />
+            <MonitorStat label="Degraded" value={`${history.degraded_count}`} />
+          </div>
+        </div>
+
+        <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <BarChart3 aria-hidden="true" className="size-4 shrink-0 text-engine" />
+              <p className="truncate text-sm font-semibold text-on-surface">Monitor run tape</p>
+            </div>
+            <span className={monitorHistoryStatusClassName(history.status)}>{history.status}</span>
+          </div>
+
+          {latestRuns.length > 0 ? (
+            <div className="mt-3 grid gap-2" aria-label="Recent read-only market monitor runs">
+              {latestRuns.map((run) => (
+                <div key={`${run.finished_at}-${run.selected_symbol}`} className="grid min-w-0 grid-cols-[76px_1fr_auto] items-center gap-2">
+                  <p className="truncate text-xs font-semibold text-on-surface">{run.selected_symbol}</p>
+                  <div className="h-2 overflow-hidden rounded-full bg-outline/15" aria-label={`${run.selected_symbol} confidence ${run.candle_confidence} of 100`}>
+                    <div
+                      className={run.provider_degraded ? "h-full rounded-full bg-caution" : "h-full rounded-full bg-engine"}
+                      style={{ width: `${Math.max(4, Math.min(100, run.candle_confidence))}%` }}
+                    />
+                  </div>
+                  <p className="min-w-0 text-right text-[11px] text-outline">
+                    {run.paper_action.replaceAll("-", " ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-md border border-dashed border-outline/20 bg-surface/50 p-3">
+              <p className="text-sm font-semibold text-on-surface">Run the monitor once</p>
+              <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                Use npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json to write the first sanitized tape row.
+              </p>
+            </div>
+          )}
+
+          <p className="mt-3 line-clamp-2 text-xs leading-5 text-on-surface-variant">{history.next_action}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MonitorStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-on-surface">{value}</p>
+    </div>
+  );
+}
+
+function monitorHistoryStatusClassName(status: Web3MarketMonitorHistory["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "active") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "blocked") return `${base} border-critical/30 bg-critical/10 text-critical`;
+  if (status === "degraded") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-outline/20 bg-surface text-outline`;
 }
 
 function SupervisedLiveRunwayPanel({ runway }: { runway: Web3SupervisedLiveRunway }) {

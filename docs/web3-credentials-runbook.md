@@ -71,7 +71,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 10. Press `Test credentials`.
 11. Press `Apply dry-run profile` only after provider, wallet, and route evidence is acceptable.
 12. Run `npm run landing-drill:web3` to confirm the landing path is still safely blocked before live signing/submission.
-13. Run `npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json` to perform one read-only market monitor pass. It refreshes DEX discovery, auto-resolves a GeckoTerminal OHLCV candidate, records local candle proof for the cockpit, and still cannot sign, submit, custody funds, mutate wallets, or unlock live capital.
+13. Run `npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json` to perform one read-only market monitor pass. It refreshes DEX discovery, auto-resolves a GeckoTerminal OHLCV candidate, records local candle proof for the cockpit, appends a sanitized monitor tape to `data/web3-market-monitor-history.json` or `WEB3_MARKET_MONITOR_HISTORY_PATH`, and still cannot sign, submit, custody funds, mutate wallets, or unlock live capital.
 14. Use the Wiring focus `Build account receipt` control to create a redacted setup receipt from local provider-account configuration and current wallet gates. It reports whether Helius/Solana, Jupiter, a dedicated public wallet, signer posture, emergency stop, and accounting targets are configured or missing without creating external accounts or echoing secrets.
 15. Use the Wiring focus `Test provider health` control to create a redacted provider-health receipt. It performs read-only Solana RPC, latest-blockhash, Helius DAS, Jupiter quote, and Jupiter order-gate checks from server environment values without returning API keys, raw wallet holdings, transaction bodies, signatures, or wallet authority.
 16. Use `Rehearse Jupiter order` in the Web3 credential setup card to create a one-shot Jupiter rehearsal receipt. It accepts a session-only Jupiter key or server `JUPITER_API_KEY`, proves SOL-to-USDC quote/order readiness when possible, hashes request evidence, withholds unsigned transaction bytes, and keeps execute/sign/submit/live trading blocked.
@@ -130,6 +130,7 @@ GET /api/web3-dex-discovery
 GET /api/web3-jupiter-order-packet
 GET /api/web3-live-capital-preflight
 GET /api/web3-live-ops-packet
+GET /api/web3-market-monitor-history
 GET /api/web3-ohlcv
 GET /api/web3-provider-health
 GET /api/web3-signer-credential-packet
@@ -145,6 +146,8 @@ The account acquisition route returns the external setup packet used by Settings
 The account setup route returns a redacted receipt with provider-account status for Helius/Solana reads, Jupiter Swap V2 order rehearsal, the dedicated public wallet, signer posture, emergency-stop ops, accounting, and optional market-feed lanes. It detects whether expected local env targets are configured but never returns their values. It also separates `wallet_scoped` from `dedicated_wallet_scoped`, so a demo all-ones wallet can prove the save path without satisfying live-readiness review. It does not create third-party accounts, submit signup forms, store secrets, sign, submit, custody funds, or mutate wallets; external account creation remains operator-owned outside the app.
 
 The operator credential handoff route, `GET /api/web3-operator-credential-handoff`, returns the machine-readable version of the Settings handoff packet. It names safe inputs, never-requested fields, collection surfaces, env targets, next input, and verifier commands for Helius/Solana, Jupiter, dedicated wallet, wallet ownership proof, signer provider, emergency stop, accounting, and manual live approval. It can guide another agent or reviewer through setup without returning raw secrets, private keys, seed phrases, transaction bodies, signed payloads, live execution permission, or wallet mutation authority.
+
+The monitor-history route, `GET /api/web3-market-monitor-history`, returns the latest sanitized `npm run monitor:web3` tape: run count, latest symbol, candle confidence, paper action, provider-degraded count, and recent read-only rows. The local file stores no API keys, private keys, seed phrases, transaction bodies, signed payloads, live execution permission, or wallet mutation authority, and rejects rows that do not preserve those blocked permissions.
 
 The dedicated wallet packet route returns a redacted operator-wallet receipt. It reports whether a public wallet is scoped, whether that wallet is the sample all-ones demo wallet, whether it counts as a dedicated wallet, whether hash-only ownership proof exists, the strict operator-wallet verifier command, setup links, and the next safe wallet step. It stores and returns no private keys, seed phrases, raw signatures, transaction bodies, signed payloads, live execution permission, or wallet mutation authority.
 
