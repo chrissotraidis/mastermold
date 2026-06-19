@@ -29,12 +29,22 @@ type CredentialInput = {
   rpc_url?: unknown;
   ws_url?: unknown;
   jupiter_api_key?: unknown;
+  emergency_stop_webhook_url?: unknown;
+  emergency_stop_contact?: unknown;
+  tax_ledger_export_path?: unknown;
 };
 
 type CredentialTarget = {
   field: keyof CredentialInput;
-  env: "HELIUS_API_KEY" | "SOLANA_RPC_URL" | "SOLANA_WS_URL" | "JUPITER_API_KEY";
-  kind: "key" | "http-url" | "ws-url";
+  env:
+    | "HELIUS_API_KEY"
+    | "SOLANA_RPC_URL"
+    | "SOLANA_WS_URL"
+    | "JUPITER_API_KEY"
+    | "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL"
+    | "MASTERMOLD_EMERGENCY_STOP_CONTACT"
+    | "MASTERMOLD_TAX_LEDGER_EXPORT_PATH";
+  kind: "key" | "http-url" | "ws-url" | "contact" | "path";
 };
 
 const CREDENTIAL_TARGETS: CredentialTarget[] = [
@@ -42,6 +52,9 @@ const CREDENTIAL_TARGETS: CredentialTarget[] = [
   { field: "rpc_url", env: "SOLANA_RPC_URL", kind: "http-url" },
   { field: "ws_url", env: "SOLANA_WS_URL", kind: "ws-url" },
   { field: "jupiter_api_key", env: "JUPITER_API_KEY", kind: "key" },
+  { field: "emergency_stop_webhook_url", env: "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL", kind: "http-url" },
+  { field: "emergency_stop_contact", env: "MASTERMOLD_EMERGENCY_STOP_CONTACT", kind: "contact" },
+  { field: "tax_ledger_export_path", env: "MASTERMOLD_TAX_LEDGER_EXPORT_PATH", kind: "path" },
 ];
 
 export function buildWeb3LocalCredentialInstallHealth(request?: Request): Web3LocalCredentialInstallReceipt {
@@ -67,7 +80,7 @@ export function buildWeb3LocalCredentialInstallHealth(request?: Request): Web3Lo
       ? nextInstallAction(missing, [])
       : "Open the local app on localhost or set MASTERMOLD_ALLOW_LOCAL_CREDENTIAL_INSTALL=true for an explicitly trusted local environment.",
     summary: allowed
-      ? `${configured.length}/${CREDENTIAL_TARGETS.length} local Web3 credential targets are configured.`
+      ? `${configured.length}/${CREDENTIAL_TARGETS.length} local Web3 credential and ops targets are configured.`
       : "Local credential install is blocked outside trusted localhost scope.",
   };
 }
@@ -162,7 +175,7 @@ function invalidReceipt(rejectedFields: string[], summary: string): Web3LocalCre
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     secret_echo_permission: "blocked",
-    next_action: "Submit only Helius, Solana RPC/WebSocket, or Jupiter provider credentials; never submit private keys or seed phrases.",
+    next_action: "Submit only Helius, Solana RPC/WebSocket, Jupiter, emergency-stop, or accounting targets; never submit private keys or seed phrases.",
     summary,
   };
 }
@@ -195,6 +208,8 @@ function isValidCredentialValue(value: string, kind: CredentialTarget["kind"]) {
   if (/[\r\n\0]/.test(value)) return false;
   if (kind === "http-url") return /^https?:\/\/[^\s]+$/i.test(value);
   if (kind === "ws-url") return /^wss?:\/\/[^\s]+$/i.test(value);
+  if (kind === "contact") return /^[^<>{}\[\]\r\n\0]{3,}$/.test(value);
+  if (kind === "path") return /^[~/A-Za-z0-9._:\-\/ ]{3,}$/.test(value);
   return /^[A-Za-z0-9._:\-/+=]{8,}$/.test(value);
 }
 
@@ -205,7 +220,7 @@ function findRejectedCredentialFields(input: object) {
 }
 
 function writeIgnoredLocalEnv(updates: Map<CredentialTarget["env"], string>) {
-  const filePath = join(process.cwd(), LOCAL_ENV_FILE);
+  const filePath = localEnvFilePath();
   const existing = existsSync(filePath) ? readFileSync(filePath, "utf8") : "";
   const lines = existing.length > 0 ? existing.split(/\n/) : [];
   const seen = new Set<string>();
@@ -227,6 +242,15 @@ function writeIgnoredLocalEnv(updates: Map<CredentialTarget["env"], string>) {
 function nextInstallAction(missing: string[], installed: string[]) {
   if (missing.includes("JUPITER_API_KEY")) return "Add JUPITER_API_KEY, then run Jupiter rehearsal and strict order verification.";
   if (missing.includes("HELIUS_API_KEY") && missing.includes("SOLANA_RPC_URL")) return "Add HELIUS_API_KEY or SOLANA_RPC_URL, then test provider health.";
+  if (missing.includes("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL") && missing.includes("MASTERMOLD_EMERGENCY_STOP_CONTACT")) {
+    return "Add an emergency-stop contact or webhook, then run the local stop drill and live ops packet.";
+  }
+  if (missing.includes("MASTERMOLD_TAX_LEDGER_EXPORT_PATH")) return "Add an accounting export target, then rebuild the live ops packet.";
   if (installed.length > 0) return "Run Test credentials, Rehearse Jupiter, and npm run verify:web3 after the local server reads the updated environment.";
   return "Scope a dedicated public wallet and prove ownership; live execution remains blocked.";
+}
+
+function localEnvFilePath() {
+  const override = process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH;
+  return override && override.trim().length > 0 ? override : join(process.cwd(), LOCAL_ENV_FILE);
 }

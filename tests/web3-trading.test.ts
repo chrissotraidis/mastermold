@@ -1,7 +1,7 @@
 /// <reference types="bun" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
@@ -66,6 +66,7 @@ let prevYellowstoneGrpcToken: string | undefined;
 let prevEmergencyStopWebhookUrl: string | undefined;
 let prevEmergencyStopContact: string | undefined;
 let prevTaxLedgerExportPath: string | undefined;
+let prevLocalCredentialInstallEnvPath: string | undefined;
 let prevFetch: typeof globalThis.fetch;
 
 beforeEach(() => {
@@ -96,6 +97,7 @@ beforeEach(() => {
   prevEmergencyStopWebhookUrl = process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL;
   prevEmergencyStopContact = process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT;
   prevTaxLedgerExportPath = process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
+  prevLocalCredentialInstallEnvPath = process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH;
   prevFetch = globalThis.fetch;
   const testRoot = mkdtempSync(join(tmpdir(), "mm-web3-"));
   process.env.MASTERMOLD_DB = join(testRoot, "db.sqlite");
@@ -125,6 +127,7 @@ beforeEach(() => {
   delete process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL;
   delete process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT;
   delete process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
+  delete process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH;
   __resetStoreForTests();
 });
 
@@ -183,6 +186,8 @@ afterEach(() => {
   else process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = prevEmergencyStopContact;
   if (prevTaxLedgerExportPath === undefined) delete process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH;
   else process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = prevTaxLedgerExportPath;
+  if (prevLocalCredentialInstallEnvPath === undefined) delete process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH;
+  else process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH = prevLocalCredentialInstallEnvPath;
   globalThis.fetch = prevFetch;
   __resetStoreForTests();
 });
@@ -484,6 +489,57 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(rejectedReceipt.secret_echo_permission).toBe("blocked");
     expect(rejectedText).not.toContain("test-helius-secret");
     expect(rejectedText).not.toContain("alpha beta gamma");
+  });
+
+  test("GIVEN local ops targets WHEN the local installer runs THEN it writes ignored env keys without echoing values", async () => {
+    const envPath = join(mkdtempSync(join(tmpdir(), "mm-web3-env-")), ".env.local");
+    process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH = envPath;
+
+    const response = await LOCAL_CREDENTIALS_POST(new Request("http://localhost/api/web3-local-credentials", {
+      method: "POST",
+      headers: { "content-type": "application/json", host: "localhost" },
+      body: JSON.stringify({
+        emergency_stop_webhook_url: "https://ops.example.test/live-stop-canary",
+        emergency_stop_contact: "ops-canary@example.test",
+        tax_ledger_export_path: "/tmp/mastermold-tax-canary.csv",
+      }),
+    }));
+    const receipt = await json<{
+      status: string;
+      installed_keys: string[];
+      configured_keys: string[];
+      missing_keys: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      secret_echo_permission: string;
+      summary: string;
+      next_action: string;
+    }>(response);
+    const receiptText = JSON.stringify(receipt);
+    const envText = readFileSync(envPath, "utf8");
+
+    expect(response.status).toBe(200);
+    expect(receipt.status).toBe("installed");
+    expect(receipt.installed_keys).toEqual(expect.arrayContaining([
+      "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL",
+      "MASTERMOLD_EMERGENCY_STOP_CONTACT",
+      "MASTERMOLD_TAX_LEDGER_EXPORT_PATH",
+    ]));
+    expect(receipt.configured_keys).toEqual(expect.arrayContaining([
+      "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL",
+      "MASTERMOLD_EMERGENCY_STOP_CONTACT",
+      "MASTERMOLD_TAX_LEDGER_EXPORT_PATH",
+    ]));
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.summary).toContain("values were not returned");
+    expect(envText).toContain("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL=https://ops.example.test/live-stop-canary");
+    expect(envText).toContain("MASTERMOLD_EMERGENCY_STOP_CONTACT=ops-canary@example.test");
+    expect(envText).toContain("MASTERMOLD_TAX_LEDGER_EXPORT_PATH=/tmp/mastermold-tax-canary.csv");
+    expect(receiptText).not.toContain("live-stop-canary");
+    expect(receiptText).not.toContain("ops-canary@example.test");
+    expect(receiptText).not.toContain("mastermold-tax-canary");
   });
 
   test("GIVEN local provider env WHEN the account setup route runs THEN it reports missing accounts without leaking secrets", async () => {

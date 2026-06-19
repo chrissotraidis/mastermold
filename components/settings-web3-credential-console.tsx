@@ -30,6 +30,9 @@ type Draft = {
   rpc_url: string;
   ws_url: string;
   jupiter_api_key: string;
+  emergency_stop_webhook_url: string;
+  emergency_stop_contact: string;
+  tax_ledger_export_path: string;
   wallet_public_key: string;
   signer_mode: Web3SignerSetupMode;
   max_trade_usd: string;
@@ -76,6 +79,9 @@ export function SettingsWeb3CredentialConsole({
     rpc_url: "",
     ws_url: "",
     jupiter_api_key: "",
+    emergency_stop_webhook_url: "",
+    emergency_stop_contact: "",
+    tax_ledger_export_path: "",
     wallet_public_key: defaultWalletPublicKey,
     signer_mode: "external-wallet",
     max_trade_usd: String(maxTradeUsd),
@@ -95,9 +101,11 @@ export function SettingsWeb3CredentialConsole({
 
   function updateDraft(field: keyof Draft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
-    setMessage(field === "helius_api_key" || field === "jupiter_api_key"
-      ? "Secret value is held only in this page session and is not saved."
-      : "Session value updated. Use a public wallet address only.");
+    setMessage(field === "helius_api_key" || field === "jupiter_api_key" || field === "emergency_stop_webhook_url"
+      ? "Sensitive value is held only in this page session and is not saved to browser storage."
+      : field === "wallet_public_key"
+        ? "Session value updated. Use a public wallet address only."
+        : "Session value updated.");
   }
 
   async function testCredentials() {
@@ -131,12 +139,20 @@ export function SettingsWeb3CredentialConsole({
   }
 
   async function installLocalCredentials() {
-    if (![draft.helius_api_key, draft.rpc_url, draft.ws_url, draft.jupiter_api_key].some((value) => value.trim().length > 0)) {
-      setMessage("Enter a Helius, Solana RPC/WebSocket, or Jupiter value before installing local env credentials.");
+    if (![
+      draft.helius_api_key,
+      draft.rpc_url,
+      draft.ws_url,
+      draft.jupiter_api_key,
+      draft.emergency_stop_webhook_url,
+      draft.emergency_stop_contact,
+      draft.tax_ledger_export_path,
+    ].some((value) => value.trim().length > 0)) {
+      setMessage("Enter a provider, emergency-stop, or accounting value before installing local env targets.");
       return;
     }
     setBusy("install");
-    setMessage("Installing known Web3 credential targets into ignored local env without echoing values...");
+    setMessage("Installing known Web3 credential and ops targets into ignored local env without echoing values...");
     try {
       const response = await fetch("/api/web3-local-credentials", {
         method: "POST",
@@ -146,6 +162,9 @@ export function SettingsWeb3CredentialConsole({
           rpc_url: draft.rpc_url,
           ws_url: draft.ws_url,
           jupiter_api_key: draft.jupiter_api_key,
+          emergency_stop_webhook_url: draft.emergency_stop_webhook_url,
+          emergency_stop_contact: draft.emergency_stop_contact,
+          tax_ledger_export_path: draft.tax_ledger_export_path,
         }),
       });
       const payload = (await response.json().catch(() => null)) as Web3LocalCredentialInstallReceipt | { error: string } | null;
@@ -159,6 +178,9 @@ export function SettingsWeb3CredentialConsole({
         rpc_url: "",
         ws_url: "",
         jupiter_api_key: "",
+        emergency_stop_webhook_url: "",
+        emergency_stop_contact: "",
+        tax_ledger_export_path: "",
       }));
       setMessage(payload.summary);
     } catch (error) {
@@ -464,6 +486,25 @@ export function SettingsWeb3CredentialConsole({
           onChange={(value) => updateDraft("jupiter_api_key", value)}
         />
         <ConsoleInput
+          label="Emergency stop webhook"
+          type="password"
+          value={draft.emergency_stop_webhook_url}
+          placeholder="Optional HTTPS stop target"
+          onChange={(value) => updateDraft("emergency_stop_webhook_url", value)}
+        />
+        <ConsoleInput
+          label="Emergency stop contact"
+          value={draft.emergency_stop_contact}
+          placeholder="Ops email, phone, or channel"
+          onChange={(value) => updateDraft("emergency_stop_contact", value)}
+        />
+        <ConsoleInput
+          label="Accounting export path"
+          value={draft.tax_ledger_export_path}
+          placeholder="Local CSV/export path"
+          onChange={(value) => updateDraft("tax_ledger_export_path", value)}
+        />
+        <ConsoleInput
           label="Wallet public address"
           value={draft.wallet_public_key}
           placeholder="Public Solana address only"
@@ -495,7 +536,7 @@ export function SettingsWeb3CredentialConsole({
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Local credential installer</p>
             <p className="mt-1 text-xs font-semibold text-on-surface">
-              Install known provider values into ignored local env
+              Install known provider, ops, and accounting values into ignored local env
             </p>
           </div>
           <button
@@ -509,12 +550,12 @@ export function SettingsWeb3CredentialConsole({
           </button>
         </div>
         <p className="mt-2 text-[11px] leading-4 text-outline">
-          Local install accepts only Helius, Solana RPC/WebSocket, and Jupiter provider fields, writes to ignored local env on trusted localhost, clears the page secret fields after success, and keeps live execution blocked.
+          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, emergency-stop, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps live execution blocked.
         </p>
         {localInstallReceipt ? (
           <div className="mt-2 grid gap-2 sm:grid-cols-3" aria-label="Local Web3 credential install receipt">
             <ConsoleMetric label="Install" value={localInstallReceipt.status} tone={localInstallReceipt.status === "installed" ? "engine" : localInstallReceipt.status === "invalid" || localInstallReceipt.status === "blocked" ? "critical" : "neutral"} />
-            <ConsoleMetric label="Configured" value={`${localInstallReceipt.configured_keys.length}/4`} tone={localInstallReceipt.configured_keys.length >= 2 ? "engine" : "caution"} />
+            <ConsoleMetric label="Configured" value={`${localInstallReceipt.configured_keys.length}/7`} tone={localInstallReceipt.configured_keys.length >= 4 ? "engine" : "caution"} />
             <ConsoleMetric label="Missing" value={localInstallReceipt.missing_keys.join(", ") || "none"} tone={localInstallReceipt.missing_keys.length === 0 ? "engine" : "caution"} />
           </div>
         ) : null}
@@ -841,7 +882,7 @@ export function SettingsWeb3CredentialConsole({
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
         Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
-        Local credential installer can write known provider values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
+        Local credential installer can write known provider, emergency-stop, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
       </p>
     </section>
   );
