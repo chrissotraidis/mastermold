@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { Chip } from "@/components/sentinel";
 import { Web3TradingWorkspaceLoader } from "@/components/web3-trading-workspace-loader";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
+import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { getWeb3TradingStateAsync, isTradingAccountMode, isTradingMarketSource } from "@/src/db/web3-trading";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     source,
   });
   const supervisorHealth = getWeb3DaemonSupervisorHealth();
+  const promotedAutopilotHealth = getWeb3PromotedPaperAutopilotHealth();
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -41,7 +43,11 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
         />
 
         <div className="w-full min-w-0 space-y-4">
-          <Web3TradingWorkspaceLoader initialState={initialState} initialSupervisorHealth={supervisorHealth} />
+          <Web3TradingWorkspaceLoader
+            initialState={initialState}
+            initialSupervisorHealth={supervisorHealth}
+            initialPromotedAutopilotHealth={promotedAutopilotHealth}
+          />
         </div>
       </div>
     </AppShell>

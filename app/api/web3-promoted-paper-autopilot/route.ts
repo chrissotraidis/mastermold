@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
+import { writeWeb3PromotedPaperAutopilotReceipt } from "@/src/db/web3-promoted-paper-autopilot";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,6 +65,7 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
       },
     });
     const report = JSON.parse(stdout) as Record<string, unknown>;
+    writeWeb3PromotedPaperAutopilotReceipt(report);
     return NextResponse.json({
       ...report,
       api_boundary: "local-paper-process",

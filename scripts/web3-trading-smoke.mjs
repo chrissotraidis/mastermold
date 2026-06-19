@@ -60,6 +60,13 @@ async function main() {
   assert(!("receipt_path" in health.web3_daemon_supervisor), "Supervisor health should not expose local receipt paths.", health.web3_daemon_supervisor);
   assert(typeof health.web3_daemon_supervisor.net_pnl_usd === "number", "Supervisor health should expose sanitized paper PnL.", health.web3_daemon_supervisor);
   assert(typeof health.web3_daemon_supervisor.max_drawdown_usd === "number", "Supervisor health should expose sanitized drawdown.", health.web3_daemon_supervisor);
+  assert(health.web3_promoted_paper_autopilot, "Health endpoint should expose promoted paper autopilot health.", health);
+  assert(["absent", "blocked", "target-hit", "completed", "running", "paper-guarded", "not-started"].includes(health.web3_promoted_paper_autopilot.status), "Promoted paper autopilot health should return a known status.", health.web3_promoted_paper_autopilot);
+  assert(health.web3_promoted_paper_autopilot.live_execution_permission === "blocked", "Promoted paper autopilot health should keep live execution blocked.", health.web3_promoted_paper_autopilot);
+  assert(health.web3_promoted_paper_autopilot.wallet_mutation_permission === "blocked", "Promoted paper autopilot health should keep wallet mutation blocked.", health.web3_promoted_paper_autopilot);
+  assert(!("receipt_path" in health.web3_promoted_paper_autopilot), "Promoted paper autopilot health should not expose local receipt paths.", health.web3_promoted_paper_autopilot);
+  assert(typeof health.web3_promoted_paper_autopilot.net_pnl_usd === "number", "Promoted paper autopilot health should expose sanitized paper PnL.", health.web3_promoted_paper_autopilot);
+  assert(typeof health.web3_promoted_paper_autopilot.posted_ticks === "number", "Promoted paper autopilot health should expose sanitized posted ticks.", health.web3_promoted_paper_autopilot);
 
   const page = await request("/trading");
   const html = await page.text();
@@ -68,6 +75,8 @@ async function main() {
   assert(html.includes("Autonomous Web3 trading desk"), "Trading page should describe the autonomous Web3 trading desk.");
   assert(html.includes("Autonomous command"), "Trading page should expose the compact autonomous command deck.");
   assert(html.includes("Autonomous trading command deck"), "Trading page should label the new first-screen command deck.");
+  assert(html.includes("Promoted run"), "Trading page should expose the promoted paper autopilot control.");
+  assert(html.includes("Promoted paper autopilot"), "Trading page should expose persisted promoted autopilot health.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");

@@ -6,6 +6,7 @@ import { Activity, CandlestickChart, LineChart, Pause, Play, RefreshCw, RotateCc
 
 import { Chip } from "@/components/sentinel";
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
+import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
@@ -41,6 +42,7 @@ type QuickAgentActionOutcome = {
 type HealthPayload = {
   status: "ok";
   web3_daemon_supervisor?: Web3DaemonSupervisorHealth;
+  web3_promoted_paper_autopilot?: Web3PromotedPaperAutopilotHealth;
 };
 type PromotedPaperAutopilotReceipt = {
   mode: "web3-promoted-paper-autopilot";
@@ -66,12 +68,15 @@ type PromotedPaperAutopilotReceipt = {
 export function Web3TradingWorkspaceLoader({
   initialState,
   initialSupervisorHealth,
+  initialPromotedAutopilotHealth,
 }: {
   initialState?: Web3TradingState;
   initialSupervisorHealth?: Web3DaemonSupervisorHealth;
+  initialPromotedAutopilotHealth?: Web3PromotedPaperAutopilotHealth;
 }) {
   const [state, setState] = useState<Web3TradingState | undefined>(initialState);
   const [supervisorHealth, setSupervisorHealth] = useState<Web3DaemonSupervisorHealth | undefined>(initialSupervisorHealth);
+  const [promotedAutopilotHealth, setPromotedAutopilotHealth] = useState<Web3PromotedPaperAutopilotHealth | undefined>(initialPromotedAutopilotHealth);
   const [error, setError] = useState<string | null>(null);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [loadingControls, setLoadingControls] = useState(false);
@@ -111,8 +116,9 @@ export function Web3TradingWorkspaceLoader({
       try {
         const response = await fetch("/api/health", { cache: "no-store" });
         const payload = (await response.json()) as HealthPayload;
-        if (!cancelled && response.ok && payload.web3_daemon_supervisor) {
-          setSupervisorHealth(payload.web3_daemon_supervisor);
+        if (!cancelled && response.ok) {
+          if (payload.web3_daemon_supervisor) setSupervisorHealth(payload.web3_daemon_supervisor);
+          if (payload.web3_promoted_paper_autopilot) setPromotedAutopilotHealth(payload.web3_promoted_paper_autopilot);
         }
       } catch {
         if (!cancelled) {
@@ -175,6 +181,9 @@ export function Web3TradingWorkspaceLoader({
     const payload = (await response.json()) as HealthPayload;
     if (!response.ok || payload.status !== "ok") {
       throw new Error("Supervisor health could not be loaded.");
+    }
+    if (payload.web3_promoted_paper_autopilot) {
+      setPromotedAutopilotHealth(payload.web3_promoted_paper_autopilot);
     }
     return payload.web3_daemon_supervisor;
   }
@@ -925,6 +934,7 @@ export function Web3TradingWorkspaceLoader({
                 autoWatch={autoWatch}
                 autoWatchPlan={autoWatchPlan}
               />
+              <QuickPromotedAutopilotPanel health={promotedAutopilotHealth} />
               <QuickDaemonSupervisorPanel health={supervisorHealth} />
               <QuickDaemonHandoffPanel handoff={daemonHandoff} />
             </div>
@@ -1044,6 +1054,9 @@ export function Web3TradingWorkspaceLoader({
             <div className="mt-2 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" aria-label="Autonomous wiring focus">
               <div className="xl:col-span-2">
                 <QuickLiveAutonomyReadinessAudit readiness={liveAutonomyReadiness} />
+              </div>
+              <div className="xl:col-span-2">
+                <QuickPromotedAutopilotPanel health={promotedAutopilotHealth} />
               </div>
               <div className="xl:col-span-2">
                 <QuickDaemonSupervisorPanel health={supervisorHealth} />
@@ -6889,6 +6902,54 @@ function QuickDaemonSupervisorPanel({
   );
 }
 
+function QuickPromotedAutopilotPanel({
+  health,
+}: {
+  health?: Web3PromotedPaperAutopilotHealth;
+}) {
+  const status = health?.status ?? "absent";
+  const tone = promotedAutopilotTone(status);
+  const updatedAt = health?.updated_at ? compactIsoTime(health.updated_at) : "no receipt";
+  const runner = health?.runner_id ?? "not run";
+  const summary = health?.summary ?? "No promoted Web3 paper autopilot receipt has been written yet.";
+  const netPnl = health?.net_pnl_usd ?? 0;
+  const postedTicks = health?.posted_ticks ?? 0;
+  const blockedTicks = health?.blocked_ticks ?? 0;
+
+  return (
+    <section className="rounded-md border border-outline-variant/30 bg-surface-dim/15 p-2 sm:p-3" aria-label="Promoted paper autopilot health">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Promoted paper autopilot</p>
+          <p className="mt-1 break-words text-sm font-semibold text-on-surface">
+            {status === "absent" ? "No promoted run receipt yet" : status.replaceAll("-", " ")}
+          </p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+            {summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone={health?.profit_target_hit ? "engine" : netPnl >= 0 ? "caution" : "critical"}>{formatCompactSignedCurrency(netPnl)}</Chip>
+          <Chip tone="demo">paper only</Chip>
+          <Chip tone={health?.live_execution_permission === "blocked" ? "demo" : "critical"}>live locked</Chip>
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6" aria-label="Promoted paper autopilot metrics">
+        <ProfitMetric label="Runner" value={runner} detail="promoted paper chain" tone={status === "running" ? "engine" : "neutral"} />
+        <ProfitMetric label="Promotion" value={health?.promotion_permission ?? "missing"} detail="guard permission" tone={status === "blocked" ? "critical" : status === "absent" ? "neutral" : "engine"} />
+        <ProfitMetric label="Supervisor" value={health?.supervisor_status ?? "not-run"} detail={`${postedTicks} posted · ${blockedTicks} blocked`} tone={postedTicks > 0 ? "engine" : blockedTicks > 0 ? "critical" : "neutral"} />
+        <ProfitMetric label="Paper PnL" value={formatCompactSignedCurrency(netPnl)} detail={health?.profit_target_hit ? "target hit" : "target open"} tone={health?.profit_target_hit || netPnl > 0 ? "engine" : netPnl < 0 ? "critical" : "neutral"} />
+        <ProfitMetric label="Updated" value={updatedAt} detail="local health receipt" tone={status === "absent" ? "neutral" : "engine"} />
+        <ProfitMetric label="Wallet" value={health?.wallet_mutation_permission ?? "blocked"} detail="mutation permission" tone="demo" />
+      </div>
+      <span className="sr-only" aria-label="Promoted paper autopilot health receipt">
+        Promoted paper autopilot status {status}; runner {runner}; promotion permission {health?.promotion_permission ?? "missing"}; supervisor {health?.supervisor_status ?? "not-run"}; net PnL {formatSignedCurrency(netPnl)}; posted ticks {postedTicks}; blocked ticks {blockedTicks}; target hit {health?.profit_target_hit ? "yes" : "no"}; loss brake {health?.loss_brake_tripped ? "tripped" : "clear"}; live execution {health?.live_execution_permission ?? "blocked"}; wallet mutation {health?.wallet_mutation_permission ?? "blocked"}.
+      </span>
+    </section>
+  );
+}
+
 function QuickDaemonHandoffPanel({
   handoff,
 }: {
@@ -7540,6 +7601,13 @@ function supervisorTone(status: Web3DaemonSupervisorHealth["status"]): QuickChip
   if (status === "running" || status === "completed") return "engine";
   if (status === "idle" || status === "absent") return "caution";
   if (status === "circuit-open" || status === "error") return "critical";
+  return "neutral";
+}
+
+function promotedAutopilotTone(status: Web3PromotedPaperAutopilotHealth["status"]): QuickChipTone {
+  if (status === "target-hit" || status === "completed" || status === "running") return "engine";
+  if (status === "paper-guarded" || status === "not-started" || status === "absent") return "caution";
+  if (status === "blocked") return "critical";
   return "neutral";
 }
 
