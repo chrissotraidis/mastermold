@@ -817,6 +817,28 @@ function triggerReconciliationTone(status: Web3TradingState["trigger_order_recon
   return "neutral";
 }
 
+type ChipTone = "neutral" | "violet" | "engine" | "demo" | "caution" | "critical";
+
+function signatureConfirmationTone(status: NonNullable<Web3TradingState["signature_confirmation_poll"]>["status"] | "idle"): ChipTone {
+  if (status === "confirmed") return "engine";
+  if (status === "pending") return "caution";
+  if (status === "failed" || status === "blocked") return "critical";
+  return "neutral";
+}
+
+function settlementFillTone(status: NonNullable<Web3TradingState["settlement_fill_reconciliation"]>["status"] | "idle"): ChipTone {
+  if (status === "reconciled") return "engine";
+  if (status === "pending" || status === "ambiguous") return "caution";
+  if (status === "failed" || status === "blocked") return "critical";
+  return "neutral";
+}
+
+function portfolioMirrorApplyTone(status: NonNullable<Web3TradingState["portfolio_mirror_apply"]>["status"] | "idle" | "ready"): ChipTone {
+  if (status === "applied" || status === "duplicate" || status === "ready") return "engine";
+  if (status === "blocked") return "critical";
+  return "neutral";
+}
+
 function protectiveTriggerCoverageTone(status: Web3TradingState["protective_trigger_coverage"]["status"]) {
   if (status === "covered" || status === "plan-ready") return "engine";
   if (status === "auth-required") return "caution";
@@ -1714,6 +1736,102 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
       setState(payload);
       setExecutionDraft(draftFromReadiness(payload));
       setNotice("Execution drill recorded. Nothing was signed or submitted.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runSignatureConfirmationPoll() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/web3-trading", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario,
+          cycles,
+          source: marketSource,
+          account: "persistent",
+          advance: false,
+          confirmation_poll: {
+            action: "poll",
+            search_transaction_history: true,
+          },
+        }),
+      });
+      const payload = (await response.json()) as Web3TradingState | { error: string };
+      if (!response.ok || "error" in payload) {
+        setNotice("Signature confirmation poll was rejected.");
+        return;
+      }
+      setState(payload);
+      setExecutionDraft(draftFromReadiness(payload));
+      setNotice(payload.signature_confirmation_poll?.summary ?? "Signature confirmation poll completed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runSettlementFillReconcile() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/web3-trading", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario,
+          cycles,
+          source: marketSource,
+          account: "persistent",
+          advance: false,
+          fill_reconcile: {
+            action: "reconcile",
+            commitment: "confirmed",
+            max_fill_usd: state.execution_readiness.config.max_trade_usd,
+          },
+        }),
+      });
+      const payload = (await response.json()) as Web3TradingState | { error: string };
+      if (!response.ok || "error" in payload) {
+        setNotice("Settlement fill reconciliation was rejected.");
+        return;
+      }
+      setState(payload);
+      setExecutionDraft(draftFromReadiness(payload));
+      setNotice(payload.settlement_fill_reconciliation?.summary ?? "Settlement fill reconciliation completed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function applyReviewedMirrorRequest() {
+    const request = state.settlement_fill_reconciliation?.mirror_apply_request;
+    if (!request) {
+      setNotice("No reviewed mirror apply request is ready.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch("/api/web3-trading", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario,
+          cycles,
+          source: marketSource,
+          account: "persistent",
+          advance: false,
+          portfolio_mirror: request,
+        }),
+      });
+      const payload = (await response.json()) as Web3TradingState | { error: string };
+      if (!response.ok || "error" in payload) {
+        setNotice("Portfolio mirror apply was rejected.");
+        return;
+      }
+      setState(payload);
+      setExecutionDraft(draftFromReadiness(payload));
+      setNotice(payload.portfolio_mirror_apply?.summary ?? "Portfolio mirror apply completed.");
     } finally {
       setLoading(false);
     }
@@ -4565,6 +4683,13 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
                   </Chip>
                 </div>
               </article>
+              <SettlementChainPanel
+                state={state}
+                loading={loading}
+                onPollSignature={runSignatureConfirmationPoll}
+                onReconcileFill={runSettlementFillReconcile}
+                onApplyMirror={applyReviewedMirrorRequest}
+              />
               <ExecutionPathTimeline state={state} handoffPaperTrade={handoffPaperTrade} />
               <ExecutionRail label="Execution adapter" status={state.autonomous_execution_adapter_readiness.status} summary={state.autonomous_execution_adapter_readiness.summary} next={state.autonomous_execution_adapter_readiness.next_action} tone={executionAdapterReadinessTone(state.autonomous_execution_adapter_readiness.status)} />
               <ExecutionRail label="Trade gate" status={state.autonomous_trade_readiness_gate.status} summary={state.autonomous_trade_readiness_gate.summary} next={state.autonomous_trade_readiness_gate.next_action} tone={tradeReadinessTone(state.autonomous_trade_readiness_gate.status)} />
@@ -16356,6 +16481,102 @@ function ExecutionRail({
       </div>
       <p className="mt-3 text-sm leading-6 text-on-surface-variant">{summary}</p>
       <p className="mt-3 rounded-md border border-outline-variant/40 bg-void/30 px-3 py-2 text-xs leading-5 text-outline">{next}</p>
+    </article>
+  );
+}
+
+function SettlementChainPanel({
+  state,
+  loading,
+  onPollSignature,
+  onReconcileFill,
+  onApplyMirror,
+}: {
+  state: Web3TradingState;
+  loading: boolean;
+  onPollSignature: () => void;
+  onReconcileFill: () => void;
+  onApplyMirror: () => void;
+}) {
+  const poll = state.signature_confirmation_poll;
+  const fill = state.settlement_fill_reconciliation;
+  const mirror = state.portfolio_mirror_apply;
+  const mirrorRequest = fill?.mirror_apply_request ?? null;
+  const pollStatus = poll?.status ?? "idle";
+  const fillStatus = fill?.status ?? "idle";
+  const mirrorStatus = mirror?.status ?? (mirrorRequest ? "ready" : "idle");
+  const settlementRows = [
+    {
+      label: "Signature",
+      status: pollStatus,
+      tone: signatureConfirmationTone(pollStatus),
+      value: poll?.confirmation_status ?? state.signed_transaction_relay.confirmation_status ?? "not polled",
+      detail: poll?.summary ?? state.signed_transaction_relay.summary,
+    },
+    {
+      label: "Fill",
+      status: fillStatus,
+      tone: settlementFillTone(fillStatus),
+      value: fill?.estimated_fill_price_usd ? `${formatCurrency(fill.estimated_fill_price_usd)} px` : fill?.fill_side ?? "no fill",
+      detail: fill?.summary ?? "No getTransaction fill reconciliation has been run for the latest relay.",
+    },
+    {
+      label: "Mirror",
+      status: mirrorStatus,
+      tone: portfolioMirrorApplyTone(mirrorStatus),
+      value: mirrorRequest ? `${formatCurrency(mirrorRequest.filled_quantity ?? 0)} qty` : mirror?.portfolio_mirror_permission ?? "blocked",
+      detail: mirror?.summary ?? (mirrorRequest ? "Reviewed mirror payload is ready for the guarded apply path." : "Mirror apply stays blocked until fill evidence emits a reviewed payload."),
+    },
+  ];
+
+  return (
+    <article className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 md:col-span-2 xl:col-span-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-display text-base font-semibold text-on-surface">Settlement chain</p>
+          <p className="mt-1 text-sm leading-6 text-on-surface-variant">
+            Confirm signature, reconcile the landed fill, then mirror only a reviewed payload.
+          </p>
+        </div>
+        <Chip tone={mirrorRequest ? "engine" : fillStatus === "blocked" || pollStatus === "blocked" ? "critical" : "caution"}>
+          {mirrorRequest ? "payload ready" : "gated"}
+        </Chip>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        {settlementRows.map((row) => (
+          <div key={row.label} className="min-w-0 rounded-md border border-outline-variant/40 bg-void/30 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">{row.label}</p>
+              <Chip tone={row.tone}>{String(row.status).replace("-", " ")}</Chip>
+            </div>
+            <p className="mt-2 truncate font-display text-sm font-semibold text-on-surface">{row.value}</p>
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">{row.detail}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <MiniStat label="Relay" value={state.signed_transaction_relay.status} valueClassName="text-xs leading-5 capitalize" />
+        <MiniStat label="Lifecycle" value={state.transaction_lifecycle.status} valueClassName="text-xs leading-5 capitalize" />
+        <MiniStat label="Side" value={fill?.fill_side ?? state.signed_transaction_relay.latest_side ?? "none"} valueClassName="text-xs leading-5 capitalize" />
+        <MiniStat label="Notional" value={fill?.input_usd ?? fill?.output_usd ? formatCurrency(fill.input_usd ?? fill.output_usd ?? 0) : "none"} valueClassName="text-xs leading-5" />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="button" onClick={onPollSignature} disabled={loading} variant="outline" className="border-outline-variant/60 bg-surface-dim/50 text-on-surface">
+          <RadioTower aria-hidden="true" />
+          Poll
+        </Button>
+        <Button type="button" onClick={onReconcileFill} disabled={loading} variant="outline" className="border-outline-variant/60 bg-surface-dim/50 text-on-surface">
+          <ClipboardCheck aria-hidden="true" />
+          Reconcile
+        </Button>
+        <Button type="button" onClick={onApplyMirror} disabled={loading || !mirrorRequest} className={cn(mirrorRequest ? "bg-engine text-void hover:bg-engine" : "bg-surface-high text-outline")}>
+          <Wallet aria-hidden="true" />
+          Mirror
+        </Button>
+      </div>
+      <p className="mt-3 rounded-md border border-outline-variant/40 bg-void/30 px-3 py-2 text-xs leading-5 text-outline">
+        This chain is read-only until the final guarded mirror apply. It never stores signed transaction bodies, signs, submits, rebroadcasts, or moves wallet funds.
+      </p>
     </article>
   );
 }
