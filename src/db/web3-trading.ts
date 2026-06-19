@@ -8407,6 +8407,15 @@ export type SignedTransactionRelayRequest = {
   route?: "jupiter-swap-v2" | "solana-rpc";
 };
 
+export type AutonomousSignerRequestRelayRequest = {
+  action: "request";
+  provider: AutonomousSignerOpsProvider;
+  request_id: string;
+  payload_hash: string;
+  policy_hash?: string;
+  request_body_hash?: string;
+};
+
 export type SignatureConfirmationPollRequest = {
   action: "poll";
   signature?: string;
@@ -9435,6 +9444,7 @@ export type TradingStateInput = {
   daemon?: boolean;
   drill?: boolean;
   execution?: ExecutionUpdate;
+  signer_request?: AutonomousSignerRequestRelayRequest;
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
   fill_reconcile?: SettlementFillReconciliationRequest;
@@ -13055,7 +13065,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: configuredState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
@@ -13091,7 +13101,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: fallbackState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -13132,7 +13142,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
     monitorDecision: liveState.autonomous_monitor,
   });
-  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
+  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.signer_request, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
 }
 
 async function maybeApplyRouteRefreshRequest({
@@ -17953,6 +17963,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
 async function finalizeExecutionAudit(
   state: Web3TradingState,
   drill: boolean,
+  signerRequest: AutonomousSignerRequestRelayRequest | undefined,
   relay: SignedTransactionRelayRequest | undefined,
   confirmationPoll: SignatureConfirmationPollRequest | undefined,
   fillReconcile: SettlementFillReconciliationRequest | undefined,
@@ -17963,13 +17974,15 @@ async function finalizeExecutionAudit(
   portfolioMirror: PortfolioMirrorApplyRequest | undefined,
   fetchImpl: FetchLike,
 ): Promise<Web3TradingState> {
-  let latestEntry: ExecutionAuditEntry | null = null;
-  if (drill) latestEntry = runExecutionDrill(state);
-  if (relay) latestEntry = await runSignedTransactionRelay(state, relay, fetchImpl);
+  const latestEntries: ExecutionAuditEntry[] = [];
+  if (drill) latestEntries.push(runExecutionDrill(state));
+  if (signerRequest) latestEntries.push(runAutonomousSignerRequest(state, signerRequest));
+  if (relay) latestEntries.push(await runSignedTransactionRelay(state, relay, fetchImpl));
   const current = readExecutionAudit();
+  const latestEntry = latestEntries.at(-1) ?? null;
   const execution_audit = latestEntry
     ? {
-      entries: [latestEntry, ...current.entries.filter((item) => item.id !== latestEntry.id)].slice(0, 25),
+      entries: [...latestEntries].reverse().concat(current.entries.filter((item) => !latestEntries.some((entry) => entry.id === item.id))).slice(0, 25),
       latest: latestEntry,
     }
     : current;
@@ -19980,6 +19993,96 @@ function runExecutionDrill(state: Web3TradingState): ExecutionAuditEntry {
     data: entry,
   } satisfies Web3ExecutionAuditRow);
   return entry;
+}
+
+function runAutonomousSignerRequest(
+  state: Web3TradingState,
+  request: AutonomousSignerRequestRelayRequest,
+): ExecutionAuditEntry {
+  const existing = readExecutionAudit().entries;
+  const now = new Date().toISOString();
+  const activeRequest = state.autonomous_signer_ops.active_request;
+  const adapter = state.autonomous_signer_ops.provider_adapter;
+  const plan = activeRequest?.plan_id
+    ? state.execution_plans.find((item) => item.id === activeRequest.plan_id) ?? null
+    : state.execution_plans.find((item) => item.dry_run.request_id === request.request_id) ?? state.execution_plans[0] ?? null;
+  const nonce = `web3-signer-request-${String(existing.length + 1).padStart(4, "0")}`;
+  const blockers = signerRequestBlockers(state, request, activeRequest, adapter, plan);
+  const status: ExecutionAuditEntry["status"] = blockers.length === 0 ? "ready-to-sign" : "blocked";
+  const entry: ExecutionAuditEntry = {
+    id: `${nonce}-${Date.parse(now)}`,
+    created_at: now,
+    nonce,
+    plan_id: activeRequest?.plan_id ?? plan?.id ?? null,
+    symbol: activeRequest?.symbol ?? plan?.symbol ?? null,
+    side: activeRequest?.side === "buy" || activeRequest?.side === "sell" ? activeRequest.side : plan?.side ?? null,
+    status,
+    attempt: status === "ready-to-sign" ? 1 : 0,
+    max_attempts: 1,
+    retry_window_seconds: Math.max(10, activeRequest?.revoke_after_seconds ?? 30),
+    next_retry_at: status === "blocked" ? new Date(Date.parse(now) + 20_000).toISOString() : null,
+    request_id: activeRequest?.request_id ?? request.request_id,
+    router: plan?.dry_run.router ?? null,
+    relay_path: signerRequestRelayPath(activeRequest, state.live_execution_arming.transaction_path),
+    transaction_ready: Boolean(activeRequest?.payload_hash ?? plan?.dry_run.transaction_ready),
+    payload_hash: activeRequest?.payload_hash ?? request.payload_hash,
+    payload_bytes: null,
+    simulated_signature: null,
+    relay_signature: null,
+    relay_slot: null,
+    confirmation_status: null,
+    signer_session_label: `${request.provider}:${adapter.request_transport}`,
+    signer_network: null,
+    kill_switch: state.execution_readiness.config.kill_switch,
+    reason: status === "ready-to-sign"
+      ? `${request.provider.replaceAll("-", " ")} signer request accepted for external signing; signed payload must return through relay.`
+      : blockers[0],
+  };
+  store().appendWeb3ExecutionAudit({
+    id: entry.id,
+    created_at: entry.created_at,
+    data: entry,
+  } satisfies Web3ExecutionAuditRow);
+  return entry;
+}
+
+function signerRequestRelayPath(
+  activeRequest: AutonomousSignerRequestEnvelope | null,
+  fallback: LiveExecutionArming["transaction_path"],
+): LiveExecutionArming["transaction_path"] {
+  if (activeRequest?.path === "jupiter-swap-v2") return "jupiter-swap-v2";
+  if (activeRequest?.path === "solana-rpc") return "solana-rpc";
+  return fallback;
+}
+
+function signerRequestBlockers(
+  state: Web3TradingState,
+  request: AutonomousSignerRequestRelayRequest,
+  activeRequest: AutonomousSignerRequestEnvelope | null,
+  adapter: AutonomousSignerProviderAdapter,
+  plan: ExecutionPlan | null,
+) {
+  const blockers = [
+    request.action !== "request" ? "signer_request.action must be request." : null,
+    !activeRequest ? "No active hash-only signer request exists." : null,
+    !plan ? "No execution plan exists for the signer request." : null,
+    request.provider !== adapter.provider ? "Signer request provider does not match the active adapter." : null,
+    activeRequest && request.provider !== activeRequest.provider ? "Signer request provider does not match the active request." : null,
+    request.request_id !== adapter.request_id ? "Signer request id does not match the active adapter request id." : null,
+    activeRequest && request.request_id !== activeRequest.request_id ? "Signer request id does not match the active signer request." : null,
+    request.payload_hash !== adapter.payload_hash ? "Signer request payload hash does not match the active adapter payload hash." : null,
+    activeRequest && request.payload_hash !== activeRequest.payload_hash ? "Signer request payload hash does not match the active signer request." : null,
+    request.policy_hash && request.policy_hash !== adapter.policy_hash ? "Signer request policy hash is stale or mismatched." : null,
+    request.request_body_hash && request.request_body_hash !== adapter.request_body_hash ? "Signer request body hash is stale or mismatched." : null,
+    adapter.status === "idle" ? "Signer provider adapter is idle." : null,
+    adapter.status === "blocked" ? adapter.blockers[0] ?? "Signer provider adapter is blocked." : null,
+    !adapter.credential_configured ? "Signer provider credentials or wallet scope are not configured." : null,
+    state.execution_readiness.config.kill_switch ? "Kill switch is on; signer request refused." : null,
+    adapter.raw_transaction_included !== false || adapter.signed_payload_included !== false || adapter.private_key_required !== false
+      ? "Signer adapter must remain hash-only with no raw transaction, signed payload, or private-key requirement."
+      : null,
+  ].filter((item): item is string => Boolean(item));
+  return [...new Set(blockers)].slice(0, 8);
 }
 
 async function runSignedTransactionRelay(

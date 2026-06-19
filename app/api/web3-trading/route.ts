@@ -10,6 +10,7 @@ import {
   type AutonomousCandleRefreshRecordRequest,
   type AutonomousDaemonLeaseRequest,
   type AutonomousLoopTickRequest,
+  type AutonomousSignerRequestRelayRequest,
   type AutonomousSessionRunRequest,
   type AutonomousSettlementWatchdogRequest,
   type ExecutionUpdate,
@@ -39,6 +40,7 @@ type TradingRequest = {
   daemon?: boolean;
   drill?: boolean;
   execution?: ExecutionUpdate;
+  signer_request?: AutonomousSignerRequestRelayRequest;
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
   fill_reconcile?: SettlementFillReconciliationRequest;
@@ -112,6 +114,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
   const daemon = record.daemon === true;
   const drill = record.drill === true;
   const execution = record.execution === undefined ? undefined : parseExecutionUpdate(record.execution);
+  const signerRequest = record.signer_request === undefined ? undefined : parseAutonomousSignerRequestRelayRequest(record.signer_request);
   const relay = record.relay === undefined ? undefined : parseSignedRelayRequest(record.relay);
   const confirmationPoll = record.confirmation_poll === undefined ? undefined : parseSignatureConfirmationPollRequest(record.confirmation_poll);
   const fillReconcile = record.fill_reconcile === undefined ? undefined : parseSettlementFillReconciliationRequest(record.fill_reconcile);
@@ -159,6 +162,10 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
 
   if (execution && !execution.ok) {
     return { ok: false, error: execution.error };
+  }
+
+  if (signerRequest && !signerRequest.ok) {
+    return { ok: false, error: signerRequest.error };
   }
 
   if (relay && !relay.ok) {
@@ -237,6 +244,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       daemon,
       drill,
       execution: execution?.value,
+      signer_request: signerRequest?.value,
       relay: relay?.value,
       confirmation_poll: confirmationPoll?.value,
       fill_reconcile: fillReconcile?.value,
@@ -253,6 +261,51 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       autonomous_loop: autonomousLoop?.value,
       daemon_lease: daemonLease?.value,
       candle_refresh: candleRefresh?.value,
+    },
+  };
+}
+
+function parseAutonomousSignerRequestRelayRequest(value: unknown):
+  | { ok: true; value: AutonomousSignerRequestRelayRequest }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "signer_request must be an object." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.action !== "request") {
+    return { ok: false, error: "signer_request.action must be request." };
+  }
+  if (
+    record.provider !== "external-wallet" &&
+    record.provider !== "privy-server-wallet" &&
+    record.provider !== "turnkey-policy-wallet" &&
+    record.provider !== "session-key-vault"
+  ) {
+    return { ok: false, error: "signer_request.provider is invalid." };
+  }
+  if (typeof record.request_id !== "string" || record.request_id.trim().length < 3 || record.request_id.trim().length > 180) {
+    return { ok: false, error: "signer_request.request_id must be a string from 3 to 180 characters." };
+  }
+  if (typeof record.payload_hash !== "string" || !/^[0-9a-f]{64}$/i.test(record.payload_hash.trim())) {
+    return { ok: false, error: "signer_request.payload_hash must be a 64-character hex hash." };
+  }
+  if (record.policy_hash !== undefined && (typeof record.policy_hash !== "string" || !/^[0-9a-f]{64}$/i.test(record.policy_hash.trim()))) {
+    return { ok: false, error: "signer_request.policy_hash must be a 64-character hex hash when provided." };
+  }
+  if (record.request_body_hash !== undefined && (typeof record.request_body_hash !== "string" || !/^[0-9a-f]{64}$/i.test(record.request_body_hash.trim()))) {
+    return { ok: false, error: "signer_request.request_body_hash must be a 64-character hex hash when provided." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      action: "request",
+      provider: record.provider,
+      request_id: record.request_id.trim(),
+      payload_hash: record.payload_hash.trim().toLowerCase(),
+      policy_hash: typeof record.policy_hash === "string" ? record.policy_hash.trim().toLowerCase() : undefined,
+      request_body_hash: typeof record.request_body_hash === "string" ? record.request_body_hash.trim().toLowerCase() : undefined,
     },
   };
 }
