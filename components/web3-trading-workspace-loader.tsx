@@ -101,6 +101,7 @@ export function Web3TradingWorkspaceLoader({
 }) {
   const [state, setState] = useState<Web3TradingState | undefined>(initialState);
   const [supervisorHealth, setSupervisorHealth] = useState<Web3DaemonSupervisorHealth | undefined>(initialSupervisorHealth);
+  const [productionSupervisorReadiness, setProductionSupervisorReadiness] = useState<Web3ProductionSupervisorReadiness | undefined>(initialLaunchChecklist?.production_supervisor_readiness);
   const [promotedAutopilotHealth, setPromotedAutopilotHealth] = useState<Web3PromotedPaperAutopilotHealth | undefined>(initialPromotedAutopilotHealth);
   const [error, setError] = useState<string | null>(null);
   const [controlsOpen, setControlsOpen] = useState(false);
@@ -150,6 +151,7 @@ export function Web3TradingWorkspaceLoader({
         const payload = (await response.json()) as HealthPayload;
         if (!cancelled && response.ok) {
           if (payload.web3_daemon_supervisor) setSupervisorHealth(payload.web3_daemon_supervisor);
+          if (payload.web3_production_supervisor) setProductionSupervisorReadiness(payload.web3_production_supervisor);
           if (payload.web3_promoted_paper_autopilot) setPromotedAutopilotHealth(payload.web3_promoted_paper_autopilot);
         }
       } catch {
@@ -216,6 +218,9 @@ export function Web3TradingWorkspaceLoader({
     }
     if (payload.web3_promoted_paper_autopilot) {
       setPromotedAutopilotHealth(payload.web3_promoted_paper_autopilot);
+    }
+    if (payload.web3_production_supervisor) {
+      setProductionSupervisorReadiness(payload.web3_production_supervisor);
     }
     return payload.web3_daemon_supervisor;
   }
@@ -773,6 +778,7 @@ export function Web3TradingWorkspaceLoader({
   const launchChecklist = !mounted && initialLaunchChecklist
     ? initialLaunchChecklist
     : buildWeb3AutonomyLaunchChecklist(state, promotedAutopilotHealth, supervisorHealth);
+  const productionReadiness = productionSupervisorReadiness ?? launchChecklist.production_supervisor_readiness;
   const promotedProofPlan = launchChecklist.profit_proof_readiness.proof_plan;
   const promotedProofLabel = promotedProofPlan.status === "blocked" ? "Proof review" : "Promoted run";
   const sprintTapeItems = state.autonomous_market_evidence_fusion.items.slice(0, 2);
@@ -1236,6 +1242,9 @@ export function Web3TradingWorkspaceLoader({
               </div>
               <div className="xl:col-span-2">
                 <QuickPromotedAutopilotPanel health={promotedAutopilotHealth} />
+              </div>
+              <div className="xl:col-span-2">
+                <QuickProductionSupervisorReadinessPanel readiness={productionReadiness} />
               </div>
               <div className="xl:col-span-2">
                 <QuickDaemonSupervisorPanel health={supervisorHealth} />
@@ -8168,6 +8177,85 @@ function QuickDaemonSupervisorPanel({
   );
 }
 
+function QuickProductionSupervisorReadinessPanel({
+  readiness,
+}: {
+  readiness: Web3ProductionSupervisorReadiness;
+}) {
+  const tone = productionSupervisorTone(readiness.status);
+  const receiptAge = readiness.receipt_age_seconds === null
+    ? "unknown"
+    : readiness.receipt_age_seconds < 60
+      ? `${readiness.receipt_age_seconds}s`
+      : `${Math.round(readiness.receipt_age_seconds / 60)}m`;
+  const checkLeader = readiness.checks.find((check) => check.status === "fail") ??
+    readiness.checks.find((check) => check.status === "watch") ??
+    readiness.checks[0];
+
+  return (
+    <section className="rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:p-3" aria-label="Production supervisor readiness">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Production worker review</p>
+          <p className="mt-1 break-words text-sm font-semibold text-on-surface">
+            {readiness.status.replaceAll("-", " ")} - {readiness.readiness_score}/100
+          </p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            {readiness.summary}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{readiness.status.replaceAll("-", " ")}</Chip>
+          <Chip tone={readiness.receipt_fresh ? "engine" : readiness.receipt_age_seconds === null ? "neutral" : "critical"}>
+            receipt {readiness.receipt_fresh ? "fresh" : receiptAge}
+          </Chip>
+          <Chip tone={readiness.can_satisfy_process_gate ? "critical" : "demo"}>process gate blocked</Chip>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <div className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2">
+          <p className="text-xs leading-5 text-outline">{readiness.next_action}</p>
+          <p className="mt-2 rounded-md border border-outline-variant/20 bg-void/30 p-2 font-mono text-[10px] uppercase tracking-telemetry text-on-surface-variant">
+            npm run supervise:web3
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px] leading-4 text-outline">
+            <span>Runner {readiness.runner_id ?? "none"}</span>
+            <span>Manager {readiness.process_manager.replaceAll("-", " ")}</span>
+            <span>Paper evidence {readiness.paper_supervision_evidence ? "yes" : "no"}</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+          <ProfitMetric label="Readiness" value={`${readiness.readiness_score}/100`} detail={readiness.status.replaceAll("-", " ")} tone={tone} />
+          <ProfitMetric label="Receipt age" value={receiptAge} detail={readiness.receipt_fresh ? "fresh enough" : "needs refresh"} tone={readiness.receipt_fresh ? "engine" : readiness.receipt_age_seconds === null ? "neutral" : "critical"} />
+          <ProfitMetric label="Manager" value={readiness.process_manager.replaceAll("-", " ")} detail="production gate" tone={readiness.process_manager === "production-review-required" ? "caution" : readiness.process_manager === "local-supervisor-receipt" ? "engine" : "neutral"} />
+          <ProfitMetric label="Evidence" value={readiness.paper_supervision_evidence ? "paper" : "missing"} detail="supervised receipt" tone={readiness.paper_supervision_evidence ? "engine" : "critical"} />
+          <ProfitMetric label="Live funds" value={readiness.live_execution_permission} detail="execution permission" tone="demo" />
+          <ProfitMetric label="Wallet" value={readiness.wallet_mutation_permission} detail="mutation permission" tone="demo" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-1 sm:grid-cols-2 xl:grid-cols-3">
+        {readiness.checks.map((check) => (
+          <div key={check.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{check.label}</p>
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", productionSupervisorCheckDotClass(check.status))} />
+            </div>
+            <p className={cn("mt-1 text-xs font-semibold", productionSupervisorCheckTextClass(check.status))}>{check.status}</p>
+            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{check.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="sr-only" aria-label="Production supervisor readiness receipt">
+        Production supervisor readiness status {readiness.status}; score {readiness.readiness_score}; process manager {readiness.process_manager}; receipt fresh {readiness.receipt_fresh ? "yes" : "no"}; paper supervision evidence {readiness.paper_supervision_evidence ? "yes" : "no"}; process gate {readiness.can_satisfy_process_gate ? "satisfied" : "blocked"}; live execution {readiness.live_execution_permission}; wallet mutation {readiness.wallet_mutation_permission}; leading check {checkLeader?.label ?? "none"} {checkLeader?.status ?? "unknown"}.
+      </p>
+    </section>
+  );
+}
+
 function QuickPromotedAutopilotPanel({
   health,
 }: {
@@ -9143,6 +9231,25 @@ function supervisorTone(status: Web3DaemonSupervisorHealth["status"]): QuickChip
   if (status === "idle" || status === "absent") return "caution";
   if (status === "circuit-open" || status === "error") return "critical";
   return "neutral";
+}
+
+function productionSupervisorTone(status: Web3ProductionSupervisorReadiness["status"]): QuickChipTone {
+  if (status === "production-gated") return "engine";
+  if (status === "paper-supervised" || status === "stale") return "caution";
+  if (status === "blocked" || status === "missing") return "critical";
+  return "neutral";
+}
+
+function productionSupervisorCheckDotClass(status: Web3ProductionSupervisorReadiness["checks"][number]["status"]) {
+  if (status === "pass") return "bg-engine";
+  if (status === "watch") return "bg-caution";
+  return "bg-critical";
+}
+
+function productionSupervisorCheckTextClass(status: Web3ProductionSupervisorReadiness["checks"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
+  return "text-critical";
 }
 
 function promotedAutopilotTone(status: Web3PromotedPaperAutopilotHealth["status"]): QuickChipTone {
