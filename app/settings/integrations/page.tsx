@@ -17,11 +17,15 @@ import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/int
 import { getPortfolio } from "@/src/db/portfolio";
 import { buildWeb3AccountAcquisitionReceipt, type Web3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
 import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
+import { buildWeb3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
 import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
+import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3JupiterOrderPacket, type Web3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
@@ -54,10 +58,19 @@ export default async function IntegrationsSettingsPage() {
   const web3JupiterOrderPacket = buildWeb3JupiterOrderPacket(web3State);
   const web3SignerPacket = buildWeb3SignerCredentialPacket(web3State);
   const web3CredentialDoctor = getWeb3CredentialDoctorHealth();
+  const web3DaemonSupervisorHealth = getWeb3DaemonSupervisorHealth();
+  const web3ProductionSupervisor = buildWeb3ProductionSupervisorReadiness(web3DaemonSupervisorHealth);
+  const web3AccountingReceipt = buildWeb3AccountingLedgerReceipt(web3State);
+  const web3LiveOpsPacket = buildWeb3LiveOpsPacket({
+    state: web3State,
+    productionSupervisor: web3ProductionSupervisor,
+    emergencyStop: buildWeb3EmergencyStopDrillReceipt({ reason: "settings preview", operator_ack: true }),
+    accounting: web3AccountingReceipt,
+  });
   const web3LaunchChecklist = buildWeb3AutonomyLaunchChecklist(
     web3State,
     getWeb3PromotedPaperAutopilotHealth(),
-    getWeb3DaemonSupervisorHealth(),
+    web3DaemonSupervisorHealth,
   );
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
@@ -81,6 +94,7 @@ export default async function IntegrationsSettingsPage() {
             dedicatedWalletPacket={web3DedicatedWalletPacket}
             jupiterOrderPacket={web3JupiterOrderPacket}
             signerPacket={web3SignerPacket}
+            liveOpsPacket={web3LiveOpsPacket}
             credentialDoctor={web3CredentialDoctor}
             launchChecklist={web3LaunchChecklist}
             state={web3State}
@@ -126,6 +140,7 @@ function Web3CredentialsRunwayCard({
   dedicatedWalletPacket,
   jupiterOrderPacket,
   signerPacket,
+  liveOpsPacket,
   credentialDoctor,
   launchChecklist,
   state,
@@ -135,6 +150,7 @@ function Web3CredentialsRunwayCard({
   dedicatedWalletPacket: Web3DedicatedWalletPacket;
   jupiterOrderPacket: Web3JupiterOrderPacket;
   signerPacket: Web3SignerCredentialPacket;
+  liveOpsPacket: Web3LiveOpsPacket;
   credentialDoctor: Web3CredentialDoctorHealth;
   launchChecklist: Web3AutonomyLaunchChecklist;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
@@ -267,6 +283,8 @@ function Web3CredentialsRunwayCard({
 
           <SettingsSignerCredentialPacketPanel packet={signerPacket} />
 
+          <SettingsLiveOpsPacketPanel packet={liveOpsPacket} />
+
           <div className="rounded-md border border-engine/25 bg-surface-dim/35 p-3" aria-label="Live Web3 credential queue">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
@@ -338,7 +356,7 @@ function Web3CredentialsRunwayCard({
                   {item.env_targets.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {item.env_targets.map((target) => (
-                        <span key={target} className="rounded-md border border-outline-variant/35 bg-void/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                        <span key={target} className="max-w-full break-all rounded-md border border-outline-variant/35 bg-void/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
                           {target}
                         </span>
                       ))}
@@ -863,6 +881,98 @@ function SettingsJupiterOrderPacketPanel({ packet }: { packet: Web3JupiterOrderP
   );
 }
 
+function SettingsLiveOpsPacketPanel({ packet }: { packet: Web3LiveOpsPacket }) {
+  const openCount = packet.missing_required.length;
+  const primaryTone = packet.status === "manual-review-needed" ? "watch" : packet.status === "blocked" ? "fail" : "watch";
+  return (
+    <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Web3 live ops packet">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Live ops packet</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            Production worker review · {packet.status.replaceAll("-", " ")}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{packet.summary}</p>
+        </div>
+        <LaunchQueueBadge status={primaryTone} label={openCount > 0 ? `${openCount} open` : "review"} />
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Supervisor</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">
+            {packet.production_supervisor_status.replaceAll("-", " ")} · {packet.production_supervisor_score}/100
+          </p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            Receipt {packet.production_supervisor_fresh ? "fresh" : "stale/missing"} · process gate remains external.
+          </p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Emergency stop</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">
+            {packet.emergency_stop_configured ? "Ops target configured" : "Ops target missing"}
+          </p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            Webhook {packet.emergency_stop_webhook_configured ? "set" : "missing"} · contact {packet.emergency_stop_contact_configured ? "set" : "missing"} · External dispatch blocked.
+          </p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Accounting</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">
+            {packet.accounting_export_configured ? "Export target review" : "Export target needed"}
+          </p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            Boundary {packet.accounting_boundary}; settlement {packet.settlement_status.replaceAll("-", " ")}; mirror {packet.portfolio_mirror_status.replaceAll("-", " ")}.
+          </p>
+        </div>
+      </div>
+
+      {packet.missing_required.length > 0 ? (
+        <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.035] p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Required before live ops review</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {packet.missing_required.map((item) => (
+              <span key={item} className="rounded-md border border-caution/30 bg-caution/10 px-2 py-1 text-[11px] leading-4 text-caution">
+                {item}
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{packet.next_action}</p>
+        </div>
+      ) : null}
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {packet.steps.map((step) => (
+          <div key={step.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{step.label}</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-outline">{step.detail}</p>
+              </div>
+              <CredentialStateBadge configured={step.status === "done"} status={step.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{step.next_action}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe commands</p>
+        <div className="mt-2 grid gap-1">
+          {packet.safe_commands.slice(0, 4).map((command) => (
+            <code key={command} className="break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {command}
+            </code>
+          ))}
+        </div>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Live ops packet receipts cannot send webhooks, install process managers, approve live trades, submit transactions, or mutate wallets.
+      </p>
+    </div>
+  );
+}
+
 function SettingsCredentialDoctorPanel({ health }: { health: Web3CredentialDoctorHealth }) {
   const topChecks = health.checks.slice(0, 7);
   return (
@@ -983,7 +1093,7 @@ function SettingsSignerCredentialPacketPanel({ packet }: { packet: Web3SignerCre
             <p className="mt-2 text-[11px] leading-4 text-outline">{path.security_rule}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {path.env_targets.map((target) => (
-                <span key={target} className="rounded-md border border-outline-variant/25 bg-void/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                <span key={target} className="max-w-full break-all rounded-md border border-outline-variant/25 bg-void/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
                   {target}
                 </span>
               ))}

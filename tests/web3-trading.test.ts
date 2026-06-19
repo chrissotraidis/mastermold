@@ -16,6 +16,7 @@ import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wallet-packet/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
+import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
@@ -1099,6 +1100,79 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("not CPA-reviewed"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
     expect(JSON.stringify(receipt)).not.toContain("tax-ledger-secret");
+  });
+
+  test("GIVEN live ops are reviewed WHEN the live ops packet route runs THEN it returns a consolidated blocked no-secrets packet", async () => {
+    process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL = "https://ops.example.test/live-stop-secret";
+    process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = "ops-secret@example.test";
+    process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = "/tmp/mastermold-tax-ledger-secret";
+
+    const rejected = await LIVE_OPS_PACKET_GET(new Request("http://localhost/api/web3-live-ops-packet?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await LIVE_OPS_PACKET_GET(new Request("http://localhost/api/web3-live-ops-packet?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      production_supervisor_status: string;
+      production_supervisor_score: number;
+      production_supervisor_fresh: boolean;
+      paper_supervision_evidence: boolean;
+      emergency_stop_configured: boolean;
+      emergency_stop_webhook_configured: boolean;
+      emergency_stop_contact_configured: boolean;
+      accounting_export_configured: boolean;
+      accounting_boundary: string;
+      manual_live_review_required: boolean;
+      external_process_manager_required: boolean;
+      missing_required: string[];
+      safe_commands: string[];
+      steps: Array<{ id: string; status: string; detail: string; next_action: string }>;
+      external_dispatch_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-live-ops-packet");
+    expect(["missing-supervisor", "stale-supervisor", "missing-emergency-stop", "accounting-needed", "manual-review-needed", "blocked"]).toContain(packet.status);
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.production_supervisor_score).toBeGreaterThanOrEqual(0);
+    expect(packet.emergency_stop_configured).toBe(true);
+    expect(packet.emergency_stop_webhook_configured).toBe(true);
+    expect(packet.emergency_stop_contact_configured).toBe(true);
+    expect(packet.accounting_export_configured).toBe(true);
+    expect(packet.accounting_boundary).toBe("paper-only");
+    expect(packet.manual_live_review_required).toBe(true);
+    expect(packet.external_process_manager_required).toBe(true);
+    expect(packet.safe_commands).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
+    expect(packet.safe_commands.some((command) => command.includes("supervise:web3"))).toBe(true);
+    expect(packet.steps.map((step) => step.id)).toEqual([
+      "refresh-supervisor",
+      "configure-emergency-stop",
+      "run-stop-drill",
+      "configure-accounting",
+      "review-process-manager",
+      "manual-live-review",
+    ]);
+    expect(packet.steps.find((step) => step.id === "manual-live-review")?.status).toBe("blocked");
+    expect(packet.external_dispatch_permission).toBe("blocked");
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.transaction_submission_permission).toBe("blocked");
+    expect(packet.private_key_storage).toBe("blocked");
+    expect(packet.seed_phrase_storage).toBe("blocked");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(packet.controls.some((control) => control.includes("configured/missing booleans only"))).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain("live-stop-secret");
+    expect(JSON.stringify(packet)).not.toContain("ops-secret@example.test");
+    expect(JSON.stringify(packet)).not.toContain("tax-ledger-secret");
   });
 
   test("GIVEN signer readiness state WHEN the signer handoff route runs THEN it returns a redacted blocked receipt", async () => {
