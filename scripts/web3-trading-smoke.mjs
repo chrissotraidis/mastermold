@@ -1,6 +1,7 @@
 import { buildDaemonTickBody, runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
 import { buildSupervisorReceipt, runWeb3DaemonSupervisor } from "./web3-daemon-supervisor.mjs";
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
+import { buildLiveLandingDrillReport } from "./web3-live-landing-drill.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
 import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
 import { buildSettlementReconciliationReport } from "./web3-settlement-reconciliation.mjs";
@@ -4930,6 +4931,21 @@ async function main() {
   assert(livePreflight.daemon_can_trade_real_capital === false, "Live-capital preflight should verify daemon handoff cannot trade real capital.", livePreflight);
   assert(livePreflight.repeat_proof_status === "passed" && livePreflight.repeat_promotion_permission === "paper-promote", "Live-capital preflight should consume the repeat proof gate before considering any stronger action.", livePreflight);
   assert(["blocked-as-expected", "paper-only", "blocked"].includes(livePreflight.status), "Live-capital preflight should publish a known live-boundary status.", livePreflight);
+  const landingDrill = buildLiveLandingDrillReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      allowLiveReady: false,
+    },
+    state: tick.payload,
+  });
+  assert(landingDrill.mode === "web3-live-landing-drill", "Live landing drill should publish a dedicated report mode.", landingDrill);
+  assert(landingDrill.paper_only === true && landingDrill.live_execution_permission === "blocked", "Live landing drill must not grant live execution from local paper state.", landingDrill);
+  assert(["blocked-as-expected", "paper-only", "manual-review-required", "blocked"].includes(landingDrill.status), "Live landing drill should publish a known landing-boundary status.", landingDrill);
+  assert(landingDrill.items.map((item) => item.id).join(",") === "route,order,blockhash,fees,slippage,signer,relay,confirmation,boundary", "Live landing drill should cover route, order, blockhash, fees, slippage, signer, relay, confirmation, and boundary evidence.", landingDrill);
+  assert(typeof landingDrill.blockhash_lifetime_ready === "boolean" && typeof landingDrill.priority_fee_ready === "boolean" && typeof landingDrill.slippage_guard_ready === "boolean", "Live landing drill should expose landing-readiness booleans.", landingDrill);
+  assert(landingDrill.controls.some((control) => control.includes("never signs")), "Live landing drill should disclose its no-signing boundary.", landingDrill);
   const unsafeLivePreflight = buildLiveCapitalPreflightReport({
     config: {
       baseUrl,
@@ -4951,6 +4967,24 @@ async function main() {
   });
   assert(unsafeLivePreflight.status === "blocked" && unsafeLivePreflight.exit_code === 1, "Live-capital preflight should fail closed if live readiness appears without explicit allowance.", unsafeLivePreflight);
   assert(unsafeLivePreflight.blockers.some((blocker) => blocker.includes("--allow-live-ready")), "Live-capital preflight should explain missing explicit live allowance.", unsafeLivePreflight);
+  const unsafeLandingDrill = buildLiveLandingDrillReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      allowLiveReady: false,
+    },
+    state: {
+      ...tick.payload,
+      autonomous_live_autonomy_readiness: {
+        ...tick.payload.autonomous_live_autonomy_readiness,
+        status: "live-ready",
+        can_trade_real_capital: true,
+      },
+    },
+  });
+  assert(unsafeLandingDrill.status === "blocked" && unsafeLandingDrill.exit_code === 1, "Live landing drill should fail closed if live readiness appears without explicit allowance.", unsafeLandingDrill);
+  assert(unsafeLandingDrill.blockers.some((blocker) => blocker.includes("--allow-live-ready")), "Live landing drill should explain missing explicit live allowance.", unsafeLandingDrill);
   const settlementReconciliation = buildSettlementReconciliationReport({
     config: {
       baseUrl,

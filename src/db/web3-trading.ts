@@ -49437,10 +49437,11 @@ function landingOptimizerComputeUnitLimit(
   priorityFeeLamports: number,
   topCost: ExecutionCostItem | undefined,
 ) {
-  if (selectedPath === "paper-ledger" || selectedPath === "blocked") return 0;
+  if (selectedPath === "blocked" || priorityFeeLamports <= 0) return 0;
   if (topCost?.compute_unit_price_micro_lamports && topCost.compute_unit_price_micro_lamports > 0 && priorityFeeLamports > 0) {
     return clamp(Math.ceil(priorityFeeLamports * 1_000_000 / topCost.compute_unit_price_micro_lamports), 200_000, 1_400_000);
   }
+  if (selectedPath === "paper-ledger") return DEFAULT_MEME_SWAP_COMPUTE_UNITS;
   if (selectedPath === "helius-sender") return 650_000;
   if (selectedPath === "jupiter-router-submit") return 520_000;
   return 420_000;
