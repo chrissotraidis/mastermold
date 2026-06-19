@@ -4733,6 +4733,8 @@ async function main() {
   assert(daemonRun.events[0].status === "posted", "Autonomous daemon smoke run should post a leased backend tick.", daemonRun);
   assert(["acquired", "renewed", "replayed", "expired"].includes(daemonRun.events[0].lease_status), "Autonomous daemon smoke run should return a recorded non-conflicting lease status.", daemonRun);
   assert(daemonRun.events[0].active_runner_id === "implicit-daemon-runner" || daemonRun.events[0].active_runner_id === null, "Autonomous daemon smoke run should own or safely idle the lease.", daemonRun);
+  assert(["ready", "refresh-first", "sample-only", "throttled", "blocked", "idle"].includes(daemonRun.events[0].market_worker), "Autonomous daemon smoke run should report a known market worker status.", daemonRun);
+  assert(typeof daemonRun.events[0].market_worker_lane === "string" && daemonRun.events[0].market_worker_lane.length > 0, "Autonomous daemon smoke run should report the market worker lane.", daemonRun);
   assert(daemonRun.events[0].settlement_watchdog === "not-requested", "Autonomous daemon should not request settlement watchdog without relayed signature evidence.", daemonRun);
   const forwardRun = await runWeb3AutonomousForwardRun({
     baseUrl,
@@ -5165,6 +5167,8 @@ async function main() {
     scenario: tick.payload.scenario,
     daemonRunner: daemonRun.events[0].status,
     daemonLease: daemonRun.events[0].lease_status,
+    daemonMarketWorker: daemonRun.events[0].market_worker,
+    daemonMarketWorkerLane: daemonRun.events[0].market_worker_lane,
     forwardVerdict: forwardRun.verdict,
     forwardNetPnl: forwardRun.net_pnl_usd,
     forwardTargetMet: forwardRun.target_met,

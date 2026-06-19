@@ -5444,6 +5444,16 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_daemon_handoff.lease_replay_count).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_daemon_handoff.lease_conflict_count).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_daemon_handoff.can_trade_real_capital).toBe(false);
+    expect(state.autonomous_daemon_handoff.market_worker.mode).toBe("daemon-market-worker-handoff");
+    expect(["ready", "refresh-first", "sample-only", "throttled", "blocked", "idle"]).toContain(state.autonomous_daemon_handoff.market_worker.status);
+    expect(state.autonomous_daemon_handoff.market_worker.read_only).toBe(true);
+    expect(state.autonomous_daemon_handoff.market_worker.cadence_seconds).toBeGreaterThan(0);
+    expect(state.autonomous_daemon_handoff.market_worker.budget_per_minute).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(state.autonomous_daemon_handoff.market_worker.watch_symbols)).toBe(true);
+    expect(state.autonomous_daemon_handoff.market_worker.controls.some((control) => control.includes("read-only"))).toBe(true);
+    if (state.autonomous_daemon_handoff.market_worker.status === "blocked" || state.autonomous_daemon_handoff.market_worker.status === "sample-only") {
+      expect(state.autonomous_daemon_handoff.market_worker.can_feed_paper_loop).toBe(false);
+    }
     expect(state.autonomous_daemon_handoff.items.map((item) => item.id)).toEqual([
       "lease",
       "cadence",
@@ -7291,6 +7301,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_daemon_handoff.can_trade_real_capital).toBe(false);
     expect(state.autonomous_daemon_handoff.max_fills_per_lease).toBeLessThanOrEqual(3);
     expect(state.autonomous_daemon_handoff.max_trades_next_minute).toBeLessThanOrEqual(state.autonomous_run_envelope.max_trades_next_minute);
+    expect(state.autonomous_daemon_handoff.market_worker.mode).toBe("daemon-market-worker-handoff");
+    expect(state.autonomous_daemon_handoff.market_worker.read_only).toBe(true);
+    expect(["ready", "refresh-first", "sample-only", "throttled", "blocked", "idle"]).toContain(state.autonomous_daemon_handoff.market_worker.status);
+    expect(state.autonomous_daemon_handoff.market_worker.cadence_seconds).toBeGreaterThan(0);
     if (state.autonomous_daemon_handoff.status === "blocked" || state.autonomous_daemon_handoff.status === "paused") {
       expect(state.autonomous_daemon_handoff.can_run_background_paper).toBe(false);
     }

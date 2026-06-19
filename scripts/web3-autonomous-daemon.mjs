@@ -55,6 +55,8 @@ export async function runWeb3AutonomousDaemon(input = {}) {
         lease_status: handoff?.lease_status ?? "missing",
         active_runner_id: handoff?.active_runner_id ?? null,
         can_issue_tick: Boolean(handoff?.can_issue_tick),
+        market_worker: handoff?.market_worker?.status ?? "missing",
+        market_worker_lane: handoff?.market_worker?.lane ?? "none",
       });
       if (config.exitOnBlocked) break;
       if (index < config.maxTicks - 1) await waitForNextTick(config, handoff);
@@ -70,6 +72,8 @@ export async function runWeb3AutonomousDaemon(input = {}) {
         request_id: requestId,
         lease_id: body.daemon_lease.lease_id,
         next_wake_seconds: handoff.next_wake_seconds,
+        market_worker: handoff.market_worker?.status ?? "missing",
+        market_worker_lane: handoff.market_worker?.lane ?? "none",
       });
       if (index < config.maxTicks - 1) await waitForNextTick(config, handoff);
       continue;
@@ -89,6 +93,9 @@ export async function runWeb3AutonomousDaemon(input = {}) {
       loop_action: payload.autonomous_loop_tick?.action ?? "unknown",
       paper_cycle: payload.paper_account?.cycle ?? null,
       equity_usd: payload.portfolio?.equity_usd ?? null,
+      market_worker: nextHandoff?.market_worker?.status ?? "missing",
+      market_worker_lane: nextHandoff?.market_worker?.lane ?? "none",
+      market_worker_can_feed_loop: Boolean(nextHandoff?.market_worker?.can_feed_paper_loop),
       settlement_watchdog: payload.autonomous_settlement_watchdog?.status ?? "not-requested",
       settlement_action: payload.autonomous_settlement_watchdog?.action ?? "none",
       next_action: payload.autonomous_loop_tick?.next_action ?? nextHandoff?.summary ?? "No next action returned.",

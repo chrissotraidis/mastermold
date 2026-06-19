@@ -8827,6 +8827,24 @@ export type AutonomousDaemonHandoffItem = {
   detail: string;
 };
 
+export type AutonomousDaemonMarketWorker = {
+  mode: "daemon-market-worker-handoff";
+  status: "ready" | "refresh-first" | "sample-only" | "throttled" | "blocked" | "idle";
+  lane: MarketIngestionPlanStep["id"] | "none";
+  provider: MarketIngestionPlanStep["source"] | "none";
+  endpoint: string;
+  action: MarketIngestionPlanStep["action"] | "stand-down";
+  cadence_seconds: number;
+  budget_per_minute: number;
+  watch_symbols: string[];
+  can_feed_paper_loop: boolean;
+  route_refresh_first: boolean;
+  read_only: true;
+  next_action: string;
+  blockers: string[];
+  controls: string[];
+};
+
 export type AutonomousDaemonLeaseStatus = "idle" | "acquired" | "renewed" | "replayed" | "conflict" | "expired" | "blocked";
 
 export type AutonomousDaemonLeaseRequest = {
@@ -8890,6 +8908,7 @@ export type AutonomousDaemonHandoff = {
   max_trades_next_minute: number;
   provider_budget_pct: number;
   expected_profit_per_minute_usd: number;
+  market_worker: AutonomousDaemonMarketWorker;
   stop_conditions: string[];
   blockers: string[];
   controls: string[];
@@ -71750,6 +71769,12 @@ function buildAutonomousDaemonHandoff({
     routeRefreshExecution.route_refresh_required ||
     marketIngestion.status === "blocked" ||
     marketIngestion.status === "paused";
+  const marketWorker = buildAutonomousDaemonMarketWorker({
+    marketIngestion,
+    routeRefreshExecution,
+    runEnvelope,
+    loopDirector,
+  });
   const hardBlockers = [
     ...(leaseHardBlocker ? [leaseHardBlocker] : []),
     ...(liveReadiness.status === "blocked" ? liveReadiness.blockers : []),
@@ -71874,16 +71899,159 @@ function buildAutonomousDaemonHandoff({
     max_trades_next_minute: status === "observe-only" || status === "paused" || status === "blocked" ? 0 : runEnvelope.max_trades_next_minute,
     provider_budget_pct: runEnvelope.provider_utilization_pct,
     expected_profit_per_minute_usd: roundMetric(runEnvelope.expected_profit_per_minute_usd),
+    market_worker: marketWorker,
     stop_conditions: stopConditions,
     blockers,
     controls: [
       "External schedulers should treat this as a lease contract, not a live wallet approval.",
       "The payload reuses the existing backend daemon path and lets the server decide observe, refresh, protect, or paper-fill each tick.",
+      "The market worker handoff may run read-only provider refreshes before a paper tick, but it cannot sign, submit, settle, or mutate a wallet.",
       "Use idempotent lease renewal and stop conditions so overlapping runners do not double-advance the paper ledger.",
       "The handoff intentionally sets can_trade_real_capital=false until a separate live executor, signer, custody policy, and compliance gate are implemented.",
     ],
     items,
   };
+}
+
+function buildAutonomousDaemonMarketWorker({
+  marketIngestion,
+  routeRefreshExecution,
+  runEnvelope,
+  loopDirector,
+}: {
+  marketIngestion: MarketIngestionPlan;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+  runEnvelope: AutonomousRunEnvelope;
+  loopDirector: AutonomousLoopDirector;
+}): AutonomousDaemonMarketWorker {
+  const nextStep = autonomousDaemonMarketWorkerStep(marketIngestion, routeRefreshExecution);
+  const routeRefreshFirst = routeRefreshExecution.route_refresh_required || runEnvelope.action === "refresh-route";
+  const status = autonomousDaemonMarketWorkerStatus({
+    marketIngestion,
+    routeRefreshExecution,
+    runEnvelope,
+    loopDirector,
+    nextStep,
+    routeRefreshFirst,
+  });
+  const blockers = autonomousDaemonMarketWorkerBlockers(status, marketIngestion, routeRefreshExecution, nextStep);
+  const cadence = nextStep
+    ? Math.max(2, Math.min(nextStep.cadence_seconds, marketIngestion.next_provider_refresh_seconds || nextStep.cadence_seconds))
+    : Math.max(5, Math.min(60, marketIngestion.next_provider_refresh_seconds || runEnvelope.next_wake_seconds || 30));
+
+  return {
+    mode: "daemon-market-worker-handoff",
+    status,
+    lane: nextStep?.id ?? "none",
+    provider: nextStep?.source ?? "none",
+    endpoint: nextStep ? autonomousDaemonMarketWorkerEndpoint(nextStep) : "none",
+    action: status === "blocked" || status === "sample-only" ? "stand-down" : nextStep?.action ?? "stand-down",
+    cadence_seconds: cadence,
+    budget_per_minute: nextStep?.budget_per_minute ?? 0,
+    watch_symbols: nextStep?.watch_symbols.slice(0, 8) ?? marketIngestion.watch_symbols.slice(0, 8),
+    can_feed_paper_loop: status === "ready" && !routeRefreshFirst && blockers.length === 0,
+    route_refresh_first: routeRefreshFirst,
+    read_only: true,
+    next_action: autonomousDaemonMarketWorkerNextAction(status, nextStep, marketIngestion, routeRefreshExecution, routeRefreshFirst),
+    blockers,
+    controls: [
+      "Runs only read-only market, route, candle, paid-order, or wallet-mark evidence refresh work before the paper daemon tick.",
+      "Shares provider budget and watch-symbol context with the autonomous intake plan so hot memecoin evidence can stay current.",
+      "Does not create orders, sign payloads, submit swaps, settle fills, custody funds, or prove future profit.",
+    ],
+  };
+}
+
+function autonomousDaemonMarketWorkerStep(
+  marketIngestion: MarketIngestionPlan,
+  routeRefreshExecution: AutonomousRouteRefreshExecution,
+) {
+  if (routeRefreshExecution.route_refresh_required) {
+    const routeStep = marketIngestion.steps.find((step) => step.id === "route-quotes");
+    if (routeStep) return routeStep;
+  }
+  return marketIngestion.steps.find((step) => step.action !== "pause" && step.priority === "immediate") ??
+    marketIngestion.steps.find((step) => step.action !== "pause" && step.priority === "soon") ??
+    marketIngestion.steps.find((step) => step.action !== "pause") ??
+    marketIngestion.steps[0] ??
+    null;
+}
+
+function autonomousDaemonMarketWorkerStatus({
+  marketIngestion,
+  routeRefreshExecution,
+  runEnvelope,
+  loopDirector,
+  nextStep,
+  routeRefreshFirst,
+}: {
+  marketIngestion: MarketIngestionPlan;
+  routeRefreshExecution: AutonomousRouteRefreshExecution;
+  runEnvelope: AutonomousRunEnvelope;
+  loopDirector: AutonomousLoopDirector;
+  nextStep: MarketIngestionPlanStep | null;
+  routeRefreshFirst: boolean;
+}): AutonomousDaemonMarketWorker["status"] {
+  if (marketIngestion.status === "sample") return "sample-only";
+  if (!nextStep || marketIngestion.status === "blocked" || routeRefreshExecution.status === "blocked") return "blocked";
+  if (marketIngestion.provider_budget_status === "paused" || nextStep.action === "pause") return "blocked";
+  if (marketIngestion.provider_budget_status === "throttled") return "throttled";
+  if (routeRefreshFirst || marketIngestion.status === "repair" || runEnvelope.action === "refresh-market") return "refresh-first";
+  if (loopDirector.client_should_run || runEnvelope.keep_running) return "ready";
+  return "idle";
+}
+
+function autonomousDaemonMarketWorkerBlockers(
+  status: AutonomousDaemonMarketWorker["status"],
+  marketIngestion: MarketIngestionPlan,
+  routeRefreshExecution: AutonomousRouteRefreshExecution,
+  nextStep: MarketIngestionPlanStep | null,
+) {
+  const blockers = [
+    status === "sample-only" ? "Sample mode uses local replay only; do not poll external market providers." : null,
+    marketIngestionBlockedReason(status, marketIngestion),
+    routeRefreshExecution.status === "blocked" ? routeRefreshExecution.blockers[0] ?? routeRefreshExecution.next_action : null,
+    nextStep?.blockers[0] ?? null,
+    status === "throttled" ? "Provider budget is throttled; delay non-critical market refreshes." : null,
+  ].filter((item): item is string => Boolean(item));
+  return [...new Set(blockers)].slice(0, 5);
+}
+
+function marketIngestionBlockedReason(
+  status: AutonomousDaemonMarketWorker["status"],
+  marketIngestion: MarketIngestionPlan,
+) {
+  if (status !== "blocked") return null;
+  if (marketIngestion.provider_budget_status === "paused") return "Provider budget is paused.";
+  if (marketIngestion.status === "blocked") return marketIngestion.next_action;
+  return "No read-only market worker lane is available.";
+}
+
+function autonomousDaemonMarketWorkerNextAction(
+  status: AutonomousDaemonMarketWorker["status"],
+  nextStep: MarketIngestionPlanStep | null,
+  marketIngestion: MarketIngestionPlan,
+  routeRefreshExecution: AutonomousRouteRefreshExecution,
+  routeRefreshFirst: boolean,
+) {
+  if (status === "sample-only") return "Keep the daemon on local sample replay until Live DEX mode is selected.";
+  if (status === "blocked") return routeRefreshExecution.blockers[0] ?? marketIngestion.next_action;
+  if (status === "throttled") return "Wait for provider budget to cool before issuing another read-only market request.";
+  if (!nextStep) return "Wait for a market-intake lane.";
+  if (routeRefreshFirst) return `Run read-only ${nextStep.id.replaceAll("-", " ")} before any paper fill spends or releases.`;
+  if (status === "ready") return `${nextStep.action} ${nextStep.id.replaceAll("-", " ")} via ${nextStep.source} every ${nextStep.cadence_seconds}s for ${nextStep.watch_symbols.slice(0, 3).join(", ") || "the active watchlist"}.`;
+  return marketIngestion.next_action;
+}
+
+function autonomousDaemonMarketWorkerEndpoint(step: MarketIngestionPlanStep) {
+  if (step.id === "token-profiles") return "/token-profiles/latest/v1";
+  if (step.id === "boosts") return "/token-boosts/latest/v1";
+  if (step.id === "community-takeovers") return "/community-takeovers/latest/v1";
+  if (step.id === "ads" || step.id === "paid-orders") return "/orders/v1/{chainId}/{tokenAddress}";
+  if (step.id === "pair-backfill") return "/latest/dex/pairs/{chainId}/{pairId}";
+  if (step.id === "route-quotes") return "/swap/v1/quote-readonly";
+  if (step.id === "solana-logs") return "logsSubscribe/read-only";
+  return "local-sample";
 }
 
 function autonomousDaemonLeaseStatus(

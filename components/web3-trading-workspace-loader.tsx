@@ -6694,6 +6694,8 @@ function QuickDaemonHandoffPanel({
   const tone = daemonHandoffTone(handoff.status);
   const leaseTone = daemonHandoffLeaseTone(handoff.lease_status);
   const laneItems = handoff.items.slice(0, 7);
+  const worker = handoff.market_worker;
+  const workerTone = daemonMarketWorkerTone(worker.status);
 
   return (
     <section className="rounded-md border border-outline-variant/30 bg-surface-dim/15 p-2 sm:p-3" aria-label="Autonomous daemon handoff">
@@ -6731,6 +6733,23 @@ function QuickDaemonHandoffPanel({
                 renew {handoff.renew_after_seconds}s · wake {handoff.next_wake_seconds}s · runner {handoff.active_runner_id ?? "open"}
               </p>
             </div>
+            <div className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2 sm:col-span-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Market worker</p>
+                  <p className="mt-1 break-words font-mono text-xs text-on-surface">
+                    {worker.lane.replaceAll("-", " ")} · {worker.provider.replaceAll("-", " ")}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">
+                    {worker.next_action}
+                  </p>
+                </div>
+                <Chip tone={workerTone}>{worker.can_feed_paper_loop ? "feeds loop" : worker.status.replaceAll("-", " ")}</Chip>
+              </div>
+              <p className="mt-1 break-words font-mono text-[10px] leading-4 text-outline">
+                {worker.endpoint} · {worker.cadence_seconds}s · {worker.budget_per_minute}/min · {worker.watch_symbols.slice(0, 3).join(", ") || "watchlist"}
+              </p>
+            </div>
           </div>
 
           <div className="mt-2 grid gap-1 sm:grid-cols-7" aria-label="Daemon handoff readiness lanes">
@@ -6760,7 +6779,7 @@ function QuickDaemonHandoffPanel({
         </div>
       </div>
       <span className="sr-only" aria-label="Autonomous daemon handoff receipt">
-        Daemon handoff status {handoff.status}; lease status {handoff.lease_status}; can issue tick {handoff.can_issue_tick ? "yes" : "no"}; active runner {handoff.active_runner_id ?? "none"}; active request {handoff.active_request_id ?? "none"}; lease expires {handoff.active_expires_at ?? "none"}; renewals {handoff.lease_renewal_count}; replays {handoff.lease_replay_count}; conflicts {handoff.lease_conflict_count}; can run background paper {handoff.can_run_background_paper ? "yes" : "no"}; can trade real capital {handoff.can_trade_real_capital ? "yes" : "no"}; endpoint {handoff.endpoint}; method {handoff.method}; lease {handoff.lease_id}; lease ttl {handoff.lease_ttl_seconds}; renew after {handoff.renew_after_seconds}; next wake {handoff.next_wake_seconds}; source {handoff.request.source}; target {handoff.target_symbol ?? "desk"}; max ticks {handoff.max_ticks_per_lease}; max fills {handoff.max_fills_per_lease}; max trades next minute {handoff.max_trades_next_minute}; blockers {handoff.blockers.join("; ") || "none"}; stop conditions {handoff.stop_conditions.join(" ")}; controls {handoff.controls.join(" ")}
+        Daemon handoff status {handoff.status}; lease status {handoff.lease_status}; can issue tick {handoff.can_issue_tick ? "yes" : "no"}; active runner {handoff.active_runner_id ?? "none"}; active request {handoff.active_request_id ?? "none"}; lease expires {handoff.active_expires_at ?? "none"}; renewals {handoff.lease_renewal_count}; replays {handoff.lease_replay_count}; conflicts {handoff.lease_conflict_count}; can run background paper {handoff.can_run_background_paper ? "yes" : "no"}; can trade real capital {handoff.can_trade_real_capital ? "yes" : "no"}; endpoint {handoff.endpoint}; method {handoff.method}; lease {handoff.lease_id}; lease ttl {handoff.lease_ttl_seconds}; renew after {handoff.renew_after_seconds}; next wake {handoff.next_wake_seconds}; source {handoff.request.source}; target {handoff.target_symbol ?? "desk"}; market worker status {worker.status}; market worker lane {worker.lane}; market worker provider {worker.provider}; market worker endpoint {worker.endpoint}; market worker read only {worker.read_only ? "yes" : "no"}; market worker can feed paper loop {worker.can_feed_paper_loop ? "yes" : "no"}; market worker blockers {worker.blockers.join("; ") || "none"}; max ticks {handoff.max_ticks_per_lease}; max fills {handoff.max_fills_per_lease}; max trades next minute {handoff.max_trades_next_minute}; blockers {handoff.blockers.join("; ") || "none"}; stop conditions {handoff.stop_conditions.join(" ")}; controls {handoff.controls.join(" ")}
       </span>
     </section>
   );
@@ -7303,6 +7322,14 @@ function daemonHandoffLeaseTone(status: Web3TradingState["autonomous_daemon_hand
   if (status === "acquired" || status === "renewed") return "engine";
   if (status === "replayed" || status === "expired") return "caution";
   if (status === "conflict" || status === "blocked") return "critical";
+  return "neutral";
+}
+
+function daemonMarketWorkerTone(status: Web3TradingState["autonomous_daemon_handoff"]["market_worker"]["status"]): QuickChipTone {
+  if (status === "ready") return "engine";
+  if (status === "refresh-first" || status === "throttled") return "caution";
+  if (status === "blocked") return "critical";
+  if (status === "sample-only") return "demo";
   return "neutral";
 }
 
