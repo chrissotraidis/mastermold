@@ -2,8 +2,14 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const LOCAL_ENV_FILE = ".env.local";
-const MAX_SECRET_LENGTH = 512;
+const MAX_SECRET_LENGTH = 4096;
 const SENSITIVE_FIELD_PATTERN = /(private|secret|seed|mnemonic|recovery|phrase|keypair)/i;
+const ALLOWED_SENSITIVE_FIELDS = new Set([
+  "helius_api_key",
+  "jupiter_api_key",
+  "privy_app_secret",
+  "turnkey_api_private_key",
+]);
 
 export type Web3LocalCredentialInstallStatus = "installed" | "unchanged" | "blocked" | "invalid";
 
@@ -29,6 +35,16 @@ type CredentialInput = {
   rpc_url?: unknown;
   ws_url?: unknown;
   jupiter_api_key?: unknown;
+  autonomous_signer_provider?: unknown;
+  privy_app_id?: unknown;
+  privy_app_secret?: unknown;
+  privy_solana_wallet_id?: unknown;
+  turnkey_organization_id?: unknown;
+  turnkey_api_public_key?: unknown;
+  turnkey_api_private_key?: unknown;
+  turnkey_solana_wallet_account?: unknown;
+  session_key_public_key?: unknown;
+  session_policy_hash?: unknown;
   emergency_stop_webhook_url?: unknown;
   emergency_stop_contact?: unknown;
   tax_ledger_export_path?: unknown;
@@ -41,10 +57,20 @@ type CredentialTarget = {
     | "SOLANA_RPC_URL"
     | "SOLANA_WS_URL"
     | "JUPITER_API_KEY"
+    | "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER"
+    | "PRIVY_APP_ID"
+    | "PRIVY_APP_SECRET"
+    | "PRIVY_SOLANA_WALLET_ID"
+    | "TURNKEY_ORGANIZATION_ID"
+    | "TURNKEY_API_PUBLIC_KEY"
+    | "TURNKEY_API_PRIVATE_KEY"
+    | "TURNKEY_SOLANA_WALLET_ACCOUNT"
+    | "MASTERMOLD_SESSION_KEY_PUBLIC_KEY"
+    | "MASTERMOLD_SESSION_POLICY_HASH"
     | "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL"
     | "MASTERMOLD_EMERGENCY_STOP_CONTACT"
     | "MASTERMOLD_TAX_LEDGER_EXPORT_PATH";
-  kind: "key" | "http-url" | "ws-url" | "contact" | "path";
+  kind: "key" | "http-url" | "ws-url" | "contact" | "path" | "signer-provider";
 };
 
 const CREDENTIAL_TARGETS: CredentialTarget[] = [
@@ -52,6 +78,16 @@ const CREDENTIAL_TARGETS: CredentialTarget[] = [
   { field: "rpc_url", env: "SOLANA_RPC_URL", kind: "http-url" },
   { field: "ws_url", env: "SOLANA_WS_URL", kind: "ws-url" },
   { field: "jupiter_api_key", env: "JUPITER_API_KEY", kind: "key" },
+  { field: "autonomous_signer_provider", env: "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER", kind: "signer-provider" },
+  { field: "privy_app_id", env: "PRIVY_APP_ID", kind: "key" },
+  { field: "privy_app_secret", env: "PRIVY_APP_SECRET", kind: "key" },
+  { field: "privy_solana_wallet_id", env: "PRIVY_SOLANA_WALLET_ID", kind: "key" },
+  { field: "turnkey_organization_id", env: "TURNKEY_ORGANIZATION_ID", kind: "key" },
+  { field: "turnkey_api_public_key", env: "TURNKEY_API_PUBLIC_KEY", kind: "key" },
+  { field: "turnkey_api_private_key", env: "TURNKEY_API_PRIVATE_KEY", kind: "key" },
+  { field: "turnkey_solana_wallet_account", env: "TURNKEY_SOLANA_WALLET_ACCOUNT", kind: "key" },
+  { field: "session_key_public_key", env: "MASTERMOLD_SESSION_KEY_PUBLIC_KEY", kind: "key" },
+  { field: "session_policy_hash", env: "MASTERMOLD_SESSION_POLICY_HASH", kind: "key" },
   { field: "emergency_stop_webhook_url", env: "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL", kind: "http-url" },
   { field: "emergency_stop_contact", env: "MASTERMOLD_EMERGENCY_STOP_CONTACT", kind: "contact" },
   { field: "tax_ledger_export_path", env: "MASTERMOLD_TAX_LEDGER_EXPORT_PATH", kind: "path" },
@@ -175,7 +211,7 @@ function invalidReceipt(rejectedFields: string[], summary: string): Web3LocalCre
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     secret_echo_permission: "blocked",
-    next_action: "Submit only Helius, Solana RPC/WebSocket, Jupiter, emergency-stop, or accounting targets; never submit private keys or seed phrases.",
+    next_action: "Submit only allowlisted provider, signer-provider, emergency-stop, or accounting targets; never submit wallet private keys or seed phrases.",
     summary,
   };
 }
@@ -210,12 +246,13 @@ function isValidCredentialValue(value: string, kind: CredentialTarget["kind"]) {
   if (kind === "ws-url") return /^wss?:\/\/[^\s]+$/i.test(value);
   if (kind === "contact") return /^[^<>{}\[\]\r\n\0]{3,}$/.test(value);
   if (kind === "path") return /^[~/A-Za-z0-9._:\-\/ ]{3,}$/.test(value);
-  return /^[A-Za-z0-9._:\-/+=]{8,}$/.test(value);
+  if (kind === "signer-provider") return /^(external-wallet|privy|turnkey|session-key)$/i.test(value);
+  return /^[A-Za-z0-9._:\-/+=@]{8,}$/.test(value);
 }
 
 function findRejectedCredentialFields(input: object) {
   return Object.keys(input)
-    .filter((field) => SENSITIVE_FIELD_PATTERN.test(field) && !["helius_api_key", "jupiter_api_key"].includes(field))
+    .filter((field) => SENSITIVE_FIELD_PATTERN.test(field) && !ALLOWED_SENSITIVE_FIELDS.has(field))
     .slice(0, 8);
 }
 
@@ -242,6 +279,19 @@ function writeIgnoredLocalEnv(updates: Map<CredentialTarget["env"], string>) {
 function nextInstallAction(missing: string[], installed: string[]) {
   if (missing.includes("JUPITER_API_KEY")) return "Add JUPITER_API_KEY, then run Jupiter rehearsal and strict order verification.";
   if (missing.includes("HELIUS_API_KEY") && missing.includes("SOLANA_RPC_URL")) return "Add HELIUS_API_KEY or SOLANA_RPC_URL, then test provider health.";
+  const signerProvider = (process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER ?? "").trim().toLowerCase();
+  if (!signerProvider && missing.includes("MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER")) {
+    return "Keep external-wallet as the first supervised path, or choose privy, turnkey, or session-key before installing provider signer credentials.";
+  }
+  if (signerProvider === "privy" && ["PRIVY_APP_ID", "PRIVY_APP_SECRET", "PRIVY_SOLANA_WALLET_ID"].some((key) => missing.includes(key))) {
+    return "Add the Privy app id, app secret, and Solana wallet id, then rebuild the signer credential packet.";
+  }
+  if (signerProvider === "turnkey" && ["TURNKEY_ORGANIZATION_ID", "TURNKEY_API_PUBLIC_KEY", "TURNKEY_API_PRIVATE_KEY", "TURNKEY_SOLANA_WALLET_ACCOUNT"].some((key) => missing.includes(key))) {
+    return "Add the Turnkey organization, API key pair, and Solana wallet account, then rebuild the signer credential packet.";
+  }
+  if (signerProvider === "session-key" && ["MASTERMOLD_SESSION_KEY_PUBLIC_KEY", "MASTERMOLD_SESSION_POLICY_HASH"].some((key) => missing.includes(key))) {
+    return "Add session-key public scope and policy hash only; never install a session private key.";
+  }
   if (missing.includes("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL") && missing.includes("MASTERMOLD_EMERGENCY_STOP_CONTACT")) {
     return "Add an emergency-stop contact or webhook, then run the local stop drill and live ops packet.";
   }

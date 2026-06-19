@@ -30,6 +30,16 @@ type Draft = {
   rpc_url: string;
   ws_url: string;
   jupiter_api_key: string;
+  autonomous_signer_provider: "external-wallet" | "privy" | "turnkey" | "session-key";
+  privy_app_id: string;
+  privy_app_secret: string;
+  privy_solana_wallet_id: string;
+  turnkey_organization_id: string;
+  turnkey_api_public_key: string;
+  turnkey_api_private_key: string;
+  turnkey_solana_wallet_account: string;
+  session_key_public_key: string;
+  session_policy_hash: string;
   emergency_stop_webhook_url: string;
   emergency_stop_contact: string;
   tax_ledger_export_path: string;
@@ -79,6 +89,16 @@ export function SettingsWeb3CredentialConsole({
     rpc_url: "",
     ws_url: "",
     jupiter_api_key: "",
+    autonomous_signer_provider: "external-wallet",
+    privy_app_id: "",
+    privy_app_secret: "",
+    privy_solana_wallet_id: "",
+    turnkey_organization_id: "",
+    turnkey_api_public_key: "",
+    turnkey_api_private_key: "",
+    turnkey_solana_wallet_account: "",
+    session_key_public_key: "",
+    session_policy_hash: "",
     emergency_stop_webhook_url: "",
     emergency_stop_contact: "",
     tax_ledger_export_path: "",
@@ -101,7 +121,7 @@ export function SettingsWeb3CredentialConsole({
 
   function updateDraft(field: keyof Draft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
-    setMessage(field === "helius_api_key" || field === "jupiter_api_key" || field === "emergency_stop_webhook_url"
+    setMessage(isSessionSensitiveDraftField(field)
       ? "Sensitive value is held only in this page session and is not saved to browser storage."
       : field === "wallet_public_key"
         ? "Session value updated. Use a public wallet address only."
@@ -144,6 +164,16 @@ export function SettingsWeb3CredentialConsole({
       draft.rpc_url,
       draft.ws_url,
       draft.jupiter_api_key,
+      draft.autonomous_signer_provider,
+      draft.privy_app_id,
+      draft.privy_app_secret,
+      draft.privy_solana_wallet_id,
+      draft.turnkey_organization_id,
+      draft.turnkey_api_public_key,
+      draft.turnkey_api_private_key,
+      draft.turnkey_solana_wallet_account,
+      draft.session_key_public_key,
+      draft.session_policy_hash,
       draft.emergency_stop_webhook_url,
       draft.emergency_stop_contact,
       draft.tax_ledger_export_path,
@@ -162,6 +192,16 @@ export function SettingsWeb3CredentialConsole({
           rpc_url: draft.rpc_url,
           ws_url: draft.ws_url,
           jupiter_api_key: draft.jupiter_api_key,
+          autonomous_signer_provider: draft.autonomous_signer_provider,
+          privy_app_id: draft.privy_app_id,
+          privy_app_secret: draft.privy_app_secret,
+          privy_solana_wallet_id: draft.privy_solana_wallet_id,
+          turnkey_organization_id: draft.turnkey_organization_id,
+          turnkey_api_public_key: draft.turnkey_api_public_key,
+          turnkey_api_private_key: draft.turnkey_api_private_key,
+          turnkey_solana_wallet_account: draft.turnkey_solana_wallet_account,
+          session_key_public_key: draft.session_key_public_key,
+          session_policy_hash: draft.session_policy_hash,
           emergency_stop_webhook_url: draft.emergency_stop_webhook_url,
           emergency_stop_contact: draft.emergency_stop_contact,
           tax_ledger_export_path: draft.tax_ledger_export_path,
@@ -178,6 +218,15 @@ export function SettingsWeb3CredentialConsole({
         rpc_url: "",
         ws_url: "",
         jupiter_api_key: "",
+        privy_app_id: "",
+        privy_app_secret: "",
+        privy_solana_wallet_id: "",
+        turnkey_organization_id: "",
+        turnkey_api_public_key: "",
+        turnkey_api_private_key: "",
+        turnkey_solana_wallet_account: "",
+        session_key_public_key: "",
+        session_policy_hash: "",
         emergency_stop_webhook_url: "",
         emergency_stop_contact: "",
         tax_ledger_export_path: "",
@@ -434,6 +483,18 @@ export function SettingsWeb3CredentialConsole({
   const operatorWalletReady = isLikelySolanaPublicKey(trimmedWallet) && trimmedWallet !== SAMPLE_SYSTEM_WALLET;
   const localJupiterConfigured = localInstallReceipt?.configured_keys.includes("JUPITER_API_KEY") === true;
   const jupiterKeyReady = jupiterConfigured || localJupiterConfigured || draft.jupiter_api_key.trim().length > 0;
+  const signerTargetCount = [
+    "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
+    "PRIVY_APP_ID",
+    "PRIVY_APP_SECRET",
+    "PRIVY_SOLANA_WALLET_ID",
+    "TURNKEY_ORGANIZATION_ID",
+    "TURNKEY_API_PUBLIC_KEY",
+    "TURNKEY_API_PRIVATE_KEY",
+    "TURNKEY_SOLANA_WALLET_ACCOUNT",
+    "MASTERMOLD_SESSION_KEY_PUBLIC_KEY",
+    "MASTERMOLD_SESSION_POLICY_HASH",
+  ].filter((key) => localInstallReceipt?.configured_keys.includes(key) === true).length;
   const dexLiveReady = dexReceipt?.status === "live-ready" || dexReceipt?.status === "live-watch";
   const commandWallet = operatorWalletReady ? trimmedWallet : "<public-solana-address>";
   const operatorWalletCommand = `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${commandWallet} --require-operator-wallet`;
@@ -510,13 +571,13 @@ export function SettingsWeb3CredentialConsole({
           placeholder="Public Solana address only"
           onChange={(value) => updateDraft("wallet_public_key", value)}
         />
-        <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
-          Signer mode
-          <select
-            value={draft.signer_mode}
-            onChange={(event) => updateDraft("signer_mode", event.target.value)}
-            className="h-10 w-full rounded-md border border-outline-variant/45 bg-void/40 px-3 text-sm normal-case tracking-normal text-on-surface outline-none transition focus:border-engine/60"
-          >
+          <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
+            Signer mode
+            <select
+              value={draft.signer_mode}
+              onChange={(event) => updateDraft("signer_mode", event.target.value)}
+              className="h-10 w-full rounded-md border border-outline-variant/45 bg-void/40 px-3 text-sm normal-case tracking-normal text-on-surface outline-none transition focus:border-engine/60"
+            >
             <option value="external-wallet">Manual external wallet</option>
             <option value="privy-server-wallet">Privy policy wallet</option>
             <option value="turnkey-policy-wallet">Turnkey policy wallet</option>
@@ -529,6 +590,45 @@ export function SettingsWeb3CredentialConsole({
         <ConsoleInput label="Max trade USD" type="number" value={draft.max_trade_usd} placeholder="250" onChange={(value) => updateDraft("max_trade_usd", value)} />
         <ConsoleInput label="Daily spend cap" type="number" value={draft.daily_spend_cap_usd} placeholder="1000" onChange={(value) => updateDraft("daily_spend_cap_usd", value)} />
         <ConsoleInput label="Max slippage bps" type="number" value={draft.max_slippage_bps} placeholder="150" onChange={(value) => updateDraft("max_slippage_bps", value)} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-violet/25 bg-void/20 p-2" aria-label="Signer provider local credential targets">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Signer provider targets</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              Optional local env targets for Privy, Turnkey, or session-key review
+            </p>
+          </div>
+          <BoundaryBadge label="wallet keys rejected" />
+        </div>
+        <div className="mt-2 grid gap-2 lg:grid-cols-2">
+          <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
+            Autonomous signer provider
+            <select
+              value={draft.autonomous_signer_provider}
+              onChange={(event) => updateDraft("autonomous_signer_provider", event.target.value)}
+              className="h-10 w-full rounded-md border border-outline-variant/45 bg-void/40 px-3 text-sm normal-case tracking-normal text-on-surface outline-none transition focus:border-engine/60"
+            >
+              <option value="external-wallet">External wallet first</option>
+              <option value="privy">Privy server wallet</option>
+              <option value="turnkey">Turnkey policy wallet</option>
+              <option value="session-key">Session-key vault</option>
+            </select>
+          </label>
+          <ConsoleInput label="Privy app id" value={draft.privy_app_id} placeholder="Optional Privy target" onChange={(value) => updateDraft("privy_app_id", value)} />
+          <ConsoleInput label="Privy app secret" type="password" value={draft.privy_app_secret} placeholder="Stored only in ignored local env" onChange={(value) => updateDraft("privy_app_secret", value)} />
+          <ConsoleInput label="Privy Solana wallet id" value={draft.privy_solana_wallet_id} placeholder="Provider wallet id, not a key" onChange={(value) => updateDraft("privy_solana_wallet_id", value)} />
+          <ConsoleInput label="Turnkey organization id" value={draft.turnkey_organization_id} placeholder="Optional Turnkey target" onChange={(value) => updateDraft("turnkey_organization_id", value)} />
+          <ConsoleInput label="Turnkey API public key" value={draft.turnkey_api_public_key} placeholder="Provider API public key" onChange={(value) => updateDraft("turnkey_api_public_key", value)} />
+          <ConsoleInput label="Turnkey API private key" type="password" value={draft.turnkey_api_private_key} placeholder="Provider API credential, never wallet key" onChange={(value) => updateDraft("turnkey_api_private_key", value)} />
+          <ConsoleInput label="Turnkey Solana wallet account" value={draft.turnkey_solana_wallet_account} placeholder="Provider wallet account id" onChange={(value) => updateDraft("turnkey_solana_wallet_account", value)} />
+          <ConsoleInput label="Session-key public key" value={draft.session_key_public_key} placeholder="Public session key only" onChange={(value) => updateDraft("session_key_public_key", value)} />
+          <ConsoleInput label="Session policy hash" value={draft.session_policy_hash} placeholder="Reviewed policy hash only" onChange={(value) => updateDraft("session_policy_hash", value)} />
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-outline">
+          This installer accepts signer-provider API credentials only for ignored localhost env. It still rejects wallet private keys, seed phrases, session private keys, raw transactions, and signed payloads.
+        </p>
       </div>
 
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Local Web3 credential installer">
@@ -550,13 +650,14 @@ export function SettingsWeb3CredentialConsole({
           </button>
         </div>
         <p className="mt-2 text-[11px] leading-4 text-outline">
-          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, emergency-stop, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps live execution blocked.
+          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, signer-provider, emergency-stop, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps live execution blocked.
         </p>
         {localInstallReceipt ? (
           <div className="mt-2 grid gap-2 sm:grid-cols-3" aria-label="Local Web3 credential install receipt">
             <ConsoleMetric label="Install" value={localInstallReceipt.status} tone={localInstallReceipt.status === "installed" ? "engine" : localInstallReceipt.status === "invalid" || localInstallReceipt.status === "blocked" ? "critical" : "neutral"} />
-            <ConsoleMetric label="Configured" value={`${localInstallReceipt.configured_keys.length}/7`} tone={localInstallReceipt.configured_keys.length >= 4 ? "engine" : "caution"} />
-            <ConsoleMetric label="Missing" value={localInstallReceipt.missing_keys.join(", ") || "none"} tone={localInstallReceipt.missing_keys.length === 0 ? "engine" : "caution"} />
+            <ConsoleMetric label="Configured" value={String(localInstallReceipt.configured_keys.length)} tone={localInstallReceipt.configured_keys.length >= 4 ? "engine" : "caution"} />
+            <ConsoleMetric label="Signer targets" value={`${signerTargetCount}/10`} tone={signerTargetCount > 0 ? "engine" : "neutral"} />
+            <ConsoleMetric label="Missing" value={formatMissingTargets(localInstallReceipt.missing_keys)} tone={localInstallReceipt.missing_keys.length === 0 ? "engine" : "caution"} />
           </div>
         ) : null}
       </div>
@@ -881,11 +982,27 @@ export function SettingsWeb3CredentialConsole({
       ) : null}
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
-        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
-        Local credential installer can write known provider, emergency-stop, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
+        Settings Web3 credential console keeps API keys session only; no browser storage for Helius, Jupiter, Privy, Turnkey, or signer-provider keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
+        Local credential installer can write known provider, signer-provider, emergency-stop, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
       </p>
     </section>
   );
+}
+
+function isSessionSensitiveDraftField(field: keyof Draft) {
+  return [
+    "helius_api_key",
+    "jupiter_api_key",
+    "privy_app_secret",
+    "turnkey_api_private_key",
+    "emergency_stop_webhook_url",
+  ].includes(field);
+}
+
+function formatMissingTargets(keys: string[]) {
+  if (keys.length === 0) return "none";
+  const preview = keys.slice(0, 4).join(", ");
+  return keys.length > 4 ? `${preview} +${keys.length - 4}` : preview;
 }
 
 function ConsoleInput({

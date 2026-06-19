@@ -543,6 +543,79 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receiptText).not.toContain("mastermold-tax-canary");
   });
 
+  test("GIVEN signer provider targets WHEN the local installer runs THEN it allowlists provider credentials but rejects wallet secrets", async () => {
+    const envPath = join(mkdtempSync(join(tmpdir(), "mm-web3-signer-env-")), ".env.local");
+    process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH = envPath;
+    const walletPrivateCanary = ["wallet", "private", "canary"].join("-");
+    const sessionPrivateCanary = ["session", "private", "canary"].join("-");
+    const turnkeyApiPrivateCanary = ["turnkey", "api", "private", "canary"].join("-");
+    const turnkeyPrivateCanary = ["turnkey", "private", "canary"].join("-");
+    const turnkeyPublicCanary = ["turnkey", "public", "canary"].join("-");
+    const turnkeyWalletCanary = ["turnkey", "wallet", "canary"].join("-");
+
+    const rejected = await LOCAL_CREDENTIALS_POST(new Request("http://localhost/api/web3-local-credentials", {
+      method: "POST",
+      headers: { "content-type": "application/json", host: "localhost" },
+      body: JSON.stringify({
+        autonomous_signer_provider: "turnkey",
+        turnkey_api_private_key: turnkeyApiPrivateCanary,
+        wallet_private_key: walletPrivateCanary,
+        session_key_private_key: sessionPrivateCanary,
+      }),
+    }));
+    const rejectedReceipt = await json<{ status: string; rejected_fields: string[]; secret_echo_permission: string }>(rejected);
+    expect(rejected.status).toBe(422);
+    expect(rejectedReceipt.status).toBe("invalid");
+    expect(rejectedReceipt.rejected_fields).toEqual(expect.arrayContaining(["wallet_private_key", "session_key_private_key"]));
+    expect(JSON.stringify(rejectedReceipt)).not.toContain(turnkeyApiPrivateCanary);
+    expect(JSON.stringify(rejectedReceipt)).not.toContain(walletPrivateCanary);
+
+    const response = await LOCAL_CREDENTIALS_POST(new Request("http://localhost/api/web3-local-credentials", {
+      method: "POST",
+      headers: { "content-type": "application/json", host: "localhost" },
+      body: JSON.stringify({
+        autonomous_signer_provider: "turnkey",
+        turnkey_organization_id: "turnkey-org-canary",
+        turnkey_api_public_key: turnkeyPublicCanary,
+        turnkey_api_private_key: turnkeyPrivateCanary,
+        turnkey_solana_wallet_account: turnkeyWalletCanary,
+      }),
+    }));
+    const receipt = await json<{
+      status: string;
+      installed_keys: string[];
+      configured_keys: string[];
+      secret_echo_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      next_action: string;
+    }>(response);
+    const receiptText = JSON.stringify(receipt);
+    const envText = readFileSync(envPath, "utf8");
+
+    expect(response.status).toBe(200);
+    expect(receipt.status).toBe("installed");
+    expect(receipt.installed_keys).toEqual(expect.arrayContaining([
+      "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
+      "TURNKEY_ORGANIZATION_ID",
+      "TURNKEY_API_PUBLIC_KEY",
+      "TURNKEY_API_PRIVATE_KEY",
+      "TURNKEY_SOLANA_WALLET_ACCOUNT",
+    ]));
+    expect(receipt.configured_keys).toEqual(expect.arrayContaining([
+      "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
+      "TURNKEY_API_PRIVATE_KEY",
+    ]));
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(envText).toContain("MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER=turnkey");
+    expect(envText).toContain(`TURNKEY_API_PRIVATE_KEY=${turnkeyPrivateCanary}`);
+    expect(receiptText).not.toContain(turnkeyPrivateCanary);
+    expect(receiptText).not.toContain(turnkeyPublicCanary);
+    expect(receiptText).not.toContain(turnkeyWalletCanary);
+  });
+
   test("GIVEN local provider env WHEN the account setup route runs THEN it reports missing accounts without leaking secrets", async () => {
     process.env.HELIUS_API_KEY = "test-helius-secret";
     process.env.BIRDEYE_API_KEY = "test-birdeye-secret";
