@@ -114,7 +114,8 @@ export function buildWeb3AutonomyLaunchChecklist(
   const promotedMemoryPass = ["continue-paper", "extend-paper"].includes(memoryStatus) && promotedRunCount > 0 && promotedPnl >= 0;
   const promotedMemoryFail = ["protect-paper", "stand-down"].includes(memoryStatus) || promotedHealth?.loss_brake_tripped === true;
   const marketPass = dataFreshness.status === "clear" || dataFreshness.status === "tradeable";
-  const routeProofRefreshable = routeRefresh.can_request_readonly_quote || adapter.quote_request_ready;
+  const routePaperRehearsalReady = routeRefresh.local_rehearsal_ready === true;
+  const routeProofRefreshable = routeRefresh.can_request_readonly_quote || adapter.quote_request_ready || routePaperRehearsalReady;
   const routePass = adapter.quote_request_ready && !routeRefresh.route_refresh_required && routeRefresh.status === "ready";
   const routeScore = Math.max(adapter.readiness_score, routeRefresh.route_confidence_score);
   const executionQualityPass = ["route", "clear", "ready", "execute"].includes(String(quality.status)) || quality.selected_score >= 70;
@@ -163,8 +164,16 @@ export function buildWeb3AutonomyLaunchChecklist(
       label: "Route proof",
       status: routePass ? "pass" : routeProofRefreshable ? "watch" : "fail",
       score: routeScore,
-      detail: `${routeRefresh.selected_lane?.replaceAll("-", " ") ?? adapter.quote_provider.replaceAll("-", " ")} route ${routeRefresh.status.replaceAll("-", " ")}; ${adapter.fastest_ttl_seconds}s TTL.`,
-      blocker: routePass ? null : routeProofRefreshable ? routeRefresh.next_action : adapter.next_action,
+      detail: routePaperRehearsalReady && !routePass && !routeRefresh.can_request_readonly_quote
+        ? `local paper route rehearsal accepted at ${routeRefresh.route_confidence_score}/100; live route still needs read-only quote/order proof.`
+        : `${routeRefresh.selected_lane?.replaceAll("-", " ") ?? adapter.quote_provider.replaceAll("-", " ")} route ${routeRefresh.status.replaceAll("-", " ")}; ${adapter.fastest_ttl_seconds}s TTL.`,
+      blocker: routePass
+        ? null
+        : routePaperRehearsalReady && !routeRefresh.can_request_readonly_quote
+          ? "Use the order rehearsal action to turn local paper route evidence into read-only quote and dry-run order proof before live review."
+          : routeProofRefreshable
+            ? routeRefresh.next_action
+            : adapter.next_action,
     },
     {
       id: "execution-quality",
@@ -303,6 +312,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     walletAccounting,
     routePass,
     routeProofRefreshable,
+    routePaperRehearsalReady,
     adapterOrderReady: adapter.swap_v2_order_ready,
     liveReviewPermitted,
   });
@@ -345,6 +355,7 @@ function buildCutoverRunway({
   walletAccounting,
   routePass,
   routeProofRefreshable,
+  routePaperRehearsalReady,
   adapterOrderReady,
   liveReviewPermitted,
 }: {
@@ -354,6 +365,7 @@ function buildCutoverRunway({
   walletAccounting: Web3TradingState["live_wallet_accounting_readiness"];
   routePass: boolean;
   routeProofRefreshable: boolean;
+  routePaperRehearsalReady: boolean;
   adapterOrderReady: boolean;
   liveReviewPermitted: boolean;
 }): Web3AutonomyCutoverRunwayStep[] {
@@ -418,7 +430,7 @@ function buildCutoverRunway({
       label: "Rehearse order path",
       status: routeOrderStatus,
       command: "Order rehearsal",
-      evidence: `Route proof ${routePass ? "passes" : routeProofRefreshable ? "is refreshable" : "is blocked"}; Swap V2 order ${adapterOrderReady ? "ready" : "gated"}.`,
+      evidence: `Route proof ${routePass ? "passes" : routePaperRehearsalReady ? "has paper rehearsal" : routeProofRefreshable ? "is refreshable" : "is blocked"}; Swap V2 order ${adapterOrderReady ? "ready" : "gated"}.`,
       next_action: routePass && adapterOrderReady
         ? "Keep rehearsing read-only quotes and dry-run orders before any live review."
         : "Use the order rehearsal action to refresh read-only DEX route and dry-run order evidence.",

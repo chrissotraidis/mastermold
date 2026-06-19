@@ -5599,6 +5599,21 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("public wallet key");
     expect(launchChecklist.items.find((item) => item.id === "wallet-accounting")?.blocker).toContain("wallet holdings");
     expect(launchChecklist.items.find((item) => item.id === "profit-proof")?.blocker).toContain("promoted paper");
+    if (state.autonomous_route_refresh_execution.local_rehearsal_ready) {
+      expect(launchChecklist.items.find((item) => item.id === "route-proof")).toMatchObject({
+        status: "watch",
+        detail: expect.stringContaining("local paper route rehearsal accepted"),
+        blocker: expect.stringContaining("read-only quote and dry-run order proof"),
+      });
+      expect(launchChecklist.hard_blockers).not.toContain(
+        state.autonomous_route_refresh_execution.next_action,
+      );
+      expect(launchChecklist.cutover_runway.find((step) => step.id === "route-order-rehearsal")).toMatchObject({
+        status: "active",
+        evidence: expect.stringContaining("paper rehearsal"),
+        blocks_live_capital: true,
+      });
+    }
     expect(launchChecklist.remaining_work.map((item) => item.id)).toEqual(expect.arrayContaining([
       "process-supervision",
       "provider-credentials",
