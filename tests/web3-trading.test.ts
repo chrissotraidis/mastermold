@@ -5489,10 +5489,24 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
+    expect(launchChecklist.profit_proof_readiness).toMatchObject({
+      mode: "web3-profit-proof-readiness",
+      can_satisfy_profit_gate: false,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(launchChecklist.profit_proof_readiness.checks.map((check) => check.id)).toEqual([
+      "local-paper",
+      "promoted-memory",
+      "sample-size",
+      "target-hit-rate",
+      "drawdown",
+      "live-boundary",
+    ]);
     expect(launchChecklist.items.find((item) => item.id === "process-supervision")?.blocker).toContain("supervise:web3");
     expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("custody/provider credentials");
     expect(launchChecklist.items.find((item) => item.id === "wallet-accounting")?.blocker).toContain("wallet holdings");
-    expect(launchChecklist.items.find((item) => item.id === "profit-proof")?.blocker).toContain("long-horizon promoted paper proof");
+    expect(launchChecklist.items.find((item) => item.id === "profit-proof")?.blocker).toContain("promoted paper");
     expect(launchChecklist.remaining_work.map((item) => item.id)).toEqual(expect.arrayContaining([
       "process-supervision",
       "provider-credentials",
@@ -5521,6 +5535,43 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(supervisedChecklist.items.find((item) => item.id === "process-supervision")).toMatchObject({
       status: "watch",
       blocker: "Move this to external production-worker review with process manager, restart policy, alerts, and secret scope documented.",
+    });
+    const repeatProfitChecklist = buildWeb3AutonomyLaunchChecklist(state, {
+      status: "target-hit",
+      updated_at: new Date().toISOString(),
+      runner_id: "profit-proof-test",
+      summary: "Promoted paper proof is repeatable.",
+      promotion_permission: "scale-paper",
+      supervisor_status: "completed",
+      net_pnl_usd: 42,
+      posted_ticks: 6,
+      blocked_ticks: 0,
+      profit_target_hit: true,
+      loss_brake_tripped: false,
+      run_count: 3,
+      total_net_pnl_usd: 142,
+      average_net_pnl_usd: 47.33,
+      target_hit_rate_pct: 100,
+      recent_runs: [
+        { finished_at: new Date().toISOString(), status: "completed", promotion_permission: "scale-paper", supervisor_status: "completed", net_pnl_usd: 45, posted_ticks: 5, blocked_ticks: 0, profit_target_hit: true, loss_brake_tripped: false },
+        { finished_at: new Date().toISOString(), status: "completed", promotion_permission: "scale-paper", supervisor_status: "completed", net_pnl_usd: 55, posted_ticks: 5, blocked_ticks: 0, profit_target_hit: true, loss_brake_tripped: false },
+        { finished_at: new Date().toISOString(), status: "target-hit", promotion_permission: "scale-paper", supervisor_status: "completed", net_pnl_usd: 42, posted_ticks: 6, blocked_ticks: 0, profit_target_hit: true, loss_brake_tripped: false },
+      ],
+      run_memory_status: "extend-paper",
+      run_memory_score: 88,
+      recommended_supervisor_round_cap: 4,
+      memory_next_action: "Run-memory is profitable; allow a larger bounded promoted paper window while keeping live execution locked.",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(repeatProfitChecklist.profit_proof_readiness).toMatchObject({
+      status: "repeatable-paper",
+      can_satisfy_profit_gate: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(repeatProfitChecklist.items.find((item) => item.id === "profit-proof")).toMatchObject({
+      status: "pass",
     });
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);

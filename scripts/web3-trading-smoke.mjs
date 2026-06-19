@@ -77,6 +77,10 @@ async function main() {
   assert(Array.isArray(health.web3_promoted_paper_autopilot.recent_runs), "Promoted paper autopilot health should expose compact recent run history.", health.web3_promoted_paper_autopilot);
   assert(["learning", "extend-paper", "continue-paper", "tighten-paper", "protect-paper", "stand-down"].includes(health.web3_promoted_paper_autopilot.run_memory_status), "Promoted paper autopilot health should expose a known run-memory status.", health.web3_promoted_paper_autopilot);
   assert(typeof health.web3_promoted_paper_autopilot.recommended_supervisor_round_cap === "number", "Promoted paper autopilot health should expose a memory-based supervisor round cap.", health.web3_promoted_paper_autopilot);
+  assert(health.web3_profit_proof?.mode === "web3-profit-proof-readiness", "Health endpoint should expose Web3 profit-proof readiness.", health.web3_profit_proof);
+  assert(health.web3_profit_proof.live_execution_permission === "blocked", "Profit-proof readiness should keep live execution blocked.", health.web3_profit_proof);
+  assert(health.web3_profit_proof.wallet_mutation_permission === "blocked", "Profit-proof readiness should keep wallet mutation blocked.", health.web3_profit_proof);
+  assert(Array.isArray(health.web3_profit_proof.checks) && health.web3_profit_proof.checks.some((check) => check.id === "target-hit-rate"), "Profit-proof readiness should expose target-hit evidence.", health.web3_profit_proof);
 
   const launchChecklistResponse = await request("/api/web3-launch-checklist?scenario=breakout&source=sample&account=persistent");
   const launchChecklist = await readJson(launchChecklistResponse);
@@ -92,6 +96,9 @@ async function main() {
   assert(Array.isArray(launchChecklist.items), "Web3 launch checklist should expose proof items.", launchChecklist);
   assert(["paper-profit", "promoted-memory", "market-feed", "route-proof", "execution-quality", "custody-policy", "signer", "relay", "settlement", "kill-switch", "process-supervision", "provider-credentials", "wallet-accounting", "profit-proof", "live-boundary"].every((id) => launchChecklist.items.some((item) => item.id === id)), "Web3 launch checklist should cover paper, market, execution, custody, settlement, production, wallet accounting, profit proof, and live-boundary proofs.", launchChecklist);
   assert(Array.isArray(launchChecklist.remaining_work), "Web3 launch checklist should expose structured remaining work.", launchChecklist);
+  assert(launchChecklist.profit_proof_readiness?.mode === "web3-profit-proof-readiness", "Web3 launch checklist should expose profit-proof readiness.", launchChecklist);
+  assert(launchChecklist.profit_proof_readiness.live_execution_permission === "blocked", "Checklist profit-proof readiness should keep live execution blocked.", launchChecklist.profit_proof_readiness);
+  assert(launchChecklist.profit_proof_readiness.wallet_mutation_permission === "blocked", "Checklist profit-proof readiness should keep wallet mutation blocked.", launchChecklist.profit_proof_readiness);
   assert(launchChecklist.remaining_work_count === launchChecklist.remaining_work.length, "Web3 launch checklist remaining work count should match remaining work rows.", launchChecklist);
   assert(launchChecklist.completed_proof_count + launchChecklist.remaining_work_count === launchChecklist.items.length, "Web3 launch checklist proof counts should reconcile.", launchChecklist);
   assert(launchChecklist.remaining_work.every((item) => ["required", "review"].includes(item.priority) && item.next_action.length > 0), "Web3 launch checklist remaining work rows should include priority and next action.", launchChecklist);

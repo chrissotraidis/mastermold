@@ -1,6 +1,7 @@
 import type { Web3PromotedPaperAutopilotHealth } from "./web3-promoted-paper-autopilot";
 import type { Web3DaemonSupervisorHealth } from "./web3-daemon-supervisor";
 import { buildWeb3ProductionSupervisorReadiness, type Web3ProductionSupervisorReadiness } from "./web3-production-supervisor";
+import { buildWeb3ProfitProofReadiness, type Web3ProfitProofReadiness } from "./web3-profit-proof";
 import type { Web3TradingState } from "./web3-trading";
 
 export type Web3AutonomyLaunchChecklistStatus =
@@ -59,6 +60,7 @@ export type Web3AutonomyLaunchChecklist = {
   watch_count: number;
   hard_blockers: string[];
   production_supervisor_readiness: Web3ProductionSupervisorReadiness;
+  profit_proof_readiness: Web3ProfitProofReadiness;
   controls: string[];
   items: Web3AutonomyLaunchChecklistItem[];
   remaining_work: Web3AutonomyLaunchRemainingWorkItem[];
@@ -82,6 +84,7 @@ export function buildWeb3AutonomyLaunchChecklist(
   const daemon = state.autonomous_daemon_handoff;
   const walletAccounting = state.live_wallet_accounting_readiness;
   const productionSupervisor = buildWeb3ProductionSupervisorReadiness(supervisorHealth);
+  const profitProof = buildWeb3ProfitProofReadiness({ paperProfit, promotedHealth });
   const killSwitchFail = state.execution_readiness.checks.some((check) => check.id === "kill-switch" && check.status === "fail");
   const memoryStatus = promotedHealth?.run_memory_status ?? "learning";
   const promotedRunCount = promotedHealth?.run_count ?? 0;
@@ -104,8 +107,8 @@ export function buildWeb3AutonomyLaunchChecklist(
   const providerCredentialsWatch = custody.status === "bounded-ready" || signer.ready_count > 0 || signer.can_request_signature;
   const walletAccountingPass = walletAccounting.can_trust_live_pnl;
   const walletAccountingWatch = walletAccounting.status !== "missing-wallet" && walletAccounting.status !== "rpc-gated" && walletAccounting.status !== "blocked";
-  const profitProofPass = promotedMemoryPass && paperProfit.making_money && paperProfit.accountability_score >= 70;
-  const profitProofWatch = paperProfit.net_pnl_usd >= 0 || promotedRunCount > 0;
+  const profitProofPass = profitProof.can_satisfy_profit_gate;
+  const profitProofWatch = profitProof.status === "profitable-paper" || (profitProof.status === "learning" && profitProof.promoted_run_count > 0);
   const liveBoundaryPass = !liveReadiness.can_trade_real_capital && !state.execution_gate.live_execution_enabled;
 
   const items: Web3AutonomyLaunchChecklistItem[] = [
@@ -217,9 +220,9 @@ export function buildWeb3AutonomyLaunchChecklist(
       id: "profit-proof",
       label: "Profit proof",
       status: profitProofPass ? "pass" : profitProofWatch ? "watch" : "fail",
-      score: profitProofPass ? 92 : profitProofWatch ? 54 : 22,
-      detail: `${formatSignedCompactValue(paperProfit.net_pnl_usd)} paper net; promoted memory ${memoryStatus.replaceAll("-", " ")} across ${promotedRunCount} run${promotedRunCount === 1 ? "" : "s"}.`,
-      blocker: profitProofPass ? null : "Run long-horizon promoted paper proof with positive net PnL, stable drawdown, and repeatable target-hit evidence before live-capital review.",
+      score: profitProofPass ? 92 : profitProofWatch ? Math.max(48, profitProof.readiness_score) : Math.min(32, profitProof.readiness_score),
+      detail: `${profitProof.status.replaceAll("-", " ")}; ${formatSignedCompactValue(profitProof.promoted_total_net_pnl_usd)} promoted total, ${profitProof.promoted_target_hit_rate_pct.toFixed(0)}% target hits across ${profitProof.promoted_run_count} run${profitProof.promoted_run_count === 1 ? "" : "s"}.`,
+      blocker: profitProofPass ? null : profitProof.next_action,
     },
     {
       id: "live-boundary",
@@ -251,7 +254,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     .sort((a, b) => launchRemainingWorkRank(b) - launchRemainingWorkRank(a));
   const remainingWorkCount = remainingWork.length;
   const readinessScore = Math.round(items.reduce((sum, item) => sum + item.score, 0) / Math.max(1, items.length));
-  const paperScalePermitted = paperProfit.making_money && marketPass && !promotedMemoryFail && !killSwitchFail && paperProfit.accountability_score >= 70;
+  const paperScalePermitted = profitProof.can_support_paper_scale && marketPass && !promotedMemoryFail && !killSwitchFail;
   const liveReviewPermitted = liveReadiness.can_trade_real_capital &&
     hardBlockers.length === 0 &&
     promotedMemoryPass &&
@@ -287,6 +290,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     watch_count: watchCount,
     hard_blockers: hardBlockers,
     production_supervisor_readiness: productionSupervisor,
+    profit_proof_readiness: profitProof,
     controls: [
       "This checklist is a launch-readiness contract; it does not sign, submit, custody funds, or unlock real-capital trading.",
       "Paper scale requires current paper profit proof, market freshness, promoted-run memory that is not protecting, and a clear kill switch.",
