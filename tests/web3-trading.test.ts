@@ -11,6 +11,7 @@ import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/r
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
 import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
+import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
@@ -9827,6 +9828,120 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.learning_loop.signals.length).toBeGreaterThan(0);
     expect(state.market.length).toBeGreaterThan(0);
     expect(state.market.some((market) => market.symbol === "BONK")).toBe(true);
+  });
+
+  test("GIVEN public DEX discovery works WHEN the discovery receipt runs THEN it exposes scanner evidence without live authority", async () => {
+    const tokenAddress = "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/token-boosts/top/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, amount: 9, totalAmount: 14, description: "top boost" }]);
+      }
+      if (url.includes("/token-boosts/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, amount: 3, totalAmount: 14, description: "fresh boost" }]);
+      }
+      if (url.includes("/token-profiles/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, description: "fresh profile" }]);
+      }
+      if (url.includes("/community-takeovers/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, description: "takeover" }]);
+      }
+      if (url.includes("/ads/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress, type: "tokenAd", impressions: 42_000 }]);
+      }
+      if (url.includes("/orders/v1/solana/")) {
+        return Response.json([{ type: "tokenAd", status: "approved" }]);
+      }
+      if (url.includes("/tokens/v1/solana/")) {
+        return Response.json([
+          {
+            chainId: "solana",
+            dexId: "raydium",
+            pairAddress: "bonk-pair-live",
+            pairCreatedAt: Date.now() - 20 * 60 * 1000,
+            baseToken: { address: tokenAddress, symbol: "BONK", name: "Bonk" },
+            quoteToken: { address: "So11111111111111111111111111111111111111112", symbol: "SOL", name: "Solana" },
+            priceUsd: "0.000024",
+            marketCap: 1_900_000_000,
+            liquidity: { usd: 28_000_000 },
+            volume: { m5: 120_000, h1: 1_900_000, h24: 41_000_000 },
+            txns: { m5: { buys: 110, sells: 42 } },
+            priceChange: { m5: 4.8, h1: 13.5, h6: 22.1 },
+            boosts: { active: 4 },
+          },
+        ]);
+      }
+      return Response.json({ error: "unexpected DEX test request" }, { status: 500 });
+    }) as typeof fetch;
+
+    const rejected = await DEX_DISCOVERY_GET(new Request("http://localhost/api/web3-dex-discovery?source=bad-source"));
+    expect(rejected.status).toBe(422);
+
+    const response = await DEX_DISCOVERY_GET(new Request("http://localhost/api/web3-dex-discovery?scenario=breakout&source=live-dex&account=ephemeral&cycles=0"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      provider: string;
+      provider_docs_url: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      secret_echo_permission: string;
+      private_key_storage: string;
+      transaction_submission_permission: string;
+      source_summary: {
+        market_source_status: string;
+        discovery_status: string;
+        tokens_considered: number;
+        pairs_mapped: number;
+        pair_coverage_pct: number;
+        failed_source_count: number;
+        live_candidate_count: number;
+        paid_hype_count: number;
+        top_symbols: string[];
+      };
+      source_checks: Array<{ id: string; status: string; rate_limit_class: string }>;
+      top_candidates: Array<{ symbol: string; paid_order_checked: boolean; paid_order_count: number; sources: string[] }>;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-dex-discovery-receipt");
+    expect(["live-ready", "live-watch"]).toContain(receipt.status);
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.provider).toBe("DEX Screener");
+    expect(receipt.provider_docs_url).toBe("https://docs.dexscreener.com/api/reference");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.source_summary.market_source_status).toBe("live");
+    expect(receipt.source_summary.discovery_status).toBe("live");
+    expect(receipt.source_summary.tokens_considered).toBeGreaterThan(0);
+    expect(receipt.source_summary.pairs_mapped).toBeGreaterThan(0);
+    expect(receipt.source_summary.pair_coverage_pct).toBeGreaterThan(0);
+    expect(receipt.source_summary.failed_source_count).toBe(0);
+    expect(receipt.source_summary.live_candidate_count).toBeGreaterThan(0);
+    expect(receipt.source_summary.top_symbols).toContain("BONK");
+    expect(receipt.source_checks.map((check) => check.id)).toEqual([
+      "dex-top-boosts",
+      "dex-latest-boosts",
+      "dex-latest-profiles",
+      "dex-community-takeovers",
+      "dex-latest-ads",
+      "portfolio-watch",
+    ]);
+    expect(receipt.source_checks.every((check) => check.status === "ok")).toBe(true);
+    expect(receipt.source_checks.find((check) => check.id === "dex-latest-profiles")?.rate_limit_class).toBe("discovery-60-rpm");
+    expect(receipt.top_candidates[0]).toMatchObject({
+      symbol: "BONK",
+      paid_order_checked: true,
+      paid_order_count: 1,
+    });
+    expect(receipt.top_candidates[0].sources).toContain("dex-latest-profiles");
+    expect(receipt.controls.some((control) => control.includes("local paper decisions only"))).toBe(true);
+    expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
   });
 
   test("GIVEN live discovery fails WHEN persistent paper advances THEN legacy entries stay blocked by readiness gate", async () => {

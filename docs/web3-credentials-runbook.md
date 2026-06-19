@@ -94,6 +94,7 @@ The Wiring focus also exposes:
 GET /api/web3-account-acquisition
 GET /api/web3-account-setup
 GET /api/web3-accounting-ledger
+GET /api/web3-dex-discovery
 GET /api/web3-provider-health
 GET /api/web3-signer-handoff
 POST /api/web3-emergency-stop/drill
@@ -105,6 +106,8 @@ The account acquisition route returns the external setup packet used by Settings
 The account setup route returns a redacted receipt with provider-account status for Helius/Solana reads, Jupiter execution rehearsal, the dedicated public wallet, signer posture, emergency-stop ops, accounting, and optional market-feed lanes. It detects whether expected local env targets are configured but never returns their values. It does not create third-party accounts, submit signup forms, store secrets, sign, submit, custody funds, or mutate wallets; external account creation remains operator-owned outside the app.
 
 The provider health route returns a redacted receipt from live read-only provider checks. It can derive Helius mainnet RPC from `HELIUS_API_KEY`, test Solana `getHealth`, `getLatestBlockhash`, and `getSlot`, test Helius DAS `getAssetsByOwner` only when a public wallet is scoped, and test Jupiter quote/order readiness. It returns endpoint host/path, status booleans, aggregate wallet counts, and a receipt hash only; API keys, private keys, raw holdings, unsigned transactions, signed transactions, signatures, and wallet authority are never returned. Live execution and wallet mutation remain blocked even when all provider checks pass.
+
+The DEX discovery route returns a redacted read-only scanner receipt from DEX Screener public discovery evidence. It can fetch latest token profiles, latest boosts, top boosts, community takeovers, latest ads, paid-order records, and token-pair mapping through the existing `live-dex` source path, then summarize source health, pair coverage, paid-hype count, top symbols, and scanner intake status. It returns no API keys, private keys, wallet authority, raw transaction bodies, or live execution permission; all candidates remain paper-only scanner evidence.
 
 The Jupiter rehearsal route accepts a POST body with `jupiter_api_key`, `wallet_public_key`, and `max_slippage_bps`. The Jupiter key may be a one-shot session input or server `JUPITER_API_KEY`; it is never echoed or stored. The route requests SOL-to-USDC quote/order readiness, hashes the raw Jupiter request id, reports whether a transaction body was detected, withholds any unsigned transaction body, rejects private-key/seed-phrase-shaped fields, and always blocks execute, signing, transaction submission, live execution, and wallet mutation.
 

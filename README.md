@@ -138,6 +138,10 @@ or `WEB3_VERIFY_JUPITER_API_KEY` is available to fail closed until quote and uns
 readiness are both proven without returning transaction bytes. Add `--require-operator-wallet`
 with `--wallet=<public-solana-address>` or `WEB3_VERIFY_WALLET_PUBLIC_KEY` to fail closed
 until the sample all-ones wallet has been replaced by a dedicated public trading wallet.
+`/api/web3-dex-discovery?source=live-dex` is the compact read-only scanner receipt for
+current public DEX Screener discovery evidence: profiles, boosts, ads, paid orders, pair
+mapping, top symbols, and scanner intake status. It is paper-only evidence and still blocks
+live execution, transaction submission, wallet mutation, private-key storage, and secret echo.
 
 ## Architecture: the engine and the app
 
