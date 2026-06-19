@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
+import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3CredentialsSetupReadiness } from "@/src/db/web3-credentials";
@@ -536,6 +537,82 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("not CPA-reviewed"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
     expect(JSON.stringify(receipt)).not.toContain("tax-ledger-secret");
+  });
+
+  test("GIVEN signer readiness state WHEN the signer handoff route runs THEN it returns a redacted blocked receipt", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";
+
+    const rejected = await SIGNER_HANDOFF_GET(new Request("http://localhost/api/web3-signer-handoff?scenario=nope"));
+    expect(rejected.status).toBe(422);
+
+    const response = await SIGNER_HANDOFF_GET(new Request("http://localhost/api/web3-signer-handoff?scenario=breakout&source=sample&account=ephemeral&cycles=3"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      active_provider: string;
+      signer_scope: string;
+      wallet_scoped: boolean;
+      policy_hash_preview: string | null;
+      request_summary: {
+        status: string;
+        payload_hash_preview: string | null;
+        raw_transaction_included: boolean;
+        signed_payload_included: boolean;
+        private_key_required: boolean;
+      };
+      custody_summary: { status: string; max_slippage_bps: number };
+      signer_summary: { status: string; providers: Array<{ provider: string; readiness_score: number }> };
+      relay_summary: { status: string; payload_hash_preview: string | null };
+      live_autonomy_summary: { can_trade_real_capital: boolean; live_execution_permitted: boolean };
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      provider_dispatch_permission: string;
+      private_key_storage: string;
+      transaction_body_storage: string;
+      unsigned_transaction_storage: string;
+      signed_payload_storage: string;
+      checks: Array<{ id: string; status: string; detail: string }>;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-signer-handoff-receipt");
+    expect(["missing-wallet", "policy-gated", "signature-gated", "request-ready", "submit-gated", "blocked"]).toContain(receipt.status);
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.active_provider).toBe("external-wallet");
+    expect(receipt.signer_summary.providers.length).toBeGreaterThan(0);
+    expect(receipt.signer_summary.providers.every((provider) => provider.readiness_score >= 0 && provider.readiness_score <= 100)).toBe(true);
+    expect(receipt.custody_summary.max_slippage_bps).toBeGreaterThan(0);
+    expect(receipt.request_summary.raw_transaction_included).toBe(false);
+    expect(receipt.request_summary.signed_payload_included).toBe(false);
+    expect(receipt.request_summary.private_key_required).toBe(false);
+    expect(receipt.live_autonomy_summary.can_trade_real_capital).toBe(false);
+    expect(receipt.live_autonomy_summary.live_execution_permitted).toBe(false);
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.provider_dispatch_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.transaction_body_storage).toBe("blocked");
+    expect(receipt.unsigned_transaction_storage).toBe("blocked");
+    expect(receipt.signed_payload_storage).toBe("blocked");
+    expect(receipt.checks.map((check) => check.id)).toEqual([
+      "wallet-scope",
+      "custody-policy",
+      "signer-provider",
+      "payload-hash",
+      "pre-submit",
+      "relay-boundary",
+      "live-boundary",
+      "private-key-boundary",
+    ]);
+    expect(receipt.checks.find((check) => check.id === "live-boundary")).toMatchObject({ status: "pass" });
+    expect(receipt.checks.find((check) => check.id === "private-key-boundary")?.detail).toContain("Private keys");
+    expect(receipt.controls.some((control) => control.includes("Private keys"))).toBe(true);
+    expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
+    expect(JSON.stringify(receipt)).not.toContain("test-jupiter-secret");
   });
 
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {

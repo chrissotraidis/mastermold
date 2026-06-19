@@ -576,6 +576,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperWorkspace).toContain("text-base font-semibold text-on-surface sm:text-lg");
     expect(paperWorkspace).toContain("Paper trades use this simulator balance only. No connected account is touched.");
     expect(web3Workspace).toContain("Paper execution priority");
+    expect(web3Workspace).toContain("Signer handoff receipt");
+    expect(web3Workspace).toContain("Build signer receipt");
+    expect(web3Workspace).toContain("private key storage blocked");
     expect(web3Workspace).toContain("Production worker review");
     expect(web3Workspace).toContain("Production supervisor readiness receipt");
     expect(web3Workspace).toContain("process gate blocked");

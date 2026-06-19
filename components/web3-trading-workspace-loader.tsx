@@ -12,10 +12,11 @@ import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/d
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import type { Web3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
+import type { Web3SignerHandoffReceipt } from "@/src/db/web3-signer-handoff";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
-type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "accounting-ledger" | "emergency-stop";
+type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "signer-handoff" | "accounting-ledger" | "emergency-stop";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
 type Web3CredentialsDraft = {
   helius_api_key: string;
@@ -114,6 +115,7 @@ export function Web3TradingWorkspaceLoader({
   const [quickNotice, setQuickNotice] = useState("Quick agent controls are armed for bounded paper sessions.");
   const [lastActionOutcome, setLastActionOutcome] = useState<QuickAgentActionOutcome | null>(null);
   const [lastPromotedAutopilot, setLastPromotedAutopilot] = useState<PromotedPaperAutopilotReceipt | null>(null);
+  const [signerHandoffReceipt, setSignerHandoffReceipt] = useState<Web3SignerHandoffReceipt | null>(null);
   const [accountingLedgerReceipt, setAccountingLedgerReceipt] = useState<Web3AccountingLedgerReceipt | null>(null);
   const [emergencyStopReceipt, setEmergencyStopReceipt] = useState<Web3EmergencyStopDrillReceipt | null>(null);
   const [focusMode, setFocusMode] = useState<OperatorFocusMode>("cockpit");
@@ -346,6 +348,31 @@ export function Web3TradingWorkspaceLoader({
       setQuickNotice(payload.summary);
     } catch (error) {
       setQuickNotice(error instanceof Error ? error.message : "The Web3 accounting receipt could not be built.");
+    } finally {
+      setQuickBusy(null);
+    }
+  }
+
+  async function buildSignerHandoffReceipt() {
+    if (!state || quickBusy) return;
+    setQuickBusy("signer-handoff");
+    setQuickNotice("Building a redacted signer handoff receipt from custody, order, pre-submit, and relay gates.");
+    try {
+      const params = new URLSearchParams({
+        scenario: state.scenario,
+        source: state.market_source.mode,
+        account: state.paper_account.mode,
+        cycles: String(state.paper_account.cycle),
+      });
+      const response = await fetch(`/api/web3-signer-handoff?${params.toString()}`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as Web3SignerHandoffReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "The signer handoff receipt could not be built.");
+      }
+      setSignerHandoffReceipt(payload);
+      setQuickNotice(payload.summary);
+    } catch (error) {
+      setQuickNotice(error instanceof Error ? error.message : "The signer handoff receipt could not be built.");
     } finally {
       setQuickBusy(null);
     }
@@ -1218,6 +1245,15 @@ export function Web3TradingWorkspaceLoader({
                 />
               </div>
               <div className="xl:col-span-2">
+                <QuickSignerHandoffReceiptPanel
+                  receipt={signerHandoffReceipt}
+                  state={state}
+                  busy={quickBusy === "signer-handoff"}
+                  disabled={quickDisabled}
+                  onBuild={buildSignerHandoffReceipt}
+                />
+              </div>
+              <div className="xl:col-span-2">
                 <QuickWalletTransactionIntelligencePanel intelligence={state.wallet_transaction_intelligence} readiness={state.live_wallet_accounting_readiness} />
               </div>
               <div className="xl:col-span-2">
@@ -1527,6 +1563,161 @@ function QuickWalletTransactionIntelligencePanel({
 
       <p className="sr-only" aria-label="Wallet transaction intelligence receipt">
         Wallet transaction intelligence status {intelligence.status}; decoded {intelligence.decoded_transaction_count}; swaps {intelligence.swap_transaction_count}; transfers {intelligence.transfer_transaction_count}; failed {intelligence.failed_transaction_count}; raw transaction storage {intelligence.raw_transaction_storage}; wallet mutation {intelligence.wallet_mutation_permission}; live execution {intelligence.live_execution_permission}.
+      </p>
+    </section>
+  );
+}
+
+function QuickSignerHandoffReceiptPanel({
+  receipt,
+  state,
+  busy,
+  disabled,
+  onBuild,
+}: {
+  receipt: Web3SignerHandoffReceipt | null;
+  state: Web3TradingState;
+  busy: boolean;
+  disabled: boolean;
+  onBuild: () => void;
+}) {
+  const status = receipt?.status ?? "not-built";
+  const tone = receipt ? signerHandoffTone(receipt.status) : "demo";
+  const activeProvider = receipt?.active_provider ?? state.autonomous_signer_ops.active_provider;
+  const walletScoped = receipt?.wallet_scoped ?? Boolean(state.autonomous_custody_mandate.wallet_public_key);
+  const policyHashPresent = receipt?.policy_hash_present ?? Boolean(state.autonomous_custody_mandate.policy_hash);
+  const policyPreview = receipt?.policy_hash_preview ?? state.autonomous_custody_mandate.policy_hash.slice(0, 10);
+  const requestStatus = receipt?.request_summary.status ?? state.autonomous_signer_ops.active_request?.status ?? "missing";
+  const relayStatus = receipt?.relay_summary.status ?? state.signed_transaction_relay.status;
+  const providerRows = receipt?.signer_summary.providers ?? state.autonomous_signer_ops.items.map((item) => ({
+    provider: item.provider,
+    status: item.status,
+    action: item.action,
+    readiness_score: item.readiness_score,
+    can_request_signature: item.can_request_signature,
+    can_auto_sign: item.can_auto_sign,
+    requires_user_presence: item.requires_user_presence,
+    next_action: item.next_action,
+  }));
+  const checkRows = receipt?.checks ?? signerHandoffPlaceholderChecks(state);
+
+  return (
+    <section className="min-w-0 rounded-md border border-engine/25 bg-engine/[0.035] p-2 sm:p-3" aria-label="Signer handoff receipt">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Signer handoff receipt</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">Custody, request hash, and relay boundary</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            {receipt?.summary ?? "Build a redacted signer handoff receipt that proves wallet scope, custody policy, hash-only request readiness, pre-submit rehearsal, relay boundary, and live execution locks before any real signer path is reviewed."}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone={walletScoped ? "engine" : "critical"}>{walletScoped ? "wallet scoped" : "wallet missing"}</Chip>
+          <Chip tone={receipt?.live_execution_permission === "blocked" ? "demo" : receipt ? "critical" : "demo"}>live blocked</Chip>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+        <div className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2">
+          <p className="text-xs leading-5 text-outline">
+            {receipt?.next_action ?? state.autonomous_signer_ops.next_action}
+          </p>
+          <button
+            type="button"
+            onClick={onBuild}
+            disabled={disabled || busy}
+            className="mt-2 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/40 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {busy ? "Building" : "Build signer receipt"}
+          </button>
+          {receipt ? (
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px] leading-4 text-outline">
+              <span>Receipt {receipt.receipt_hash.slice(0, 10)}</span>
+              <span>Provider {receipt.active_provider.replaceAll("-", " ")}</span>
+              <span>Request {receipt.request_summary.request_id ?? "none"}</span>
+              <span>Payload {receipt.request_summary.payload_hash_preview ?? "none"}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6">
+          <ProfitMetric
+            label="Provider"
+            value={activeProvider.replaceAll("-", " ")}
+            detail={(receipt?.signer_scope ?? state.autonomous_custody_mandate.signer_scope).replaceAll("-", " ")}
+            tone={state.autonomous_signer_ops.can_request_signature ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Wallet"
+            value={walletScoped ? "scoped" : "missing"}
+            detail={receipt?.wallet_public_key_preview ?? "public key only"}
+            tone={walletScoped ? "engine" : "critical"}
+          />
+          <ProfitMetric
+            label="Policy"
+            value={policyHashPresent ? "hashed" : "missing"}
+            detail={policyPreview ?? "no policy hash"}
+            tone={policyHashPresent ? "engine" : "critical"}
+          />
+          <ProfitMetric
+            label="Request"
+            value={requestStatus.replaceAll("-", " ")}
+            detail={receipt?.request_summary.payload_hash_preview ?? state.autonomous_signer_ops.active_request?.payload_hash?.slice(0, 10) ?? "no payload"}
+            tone={requestStatus === "ready" ? "engine" : requestStatus === "blocked" ? "critical" : "caution"}
+          />
+          <ProfitMetric
+            label="Relay"
+            value={relayStatus.replaceAll("-", " ")}
+            detail={receipt?.relay_summary.submit_path.replaceAll("-", " ") ?? state.signed_transaction_relay.submit_path.replaceAll("-", " ")}
+            tone={relayStatus === "ready" || relayStatus === "confirmed" || relayStatus === "relayed" ? "engine" : relayStatus === "failed" ? "critical" : "caution"}
+          />
+          <ProfitMetric
+            label="Boundary"
+            value={receipt?.provider_dispatch_permission ?? "blocked"}
+            detail="provider dispatch"
+            tone="demo"
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
+          {checkRows.map((check) => (
+            <div key={check.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{check.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", signerHandoffCheckDotClass(check.status))} />
+              </div>
+              <p className={cn("mt-1 text-xs font-semibold", signerHandoffCheckTextClass(check.status))}>
+                {check.status}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{check.detail}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
+          {providerRows.slice(0, 4).map((provider) => (
+            <div key={provider.provider} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{provider.provider.replaceAll("-", " ")}</p>
+                <span className={cn("rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-telemetry", signerHandoffProviderClass(provider.status))}>
+                  {provider.readiness_score}/100
+                </span>
+              </div>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{provider.action.replaceAll("-", " ")}</p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">
+                {provider.can_auto_sign ? "Auto-sign model" : provider.can_request_signature ? "Signature request model" : provider.requires_user_presence ? "User-presence required" : "Setup required"} · {provider.next_action}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="sr-only" aria-label="Signer handoff receipt status">
+        Signer handoff status {status}; provider {activeProvider}; wallet scoped {walletScoped ? "yes" : "no"}; request status {requestStatus}; relay {relayStatus}; live execution blocked; wallet mutation blocked; private key storage blocked; transaction body storage blocked; signed payload storage blocked.
       </p>
     </section>
   );
@@ -2253,6 +2444,60 @@ function accountingCheckTextClass(status: Web3AccountingLedgerReceipt["checks"][
   if (status === "pass") return "text-engine";
   if (status === "watch") return "text-caution";
   return "text-critical";
+}
+
+function signerHandoffTone(status: Web3SignerHandoffReceipt["status"]): QuickChipTone {
+  if (status === "request-ready") return "engine";
+  if (status === "submit-gated" || status === "signature-gated" || status === "policy-gated") return "caution";
+  if (status === "missing-wallet" || status === "blocked") return "critical";
+  return "neutral";
+}
+
+function signerHandoffCheckDotClass(status: Web3SignerHandoffReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "bg-engine";
+  if (status === "watch") return "bg-caution";
+  return "bg-critical";
+}
+
+function signerHandoffCheckTextClass(status: Web3SignerHandoffReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
+  return "text-critical";
+}
+
+function signerHandoffProviderClass(status: Web3SignerHandoffReceipt["signer_summary"]["providers"][number]["status"]) {
+  if (status === "ready") return "border-engine/35 bg-engine/[0.08] text-engine";
+  if (status === "watch" || status === "setup-required") return "border-caution/35 bg-caution/[0.08] text-caution";
+  return "border-critical/35 bg-critical/[0.08] text-critical";
+}
+
+function signerHandoffPlaceholderChecks(state: Web3TradingState): Web3SignerHandoffReceipt["checks"] {
+  return [
+    {
+      id: "wallet-scope",
+      label: "Wallet scope",
+      status: state.autonomous_custody_mandate.wallet_public_key ? "pass" : "fail",
+      detail: state.autonomous_custody_mandate.wallet_public_key ? "A public wallet is scoped." : "No public wallet is scoped for signer review.",
+    },
+    {
+      id: "custody-policy",
+      label: "Custody policy",
+      status: state.autonomous_custody_mandate.status === "armed" || state.autonomous_custody_mandate.status === "bounded-ready" ? "pass" : "watch",
+      detail: state.autonomous_custody_mandate.next_action,
+    },
+    {
+      id: "signer-provider",
+      label: "Signer provider",
+      status: state.autonomous_signer_ops.can_request_signature ? "pass" : "watch",
+      detail: state.autonomous_signer_ops.next_action,
+    },
+    {
+      id: "live-boundary",
+      label: "Live boundary",
+      status: "pass",
+      detail: "Live execution and wallet mutation remain blocked.",
+    },
+  ];
 }
 
 function emergencyStopSurfaceDotClass(status: Web3EmergencyStopDrillReceipt["surfaces"][number]["status"]) {
