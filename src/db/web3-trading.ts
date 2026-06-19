@@ -8881,6 +8881,38 @@ export type AutonomousSignerRequestEnvelope = {
   controls: string[];
 };
 
+export type AutonomousSignerProviderRequestPacket = {
+  mode: "provider-signature-request-packet";
+  status: "idle" | "blocked" | "ready";
+  provider: AutonomousSignerOpsProvider;
+  execution_model: "wallet-prompt" | "provider-sign-only" | "provider-managed-submit" | "session-key-sign-only";
+  sdk_action:
+    | "wallet.signTransaction"
+    | "privy.solana.signTransaction"
+    | "turnkey.solSendTransaction"
+    | "sessionKey.signTransaction"
+    | "none";
+  caip2: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp" | "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1" | "unknown";
+  endpoint_hint: string | null;
+  request_body_hash: string | null;
+  request_body_fields: {
+    wallet_id: "configured-redacted" | "not-configured" | "external-wallet" | "session-key";
+    transaction: "external-serialized-transaction-required";
+    payload_hash: string | null;
+    request_id: string | null;
+    policy_hash: string | null;
+    authorization_context: "required" | "not-required" | "provider-policy";
+    broadcast: "disabled-sign-only" | "provider-managed";
+  };
+  required_env: string[];
+  can_dispatch_now: boolean;
+  raw_transaction_included: false;
+  signed_payload_included: false;
+  private_key_required: false;
+  controls: string[];
+  blockers: string[];
+};
+
 export type AutonomousSignerProviderAdapter = {
   mode: "signer-provider-adapter";
   status: "idle" | "blocked" | "ready-to-request";
@@ -8898,6 +8930,7 @@ export type AutonomousSignerProviderAdapter = {
   raw_transaction_included: false;
   signed_payload_included: false;
   private_key_required: false;
+  provider_request_packet: AutonomousSignerProviderRequestPacket;
   blockers: string[];
   controls: string[];
 };
@@ -63321,7 +63354,7 @@ function autonomousCustodyProviderConfigured(provider: AutonomousCustodyMandateP
     return Boolean(process.env.PRIVY_APP_ID && process.env.PRIVY_APP_SECRET && process.env.PRIVY_SOLANA_WALLET_ID);
   }
   if (provider === "turnkey-policy-wallet") {
-    return Boolean(process.env.TURNKEY_ORGANIZATION_ID && process.env.TURNKEY_API_PUBLIC_KEY && process.env.TURNKEY_API_PRIVATE_KEY);
+    return Boolean(process.env.TURNKEY_ORGANIZATION_ID && process.env.TURNKEY_API_PUBLIC_KEY && process.env.TURNKEY_API_PRIVATE_KEY && process.env.TURNKEY_SOLANA_WALLET_ACCOUNT);
   }
   if (provider === "session-key-vault") {
     return Boolean(process.env.MASTERMOLD_SESSION_KEY_PUBLIC_KEY && process.env.MASTERMOLD_SESSION_POLICY_HASH);
@@ -63631,6 +63664,14 @@ function buildAutonomousSignerProviderAdapter({
     blockers.length === 0 &&
     (active.can_request_signature || active.can_auto_sign),
   );
+  const providerRequestPacket = buildAutonomousSignerProviderRequestPacket({
+    active,
+    activeRequest,
+    credentialConfigured,
+    requestBodyHash,
+    canRequestProviderSignature,
+    blockers,
+  });
 
   return {
     mode: "signer-provider-adapter",
@@ -63649,6 +63690,7 @@ function buildAutonomousSignerProviderAdapter({
     raw_transaction_included: false,
     signed_payload_included: false,
     private_key_required: false,
+    provider_request_packet: providerRequestPacket,
     blockers: blockers.slice(0, 8),
     controls: [
       "Adapter state is a redacted provider-call contract; it contains hashes and policy metadata only.",
@@ -63657,6 +63699,124 @@ function buildAutonomousSignerProviderAdapter({
       "Returned signatures still flow through the signed relay, confirmation polling, and settlement reconciliation gates before any portfolio mirror is considered.",
     ],
   };
+}
+
+function buildAutonomousSignerProviderRequestPacket({
+  active,
+  activeRequest,
+  credentialConfigured,
+  requestBodyHash,
+  canRequestProviderSignature,
+  blockers,
+}: {
+  active: AutonomousSignerOpsItem;
+  activeRequest: AutonomousSignerRequestEnvelope | null;
+  credentialConfigured: boolean;
+  requestBodyHash: string | null;
+  canRequestProviderSignature: boolean;
+  blockers: string[];
+}): AutonomousSignerProviderRequestPacket {
+  const providerShape = autonomousSignerProviderPacketShape(active.provider);
+  const packetBlockers = [
+    ...blockers,
+    providerShape.execution_model === "provider-managed-submit"
+      ? "Turnkey managed submit returns provider-managed transaction status; keep current signed-relay path locked until a managed-submit adapter is reviewed."
+      : null,
+  ].filter((item): item is string => Boolean(item));
+  const canDispatchNow = canRequestProviderSignature && packetBlockers.length === 0;
+  return {
+    mode: "provider-signature-request-packet",
+    status: !activeRequest ? "idle" : canDispatchNow ? "ready" : "blocked",
+    provider: active.provider,
+    execution_model: providerShape.execution_model,
+    sdk_action: activeRequest ? providerShape.sdk_action : "none",
+    caip2: providerShape.caip2,
+    endpoint_hint: activeRequest ? providerShape.endpoint_hint : null,
+    request_body_hash: activeRequest ? requestBodyHash : null,
+    request_body_fields: {
+      wallet_id: autonomousSignerProviderPacketWalletId(active.provider, credentialConfigured),
+      transaction: "external-serialized-transaction-required",
+      payload_hash: activeRequest?.payload_hash ?? null,
+      request_id: activeRequest?.request_id ?? null,
+      policy_hash: activeRequest?.policy_hash ?? active.policy_hash ?? null,
+      authorization_context: providerShape.authorization_context,
+      broadcast: providerShape.broadcast,
+    },
+    required_env: providerShape.required_env,
+    can_dispatch_now: canDispatchNow,
+    raw_transaction_included: false,
+    signed_payload_included: false,
+    private_key_required: false,
+    controls: [
+      "Provider packet is an execution recipe, not a signed transaction.",
+      "The serialized transaction must be fetched from the external order builder by request id and verified against the payload hash before provider signing.",
+      "Provider credentials, authorization stamps, wallet ids, and private keys are never returned in this packet.",
+      providerShape.broadcast === "provider-managed"
+        ? "Provider-managed submit must return transaction hash/status into a separately reviewed managed-submit adapter."
+        : "Provider sign-only result must return as a signed transaction through the existing signed relay path.",
+    ],
+    blockers: packetBlockers.slice(0, 8),
+  };
+}
+
+function autonomousSignerProviderPacketShape(provider: AutonomousSignerOpsProvider): Pick<
+  AutonomousSignerProviderRequestPacket,
+  "execution_model" | "sdk_action" | "caip2" | "endpoint_hint" | "required_env"
+> & {
+  authorization_context: AutonomousSignerProviderRequestPacket["request_body_fields"]["authorization_context"];
+  broadcast: AutonomousSignerProviderRequestPacket["request_body_fields"]["broadcast"];
+} {
+  if (provider === "privy-server-wallet") {
+    return {
+      execution_model: "provider-sign-only",
+      sdk_action: "privy.solana.signTransaction",
+      caip2: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      endpoint_hint: "Privy Solana wallet signTransaction / server-side SDK",
+      required_env: ["PRIVY_APP_ID", "PRIVY_APP_SECRET", "PRIVY_SOLANA_WALLET_ID"],
+      authorization_context: "required",
+      broadcast: "disabled-sign-only",
+    };
+  }
+  if (provider === "turnkey-policy-wallet") {
+    return {
+      execution_model: "provider-managed-submit",
+      sdk_action: "turnkey.solSendTransaction",
+      caip2: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      endpoint_hint: "Turnkey solSendTransaction policy-wallet transaction management",
+      required_env: ["TURNKEY_API_PUBLIC_KEY", "TURNKEY_API_PRIVATE_KEY", "TURNKEY_ORGANIZATION_ID", "TURNKEY_SOLANA_WALLET_ACCOUNT"],
+      authorization_context: "provider-policy",
+      broadcast: "provider-managed",
+    };
+  }
+  if (provider === "session-key-vault") {
+    return {
+      execution_model: "session-key-sign-only",
+      sdk_action: "sessionKey.signTransaction",
+      caip2: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      endpoint_hint: "Session-key vault signTransaction",
+      required_env: ["MASTERMOLD_SESSION_KEY_PUBLIC_KEY", "MASTERMOLD_SESSION_POLICY_HASH"],
+      authorization_context: "provider-policy",
+      broadcast: "disabled-sign-only",
+    };
+  }
+  return {
+    execution_model: "wallet-prompt",
+    sdk_action: "wallet.signTransaction",
+    caip2: "unknown",
+    endpoint_hint: "Browser wallet signTransaction prompt",
+    required_env: [],
+    authorization_context: "not-required",
+    broadcast: "disabled-sign-only",
+  };
+}
+
+function autonomousSignerProviderPacketWalletId(
+  provider: AutonomousSignerOpsProvider,
+  credentialConfigured: boolean,
+): AutonomousSignerProviderRequestPacket["request_body_fields"]["wallet_id"] {
+  if (provider === "external-wallet") return "external-wallet";
+  if (provider === "session-key-vault") return "session-key";
+  return credentialConfigured ? "configured-redacted" : "not-configured";
 }
 
 function buildAutonomousSignerOpsItem({

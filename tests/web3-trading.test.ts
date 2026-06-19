@@ -5405,6 +5405,13 @@ describe("Web3 autonomous trading subsystem", () => {
       private_key_required: false,
       can_auto_submit_after_signature: false,
     });
+    expect(state.autonomous_signer_ops.provider_adapter.provider_request_packet).toMatchObject({
+      mode: "provider-signature-request-packet",
+      provider: state.autonomous_signer_ops.active_provider,
+      raw_transaction_included: false,
+      signed_payload_included: false,
+      private_key_required: false,
+    });
     expect(state.autonomous_signer_ops.controls.some((control) => control.includes("private keys"))).toBe(true);
     expect(state.autonomous_live_autonomy_readiness.mode).toBe("autonomous-live-autonomy-readiness");
     expect(["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"]).toContain(state.autonomous_live_autonomy_readiness.status);
@@ -6897,6 +6904,27 @@ describe("Web3 autonomous trading subsystem", () => {
       private_key_required: false,
       can_auto_submit_after_signature: false,
     });
+    expect(state.autonomous_signer_ops.provider_adapter.provider_request_packet).toMatchObject({
+      mode: "provider-signature-request-packet",
+      provider: "privy-server-wallet",
+      execution_model: "provider-sign-only",
+      sdk_action: "privy.solana.signTransaction",
+      caip2: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+      request_body_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      request_body_fields: {
+        wallet_id: "configured-redacted",
+        transaction: "external-serialized-transaction-required",
+        payload_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        request_id: "order-123",
+        policy_hash: state.autonomous_custody_mandate.policy_hash,
+        authorization_context: "required",
+        broadcast: "disabled-sign-only",
+      },
+      required_env: ["PRIVY_APP_ID", "PRIVY_APP_SECRET", "PRIVY_SOLANA_WALLET_ID"],
+      raw_transaction_included: false,
+      signed_payload_included: false,
+      private_key_required: false,
+    });
     expect(["blocked", "ready-to-request"]).toContain(state.autonomous_signer_ops.provider_adapter.status);
     expect(state.autonomous_signer_ops.provider_adapter.request_body_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(["ready", "blocked"]).toContain(state.autonomous_signer_ops.status);
@@ -7001,6 +7029,13 @@ describe("Web3 autonomous trading subsystem", () => {
       provider: "privy-server-wallet",
       request_id: "order-123",
       can_request_provider_signature: true,
+    });
+    expect(setup.autonomous_signer_ops.provider_adapter.provider_request_packet).toMatchObject({
+      status: "ready",
+      execution_model: "provider-sign-only",
+      sdk_action: "privy.solana.signTransaction",
+      can_dispatch_now: true,
+      signed_payload_included: false,
     });
 
     const state = await getWeb3TradingStateAsync({

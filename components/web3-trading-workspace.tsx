@@ -6087,6 +6087,31 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
               <p className="rounded-md border border-outline-variant/40 bg-void/30 px-3 py-2 text-xs leading-5 text-on-surface-variant">
                 {state.autonomous_signer_ops.next_action}
               </p>
+              <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Provider packet</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-on-surface">
+                      {state.autonomous_signer_ops.provider_adapter.provider_request_packet.sdk_action}
+                    </p>
+                  </div>
+                  <Chip tone={signerProviderPacketTone(state.autonomous_signer_ops.provider_adapter.provider_request_packet.status)}>
+                    {state.autonomous_signer_ops.provider_adapter.provider_request_packet.status.replace("-", " ")}
+                  </Chip>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                  <MiniStat label="Model" value={state.autonomous_signer_ops.provider_adapter.provider_request_packet.execution_model.replaceAll("-", " ")} valueClassName="text-sm leading-5 capitalize" />
+                  <MiniStat label="Body" value={shortHash(state.autonomous_signer_ops.provider_adapter.provider_request_packet.request_body_hash ?? "")} valueClassName="text-sm leading-5" />
+                  <MiniStat label="Payload" value={shortHash(state.autonomous_signer_ops.provider_adapter.provider_request_packet.request_body_fields.payload_hash ?? "")} valueClassName="text-sm leading-5" />
+                  <MiniStat label="Dispatch" value={state.autonomous_signer_ops.provider_adapter.provider_request_packet.can_dispatch_now ? "ready" : "locked"} valueClassName={cn("text-sm leading-5", state.autonomous_signer_ops.provider_adapter.provider_request_packet.can_dispatch_now ? "text-engine" : "text-outline")} />
+                </div>
+                <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+                  {state.autonomous_signer_ops.provider_adapter.provider_request_packet.endpoint_hint ?? "No provider endpoint is active."}
+                </p>
+                {state.autonomous_signer_ops.provider_adapter.provider_request_packet.blockers[0] ? (
+                  <p className="mt-2 text-xs leading-5 text-caution">{state.autonomous_signer_ops.provider_adapter.provider_request_packet.blockers[0]}</p>
+                ) : null}
+              </div>
               <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                 <div className="grid gap-2">
                   {state.autonomous_signer_ops.items.map((item) => (
@@ -17416,6 +17441,12 @@ function custodyMandateTone(status: Web3TradingState["autonomous_custody_mandate
 function signerOpsTone(status: Web3TradingState["autonomous_signer_ops"]["status"]) {
   if (status === "ready") return "engine";
   if (status === "signature-needed" || status === "setup-required") return "caution";
+  if (status === "blocked") return "critical";
+  return "neutral";
+}
+
+function signerProviderPacketTone(status: Web3TradingState["autonomous_signer_ops"]["provider_adapter"]["provider_request_packet"]["status"]) {
+  if (status === "ready") return "engine";
   if (status === "blocked") return "critical";
   return "neutral";
 }
