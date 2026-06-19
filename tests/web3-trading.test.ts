@@ -7836,7 +7836,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_loop_tick.fill_count).toBeGreaterThanOrEqual(1);
     expect(state.autonomous_loop_tick.summary).toContain("bounded clean-wallet scout");
     expect(buys).toHaveLength(1);
-    expect(buys[0].size_usd).toBeLessThanOrEqual(750);
+    expect(buys[0].symbol).toBe("FARTCOIN");
+    expect(buys[0].size_usd).toBeLessThanOrEqual(1_000);
+    expect(buys[0].reason).toContain("Clean-wallet scout score");
   });
 
   test("GIVEN an active daemon lease WHEN another runner posts THEN the conflict is persisted and no paper advance occurs", async () => {

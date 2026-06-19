@@ -10576,6 +10576,7 @@ type CleanWalletScoutCandidate = {
   token: MemecoinMarket;
   signal: TradingSignal;
   size_usd: number;
+  score: number;
 };
 
 function cleanWalletScoutCandidate(state: Web3TradingState): CleanWalletScoutCandidate | null {
@@ -10593,12 +10594,22 @@ function cleanWalletScoutCandidate(state: Web3TradingState): CleanWalletScoutCan
       if (hasHardRisk || token.liquidity_usd < 1_000_000 || token.price_change_5m_pct <= 0 || token.price_change_1h_pct <= 0) return [];
       const buyPressure = token.buys_5m / Math.max(1, token.buys_5m + token.sells_5m);
       if (buyPressure < 0.52) return [];
+      const volumeToLiquidity = token.volume_1h_usd / Math.max(1, token.liquidity_usd);
+      const softRiskPenalty = token.risk_flags.length * 20 + signal.risk_warnings.filter((flag) => flag !== "No major sample risk flag").length * 10;
+      const scoutScore = roundMetric(
+        signal.score +
+          token.price_change_5m_pct * 2 +
+          token.price_change_1h_pct * 1.5 +
+          buyPressure * 20 +
+          Math.min(18, volumeToLiquidity * 20) -
+          softRiskPenalty,
+      );
       const size = Math.floor(Math.min(
         signal.suggested_size_usd,
         state.execution_readiness.config.max_trade_usd,
-        state.portfolio.cash_usd * 0.03,
+        state.portfolio.cash_usd * 0.04,
         token.liquidity_usd * 0.00025,
-        750,
+        1_000,
       ));
       if (size < 100) return [];
       return [{
@@ -10606,17 +10617,18 @@ function cleanWalletScoutCandidate(state: Web3TradingState): CleanWalletScoutCan
         signal,
         size_usd: size,
         buyPressure,
+        score: scoutScore,
       }];
     })
     .sort((a, b) =>
-      Number(a.token.risk_flags.length > 0) - Number(b.token.risk_flags.length > 0) ||
+      b.score - a.score ||
       b.signal.score - a.signal.score ||
       b.buyPressure - a.buyPressure ||
       b.token.volume_1h_usd - a.token.volume_1h_usd
     );
 
   const selected = candidates[0];
-  return selected ? { token: selected.token, signal: selected.signal, size_usd: selected.size_usd } : null;
+  return selected ? { token: selected.token, signal: selected.signal, size_usd: selected.size_usd, score: selected.score } : null;
 }
 
 function isCleanWalletScoutHardRiskFlag(flag: string) {
@@ -10653,7 +10665,7 @@ function applyCleanWalletScoutTick(state: Web3TradingState, candidate: CleanWall
     size_usd: candidate.size_usd,
     price_usd: candidate.token.price_usd,
     status: "paper-filled",
-    reason: `Clean-wallet scout: ${candidate.signal.thesis} Bounded to ${formatCompactValue(candidate.size_usd)} in local paper mode before any scale-up.`,
+    reason: `Clean-wallet scout score ${candidate.score}: ${candidate.signal.thesis} Bounded to ${formatCompactValue(candidate.size_usd)} in local paper mode before any scale-up.`,
     created_at: now,
   };
   const applied = applyArbiterPaperTradeToLedger(current, state.market, trade);

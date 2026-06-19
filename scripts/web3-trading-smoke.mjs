@@ -4752,6 +4752,7 @@ async function main() {
   assert(typeof forwardRun.hot_coin_baseline_pnl_usd === "number" && typeof forwardRun.hot_coin_alpha_usd === "number", "Autonomous forward suite should compare agent PnL against the best visible coin baseline.", forwardRun);
   assert(["beat-hot-coin-suite", "lagged-hot-coin-suite"].includes(forwardRun.hot_coin_baseline_verdict), "Autonomous forward suite should publish a known hot-coin baseline verdict.", forwardRun);
   assert(forwardRun.scenarios.every((report) => typeof report.hot_coin_alpha_usd === "number" && typeof report.agent_return_pct === "number"), "Every forward scenario should expose visible-market alpha metrics.", forwardRun.scenarios);
+  assert(forwardRun.scenarios.find((report) => report.scenario === "breakout")?.events?.[0]?.next_action?.includes("FARTCOIN"), "Breakout forward run should scout the visible momentum leader instead of defaulting to the safest large cap.", forwardRun.scenarios);
   assert(["all-profitable", "mixed-target-met", "flat-target-met", "profitable-below-target", "not-profitable"].includes(forwardRun.verdict), "Autonomous forward suite should publish a known profit verdict.", forwardRun);
 
   const summary = {
