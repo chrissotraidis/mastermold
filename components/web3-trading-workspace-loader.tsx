@@ -634,7 +634,6 @@ export function Web3TradingWorkspaceLoader({
   const quickDisabled = Boolean(quickBusy);
   const sessionRun = state.autonomous_session_run;
   const wallet = state.autonomous_wallet_telemetry;
-  const loopThrottle = state.autonomous_loop_throttle;
   const loopFeedback = state.autonomous_loop_feedback;
   const loopTick = state.autonomous_loop_tick;
   const candleRefresh = state.autonomous_candle_refresh;
@@ -790,9 +789,9 @@ export function Web3TradingWorkspaceLoader({
       <div className="rounded-md border border-engine/25 bg-engine/[0.045] p-2 sm:p-3" aria-label="Quick autonomous controls">
         <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
           <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Quick autonomous controls</p>
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Autonomous trading cockpit</p>
             <h2 className="mt-1 break-words text-sm font-semibold text-on-surface">
-              Copilot + Autonomous trading cockpit
+              Copilot + autonomous trader
             </h2>
             <p className="mt-1 break-words text-sm font-semibold text-on-surface">
               {state.autonomous_market_evidence_fusion.leader_symbol ?? "Desk"} · {state.autonomous_market_evidence_fusion.leader_action?.replace("-", " ") ?? state.autonomous_market_evidence_fusion.status}
@@ -807,40 +806,33 @@ export function Web3TradingWorkspaceLoader({
               {state.autonomous_market_evidence_fusion.can_trade ? "fused trade ok" : tradeBlocked ? "trade blocked · cycle can run" : "refresh first"}
             </Chip>
             <Chip tone={autoWatch ? "engine" : "neutral"}>{autoWatch ? "auto watch on" : "auto watch off"}</Chip>
-            <Chip tone={!autoWatchPrimed && autoWatch ? "caution" : autoWatchPlan.mode === "sprint" || autoWatchPlan.mode === "minute" ? "engine" : "caution"}>
-              {!autoWatchPrimed && autoWatch ? "auto refresh" : autoWatchPlan.label}
+            <Chip tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"}>
+              {state.execution_gate.live_execution_enabled ? "live boundary armed" : "paper boundary"}
             </Chip>
-            <Chip tone={loopImpactTone(loopImpact.status)}>
-              impact {loopImpact.status.replace("-", " ")}
-            </Chip>
-            <Chip tone={profitCaptureAutopilotTone(profitCaptureAutopilot.status)}>
-              capture {profitCaptureAutopilot.status.replace("-", " ")}
-            </Chip>
-            <Chip tone={profitRedeployAutopilotTone(profitRedeployAutopilot.status)}>
-              redeploy {profitRedeployAutopilot.status.replace("-", " ")}
-            </Chip>
-            <Chip tone={wakePlan.can_auto_watch_run ? wakePlan.status === "minute" || wakePlan.status === "sprint" ? "engine" : "caution" : "critical"}>
-              {wakePlan.auto_watch_label}
-            </Chip>
-            <Chip tone={marketIntake.can_feed_trade_loop ? "engine" : marketIntake.status === "blocked" ? "critical" : "caution"}>
-              intake {marketIntake.status}
-            </Chip>
-            <Chip tone={profitAllocation.can_deploy ? "engine" : profitAllocation.should_release_first ? "caution" : profitAllocation.status === "cooldown" ? "critical" : "neutral"}>
-              allocator {profitAllocation.status}
-            </Chip>
-            <Chip tone={loopThrottle.can_run ? "engine" : loopThrottle.status === "blocked" ? "critical" : "caution"}>
-              {loopThrottle.status.replace("-", " ")}
-            </Chip>
-            {supervisorHealth ? (
-              <Chip tone={supervisorTone(supervisorHealth.status)}>
-                supervisor {supervisorHealth.status.replace("-", " ")}
-              </Chip>
-            ) : null}
           </div>
         </div>
         <p className="mt-2 truncate font-mono text-[10px] uppercase tracking-telemetry text-outline sm:hidden">
           {state.market_source.label} · {state.autonomous_market_evidence_fusion.can_trade ? "trade ok" : tradeBlocked ? "trade blocked" : "refresh"} · {autoWatch ? "watch on" : "watch off"} · {wakePlan.auto_watch_label} · intake {marketIntake.status} · allocator {profitAllocation.status}
         </p>
+
+        <QuickOperatorHud
+          state={state}
+          autoWatch={autoWatch}
+          autoWatchPlan={autoWatchPlan}
+          supervisorHealth={supervisorHealth}
+        />
+
+        <QuickTradingCommandDeck
+          state={state}
+          autoWatch={autoWatch}
+          autoWatchPlan={autoWatchPlan}
+          decision={nowDecision}
+          lastActionOutcome={lastActionOutcome}
+          busy={quickBusy}
+          onPrimaryAction={runNowDecision}
+        />
+
+        <QuickAutonomousNextMoves items={nextMoves} state={state} />
 
         <div className="mt-3">
           <QuickLaunchChecklistPanel
@@ -856,18 +848,6 @@ export function Web3TradingWorkspaceLoader({
           <QuickFirstScreenPriceActionRail state={state} />
           <QuickFirstScreenProfitBenchmarkStrip state={state} />
         </div>
-
-        <QuickAutonomousNextMoves items={nextMoves} state={state} />
-
-        <QuickTradingCommandDeck
-          state={state}
-          autoWatch={autoWatch}
-          autoWatchPlan={autoWatchPlan}
-          decision={nowDecision}
-          lastActionOutcome={lastActionOutcome}
-          busy={quickBusy}
-          onPrimaryAction={runNowDecision}
-        />
 
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
           <button
@@ -956,21 +936,12 @@ export function Web3TradingWorkspaceLoader({
           </p>
         ) : null}
 
-        <p className="mt-2 text-xs leading-5 text-outline">
-          Auto decision: {!autoWatchPrimed && autoWatch ? `Refresh ${state.market_source.label} before the backend loop tick chooses the next local paper action.` : autoWatchPlan.reason}
-        </p>
-        <p className="mt-1 text-xs leading-5 text-outline">
-          Benchmark cadence: {state.autonomous_profit_benchmark.status.replaceAll("-", " ")} · {formatCompactSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)} risk alpha · {state.autonomous_alpha_feedback_loop.action.replaceAll("-", " ")} feedback can tighten, retarget, or press Auto watch.
-        </p>
-        <p className="mt-1 text-xs leading-5 text-outline">
-          Provider intake: {marketIntake.next_provider} {marketIntake.next_lane.replaceAll("-", " ")} · {marketIntake.provider_budget_status.replaceAll("-", " ")} at {marketIntake.provider_budget_utilization_pct}% · {marketIntake.can_feed_trade_loop ? "can feed the next paper loop" : "refresh or defer before fresh paper size"}.
-        </p>
-        <p className="mt-1 text-xs leading-5 text-outline">
-          Execution runway: {executionRunway.action.replaceAll("-", " ")} · {state.autonomous_execution_heartbeat.status.replaceAll("-", " ")} heartbeat · {executionRunway.can_auto_paper ? "paper lane clear" : "proof/protect gate before paper"}.
-        </p>
-        <p className="mt-1 text-xs leading-5 text-outline">
-          Impact gate: {loopImpact.summary} Source refresh: {state.market_source.label} read refreshes first; smart ticks can attach chart proof before the backend loop owns trade and protect actions.
-        </p>
+        <QuickRunwaySummaryRail
+          state={state}
+          autoWatch={autoWatch}
+          autoWatchPrimed={autoWatchPrimed}
+          autoWatchPlan={autoWatchPlan}
+        />
         <span className="sr-only" aria-label="Autonomous chart proof action receipt">
           Chart proof records read-only OHLCV or sample price-action evidence into the autonomous candle memory. Auto watch and Proof plus tick can use it when the freshness gate asks for candle evidence; it cannot sign, submit, custody funds, or guarantee profit.
         </span>
@@ -1232,6 +1203,231 @@ export function Web3TradingWorkspaceLoader({
 }
 
 type AutoWatchPlan = ReturnType<typeof chooseAutoWatchPlan>;
+
+function QuickOperatorHud({
+  state,
+  autoWatch,
+  autoWatchPlan,
+  supervisorHealth,
+}: {
+  state: Web3TradingState;
+  autoWatch: boolean;
+  autoWatchPlan: AutoWatchPlan;
+  supervisorHealth?: Web3DaemonSupervisorHealth;
+}) {
+  const wallet = state.autonomous_wallet_telemetry;
+  const decision = state.autonomous_now_decision;
+  const fusion = state.autonomous_market_evidence_fusion;
+  const route = state.autonomous_route_refresh_execution;
+  const candle = state.autonomous_candle_refresh;
+  const accountability = state.autonomous_profit_accountability;
+  const boundaryTone: QuickChipTone = state.execution_gate.live_execution_enabled ? "critical" : "demo";
+  const decisionTone: QuickChipTone = decision.status === "attack" || decision.status === "probe" || decision.status === "loop"
+    ? "engine"
+    : decision.status === "blocked"
+      ? "critical"
+      : decision.route_refresh_required || decision.chart_proof_required || decision.status === "protect"
+        ? "caution"
+        : "neutral";
+  const candleTone: QuickChipTone = candle.status === "ready"
+    ? "engine"
+    : candle.status === "blocked"
+      ? "critical"
+      : candle.requested
+        ? "caution"
+        : "neutral";
+  const fusionTone: QuickChipTone = fusion.can_trade
+    ? "engine"
+    : fusion.status === "blocked" || fusion.status === "protect"
+      ? "critical"
+      : "caution";
+  const accountTone: QuickChipTone = accountability.making_money
+    ? "engine"
+    : accountability.status === "blocked"
+      ? "critical"
+      : "caution";
+  const watchTone: QuickChipTone = autoWatch
+    ? "engine"
+    : autoWatchPlan.mode === "refresh"
+      ? "caution"
+      : "neutral";
+
+  return (
+    <section className="mt-3 grid min-w-0 gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(20rem,0.9fr)]" aria-label="Autonomous operator HUD">
+      <div className="min-w-0 rounded-md border border-engine/25 bg-void/25 p-2 sm:p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Wallet command curve</p>
+            <p className="mt-1 truncate text-xl font-semibold text-on-surface">{formatCurrency(wallet.equity_usd)}</p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Chip tone={wallet.window_pnl_usd >= 0 ? "engine" : "critical"}>{formatCompactSignedCurrency(wallet.window_pnl_usd)} window</Chip>
+            <Chip tone={watchTone}>{autoWatch ? "watch on" : autoWatchPlan.label}</Chip>
+            <Chip tone={boundaryTone}>{state.execution_gate.live_execution_enabled ? "live armed" : "paper only"}</Chip>
+          </div>
+        </div>
+        <QuickOperatorWalletSparkline wallet={wallet} />
+      </div>
+
+      <div className="grid min-w-0 grid-cols-2 gap-2">
+        <ProfitMetric
+          label="Now"
+          value={`${decision.action.replaceAll("-", " ")} ${decision.target_symbol ?? fusion.leader_symbol ?? "desk"}`}
+          detail={`${decision.review_after_seconds}s review · ${formatCompactSignedCurrency(decision.expected_edge_usd)} edge`}
+          tone={decisionTone}
+        />
+        <ProfitMetric
+          label="Signal"
+          value={fusion.leader_symbol ?? "no leader"}
+          detail={`${fusion.fusion_score}/100 fusion · ${fusion.max_next_fills} fills`}
+          tone={fusionTone}
+        />
+        <ProfitMetric
+          label="Route proof"
+          value={route.status.replaceAll("-", " ")}
+          detail={route.local_rehearsal_ready ? "local rehearsal accepted" : route.selected_symbol ?? state.market_source.label}
+          tone={routeRefreshTone(route.status)}
+        />
+        <ProfitMetric
+          label="Chart proof"
+          value={candle.requested ? candle.status.replaceAll("-", " ") : "waiting"}
+          detail={candle.symbol ?? state.market_source.label}
+          tone={candleTone}
+        />
+        <ProfitMetric
+          label="Profit proof"
+          value={`${accountability.accountability_score}/100`}
+          detail={`${formatCompactSignedCurrency(accountability.net_pnl_usd)} net · ${accountability.max_next_fills} fills`}
+          tone={accountTone}
+        />
+        <ProfitMetric
+          label="Boundary"
+          value={state.execution_gate.live_execution_enabled ? "live gated" : "paper locked"}
+          detail={supervisorHealth ? `supervisor ${supervisorHealth.status.replaceAll("-", " ")}` : "no wallet mutation"}
+          tone={boundaryTone}
+        />
+      </div>
+      <span className="sr-only" aria-label="Autonomous operator HUD receipt">
+        Operator HUD wallet {formatCurrency(wallet.equity_usd)}, window PnL {formatSignedCurrency(wallet.window_pnl_usd)}, decision {decision.status} {decision.action} {decision.target_symbol ?? "desk"}, signal {fusion.leader_symbol ?? "none"} {fusion.fusion_score}, route {route.status}, local rehearsal {route.local_rehearsal_ready ? "accepted" : "missing"}, candle {candle.status}, profit accountability {accountability.status} {accountability.accountability_score}, live execution {state.execution_gate.live_execution_enabled ? "armed" : "locked"}.
+      </span>
+    </section>
+  );
+}
+
+function QuickOperatorWalletSparkline({ wallet }: { wallet: Web3TradingState["autonomous_wallet_telemetry"] }) {
+  const width = 420;
+  const height = 92;
+  const pad = { left: 12, right: 12, top: 12, bottom: 16 };
+  const points = wallet.curve.length > 0
+    ? wallet.curve
+    : [{
+      id: "current",
+      label: "now",
+      recorded_at: "",
+      cycle: 0,
+      action: "current" as const,
+      equity_usd: wallet.equity_usd,
+      cash_usd: wallet.cash_usd,
+      exposure_usd: wallet.exposure_usd,
+      realized_pnl_usd: wallet.realized_pnl_usd,
+      unrealized_pnl_usd: wallet.unrealized_pnl_usd,
+      drawdown_pct: wallet.max_drawdown_pct,
+      filled_count: wallet.fill_count,
+      blocked_count: wallet.blocked_count,
+    }];
+  const values = points.flatMap((point) => [point.equity_usd, point.cash_usd, point.exposure_usd, wallet.high_watermark_usd]);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const range = Math.max(1, maxValue - minValue);
+  const xFor = (index: number, count = points.length) => pad.left + (count <= 1 ? 0 : (index / (count - 1)) * (width - pad.left - pad.right));
+  const yFor = (value: number) => Math.round(pad.top + (1 - ((value - minValue) / range)) * (height - pad.top - pad.bottom));
+  const equityPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.equity_usd)}`).join(" ");
+  const exposurePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.exposure_usd)}`).join(" ");
+  const cashPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.cash_usd)}`).join(" ");
+  const lastPoint = points[points.length - 1];
+  const lastX = xFor(points.length - 1);
+  const lastY = yFor(lastPoint.equity_usd);
+  const chartTone = wallet.window_pnl_usd >= 0 ? "text-engine" : "text-critical";
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Compact wallet net worth curve"
+      className={cn("mt-2 h-24 w-full", chartTone)}
+    >
+      <rect width={width} height={height} rx="8" className="fill-surface-dim" opacity="0.26" />
+      <path d={exposurePath} fill="none" stroke="currentColor" strokeDasharray="2 7" strokeOpacity="0.24" strokeWidth="2" />
+      <path d={cashPath} fill="none" stroke="currentColor" strokeDasharray="7 7" strokeOpacity="0.34" strokeWidth="2" />
+      <path d={equityPath} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+      <circle cx={lastX} cy={lastY} r="6" className={wallet.window_pnl_usd >= 0 ? "fill-engine" : "fill-critical"} />
+      <text x="12" y="20" className="fill-outline font-mono text-[11px] uppercase tracking-telemetry">equity · cash · exposure</text>
+      <text x="12" y={height - 8} className="fill-outline font-mono text-[10px] uppercase tracking-telemetry">{points.length} ticks · {formatCompactCurrency(wallet.exposure_usd)} exposed</text>
+    </svg>
+  );
+}
+
+function QuickRunwaySummaryRail({
+  state,
+  autoWatch,
+  autoWatchPrimed,
+  autoWatchPlan,
+}: {
+  state: Web3TradingState;
+  autoWatch: boolean;
+  autoWatchPrimed: boolean;
+  autoWatchPlan: AutoWatchPlan;
+}) {
+  const marketIntake = state.autonomous_market_intake_plan;
+  const executionRunway = state.autonomous_execution_runway;
+  const loopImpact = state.autonomous_loop_impact_auditor;
+  const benchmark = state.autonomous_profit_benchmark;
+  const alphaFeedback = state.autonomous_alpha_feedback_loop;
+  const autoLabel = !autoWatchPrimed && autoWatch ? "auto refresh" : autoWatchPlan.label;
+  const autoTone: QuickChipTone = autoWatch
+    ? "engine"
+    : autoWatchPlan.mode === "refresh"
+      ? "caution"
+      : "neutral";
+
+  return (
+    <section className="mt-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5" aria-label="Autonomous runway summary">
+      <ProfitMetric
+        label="Auto decision"
+        value={autoLabel}
+        detail={autoWatchPlan.reason}
+        tone={autoTone}
+      />
+      <ProfitMetric
+        label="Alpha cadence"
+        value={benchmark.status.replaceAll("-", " ")}
+        detail={`${formatCompactSignedCurrency(benchmark.risk_adjusted_alpha_usd)} risk · ${alphaFeedback.action.replaceAll("-", " ")}`}
+        tone={profitBenchmarkTone(benchmark)}
+      />
+      <ProfitMetric
+        label="Provider intake"
+        value={marketIntake.next_provider}
+        detail={`${marketIntake.next_lane.replaceAll("-", " ")} · ${marketIntake.provider_budget_utilization_pct}% budget`}
+        tone={marketIntakeTone(marketIntake.status, marketIntake.can_feed_trade_loop)}
+      />
+      <ProfitMetric
+        label="Execution runway"
+        value={executionRunway.action.replaceAll("-", " ")}
+        detail={`${state.autonomous_execution_heartbeat.status.replaceAll("-", " ")} · ${executionRunway.can_auto_paper ? "paper clear" : "proof gated"}`}
+        tone={executionRunway.can_auto_paper ? "engine" : executionRunway.status === "blocked" ? "critical" : "caution"}
+      />
+      <ProfitMetric
+        label="Impact gate"
+        value={`${loopImpact.impact_score}/100`}
+        detail={`${loopImpact.status.replaceAll("-", " ")} · ${loopImpact.next_cadence_seconds}s`}
+        tone={loopImpactTone(loopImpact.status)}
+      />
+      <span className="sr-only" aria-label="Autonomous runway summary receipt">
+        Auto decision {autoLabel}: {autoWatchPlan.reason} Source refresh {state.market_source.label} read refreshes before backend action when the selected market source or proof gate is stale; backend loop tick owns trade and protect actions; backend autonomous loop tick owns trade and protect decisions. Benchmark {benchmark.status}, risk alpha {formatSignedCurrency(benchmark.risk_adjusted_alpha_usd)}, alpha feedback {alphaFeedback.action}. Provider intake {marketIntake.next_provider} {marketIntake.next_lane}, budget {marketIntake.provider_budget_utilization_pct} percent, can feed loop {marketIntake.can_feed_trade_loop ? "yes" : "no"}. Execution runway {executionRunway.status} {executionRunway.action}, heartbeat {state.autonomous_execution_heartbeat.status}, paper lane {executionRunway.can_auto_paper ? "clear" : "gated"}. Impact gate {loopImpact.status}, score {loopImpact.impact_score}, summary {loopImpact.summary}.
+      </span>
+    </section>
+  );
+}
 
 export function shouldPauseAutoWatchForPlan(
   state: Web3TradingState,
