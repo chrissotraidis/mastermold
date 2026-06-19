@@ -94,6 +94,7 @@ npm run preflight-live:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs
 npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
 npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
 npm run verify:web3 -- --base-url=http://localhost:4010
+npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet
 npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
 ```
 
@@ -134,7 +135,9 @@ execution input validation, public-wallet dry-run scope save, credential validat
 redaction, one-shot Jupiter rehearsal redaction, private-field rejection, and the live
 execution/wallet mutation locks. Add `--require-jupiter-order` after a `JUPITER_API_KEY`
 or `WEB3_VERIFY_JUPITER_API_KEY` is available to fail closed until quote and unsigned-order
-readiness are both proven without returning transaction bytes.
+readiness are both proven without returning transaction bytes. Add `--require-operator-wallet`
+with `--wallet=<public-solana-address>` or `WEB3_VERIFY_WALLET_PUBLIC_KEY` to fail closed
+until the sample all-ones wallet has been replaced by a dedicated public trading wallet.
 
 ## Architecture: the engine and the app
 

@@ -9,6 +9,7 @@ const config = parseArgs(process.argv.slice(2));
 const baseUrl = (config.baseUrl || process.env.WEB3_VERIFY_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
 const walletPublicKey = config.wallet || process.env.WEB3_VERIFY_WALLET_PUBLIC_KEY || DEFAULT_WALLET;
 const requireJupiterOrder = config.requireJupiterOrder || process.env.WEB3_VERIFY_REQUIRE_JUPITER_ORDER === "1";
+const requireOperatorWallet = config.requireOperatorWallet || process.env.WEB3_VERIFY_REQUIRE_OPERATOR_WALLET === "1";
 const strictJupiterKey = process.env.WEB3_VERIFY_JUPITER_API_KEY || process.env.JUPITER_API_KEY || "";
 const secretValues = [
   { label: "jupiter canary", value: CANARY_JUPITER_KEY },
@@ -26,6 +27,7 @@ function parseArgs(args) {
     if (arg.startsWith("--base-url=")) parsed.baseUrl = arg.slice("--base-url=".length);
     if (arg.startsWith("--wallet=")) parsed.wallet = arg.slice("--wallet=".length);
     if (arg === "--require-jupiter-order") parsed.requireJupiterOrder = true;
+    if (arg === "--require-operator-wallet") parsed.requireOperatorWallet = true;
     if (arg === "--json") parsed.json = true;
   }
   return parsed;
@@ -58,6 +60,10 @@ function assertNoLeak(label, value) {
 
 function record(name, status, detail = "") {
   results.push({ name, status, detail });
+}
+
+function isLikelySolanaPublicKey(value) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
 async function requestJson(path, init = {}) {
@@ -96,6 +102,24 @@ async function verifyHealth() {
   assert(json.web3_production_supervisor?.live_execution_permission === "blocked", "Production supervisor should keep live execution blocked.", json.web3_production_supervisor);
   assert(json.web3_production_supervisor?.wallet_mutation_permission === "blocked", "Production supervisor should keep wallet mutation blocked.", json.web3_production_supervisor);
   record("health", "pass", "live and wallet mutation locks are blocked");
+}
+
+async function verifyOperatorWalletScope() {
+  const walletProvided = Boolean(config.wallet || process.env.WEB3_VERIFY_WALLET_PUBLIC_KEY);
+  const sampleWallet = walletPublicKey === DEFAULT_WALLET;
+  if (!requireOperatorWallet) {
+    record(
+      "operator-wallet-strict",
+      "skipped",
+      sampleWallet ? "sample system wallet is allowed in non-strict verification" : "operator public wallet supplied",
+    );
+    return;
+  }
+
+  assert(walletProvided, "Strict operator-wallet verification requires --wallet=<public-solana-address> or WEB3_VERIFY_WALLET_PUBLIC_KEY.");
+  assert(!sampleWallet, "Strict operator-wallet verification refuses the sample all-ones system wallet.");
+  assert(isLikelySolanaPublicKey(walletPublicKey), "Strict operator-wallet verification requires a valid public Solana wallet address.");
+  record("operator-wallet-strict", "pass", "dedicated operator public wallet supplied");
 }
 
 async function verifyRejectedExecutionInputs() {
@@ -280,6 +304,7 @@ async function verifyStrictJupiterOrderReadiness() {
 
 async function main() {
   await verifyHealth();
+  await verifyOperatorWalletScope();
   await verifyRejectedExecutionInputs();
   await verifyPublicScopeSave();
   await verifyAccountSetupReceipt();
@@ -293,6 +318,7 @@ async function main() {
     mode: "web3-readiness-verify",
     base_url: baseUrl,
     wallet_scope: walletPublicKey === DEFAULT_WALLET ? "sample-system-wallet" : "operator-public-wallet",
+    strict_operator_wallet_required: requireOperatorWallet,
     strict_jupiter_order_required: requireJupiterOrder,
     checked_at: new Date().toISOString(),
     result: "pass",

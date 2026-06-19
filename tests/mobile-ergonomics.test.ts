@@ -787,13 +787,17 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("unsigned transaction return withheld");
     expect(source("package.json")).toContain("\"verify:web3\": \"node scripts/web3-readiness-verify.mjs\"");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyProviderHealthReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-provider-health?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyOperatorWalletScope");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-operator-wallet");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyStrictJupiterOrderReadiness");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-jupiter-order");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run verify:web3 gate");
     expect(source("components/review-readiness.tsx")).toContain("configured Helius/Solana provider-health proof");
+    expect(source("components/review-readiness.tsx")).toContain("opt-in --require-operator-wallet gate");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-jupiter-order gate");
     expect(settingsPage).toContain("Open Web3 wiring");
     expect(settingsPage).toContain("live execution blocked");
