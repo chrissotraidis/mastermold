@@ -8,6 +8,7 @@ import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/d
 import type { Web3DexDiscoveryReceipt } from "@/src/db/web3-dex-discovery";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
+import type { Web3LocalCredentialInstallReceipt } from "@/src/db/web3-local-credential-install";
 import type { Web3TradingState } from "@/src/db/web3-trading";
 import type { Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
 
@@ -81,12 +82,13 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"credentials" | "dex" | "jupiter" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
+  const [busy, setBusy] = useState<"credentials" | "dex" | "install" | "jupiter" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [browserWallet, setBrowserWallet] = useState<BrowserWalletReceipt | null>(null);
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
   const [dexReceipt, setDexReceipt] = useState<Web3DexDiscoveryReceipt | null>(null);
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
+  const [localInstallReceipt, setLocalInstallReceipt] = useState<Web3LocalCredentialInstallReceipt | null>(null);
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveCapitalPreflightReceipt | null>(null);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
@@ -123,6 +125,44 @@ export function SettingsWeb3CredentialConsole({
       setMessage(payload.summary);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Credential test failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function installLocalCredentials() {
+    if (![draft.helius_api_key, draft.rpc_url, draft.ws_url, draft.jupiter_api_key].some((value) => value.trim().length > 0)) {
+      setMessage("Enter a Helius, Solana RPC/WebSocket, or Jupiter value before installing local env credentials.");
+      return;
+    }
+    setBusy("install");
+    setMessage("Installing known Web3 credential targets into ignored local env without echoing values...");
+    try {
+      const response = await fetch("/api/web3-local-credentials", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          helius_api_key: draft.helius_api_key,
+          rpc_url: draft.rpc_url,
+          ws_url: draft.ws_url,
+          jupiter_api_key: draft.jupiter_api_key,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as Web3LocalCredentialInstallReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Local credential install failed.");
+      }
+      setLocalInstallReceipt(payload);
+      setDraft((current) => ({
+        ...current,
+        helius_api_key: "",
+        rpc_url: "",
+        ws_url: "",
+        jupiter_api_key: "",
+      }));
+      setMessage(payload.summary);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Local credential install failed.");
     } finally {
       setBusy(null);
     }
@@ -370,7 +410,8 @@ export function SettingsWeb3CredentialConsole({
   const disabled = busy !== null;
   const trimmedWallet = draft.wallet_public_key.trim();
   const operatorWalletReady = isLikelySolanaPublicKey(trimmedWallet) && trimmedWallet !== SAMPLE_SYSTEM_WALLET;
-  const jupiterKeyReady = jupiterConfigured || draft.jupiter_api_key.trim().length > 0;
+  const localJupiterConfigured = localInstallReceipt?.configured_keys.includes("JUPITER_API_KEY") === true;
+  const jupiterKeyReady = jupiterConfigured || localJupiterConfigured || draft.jupiter_api_key.trim().length > 0;
   const dexLiveReady = dexReceipt?.status === "live-ready" || dexReceipt?.status === "live-watch";
   const commandWallet = operatorWalletReady ? trimmedWallet : "<public-solana-address>";
   const operatorWalletCommand = `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${commandWallet} --require-operator-wallet`;
@@ -389,6 +430,7 @@ export function SettingsWeb3CredentialConsole({
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           <BoundaryBadge label="session only" />
+          <BoundaryBadge label="local env optional" />
           <BoundaryBadge label="secret echo blocked" />
           <BoundaryBadge label="live blocked" />
         </div>
@@ -446,6 +488,36 @@ export function SettingsWeb3CredentialConsole({
         <ConsoleInput label="Max trade USD" type="number" value={draft.max_trade_usd} placeholder="250" onChange={(value) => updateDraft("max_trade_usd", value)} />
         <ConsoleInput label="Daily spend cap" type="number" value={draft.daily_spend_cap_usd} placeholder="1000" onChange={(value) => updateDraft("daily_spend_cap_usd", value)} />
         <ConsoleInput label="Max slippage bps" type="number" value={draft.max_slippage_bps} placeholder="150" onChange={(value) => updateDraft("max_slippage_bps", value)} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Local Web3 credential installer">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Local credential installer</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              Install known provider values into ignored local env
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={installLocalCredentials}
+            disabled={disabled}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-violet/45 bg-violet/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-violet transition hover:bg-violet/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Terminal className={cn("size-3.5 shrink-0", busy === "install" && "animate-pulse")} aria-hidden="true" />
+            {busy === "install" ? "Installing" : "Install local env"}
+          </button>
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-outline">
+          Local install accepts only Helius, Solana RPC/WebSocket, and Jupiter provider fields, writes to ignored local env on trusted localhost, clears the page secret fields after success, and keeps live execution blocked.
+        </p>
+        {localInstallReceipt ? (
+          <div className="mt-2 grid gap-2 sm:grid-cols-3" aria-label="Local Web3 credential install receipt">
+            <ConsoleMetric label="Install" value={localInstallReceipt.status} tone={localInstallReceipt.status === "installed" ? "engine" : localInstallReceipt.status === "invalid" || localInstallReceipt.status === "blocked" ? "critical" : "neutral"} />
+            <ConsoleMetric label="Configured" value={`${localInstallReceipt.configured_keys.length}/4`} tone={localInstallReceipt.configured_keys.length >= 2 ? "engine" : "caution"} />
+            <ConsoleMetric label="Missing" value={localInstallReceipt.missing_keys.join(", ") || "none"} tone={localInstallReceipt.missing_keys.length === 0 ? "engine" : "caution"} />
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -571,6 +643,11 @@ export function SettingsWeb3CredentialConsole({
           label="Credential score"
           value={credentialResult ? `${credentialResult.readiness_score}/100` : "untested"}
           tone={credentialResult?.status === "configured" ? "engine" : credentialResult ? "caution" : "neutral"}
+        />
+        <ConsoleMetric
+          label="Local env"
+          value={localInstallReceipt ? localInstallReceipt.status : "not installed"}
+          tone={localInstallReceipt?.status === "installed" ? "engine" : localInstallReceipt?.status === "invalid" || localInstallReceipt?.status === "blocked" ? "critical" : "neutral"}
         />
         <ConsoleMetric
           label="Wallet sync"
@@ -764,6 +841,7 @@ export function SettingsWeb3CredentialConsole({
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
         Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
+        Local credential installer can write known provider values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
       </p>
     </section>
   );
@@ -803,7 +881,7 @@ function ConsoleMetric({
 }: {
   label: string;
   value: string;
-  tone: "engine" | "caution" | "neutral";
+  tone: "critical" | "engine" | "caution" | "neutral";
 }) {
   return (
     <div className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
@@ -812,6 +890,7 @@ function ConsoleMetric({
         "mt-1 truncate text-sm font-semibold",
         tone === "engine" && "text-engine",
         tone === "caution" && "text-caution",
+        tone === "critical" && "text-critical",
         tone === "neutral" && "text-on-surface",
       )}>
         {value}

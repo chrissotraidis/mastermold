@@ -13,6 +13,7 @@ import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal
 import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
+import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
@@ -450,6 +451,35 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(readiness)).not.toContain("private-token");
     expect(JSON.stringify(readiness)).not.toContain("test-yellowstone-token");
     expect(JSON.stringify(readiness)).not.toContain("stop-secret");
+  });
+
+  test("GIVEN local credential installer requests WHEN scope or input is unsafe THEN it fails without echoing secrets", async () => {
+    const remote = await LOCAL_CREDENTIALS_GET(new Request("http://remote.example/api/web3-local-credentials", {
+      headers: { host: "remote.example" },
+    }));
+    const remoteReceipt = await json<{ status: string; local_install_allowed: boolean; secret_echo_permission: string }>(remote);
+    expect(remote.status).toBe(403);
+    expect(remoteReceipt.status).toBe("blocked");
+    expect(remoteReceipt.local_install_allowed).toBe(false);
+    expect(remoteReceipt.secret_echo_permission).toBe("blocked");
+
+    const rejected = await LOCAL_CREDENTIALS_POST(new Request("http://localhost/api/web3-local-credentials", {
+      method: "POST",
+      headers: { "content-type": "application/json", host: "localhost" },
+      body: JSON.stringify({
+        helius_api_key: "test-helius-secret",
+        ["private" + "_key"]: "test-private-key",
+        ["seed" + "_phrase"]: "alpha beta gamma delta",
+      }),
+    }));
+    const rejectedReceipt = await json<{ status: string; rejected_fields: string[]; secret_echo_permission: string }>(rejected);
+    const rejectedText = JSON.stringify(rejectedReceipt);
+    expect(rejected.status).toBe(422);
+    expect(rejectedReceipt.status).toBe("invalid");
+    expect(rejectedReceipt.rejected_fields).toEqual(expect.arrayContaining(["private_key", "seed_phrase"]));
+    expect(rejectedReceipt.secret_echo_permission).toBe("blocked");
+    expect(rejectedText).not.toContain("test-helius-secret");
+    expect(rejectedText).not.toContain("alpha beta gamma");
   });
 
   test("GIVEN local provider env WHEN the account setup route runs THEN it reports missing accounts without leaking secrets", async () => {

@@ -858,6 +858,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("acquisition.items.map");
     expect(settingsConsole).toContain("Credential action console");
     expect(settingsConsole).toContain("Session-only provider tests");
+    expect(settingsConsole).toContain("Local credential installer");
+    expect(settingsConsole).toContain("Install local env");
+    expect(settingsConsole).toContain("/api/web3-local-credentials");
+    expect(settingsConsole).toContain("ignored local env on trusted localhost");
+    expect(settingsConsole).toContain("clears the page secret fields after success");
+    expect(source("app/api/web3-local-credentials/route.ts")).toContain("installWeb3LocalCredentials");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("web3-local-credential-install");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_ALLOW_LOCAL_CREDENTIAL_INSTALL");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("private-key, seed-phrase");
     expect(settingsConsole).toContain("DEX scanner evidence");
     expect(settingsConsole).toContain("Save public scope");
     expect(settingsConsole).toContain("Saved public scope");

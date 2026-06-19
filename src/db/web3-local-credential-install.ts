@@ -1,0 +1,232 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const LOCAL_ENV_FILE = ".env.local";
+const MAX_SECRET_LENGTH = 512;
+const SENSITIVE_FIELD_PATTERN = /(private|secret|seed|mnemonic|recovery|phrase|keypair)/i;
+
+export type Web3LocalCredentialInstallStatus = "installed" | "unchanged" | "blocked" | "invalid";
+
+export type Web3LocalCredentialInstallReceipt = {
+  mode: "web3-local-credential-install";
+  status: Web3LocalCredentialInstallStatus;
+  installed_keys: string[];
+  configured_keys: string[];
+  missing_keys: string[];
+  rejected_fields: string[];
+  local_install_allowed: boolean;
+  storage: "ignored-local-env";
+  generated_at: string;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  secret_echo_permission: "blocked";
+  next_action: string;
+  summary: string;
+};
+
+type CredentialInput = {
+  helius_api_key?: unknown;
+  rpc_url?: unknown;
+  ws_url?: unknown;
+  jupiter_api_key?: unknown;
+};
+
+type CredentialTarget = {
+  field: keyof CredentialInput;
+  env: "HELIUS_API_KEY" | "SOLANA_RPC_URL" | "SOLANA_WS_URL" | "JUPITER_API_KEY";
+  kind: "key" | "http-url" | "ws-url";
+};
+
+const CREDENTIAL_TARGETS: CredentialTarget[] = [
+  { field: "helius_api_key", env: "HELIUS_API_KEY", kind: "key" },
+  { field: "rpc_url", env: "SOLANA_RPC_URL", kind: "http-url" },
+  { field: "ws_url", env: "SOLANA_WS_URL", kind: "ws-url" },
+  { field: "jupiter_api_key", env: "JUPITER_API_KEY", kind: "key" },
+];
+
+export function buildWeb3LocalCredentialInstallHealth(request?: Request): Web3LocalCredentialInstallReceipt {
+  const allowed = isLocalCredentialInstallAllowed(request);
+  const configured = configuredLocalCredentialKeys();
+  const missing = CREDENTIAL_TARGETS
+    .map((target) => target.env)
+    .filter((env) => !configured.includes(env));
+  return {
+    mode: "web3-local-credential-install",
+    status: allowed ? "unchanged" : "blocked",
+    installed_keys: [],
+    configured_keys: configured,
+    missing_keys: missing,
+    rejected_fields: [],
+    local_install_allowed: allowed,
+    storage: "ignored-local-env",
+    generated_at: new Date().toISOString(),
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
+    next_action: allowed
+      ? nextInstallAction(missing, [])
+      : "Open the local app on localhost or set MASTERMOLD_ALLOW_LOCAL_CREDENTIAL_INSTALL=true for an explicitly trusted local environment.",
+    summary: allowed
+      ? `${configured.length}/${CREDENTIAL_TARGETS.length} local Web3 credential targets are configured.`
+      : "Local credential install is blocked outside trusted localhost scope.",
+  };
+}
+
+export function installWeb3LocalCredentials(input: unknown, request?: Request): Web3LocalCredentialInstallReceipt {
+  const allowed = isLocalCredentialInstallAllowed(request);
+  if (!allowed) {
+    return {
+      ...buildWeb3LocalCredentialInstallHealth(request),
+      status: "blocked",
+      next_action: "Credential install is available only for trusted localhost development or explicit operator opt-in.",
+      summary: "Refused to write local Web3 credentials outside trusted local scope.",
+    };
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return invalidReceipt(["body"], "Request body must be a credential install object.");
+  }
+
+  const rejectedFields = findRejectedCredentialFields(input);
+  if (rejectedFields.length > 0) {
+    return invalidReceipt(rejectedFields, "Rejected private-key, seed-phrase, or unsupported sensitive credential fields.");
+  }
+
+  const updates = new Map<CredentialTarget["env"], string>();
+  const invalidFields: string[] = [];
+  const row = input as CredentialInput;
+  for (const target of CREDENTIAL_TARGETS) {
+    const value = normalizeCredentialValue(row[target.field]);
+    if (!value) continue;
+    if (!isValidCredentialValue(value, target.kind)) {
+      invalidFields.push(String(target.field));
+      continue;
+    }
+    updates.set(target.env, value);
+  }
+
+  if (invalidFields.length > 0) {
+    return invalidReceipt(invalidFields, "One or more credential values are malformed.");
+  }
+  if (updates.size === 0) {
+    const health = buildWeb3LocalCredentialInstallHealth(request);
+    return {
+      ...health,
+      status: "unchanged",
+      next_action: nextInstallAction(health.missing_keys, []),
+      summary: "No non-empty credential fields were provided; local env was not changed.",
+    };
+  }
+
+  writeIgnoredLocalEnv(updates);
+  for (const [key, value] of updates) {
+    process.env[key] = value;
+  }
+  const configured = configuredLocalCredentialKeys();
+  const missing = CREDENTIAL_TARGETS
+    .map((target) => target.env)
+    .filter((env) => !configured.includes(env));
+  const installed = Array.from(updates.keys());
+  return {
+    mode: "web3-local-credential-install",
+    status: "installed",
+    installed_keys: installed,
+    configured_keys: configured,
+    missing_keys: missing,
+    rejected_fields: [],
+    local_install_allowed: true,
+    storage: "ignored-local-env",
+    generated_at: new Date().toISOString(),
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
+    next_action: nextInstallAction(missing, installed),
+    summary: `${installed.length} local Web3 credential target${installed.length === 1 ? "" : "s"} installed into ignored local env; values were not returned.`,
+  };
+}
+
+function invalidReceipt(rejectedFields: string[], summary: string): Web3LocalCredentialInstallReceipt {
+  const configured = configuredLocalCredentialKeys();
+  const missing = CREDENTIAL_TARGETS
+    .map((target) => target.env)
+    .filter((env) => !configured.includes(env));
+  return {
+    mode: "web3-local-credential-install",
+    status: "invalid",
+    installed_keys: [],
+    configured_keys: configured,
+    missing_keys: missing,
+    rejected_fields: rejectedFields,
+    local_install_allowed: true,
+    storage: "ignored-local-env",
+    generated_at: new Date().toISOString(),
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
+    next_action: "Submit only Helius, Solana RPC/WebSocket, or Jupiter provider credentials; never submit private keys or seed phrases.",
+    summary,
+  };
+}
+
+function isLocalCredentialInstallAllowed(request?: Request) {
+  if (process.env.MASTERMOLD_ALLOW_LOCAL_CREDENTIAL_INSTALL === "true") return true;
+  const host = request?.headers.get("host") ?? "";
+  const forwardedHost = request?.headers.get("x-forwarded-host") ?? "";
+  return [host, forwardedHost].some((value) =>
+    value.startsWith("localhost") ||
+    value.startsWith("127.0.0.1") ||
+    value.startsWith("[::1]") ||
+    value.startsWith("::1"),
+  );
+}
+
+function configuredLocalCredentialKeys() {
+  return CREDENTIAL_TARGETS
+    .map((target) => target.env)
+    .filter((env) => typeof process.env[env] === "string" && process.env[env]?.trim());
+}
+
+function normalizeCredentialValue(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
+function isValidCredentialValue(value: string, kind: CredentialTarget["kind"]) {
+  if (value.length === 0 || value.length > MAX_SECRET_LENGTH) return false;
+  if (/[\r\n\0]/.test(value)) return false;
+  if (kind === "http-url") return /^https?:\/\/[^\s]+$/i.test(value);
+  if (kind === "ws-url") return /^wss?:\/\/[^\s]+$/i.test(value);
+  return /^[A-Za-z0-9._:\-/+=]{8,}$/.test(value);
+}
+
+function findRejectedCredentialFields(input: object) {
+  return Object.keys(input)
+    .filter((field) => SENSITIVE_FIELD_PATTERN.test(field) && !["helius_api_key", "jupiter_api_key"].includes(field))
+    .slice(0, 8);
+}
+
+function writeIgnoredLocalEnv(updates: Map<CredentialTarget["env"], string>) {
+  const filePath = join(process.cwd(), LOCAL_ENV_FILE);
+  const existing = existsSync(filePath) ? readFileSync(filePath, "utf8") : "";
+  const lines = existing.length > 0 ? existing.split(/\n/) : [];
+  const seen = new Set<string>();
+  const nextLines = lines.map((line) => {
+    const match = line.match(/^([A-Z0-9_]+)=/);
+    if (!match) return line;
+    const key = match[1] as CredentialTarget["env"];
+    if (!updates.has(key)) return line;
+    seen.add(key);
+    return `${key}=${updates.get(key)}`;
+  });
+  for (const [key, value] of updates) {
+    if (!seen.has(key)) nextLines.push(`${key}=${value}`);
+  }
+  const output = `${nextLines.join("\n").replace(/\n*$/, "")}\n`;
+  writeFileSync(filePath, output, { encoding: "utf8", mode: 0o600 });
+}
+
+function nextInstallAction(missing: string[], installed: string[]) {
+  if (missing.includes("JUPITER_API_KEY")) return "Add JUPITER_API_KEY, then run Jupiter rehearsal and strict order verification.";
+  if (missing.includes("HELIUS_API_KEY") && missing.includes("SOLANA_RPC_URL")) return "Add HELIUS_API_KEY or SOLANA_RPC_URL, then test provider health.";
+  if (installed.length > 0) return "Run Test credentials, Rehearse Jupiter, and npm run verify:web3 after the local server reads the updated environment.";
+  return "Scope a dedicated public wallet and prove ownership; live execution remains blocked.";
+}
