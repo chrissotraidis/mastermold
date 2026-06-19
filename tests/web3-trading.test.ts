@@ -5369,6 +5369,14 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_route_refresh_execution.execution_boundary).toBe("read-only-route-refresh");
     expect(typeof state.autonomous_route_refresh_execution.route_refresh_required).toBe("boolean");
     expect(typeof state.autonomous_route_refresh_execution.can_request_readonly_quote).toBe("boolean");
+    expect(typeof state.autonomous_route_refresh_execution.local_rehearsal_ready).toBe("boolean");
+    if (state.autonomous_route_refresh_execution.local_rehearsal) {
+      expect(state.autonomous_route_refresh_execution.local_rehearsal.mode).toBe("sample-route-rehearsal");
+      expect(["ready", "blocked"]).toContain(state.autonomous_route_refresh_execution.local_rehearsal.status);
+      expect(state.autonomous_route_refresh_execution.local_rehearsal.live_execution_permission).toBe("blocked");
+      expect(state.autonomous_route_refresh_execution.local_rehearsal.wallet_mutation_permission).toBe("blocked");
+      expect(state.autonomous_route_refresh_execution.local_rehearsal.controls.some((control) => control.includes("paper-accountability repair"))).toBe(true);
+    }
     expect(state.autonomous_route_refresh_execution.requested_quote_count).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_route_refresh_execution.blocked_count).toBe(state.route_refresh_queue.blocked_count);
     expect(state.autonomous_route_refresh_execution.route_confidence_score).toBeGreaterThanOrEqual(0);
@@ -7154,6 +7162,39 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(["ready", "requesting"]).toContain(state.autonomous_route_refresh_execution.status);
     expect(state.autonomous_route_refresh_execution.can_request_readonly_quote).toBe(state.route_refresh_queue.status === "refresh-now");
     expect(state.autonomous_loop_director.should_refresh_route_quotes).toBe(state.route_refresh_queue.status === "refresh-now");
+  });
+
+  test("GIVEN sample route repair WHEN route refresh requests proof THEN the agent exposes a paper-only route rehearsal", async () => {
+    const response = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      body: JSON.stringify({
+        scenario: "breakout",
+        source: "sample",
+        account: "persistent",
+        advance: false,
+        route_refresh: { action: "request-quote" },
+      }),
+    }));
+    const state = await json<Web3TradingState>(response);
+
+    expect(response.status).toBe(200);
+    expect(state.execution_gate.live_execution_enabled).toBe(false);
+    expect(["blocked", "watching"]).toContain(state.autonomous_route_refresh_execution.status);
+    expect(state.autonomous_route_refresh_execution.can_request_readonly_quote).toBe(false);
+    expect(state.autonomous_route_refresh_execution.local_rehearsal_ready).toBe(true);
+    expect(state.autonomous_route_refresh_execution.local_rehearsal).toMatchObject({
+      mode: "sample-route-rehearsal",
+      status: "ready",
+      symbol: "FARTCOIN",
+      can_feed_local_paper: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(state.autonomous_route_refresh_execution.local_rehearsal?.summary).toContain("paper repair");
+    expect(state.autonomous_profit_accountability.repair_plan.status).toBe("refresh-first");
+    expect(state.autonomous_profit_accountability.repair_plan.request?.body.route_refresh).toEqual({ action: "request-quote" });
+    expect(state.autonomous_profit_accountability.repair_plan.live_execution_permission).toBe("blocked");
+    expect(state.autonomous_profit_accountability.repair_plan.wallet_mutation_permission).toBe("blocked");
   });
 
   test("GIVEN an externally signed Jupiter payload WHEN live relay gates are armed THEN the API records signature status without storing transaction bytes", async () => {

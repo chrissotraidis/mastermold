@@ -298,6 +298,7 @@ async function main() {
   assert(html.includes("Autonomous primary action receipt"), "Trading page should disclose how the primary now-decision action maps to read-only refreshes or bounded paper ticks.");
   assert(html.includes("Autonomous route repair receipt"), "Trading page should disclose whether the route refresh can request a quote or must repair read-only evidence first.");
   assert(html.includes("Live route repair") || html.includes("Repair route read"), "Trading page should label blocked route refreshes as route repair instead of a generic refresh.");
+  assert(html.includes("sample route rehearsal"), "Trading page should disclose sample route rehearsal for local paper repair.");
   assert(html.includes("Agent action outcome"), "Trading page should expose immediate after-action accountability in the compact cockpit.");
   assert(html.includes("Agent action outcome metrics"), "Trading page should show wallet, exposure, loop, and proof deltas for the last agent action.");
   assert(html.includes("Agent action outcome receipt"), "Trading page should disclose the before/after agent action outcome for review.");
@@ -3774,6 +3775,11 @@ async function main() {
   assert(baseline.autonomous_route_refresh_execution.execution_boundary === "read-only-route-refresh", "Route refresh execution should stay read-only.", baseline.autonomous_route_refresh_execution);
   assert(typeof baseline.autonomous_route_refresh_execution.route_refresh_required === "boolean", "Route refresh execution should disclose refresh need.", baseline.autonomous_route_refresh_execution);
   assert(typeof baseline.autonomous_route_refresh_execution.can_request_readonly_quote === "boolean", "Route refresh execution should disclose quote request readiness.", baseline.autonomous_route_refresh_execution);
+  assert(typeof baseline.autonomous_route_refresh_execution.local_rehearsal_ready === "boolean", "Route refresh execution should disclose sample rehearsal readiness.", baseline.autonomous_route_refresh_execution);
+  if (baseline.autonomous_route_refresh_execution.local_rehearsal) {
+    assert(["ready", "blocked"].includes(baseline.autonomous_route_refresh_execution.local_rehearsal.status), "Route refresh local rehearsal should expose a known status.", baseline.autonomous_route_refresh_execution.local_rehearsal);
+    assert(baseline.autonomous_route_refresh_execution.local_rehearsal.live_execution_permission === "blocked" && baseline.autonomous_route_refresh_execution.local_rehearsal.wallet_mutation_permission === "blocked", "Route refresh local rehearsal should keep live wallet permissions blocked.", baseline.autonomous_route_refresh_execution.local_rehearsal);
+  }
   assert(baseline.autonomous_route_refresh_execution.requested_quote_count >= 0, "Route refresh execution should expose non-negative request count.", baseline.autonomous_route_refresh_execution);
   assert(baseline.autonomous_route_refresh_execution.blocked_count >= 0, "Route refresh execution should expose non-negative blocker count.", baseline.autonomous_route_refresh_execution);
   assert(baseline.autonomous_route_refresh_execution.route_confidence_score >= 0, "Route refresh execution should score route confidence.", baseline.autonomous_route_refresh_execution);

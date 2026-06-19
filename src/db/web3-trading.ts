@@ -5287,6 +5287,23 @@ export type AutonomousRouteRefreshExecutionCheck = {
   detail: string;
 };
 
+export type RouteRefreshLocalRehearsal = {
+  mode: "sample-route-rehearsal";
+  status: "ready" | "blocked";
+  symbol: string | null;
+  lane: RouteRefreshQueueItem["lane"] | null;
+  side: RouteRefreshQueueItem["side"];
+  route_confidence_score: number;
+  modeled_impact_bps: number;
+  max_slippage_bps: number;
+  quote_age_seconds: number | null;
+  can_feed_local_paper: boolean;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  summary: string;
+  controls: string[];
+};
+
 export type AutonomousRouteRefreshExecution = {
   mode: "autonomous-route-refresh-execution";
   status: AutonomousRouteRefreshExecutionStatus;
@@ -5299,6 +5316,8 @@ export type AutonomousRouteRefreshExecution = {
   selected_quote_request: RouteRefreshQuoteRequest | null;
   route_refresh_required: boolean;
   can_request_readonly_quote: boolean;
+  local_rehearsal_ready: boolean;
+  local_rehearsal: RouteRefreshLocalRehearsal | null;
   execution_boundary: "read-only-route-refresh";
   requested_quote_count: number;
   blocked_count: number;
@@ -57926,6 +57945,7 @@ function buildAutonomousRouteRefreshExecution({
     selected.lane === "jupiter-quote" &&
     !selected.quote_request,
   );
+  const localRehearsal = buildRouteRefreshLocalRehearsal(selected, matchingQuote);
   const hardBlocked = routeRefreshQueue.status === "blocked" ||
     selected?.action === "blocked" ||
     quoteRequestMissing;
@@ -58025,6 +58045,8 @@ function buildAutonomousRouteRefreshExecution({
     selected_quote_request: selected?.quote_request ?? null,
     route_refresh_required: routeRefreshRequired,
     can_request_readonly_quote: canRequestReadonlyQuote,
+    local_rehearsal_ready: localRehearsal?.can_feed_local_paper ?? false,
+    local_rehearsal: localRehearsal,
     execution_boundary: "read-only-route-refresh",
     requested_quote_count: requestedQuoteCount,
     blocked_count: routeRefreshQueue.blocked_count,
@@ -58042,6 +58064,46 @@ function buildAutonomousRouteRefreshExecution({
       "Feeds the session planner and loop director with explicit route-refresh readiness before high-frequency paper sessions advance.",
     ],
     checks,
+  };
+}
+
+function buildRouteRefreshLocalRehearsal(
+  selected: RouteRefreshQueueItem | null,
+  matchingQuote: RouteQuoteSamplerItem | null,
+): RouteRefreshLocalRehearsal | null {
+  if (!selected) return null;
+  const sampleOnly = selected.blockers.some((blocker) => /sample mode does not request live swap routes/i.test(blocker)) ||
+    matchingQuote?.source === "local-gate";
+  if (!sampleOnly) return null;
+  const modeledImpact = Math.max(0, Math.round(matchingQuote?.modeled_impact_bps ?? selected.impact_drift_bps));
+  const confidence = clamp(Math.round(
+    selected.route_confidence_score -
+      Math.min(18, selected.impact_drift_bps / 18) -
+      (selected.action === "blocked" ? 24 : 0),
+  ), 0, 100);
+  const ready = selected.action !== "blocked" && confidence >= 42;
+
+  return {
+    mode: "sample-route-rehearsal",
+    status: ready ? "ready" : "blocked",
+    symbol: selected.symbol,
+    lane: selected.lane,
+    side: selected.side,
+    route_confidence_score: confidence,
+    modeled_impact_bps: modeledImpact,
+    max_slippage_bps: matchingQuote?.slippage_bps ?? 0,
+    quote_age_seconds: selected.quote_age_seconds,
+    can_feed_local_paper: ready,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    summary: ready
+      ? `${selected.symbol ?? "Route"} has local sample route rehearsal at ${confidence}/100; it can feed paper repair but not live routing.`
+      : `${selected.symbol ?? "Route"} local route rehearsal is blocked by route confidence or sample risk evidence.`,
+    controls: [
+      "Sample route rehearsal is deterministic local evidence for paper-accountability repair only.",
+      "It does not call Jupiter, build a transaction, sign, submit, custody funds, or prove live fillability.",
+      "A real read-only quote, signer policy, settlement path, and wallet accounting gate must still clear before live execution.",
+    ],
   };
 }
 

@@ -2486,7 +2486,7 @@ function QuickNowDecisionPanel({
             <div className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 px-2 py-1.5">
               <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">Route proof</p>
               <p className={cn("mt-1 truncate text-xs font-semibold", routeRefresh.can_request_readonly_quote || routeRefresh.status === "ready" ? "text-engine" : routeRefresh.status === "blocked" ? "text-critical" : "text-caution")}>
-                {routeRefresh.can_request_readonly_quote ? "quote ready" : routeRefresh.status.replaceAll("-", " ")}
+                {routeRefresh.can_request_readonly_quote ? "quote ready" : routeRefresh.local_rehearsal_ready ? "local rehearsal" : routeRefresh.status.replaceAll("-", " ")}
               </p>
             </div>
             <div className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 px-2 py-1.5">
@@ -2511,7 +2511,7 @@ function QuickNowDecisionPanel({
         Run autonomous now decision maps the server-authored button {decision.button_label} and action {decision.action} to {primaryPath}. It preserves the {decision.execution_boundary} boundary and does not sign, submit, custody funds, move live wallet funds, or guarantee profit.
       </span>
       <span className="sr-only" aria-label="Autonomous route repair receipt">
-        Route repair required {routeRepairRequired ? "yes" : "no"}; live route repair {liveRouteRepair ? "yes" : "no"}; market source {marketSource.mode}; route refresh status {routeRefresh.status}; selected route symbol {routeRefresh.selected_symbol ?? "none"}; selected route lane {routeRefresh.selected_lane ?? "none"}; can request read-only quote {routeRefresh.can_request_readonly_quote ? "yes" : "no"}; selected quote request {routeRefresh.selected_quote_request ? "present" : "missing"}; route blocker {routeRefresh.blockers[0] ?? "none"}; route next action {routeRefresh.next_action}.
+        Route repair required {routeRepairRequired ? "yes" : "no"}; live route repair {liveRouteRepair ? "yes" : "no"}; market source {marketSource.mode}; route refresh status {routeRefresh.status}; selected route symbol {routeRefresh.selected_symbol ?? "none"}; selected route lane {routeRefresh.selected_lane ?? "none"}; can request read-only quote {routeRefresh.can_request_readonly_quote ? "yes" : "no"}; sample route rehearsal {routeRefresh.local_rehearsal_ready ? "ready" : routeRefresh.local_rehearsal?.status ?? "missing"}; rehearsal live permission {routeRefresh.local_rehearsal?.live_execution_permission ?? "blocked"}; rehearsal wallet permission {routeRefresh.local_rehearsal?.wallet_mutation_permission ?? "blocked"}; selected quote request {routeRefresh.selected_quote_request ? "present" : "missing"}; route blocker {routeRefresh.blockers[0] ?? "none"}; route next action {routeRefresh.next_action}.
       </span>
     </section>
   );
