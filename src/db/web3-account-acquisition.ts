@@ -140,15 +140,17 @@ function buildAcquisitionItems(setup: Web3AccountSetupReceipt): Web3AccountAcqui
     {
       id: "dedicated-wallet",
       label: "Dedicated Solana trading wallet",
-      status: wallet.wallet_scoped ? "configured" : "needed",
+      status: wallet.dedicated_wallet_scoped ? "configured" : "needed",
       priority: "required-now",
       setup_url: "https://solana.com/wallets",
       docs_url: "https://solana.com/docs/core/accounts",
       env_targets: ["wallet_public_key"],
       account_owner: "operator",
       app_permission: "inspect-config-only",
-      next_action: wallet.wallet_scoped
+      next_action: wallet.dedicated_wallet_scoped
         ? "Keep only the public wallet address scoped; fund or sign outside the app only after manual review."
+        : wallet.wallet_is_sample
+          ? "Replace the sample all-ones wallet with a dedicated public Solana trading wallet before live-readiness review."
         : "Create a dedicated wallet externally and enter only its public Solana address in Web3 credential setup.",
       security_rule: "Never paste the private key or seed phrase into Master Mold.",
       test_action: "Run Test credentials and Test provider health to prove wallet-specific reads without mutation.",
@@ -212,7 +214,7 @@ function acquisitionStatus(
   if (missingRequired.some((item) => item.includes("Jupiter"))) return "needs-jupiter";
   if (missingRequired.some((item) => item.includes("wallet"))) return "needs-wallet";
   if (!setup.environment_summary.emergency_stop_configured) return "needs-ops";
-  if (setup.environment_summary.jupiter_configured && setup.wallet_summary.wallet_scoped) return "ready-for-order-rehearsal";
+  if (setup.environment_summary.jupiter_configured && setup.wallet_summary.dedicated_wallet_scoped) return "ready-for-order-rehearsal";
   return "live-blocked";
 }
 

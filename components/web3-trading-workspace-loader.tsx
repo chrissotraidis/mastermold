@@ -1657,6 +1657,8 @@ function QuickAccountSetupReceiptPanel({
   const status = receipt?.status ?? "not-built";
   const tone = receipt ? accountSetupTone(receipt.status) : "demo";
   const walletScoped = receipt?.wallet_summary.wallet_scoped ?? Boolean(state.autonomous_custody_mandate.wallet_public_key);
+  const walletIsSample = receipt?.wallet_summary.wallet_is_sample ?? false;
+  const dedicatedWalletScoped = receipt?.wallet_summary.dedicated_wallet_scoped ?? (walletScoped && !walletIsSample);
   const walletOwnershipProved = receipt?.wallet_summary.wallet_ownership_proved ?? false;
   const configuredCount = receipt?.environment_summary.required_configured_count ?? 0;
   const requiredCount = receipt?.environment_summary.required_account_count ?? 3;
@@ -1702,7 +1704,7 @@ function QuickAccountSetupReceiptPanel({
               <span>Receipt {receipt.receipt_hash.slice(0, 10)}</span>
               <span>Missing {receipt.environment_summary.missing_required.length}</span>
               <span>Optional feeds {receipt.environment_summary.optional_market_feed_count}</span>
-              <span>Wallet {receipt.wallet_summary.wallet_public_key_preview ?? "missing"}</span>
+              <span>Wallet {receipt.wallet_summary.wallet_is_sample ? "sample only" : receipt.wallet_summary.wallet_public_key_preview ?? "missing"}</span>
               <span>Ownership {receipt.wallet_summary.wallet_ownership_proved ? "proved" : "unproved"}</span>
             </div>
           ) : null}
@@ -1723,9 +1725,9 @@ function QuickAccountSetupReceiptPanel({
           />
           <ProfitMetric
             label="Wallet"
-            value={walletScoped ? "scoped" : "missing"}
-            detail={receipt?.wallet_summary.wallet_public_key_preview ?? "public key"}
-            tone={walletScoped ? "engine" : "critical"}
+            value={walletIsSample ? "sample" : dedicatedWalletScoped ? "dedicated" : walletScoped ? "scoped" : "missing"}
+            detail={walletIsSample ? "demo-only" : receipt?.wallet_summary.wallet_public_key_preview ?? "public key"}
+            tone={dedicatedWalletScoped ? "engine" : walletIsSample ? "caution" : "critical"}
           />
           <ProfitMetric
             label="Ownership"

@@ -478,6 +478,8 @@ describe("Web3 autonomous trading subsystem", () => {
       };
       wallet_summary: {
         wallet_scoped: boolean;
+        wallet_is_sample: boolean;
+        dedicated_wallet_scoped: boolean;
         wallet_ownership_proved: boolean;
         wallet_ownership_receipt_hash: string | null;
         wallet_public_key_preview: string | null;
@@ -506,6 +508,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.environment_summary.required_configured_count).toBe(1);
     expect(receipt.environment_summary.missing_required).toContain("Jupiter execution rail");
     expect(receipt.environment_summary.missing_required).toContain("Dedicated public trading wallet");
+    expect(receipt.wallet_summary.wallet_scoped).toBe(false);
+    expect(receipt.wallet_summary.wallet_is_sample).toBe(false);
+    expect(receipt.wallet_summary.dedicated_wallet_scoped).toBe(false);
     expect(receipt.items.find((item) => item.id === "helius-read-rail")).toMatchObject({
       status: "configured",
       configured: true,
@@ -611,6 +616,8 @@ describe("Web3 autonomous trading subsystem", () => {
       };
       wallet_summary: {
         wallet_scoped: boolean;
+        wallet_is_sample: boolean;
+        dedicated_wallet_scoped: boolean;
         wallet_ownership_proved: boolean;
         wallet_ownership_receipt_hash: string | null;
         wallet_public_key_preview: string | null;
@@ -622,10 +629,12 @@ describe("Web3 autonomous trading subsystem", () => {
     }>(response);
 
     expect(response.status).toBe(200);
-    expect(receipt.status).toBe("dry-run-ready");
-    expect(receipt.environment_summary.required_configured_count).toBe(3);
-    expect(receipt.environment_summary.missing_required).toEqual([]);
+    expect(receipt.status).toBe("missing-wallet");
+    expect(receipt.environment_summary.required_configured_count).toBe(2);
+    expect(receipt.environment_summary.missing_required).toEqual(["Dedicated public trading wallet"]);
     expect(receipt.wallet_summary.wallet_scoped).toBe(true);
+    expect(receipt.wallet_summary.wallet_is_sample).toBe(true);
+    expect(receipt.wallet_summary.dedicated_wallet_scoped).toBe(false);
     expect(receipt.wallet_summary.wallet_ownership_proved).toBe(false);
     expect(receipt.wallet_summary.wallet_ownership_receipt_hash).toBeNull();
     expect(receipt.wallet_summary.wallet_public_key_preview).toBe("11111111...1111");
@@ -1217,6 +1226,8 @@ describe("Web3 autonomous trading subsystem", () => {
     const accountReceipt = await json<{
       wallet_summary: {
         wallet_scoped: boolean;
+        wallet_is_sample: boolean;
+        dedicated_wallet_scoped: boolean;
         wallet_ownership_proved: boolean;
         wallet_ownership_receipt_hash: string | null;
         wallet_ownership_provider: string | null;
@@ -1225,6 +1236,8 @@ describe("Web3 autonomous trading subsystem", () => {
     }>(accountSetup);
     expect(accountSetup.status).toBe(200);
     expect(accountReceipt.wallet_summary.wallet_scoped).toBe(true);
+    expect(accountReceipt.wallet_summary.wallet_is_sample).toBe(false);
+    expect(accountReceipt.wallet_summary.dedicated_wallet_scoped).toBe(true);
     expect(accountReceipt.wallet_summary.wallet_ownership_proved).toBe(true);
     expect(accountReceipt.wallet_summary.wallet_ownership_receipt_hash).toBe(receipt.receipt_hash);
     expect(accountReceipt.wallet_summary.wallet_ownership_provider).toBe("test-browser-wallet");
@@ -6655,6 +6668,8 @@ describe("Web3 autonomous trading subsystem", () => {
       read_provider_status: "missing",
       helius_rpc_configured: false,
       jupiter_configured: false,
+      wallet_is_sample: false,
+      dedicated_wallet_scoped: false,
       wallet_ownership_proved: false,
       can_satisfy_provider_gate: false,
       live_execution_permission: "blocked",
@@ -6711,6 +6726,8 @@ describe("Web3 autonomous trading subsystem", () => {
       read_provider_status: "partial",
       helius_rpc_configured: true,
       jupiter_configured: false,
+      wallet_is_sample: false,
+      dedicated_wallet_scoped: false,
       wallet_ownership_proved: false,
       can_satisfy_provider_gate: false,
     });

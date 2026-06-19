@@ -825,6 +825,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Wallet + order + DEX gate");
     expect(settingsConsole).toContain("--require-dex-live");
     expect(settingsConsole).toContain("SAMPLE_SYSTEM_WALLET");
+    expect(source("src/db/web3-account-setup.ts")).toContain("wallet_is_sample");
+    expect(source("src/db/web3-account-setup.ts")).toContain("dedicated_wallet_scoped");
+    expect(source("src/db/web3-account-setup.ts")).toContain("sample all-ones wallet is allowed for demos");
+    expect(source("src/db/web3-provider-credentials.ts")).toContain("demo-only and cannot satisfy operator wallet scope");
+    expect(source("components/web3-trading-workspace-loader.tsx")).toContain("demo-only");
     expect(settingsPage).toContain("jupiterConfigured={receipt.environment_summary.jupiter_configured}");
     expect(source("package.json")).toContain("\"verify:web3\": \"node scripts/web3-readiness-verify.mjs\"");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");

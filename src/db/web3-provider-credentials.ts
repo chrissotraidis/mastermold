@@ -37,6 +37,8 @@ export type Web3ProviderCredentialsReadiness = {
   provider: AutonomousSignerOps["active_provider"];
   signer_scope: AutonomousCustodyMandate["signer_scope"];
   wallet_public_key: string | null;
+  wallet_is_sample: boolean;
+  dedicated_wallet_scoped: boolean;
   wallet_ownership_proved: boolean;
   wallet_ownership_verified_at: string | null;
   wallet_ownership_receipt_hash: string | null;
@@ -79,6 +81,8 @@ export function buildWeb3ProviderCredentialsReadiness({
   const adapter = signer.provider_adapter;
   const packet = adapter.provider_request_packet;
   const walletScoped = Boolean(custody.wallet_public_key);
+  const walletIsSample = isSampleSystemWallet(custody.wallet_public_key);
+  const dedicatedWalletScoped = walletScoped && !walletIsSample;
   const walletOwnershipProved = walletOwnership?.proved === true;
   const heliusRpcConfigured = Boolean(process.env.HELIUS_API_KEY || process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
   const jupiterConfigured = Boolean(process.env.JUPITER_API_KEY);
@@ -97,7 +101,8 @@ export function buildWeb3ProviderCredentialsReadiness({
   const packetReady = packet.status === "ready" &&
     packet.can_dispatch_now &&
     Boolean(packet.request_body_hash && packet.request_body_fields.payload_hash);
-  const canSatisfyProviderGate = walletScoped &&
+  const canSatisfyProviderGate = dedicatedWalletScoped &&
+    walletOwnershipProved &&
     providerConfigured &&
     credentialConfigured &&
     policyHashValid &&
@@ -110,6 +115,8 @@ export function buildWeb3ProviderCredentialsReadiness({
     custody,
     signer,
     walletScoped,
+    walletIsSample,
+    dedicatedWalletScoped,
     readProviderStatus,
     heliusRpcConfigured,
     jupiterConfigured,
@@ -127,7 +134,7 @@ export function buildWeb3ProviderCredentialsReadiness({
     .map((check) => check.detail)
     .slice(0, 6);
   const readinessScore = Math.round(checks.reduce((sum, check) => sum + checkScore(check.status), 0) / checks.length);
-  const status: Web3ProviderCredentialsReadinessStatus = !walletScoped
+  const status: Web3ProviderCredentialsReadinessStatus = !walletScoped || !dedicatedWalletScoped
     ? "missing-wallet"
     : !providerConfigured || !credentialConfigured
       ? "credentials-missing"
@@ -146,6 +153,8 @@ export function buildWeb3ProviderCredentialsReadiness({
     provider: signer.active_provider,
     signer_scope: custody.signer_scope,
     wallet_public_key: custody.wallet_public_key,
+    wallet_is_sample: walletIsSample,
+    dedicated_wallet_scoped: dedicatedWalletScoped,
     wallet_ownership_proved: walletOwnershipProved,
     wallet_ownership_verified_at: walletOwnership?.verified_at ?? null,
     wallet_ownership_receipt_hash: walletOwnership?.receipt_hash ?? null,
@@ -186,6 +195,8 @@ function providerCredentialChecks(evidence: {
   custody: AutonomousCustodyMandate;
   signer: AutonomousSignerOps;
   walletScoped: boolean;
+  walletIsSample: boolean;
+  dedicatedWalletScoped: boolean;
   readProviderStatus: Web3ProviderCredentialsReadiness["read_provider_status"];
   heliusRpcConfigured: boolean;
   jupiterConfigured: boolean;
@@ -206,11 +217,13 @@ function providerCredentialChecks(evidence: {
     {
       id: "wallet-scope",
       label: "Wallet scope",
-      status: evidence.walletOwnershipProved ? "pass" : evidence.walletScoped ? "watch" : "fail",
-      detail: evidence.walletOwnershipProved
+      status: evidence.dedicatedWalletScoped && evidence.walletOwnershipProved ? "pass" : evidence.dedicatedWalletScoped ? "watch" : "fail",
+      detail: evidence.dedicatedWalletScoped && evidence.walletOwnershipProved
         ? "A hash-only ownership receipt proves control of the scoped public wallet."
-        : evidence.walletScoped
+        : evidence.dedicatedWalletScoped
           ? "A public wallet key is scoped, but wallet ownership proof has not been recorded yet."
+          : evidence.walletIsSample
+            ? "The sample all-ones wallet is demo-only and cannot satisfy operator wallet scope."
           : "A public wallet key is required before provider credentials can be reviewed.",
     },
     {
@@ -311,3 +324,9 @@ function formatCompactValue(value: number) {
   if (absolute >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
   return `$${value.toFixed(0)}`;
 }
+
+function isSampleSystemWallet(value: string | null | undefined) {
+  return value === SAMPLE_SYSTEM_WALLET;
+}
+
+const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";

@@ -155,6 +155,9 @@ transaction submission, account creation, private-key storage, and wallet mutati
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.
+The sample all-ones Solana wallet remains allowed for demo/public-scope rehearsal, but the
+account setup and provider-readiness receipts mark it as demo-only and keep the dedicated
+operator-wallet gate missing until a real public trading wallet is scoped.
 It does not request transaction signatures, store wallet secrets, submit transactions, or
 mutate balances.
 

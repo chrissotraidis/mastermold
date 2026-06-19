@@ -59,6 +59,8 @@ export type Web3AccountSetupReceipt = {
   };
   wallet_summary: {
     wallet_scoped: boolean;
+    wallet_is_sample: boolean;
+    dedicated_wallet_scoped: boolean;
     wallet_ownership_proved: boolean;
     wallet_ownership_verified_at: string | null;
     wallet_ownership_provider: string | null;
@@ -118,18 +120,21 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
     hasEnv("YELLOWSTONE_GRPC_ENDPOINT") || hasEnv("YELLOWSTONE_GRPC_TOKEN"),
   ].filter(Boolean).length;
   const walletScoped = Boolean(walletPublicKey);
+  const walletIsSample = isSampleSystemWallet(walletPublicKey);
+  const dedicatedWalletScoped = walletScoped && !walletIsSample;
   const walletOwnership = getLatestWeb3WalletOwnershipReceipt(walletPublicKey);
   const missingRequired = [
     !heliusConfigured ? "Helius/Solana read rail" : null,
     !jupiterConfigured ? "Jupiter execution rail" : null,
-    !walletScoped ? "Dedicated public trading wallet" : null,
+    !dedicatedWalletScoped ? "Dedicated public trading wallet" : null,
   ].filter((item): item is string => Boolean(item));
   const requiredAccountCount = 3;
   const requiredConfiguredCount = requiredAccountCount - missingRequired.length;
   const checks = buildAccountSetupChecks({
     heliusConfigured,
     jupiterConfigured,
-    walletScoped,
+    walletIsSample,
+    dedicatedWalletScoped,
     signerProvider,
     emergencyStopConfigured,
     taxLedgerConfigured,
@@ -137,7 +142,7 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
   const status = accountSetupStatus({
     heliusConfigured,
     jupiterConfigured,
-    walletScoped,
+    dedicatedWalletScoped,
     emergencyStopConfigured,
     taxLedgerConfigured,
   });
@@ -146,7 +151,7 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
     status: accountItemStatusOverride(item, {
       heliusConfigured,
       jupiterConfigured,
-      walletScoped,
+      dedicatedWalletScoped,
       signerProvider,
       emergencyStopConfigured,
       taxLedgerConfigured,
@@ -154,7 +159,7 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
     configured: accountItemConfigured(item.id, {
       heliusConfigured,
       jupiterConfigured,
-      walletScoped,
+      dedicatedWalletScoped,
       signerProvider,
       emergencyStopConfigured,
       taxLedgerConfigured,
@@ -194,6 +199,8 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
     },
     wallet_summary: {
       wallet_scoped: walletScoped,
+      wallet_is_sample: walletIsSample,
+      dedicated_wallet_scoped: dedicatedWalletScoped,
       wallet_ownership_proved: Boolean(walletOwnership),
       wallet_ownership_verified_at: walletOwnership?.generated_at ?? null,
       wallet_ownership_provider: walletOwnership?.provider ?? null,
@@ -235,13 +242,13 @@ export function buildWeb3AccountSetupReceipt(state: Web3TradingState): Web3Accou
 function accountSetupStatus(input: {
   heliusConfigured: boolean;
   jupiterConfigured: boolean;
-  walletScoped: boolean;
+  dedicatedWalletScoped: boolean;
   emergencyStopConfigured: boolean;
   taxLedgerConfigured: boolean;
 }): Web3AccountSetupReceiptStatus {
   if (!input.heliusConfigured) return "missing-read-rail";
   if (!input.jupiterConfigured) return "missing-execution-rail";
-  if (!input.walletScoped) return "missing-wallet";
+  if (!input.dedicatedWalletScoped) return "missing-wallet";
   if (!input.emergencyStopConfigured) return "ops-gated";
   if (input.taxLedgerConfigured) return "live-review-blocked";
   return "dry-run-ready";
@@ -250,7 +257,8 @@ function accountSetupStatus(input: {
 function buildAccountSetupChecks(input: {
   heliusConfigured: boolean;
   jupiterConfigured: boolean;
-  walletScoped: boolean;
+  walletIsSample: boolean;
+  dedicatedWalletScoped: boolean;
   signerProvider: Web3SignerSetupMode;
   emergencyStopConfigured: boolean;
   taxLedgerConfigured: boolean;
@@ -275,10 +283,12 @@ function buildAccountSetupChecks(input: {
     {
       id: "dedicated-wallet",
       label: "Dedicated wallet",
-      status: input.walletScoped ? "pass" : "fail",
-      detail: input.walletScoped
-        ? "A public wallet is scoped; keep private keys and seed phrases outside the app."
-        : "Enter only a public Solana trading-wallet address in credential setup.",
+      status: input.dedicatedWalletScoped ? "pass" : "fail",
+      detail: input.dedicatedWalletScoped
+        ? "A dedicated public trading wallet is scoped; keep private keys and seed phrases outside the app."
+        : input.walletIsSample
+          ? "The sample all-ones wallet is allowed for demos but cannot satisfy dedicated trading-wallet readiness."
+          : "Enter only a public Solana trading-wallet address in credential setup.",
     },
     {
       id: "manual-signer",
@@ -324,7 +334,7 @@ function accountItemStatusOverride(
   input: {
     heliusConfigured: boolean;
     jupiterConfigured: boolean;
-    walletScoped: boolean;
+    dedicatedWalletScoped: boolean;
     signerProvider: Web3SignerSetupMode;
     emergencyStopConfigured: boolean;
     taxLedgerConfigured: boolean;
@@ -332,7 +342,7 @@ function accountItemStatusOverride(
 ): Web3ProviderAccountRunwayItem["status"] {
   if (item.id === "helius-read-rail") return input.heliusConfigured ? "configured" : "needed";
   if (item.id === "jupiter-execution-rail") return input.jupiterConfigured ? "configured" : "needed";
-  if (item.id === "dedicated-trading-wallet") return input.walletScoped ? "configured" : "needed";
+  if (item.id === "dedicated-trading-wallet") return input.dedicatedWalletScoped ? "configured" : "needed";
   if (item.id === "external-signer") return input.signerProvider === "external-wallet" ? "configured" : "needed";
   if (item.id === "emergency-stop") return input.emergencyStopConfigured ? "configured" : "blocked";
   if (item.id === "tax-ledger") return input.taxLedgerConfigured ? "configured" : "future";
@@ -344,7 +354,7 @@ function accountItemConfigured(
   input: {
     heliusConfigured: boolean;
     jupiterConfigured: boolean;
-    walletScoped: boolean;
+    dedicatedWalletScoped: boolean;
     signerProvider: Web3SignerSetupMode;
     emergencyStopConfigured: boolean;
     taxLedgerConfigured: boolean;
@@ -352,7 +362,7 @@ function accountItemConfigured(
 ) {
   if (id === "helius-read-rail") return input.heliusConfigured;
   if (id === "jupiter-execution-rail") return input.jupiterConfigured;
-  if (id === "dedicated-trading-wallet") return input.walletScoped;
+  if (id === "dedicated-trading-wallet") return input.dedicatedWalletScoped;
   if (id === "external-signer") return input.signerProvider === "external-wallet";
   if (id === "emergency-stop") return input.emergencyStopConfigured;
   if (id === "tax-ledger") return input.taxLedgerConfigured;
@@ -419,3 +429,9 @@ function hasEnv(name: string) {
   const value = process.env[name];
   return typeof value === "string" && value.trim().length > 0;
 }
+
+function isSampleSystemWallet(value: string | null | undefined) {
+  return value === SAMPLE_SYSTEM_WALLET;
+}
+
+const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";

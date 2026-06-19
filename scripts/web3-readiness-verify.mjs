@@ -186,6 +186,18 @@ async function verifyAccountSetupReceipt() {
   assert(response.status === 200, "Account setup receipt should return 200.", { status: response.status, json });
   assert(json.mode === "web3-account-setup-receipt", "Account setup receipt should expose the expected mode.", json);
   assert(json.wallet_summary?.wallet_scoped === true, "Account setup receipt should see the saved public wallet scope.", json.wallet_summary);
+  if (walletPublicKey === DEFAULT_WALLET) {
+    assert(json.wallet_summary?.wallet_is_sample === true, "Account setup should flag the default all-ones wallet as sample-only.", json.wallet_summary);
+    assert(json.wallet_summary?.dedicated_wallet_scoped === false, "Sample wallet must not satisfy dedicated wallet scope.", json.wallet_summary);
+    assert(
+      json.environment_summary?.missing_required?.includes("Dedicated public trading wallet"),
+      "Sample wallet should leave the dedicated public wallet requirement missing.",
+      json.environment_summary,
+    );
+  } else {
+    assert(json.wallet_summary?.wallet_is_sample === false, "Operator wallet should not be flagged as the sample system wallet.", json.wallet_summary);
+    assert(json.wallet_summary?.dedicated_wallet_scoped === true, "Operator wallet should satisfy dedicated public wallet scope.", json.wallet_summary);
+  }
   assert(json.live_execution_permission === "blocked", "Account setup receipt should block live execution.", json);
   assert(json.wallet_mutation_permission === "blocked", "Account setup receipt should block wallet mutation.", json);
   assert(json.private_key_storage === "blocked", "Account setup receipt should block private key storage.", json);
@@ -247,6 +259,8 @@ async function verifyWalletOwnershipReceipt() {
 
   const setup = await requestJson("/api/web3-account-setup?source=sample&account=persistent");
   assert(setup.response.status === 200, "Account setup should return after wallet ownership proof.", setup.json);
+  assert(setup.json.wallet_summary?.wallet_is_sample === false, "Generated ownership wallet should not be marked as sample.", setup.json.wallet_summary);
+  assert(setup.json.wallet_summary?.dedicated_wallet_scoped === true, "Generated ownership wallet should satisfy dedicated wallet scope.", setup.json.wallet_summary);
   assert(setup.json.wallet_summary?.wallet_ownership_proved === true, "Account setup should see the durable wallet ownership proof.", setup.json.wallet_summary);
   assert(setup.json.wallet_summary?.wallet_ownership_receipt_hash === json.receipt_hash, "Account setup should link to the wallet ownership receipt hash.", setup.json.wallet_summary);
 
