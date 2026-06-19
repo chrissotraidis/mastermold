@@ -111,6 +111,8 @@ function Web3CredentialsRunwayCard({
     state.live_wallet_accounting_readiness.wallet_public_key ??
     state.execution_readiness.config.wallet_public_key ??
     "";
+  const credentialQueue = buildWeb3CredentialActionQueue(receipt, acquisition);
+  const queueReadyCount = credentialQueue.filter((item) => item.status === "ready").length;
 
   return (
     <section aria-labelledby="web3-credential-runway-title">
@@ -134,6 +136,36 @@ function Web3CredentialsRunwayCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0">
+          <div className="rounded-md border border-engine/25 bg-surface-dim/35 p-3" aria-label="Live Web3 credential queue">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Live credential queue</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">What is left before supervised trading review</p>
+                <p className="mt-1 text-xs leading-5 text-outline">
+                  {queueReadyCount}/{credentialQueue.length} setup lanes are ready. Secrets stay in ignored server env or one-shot tests; private keys and seed phrases stay out of the app.
+                </p>
+              </div>
+              <CredentialStateBadge configured={queueReadyCount === credentialQueue.length} status={`${queueReadyCount}/${credentialQueue.length} ready`} />
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {credentialQueue.map((item) => (
+                <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/30 bg-void/20 p-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                      <p className="mt-0.5 text-[11px] leading-4 text-outline">{item.detail}</p>
+                    </div>
+                    <CredentialQueueBadge status={item.status} />
+                  </div>
+                  <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.action}</p>
+                  <p className="mt-2 rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                    {item.storage}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-3">
             <SettingsMetric label="Required rails" value={`${requiredConfigured}/${requiredTotal}`} />
             <SettingsMetric label="Current gate" value={receipt.status.replaceAll("-", " ")} />
@@ -328,6 +360,95 @@ function ConnectionChecks({ integrations }: { integrations: SettingsIntegrationS
   );
 }
 
+type CredentialQueueStatus = "ready" | "missing" | "review" | "blocked";
+
+type CredentialQueueItem = {
+  id: string;
+  label: string;
+  status: CredentialQueueStatus;
+  detail: string;
+  action: string;
+  storage: string;
+};
+
+function buildWeb3CredentialActionQueue(
+  receipt: Web3AccountSetupReceipt,
+  acquisition: Web3AccountAcquisitionReceipt,
+): CredentialQueueItem[] {
+  const sampleWallet = receipt.wallet_summary.wallet_is_sample;
+  const dedicatedWallet = receipt.wallet_summary.dedicated_wallet_scoped;
+  const ownershipProved = receipt.wallet_summary.wallet_ownership_proved;
+  const emergencyStop = receipt.environment_summary.emergency_stop_configured;
+  const accounting = receipt.environment_summary.tax_ledger_configured;
+  const jupiter = receipt.environment_summary.jupiter_configured;
+  const readRail = receipt.environment_summary.helius_read_rail_configured;
+
+  return [
+    {
+      id: "read-rail",
+      label: "Helius / Solana read rail",
+      status: readRail ? "ready" : "missing",
+      detail: readRail ? "Server scope has read-provider evidence." : "Wallet and chain reads need Helius or Solana RPC.",
+      action: readRail ? "Run provider health after rotating the key." : "Add HELIUS_API_KEY or SOLANA_RPC_URL in ignored local env.",
+      storage: "secret: server env only",
+    },
+    {
+      id: "jupiter-order",
+      label: "Jupiter order rehearsal",
+      status: jupiter ? "ready" : "missing",
+      detail: jupiter ? "Jupiter server key is configured for quote/order rehearsal." : "Order rehearsal cannot prove route readiness without Jupiter access.",
+      action: jupiter ? "Run Rehearse Jupiter and strict order verifier." : "Add JUPITER_API_KEY in ignored local env or use a one-shot Settings test.",
+      storage: "secret: server env or one-shot",
+    },
+    {
+      id: "dedicated-wallet",
+      label: "Dedicated trading wallet",
+      status: dedicatedWallet ? "ready" : "missing",
+      detail: dedicatedWallet
+        ? `Scoped wallet ${receipt.wallet_summary.wallet_public_key_preview ?? "public key"} is not the sample wallet.`
+        : sampleWallet
+          ? "The sample all-ones wallet is scoped for demo only."
+          : "No dedicated public trading wallet is scoped yet.",
+      action: dedicatedWallet ? "Keep seed phrase and private key outside Master Mold." : acquisition.items.find((item) => item.id === "dedicated-wallet")?.next_action ?? "Enter only a public Solana address.",
+      storage: "public address: browser-safe",
+    },
+    {
+      id: "wallet-ownership",
+      label: "Wallet ownership proof",
+      status: ownershipProved && dedicatedWallet ? "ready" : dedicatedWallet ? "review" : "blocked",
+      detail: ownershipProved ? "Hash-only ownership receipt is recorded." : "Ownership is unproved until a browser wallet signs the text challenge.",
+      action: ownershipProved ? "Use the receipt as review evidence; it grants no signing authority." : "Connect the browser wallet and run Prove ownership.",
+      storage: "signature evidence: hash-only",
+    },
+    {
+      id: "manual-signer",
+      label: "Manual external signer",
+      status: receipt.environment_summary.signer_provider === "external-wallet" ? "review" : "missing",
+      detail: "First live posture should require user-present external wallet approval.",
+      action: receipt.environment_summary.signer_provider === "external-wallet"
+        ? "Build signer receipt; live submission remains blocked."
+        : "Switch signer posture to manual external wallet before live review.",
+      storage: "signer secrets: never stored here",
+    },
+    {
+      id: "emergency-stop",
+      label: "Emergency stop operations",
+      status: emergencyStop ? "review" : "missing",
+      detail: emergencyStop ? "Ops target metadata is configured." : "Supervised live review needs an external stop owner/channel.",
+      action: emergencyStop ? "Run the local stop drill before live review." : "Add MASTERMOLD_EMERGENCY_STOP_CONTACT or webhook target in server env.",
+      storage: "ops target: server env only",
+    },
+    {
+      id: "accounting",
+      label: "Settlement and accounting",
+      status: accounting ? "review" : "missing",
+      detail: accounting ? "Accounting export target is configured." : "Real fills need settlement evidence and export handling before they are trusted.",
+      action: accounting ? "Use only after confirmed fill reconciliation." : "Choose an export target after guarded fill reconciliation is clean.",
+      storage: "fill evidence: reviewed ledger",
+    },
+  ];
+}
+
 function DataPrivacyCard() {
   const items = [
     {
@@ -459,6 +580,24 @@ function CredentialStateBadge({ configured, status }: { configured: boolean; sta
       )}
     >
       {configured ? "Configured" : status.replaceAll("-", " ")}
+    </Badge>
+  );
+}
+
+function CredentialQueueBadge({ status }: { status: CredentialQueueStatus }) {
+  const label = status === "ready" ? "Ready" : status === "review" ? "Review" : status === "blocked" ? "Blocked" : "Missing";
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "shrink-0 border text-xs",
+        status === "ready" && "border-engine/35 bg-engine/10 text-engine",
+        status === "review" && "border-violet/35 bg-violet/10 text-violet",
+        status === "missing" && "border-caution/40 bg-caution/10 text-caution",
+        status === "blocked" && "border-critical/35 bg-critical/10 text-critical",
+      )}
+    >
+      {label}
     </Badge>
   );
 }

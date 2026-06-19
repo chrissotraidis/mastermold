@@ -778,6 +778,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 trading credentials");
     expect(settingsPage).toContain("Secure setup state for the autonomous Web3 paper desk");
     expect(settingsPage).toContain("SettingsWeb3CredentialConsole");
+    expect(settingsPage).toContain("Live credential queue");
+    expect(settingsPage).toContain("What is left before supervised trading review");
+    expect(settingsPage).toContain("buildWeb3CredentialActionQueue");
+    expect(settingsPage).toContain("JUPITER_API_KEY in ignored local env");
+    expect(settingsPage).toContain("signature evidence: hash-only");
+    expect(settingsPage).toContain("signer secrets: never stored here");
+    expect(settingsPage).toContain("private keys and seed phrases stay out of the app");
     expect(settingsPage).toContain("Credential checklist");
     expect(settingsPage).toContain("Ignored env template");
     expect(settingsPage).toContain("Web3 credential environment template");
