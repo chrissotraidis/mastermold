@@ -110,7 +110,8 @@ async function main() {
   assert(html.includes("Actually left"), "Trading page should expose what is actually left for Web3 launch readiness.");
   assert(html.includes("actual remaining gates"), "Trading page should summarize the remaining launch gates.");
   assert(html.includes("Dry-run signer"), "Trading page should expose a safe dry-run signer setup action in the launch checklist.");
-  assert(html.includes("Dry-run signer setup only scopes a public-key rehearsal"), "Trading page should disclose the dry-run signer boundary.");
+  assert(html.includes("Order rehearsal"), "Trading page should expose a safe live DEX dry-run order rehearsal action in the launch checklist.");
+  assert(html.includes("Dry-run signer and order rehearsal only scope public-key rehearsal"), "Trading page should disclose the dry-run signer and order boundary.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");
@@ -4102,7 +4103,7 @@ async function main() {
       signer_session_label: "smoke-dry-run-rehearsal",
       signer_network: "devnet",
       max_trade_usd: 100,
-      daily_spend_cap_usd: 500,
+      daily_spend_cap_usd: 10_000,
       max_slippage_bps: 150,
     },
   });
@@ -4112,9 +4113,36 @@ async function main() {
   assert(dryRunSignerSetup.payload.execution_readiness.config.wallet_public_key === "11111111111111111111111111111111", "Dry-run signer setup should scope a public wallet key.", dryRunSignerSetup.payload.execution_readiness.config);
   assert(dryRunSignerSetup.payload.execution_readiness.config.signer_simulation_enabled === true, "Dry-run signer setup should enable signer simulation metadata.", dryRunSignerSetup.payload.execution_readiness.config);
   assert(dryRunSignerSetup.payload.autonomous_custody_mandate.wallet_public_key === "11111111111111111111111111111111", "Dry-run signer setup should flow wallet scope into custody mandate.", dryRunSignerSetup.payload.autonomous_custody_mandate);
+  assert(dryRunSignerSetup.payload.autonomous_custody_mandate.remaining_cap_usd > 0, "Dry-run signer setup should leave dry-run spend capacity for order rehearsal.", dryRunSignerSetup.payload.autonomous_custody_mandate);
   assert(dryRunSignerSetup.payload.autonomous_signer_ops.controls.some((control) => control.includes("private keys")), "Dry-run signer setup should keep private keys outside the app.", dryRunSignerSetup.payload.autonomous_signer_ops);
   assert(dryRunSignerSetup.payload.execution_gate.live_execution_enabled === false, "Dry-run signer setup must not enable live execution.", dryRunSignerSetup.payload.execution_gate);
   assert(dryRunSignerSetup.payload.autonomous_live_autonomy_readiness.can_trade_real_capital === false, "Dry-run signer setup must not permit real-capital trading.", dryRunSignerSetup.payload.autonomous_live_autonomy_readiness);
+
+  const orderRehearsal = await postTrading({
+    scenario: "breakout",
+    source: "live-dex",
+    account: "persistent",
+    advance: false,
+    execution: {
+      mode: "dry-run",
+      kill_switch: false,
+      wallet_public_key: "11111111111111111111111111111111",
+      signer_simulation_enabled: true,
+      signer_session_label: "smoke-order-rehearsal",
+      signer_network: "devnet",
+      max_trade_usd: 500,
+      daily_spend_cap_usd: 10_000,
+      max_slippage_bps: 150,
+    },
+  });
+  assert(orderRehearsal.response.status === 200, "Dry-run live DEX order rehearsal should be accepted.", orderRehearsal.payload);
+  assert(orderRehearsal.payload.market_source.mode === "live-dex", "Order rehearsal should use the live DEX read lane.", orderRehearsal.payload.market_source);
+  assert(orderRehearsal.payload.execution_readiness.config.mode === "dry-run", "Order rehearsal should keep execution in dry-run mode.", orderRehearsal.payload.execution_readiness.config);
+  assert(orderRehearsal.payload.execution_readiness.config.daily_spend_cap_usd === 10_000, "Order rehearsal should carry enough dry-run cap for route/order proof.", orderRehearsal.payload.execution_readiness.config);
+  assert(orderRehearsal.payload.pre_submit_rehearsal?.mode === "pre-submit-rehearsal", "Order rehearsal should expose pre-submit rehearsal evidence.", orderRehearsal.payload.pre_submit_rehearsal);
+  assert(orderRehearsal.payload.autonomous_order_handoff?.mode === "autonomous-order-handoff", "Order rehearsal should expose order handoff evidence.", orderRehearsal.payload.autonomous_order_handoff);
+  assert(orderRehearsal.payload.execution_gate.live_execution_enabled === false, "Order rehearsal must not enable live execution.", orderRehearsal.payload.execution_gate);
+  assert(orderRehearsal.payload.autonomous_live_autonomy_readiness.can_trade_real_capital === false, "Order rehearsal must not permit real-capital trading.", orderRehearsal.payload.autonomous_live_autonomy_readiness);
 
   const reset = await postTrading({
     scenario: "base",
