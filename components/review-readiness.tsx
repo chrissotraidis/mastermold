@@ -34,6 +34,7 @@ import { getJournal } from "@/src/db/journal";
 import { getPortfolio } from "@/src/db/portfolio";
 import { getProductMetricSummary } from "@/src/db/metrics";
 import { getScreenerFeedback } from "@/src/db/screener-feedback";
+import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 
 type ReviewReadinessProps = {
   surface: "public" | "authenticated";
@@ -72,6 +73,7 @@ const disclosureSections = [
       "Autonomous daemon handoff now exposes and persists an external-scheduler lease guard with endpoint, POST payload, renewal timing, active runner/request id, expiry, replay/conflict counts, max ticks/fills, provider budget, stop conditions, and paper-only live-boundary controls so overlapping daemon calls cannot silently double-advance the local paper loop.",
       "Autonomous daemon handoff now includes a read-only market-worker contract that tells an external runner which DEX/profile/pair/paid-order/route evidence lane to refresh next, with cadence, budget, watch symbols, loop-feed permission, blockers, and no signing or wallet authority.",
       "A runnable Web3 autonomous daemon script can now operate the existing backend loop outside the browser with bounded tick counts, lease ownership, replay/conflict protection, gated-heartbeat mode, JSON run receipts, and a hard paper-only refusal if real-capital autonomy is armed.",
+      "A supervised Web3 daemon runner can now run repeated leased paper-daemon rounds outside the browser, write a local health receipt, count posted/blocked/error rounds, and open a fail-closed circuit while still refusing signing, wallet mutation, or real-capital authority.",
       "The autonomous daemon runner now opportunistically attaches the guarded settlement watchdog request when local state already contains relayed signature evidence, so confirmation polling, fill reconciliation, and local paper mirror follow-through can proceed without a human opening Route Ops.",
       "A Web3 autonomous forward-run harness now resets the local paper ledger, runs bounded daemon ticks, compares start/end wallet equity, reports net paper PnL against a target, and can fail deployment checks when the make-money loop is not producing target paper alpha.",
       "The Web3 autonomous forward suite now repeats the bounded paper-daemon proof across base, breakout, and rug-risk sample regimes, reporting aggregate PnL, moved/traded regime counts, full-wallet hot-coin baseline alpha, same-notional deployed-capital alpha, and best/worst scenario outcomes so the make-money loop is not judged from one tape only.",
@@ -400,7 +402,7 @@ const disclosureSections = [
       "Autonomous daily profit lock is a local paper circuit breaker only. It can block fresh simulated buys, preserve harvest/protect paper sells, or stand down the local loop from target/loss evidence, but it cannot guarantee profit, reset a real trading day, sign, submit, or move funds.",
       "Auto Watch profit-lock gating is local orchestration only. It can choose protect, harvest, cooldown, or stand-down paper ticks before fresh paper entries, but it cannot run after the app stops, guarantee realized profit, or submit live swaps.",
       "Auto Watch wallet and fill-audit gating is local paper feedback only. It can slow, protect, or tighten the browser loop from simulator wallet curves and local fill audits, but it cannot verify exchange balances, guarantee fills, or recover real losses.",
-      "Auto Watch safety-loop keep-alive is still browser-local. It can keep local protect/review/cooldown ticks moving while the page is open, but it cannot run as a durable background daemon, submit live orders, or guarantee that monitoring prevents loss.",
+      "Auto Watch safety-loop keep-alive is still browser-local. It can keep local protect/review/cooldown ticks moving while the page is open; the separate supervised daemon can write local paper health receipts outside the browser, but it is not a process manager, live order submitter, loss-prevention guarantee, or real-capital trading bot.",
       "Autonomous replay gate is local deterministic replay evidence only. It can throttle simulated fresh buys from base, breakout, and rug-risk paper scenarios, but it cannot prove future profit, prevent live losses, sign swaps, submit transactions, or move wallet funds.",
       "Autonomous data freshness gate is local/read-only provider discipline only. It can block or shrink simulated fresh buys from stale stream, paid-order, OHLCV, quote, or provider-budget evidence, but it cannot open durable sockets, bypass rate limits, prove live liquidity, sign swaps, submit transactions, or guarantee profit.",
       "Autonomous market evidence fusion is a local paper/read-only scoring surface only. It can prioritize trade, probe, route refresh, candle refresh, protection, rejection, or watch actions from fused evidence, but it cannot prove future profit, maintain background trading after the app stops, sign swaps, submit transactions, custody funds, or move money.",
@@ -484,6 +486,7 @@ const disclosureSections = [
       "High-frequency paper execution results are local ledger effects only. They can queue or record one bounded paper buy or sell from the fast-race winner, but they cannot request signatures, submit Jupiter orders, broadcast swaps, move wallet funds, or prove live profitability.",
       "High-frequency paper route fallback is not route proof. It deliberately preserves live route and signer blockers while allowing local portfolio-risk rehearsal in the paper wallet.",
       "The Web3 cockpit chart, flow map, profit attribution board, and runway are UI summaries of local paper telemetry and mission metadata. They make the agent flow easier to review, but they still do not represent exchange statements, custody access, proof of future profit, or live wallet trading authority.",
+      "Web3 daemon supervisor receipts are local process-health evidence only. They show whether the external paper runner posted, blocked, errored, or opened its circuit; they do not prove exchange uptime, live fill quality, custody safety, or future profit.",
       "The autonomous operator brief is a compact UI synthesis only. It can show the current trade/protect/refresh order and wallet-impact estimate, but it cannot execute live swaps, keep running after the app stops, or guarantee profit.",
       "The autonomous position situation board is a local paper synthesis only. It can block or slow fresh paper buys while held coins need exit, trim, harvest, route refresh, or defense, but it cannot sell live tokens, custody a wallet, submit swaps, or guarantee profit.",
       "The autonomous trading directive is a local paper/read-only command summary only. It can decide whether the app should protect, harvest, refresh, attack, probe, stand down, or observe next, but it cannot sign, submit, custody funds, continue after the app stops, or guarantee profit.",
@@ -968,7 +971,7 @@ function TrustBoundaryCard() {
     {
       title: "What is actually left",
       body:
-        "Still missing for real-money autonomy: production signer/custody policy, always-on market and route workers, real wallet accounting, audited live submit/settlement, and out-of-sample profit proof.",
+        "Still missing for real-money autonomy: production process management, signer/custody policy, provider-backed market and route workers, real wallet accounting, audited live submit/settlement, and out-of-sample profit proof.",
       tone: "border-critical/30 bg-critical/[0.06]",
     },
   ];
@@ -992,6 +995,7 @@ function TrustBoundaryCard() {
 }
 
 function AutonomousTradingStatusCard() {
+  const supervisor = getWeb3DaemonSupervisorHealth();
   const rows: Array<{
     label: string;
     value: string;
@@ -1013,10 +1017,17 @@ function AutonomousTradingStatusCard() {
       tone: "text-caution",
     },
     {
+      label: "Supervisor",
+      value: supervisor.status === "absent" ? "No receipt yet" : supervisor.status.replaceAll("-", " "),
+      detail:
+        supervisor.summary,
+      tone: supervisor.status === "running" || supervisor.status === "completed" ? "text-engine" : supervisor.status === "circuit-open" || supervisor.status === "error" ? "text-critical" : "text-caution",
+    },
+    {
       label: "Not done",
       value: "Production trader",
       detail:
-        "The remaining work is not more dashboard labels; it is real infrastructure: persistent workers, provider credentials, custody policy, audited order submission, real fill accounting, and long-run profit proof.",
+        "The remaining work is not more dashboard labels; it is real infrastructure: process supervision, provider credentials, custody policy, audited order submission, real fill accounting, and long-run profit proof.",
       tone: "text-critical",
     },
   ];
@@ -1034,7 +1045,7 @@ function AutonomousTradingStatusCard() {
           </CardDescription>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-3 p-5 pt-0 lg:grid-cols-3">
+      <CardContent className="grid gap-3 p-5 pt-0 md:grid-cols-2 xl:grid-cols-4">
         {rows.map((row) => (
           <div key={row.label} className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-4">
             <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">{row.label}</p>

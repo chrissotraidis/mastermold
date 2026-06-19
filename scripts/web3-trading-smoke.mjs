@@ -1,4 +1,5 @@
 import { buildDaemonTickBody, runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
+import { runWeb3DaemonSupervisor } from "./web3-daemon-supervisor.mjs";
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
 import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
@@ -45,6 +46,15 @@ async function postTrading(body) {
 }
 
 async function main() {
+  const healthResponse = await request("/api/health");
+  const health = await readJson(healthResponse);
+  assert(healthResponse.status === 200, "Health endpoint should remain available.", { status: healthResponse.status, health });
+  assert(health.status === "ok", "Health endpoint should preserve the ok status.", health);
+  assert(health.web3_daemon_supervisor, "Health endpoint should expose Web3 daemon supervisor health.", health);
+  assert(["absent", "running", "idle", "completed", "circuit-open", "error"].includes(health.web3_daemon_supervisor.status), "Supervisor health should return a known status.", health.web3_daemon_supervisor);
+  assert(health.web3_daemon_supervisor.live_execution_permission === "blocked", "Supervisor health should keep live execution blocked.", health.web3_daemon_supervisor);
+  assert(health.web3_daemon_supervisor.wallet_mutation_permission === "blocked", "Supervisor health should keep wallet mutation blocked.", health.web3_daemon_supervisor);
+
   const page = await request("/trading");
   const html = await page.text();
   assert(page.status === 200, "Trading page should render.", { status: page.status });
@@ -4736,6 +4746,23 @@ async function main() {
   assert(["ready", "refresh-first", "sample-only", "throttled", "blocked", "idle"].includes(daemonRun.events[0].market_worker), "Autonomous daemon smoke run should report a known market worker status.", daemonRun);
   assert(typeof daemonRun.events[0].market_worker_lane === "string" && daemonRun.events[0].market_worker_lane.length > 0, "Autonomous daemon smoke run should report the market worker lane.", daemonRun);
   assert(daemonRun.events[0].settlement_watchdog === "not-requested", "Autonomous daemon should not request settlement watchdog without relayed signature evidence.", daemonRun);
+  const supervisorRun = await runWeb3DaemonSupervisor({
+    baseUrl,
+    scenario: "base",
+    source: "sample",
+    runnerId: "smoke-supervisor-runner",
+    rounds: 1,
+    ticksPerRound: 1,
+    intervalMs: 0,
+    roundDelayMs: 0,
+    statusPath: "/tmp/mastermold-web3-daemon-supervisor-smoke.json",
+  });
+  assert(supervisorRun.mode === "web3-daemon-supervisor", "Supervisor should return a durable receipt shape.", supervisorRun);
+  assert(supervisorRun.status === "completed", "Supervisor should complete a one-round paper run.", supervisorRun);
+  assert(supervisorRun.paper_only === true, "Supervisor must remain paper-only.", supervisorRun);
+  assert(supervisorRun.live_execution_permission === "blocked" && supervisorRun.wallet_mutation_permission === "blocked", "Supervisor receipt should block live execution and wallet mutation.", supervisorRun);
+  assert(supervisorRun.round === 1 && supervisorRun.posted_ticks >= 1, "Supervisor should post at least one leased paper daemon tick.", supervisorRun);
+  assert(supervisorRun.controls.some((control) => control.includes("paper daemon")), "Supervisor receipt should disclose its paper daemon boundary.", supervisorRun);
   const forwardRun = await runWeb3AutonomousForwardRun({
     baseUrl,
     scenario: "all",

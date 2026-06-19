@@ -11,6 +11,7 @@
     "seed": "bun run scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "daemon:web3": "node scripts/web3-autonomous-daemon.mjs",
+    "supervise:web3": "node scripts/web3-daemon-supervisor.mjs",
     "forward:web3": "node scripts/web3-autonomous-forward-run.mjs",
     "forward-suite:web3": "node scripts/web3-autonomous-forward-run.mjs --scenario=all",
     "forward-repeat:web3": "node scripts/web3-autonomous-forward-run.mjs --scenario=all --runs=3",
