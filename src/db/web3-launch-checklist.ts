@@ -29,11 +29,22 @@ export type Web3AutonomyLaunchChecklistItem = {
   blocker: string | null;
 };
 
+export type Web3AutonomyLaunchRemainingWorkItem = {
+  id: Web3AutonomyLaunchChecklistItem["id"];
+  label: string;
+  status: "watch" | "fail";
+  priority: "required" | "review";
+  detail: string;
+  next_action: string;
+};
+
 export type Web3AutonomyLaunchChecklist = {
   mode: "web3-autonomy-launch-checklist";
   status: Web3AutonomyLaunchChecklistStatus;
   summary: string;
   readiness_score: number;
+  completed_proof_count: number;
+  remaining_work_count: number;
   paper_scale_permitted: boolean;
   live_review_permitted: boolean;
   real_capital_blocked: boolean;
@@ -43,6 +54,7 @@ export type Web3AutonomyLaunchChecklist = {
   hard_blockers: string[];
   controls: string[];
   items: Web3AutonomyLaunchChecklistItem[];
+  remaining_work: Web3AutonomyLaunchRemainingWorkItem[];
 };
 
 export function buildWeb3AutonomyLaunchChecklist(
@@ -58,6 +70,7 @@ export function buildWeb3AutonomyLaunchChecklist(
   const lifecycle = state.transaction_lifecycle;
   const custody = state.autonomous_custody_mandate;
   const signer = state.autonomous_signer_ops;
+  const routeRefresh = state.autonomous_route_refresh_execution;
   const killSwitchFail = state.execution_readiness.checks.some((check) => check.id === "kill-switch" && check.status === "fail");
   const memoryStatus = promotedHealth?.run_memory_status ?? "learning";
   const promotedRunCount = promotedHealth?.run_count ?? 0;
@@ -67,7 +80,9 @@ export function buildWeb3AutonomyLaunchChecklist(
   const promotedMemoryPass = ["continue-paper", "extend-paper"].includes(memoryStatus) && promotedRunCount > 0 && promotedPnl >= 0;
   const promotedMemoryFail = ["protect-paper", "stand-down"].includes(memoryStatus) || promotedHealth?.loss_brake_tripped === true;
   const marketPass = dataFreshness.status === "clear" || dataFreshness.status === "tradeable";
-  const routePass = adapter.quote_request_ready && !state.autonomous_route_refresh_execution.route_refresh_required;
+  const routeProofRefreshable = routeRefresh.can_request_readonly_quote || adapter.quote_request_ready;
+  const routePass = adapter.quote_request_ready && !routeRefresh.route_refresh_required && routeRefresh.status === "ready";
+  const routeScore = Math.max(adapter.readiness_score, routeRefresh.route_confidence_score);
   const executionQualityPass = ["route", "clear", "ready", "execute"].includes(String(quality.status)) || quality.selected_score >= 70;
   const signerPass = signer.can_request_signature && signer.status !== "blocked" && custody.status === "armed";
   const relayPass = relay.status === "ready" || relay.status === "relayed" || relay.status === "confirmed";
@@ -102,10 +117,10 @@ export function buildWeb3AutonomyLaunchChecklist(
     {
       id: "route-proof",
       label: "Route proof",
-      status: routePass ? "pass" : adapter.status === "blocked" ? "fail" : "watch",
-      score: adapter.readiness_score,
-      detail: `${adapter.quote_provider.replaceAll("-", " ")} quote ${adapter.quote_request_ready ? "ready" : "gated"}; ${adapter.fastest_ttl_seconds}s TTL.`,
-      blocker: routePass ? null : adapter.next_action,
+      status: routePass ? "pass" : routeProofRefreshable ? "watch" : "fail",
+      score: routeScore,
+      detail: `${routeRefresh.selected_lane?.replaceAll("-", " ") ?? adapter.quote_provider.replaceAll("-", " ")} route ${routeRefresh.status.replaceAll("-", " ")}; ${adapter.fastest_ttl_seconds}s TTL.`,
+      blocker: routePass ? null : routeProofRefreshable ? routeRefresh.next_action : adapter.next_action,
     },
     {
       id: "execution-quality",
@@ -171,6 +186,19 @@ export function buildWeb3AutonomyLaunchChecklist(
     .filter(Boolean)
     .slice(0, 8);
   const watchCount = items.filter((item) => item.status === "watch").length;
+  const completedProofCount = items.filter((item) => item.status === "pass").length;
+  const remainingWork = items
+    .filter((item): item is Web3AutonomyLaunchChecklistItem & { status: "watch" | "fail" } => item.status !== "pass")
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      status: item.status,
+      priority: item.status === "fail" ? "required" as const : "review" as const,
+      detail: item.detail,
+      next_action: item.blocker ?? item.detail,
+    }))
+    .sort((a, b) => launchRemainingWorkRank(b) - launchRemainingWorkRank(a));
+  const remainingWorkCount = remainingWork.length;
   const readinessScore = Math.round(items.reduce((sum, item) => sum + item.score, 0) / Math.max(1, items.length));
   const paperScalePermitted = paperProfit.making_money && marketPass && !promotedMemoryFail && !killSwitchFail && paperProfit.accountability_score >= 70;
   const liveReviewPermitted = liveReadiness.can_trade_real_capital && hardBlockers.length === 0 && promotedMemoryPass && settlementPass && relayPass;
@@ -190,6 +218,8 @@ export function buildWeb3AutonomyLaunchChecklist(
     status,
     summary: launchChecklistSummary(status, readinessScore, paperScalePermitted, liveReviewPermitted, hardBlockers),
     readiness_score: readinessScore,
+    completed_proof_count: completedProofCount,
+    remaining_work_count: remainingWorkCount,
     paper_scale_permitted: paperScalePermitted,
     live_review_permitted: liveReviewPermitted,
     real_capital_blocked: realCapitalBlocked,
@@ -204,7 +234,15 @@ export function buildWeb3AutonomyLaunchChecklist(
       "Real-capital autonomy stays blocked unless this checklist reaches manual live review and an external reviewed executor is deliberately enabled.",
     ],
     items,
+    remaining_work: remainingWork,
   };
+}
+
+function launchRemainingWorkRank(item: Web3AutonomyLaunchRemainingWorkItem) {
+  const priority = item.priority === "required" ? 20 : 8;
+  const liveCapitalGate = ["signer", "relay", "settlement", "custody-policy", "kill-switch"].includes(item.id) ? 8 : 0;
+  const routeOrMarketGate = item.id === "route-proof" || item.id === "market-feed" ? 6 : 0;
+  return priority + liveCapitalGate + routeOrMarketGate;
 }
 
 function launchChecklistSummary(

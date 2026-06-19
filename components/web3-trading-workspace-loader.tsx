@@ -778,6 +778,10 @@ export function Web3TradingWorkspaceLoader({
           {state.market_source.label} · {state.autonomous_market_evidence_fusion.can_trade ? "trade ok" : tradeBlocked ? "trade blocked" : "refresh"} · {autoWatch ? "watch on" : "watch off"} · {wakePlan.auto_watch_label} · intake {marketIntake.status} · allocator {profitAllocation.status}
         </p>
 
+        <div className="mt-3">
+          <QuickLaunchChecklistPanel checklist={launchChecklist} />
+        </div>
+
         <div className="mt-3 grid gap-2 xl:grid-cols-2" aria-label="First-screen autonomous chart and profit benchmark">
           <QuickFirstScreenPriceActionRail state={state} />
           <QuickFirstScreenProfitBenchmarkStrip state={state} />
@@ -936,7 +940,6 @@ export function Web3TradingWorkspaceLoader({
                 autoWatch={autoWatch}
                 autoWatchPlan={autoWatchPlan}
               />
-              <QuickLaunchChecklistPanel checklist={launchChecklist} />
               <QuickPromotedAutopilotPanel health={promotedAutopilotHealth} />
               <QuickDaemonSupervisorPanel health={supervisorHealth} />
               <QuickDaemonHandoffPanel handoff={daemonHandoff} />
@@ -6982,7 +6985,7 @@ function QuickLaunchChecklistPanel({
 }) {
   const tone = launchChecklistTone(checklist.status);
   const topItems = checklist.items.slice(0, 6);
-  const liveItems = checklist.items.slice(6);
+  const remainingWork = checklist.remaining_work.slice(0, 4);
 
   return (
     <section className="rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:p-3" aria-label="Web3 autonomy launch checklist">
@@ -7019,18 +7022,38 @@ function QuickLaunchChecklistPanel({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-1" aria-label="Launch checklist live-capital boundary">
+          <ProfitMetric label="Proof done" value={`${checklist.completed_proof_count}/${checklist.items.length}`} detail="launch gates" tone={checklist.completed_proof_count === checklist.items.length ? "engine" : "caution"} />
+          <ProfitMetric label="Left" value={checklist.remaining_work_count.toString()} detail="actual remaining gates" tone={checklist.remaining_work_count === 0 ? "engine" : checklist.hard_blocker_count > 0 ? "critical" : "caution"} />
           <ProfitMetric label="Paper scale" value={checklist.paper_scale_permitted ? "permitted" : "gated"} detail={checklist.next_action} tone={checklist.paper_scale_permitted ? "engine" : "caution"} />
           <ProfitMetric label="Live review" value={checklist.live_review_permitted ? "ready" : "blocked"} detail={checklist.real_capital_blocked ? "no fund movement" : "manual only"} tone={checklist.live_review_permitted ? "critical" : "demo"} />
           <ProfitMetric label="Watch gates" value={checklist.watch_count.toString()} detail="needs review" tone={checklist.watch_count > 0 ? "caution" : "engine"} />
           <ProfitMetric label="Hard blockers" value={checklist.hard_blocker_count.toString()} detail={checklist.hard_blockers[0] ?? "none"} tone={checklist.hard_blocker_count > 0 ? "critical" : "engine"} />
-          {liveItems.slice(0, 2).map((item) => (
-            <ProfitMetric key={item.id} label={item.label} value={item.status} detail={item.detail} tone={item.status === "pass" ? "engine" : item.status === "watch" ? "caution" : "critical"} />
-          ))}
         </div>
       </div>
+      {remainingWork.length > 0 ? (
+        <div className="mt-2 rounded-md border border-outline-variant/20 bg-surface-dim/15 p-2" aria-label="Web3 launch remaining work">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Actually left</p>
+            <Chip tone={checklist.hard_blocker_count > 0 ? "critical" : "caution"}>
+              {checklist.remaining_work_count} gate{checklist.remaining_work_count === 1 ? "" : "s"}
+            </Chip>
+          </div>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
+            {remainingWork.map((item) => (
+              <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-xs font-semibold text-on-surface">{item.label}</p>
+                  <Chip tone={item.priority === "required" ? "critical" : "caution"}>{item.priority}</Chip>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{item.next_action}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">{checklist.next_action}</p>
       <span className="sr-only" aria-label="Web3 launch checklist receipt">
-        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; controls {checklist.controls.join(" ")}
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
       </span>
     </section>
   );

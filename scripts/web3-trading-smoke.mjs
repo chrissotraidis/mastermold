@@ -82,8 +82,14 @@ async function main() {
   assert(typeof launchChecklist.paper_scale_permitted === "boolean", "Web3 launch checklist should expose paper-scale permission.", launchChecklist);
   assert(typeof launchChecklist.live_review_permitted === "boolean", "Web3 launch checklist should expose live-review permission.", launchChecklist);
   assert(launchChecklist.real_capital_blocked === true, "Web3 launch checklist should keep real capital blocked in the default local build.", launchChecklist);
+  assert(typeof launchChecklist.completed_proof_count === "number", "Web3 launch checklist should expose completed proof count.", launchChecklist);
+  assert(typeof launchChecklist.remaining_work_count === "number", "Web3 launch checklist should expose remaining work count.", launchChecklist);
   assert(Array.isArray(launchChecklist.items), "Web3 launch checklist should expose proof items.", launchChecklist);
   assert(["paper-profit", "promoted-memory", "market-feed", "route-proof", "execution-quality", "custody-policy", "signer", "relay", "settlement", "kill-switch", "live-boundary"].every((id) => launchChecklist.items.some((item) => item.id === id)), "Web3 launch checklist should cover paper, market, execution, custody, settlement, and live-boundary proofs.", launchChecklist);
+  assert(Array.isArray(launchChecklist.remaining_work), "Web3 launch checklist should expose structured remaining work.", launchChecklist);
+  assert(launchChecklist.remaining_work_count === launchChecklist.remaining_work.length, "Web3 launch checklist remaining work count should match remaining work rows.", launchChecklist);
+  assert(launchChecklist.completed_proof_count + launchChecklist.remaining_work_count === launchChecklist.items.length, "Web3 launch checklist proof counts should reconcile.", launchChecklist);
+  assert(launchChecklist.remaining_work.every((item) => ["required", "review"].includes(item.priority) && item.next_action.length > 0), "Web3 launch checklist remaining work rows should include priority and next action.", launchChecklist);
 
   const page = await request("/trading");
   const html = await page.text();
@@ -101,6 +107,8 @@ async function main() {
   assert(html.includes("Web3 autonomy launch checklist"), "Trading page should render the launch checklist as a first-screen cockpit surface.");
   assert(html.includes("Web3 launch checklist receipt"), "Trading page should expose an accessible launch checklist receipt.");
   assert(html.includes("real-cap blocked"), "Trading page should make the real-capital boundary visible in the launch checklist.");
+  assert(html.includes("Actually left"), "Trading page should expose what is actually left for Web3 launch readiness.");
+  assert(html.includes("actual remaining gates"), "Trading page should summarize the remaining launch gates.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");
