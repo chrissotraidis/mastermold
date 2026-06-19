@@ -8,6 +8,7 @@ import { GET, POST } from "@/app/api/web3-trading/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
 import {
   getWeb3TradingStateAsync,
   getWeb3TradingState,
@@ -5631,6 +5632,49 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(repeatProfitChecklist.cutover_runway.find((step) => step.id === "profit-proof")).toMatchObject({
       status: "done",
+    });
+    const protectedProfitProof = buildWeb3ProfitProofReadiness({
+      promotedHealth: {
+        status: "blocked",
+        updated_at: new Date().toISOString(),
+        runner_id: "protected-proof-test",
+        summary: "Promotion guard blocked after missed target runs.",
+        promotion_permission: "blocked",
+        supervisor_status: "not-run",
+        net_pnl_usd: 0,
+        posted_ticks: 0,
+        blocked_ticks: 0,
+        profit_target_hit: false,
+        loss_brake_tripped: false,
+        run_count: 3,
+        total_net_pnl_usd: 33,
+        average_net_pnl_usd: 11,
+        target_hit_rate_pct: 33.33,
+        recent_runs: [
+          { finished_at: new Date().toISOString(), status: "target-hit", promotion_permission: "selective-paper", supervisor_status: "completed", net_pnl_usd: 33, posted_ticks: 2, blocked_ticks: 0, profit_target_hit: true, loss_brake_tripped: false },
+          { finished_at: new Date().toISOString(), status: "blocked", promotion_permission: "blocked", supervisor_status: "not-run", net_pnl_usd: 0, posted_ticks: 0, blocked_ticks: 0, profit_target_hit: false, loss_brake_tripped: false },
+          { finished_at: new Date().toISOString(), status: "blocked", promotion_permission: "blocked", supervisor_status: "not-run", net_pnl_usd: 0, posted_ticks: 0, blocked_ticks: 0, profit_target_hit: false, loss_brake_tripped: false },
+        ],
+        run_memory_status: "protect-paper",
+        run_memory_score: 34,
+        recommended_supervisor_round_cap: 0,
+        memory_next_action: "Protect paper capital; run proof-only or one manual review cycle before more supervised ticks.",
+        live_execution_permission: "blocked",
+        wallet_mutation_permission: "blocked",
+      },
+    });
+    expect(protectedProfitProof).toMatchObject({
+      status: "blocked",
+      promoted_recent_positive_count: 1,
+      promoted_recent_loss_count: 2,
+      can_satisfy_profit_gate: false,
+    });
+    expect(protectedProfitProof.proof_plan).toMatchObject({
+      status: "blocked",
+      observed_recent_positive_runs: 1,
+      remaining_promoted_runs: 0,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
     });
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);

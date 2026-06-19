@@ -79,8 +79,8 @@ export function buildWeb3ProfitProofReadiness({
   const averagePnl = roundMoney(promotedHealth?.average_net_pnl_usd ?? 0);
   const hitRate = roundMoney(promotedHealth?.target_hit_rate_pct ?? 0);
   const recent = promotedHealth?.recent_runs ?? [];
-  const recentPositiveCount = recent.filter((run) => run.net_pnl_usd >= 0 && !run.loss_brake_tripped).length;
-  const recentLossCount = recent.filter((run) => run.net_pnl_usd < 0 || run.loss_brake_tripped).length;
+  const recentPositiveCount = recent.filter((run) => run.net_pnl_usd > 0 && run.profit_target_hit && !run.loss_brake_tripped).length;
+  const recentLossCount = recent.filter((run) => run.net_pnl_usd < 0 || run.loss_brake_tripped || !run.profit_target_hit).length;
   const lossBrakeTripped = promotedHealth?.loss_brake_tripped === true || recent.some((run) => run.loss_brake_tripped);
   const memoryProtecting = memoryStatus === "protect-paper" || memoryStatus === "stand-down";
   const enoughSample = runCount >= 3;
