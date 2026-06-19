@@ -15562,7 +15562,7 @@ function buildWeb3TradingState({
 }
 
 async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLike): Promise<Web3TradingState> {
-  const plans = await buildExecutionPlans(state.market, state.signals, state.execution_readiness, fetchImpl);
+  const plans = await buildExecutionPlans(state.market, state.signals, state.portfolio, state.execution_readiness, fetchImpl);
   const profit_optimizer = reconcileOptimizerFills(
     buildProfitOptimizer(
       state.market,
@@ -20885,6 +20885,7 @@ function isConfirmationStatus(value: unknown): value is ExecutionAuditEntry["con
 async function buildExecutionPlans(
   market: MemecoinMarket[],
   signals: TradingSignal[],
+  portfolio: TradingPortfolio,
   readiness: ExecutionReadiness,
   fetchImpl: FetchLike,
 ): Promise<ExecutionPlan[]> {
@@ -20905,7 +20906,12 @@ async function buildExecutionPlans(
       return quoteJupiterPlan(token, signal, readiness, fetchImpl);
     }),
   );
-  return plans.filter((plan): plan is ExecutionPlan => plan !== null);
+  const sellPlans = await Promise.all(
+    protectiveSellCandidates(market, portfolio)
+      .slice(0, 3)
+      .map(({ position, token }) => quoteJupiterSellPlan(token, position, readiness, fetchImpl)),
+  );
+  return [...plans, ...sellPlans].filter((plan): plan is ExecutionPlan => plan !== null);
 }
 
 function buildLocalExecutionPlans(
@@ -20995,6 +21001,86 @@ async function quoteJupiterPlan(
   }
 }
 
+async function quoteJupiterSellPlan(
+  token: MemecoinMarket,
+  position: TradingPosition,
+  readiness: ExecutionReadiness,
+  fetchImpl: FetchLike,
+): Promise<ExecutionPlan> {
+  if (token.chain !== "solana") {
+    return localPositionSellPlan(token, position, readiness, "unsupported-chain", "Jupiter sell quote planning is only available for Solana tokens.");
+  }
+  const size = cappedSellSize(position, readiness);
+  const amountRaw = triggerOrderInputAmountRaw(position, size, token);
+  if (size <= 0 || !amountRaw) {
+    return localPositionSellPlan(token, position, readiness, "blocked", "Position sizing returned zero, so no sell quote was requested.");
+  }
+  const params = new URLSearchParams({
+    inputMint: token.token_address,
+    outputMint: USDC_MINT,
+    amount: amountRaw,
+    slippageBps: String(readiness.config.max_slippage_bps),
+    swapMode: "ExactIn",
+  });
+
+  try {
+    const response = await fetchImpl(`${JUPITER_QUOTE_BASE_URL}?${params.toString()}`, {
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) {
+      return localPositionSellPlan(token, position, readiness, "no-route", `Jupiter sell quote failed with ${response.status}.`);
+    }
+    const quote = await response.json() as {
+      outAmount?: string;
+      priceImpactPct?: string | number;
+      routePlan?: Array<{ swapInfo?: { label?: string; ammKey?: string } }>;
+      contextSlot?: number;
+      timeTaken?: number;
+      quotedAt?: string;
+      error?: string;
+    };
+    if (quote.error || !quote.outAmount) {
+      return localPositionSellPlan(token, position, readiness, "no-route", quote.error ?? "Jupiter returned no sell output amount.");
+    }
+    const routeLabel = quote.routePlan?.map((route) => route.swapInfo?.label).filter(Boolean).join(" / ") || "Jupiter route";
+    const dryRun = await buildJupiterDryRun(token, size, amountRaw, readiness, fetchImpl, token.token_address, USDC_MINT);
+    const quotedAt = typeof quote.quotedAt === "string" && Number.isFinite(Date.parse(quote.quotedAt))
+      ? quote.quotedAt
+      : new Date().toISOString();
+    return {
+      id: `plan-sell-${token.id}`,
+      token_id: token.id,
+      symbol: token.symbol,
+      side: "sell",
+      source: "jupiter",
+      status: "quoted",
+      input_mint: token.token_address,
+      output_mint: USDC_MINT,
+      input_amount_usd: size,
+      input_amount_raw: amountRaw,
+      estimated_output_raw: quote.outAmount,
+      price_impact_pct: numberOrNull(quote.priceImpactPct),
+      quoted_at: quotedAt,
+      quote_context_slot: typeof quote.contextSlot === "number" ? quote.contextSlot : null,
+      quote_time_taken_seconds: typeof quote.timeTaken === "number" ? roundQuoteSeconds(quote.timeTaken) : null,
+      slippage_bps: readiness.config.max_slippage_bps,
+      route_label: routeLabel,
+      gate: "would-block-live",
+      message: "Read-only Jupiter sell quote found for a held position. Signing and swap submission remain blocked.",
+      capped_by_risk_usd: size,
+      dry_run: dryRun,
+    };
+  } catch (error) {
+    return localPositionSellPlan(
+      token,
+      position,
+      readiness,
+      "no-route",
+      error instanceof Error ? error.message : "Jupiter sell quote failed.",
+    );
+  }
+}
+
 function localPlan(
   token: MemecoinMarket,
   signal: TradingSignal,
@@ -21003,15 +21089,16 @@ function localPlan(
   message: string,
 ): ExecutionPlan {
   const size = cappedTradeSize(signal.suggested_size_usd, readiness);
+  const side = signal.action === "sell" ? "sell" : "buy";
   return {
     id: `plan-${token.id}`,
     token_id: token.id,
     symbol: token.symbol,
-    side: signal.action === "sell" ? "sell" : "buy",
+    side,
     source: "local-gate",
     status,
-    input_mint: token.chain === "solana" ? USDC_MINT : null,
-    output_mint: token.chain === "solana" ? token.token_address : null,
+    input_mint: token.chain === "solana" ? side === "sell" ? token.token_address : USDC_MINT : null,
+    output_mint: token.chain === "solana" ? side === "sell" ? USDC_MINT : token.token_address : null,
     input_amount_usd: size,
     input_amount_raw: size > 0 ? String(size * 1_000_000) : null,
     estimated_output_raw: null,
@@ -21026,6 +21113,64 @@ function localPlan(
     capped_by_risk_usd: size,
     dry_run: dryRunBlocked(readiness),
   };
+}
+
+function localPositionSellPlan(
+  token: MemecoinMarket,
+  position: TradingPosition,
+  readiness: ExecutionReadiness,
+  status: ExecutionPlan["status"],
+  message: string,
+): ExecutionPlan {
+  const size = cappedSellSize(position, readiness);
+  return {
+    id: `plan-sell-${token.id}`,
+    token_id: token.id,
+    symbol: token.symbol,
+    side: "sell",
+    source: "local-gate",
+    status,
+    input_mint: token.chain === "solana" ? token.token_address : null,
+    output_mint: token.chain === "solana" ? USDC_MINT : null,
+    input_amount_usd: size,
+    input_amount_raw: triggerOrderInputAmountRaw(position, size, token),
+    estimated_output_raw: null,
+    price_impact_pct: null,
+    quoted_at: null,
+    quote_context_slot: null,
+    quote_time_taken_seconds: null,
+    slippage_bps: readiness.config.max_slippage_bps,
+    route_label: "No live sell route",
+    gate: "paper-only",
+    message,
+    capped_by_risk_usd: size,
+    dry_run: dryRunBlocked(readiness),
+  };
+}
+
+function protectiveSellCandidates(market: MemecoinMarket[], portfolio: TradingPortfolio) {
+  const byId = new Map(market.map((token) => [token.id, token]));
+  const bySymbol = new Map(market.map((token) => [token.symbol.toUpperCase(), token]));
+  return portfolio.open_positions
+    .flatMap((position) => {
+      const token = byId.get(position.token_id) ?? bySymbol.get(position.symbol.toUpperCase());
+      return token && position.value_usd > 0 ? [{ position, token }] : [];
+    })
+    .sort((a, b) => protectiveSellPressure(b.position, b.token) - protectiveSellPressure(a.position, a.token));
+}
+
+function protectiveSellPressure(position: TradingPosition, token: MemecoinMarket) {
+  const stopGapPct = position.mark_price_usd > 0
+    ? ((position.mark_price_usd - position.trailing_stop_price_usd) / position.mark_price_usd) * 100
+    : 100;
+  const breakdownPressure = token.price_change_5m_pct < -2 || token.price_change_1h_pct < -6 ? 45 : 0;
+  const profitPressure = position.pnl_pct >= position.take_profit_pct * 0.5 ? 25 : 0;
+  const stopPressure = stopGapPct <= 6 ? 35 : stopGapPct <= 12 ? 15 : 0;
+  return position.value_usd * 0.01 + breakdownPressure + profitPressure + stopPressure + Math.max(0, -position.pnl_usd) * 0.02;
+}
+
+function cappedSellSize(position: TradingPosition, readiness: ExecutionReadiness): number {
+  return Math.max(0, Math.floor(Math.min(position.value_usd, readiness.config.max_trade_usd)));
 }
 
 export async function fetchDexScreenerMarkets(
@@ -21214,7 +21359,8 @@ function buildPortfolio(market: MemecoinMarket[]): TradingPortfolio {
     { id: "pos-popcat", token_id: "popcat-sol", symbol: "POPCAT", quantity: 4_600, entry_price_usd: 0.83, stop_loss_pct: -10, take_profit_pct: 20 },
   ];
   const open_positions = positionInputs.flatMap((position) => {
-    const token = market.find((item) => item.id === position.token_id);
+    const token = market.find((item) => item.id === position.token_id)
+      ?? market.find((item) => item.symbol.toUpperCase() === position.symbol.toUpperCase());
     if (!token) return [];
     const mark = token?.price_usd ?? position.entry_price_usd;
     const peak = Math.max(position.entry_price_usd, mark);
@@ -21384,6 +21530,8 @@ async function buildJupiterDryRun(
   amountRaw: string,
   readiness: ExecutionReadiness,
   fetchImpl: FetchLike,
+  inputMint = USDC_MINT,
+  outputMint = token.token_address,
 ): Promise<ExecutionPlan["dry_run"]> {
   if (readiness.config.mode !== "dry-run") {
     return {
@@ -21440,8 +21588,8 @@ async function buildJupiterDryRun(
   }
 
   const params = new URLSearchParams({
-    inputMint: USDC_MINT,
-    outputMint: token.token_address,
+    inputMint,
+    outputMint,
     amount: amountRaw,
     taker: readiness.config.wallet_public_key,
     slippageBps: String(readiness.config.max_slippage_bps),
