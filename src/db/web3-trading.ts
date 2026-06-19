@@ -8393,6 +8393,11 @@ export type WalletHoldingsAdapter = {
   scan_scope: "all-spl-token-accounts";
   wallet_public_key: string | null;
   rpc_configured: boolean;
+  asset_index_status: "not-configured" | "ready" | "skipped" | "blocked";
+  asset_index_count: number | null;
+  asset_index_fungible_count: number | null;
+  asset_index_priced_count: number | null;
+  asset_index_priced_value_usd: number | null;
   matched_position_count: number;
   token_account_count: number;
   priced_wallet_mint_count: number;
@@ -8616,6 +8621,7 @@ export type LiveWalletAccountingReadinessCheck = {
   id:
     | "wallet-scope"
     | "rpc"
+    | "asset-index"
     | "holdings-sync"
     | "pricing-coverage"
     | "portfolio-application"
@@ -8633,6 +8639,11 @@ export type LiveWalletAccountingReadiness = {
   readiness_score: number;
   wallet_public_key: string | null;
   rpc_configured: boolean;
+  asset_index_status: WalletHoldingsAdapter["asset_index_status"];
+  asset_index_count: number | null;
+  asset_index_fungible_count: number | null;
+  asset_index_priced_count: number | null;
+  asset_index_priced_value_usd: number | null;
   holdings_status: WalletHoldingsAdapter["status"];
   matched_position_count: number;
   token_account_count: number;
@@ -21524,7 +21535,7 @@ async function relayViaSolanaRpc(
   }
 }
 
-async function solanaRpc(fetchImpl: FetchLike, endpoint: string, method: string, params: unknown[]) {
+async function solanaRpc(fetchImpl: FetchLike, endpoint: string, method: string, params: unknown[] | Record<string, unknown>) {
   const response = await fetchImpl(endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -21532,6 +21543,8 @@ async function solanaRpc(fetchImpl: FetchLike, endpoint: string, method: string,
   });
   const body = await safeJson(response);
   if (!response.ok) throw new Error(`Solana RPC ${method} failed with ${response.status}.`);
+  const rpcMessage = body ? rpcErrorMessage(body) : null;
+  if (rpcMessage) throw new Error(`Solana RPC ${method} returned ${rpcMessage}.`);
   return body ?? {};
 }
 
@@ -21561,6 +21574,14 @@ function rpcErrorMessage(value: Record<string, any>) {
 
 function solanaRpcUrl() {
   return process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || null;
+}
+
+function isHeliusRpcEndpoint(value: string) {
+  try {
+    return new URL(value).hostname.endsWith("helius-rpc.com");
+  } catch {
+    return false;
+  }
 }
 
 async function resolveTokenDecimals(
@@ -22292,6 +22313,7 @@ async function buildReadOnlyWalletHoldingsAdapter(
         ...idleWalletHoldingsAdapter(wallet),
         status: "blocked",
         rpc_configured: false,
+        asset_index_status: "not-configured",
         summary: "Wallet holdings were not read because Solana RPC is not configured.",
         next_action: "Configure SOLANA_RPC_URL for read-only wallet balance monitoring.",
         blockers: ["Solana RPC endpoint is not configured."],
@@ -22304,6 +22326,7 @@ async function buildReadOnlyWalletHoldingsAdapter(
 
   try {
     const accounts = await fetchWalletTokenBalances(wallet, fetchImpl);
+    const assetIndex = await fetchHeliusWalletAssetIndex(wallet, fetchImpl);
     const priced = await augmentMarketWithWalletHoldings(market, accounts, fetchImpl);
     const augmentedMarket = priced.market;
     const byMint = new Map(augmentedMarket.map((token) => [token.token_address.toLowerCase(), token]));
@@ -22348,6 +22371,11 @@ async function buildReadOnlyWalletHoldingsAdapter(
       scan_scope: "all-spl-token-accounts",
       wallet_public_key: wallet,
       rpc_configured: true,
+      asset_index_status: assetIndex.status,
+      asset_index_count: assetIndex.asset_count,
+      asset_index_fungible_count: assetIndex.fungible_count,
+      asset_index_priced_count: assetIndex.priced_count,
+      asset_index_priced_value_usd: assetIndex.priced_value_usd,
       matched_position_count: positions.length,
       token_account_count: accounts.length,
       priced_wallet_mint_count: matchedMints.size,
@@ -22355,8 +22383,8 @@ async function buildReadOnlyWalletHoldingsAdapter(
       total_value_usd: roundMetric(items.reduce((sum, item) => sum + item.value_usd, 0)),
       portfolio_applied: portfolio !== null,
       summary: positions.length > 0
-        ? `Read ${positions.length} priced wallet holding${positions.length === 1 ? "" : "s"} from ${accounts.length} SPL token account${accounts.length === 1 ? "" : "s"} without signing authority.`
-        : "Wallet SPL token accounts were read, but none matched a priced Solana DEX market yet.",
+        ? `Read ${positions.length} priced wallet holding${positions.length === 1 ? "" : "s"} from ${accounts.length} SPL token account${accounts.length === 1 ? "" : "s"} without signing authority. ${assetIndex.summary}`
+        : `Wallet SPL token accounts were read, but none matched a priced Solana DEX market yet. ${assetIndex.summary}`,
       next_action: positions.length > 0
         ? "Use read-only wallet balances for position protection and dry-run route rehearsal."
         : "Keep paper seed positions until a wallet-held token has live DEX pricing.",
@@ -22387,6 +22415,31 @@ type WalletTokenAccountBalance = {
   quantity: number;
   decimals: number;
   tokenAccount: string | null;
+};
+
+type WalletAssetIndexSnapshot = {
+  status: WalletHoldingsAdapter["asset_index_status"];
+  asset_count: number | null;
+  fungible_count: number | null;
+  priced_count: number | null;
+  priced_value_usd: number | null;
+  summary: string;
+};
+
+type HeliusWalletAssetItem = {
+  interface?: string;
+  token_info?: {
+    price_info?: {
+      total_price?: number;
+    };
+  };
+};
+
+type HeliusWalletAssetResponse = {
+  result?: {
+    total?: number;
+    items?: HeliusWalletAssetItem[];
+  };
 };
 
 async function fetchWalletTokenBalances(
@@ -22420,6 +22473,65 @@ async function fetchWalletTokenBalances(
     byMint.set(key, current);
   }
   return [...byMint.values()];
+}
+
+async function fetchHeliusWalletAssetIndex(
+  wallet: string,
+  fetchImpl: FetchLike,
+): Promise<WalletAssetIndexSnapshot> {
+  const endpoint = solanaRpcUrl();
+  if (!endpoint || !isHeliusRpcEndpoint(endpoint)) {
+    return {
+      status: endpoint ? "skipped" : "not-configured",
+      asset_count: null,
+      fungible_count: null,
+      priced_count: null,
+      priced_value_usd: null,
+      summary: endpoint
+        ? "Helius DAS asset index skipped because the configured RPC endpoint is not Helius."
+        : "Helius DAS asset index skipped because Solana RPC is not configured.",
+    };
+  }
+
+  try {
+    const response = await solanaRpc(fetchImpl, endpoint, "getAssetsByOwner", {
+      ownerAddress: wallet,
+      page: 1,
+      limit: 10,
+      displayOptions: {
+        showFungible: true,
+        showNativeBalance: true,
+      },
+    }) as HeliusWalletAssetResponse;
+    const result = response.result && typeof response.result === "object" ? response.result : null;
+    const items = Array.isArray(result?.items) ? result.items : [];
+    const total = typeof result?.total === "number" ? result.total : items.length;
+    const fungible = items.filter((item) => {
+      const iface = typeof item.interface === "string" ? item.interface.toLowerCase() : "";
+      return iface.includes("fungible") || Boolean(item.token_info);
+    });
+    const priced = fungible
+      .map((item) => item.token_info?.price_info?.total_price)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+    const pricedValue = roundMetric(priced.reduce((sum, value) => sum + value, 0));
+    return {
+      status: "ready",
+      asset_count: total,
+      fungible_count: fungible.length,
+      priced_count: priced.length,
+      priced_value_usd: pricedValue,
+      summary: `Helius DAS indexed ${total} wallet asset${total === 1 ? "" : "s"} on page 1, including ${fungible.length} fungible token${fungible.length === 1 ? "" : "s"} and ${priced.length} priced asset${priced.length === 1 ? "" : "s"}.`,
+    };
+  } catch (error) {
+    return {
+      status: "blocked",
+      asset_count: null,
+      fungible_count: null,
+      priced_count: null,
+      priced_value_usd: null,
+      summary: error instanceof Error ? error.message : "Helius DAS asset index failed before returning a read-only wallet snapshot.",
+    };
+  }
 }
 
 async function augmentMarketWithWalletHoldings(
@@ -22498,6 +22610,11 @@ function idleWalletHoldingsAdapter(wallet: string | null): WalletHoldingsAdapter
     scan_scope: "all-spl-token-accounts",
     wallet_public_key: wallet,
     rpc_configured: Boolean(solanaRpcUrl()),
+    asset_index_status: solanaRpcUrl() ? "skipped" : "not-configured",
+    asset_index_count: null,
+    asset_index_fungible_count: null,
+    asset_index_priced_count: null,
+    asset_index_priced_value_usd: null,
     matched_position_count: 0,
     token_account_count: 0,
     priced_wallet_mint_count: 0,
@@ -22559,6 +22676,7 @@ function buildLiveWalletAccountingReadiness({
   const blockers = [
     !walletScoped ? "Configure a valid public wallet key before live wallet accounting can be trusted." : null,
     !walletHoldings.rpc_configured ? "Configure SOLANA_RPC_URL so the app can read wallet token accounts directly." : null,
+    walletHoldings.asset_index_status === "blocked" ? "Helius DAS asset index proof is blocked; retry the read-only wallet asset snapshot before trusting provider coverage." : null,
     walletHoldings.status === "blocked" ? walletHoldings.blockers[0] ?? "Read-only wallet holdings scan is blocked." : null,
     walletHoldings.status === "idle" && walletScoped && walletHoldings.rpc_configured ? "Run a live DEX/RPC wallet holdings sync before trusting wallet PnL." : null,
     walletHoldings.unpriced_token_account_count > 0 ? `Price or explicitly review ${walletHoldings.unpriced_token_account_count} unpriced wallet token account${walletHoldings.unpriced_token_account_count === 1 ? "" : "s"} before trusting live PnL.` : null,
@@ -22579,6 +22697,16 @@ function buildLiveWalletAccountingReadiness({
       label: "RPC read",
       status: walletHoldings.rpc_configured ? "pass" : "fail",
       detail: walletHoldings.rpc_configured ? "Solana RPC is configured for read-only token-account reads." : "Solana RPC is not configured.",
+    },
+    {
+      id: "asset-index",
+      label: "Asset index",
+      status: walletHoldings.asset_index_status === "ready" ? "pass" : walletHoldings.asset_index_status === "blocked" ? "fail" : "watch",
+      detail: walletHoldings.asset_index_status === "ready"
+        ? `Helius DAS indexed ${walletHoldings.asset_index_count ?? 0} wallet asset${walletHoldings.asset_index_count === 1 ? "" : "s"} on page 1; ${walletHoldings.asset_index_fungible_count ?? 0} fungible, ${walletHoldings.asset_index_priced_count ?? 0} priced, ${formatCompactValue(walletHoldings.asset_index_priced_value_usd ?? 0)} priced value.`
+        : walletHoldings.asset_index_status === "blocked"
+          ? "Helius DAS wallet asset index proof failed."
+          : "Helius DAS wallet asset index proof is optional unless the configured wallet provider is Helius.",
     },
     {
       id: "holdings-sync",
@@ -22646,6 +22774,11 @@ function buildLiveWalletAccountingReadiness({
     readiness_score: readinessScore,
     wallet_public_key: walletHoldings.wallet_public_key,
     rpc_configured: walletHoldings.rpc_configured,
+    asset_index_status: walletHoldings.asset_index_status,
+    asset_index_count: walletHoldings.asset_index_count,
+    asset_index_fungible_count: walletHoldings.asset_index_fungible_count,
+    asset_index_priced_count: walletHoldings.asset_index_priced_count,
+    asset_index_priced_value_usd: walletHoldings.asset_index_priced_value_usd,
     holdings_status: walletHoldings.status,
     matched_position_count: walletHoldings.matched_position_count,
     token_account_count: walletHoldings.token_account_count,
@@ -22663,6 +22796,7 @@ function buildLiveWalletAccountingReadiness({
     next_action: blockers[0] ?? liveWalletAccountingNextAction(status),
     controls: [
       "This readiness receipt is read-only accounting evidence; it never signs, submits, approves, transfers, or mutates wallet funds.",
+      "Helius DAS asset index proof is aggregate-only provider coverage for wallet-held assets and does not store raw wallet holdings.",
       "Live PnL is trusted only when a valid wallet, RPC scan, full pricing coverage, and local portfolio mirror all pass.",
       "Settlement and portfolio-mirror evidence can strengthen accounting after an externally signed, confirmed transaction, but still cannot unlock real-capital autonomy.",
     ],

@@ -6731,12 +6731,13 @@ describe("Web3 autonomous trading subsystem", () => {
   test("GIVEN dry-run readiness WHEN Jupiter v2 order returns an unsigned transaction THEN the plan records order metadata only", async () => {
     process.env.JUPITER_API_KEY = "test-key";
     const previousRpcUrl = process.env.SOLANA_RPC_URL;
-    process.env.SOLANA_RPC_URL = "https://solana-rpc.test";
+    const rpcUrl = "https://mainnet.helius-rpc.com/?api-key=test";
+    process.env.SOLANA_RPC_URL = rpcUrl;
     const requestedUrls: string[] = [];
     const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       requestedUrls.push(url);
-      if (url === "https://solana-rpc.test") {
+      if (url === rpcUrl) {
         const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
         if (body.method === "getTokenAccountsByOwner") {
           const selector = body.params?.[1];
@@ -6809,6 +6810,37 @@ describe("Web3 autonomous trading subsystem", () => {
                   },
                 ]
                 : [],
+            },
+          });
+        }
+        if (body.method === "getAssetsByOwner") {
+          return Response.json({
+            jsonrpc: "2.0",
+            id: body.id,
+            result: {
+              total: 9,
+              items: [
+                {
+                  interface: "FungibleToken",
+                  token_info: {
+                    price_info: {
+                      total_price: 2360,
+                    },
+                  },
+                },
+                {
+                  interface: "FungibleToken",
+                  token_info: {
+                    price_info: {
+                      total_price: 600,
+                    },
+                  },
+                },
+                {
+                  interface: "FungibleToken",
+                  token_info: {},
+                },
+              ],
             },
           });
         }
@@ -6947,11 +6979,16 @@ describe("Web3 autonomous trading subsystem", () => {
       url.includes("/tokens/v1/solana/") &&
       url.includes("DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263")
     )).toBe(true);
-    expect(requestedUrls.filter((url) => url === "https://solana-rpc.test").length).toBeGreaterThanOrEqual(2);
+    expect(requestedUrls.filter((url) => url === rpcUrl).length).toBeGreaterThanOrEqual(3);
     expect(state.wallet_holdings_adapter).toMatchObject({
       status: "synced",
       scan_scope: "all-spl-token-accounts",
       rpc_configured: true,
+      asset_index_status: "ready",
+      asset_index_count: 9,
+      asset_index_fungible_count: 3,
+      asset_index_priced_count: 2,
+      asset_index_priced_value_usd: 2960,
       matched_position_count: 2,
       token_account_count: 3,
       priced_wallet_mint_count: 2,
@@ -6964,6 +7001,11 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "pricing-gapped",
       wallet_public_key: "11111111111111111111111111111111",
       rpc_configured: true,
+      asset_index_status: "ready",
+      asset_index_count: 9,
+      asset_index_fungible_count: 3,
+      asset_index_priced_count: 2,
+      asset_index_priced_value_usd: 2960,
       holdings_status: "synced",
       matched_position_count: 2,
       token_account_count: 3,
@@ -6977,6 +7019,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.live_wallet_accounting_readiness.checks.map((check) => check.id)).toEqual([
       "wallet-scope",
       "rpc",
+      "asset-index",
       "holdings-sync",
       "pricing-coverage",
       "portfolio-application",

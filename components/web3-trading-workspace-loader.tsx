@@ -90,10 +90,12 @@ export function Web3TradingWorkspaceLoader({
   initialState,
   initialSupervisorHealth,
   initialPromotedAutopilotHealth,
+  initialLaunchChecklist,
 }: {
   initialState?: Web3TradingState;
   initialSupervisorHealth?: Web3DaemonSupervisorHealth;
   initialPromotedAutopilotHealth?: Web3PromotedPaperAutopilotHealth;
+  initialLaunchChecklist?: Web3AutonomyLaunchChecklist;
 }) {
   const [state, setState] = useState<Web3TradingState | undefined>(initialState);
   const [supervisorHealth, setSupervisorHealth] = useState<Web3DaemonSupervisorHealth | undefined>(initialSupervisorHealth);
@@ -110,8 +112,13 @@ export function Web3TradingWorkspaceLoader({
   const [lastActionOutcome, setLastActionOutcome] = useState<QuickAgentActionOutcome | null>(null);
   const [lastPromotedAutopilot, setLastPromotedAutopilot] = useState<PromotedPaperAutopilotReceipt | null>(null);
   const [focusMode, setFocusMode] = useState<OperatorFocusMode>("cockpit");
+  const [mounted, setMounted] = useState(false);
   const [WorkspaceComponent, setWorkspaceComponent] = useState<ComponentType<{ initialState: Web3TradingState }> | null>(null);
   const [DiagnosticsComponent, setDiagnosticsComponent] = useState<ComponentType<{ state?: Web3TradingState }> | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (state) return;
@@ -707,7 +714,9 @@ export function Web3TradingWorkspaceLoader({
   const daemonHandoff = state.autonomous_daemon_handoff;
   const marketIngestion = state.market_ingestion_plan;
   const marketIntake = state.autonomous_market_intake_plan;
-  const launchChecklist = buildWeb3AutonomyLaunchChecklist(state, promotedAutopilotHealth, supervisorHealth);
+  const launchChecklist = !mounted && initialLaunchChecklist
+    ? initialLaunchChecklist
+    : buildWeb3AutonomyLaunchChecklist(state, promotedAutopilotHealth, supervisorHealth);
   const promotedProofPlan = launchChecklist.profit_proof_readiness.proof_plan;
   const promotedProofLabel = promotedProofPlan.status === "blocked" ? "Proof review" : "Promoted run";
   const sprintTapeItems = state.autonomous_market_evidence_fusion.items.slice(0, 2);

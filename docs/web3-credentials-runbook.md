@@ -54,6 +54,8 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 - Risk policy: keep conservative per-trade caps, daily spend caps, max slippage, paper proof, and kill-switch review ahead of live autonomy.
 - Live cutover: require supervised worker proof, profit proof, signer proof, settlement proof, wallet accounting, and manual live review before real-capital trading.
 
+When the configured Solana RPC endpoint is Helius, live wallet accounting also attempts an aggregate DAS asset-index proof. That proof records asset counts, fungible counts, priced-asset counts, and priced value only; it does not store raw wallet holdings, authorize signing, or unlock live execution.
+
 ## API
 
 The setup UI posts to:

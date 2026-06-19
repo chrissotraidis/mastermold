@@ -261,7 +261,7 @@ export function buildWeb3AutonomyLaunchChecklist(
       label: "Wallet accounting",
       status: walletAccountingPass ? "pass" : walletAccountingWatch ? "watch" : "fail",
       score: walletAccountingPass ? 88 : walletAccountingWatch ? Math.max(42, walletAccounting.readiness_score) : Math.min(28, walletAccounting.readiness_score),
-      detail: `${walletAccounting.status.replaceAll("-", " ")}; ${walletAccounting.matched_position_count} matched positions, ${walletAccounting.unpriced_token_account_count} unpriced accounts, settlement ${walletAccounting.settlement_status.replaceAll("-", " ")}.`,
+      detail: `${walletAccounting.status.replaceAll("-", " ")}; ${walletAccounting.matched_position_count} matched positions, ${walletAccounting.unpriced_token_account_count} unpriced accounts, asset index ${walletAccounting.asset_index_status.replaceAll("-", " ")}, settlement ${walletAccounting.settlement_status.replaceAll("-", " ")}.`,
       blocker: walletAccountingPass ? null : walletAccounting.next_action,
     },
     {
