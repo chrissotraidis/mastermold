@@ -21,6 +21,10 @@ export type Web3AutonomyLaunchChecklistItem = {
     | "relay"
     | "settlement"
     | "kill-switch"
+    | "process-supervision"
+    | "provider-credentials"
+    | "wallet-accounting"
+    | "profit-proof"
     | "live-boundary";
   label: string;
   status: "pass" | "watch" | "fail";
@@ -71,6 +75,8 @@ export function buildWeb3AutonomyLaunchChecklist(
   const custody = state.autonomous_custody_mandate;
   const signer = state.autonomous_signer_ops;
   const routeRefresh = state.autonomous_route_refresh_execution;
+  const daemon = state.autonomous_daemon_handoff;
+  const walletHoldings = state.wallet_holdings_adapter;
   const killSwitchFail = state.execution_readiness.checks.some((check) => check.id === "kill-switch" && check.status === "fail");
   const memoryStatus = promotedHealth?.run_memory_status ?? "learning";
   const promotedRunCount = promotedHealth?.run_count ?? 0;
@@ -87,6 +93,14 @@ export function buildWeb3AutonomyLaunchChecklist(
   const signerPass = signer.can_request_signature && signer.status !== "blocked" && custody.status === "armed";
   const relayPass = relay.status === "ready" || relay.status === "relayed" || relay.status === "confirmed";
   const settlementPass = lifecycle.status === "confirming" || lifecycle.items.some((item) => item.stage === "landed");
+  const processSupervisionPass = daemon.status === "ready" && daemon.can_issue_tick && daemon.can_trade_real_capital;
+  const processSupervisionWatch = daemon.status === "ready" && daemon.can_issue_tick;
+  const providerCredentialsPass = custody.status === "armed" && signer.can_request_signature && signer.provider_adapter.credential_configured;
+  const providerCredentialsWatch = custody.status === "bounded-ready" || signer.ready_count > 0 || signer.can_request_signature;
+  const walletAccountingPass = walletHoldings.status === "synced" && walletHoldings.portfolio_applied && walletHoldings.matched_position_count > 0;
+  const walletAccountingWatch = walletHoldings.rpc_configured && Boolean(walletHoldings.wallet_public_key);
+  const profitProofPass = promotedMemoryPass && paperProfit.making_money && paperProfit.accountability_score >= 70;
+  const profitProofWatch = paperProfit.net_pnl_usd >= 0 || promotedRunCount > 0;
   const liveBoundaryPass = !liveReadiness.can_trade_real_capital && !state.execution_gate.live_execution_enabled;
 
   const items: Web3AutonomyLaunchChecklistItem[] = [
@@ -171,6 +185,38 @@ export function buildWeb3AutonomyLaunchChecklist(
       blocker: killSwitchFail ? "Turn the kill switch off only after the live-capital path has been audited." : null,
     },
     {
+      id: "process-supervision",
+      label: "Process supervision",
+      status: processSupervisionPass ? "pass" : processSupervisionWatch ? "watch" : "fail",
+      score: processSupervisionPass ? 92 : processSupervisionWatch ? 58 : 18,
+      detail: `${daemon.status.replaceAll("-", " ")} ${daemon.runner_role.replaceAll("-", " ")}; lease ${daemon.lease_status.replaceAll("-", " ")}; live-capital runner ${daemon.can_trade_real_capital ? "allowed" : "blocked"}.`,
+      blocker: processSupervisionPass ? null : "Install and monitor a production worker with lease renewal, crash recovery, circuit breakers, and explicit real-capital authority.",
+    },
+    {
+      id: "provider-credentials",
+      label: "Provider credentials",
+      status: providerCredentialsPass ? "pass" : providerCredentialsWatch ? "watch" : "fail",
+      score: providerCredentialsPass ? 90 : providerCredentialsWatch ? 56 : 16,
+      detail: `${signer.active_provider.replaceAll("-", " ")} credentials ${signer.provider_adapter.credential_configured ? "configured" : "missing"}; custody ${custody.status.replaceAll("-", " ")}; signature ${signer.can_request_signature ? "requestable" : "locked"}.`,
+      blocker: providerCredentialsPass ? null : "Configure reviewed custody/provider credentials, policy ids, wallet scope, and request signing before live-capital review.",
+    },
+    {
+      id: "wallet-accounting",
+      label: "Wallet accounting",
+      status: walletAccountingPass ? "pass" : walletAccountingWatch ? "watch" : "fail",
+      score: walletAccountingPass ? 88 : walletAccountingWatch ? 52 : 14,
+      detail: `${walletHoldings.status.replaceAll("-", " ")} wallet holdings; ${walletHoldings.matched_position_count} matched positions, ${walletHoldings.unpriced_token_account_count} unpriced accounts.`,
+      blocker: walletAccountingPass ? null : "Sync read-only wallet holdings from RPC and reconcile priced token accounts into the portfolio before trusting live PnL.",
+    },
+    {
+      id: "profit-proof",
+      label: "Profit proof",
+      status: profitProofPass ? "pass" : profitProofWatch ? "watch" : "fail",
+      score: profitProofPass ? 92 : profitProofWatch ? 54 : 22,
+      detail: `${formatSignedCompactValue(paperProfit.net_pnl_usd)} paper net; promoted memory ${memoryStatus.replaceAll("-", " ")} across ${promotedRunCount} run${promotedRunCount === 1 ? "" : "s"}.`,
+      blocker: profitProofPass ? null : "Run long-horizon promoted paper proof with positive net PnL, stable drawdown, and repeatable target-hit evidence before live-capital review.",
+    },
+    {
       id: "live-boundary",
       label: "Live boundary",
       status: liveBoundaryPass ? "pass" : liveReadiness.can_trade_real_capital ? "watch" : "fail",
@@ -201,7 +247,15 @@ export function buildWeb3AutonomyLaunchChecklist(
   const remainingWorkCount = remainingWork.length;
   const readinessScore = Math.round(items.reduce((sum, item) => sum + item.score, 0) / Math.max(1, items.length));
   const paperScalePermitted = paperProfit.making_money && marketPass && !promotedMemoryFail && !killSwitchFail && paperProfit.accountability_score >= 70;
-  const liveReviewPermitted = liveReadiness.can_trade_real_capital && hardBlockers.length === 0 && promotedMemoryPass && settlementPass && relayPass;
+  const liveReviewPermitted = liveReadiness.can_trade_real_capital &&
+    hardBlockers.length === 0 &&
+    promotedMemoryPass &&
+    settlementPass &&
+    relayPass &&
+    processSupervisionPass &&
+    providerCredentialsPass &&
+    walletAccountingPass &&
+    profitProofPass;
   const realCapitalBlocked = !liveReviewPermitted;
   const status: Web3AutonomyLaunchChecklistStatus = killSwitchFail || hardBlockers.length >= 3
     ? "blocked"
@@ -230,7 +284,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     controls: [
       "This checklist is a launch-readiness contract; it does not sign, submit, custody funds, or unlock real-capital trading.",
       "Paper scale requires current paper profit proof, market freshness, promoted-run memory that is not protecting, and a clear kill switch.",
-      "Live review requires every signer, relay, settlement, custody, route, and live-boundary proof to pass before a separate executor review.",
+      "Live review requires every signer, relay, settlement, custody, route, process-supervision, provider-credential, wallet-accounting, profit-proof, and live-boundary proof to pass before a separate executor review.",
       "Real-capital autonomy stays blocked unless this checklist reaches manual live review and an external reviewed executor is deliberately enabled.",
     ],
     items,
@@ -240,7 +294,7 @@ export function buildWeb3AutonomyLaunchChecklist(
 
 function launchRemainingWorkRank(item: Web3AutonomyLaunchRemainingWorkItem) {
   const priority = item.priority === "required" ? 20 : 8;
-  const liveCapitalGate = ["signer", "relay", "settlement", "custody-policy", "kill-switch"].includes(item.id) ? 8 : 0;
+  const liveCapitalGate = ["signer", "relay", "settlement", "custody-policy", "kill-switch", "process-supervision", "provider-credentials", "wallet-accounting", "profit-proof"].includes(item.id) ? 8 : 0;
   const routeOrMarketGate = item.id === "route-proof" || item.id === "market-feed" ? 6 : 0;
   return priority + liveCapitalGate + routeOrMarketGate;
 }

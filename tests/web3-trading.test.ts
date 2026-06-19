@@ -5476,9 +5476,24 @@ describe("Web3 autonomous trading subsystem", () => {
       "relay",
       "settlement",
       "kill-switch",
+      "process-supervision",
+      "provider-credentials",
+      "wallet-accounting",
+      "profit-proof",
       "live-boundary",
     ]);
+    expect(launchChecklist.items.find((item) => item.id === "process-supervision")?.blocker).toContain("production worker");
+    expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("custody/provider credentials");
+    expect(launchChecklist.items.find((item) => item.id === "wallet-accounting")?.blocker).toContain("wallet holdings");
+    expect(launchChecklist.items.find((item) => item.id === "profit-proof")?.blocker).toContain("long-horizon promoted paper proof");
+    expect(launchChecklist.remaining_work.map((item) => item.id)).toEqual(expect.arrayContaining([
+      "process-supervision",
+      "provider-credentials",
+      "wallet-accounting",
+      "profit-proof",
+    ]));
     expect(launchChecklist.controls.some((control) => control.includes("launch-readiness contract"))).toBe(true);
+    expect(launchChecklist.controls.some((control) => control.includes("process-supervision"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("does not sign"))).toBe(true);
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);
