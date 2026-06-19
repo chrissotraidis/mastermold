@@ -12,6 +12,7 @@ import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/ap
 import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
 import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
+import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wallet-packet/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -1261,6 +1262,81 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.live_execution_permission).toBe("blocked");
     expect(packet.wallet_mutation_permission).toBe("blocked");
     expect(packet.controls.some((control) => control.includes("Private keys"))).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain("test-helius-secret");
+    expect(JSON.stringify(packet)).not.toContain("test-jupiter-secret");
+  });
+
+  test("GIVEN the operator wallet gate is reviewed WHEN the dedicated wallet packet route runs THEN it rejects sample scope and keeps wallet authority blocked", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.SOLANA_RPC_URL = "https://example-rpc.invalid";
+    process.env.JUPITER_API_KEY = "test-jupiter-secret";
+
+    const rejected = await DEDICATED_WALLET_PACKET_GET(new Request("http://localhost/api/web3-dedicated-wallet-packet?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await DEDICATED_WALLET_PACKET_GET(new Request("http://localhost/api/web3-dedicated-wallet-packet?scenario=base&source=sample&account=ephemeral&cycles=1"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      wallet_public_key_preview: string | null;
+      wallet_scoped: boolean;
+      wallet_is_sample: boolean;
+      dedicated_wallet_scoped: boolean;
+      sample_wallet_rejected: boolean;
+      wallet_ownership_proved: boolean;
+      read_provider_configured: boolean;
+      jupiter_configured: boolean;
+      strict_verifier_command: string;
+      missing_required: string[];
+      steps: Array<{ id: string; label: string; status: string; detail: string; next_action: string }>;
+      setup_links: Array<{ label: string; url: string; detail: string }>;
+      public_address_storage: string;
+      ownership_proof_storage: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      signing_permission: string;
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-dedicated-wallet-packet");
+    expect(["missing-wallet", "sample-wallet", "ownership-needed", "strict-verifier-ready", "review-ready"]).toContain(packet.status);
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.wallet_scoped).toBe(true);
+    expect(packet.wallet_is_sample).toBe(true);
+    expect(packet.dedicated_wallet_scoped).toBe(false);
+    expect(packet.sample_wallet_rejected).toBe(true);
+    expect(packet.wallet_ownership_proved).toBe(false);
+    expect(packet.read_provider_configured).toBe(true);
+    expect(packet.jupiter_configured).toBe(true);
+    expect(packet.strict_verifier_command).toContain("--require-operator-wallet");
+    expect(packet.missing_required).toContain("Dedicated public Solana trading wallet");
+    expect(packet.missing_required).toContain("Replace sample all-ones wallet");
+    expect(packet.steps.map((step) => step.id)).toEqual([
+      "create-wallet",
+      "enter-public-address",
+      "reject-sample-wallet",
+      "prove-ownership",
+      "run-strict-verifier",
+      "keep-secrets-out",
+    ]);
+    expect(packet.steps.find((step) => step.id === "reject-sample-wallet")?.status).toBe("blocked");
+    expect(packet.setup_links.some((link) => link.url === "https://solana.com/wallets")).toBe(true);
+    expect(packet.public_address_storage).toBe("browser-safe-public-scope");
+    expect(packet.ownership_proof_storage).toBe("hash-only-local-receipt");
+    expect(packet.private_key_storage).toBe("blocked");
+    expect(packet.seed_phrase_storage).toBe("blocked");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(packet.signing_permission).toBe("blocked");
+    expect(packet.transaction_submission_permission).toBe("blocked");
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.controls.some((control) => control.includes("sample all-ones wallet"))).toBe(true);
     expect(JSON.stringify(packet)).not.toContain("test-helius-secret");
     expect(JSON.stringify(packet)).not.toContain("test-jupiter-secret");
   });

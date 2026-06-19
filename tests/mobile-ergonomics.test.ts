@@ -808,6 +808,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Swap V2 docs");
     expect(settingsPage).toContain("--require-jupiter-order");
     expect(settingsPage).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
+    expect(settingsPage).toContain("buildWeb3DedicatedWalletPacket");
+    expect(settingsPage).toContain("SettingsDedicatedWalletPacketPanel");
+    expect(settingsPage).toContain("Dedicated wallet packet");
+    expect(settingsPage).toContain("Sample wallet rejected");
+    expect(settingsPage).toContain("Public address only");
+    expect(settingsPage).toContain("--require-operator-wallet");
     expect(settingsPage).toContain("SettingsCredentialDoctorPanel");
     expect(settingsPage).toContain("Credential doctor receipt");
     expect(settingsPage).toContain("npm run doctor:web3 -- --json");
@@ -931,6 +937,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-account-setup.ts")).toContain("wallet_is_sample");
     expect(source("src/db/web3-account-setup.ts")).toContain("dedicated_wallet_scoped");
     expect(source("src/db/web3-account-setup.ts")).toContain("sample all-ones wallet is allowed for demos");
+    expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("web3-dedicated-wallet-packet");
+    expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("sample all-ones wallet");
+    expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--require-operator-wallet");
+    expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("private_key_storage: \"blocked\"");
+    expect(source("app/api/web3-dedicated-wallet-packet/route.ts")).toContain("buildWeb3DedicatedWalletPacket");
     expect(source("src/db/web3-provider-credentials.ts")).toContain("demo-only and cannot satisfy operator wallet scope");
     expect(source("components/web3-trading-workspace-loader.tsx")).toContain("demo-only");
     expect(settingsPage).toContain("jupiterConfigured={receipt.environment_summary.jupiter_configured}");
@@ -946,6 +957,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("browser-wallet public-address detection");
     expect(source("docs/web3-credentials-runbook.md")).toContain("POST /api/web3-wallet-ownership");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dex-discovery");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dedicated-wallet-packet");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Dedicated wallet packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-capital-preflight");
     expect(source("docs/web3-credentials-runbook.md")).toContain("launch-blocker queue");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Operator input packet");
