@@ -61,6 +61,22 @@ export type Web3AutonomyCutoverRunwayStep = {
   blocks_live_capital: boolean;
 };
 
+export type Web3AutonomyLaunchResearchDecision = {
+  id:
+    | "provider-stack"
+    | "market-discovery"
+    | "execution-stack"
+    | "signer-custody"
+    | "risk-policy"
+    | "live-cutover";
+  label: string;
+  status: "chosen" | "needs-credential" | "needs-review" | "blocked";
+  decision: string;
+  evidence: string;
+  next_action: string;
+  needs_user_input: string[];
+};
+
 export type Web3AutonomyLaunchChecklist = {
   mode: "web3-autonomy-launch-checklist";
   status: Web3AutonomyLaunchChecklistStatus;
@@ -80,6 +96,7 @@ export type Web3AutonomyLaunchChecklist = {
   production_supervisor_readiness: Web3ProductionSupervisorReadiness;
   profit_proof_readiness: Web3ProfitProofReadiness;
   provider_credentials_readiness: Web3ProviderCredentialsReadiness;
+  research_decisions: Web3AutonomyLaunchResearchDecision[];
   controls: string[];
   items: Web3AutonomyLaunchChecklistItem[];
   remaining_work: Web3AutonomyLaunchRemainingWorkItem[];
@@ -317,6 +334,17 @@ export function buildWeb3AutonomyLaunchChecklist(
     liveReviewPermitted,
   });
   const nextCutoverStep = cutoverRunway.find((step) => step.status !== "done") ?? cutoverRunway[cutoverRunway.length - 1];
+  const researchDecisions = buildResearchDecisions({
+    state,
+    providerCredentials,
+    walletAccounting,
+    productionSupervisor,
+    profitProof,
+    routePass,
+    adapterOrderReady: adapter.swap_v2_order_ready,
+    killSwitchFail,
+    liveReviewPermitted,
+  });
 
   return {
     mode: "web3-autonomy-launch-checklist",
@@ -337,6 +365,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     production_supervisor_readiness: productionSupervisor,
     profit_proof_readiness: profitProof,
     provider_credentials_readiness: providerCredentials,
+    research_decisions: researchDecisions,
     controls: [
       "This checklist is a launch-readiness contract; it does not sign, submit, custody funds, or unlock real-capital trading.",
       "Paper scale requires current paper profit proof, market freshness, promoted-run memory that is not protecting, and a clear kill switch.",
@@ -346,6 +375,117 @@ export function buildWeb3AutonomyLaunchChecklist(
     items,
     remaining_work: remainingWork,
   };
+}
+
+function buildResearchDecisions({
+  state,
+  providerCredentials,
+  walletAccounting,
+  productionSupervisor,
+  profitProof,
+  routePass,
+  adapterOrderReady,
+  killSwitchFail,
+  liveReviewPermitted,
+}: {
+  state: Web3TradingState;
+  providerCredentials: Web3ProviderCredentialsReadiness;
+  walletAccounting: Web3TradingState["live_wallet_accounting_readiness"];
+  productionSupervisor: Web3ProductionSupervisorReadiness;
+  profitProof: Web3ProfitProofReadiness;
+  routePass: boolean;
+  adapterOrderReady: boolean;
+  killSwitchFail: boolean;
+  liveReviewPermitted: boolean;
+}): Web3AutonomyLaunchResearchDecision[] {
+  const rpcConfigured = Boolean(process.env.HELIUS_API_KEY || process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
+  const walletScoped = Boolean(state.execution_readiness.config.wallet_public_key);
+  const jupiterConfigured = Boolean(process.env.JUPITER_API_KEY);
+  const signerChosen = providerCredentials.provider_configured || providerCredentials.credential_configured;
+  const capsReady = state.execution_readiness.config.daily_spend_cap_usd >= state.execution_readiness.config.max_trade_usd &&
+    state.execution_readiness.config.max_slippage_bps <= 250 &&
+    !killSwitchFail;
+
+  return [
+    {
+      id: "provider-stack",
+      label: "Provider stack",
+      status: rpcConfigured ? "chosen" : "needs-credential",
+      decision: "Use Helius/Solana RPC as the first read-only wallet and chain data rail; keep provider keys server-side or one-shot test-only.",
+      evidence: rpcConfigured
+        ? "A Solana RPC credential is present in server scope; responses still redact endpoints and secrets."
+        : "No server-scoped Helius or Solana RPC credential is visible to the launch contract.",
+      next_action: rpcConfigured
+        ? "Use the Wiring credential test to prove RPC health against the target trading wallet."
+        : "Add HELIUS_API_KEY or SOLANA_RPC_URL to the ignored local environment, then test credentials.",
+      needs_user_input: rpcConfigured ? [] : ["Helius API key or Solana RPC URL"],
+    },
+    {
+      id: "market-discovery",
+      label: "Market discovery",
+      status: state.market_source.status === "live" || state.autonomous_market_intake_plan.can_feed_trade_loop ? "chosen" : "needs-review",
+      decision: "Start with the app's live DEX/read-only market intake plus chart and route proof before adding paid discovery feeds.",
+      evidence: `${state.autonomous_market_intake_plan.next_provider} ${state.autonomous_market_intake_plan.next_lane.replaceAll("-", " ")} intake; market source is ${state.market_source.status}.`,
+      next_action: state.market_source.status === "live"
+        ? "Keep live DEX reads read-only and route-gated until wallet/provider scope passes."
+        : "Use Live DEX read from the cockpit to refresh trending memecoin evidence before order rehearsal.",
+      needs_user_input: [],
+    },
+    {
+      id: "execution-stack",
+      label: "Execution stack",
+      status: routePass && adapterOrderReady ? "chosen" : jupiterConfigured ? "needs-review" : "needs-credential",
+      decision: "Use Jupiter quote/order rehearsal as the first execution path, with no signing or submit until manual live review.",
+      evidence: `Route proof ${routePass ? "passes" : "is gated"}; Swap V2 order ${adapterOrderReady ? "ready" : "not ready"}.`,
+      next_action: routePass && adapterOrderReady
+        ? "Continue read-only order rehearsal and landing drills before any live executor review."
+        : jupiterConfigured
+          ? "Run Order rehearsal and npm run landing-drill:web3 to prove the unsigned order path."
+          : "Add JUPITER_API_KEY if Swap V2 order rehearsal is required for the chosen execution lane.",
+      needs_user_input: jupiterConfigured ? [] : ["Jupiter API key"],
+    },
+    {
+      id: "signer-custody",
+      label: "Signer custody",
+      status: providerCredentials.can_satisfy_provider_gate && walletAccounting.can_trust_live_pnl
+        ? "chosen"
+        : signerChosen || walletScoped
+          ? "needs-review"
+          : "needs-credential",
+      decision: "Use a dedicated trading wallet with manual external approval first; never collect private keys in this app.",
+      evidence: `${providerCredentials.status.replaceAll("-", " ")} provider scope; ${walletAccounting.status.replaceAll("-", " ")} wallet accounting.`,
+      next_action: walletScoped
+        ? "Test credentials, then keep signer/custody behind manual review until settlement and accounting pass."
+        : "Provide a public trading-wallet address only; choose external wallet, Privy, Turnkey, or session-key policy later.",
+      needs_user_input: walletScoped ? [] : ["Public trading wallet address", "Signer/custody preference"],
+    },
+    {
+      id: "risk-policy",
+      label: "Risk policy",
+      status: capsReady ? "chosen" : "needs-review",
+      decision: "Keep conservative trade caps, daily spend caps, max slippage, paper proof, and kill switch gates ahead of live autonomy.",
+      evidence: `${formatCompactValue(state.execution_readiness.config.max_trade_usd)} max trade, ${formatCompactValue(state.execution_readiness.config.daily_spend_cap_usd)} daily cap, ${state.execution_readiness.config.max_slippage_bps} bps slippage.`,
+      next_action: capsReady
+        ? "Keep caps conservative while promoted paper proof continues."
+        : "Set daily cap above max trade, keep slippage at or below 250 bps, and clear the kill switch only after review.",
+      needs_user_input: capsReady ? [] : ["Max trade size", "Daily cap", "Max slippage", "Manual kill-switch review"],
+    },
+    {
+      id: "live-cutover",
+      label: "Live cutover",
+      status: liveReviewPermitted
+        ? "needs-review"
+        : productionSupervisor.status === "blocked" || profitProof.status === "blocked" || profitProof.status === "drawdown-gated"
+          ? "blocked"
+          : "needs-review",
+      decision: "Do not let the app self-enable real-money trading; require supervised worker proof, profit proof, signer proof, settlement proof, and manual review.",
+      evidence: `${productionSupervisor.status.replaceAll("-", " ")} supervision; ${profitProof.status.replaceAll("-", " ")} profit proof; live review ${liveReviewPermitted ? "ready" : "blocked"}.`,
+      next_action: liveReviewPermitted
+        ? "Move to a separate live-executor review while keeping app-side live execution locked."
+        : "Clear the cutover runway gates in order before requesting manual live-capital review.",
+      needs_user_input: liveReviewPermitted ? ["Explicit live-review approval"] : [],
+    },
+  ];
 }
 
 function buildCutoverRunway({

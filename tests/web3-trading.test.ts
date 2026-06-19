@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
+import { buildWeb3CredentialsSetupReadiness } from "@/src/db/web3-credentials";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
 import {
@@ -26,7 +27,9 @@ import { __resetStoreForTests } from "@/src/db/store";
 let prevDb: string | undefined;
 let prevJupiterKey: string | undefined;
 let prevJupiterTriggerJwt: string | undefined;
+let prevHeliusKey: string | undefined;
 let prevRpcUrl: string | undefined;
+let prevNextPublicRpcUrl: string | undefined;
 let prevPromotedAutopilotPath: string | undefined;
 let prevPromotedAutopilotHistoryPath: string | undefined;
 let prevLiveExecution: string | undefined;
@@ -45,7 +48,9 @@ beforeEach(() => {
   prevDb = process.env.MASTERMOLD_DB;
   prevJupiterKey = process.env.JUPITER_API_KEY;
   prevJupiterTriggerJwt = process.env.JUPITER_TRIGGER_JWT;
+  prevHeliusKey = process.env.HELIUS_API_KEY;
   prevRpcUrl = process.env.SOLANA_RPC_URL;
+  prevNextPublicRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
   prevPromotedAutopilotPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH;
   prevPromotedAutopilotHistoryPath = process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
   prevLiveExecution = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
@@ -65,7 +70,9 @@ beforeEach(() => {
   process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH = join(testRoot, "promoted-autopilot-history.json");
   delete process.env.JUPITER_API_KEY;
   delete process.env.JUPITER_TRIGGER_JWT;
+  delete process.env.HELIUS_API_KEY;
   delete process.env.SOLANA_RPC_URL;
+  delete process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
   delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   delete process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
   delete process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER;
@@ -86,8 +93,12 @@ afterEach(() => {
   else process.env.JUPITER_API_KEY = prevJupiterKey;
   if (prevJupiterTriggerJwt === undefined) delete process.env.JUPITER_TRIGGER_JWT;
   else process.env.JUPITER_TRIGGER_JWT = prevJupiterTriggerJwt;
+  if (prevHeliusKey === undefined) delete process.env.HELIUS_API_KEY;
+  else process.env.HELIUS_API_KEY = prevHeliusKey;
   if (prevRpcUrl === undefined) delete process.env.SOLANA_RPC_URL;
   else process.env.SOLANA_RPC_URL = prevRpcUrl;
+  if (prevNextPublicRpcUrl === undefined) delete process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
+  else process.env.NEXT_PUBLIC_SOLANA_RPC_URL = prevNextPublicRpcUrl;
   if (prevPromotedAutopilotPath === undefined) delete process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH;
   else process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_STATUS_PATH = prevPromotedAutopilotPath;
   if (prevPromotedAutopilotHistoryPath === undefined) delete process.env.WEB3_PROMOTED_PAPER_AUTOPILOT_HISTORY_PATH;
@@ -201,6 +212,43 @@ function withOpenProfitSafety(state: Web3TradingState): Web3TradingState {
 }
 
 describe("Web3 autonomous trading subsystem", () => {
+  test("GIVEN provider wallet and route evidence WHEN Web3 credentials are checked THEN they prepare rehearsal without unlocking live capital", () => {
+    const readiness = buildWeb3CredentialsSetupReadiness({
+      provider: "custom-rpc",
+      rpc_url: "https://mainnet.helius-rpc.com/?api-key=test-key",
+      ws_url: "wss://mainnet.helius-rpc.com/?api-key=test-key",
+      jupiter_api_key: "test-jupiter-key",
+      wallet_public_key: "11111111111111111111111111111111",
+      signer_mode: "external-wallet",
+      max_trade_usd: 250,
+      daily_spend_cap_usd: 1_000,
+      max_slippage_bps: 150,
+      require_manual_confirmation: true,
+    }, {
+      rpc_healthy: true,
+      rpc_detail: "RPC health ok; latest blockhash returned.",
+      wallet_balance_sol: 0.42,
+      wallet_balance_detail: "0.4200 SOL returned by read-only getBalance.",
+      jupiter_quote_ready: true,
+      jupiter_quote_detail: "Jupiter quote route returned for SOL to USDC.",
+      jupiter_order_ready: true,
+      jupiter_order_detail: "Jupiter unsigned order returned with route metadata.",
+    });
+
+    expect(readiness.status).toBe("configured");
+    expect(readiness.rpc_endpoint).toBe("https://mainnet.helius-rpc.com");
+    expect(readiness.websocket_endpoint).toBe("wss://mainnet.helius-rpc.com");
+    expect(readiness.can_support_route_order_rehearsal).toBe(true);
+    expect(readiness.can_support_manual_live_review).toBe(true);
+    expect(readiness.live_execution_permission).toBe("blocked");
+    expect(readiness.wallet_mutation_permission).toBe("blocked");
+    expect(JSON.stringify(readiness)).not.toContain("test-key");
+    expect(readiness.checks.find((check) => check.id === "live-boundary")).toMatchObject({
+      status: "pass",
+      detail: expect.stringContaining("real-capital execution remains blocked"),
+    });
+  });
+
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {
     const state = getWeb3TradingState("base", 0);
     const buy = state.signals.find((signal) => signal.action === "buy");
@@ -5595,6 +5643,39 @@ describe("Web3 autonomous trading subsystem", () => {
       "drawdown",
       "live-boundary",
     ]);
+    expect(launchChecklist.research_decisions.map((decision) => decision.id)).toEqual([
+      "provider-stack",
+      "market-discovery",
+      "execution-stack",
+      "signer-custody",
+      "risk-policy",
+      "live-cutover",
+    ]);
+    expect(launchChecklist.research_decisions.every((decision) =>
+      decision.decision.length > 0 &&
+      decision.evidence.length > 0 &&
+      decision.next_action.length > 0 &&
+      Array.isArray(decision.needs_user_input)
+    )).toBe(true);
+    expect(launchChecklist.research_decisions.find((decision) => decision.id === "provider-stack")).toMatchObject({
+      status: "needs-credential",
+      needs_user_input: expect.arrayContaining(["Helius API key or Solana RPC URL"]),
+    });
+    expect(launchChecklist.research_decisions.find((decision) => decision.id === "execution-stack")).toMatchObject({
+      status: "needs-credential",
+      needs_user_input: expect.arrayContaining(["Jupiter API key"]),
+    });
+    expect(launchChecklist.research_decisions.find((decision) => decision.id === "signer-custody")).toMatchObject({
+      decision: expect.stringContaining("never collect private keys"),
+      needs_user_input: expect.arrayContaining(["Public trading wallet address"]),
+    });
+    process.env.HELIUS_API_KEY = "test-helius-key";
+    const envReadyChecklist = buildWeb3AutonomyLaunchChecklist(state);
+    expect(envReadyChecklist.research_decisions.find((decision) => decision.id === "provider-stack")).toMatchObject({
+      status: "chosen",
+      needs_user_input: [],
+    });
+    delete process.env.HELIUS_API_KEY;
     expect(launchChecklist.items.find((item) => item.id === "process-supervision")?.blocker).toContain("supervise:web3");
     expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("public wallet key");
     expect(launchChecklist.items.find((item) => item.id === "wallet-accounting")?.blocker).toContain("wallet holdings");

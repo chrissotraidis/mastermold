@@ -118,6 +118,31 @@ async function main() {
   assert(launchChecklist.remaining_work_count === launchChecklist.remaining_work.length, "Web3 launch checklist remaining work count should match remaining work rows.", launchChecklist);
   assert(launchChecklist.completed_proof_count + launchChecklist.remaining_work_count === launchChecklist.items.length, "Web3 launch checklist proof counts should reconcile.", launchChecklist);
   assert(launchChecklist.remaining_work.every((item) => ["required", "review"].includes(item.priority) && item.next_action.length > 0), "Web3 launch checklist remaining work rows should include priority and next action.", launchChecklist);
+  assert(Array.isArray(launchChecklist.research_decisions), "Web3 launch checklist should expose researched stack decisions.", launchChecklist);
+  assert(["provider-stack", "market-discovery", "execution-stack", "signer-custody", "risk-policy", "live-cutover"].every((id) => launchChecklist.research_decisions.some((decision) => decision.id === id)), "Web3 launch checklist should cover provider, market, execution, signer, risk, and live cutover decisions.", launchChecklist.research_decisions);
+  assert(launchChecklist.research_decisions.every((decision) => decision.decision?.length > 0 && decision.evidence?.length > 0 && decision.next_action?.length > 0 && Array.isArray(decision.needs_user_input)), "Web3 researched stack decisions should include decision, evidence, next action, and needed user inputs.", launchChecklist.research_decisions);
+  assert(launchChecklist.research_decisions.some((decision) => decision.id === "signer-custody" && decision.decision.includes("never collect private keys")), "Signer custody decision should keep private keys out of the app.", launchChecklist.research_decisions);
+
+  const credentialSetupResponse = await request("/api/web3-credentials/test", {
+    method: "POST",
+    body: JSON.stringify({
+      provider: "helius",
+      wallet_public_key: "11111111111111111111111111111111",
+      max_trade_usd: 250,
+      daily_spend_cap_usd: 1_000,
+      max_slippage_bps: 150,
+      require_manual_confirmation: true,
+      test_mode: "validate-only",
+    }),
+  });
+  const credentialSetup = await readJson(credentialSetupResponse);
+  assert(credentialSetupResponse.status === 200, "Web3 credential setup endpoint should return a readiness contract.", { status: credentialSetupResponse.status, credentialSetup });
+  assert(credentialSetup.mode === "web3-credentials-setup-readiness", "Web3 credential setup should expose the expected mode.", credentialSetup);
+  assert(credentialSetup.network_tested === false, "Validate-only credential setup should not call external providers.", credentialSetup);
+  assert(credentialSetup.live_execution_permission === "blocked", "Credential setup must keep live execution blocked.", credentialSetup);
+  assert(credentialSetup.wallet_mutation_permission === "blocked", "Credential setup must keep wallet mutation blocked.", credentialSetup);
+  assert(!JSON.stringify(credentialSetup).includes("api-key="), "Credential setup response should not expose provider secrets.", credentialSetup);
+  assert(Array.isArray(credentialSetup.checks) && credentialSetup.checks.some((check) => check.id === "live-boundary"), "Credential setup should expose the live-boundary check.", credentialSetup);
 
   const page = await request("/trading");
   const html = await page.text();
@@ -135,6 +160,12 @@ async function main() {
   assert(html.includes("Web3 autonomy launch checklist"), "Trading page should render the launch checklist as a first-screen cockpit surface.");
   assert(html.includes("Web3 launch checklist receipt"), "Trading page should expose an accessible launch checklist receipt.");
   assert(html.includes("Cutover runway"), "Trading page should expose the compact Web3 cutover runway.");
+  assert(html.includes("Researched stack decisions"), "Trading page should expose the researched Web3 stack decisions.");
+  assert(html.includes("Helius/Solana reads"), "Trading page should show the researched provider stack decision.");
+  assert(html.includes("Provider stack"), "Trading page should show provider stack status.");
+  assert(html.includes("Execution stack"), "Trading page should show Jupiter execution stack status.");
+  assert(html.includes("Signer custody"), "Trading page should show signer custody status.");
+  assert(html.includes("researched stack decisions"), "Trading page should expose an accessible receipt for researched stack decisions.");
   assert(html.includes("Prove paper edge"), "Trading page should show the first Web3 cutover runway step.");
   assert(html.includes("Proof gap"), "Trading page should expose the promoted paper proof gap.");
   assert(html.includes("npm run autopilot-paper:web3"), "Trading page should expose the safe promoted proof command.");
@@ -145,6 +176,10 @@ async function main() {
   assert(html.includes("Order rehearsal"), "Trading page should expose a safe live DEX dry-run order rehearsal action in the launch checklist.");
   assert(html.includes("npm run landing-drill:web3"), "Trading page should expose the safe landing drill command in the launch checklist.");
   assert(html.includes("Dry-run signer and order rehearsal only scope public-key rehearsal"), "Trading page should disclose the dry-run signer and order boundary.");
+  assert(html.includes("Web3 credential setup"), "Trading page should expose the Web3 credential setup section.");
+  assert(html.includes("Test credentials"), "Trading page should expose a Web3 credential test action.");
+  assert(html.includes("Apply dry-run profile"), "Trading page should let Web3 credentials apply only to dry-run mode.");
+  assert(html.includes("Provider, wallet, route, signer policy"), "Trading page should summarize the Web3 credential setup purpose.");
   assert(html.includes("Wallet net worth curve"), "Trading page should render the first-screen wallet net worth curve.");
   assert(html.includes("Autonomous wallet net worth chart"), "Trading page should render the state-driven wallet performance chart.");
   assert(html.includes("Active price action"), "Trading page should render the active target price-action cockpit before the long workbench.");
@@ -4211,8 +4246,10 @@ async function main() {
       plan.side === "sell" &&
       plan.source === "jupiter" &&
       plan.output_mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" &&
-      plan.input_amount_source === "watchlist" &&
-      [5, 6, 9].includes(plan.input_token_decimals)
+      ["watchlist", "solana-rpc"].includes(plan.input_amount_source) &&
+      Number.isInteger(plan.input_token_decimals) &&
+      plan.input_token_decimals >= 5 &&
+      plan.input_token_decimals <= 9
     ),
     "Order rehearsal should quote at least one decimal-aware held-position protective sell route to USDC.",
     orderRehearsal.payload.execution_plans,

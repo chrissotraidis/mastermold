@@ -6,14 +6,27 @@ import { Activity, CandlestickChart, KeyRound, LineChart, Pause, Play, RefreshCw
 
 import { Chip } from "@/components/sentinel";
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
+import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import type { Web3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
-import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
+import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
 type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
+type Web3CredentialsDraft = {
+  helius_api_key: string;
+  rpc_url: string;
+  ws_url: string;
+  jupiter_api_key: string;
+  wallet_public_key: string;
+  signer_mode: Web3SignerSetupMode;
+  max_trade_usd: string;
+  daily_spend_cap_usd: string;
+  max_slippage_bps: string;
+  require_manual_confirmation: boolean;
+};
 type QuickWiringPath = {
   label: string;
   value: string;
@@ -363,6 +376,29 @@ export function Web3TradingWorkspaceLoader({
         max_slippage_bps: Math.max(1, Math.min(250, config.max_slippage_bps || 150)),
       },
     }, "The dry-run live order rehearsal could not run.");
+  }
+
+  function applyWeb3CredentialsProfile(draft: Web3CredentialsDraft) {
+    if (!state) return;
+    const execution: ExecutionUpdate = {
+      mode: "dry-run",
+      kill_switch: false,
+      wallet_public_key: draft.wallet_public_key,
+      signer_simulation_enabled: true,
+      signer_session_label: `web3-${draft.signer_mode}`,
+      signer_network: "devnet",
+      max_trade_usd: Math.max(1, Number(draft.max_trade_usd) || state.execution_readiness.config.max_trade_usd),
+      daily_spend_cap_usd: Math.max(1, Number(draft.daily_spend_cap_usd) || state.execution_readiness.config.daily_spend_cap_usd),
+      max_slippage_bps: Math.max(1, Math.min(2_500, Number(draft.max_slippage_bps) || state.execution_readiness.config.max_slippage_bps)),
+    };
+    void submitTradingRequest("dry-run-setup", {
+      scenario: state.scenario,
+      cycles: state.paper_account.cycle,
+      source: state.market_source.mode,
+      account: state.paper_account.mode,
+      advance: false,
+      execution,
+    }, "The Web3 credentials profile could not be applied to dry-run mode.");
   }
 
   async function runAutonomousLoopTick() {
@@ -951,6 +987,9 @@ export function Web3TradingWorkspaceLoader({
         <span className="sr-only" aria-label="Auto watch smart tick receipt">
           Auto watch uses the same Proof plus tick path for candle-gate refresh wakes, then lets execution runway, heartbeat, loop impact, provider intake, and profit benchmark evidence choose whether to continue, tighten, retarget, protect, harvest, refresh, defer, cool down, or block the next backend tick. Current execution runway {executionRunway.status}; runway action {executionRunway.action}; heartbeat {state.autonomous_execution_heartbeat.status}; heartbeat action {state.autonomous_execution_heartbeat.primary_action}; paper lane {executionRunway.can_auto_paper ? "clear" : "gated"}; current impact status {loopImpact.status}; impact action {loopImpact.action}; impact score {loopImpact.impact_score}; provider intake {marketIntake.status}; intake lane {marketIntake.next_lane}; provider budget {marketIntake.provider_budget_status}; can feed loop {marketIntake.can_feed_trade_loop ? "yes" : "no"}; profit benchmark {state.autonomous_profit_benchmark.status}; risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}; alpha feedback {state.autonomous_alpha_feedback_loop.action}; next cadence {Math.min(loopImpact.next_cadence_seconds, executionRunway.next_tick_seconds, state.autonomous_execution_heartbeat.next_tick_seconds)} seconds.
         </span>
+        <span className="sr-only" aria-label="Web3 credential setup availability">
+          Web3 credential setup is available under the Wiring focus. It exposes Test credentials and Apply dry-run profile for Provider, wallet, route, signer policy, Helius RPC, Jupiter, and risk caps while live trading remains blocked.
+        </span>
 
         <section className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:mt-3 sm:p-3" aria-label="Web3 operator focus deck">
           <div className="grid grid-cols-2 gap-1 sm:grid-cols-4" role="tablist" aria-label="Trading cockpit view">
@@ -1099,6 +1138,14 @@ export function Web3TradingWorkspaceLoader({
 
           {focusMode === "wiring" ? (
             <div className="mt-2 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" aria-label="Autonomous wiring focus">
+              <div className="xl:col-span-2">
+                <QuickWeb3CredentialsSetupPanel
+                  state={state}
+                  busy={quickBusy}
+                  disabled={quickDisabled}
+                  onApplyProfile={applyWeb3CredentialsProfile}
+                />
+              </div>
               <div className="xl:col-span-2">
                 <QuickLiveAutonomyReadinessAudit readiness={liveAutonomyReadiness} />
               </div>
@@ -1312,6 +1359,308 @@ function QuickOperatorHud({
       </span>
     </section>
   );
+}
+
+function QuickWeb3CredentialsSetupPanel({
+  state,
+  busy,
+  disabled,
+  onApplyProfile,
+}: {
+  state: Web3TradingState;
+  busy: QuickBusyState | null;
+  disabled: boolean;
+  onApplyProfile: (draft: Web3CredentialsDraft) => void;
+}) {
+  const storageKey = "mastermind.web3.credentials.setup";
+  const [draft, setDraft] = useState<Web3CredentialsDraft>(() => ({
+    helius_api_key: "",
+    rpc_url: "",
+    ws_url: "",
+    jupiter_api_key: "",
+    wallet_public_key: state.execution_readiness.config.wallet_public_key ?? "",
+    signer_mode: "external-wallet",
+    max_trade_usd: String(state.execution_readiness.config.max_trade_usd),
+    daily_spend_cap_usd: String(state.execution_readiness.config.daily_spend_cap_usd),
+    max_slippage_bps: String(state.execution_readiness.config.max_slippage_bps),
+    require_manual_confirmation: true,
+  }));
+  const [loaded, setLoaded] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
+  const [message, setMessage] = useState("Not tested yet. Leave secret fields blank to use server environment values.");
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(storageKey);
+    const parsed = saved ? parseCredentialsDraft(saved) : null;
+    if (parsed) {
+      setDraft({
+        ...parsed,
+        wallet_public_key: parsed.wallet_public_key || state.execution_readiness.config.wallet_public_key || "",
+        max_trade_usd: parsed.max_trade_usd || String(state.execution_readiness.config.max_trade_usd),
+        daily_spend_cap_usd: parsed.daily_spend_cap_usd || String(state.execution_readiness.config.daily_spend_cap_usd),
+        max_slippage_bps: parsed.max_slippage_bps || String(state.execution_readiness.config.max_slippage_bps),
+      });
+    }
+    setLoaded(true);
+  }, [state.execution_readiness.config.daily_spend_cap_usd, state.execution_readiness.config.max_slippage_bps, state.execution_readiness.config.max_trade_usd, state.execution_readiness.config.wallet_public_key]);
+
+  function updateDraft(field: keyof Web3CredentialsDraft, value: string | boolean) {
+    const next = { ...draft, [field]: value };
+    setDraft(next);
+    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    setResult(null);
+    setMessage("Saved in this browser. Test credentials before applying the dry-run profile.");
+  }
+
+  async function testCredentials() {
+    setTesting(true);
+    setMessage("Testing Web3 provider, wallet, route, and policy evidence...");
+    try {
+      const response = await fetch("/api/web3-credentials/test", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          provider: draft.rpc_url ? "custom-rpc" : "helius",
+          ...draft,
+          max_trade_usd: Number(draft.max_trade_usd),
+          daily_spend_cap_usd: Number(draft.daily_spend_cap_usd),
+          max_slippage_bps: Number(draft.max_slippage_bps),
+          test_mode: "network",
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as (Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Web3 credential test failed.");
+      }
+      setResult(payload);
+      setMessage(payload.summary);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Web3 credential test failed.");
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  const canApply = Boolean(result && result.can_support_route_order_rehearsal && draft.wallet_public_key && !testing);
+  const checks = result?.checks ?? [];
+
+  return (
+    <section className="min-w-0 rounded-md border border-engine/30 bg-engine/[0.045] p-2 sm:p-3" aria-label="Web3 credential setup">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Web3 credential setup</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">Provider, wallet, route, signer policy</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            Configure read-only Solana/Helius access, Jupiter rehearsal, wallet scope, and risk caps. This section can prepare dry-run mode only; live signing, submission, custody, and wallet mutation stay blocked.
+          </p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-outline">
+            Use a wallet public address only, never a private key. Manual approval required is the default first live-review posture.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={result?.status === "configured" ? "engine" : result?.status === "blocked" ? "critical" : "caution"}>
+            {result ? `${result.status} ${result.readiness_score}/100` : "untested"}
+          </Chip>
+          <Chip tone={result?.can_support_route_order_rehearsal ? "engine" : "demo"}>
+            {result?.can_support_route_order_rehearsal ? "rehearsal ready" : "dry-run only"}
+          </Chip>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-2">
+        <CredentialInput
+          label="Helius API key"
+          type="password"
+          value={draft.helius_api_key}
+          placeholder="Leave blank to use server Helius key"
+          onChange={(value) => updateDraft("helius_api_key", value)}
+        />
+        <CredentialInput
+          label="Custom Solana RPC URL"
+          value={draft.rpc_url}
+          placeholder="Optional; Helius mainnet URL is derived from key"
+          onChange={(value) => updateDraft("rpc_url", value)}
+        />
+        <CredentialInput
+          label="Solana WebSocket URL"
+          value={draft.ws_url}
+          placeholder="Optional; Helius websocket URL is derived from key"
+          onChange={(value) => updateDraft("ws_url", value)}
+        />
+        <CredentialInput
+          label="Jupiter API key"
+          type="password"
+          value={draft.jupiter_api_key}
+          placeholder="Optional now; required for Swap V2 order rehearsal"
+          onChange={(value) => updateDraft("jupiter_api_key", value)}
+        />
+        <CredentialInput
+          label="Wallet public address"
+          value={draft.wallet_public_key}
+          placeholder="Solana public key only, never a private key"
+          onChange={(value) => updateDraft("wallet_public_key", value)}
+        />
+        <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-telemetry text-outline">
+          Signer mode
+          <select
+            value={draft.signer_mode}
+            onChange={(event) => updateDraft("signer_mode", event.target.value as Web3SignerSetupMode)}
+            className="h-10 w-full rounded-md border border-outline-variant/45 bg-void/40 px-3 text-sm normal-case tracking-normal text-on-surface outline-none transition focus:border-engine/60"
+          >
+            <option value="external-wallet">Manual external wallet</option>
+            <option value="privy-server-wallet">Privy policy wallet</option>
+            <option value="turnkey-policy-wallet">Turnkey policy wallet</option>
+            <option value="session-key-vault">Session-key vault</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        <CredentialInput
+          label="Max trade USD"
+          type="number"
+          value={draft.max_trade_usd}
+          placeholder="250"
+          onChange={(value) => updateDraft("max_trade_usd", value)}
+        />
+        <CredentialInput
+          label="Daily spend cap"
+          type="number"
+          value={draft.daily_spend_cap_usd}
+          placeholder="1000"
+          onChange={(value) => updateDraft("daily_spend_cap_usd", value)}
+        />
+        <CredentialInput
+          label="Max slippage bps"
+          type="number"
+          value={draft.max_slippage_bps}
+          placeholder="150"
+          onChange={(value) => updateDraft("max_slippage_bps", value)}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          aria-pressed={draft.require_manual_confirmation}
+          onClick={() => updateDraft("require_manual_confirmation", !draft.require_manual_confirmation)}
+          className={cn(
+            "inline-flex min-h-10 items-center justify-center rounded-md border px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry transition",
+            draft.require_manual_confirmation
+              ? "border-engine/45 bg-engine/10 text-engine"
+              : "border-critical/40 bg-critical/10 text-critical",
+          )}
+        >
+          {draft.require_manual_confirmation ? "Manual approval required" : "Manual approval off"}
+        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={testCredentials}
+            disabled={!loaded || disabled || testing}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5 shrink-0", testing && "animate-spin")} aria-hidden="true" />
+            {testing ? "Testing" : "Test credentials"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onApplyProfile(draft)}
+            disabled={disabled || !canApply}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-caution/45 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {busy === "dry-run-setup" ? "Applying" : "Apply dry-run profile"}
+          </button>
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-on-surface-variant" aria-live="polite">
+        {message}
+      </p>
+
+      {checks.length > 0 ? (
+        <div className="mt-2 grid gap-1 sm:grid-cols-3 xl:grid-cols-5" aria-label="Web3 credential readiness checks">
+          {checks.map((check) => (
+            <div key={check.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{check.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", credentialSetupDotClass(check.status))} />
+              </div>
+              <p className={cn("mt-1 text-xs font-semibold", credentialSetupTextClass(check.status))}>{check.status}</p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-outline">{check.detail}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <p className="sr-only" aria-label="Web3 credential setup receipt">
+        Web3 credential setup tests Helius or Solana RPC, Jupiter quote and order readiness, wallet public key scope, signer mode, and risk caps. It never asks for private keys and cannot enable live trading.
+      </p>
+    </section>
+  );
+}
+
+function CredentialInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  type?: "text" | "password" | "number";
+}) {
+  return (
+    <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-telemetry text-outline">
+      {label}
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete="off"
+        spellCheck={false}
+        placeholder={placeholder}
+        className="h-10 w-full rounded-md border border-outline-variant/45 bg-void/40 px-3 text-sm normal-case tracking-normal text-on-surface outline-none transition placeholder:text-outline focus:border-engine/60"
+      />
+    </label>
+  );
+}
+
+function parseCredentialsDraft(raw: string): Web3CredentialsDraft | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<Web3CredentialsDraft>;
+    return {
+      helius_api_key: typeof parsed.helius_api_key === "string" ? parsed.helius_api_key : "",
+      rpc_url: typeof parsed.rpc_url === "string" ? parsed.rpc_url : "",
+      ws_url: typeof parsed.ws_url === "string" ? parsed.ws_url : "",
+      jupiter_api_key: typeof parsed.jupiter_api_key === "string" ? parsed.jupiter_api_key : "",
+      wallet_public_key: typeof parsed.wallet_public_key === "string" ? parsed.wallet_public_key : "",
+      signer_mode: parsed.signer_mode === "privy-server-wallet" || parsed.signer_mode === "turnkey-policy-wallet" || parsed.signer_mode === "session-key-vault" ? parsed.signer_mode : "external-wallet",
+      max_trade_usd: typeof parsed.max_trade_usd === "string" ? parsed.max_trade_usd : "",
+      daily_spend_cap_usd: typeof parsed.daily_spend_cap_usd === "string" ? parsed.daily_spend_cap_usd : "",
+      max_slippage_bps: typeof parsed.max_slippage_bps === "string" ? parsed.max_slippage_bps : "",
+      require_manual_confirmation: parsed.require_manual_confirmation !== false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function credentialSetupDotClass(status: Web3CredentialsSetupReadiness["checks"][number]["status"]) {
+  if (status === "pass") return "bg-engine";
+  if (status === "watch") return "bg-caution";
+  return "bg-critical";
+}
+
+function credentialSetupTextClass(status: Web3CredentialsSetupReadiness["checks"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
+  return "text-critical";
 }
 
 function QuickOperatorWalletSparkline({ wallet }: { wallet: Web3TradingState["autonomous_wallet_telemetry"] }) {
@@ -7293,6 +7642,7 @@ function QuickLaunchChecklistPanel({
   const topItems = checklist.items.slice(0, 6);
   const remainingWork = checklist.remaining_work.slice(0, 4);
   const runway = checklist.cutover_runway;
+  const researchDecisions = checklist.research_decisions;
   const nextStep = checklist.next_cutover_step;
   const proofPlan = checklist.profit_proof_readiness.proof_plan;
 
@@ -7369,6 +7719,35 @@ function QuickLaunchChecklistPanel({
         </div>
       </div>
 
+      <div className="mt-2 rounded-md border border-engine/20 bg-engine/[0.035] p-2" aria-label="Web3 researched trading stack decisions">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Researched stack decisions</p>
+            <p className="mt-1 truncate text-xs font-semibold text-on-surface">
+              Helius/Solana reads, Jupiter rehearsal, public-wallet signer review, conservative risk caps
+            </p>
+          </div>
+          <Chip tone={researchDecisions.some((item) => item.status === "blocked") ? "critical" : researchDecisions.some((item) => item.status !== "chosen") ? "caution" : "engine"}>
+            {researchDecisions.filter((item) => item.status === "chosen").length}/{researchDecisions.length} chosen
+          </Chip>
+        </div>
+        <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-3">
+          {researchDecisions.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", researchDecisionDotClass(item.status))} />
+              </div>
+              <p className={cn("mt-1 truncate text-xs font-semibold", researchDecisionTextClass(item.status))}>{item.status.replaceAll("-", " ")}</p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.decision}</p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">
+                {item.needs_user_input.length > 0 ? `Need: ${item.needs_user_input.join(", ")}` : item.next_action}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.7fr)]">
         <div className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/15 p-2" aria-label="Launch checklist proof rows">
           <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
@@ -7419,7 +7798,7 @@ function QuickLaunchChecklistPanel({
         Dry-run signer and order rehearsal only scope public-key rehearsal, simulated signer metadata, live DEX route/order evidence, caps, slippage, and kill-switch review; they cannot store keys, sign, submit, custody funds, or enable real-capital trades.
       </p>
       <span className="sr-only" aria-label="Web3 launch checklist receipt">
-        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; researched stack decisions {researchDecisions.map((item) => `${item.label}: ${item.status}, ${item.needs_user_input.join(", ") || item.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
       </span>
     </section>
   );
@@ -8182,6 +8561,18 @@ function cutoverRunwayTextClass(status: Web3AutonomyLaunchChecklist["cutover_run
   if (status === "done") return "text-engine";
   if (status === "review") return "text-critical";
   if (status === "active") return "text-caution";
+  return "text-critical";
+}
+
+function researchDecisionDotClass(status: Web3AutonomyLaunchChecklist["research_decisions"][number]["status"]) {
+  if (status === "chosen") return "bg-engine";
+  if (status === "needs-credential" || status === "needs-review") return "bg-caution";
+  return "bg-critical";
+}
+
+function researchDecisionTextClass(status: Web3AutonomyLaunchChecklist["research_decisions"][number]["status"]) {
+  if (status === "chosen") return "text-engine";
+  if (status === "needs-credential" || status === "needs-review") return "text-caution";
   return "text-critical";
 }
 
