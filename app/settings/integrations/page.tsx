@@ -380,6 +380,7 @@ function ConnectionChecks({ integrations }: { integrations: SettingsIntegrationS
 function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaunchChecklist }) {
   const nextStep = checklist.next_cutover_step;
   const remaining = checklist.remaining_work.slice(0, 6);
+  const operatorInputs = checklist.operator_inputs_needed.slice(0, 8);
   return (
     <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Settings Web3 launch blocker queue">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -415,6 +416,40 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
           </p>
         )}
       </div>
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Operator input packet">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Operator input packet</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              What Mastermind still needs before supervised trading review
+            </p>
+          </div>
+          <LaunchQueueBadge
+            status={operatorInputs.some((item) => item.status === "blocked" || item.status === "needed") ? "fail" : "watch"}
+            label={`${operatorInputs.filter((item) => item.status !== "ready").length} open`}
+          />
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {operatorInputs.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                  <p className="mt-0.5 text-[11px] leading-4 text-outline">{item.detail}</p>
+                </div>
+                <LaunchQueueBadge status={operatorInputBadgeStatus(item.status)} label={item.status} />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+              <p className="mt-1 text-[10px] leading-4 text-outline">
+                Storage: {item.storage.replaceAll("-", " ")} · {item.secret_handling}
+              </p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs leading-5 text-outline">
+          This packet is the handoff list for credentials and approvals; private keys and seed phrases stay out of the app.
+        </p>
+      </div>
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Next cutover step</p>
         <p className="mt-1 text-xs font-semibold text-on-surface">{nextStep.label} · {nextStep.status}</p>
@@ -425,6 +460,12 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
       </p>
     </div>
   );
+}
+
+function operatorInputBadgeStatus(status: Web3AutonomyLaunchChecklist["operator_inputs_needed"][number]["status"]) {
+  if (status === "ready") return "pass";
+  if (status === "review") return "watch";
+  return "fail";
 }
 
 function LaunchQueueBadge({

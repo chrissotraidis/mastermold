@@ -77,6 +77,30 @@ export type Web3AutonomyLaunchResearchDecision = {
   needs_user_input: string[];
 };
 
+export type Web3AutonomyLaunchOperatorInput = {
+  id:
+    | "helius-solana-read-rail"
+    | "dedicated-trading-wallet"
+    | "wallet-ownership-proof"
+    | "jupiter-route-order-key"
+    | "signer-custody-choice"
+    | "signer-provider-credentials"
+    | "settlement-accounting-review"
+    | "manual-live-approval";
+  label: string;
+  status: "needed" | "ready" | "review" | "blocked";
+  storage:
+    | "server-env"
+    | "browser-public-scope"
+    | "hash-only-local-receipt"
+    | "external-operator-review"
+    | "future-signer-vault"
+    | "never-store";
+  detail: string;
+  next_action: string;
+  secret_handling: string;
+};
+
 export type Web3AutonomyLaunchChecklist = {
   mode: "web3-autonomy-launch-checklist";
   status: Web3AutonomyLaunchChecklistStatus;
@@ -97,6 +121,7 @@ export type Web3AutonomyLaunchChecklist = {
   profit_proof_readiness: Web3ProfitProofReadiness;
   provider_credentials_readiness: Web3ProviderCredentialsReadiness;
   research_decisions: Web3AutonomyLaunchResearchDecision[];
+  operator_inputs_needed: Web3AutonomyLaunchOperatorInput[];
   controls: string[];
   items: Web3AutonomyLaunchChecklistItem[];
   remaining_work: Web3AutonomyLaunchRemainingWorkItem[];
@@ -345,6 +370,17 @@ export function buildWeb3AutonomyLaunchChecklist(
     killSwitchFail,
     liveReviewPermitted,
   });
+  const operatorInputsNeeded = buildOperatorInputsNeeded({
+    state,
+    providerCredentials,
+    walletAccounting,
+    productionSupervisor,
+    profitProof,
+    routePass,
+    adapterOrderReady: adapter.swap_v2_order_ready,
+    settlementPass,
+    liveReviewPermitted,
+  });
 
   return {
     mode: "web3-autonomy-launch-checklist",
@@ -366,8 +402,10 @@ export function buildWeb3AutonomyLaunchChecklist(
     profit_proof_readiness: profitProof,
     provider_credentials_readiness: providerCredentials,
     research_decisions: researchDecisions,
+    operator_inputs_needed: operatorInputsNeeded,
     controls: [
       "This checklist is a launch-readiness contract; it does not sign, submit, custody funds, or unlock real-capital trading.",
+      "The operator input packet names only public wallet scope, server-env targets, hash-only receipts, or external review decisions; private keys and seed phrases stay out of this app.",
       "Paper scale requires current paper profit proof, market freshness, promoted-run memory that is not protecting, and a clear kill switch.",
       "Live review requires every signer, relay, settlement, custody, route, process-supervision, provider-credential, wallet-accounting, profit-proof, and live-boundary proof to pass before a separate executor review.",
       "Real-capital autonomy stays blocked unless this checklist reaches manual live review and an external reviewed executor is deliberately enabled.",
@@ -375,6 +413,161 @@ export function buildWeb3AutonomyLaunchChecklist(
     items,
     remaining_work: remainingWork,
   };
+}
+
+function buildOperatorInputsNeeded({
+  state,
+  providerCredentials,
+  walletAccounting,
+  productionSupervisor,
+  profitProof,
+  routePass,
+  adapterOrderReady,
+  settlementPass,
+  liveReviewPermitted,
+}: {
+  state: Web3TradingState;
+  providerCredentials: Web3ProviderCredentialsReadiness;
+  walletAccounting: Web3TradingState["live_wallet_accounting_readiness"];
+  productionSupervisor: Web3ProductionSupervisorReadiness;
+  profitProof: Web3ProfitProofReadiness;
+  routePass: boolean;
+  adapterOrderReady: boolean;
+  settlementPass: boolean;
+  liveReviewPermitted: boolean;
+}): Web3AutonomyLaunchOperatorInput[] {
+  const walletPublicKey = state.execution_readiness.config.wallet_public_key;
+  const heliusOrRpcConfigured = providerCredentials.helius_rpc_configured || Boolean(process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
+  const jupiterConfigured = providerCredentials.jupiter_configured || Boolean(process.env.JUPITER_API_KEY);
+  const signerProviderSelected = providerCredentials.provider_configured || providerCredentials.credential_configured;
+  const signerReady = providerCredentials.can_request_signature || providerCredentials.can_request_provider_signature;
+  const custodyReviewable = providerCredentials.policy_hash_valid && providerCredentials.custody_status !== "blocked";
+  const settlementReviewable = settlementPass && walletAccounting.can_trust_live_pnl;
+
+  return [
+    {
+      id: "helius-solana-read-rail",
+      label: "Helius / Solana read rail",
+      status: heliusOrRpcConfigured ? "ready" : "needed",
+      storage: "server-env",
+      detail: heliusOrRpcConfigured
+        ? "Read-only chain and wallet provider scope is visible to the launch checklist."
+        : "Read-only chain and wallet evidence needs HELIUS_API_KEY or SOLANA_RPC_URL.",
+      next_action: heliusOrRpcConfigured
+        ? "Run provider health against the dedicated wallet before live review."
+        : "Add HELIUS_API_KEY or SOLANA_RPC_URL to ignored server environment only.",
+      secret_handling: "Provider keys stay server-side or one-shot test only; they are never saved to browser storage or returned by receipts.",
+    },
+    {
+      id: "dedicated-trading-wallet",
+      label: "Dedicated trading wallet",
+      status: providerCredentials.dedicated_wallet_scoped ? "ready" : "needed",
+      storage: "browser-public-scope",
+      detail: providerCredentials.dedicated_wallet_scoped
+        ? `A non-sample public trading wallet is scoped${walletPublicKey ? ` (${walletPublicKey.slice(0, 4)}...${walletPublicKey.slice(-4)})` : ""}.`
+        : providerCredentials.wallet_is_sample
+          ? "The sample all-ones wallet is demo-only and cannot satisfy live operator scope."
+          : "A dedicated non-sample public Solana trading wallet has not been scoped.",
+      next_action: providerCredentials.dedicated_wallet_scoped
+        ? "Keep this wallet isolated for Mastermind trading and continue ownership/accounting proof."
+        : "Save a dedicated public Solana trading wallet address in Settings; do not paste private keys or seed phrases.",
+      secret_handling: "Only the public address belongs here; private keys and seed phrases are never accepted.",
+    },
+    {
+      id: "wallet-ownership-proof",
+      label: "Wallet ownership proof",
+      status: providerCredentials.wallet_ownership_proved
+        ? "ready"
+        : providerCredentials.dedicated_wallet_scoped
+          ? "needed"
+          : "blocked",
+      storage: "hash-only-local-receipt",
+      detail: providerCredentials.wallet_ownership_proved
+        ? "A hash-only local receipt proves public-wallet control."
+        : providerCredentials.dedicated_wallet_scoped
+          ? "The dedicated wallet still needs a text-only ownership signature receipt."
+          : "Ownership proof waits for a dedicated public wallet.",
+      next_action: providerCredentials.wallet_ownership_proved
+        ? "Keep the receipt for review and rotate it if the wallet changes."
+        : providerCredentials.dedicated_wallet_scoped
+          ? "Use Prove ownership with the browser wallet; this signs text only and cannot move funds."
+          : "Scope the dedicated wallet first, then prove ownership.",
+      secret_handling: "The app stores challenge/signature hashes only; it never stores raw signatures, transaction signatures, or wallet authority.",
+    },
+    {
+      id: "jupiter-route-order-key",
+      label: "Jupiter route/order key",
+      status: jupiterConfigured && routePass && adapterOrderReady
+        ? "ready"
+        : jupiterConfigured
+          ? "review"
+          : "needed",
+      storage: "server-env",
+      detail: jupiterConfigured
+        ? `Jupiter credential scope is present; route proof ${routePass ? "passes" : "still needs refresh"} and order readiness is ${adapterOrderReady ? "ready" : "gated"}.`
+        : "Jupiter route/order rehearsal needs JUPITER_API_KEY before Swap V2 order evidence can pass.",
+      next_action: jupiterConfigured
+        ? "Run Jupiter rehearsal and landing drill until quote and unsigned order proof pass with transaction bytes withheld."
+        : "Add JUPITER_API_KEY to ignored server environment or use a one-shot session test; never save it in browser storage.",
+      secret_handling: "Jupiter keys stay in server env or a one-shot request; receipts show configured/missing status only.",
+    },
+    {
+      id: "signer-custody-choice",
+      label: "Signer/custody choice",
+      status: custodyReviewable ? "review" : signerProviderSelected ? "review" : "needed",
+      storage: "external-operator-review",
+      detail: signerProviderSelected
+        ? `${providerCredentials.provider} is selected with ${providerCredentials.custody_status} custody and ${providerCredentials.signer_status} signer state.`
+        : "The first live path needs an explicit signer/custody posture before any signature request can be reviewed.",
+      next_action: signerProviderSelected
+        ? "Keep manual external wallet approval for the first live path unless a reviewed policy signer is configured."
+        : "Choose manual external wallet, Privy, Turnkey, session-key policy, or another reviewed signer outside this app.",
+      secret_handling: "The app records the choice and policy evidence only; signer secrets and wallet authority stay outside the app.",
+    },
+    {
+      id: "signer-provider-credentials",
+      label: "Signer provider credentials",
+      status: signerReady ? "review" : "blocked",
+      storage: "future-signer-vault",
+      detail: signerReady
+        ? "A hash-only signer request can be reviewed, but provider dispatch remains blocked here."
+        : "No signer-bound request or managed signer credential is active.",
+      next_action: signerReady
+        ? "Review request id, payload hash, policy hash, and user-presence rules outside the live executor."
+        : "Do not configure private keys here; add only reviewed provider identifiers after signer/custody is chosen.",
+      secret_handling: "Future signer credentials must live in a dedicated signer vault or provider console, never in this app or browser storage.",
+    },
+    {
+      id: "settlement-accounting-review",
+      label: "Settlement and accounting review",
+      status: settlementReviewable ? "review" : "needed",
+      storage: "external-operator-review",
+      detail: settlementReviewable
+        ? "Settlement evidence and wallet PnL are reviewable, but still require external live-executor signoff."
+        : `${walletAccounting.status.replaceAll("-", " ")} wallet accounting; settlement lifecycle is ${settlementPass ? "partially proven" : "not proven"}.`,
+      next_action: settlementReviewable
+        ? "Review reconciliation evidence against live executor receipts before allowing any real-capital mirror."
+        : "Price/review wallet token accounts and prove submitted-to-landed fill reconciliation before live review.",
+      secret_handling: "Accounting receipts may store aggregate balances, hashes, and reviewed fill evidence, never private keys or raw transaction authority.",
+    },
+    {
+      id: "manual-live-approval",
+      label: "Manual live approval",
+      status: liveReviewPermitted
+        ? "review"
+        : productionSupervisor.status === "blocked" || profitProof.status === "blocked"
+          ? "blocked"
+          : "needed",
+      storage: "external-operator-review",
+      detail: liveReviewPermitted
+        ? "All app-side gates are ready for a separate manual live-executor review."
+        : "Manual live approval is unavailable until wallet, provider, signer, settlement, supervision, accounting, and profit gates pass.",
+      next_action: liveReviewPermitted
+        ? "Perform a separate external live-executor review; this app still cannot self-enable real-capital trading."
+        : "Clear the operator input packet and cutover runway before requesting live review.",
+      secret_handling: "Approval is an external decision record; it must not include private keys, seed phrases, or raw transaction payloads.",
+    },
+  ];
 }
 
 function buildResearchDecisions({

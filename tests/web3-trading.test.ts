@@ -6736,7 +6736,41 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "chosen",
       needs_user_input: [],
     });
+    expect(envReadyChecklist.operator_inputs_needed.find((item) => item.id === "helius-solana-read-rail")).toMatchObject({
+      label: "Helius / Solana read rail",
+      status: "ready",
+      storage: "server-env",
+    });
+    expect(envReadyChecklist.operator_inputs_needed.find((item) => item.id === "jupiter-route-order-key")).toMatchObject({
+      label: "Jupiter route/order key",
+      status: "needed",
+      storage: "server-env",
+    });
     delete process.env.HELIUS_API_KEY;
+    expect(launchChecklist.operator_inputs_needed.map((item) => item.id)).toEqual(expect.arrayContaining([
+      "dedicated-trading-wallet",
+      "wallet-ownership-proof",
+      "jupiter-route-order-key",
+      "signer-custody-choice",
+      "signer-provider-credentials",
+      "settlement-accounting-review",
+      "manual-live-approval",
+    ]));
+    expect(launchChecklist.operator_inputs_needed.find((item) => item.id === "dedicated-trading-wallet")).toMatchObject({
+      label: "Dedicated trading wallet",
+      status: expect.stringMatching(/needed|ready/),
+      storage: "browser-public-scope",
+      secret_handling: expect.stringContaining("private keys and seed phrases are never accepted"),
+    });
+    expect(launchChecklist.operator_inputs_needed.find((item) => item.id === "wallet-ownership-proof")).toMatchObject({
+      label: "Wallet ownership proof",
+      storage: "hash-only-local-receipt",
+    });
+    expect(launchChecklist.operator_inputs_needed.find((item) => item.id === "manual-live-approval")).toMatchObject({
+      label: "Manual live approval",
+      storage: "external-operator-review",
+      secret_handling: expect.stringContaining("private keys"),
+    });
     expect(launchChecklist.items.find((item) => item.id === "process-supervision")?.blocker).toContain("supervise:web3");
     expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("public wallet key");
     expect(launchChecklist.items.find((item) => item.id === "wallet-accounting")?.blocker).toContain("wallet holdings");
@@ -6764,6 +6798,8 @@ describe("Web3 autonomous trading subsystem", () => {
       "profit-proof",
     ]));
     expect(launchChecklist.controls.some((control) => control.includes("launch-readiness contract"))).toBe(true);
+    expect(launchChecklist.controls.some((control) => control.includes("operator input packet"))).toBe(true);
+    expect(launchChecklist.controls.some((control) => control.includes("private keys and seed phrases stay out"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("process-supervision"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("does not sign"))).toBe(true);
     const supervisedChecklist = buildWeb3AutonomyLaunchChecklist(state, undefined, {
