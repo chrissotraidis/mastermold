@@ -35,6 +35,7 @@ export type Web3PromotedPaperAutopilotReceipt = {
   summary: string;
   next_action: string;
   blockers: string[];
+  promotion_repair_items: Web3PromotedPaperAutopilotRepairItem[];
 };
 
 export type Web3PromotedPaperAutopilotHealth = {
@@ -58,8 +59,17 @@ export type Web3PromotedPaperAutopilotHealth = {
   run_memory_score: number;
   recommended_supervisor_round_cap: number;
   memory_next_action: string;
+  promotion_repair_items: Web3PromotedPaperAutopilotRepairItem[];
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
+};
+
+export type Web3PromotedPaperAutopilotRepairItem = {
+  id: string;
+  label: string;
+  status: "pass" | "watch" | "fail";
+  value: string;
+  detail: string;
 };
 
 export type Web3PromotedPaperAutopilotHistoryEntry = {
@@ -155,6 +165,7 @@ export function getWeb3PromotedPaperAutopilotHealth(path = web3PromotedPaperAuto
       run_memory_score: memory.score,
       recommended_supervisor_round_cap: memory.recommendedSupervisorRoundCap,
       memory_next_action: memory.nextAction,
+      promotion_repair_items: [],
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     };
@@ -181,6 +192,7 @@ export function getWeb3PromotedPaperAutopilotHealth(path = web3PromotedPaperAuto
     run_memory_score: memory.score,
     recommended_supervisor_round_cap: memory.recommendedSupervisorRoundCap,
     memory_next_action: memory.nextAction,
+    promotion_repair_items: receipt.promotion_repair_items,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
   };
@@ -200,6 +212,9 @@ function sanitizeWeb3PromotedPaperAutopilotReceipt(value: unknown): Web3Promoted
   const row = value as Partial<Web3PromotedPaperAutopilotReceipt>;
   if (row.mode !== "web3-promoted-paper-autopilot") return null;
   if (!STATUSES.includes(row.status as Web3PromotedPaperAutopilotReceipt["status"])) return null;
+  const rawPromotion = "promotion" in row && row.promotion && typeof row.promotion === "object"
+    ? row.promotion as { items?: unknown }
+    : null;
 
   return {
     mode: "web3-promoted-paper-autopilot",
@@ -234,6 +249,7 @@ function sanitizeWeb3PromotedPaperAutopilotReceipt(value: unknown): Web3Promoted
     blockers: Array.isArray(row.blockers)
       ? row.blockers.filter((item): item is string => typeof item === "string").map((item) => cleanText(item, "", 240)).filter(Boolean).slice(0, 8)
       : [],
+    promotion_repair_items: sanitizeRepairItems(row.promotion_repair_items ?? rawPromotion?.items),
   };
 }
 
@@ -279,6 +295,28 @@ function sanitizeHistory(values: unknown[]) {
     .filter((item): item is Web3PromotedPaperAutopilotHistoryEntry => item !== null)
     .filter(isPromotedPaperEvidenceEntry)
     .slice(-24);
+}
+
+function sanitizeRepairItems(value: unknown): Web3PromotedPaperAutopilotRepairItem[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Partial<Web3PromotedPaperAutopilotRepairItem>;
+      const status = row.status === "pass" || row.status === "watch" || row.status === "fail" ? row.status : null;
+      const id = cleanText(row.id, "", 60);
+      const label = cleanText(row.label, "", 80);
+      if (!status || !id || !label) return null;
+      return {
+        id,
+        label,
+        status,
+        value: cleanText(row.value, "unknown", 80),
+        detail: cleanText(row.detail, "Promotion repair evidence is unavailable.", 240),
+      };
+    })
+    .filter((item): item is Web3PromotedPaperAutopilotRepairItem => item !== null)
+    .slice(0, 8);
 }
 
 function isPromotedPaperEvidenceReceipt(receipt: Web3PromotedPaperAutopilotReceipt) {

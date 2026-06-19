@@ -5627,6 +5627,7 @@ describe("Web3 autonomous trading subsystem", () => {
       run_memory_score: 88,
       recommended_supervisor_round_cap: 4,
       memory_next_action: "Run-memory is profitable; allow a larger bounded promoted paper window while keeping live execution locked.",
+      promotion_repair_items: [],
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
@@ -5675,6 +5676,7 @@ describe("Web3 autonomous trading subsystem", () => {
         run_memory_score: 34,
         recommended_supervisor_round_cap: 0,
         memory_next_action: "Protect paper capital; run proof-only or one manual review cycle before more supervised ticks.",
+        promotion_repair_items: [],
         live_execution_permission: "blocked",
         wallet_mutation_permission: "blocked",
       },
@@ -5856,6 +5858,11 @@ describe("Web3 autonomous trading subsystem", () => {
       summary: "Promoted paper autopilot reviewed the guard without running ticks.",
       next_action: "Run proof-only review or stand down.",
       blockers: ["Supervisor round cap is zero."],
+      promotion_repair_items: [
+        { id: "net-pnl", label: "Net PnL", status: "pass", value: "+$46.5", detail: "Minimum target is +$0 across repeat runs." },
+        { id: "hit-rate", label: "Hit rate", status: "fail", value: "0%", detail: "Required hit rate is 100%." },
+        { id: "consistency", label: "Consistency", status: "fail", value: "0/100", detail: "Required consistency is 80/100." },
+      ],
     });
 
     const history = getWeb3PromotedPaperAutopilotHistory();
@@ -5876,6 +5883,11 @@ describe("Web3 autonomous trading subsystem", () => {
       run_memory_status: "tighten-paper",
       recommended_supervisor_round_cap: 1,
     });
+    expect(health.promotion_repair_items).toEqual([
+      { id: "net-pnl", label: "Net PnL", status: "pass", value: "+$46.5", detail: "Minimum target is +$0 across repeat runs." },
+      { id: "hit-rate", label: "Hit rate", status: "fail", value: "0%", detail: "Required hit rate is 100%." },
+      { id: "consistency", label: "Consistency", status: "fail", value: "0/100", detail: "Required consistency is 80/100." },
+    ]);
 
     const proof = buildWeb3ProfitProofReadiness({ promotedHealth: health });
     expect(proof).toMatchObject({
@@ -5891,6 +5903,8 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
+    expect(proof.next_action).toContain("Repair promotion guard first: Hit rate is 0%");
+    expect(proof.proof_plan.next_action).toContain("Repair promotion guard first: Hit rate is 0%");
   });
 
   test("GIVEN mocked DEX Screener payloads WHEN live mode is requested THEN the agent trades from live market telemetry", async () => {

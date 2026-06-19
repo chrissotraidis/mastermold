@@ -94,6 +94,9 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
       run_memory_status: runMemory.run_memory_status,
       run_memory_score: runMemory.run_memory_score,
       run_memory_next_action: runMemory.memory_next_action,
+      promotion_repair_items: Array.isArray((report.promotion as { items?: unknown } | undefined)?.items)
+        ? (report.promotion as { items: unknown[] }).items
+        : [],
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });

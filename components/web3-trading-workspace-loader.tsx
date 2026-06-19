@@ -67,6 +67,7 @@ type PromotedPaperAutopilotReceipt = {
   proof_plan_promotion_runs?: number;
   proof_plan_remaining_runs?: number;
   applied_promotion_runs?: number;
+  promotion_repair_items?: Web3PromotedPaperAutopilotHealth["promotion_repair_items"];
   summary: string;
   next_action: string;
   blockers: string[];
@@ -7005,6 +7006,8 @@ function QuickPromotedAutopilotPanel({
   const memoryScore = health?.run_memory_score ?? 50;
   const roundCap = health?.recommended_supervisor_round_cap ?? 0;
   const memoryNextAction = health?.memory_next_action ?? "Collect promoted paper run evidence before expanding supervised runtime.";
+  const repairItems = health?.promotion_repair_items ?? [];
+  const repairLeader = repairItems.find((item) => item.status === "fail") ?? repairItems.find((item) => item.status === "watch") ?? repairItems[0];
 
   return (
     <section className="rounded-md border border-outline-variant/30 bg-surface-dim/15 p-2 sm:p-3" aria-label="Promoted paper autopilot health">
@@ -7045,9 +7048,30 @@ function QuickPromotedAutopilotPanel({
           <ProfitMetric label="Round cap" value={roundCap.toString()} detail="next promoted run" tone={roundCap > 1 ? "engine" : roundCap === 1 ? "caution" : "critical"} />
         </div>
       </div>
+      {repairItems.length > 0 ? (
+        <div className="mt-2 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Promotion guard repair board">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Promotion repair</p>
+            <Chip tone={repairLeader?.status === "fail" ? "critical" : repairLeader?.status === "watch" ? "caution" : "engine"}>
+              {repairLeader ? `${repairLeader.label} ${repairLeader.status}` : "clear"}
+            </Chip>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-3">
+            {repairItems.slice(0, 6).map((item) => (
+              <ProfitMetric
+                key={item.id}
+                label={item.label}
+                value={item.value}
+                detail={item.detail}
+                tone={item.status === "pass" ? "engine" : item.status === "watch" ? "caution" : "critical"}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
       <p className="mt-2 text-xs leading-5 text-outline">{memoryNextAction}</p>
       <span className="sr-only" aria-label="Promoted paper autopilot health receipt">
-        Promoted paper autopilot status {status}; runner {runner}; promotion permission {health?.promotion_permission ?? "missing"}; supervisor {health?.supervisor_status ?? "not-run"}; net PnL {formatSignedCurrency(netPnl)}; posted ticks {postedTicks}; blocked ticks {blockedTicks}; run count {runCount}; total PnL {formatSignedCurrency(totalPnl)}; average run {formatSignedCurrency(averagePnl)}; target hit rate {hitRate} percent; memory status {memoryStatus}; memory score {memoryScore}; next supervisor round cap {roundCap}; memory next action {memoryNextAction}; target hit {health?.profit_target_hit ? "yes" : "no"}; loss brake {health?.loss_brake_tripped ? "tripped" : "clear"}; live execution {health?.live_execution_permission ?? "blocked"}; wallet mutation {health?.wallet_mutation_permission ?? "blocked"}.
+        Promoted paper autopilot status {status}; runner {runner}; promotion permission {health?.promotion_permission ?? "missing"}; supervisor {health?.supervisor_status ?? "not-run"}; net PnL {formatSignedCurrency(netPnl)}; posted ticks {postedTicks}; blocked ticks {blockedTicks}; run count {runCount}; total PnL {formatSignedCurrency(totalPnl)}; average run {formatSignedCurrency(averagePnl)}; target hit rate {hitRate} percent; memory status {memoryStatus}; memory score {memoryScore}; next supervisor round cap {roundCap}; memory next action {memoryNextAction}; promotion repair {repairItems.map((item) => `${item.label}: ${item.status} ${item.value} ${item.detail}`).join("; ") || "none"}; target hit {health?.profit_target_hit ? "yes" : "no"}; loss brake {health?.loss_brake_tripped ? "tripped" : "clear"}; live execution {health?.live_execution_permission ?? "blocked"}; wallet mutation {health?.wallet_mutation_permission ?? "blocked"}.
       </span>
     </section>
   );

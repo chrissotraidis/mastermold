@@ -83,6 +83,7 @@ export function buildWeb3ProfitProofReadiness({
   const recentLossCount = recent.filter((run) => run.net_pnl_usd < 0 || run.loss_brake_tripped || !run.profit_target_hit).length;
   const lossBrakeTripped = promotedHealth?.loss_brake_tripped === true || recent.some((run) => run.loss_brake_tripped);
   const memoryProtecting = memoryStatus === "protect-paper" || memoryStatus === "stand-down";
+  const promotionRepairAction = promotedHealth ? promotionRepairNextAction(promotedHealth) : null;
   const enoughSample = runCount >= 3;
   const requiredRecentPositiveRuns = Math.min(3, recent.length || 3);
   const repeatable = localMakingMoney &&
@@ -116,6 +117,7 @@ export function buildWeb3ProfitProofReadiness({
     lossBrakeTripped,
     memoryProtecting,
     recommendedSupervisorRoundCap: promotedHealth?.recommended_supervisor_round_cap ?? 0,
+    promotionRepairAction,
   });
   const blockers = checks
     .filter((check) => check.status === "fail")
@@ -155,7 +157,7 @@ export function buildWeb3ProfitProofReadiness({
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     summary: profitProofSummary(status, readinessScore, localNet, runCount, hitRate, totalPnl),
-    next_action: blockers[0] ?? profitProofNextAction(status),
+    next_action: blockers[0] ?? promotionRepairAction ?? profitProofNextAction(status),
     blockers,
     checks,
     controls: [
@@ -176,6 +178,7 @@ function buildProfitProofRunPlan(evidence: {
   lossBrakeTripped: boolean;
   memoryProtecting: boolean;
   recommendedSupervisorRoundCap: number;
+  promotionRepairAction: string | null;
 }): Web3ProfitProofRunPlan {
   const requiredPromotedRuns = 3;
   const requiredHitRate = 70;
@@ -192,7 +195,7 @@ function buildProfitProofRunPlan(evidence: {
         : remainingRuns > 0
           ? "needs-runs"
           : "needs-hit-rate";
-  const nextAction = profitProofRunPlanNextAction(status, suggestedNextRuns, remainingRuns);
+  const nextAction = evidence.promotionRepairAction ?? profitProofRunPlanNextAction(status, suggestedNextRuns, remainingRuns);
 
   return {
     mode: "promoted-paper-proof-plan",
@@ -213,6 +216,15 @@ function buildProfitProofRunPlan(evidence: {
     summary: profitProofRunPlanSummary(status, evidence.runCount, remainingRuns, evidence.hitRate, evidence.totalPnl),
     next_action: nextAction,
   };
+}
+
+function promotionRepairNextAction(promotedHealth: Web3PromotedPaperAutopilotHealth) {
+  if (promotedHealth.status !== "blocked" || promotedHealth.supervisor_status !== "not-run") return null;
+  const failed = promotedHealth.promotion_repair_items.find((item) => item.status === "fail");
+  const watched = promotedHealth.promotion_repair_items.find((item) => item.status === "watch");
+  const item = failed ?? watched;
+  if (!item) return null;
+  return `Repair promotion guard first: ${item.label} is ${item.value}. ${item.detail}`;
 }
 
 function profitProofChecks(evidence: {
