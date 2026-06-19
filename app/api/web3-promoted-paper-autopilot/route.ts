@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { NextResponse } from "next/server";
+import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
 import { getWeb3PromotedPaperAutopilotHealth, writeWeb3PromotedPaperAutopilotReceipt } from "@/src/db/web3-promoted-paper-autopilot";
 
 export const runtime = "nodejs";
@@ -39,6 +40,18 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
   const origin = new URL(request.url).origin;
   const scriptPath = join(process.cwd(), "scripts", "web3-promoted-paper-autopilot.mjs");
   const runMemory = getWeb3PromotedPaperAutopilotHealth();
+  const proofPlan = buildWeb3ProfitProofReadiness({ promotedHealth: runMemory }).proof_plan;
+  const plannedPromotionRuns = resolvePlannedPromotionRuns(parsed.value.promotion_runs, proofPlan.suggested_next_runs, proofPlan.remaining_promoted_runs);
+  if (plannedPromotionRuns <= 0) {
+    return NextResponse.json({
+      error: "Promoted paper proof plan is already complete.",
+      proof_plan_status: proofPlan.status,
+      proof_plan_remaining_runs: proofPlan.remaining_promoted_runs,
+      proof_plan_promotion_runs: proofPlan.suggested_next_runs,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    }, { status: 409 });
+  }
   const supervisedRoundCap = Math.max(0, Math.min(parsed.value.max_supervisor_rounds, runMemory.recommended_supervisor_round_cap));
   const args = [
     scriptPath,
@@ -47,7 +60,7 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
     `--promotion-scenario=${parsed.value.promotion_scenario}`,
     `--source=${parsed.value.source}`,
     "--runner-id=browser-promoted-paper-autopilot",
-    `--promotion-runs=${parsed.value.promotion_runs}`,
+    `--promotion-runs=${plannedPromotionRuns}`,
     `--promotion-ticks=${parsed.value.promotion_ticks}`,
     `--max-supervisor-rounds=${supervisedRoundCap}`,
     `--max-ticks-per-round=${parsed.value.max_ticks_per_round}`,
@@ -71,6 +84,10 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
     return NextResponse.json({
       ...report,
       api_boundary: "local-paper-process",
+      requested_promotion_runs: parsed.value.promotion_runs ?? null,
+      proof_plan_promotion_runs: proofPlan.suggested_next_runs,
+      proof_plan_remaining_runs: proofPlan.remaining_promoted_runs,
+      applied_promotion_runs: plannedPromotionRuns,
       requested_supervisor_rounds: parsed.value.max_supervisor_rounds,
       memory_supervisor_round_cap: runMemory.recommended_supervisor_round_cap,
       memory_applied_supervisor_rounds: supervisedRoundCap,
@@ -92,7 +109,7 @@ export async function POST(request: Request): Promise<NextResponse<unknown>> {
 }
 
 function parseAutopilotRequest(value: unknown):
-  | { ok: true; value: Required<PromotedPaperAutopilotRequest> }
+  | { ok: true; value: Required<Omit<PromotedPaperAutopilotRequest, "promotion_runs">> & { promotion_runs: number | null } }
   | { ok: false; error: string } {
   if (!value || typeof value !== "object") {
     return { ok: false, error: "Request must be an object." };
@@ -112,7 +129,7 @@ function parseAutopilotRequest(value: unknown):
     return { ok: false, error: "promotion_scenario must be base, breakout, rug-risk, or all." };
   }
 
-  const promotionRuns = boundedInteger(record.promotion_runs, 2, 2, 6);
+  const promotionRuns = record.promotion_runs === undefined ? null : boundedInteger(record.promotion_runs, 2, 0, 6);
   const promotionTicks = boundedInteger(record.promotion_ticks, 2, 1, 8);
   const maxSupervisorRounds = boundedInteger(record.max_supervisor_rounds, 2, 0, 6);
   const maxTicksPerRound = boundedInteger(record.max_ticks_per_round, 1, 1, 4);
@@ -135,4 +152,11 @@ function boundedInteger(value: unknown, fallback: number, min: number, max: numb
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
+function resolvePlannedPromotionRuns(requestedRuns: number | null, suggestedRuns: number, remainingRuns: number) {
+  const planCap = Math.max(0, Math.min(6, remainingRuns > 0 ? Math.max(1, suggestedRuns) : suggestedRuns));
+  const requested = requestedRuns === null ? planCap : Math.max(0, Math.min(6, requestedRuns));
+  if (planCap <= 0) return 0;
+  return Math.max(1, Math.min(requested, planCap));
 }

@@ -63,6 +63,10 @@ type PromotedPaperAutopilotReceipt = {
   loss_brake_tripped: boolean;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
+  requested_promotion_runs?: number | null;
+  proof_plan_promotion_runs?: number;
+  proof_plan_remaining_runs?: number;
+  applied_promotion_runs?: number;
   summary: string;
   next_action: string;
   blockers: string[];
@@ -253,8 +257,13 @@ export function Web3TradingWorkspaceLoader({
   async function runPromotedPaperAutopilot() {
     if (!state || quickBusy) return;
     const previousState = state;
+    const proofPlan = launchChecklist.profit_proof_readiness.proof_plan;
+    if (proofPlan.suggested_next_runs <= 0) {
+      setQuickNotice(proofPlan.next_action);
+      return;
+    }
     setQuickBusy("promoted");
-    setQuickNotice("Running repeat proof, paper-promotion guard, paper reset, and bounded supervised paper daemon rounds.");
+    setQuickNotice(`Running ${proofPlan.suggested_next_runs} promoted paper proof ${proofPlan.suggested_next_runs === 1 ? "window" : "windows"}, then applying the paper-promotion guard.`);
     try {
       const response = await fetch("/api/web3-promoted-paper-autopilot", {
         method: "POST",
@@ -263,9 +272,9 @@ export function Web3TradingWorkspaceLoader({
           scenario: "breakout",
           promotion_scenario: "all",
           source: "sample",
-          promotion_runs: 2,
+          promotion_runs: proofPlan.suggested_next_runs,
           promotion_ticks: 2,
-          max_supervisor_rounds: 2,
+          max_supervisor_rounds: proofPlan.suggested_next_runs,
           max_ticks_per_round: 1,
         }),
       });

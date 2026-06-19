@@ -3,9 +3,9 @@ import { buildSupervisorReceipt, runWeb3DaemonSupervisor } from "./web3-daemon-s
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 import { buildLiveLandingDrillReport } from "./web3-live-landing-drill.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
-import { buildPaperPromotionGuardReport } from "./web3-paper-promotion-guard.mjs";
+import { buildPaperPromotionGuardReport, parsePaperPromotionGuardArgs } from "./web3-paper-promotion-guard.mjs";
 import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
-import { buildPromotedPaperAutopilotReport } from "./web3-promoted-paper-autopilot.mjs";
+import { buildPromotedPaperAutopilotReport, parsePromotedPaperAutopilotArgs } from "./web3-promoted-paper-autopilot.mjs";
 import { buildSettlementReconciliationReport } from "./web3-settlement-reconciliation.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
@@ -5066,6 +5066,10 @@ async function main() {
   assert(promotionGuard.recommended_paper_size_multiplier > 0 && promotionGuard.recommended_supervisor_rounds > 0, "Promotion guard should recommend bounded paper size and supervised rounds.", promotionGuard);
   assert(promotionGuard.full_wallet_hot_coin_alpha_usd < 0 ? promotionGuard.status === "selective-paper" : promotionGuard.status !== "blocked", "Negative full-wallet hot-coin alpha should keep promotion selective instead of scaling blindly.", promotionGuard);
   assert(promotionGuard.controls.some((control) => control.includes("cannot sign")), "Promotion guard should disclose the paper-only execution boundary.", promotionGuard);
+  const oneRunPromotionGuardArgs = parsePaperPromotionGuardArgs(["--runs=1"], {});
+  assert(oneRunPromotionGuardArgs.runs === 1, "Paper promotion guard should support exact one-run proof gaps.", oneRunPromotionGuardArgs);
+  const oneRunAutopilotArgs = parsePromotedPaperAutopilotArgs(["--promotion-runs=1"], {});
+  assert(oneRunAutopilotArgs.promotionRuns === 1, "Promoted paper autopilot should support exact one-window proof gaps.", oneRunAutopilotArgs);
   const promotedAutopilotReceipt = buildPromotedPaperAutopilotReport({
     config: {
       baseUrl,
