@@ -56,7 +56,8 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 9. Press `Test credentials`.
 10. Press `Apply dry-run profile` only after provider, wallet, and route evidence is acceptable.
 11. Run `npm run landing-drill:web3` to confirm the landing path is still safely blocked before live signing/submission.
-12. Use the Wiring focus `Run stop drill` control to record a local dry-run emergency-stop receipt. The drill halts browser Auto Watch and verifies ops target status, but it does not send webhooks, stop external processes by itself, sign, submit, or mutate wallets.
+12. Use the Wiring focus `Build ledger receipt` control to create a redacted local accounting receipt from the paper ledger, wallet-readiness state, settlement status, and mirror gates.
+13. Use the Wiring focus `Run stop drill` control to record a local dry-run emergency-stop receipt. The drill halts browser Auto Watch and verifies ops target status, but it does not send webhooks, stop external processes by itself, sign, submit, or mutate wallets.
 
 ## Researched Default Stack
 
@@ -82,8 +83,11 @@ The response also includes a provider account runway. It turns the researched st
 The Wiring focus also exposes:
 
 ```text
+GET /api/web3-accounting-ledger
 POST /api/web3-emergency-stop/drill
 ```
+
+The accounting route returns a redacted paper-ledger receipt with aggregate portfolio PnL, recent paper-fill rows, wallet accounting readiness, settlement/mirror status, export columns, a receipt hash, and explicit live-execution/wallet-mutation blocks. It never returns API keys, private keys, seed phrases, raw transaction bodies, unsigned payloads, signed payloads, full signatures, or wallet authority. Its tax export permission is `paper-only` until real fill settlement, guarded mirror evidence, and CPA-reviewed export handling exist.
 
 That route records a dry-run emergency-stop receipt only after `operator_ack` is true. It returns whether an emergency-stop webhook/contact is configured, which local surfaces would be halted or blocked, and a receipt hash. It never returns raw webhook URLs, contact details, API keys, private keys, transaction bytes, signed payloads, or wallet authority, and it never dispatches the external webhook from this local drill.
 
@@ -141,4 +145,5 @@ The credentials gate is ready for manual live review only when:
 - Confirmation polling.
 - Fill reconciliation.
 - Live wallet accounting and local portfolio mirror review.
+- CPA-reviewed tax/accounting export handling for real fills.
 - Production worker supervision, alerts, restart policy, and emergency stop operations.

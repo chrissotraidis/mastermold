@@ -5,6 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
+import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
@@ -473,6 +474,68 @@ describe("Web3 autonomous trading subsystem", () => {
     const preview = await json<Record<string, unknown>>(EMERGENCY_STOP_GET());
     expect(preview.mode).toBe("web3-emergency-stop-drill");
     expect(preview.external_dispatch_permission).toBe("blocked");
+  });
+
+  test("GIVEN paper fills exist WHEN the accounting ledger route runs THEN it returns a redacted paper-only receipt", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = "/tmp/mastermold-tax-ledger-secret";
+
+    const rejected = await ACCOUNTING_LEDGER_GET(new Request("http://localhost/api/web3-accounting-ledger?scenario=nope"));
+    expect(rejected.status).toBe(422);
+
+    const response = await ACCOUNTING_LEDGER_GET(new Request("http://localhost/api/web3-accounting-ledger?scenario=breakout&source=sample&account=ephemeral&cycles=3"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      accounting_boundary: string;
+      export_scope: string;
+      paper_account: { trade_count: number; cycle: number; persisted: boolean };
+      portfolio_summary: { equity_usd: number; net_pnl_usd: number };
+      fill_summary: { total_trade_count: number; recent_fill_count: number; paper_volume_usd: number };
+      wallet_accounting: { status: string; can_trust_live_pnl: boolean };
+      settlement_summary: { settlement_status: string; mirror_status: string; settlement_signature_hash: string | null };
+      export_columns: string[];
+      sample_rows: Array<{
+        source_id_hash: string;
+        symbol: string;
+        side: string;
+        storage_rule: string;
+        settlement_status: string;
+      }>;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      tax_export_permission: string;
+      checks: Array<{ id: string; status: string }>;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-accounting-ledger-receipt");
+    expect(["paper-ledger-ready", "live-accounting-gated", "settlement-review"]).toContain(receipt.status);
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.accounting_boundary).toBe("paper-only");
+    expect(receipt.export_scope).toBe("paper-ledger-and-redacted-readiness");
+    expect(receipt.paper_account.persisted).toBe(false);
+    expect(receipt.paper_account.trade_count).toBeGreaterThan(0);
+    expect(receipt.fill_summary.total_trade_count).toBe(receipt.paper_account.trade_count);
+    expect(receipt.fill_summary.recent_fill_count).toBeGreaterThan(0);
+    expect(receipt.fill_summary.paper_volume_usd).toBeGreaterThan(0);
+    expect(receipt.portfolio_summary.equity_usd).toBeGreaterThan(0);
+    expect(receipt.sample_rows.length).toBeGreaterThan(0);
+    expect(receipt.sample_rows.every((row) => row.storage_rule === "redacted")).toBe(true);
+    expect(receipt.sample_rows.every((row) => row.settlement_status === "paper-only")).toBe(true);
+    expect(receipt.sample_rows.every((row) => /^[0-9a-f]{16}$/.test(row.source_id_hash))).toBe(true);
+    expect(receipt.export_columns).toContain("source_id_hash");
+    expect(receipt.export_columns).toContain("storage_rule");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.tax_export_permission).toBe("paper-only");
+    expect(receipt.wallet_accounting.can_trust_live_pnl).toBe(false);
+    expect(receipt.checks.find((check) => check.id === "live-boundary")).toMatchObject({ status: "pass" });
+    expect(receipt.controls.some((control) => control.includes("not CPA-reviewed"))).toBe(true);
+    expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
+    expect(JSON.stringify(receipt)).not.toContain("tax-ledger-secret");
   });
 
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {

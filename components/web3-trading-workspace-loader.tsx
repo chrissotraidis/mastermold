@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Activity, CandlestickChart, KeyRound, LineChart, Pause, Play, RefreshCw, RotateCcw, ShieldCheck, Zap } from "lucide-react";
 
 import { Chip } from "@/components/sentinel";
+import type { Web3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import type { Web3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
@@ -14,7 +15,7 @@ import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-pa
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
-type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "emergency-stop";
+type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "accounting-ledger" | "emergency-stop";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
 type Web3CredentialsDraft = {
   helius_api_key: string;
@@ -112,6 +113,7 @@ export function Web3TradingWorkspaceLoader({
   const [quickNotice, setQuickNotice] = useState("Quick agent controls are armed for bounded paper sessions.");
   const [lastActionOutcome, setLastActionOutcome] = useState<QuickAgentActionOutcome | null>(null);
   const [lastPromotedAutopilot, setLastPromotedAutopilot] = useState<PromotedPaperAutopilotReceipt | null>(null);
+  const [accountingLedgerReceipt, setAccountingLedgerReceipt] = useState<Web3AccountingLedgerReceipt | null>(null);
   const [emergencyStopReceipt, setEmergencyStopReceipt] = useState<Web3EmergencyStopDrillReceipt | null>(null);
   const [focusMode, setFocusMode] = useState<OperatorFocusMode>("cockpit");
   const [mounted, setMounted] = useState(false);
@@ -314,6 +316,31 @@ export function Web3TradingWorkspaceLoader({
       if (nextHealth) setSupervisorHealth(nextHealth);
     } catch (reason: unknown) {
       setQuickNotice(reason instanceof Error ? reason.message : "The promoted paper autopilot could not run.");
+    } finally {
+      setQuickBusy(null);
+    }
+  }
+
+  async function buildAccountingLedgerReceipt() {
+    if (!state || quickBusy) return;
+    setQuickBusy("accounting-ledger");
+    setQuickNotice("Building a redacted Web3 accounting receipt from the local paper ledger and wallet-readiness gates.");
+    try {
+      const params = new URLSearchParams({
+        scenario: state.scenario,
+        source: state.market_source.mode,
+        account: state.paper_account.mode,
+        cycles: String(state.paper_account.cycle),
+      });
+      const response = await fetch(`/api/web3-accounting-ledger?${params.toString()}`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as Web3AccountingLedgerReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "The Web3 accounting receipt could not be built.");
+      }
+      setAccountingLedgerReceipt(payload);
+      setQuickNotice(payload.summary);
+    } catch (error) {
+      setQuickNotice(error instanceof Error ? error.message : "The Web3 accounting receipt could not be built.");
     } finally {
       setQuickBusy(null);
     }
@@ -1188,6 +1215,15 @@ export function Web3TradingWorkspaceLoader({
                 <QuickWalletTransactionIntelligencePanel intelligence={state.wallet_transaction_intelligence} readiness={state.live_wallet_accounting_readiness} />
               </div>
               <div className="xl:col-span-2">
+                <QuickAccountingLedgerReceiptPanel
+                  receipt={accountingLedgerReceipt}
+                  state={state}
+                  busy={quickBusy === "accounting-ledger"}
+                  disabled={quickDisabled}
+                  onBuild={buildAccountingLedgerReceipt}
+                />
+              </div>
+              <div className="xl:col-span-2">
                 <QuickEmergencyStopDrillPanel
                   receipt={emergencyStopReceipt}
                   busy={quickBusy === "emergency-stop"}
@@ -1482,6 +1518,164 @@ function QuickWalletTransactionIntelligencePanel({
 
       <p className="sr-only" aria-label="Wallet transaction intelligence receipt">
         Wallet transaction intelligence status {intelligence.status}; decoded {intelligence.decoded_transaction_count}; swaps {intelligence.swap_transaction_count}; transfers {intelligence.transfer_transaction_count}; failed {intelligence.failed_transaction_count}; raw transaction storage {intelligence.raw_transaction_storage}; wallet mutation {intelligence.wallet_mutation_permission}; live execution {intelligence.live_execution_permission}.
+      </p>
+    </section>
+  );
+}
+
+function QuickAccountingLedgerReceiptPanel({
+  receipt,
+  state,
+  busy,
+  disabled,
+  onBuild,
+}: {
+  receipt: Web3AccountingLedgerReceipt | null;
+  state: Web3TradingState;
+  busy: boolean;
+  disabled: boolean;
+  onBuild: () => void;
+}) {
+  const status = receipt?.status ?? "not-built";
+  const tone: QuickChipTone = receipt
+    ? receipt.status === "paper-ledger-ready" || receipt.status === "settlement-review"
+      ? "engine"
+      : receipt.status === "blocked"
+        ? "critical"
+        : "caution"
+    : "demo";
+  const paperRows = receipt?.sample_rows ?? [];
+  const checkRows = receipt?.checks ?? [
+    {
+      id: "paper-ledger" as const,
+      label: "Paper ledger",
+      status: state.paper_account.trade_count > 0 ? "pass" as const : "watch" as const,
+      detail: `${state.paper_account.trade_count} local paper fill${state.paper_account.trade_count === 1 ? "" : "s"} currently visible to the account.`,
+    },
+    {
+      id: "wallet-scope" as const,
+      label: "Wallet scope",
+      status: state.live_wallet_accounting_readiness.wallet_public_key ? "pass" as const : "fail" as const,
+      detail: state.live_wallet_accounting_readiness.wallet_public_key ? "Public wallet scope is present." : "No public wallet is scoped for live accounting.",
+    },
+    {
+      id: "live-boundary" as const,
+      label: "Live boundary",
+      status: "pass" as const,
+      detail: "Live execution and wallet mutation remain blocked.",
+    },
+  ];
+
+  return (
+    <section className="min-w-0 rounded-md border border-outline-variant/30 bg-void/20 p-2 sm:p-3" aria-label="Web3 accounting ledger receipt">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Accounting ledger receipt</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">Paper PnL, redacted rows, and live accounting gates</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            {receipt?.summary ?? "Build a redacted receipt that shows which local paper fills can be reviewed now and which wallet, settlement, mirror, and tax/accounting gates still block real-money accounting."}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone={receipt?.live_execution_permission === "blocked" ? "engine" : "critical"}>live blocked</Chip>
+          <Chip tone={receipt?.tax_export_permission === "paper-only" ? "caution" : "demo"}>
+            {receipt?.tax_export_permission ?? "preview only"}
+          </Chip>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+        <div className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2">
+          <p className="text-xs leading-5 text-outline">
+            {receipt?.next_action ?? "Use this after paper sessions or wallet-readiness checks to see the accounting state without exposing keys, private transaction bodies, or wallet authority."}
+          </p>
+          <button
+            type="button"
+            onClick={onBuild}
+            disabled={disabled || busy}
+            className="mt-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-engine/40 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <LineChart className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {busy ? "Building" : "Build ledger receipt"}
+          </button>
+          {receipt ? (
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px] leading-4 text-outline">
+              <span>Receipt {receipt.receipt_hash.slice(0, 10)}</span>
+              <span>Rows {receipt.sample_rows.length}</span>
+              <span>Wallet {receipt.wallet_accounting.status.replaceAll("-", " ")}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+          <ProfitMetric
+            label="Paper rows"
+            value={(receipt?.sample_rows.length ?? state.autonomous_fill_ledger_digest.recent_fill_count).toString()}
+            detail={`${receipt?.fill_summary.total_trade_count ?? state.paper_account.trade_count} total fills`}
+            tone={(receipt?.sample_rows.length ?? state.autonomous_fill_ledger_digest.recent_fill_count) > 0 ? "engine" : "neutral"}
+          />
+          <ProfitMetric
+            label="Paper PnL"
+            value={formatCompactSignedCurrency(receipt?.portfolio_summary.net_pnl_usd ?? state.portfolio.realized_pnl_usd + state.portfolio.unrealized_pnl_usd)}
+            detail="realized + unrealized"
+            tone={(receipt?.portfolio_summary.net_pnl_usd ?? state.portfolio.realized_pnl_usd + state.portfolio.unrealized_pnl_usd) >= 0 ? "engine" : "critical"}
+          />
+          <ProfitMetric
+            label="Volume"
+            value={formatCompactCurrency(receipt?.fill_summary.paper_volume_usd ?? state.autonomous_fill_ledger_digest.paper_volume_usd)}
+            detail="paper notional"
+            tone="neutral"
+          />
+          <ProfitMetric
+            label="Wallet score"
+            value={`${receipt?.wallet_accounting.readiness_score ?? state.live_wallet_accounting_readiness.readiness_score}/100`}
+            detail="live accounting"
+            tone={(receipt?.wallet_accounting.can_trust_live_pnl ?? state.live_wallet_accounting_readiness.can_trust_live_pnl) ? "engine" : "caution"}
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
+          {paperRows.length > 0 ? paperRows.slice(0, 4).map((row) => (
+            <div key={row.row_id} className="min-w-0 rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{row.symbol}</p>
+                <span className={cn("rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-telemetry", row.side === "buy" ? "border-engine/35 bg-engine/[0.08] text-engine" : "border-caution/35 bg-caution/[0.08] text-caution")}>
+                  {row.side}
+                </span>
+              </div>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{formatCurrency(row.notional_usd)}</p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-outline">
+                {row.lane} · est {formatSignedCurrency(row.estimated_pnl_usd)} · {row.settlement_status.replaceAll("-", " ")}
+              </p>
+            </div>
+          )) : (
+            <p className="rounded-md border border-outline-variant/20 bg-surface-dim/20 p-2 text-xs leading-5 text-on-surface-variant sm:col-span-2 xl:col-span-4">
+              Build the receipt after a paper run to preview redacted accounting rows here.
+            </p>
+          )}
+        </div>
+
+        <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-1">
+          {checkRows.slice(0, 4).map((check) => (
+            <div key={check.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{check.label}</p>
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", accountingCheckDotClass(check.status))} />
+              </div>
+              <p className={cn("mt-1 text-xs font-semibold", accountingCheckTextClass(check.status))}>
+                {check.status}
+              </p>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{check.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="sr-only" aria-label="Web3 accounting ledger receipt status">
+        Accounting receipt status {status}; live execution blocked; wallet mutation blocked; paper fills {receipt?.fill_summary.total_trade_count ?? state.paper_account.trade_count}; wallet accounting status {receipt?.wallet_accounting.status ?? state.live_wallet_accounting_readiness.status}.
       </p>
     </section>
   );
@@ -2037,6 +2231,18 @@ function providerAccountItemDotClass(status: Web3CredentialsSetupReadiness["prov
 function providerAccountItemTextClass(status: Web3CredentialsSetupReadiness["provider_account_runway"]["items"][number]["status"]) {
   if (status === "configured") return "text-engine";
   if (status === "optional" || status === "future") return "text-caution";
+  return "text-critical";
+}
+
+function accountingCheckDotClass(status: Web3AccountingLedgerReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "bg-engine";
+  if (status === "watch") return "bg-caution";
+  return "bg-critical";
+}
+
+function accountingCheckTextClass(status: Web3AccountingLedgerReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
   return "text-critical";
 }
 
