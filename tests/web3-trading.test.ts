@@ -7797,7 +7797,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(replayState.autonomous_daemon_handoff.lease_replay_count).toBeGreaterThanOrEqual(1);
   });
 
-  test("GIVEN a clean persistent paper wallet WHEN a daemon loop tick runs THEN it opens one bounded paper scout", async () => {
+  test("GIVEN a clean persistent paper wallet WHEN a daemon loop tick runs THEN it opens a bounded paper scout bundle", async () => {
     const reset = await getWeb3TradingStateAsync({
       scenario: "breakout",
       source: "sample",
@@ -7829,16 +7829,17 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.execution_gate.live_execution_enabled).toBe(false);
     expect(state.paper_daemon.advanced).toBe(true);
     expect(state.paper_account.cycle).toBe(1);
-    expect(state.paper_account.trade_count).toBe(1);
-    expect(state.portfolio.open_positions).toHaveLength(1);
+    expect(state.paper_account.trade_count).toBeGreaterThanOrEqual(2);
+    expect(state.portfolio.open_positions.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(state.portfolio.open_positions.map((position) => position.symbol)).size).toBe(state.portfolio.open_positions.length);
     expect(state.autonomous_loop_tick.status).toBe("session-run");
     expect(state.autonomous_loop_tick.action).toBe("run-cycle");
-    expect(state.autonomous_loop_tick.fill_count).toBeGreaterThanOrEqual(1);
-    expect(state.autonomous_loop_tick.summary).toContain("bounded clean-wallet scout");
-    expect(buys).toHaveLength(1);
+    expect(state.autonomous_loop_tick.fill_count).toBeGreaterThanOrEqual(2);
+    expect(state.autonomous_loop_tick.summary).toContain("bounded clean-wallet scout fills");
+    expect(buys.length).toBeGreaterThanOrEqual(2);
     expect(buys[0].symbol).toBe("FARTCOIN");
-    expect(buys[0].size_usd).toBeLessThanOrEqual(1_000);
-    expect(buys[0].reason).toContain("Clean-wallet scout score");
+    expect(buys.every((buy) => buy.size_usd <= 1_000)).toBe(true);
+    expect(buys.every((buy) => buy.reason.includes("Clean-wallet scout bundle score"))).toBe(true);
   });
 
   test("GIVEN an active daemon lease WHEN another runner posts THEN the conflict is persisted and no paper advance occurs", async () => {

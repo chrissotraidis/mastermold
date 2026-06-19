@@ -10579,10 +10579,10 @@ type CleanWalletScoutCandidate = {
   score: number;
 };
 
-function cleanWalletScoutCandidate(state: Web3TradingState): CleanWalletScoutCandidate | null {
-  if (state.market_source.mode !== "sample") return null;
-  if (state.execution_gate.live_execution_enabled) return null;
-  if (state.portfolio.open_positions.length > 0 || state.paper_account.trade_count > 0) return null;
+function cleanWalletScoutCandidates(state: Web3TradingState): CleanWalletScoutCandidate[] {
+  if (state.market_source.mode !== "sample") return [];
+  if (state.execution_gate.live_execution_enabled) return [];
+  if (state.portfolio.open_positions.length > 0 || state.paper_account.trade_count > 0) return [];
 
   const candidates = state.signals
     .filter((signal) => signal.action === "buy" && signal.score >= 74 && signal.suggested_size_usd >= 100)
@@ -10627,8 +10627,27 @@ function cleanWalletScoutCandidate(state: Web3TradingState): CleanWalletScoutCan
       b.token.volume_1h_usd - a.token.volume_1h_usd
     );
 
-  const selected = candidates[0];
-  return selected ? { token: selected.token, signal: selected.signal, size_usd: selected.size_usd, score: selected.score } : null;
+  let remainingBudget = Math.floor(Math.min(state.portfolio.cash_usd * 0.12, 3_000));
+  const selected: CleanWalletScoutCandidate[] = [];
+  const leader = candidates[0];
+  const canBundle = Boolean(leader && (leader.score >= 150 || leader.token.price_change_5m_pct >= 7));
+  for (const candidate of candidates) {
+    if (selected.length >= (canBundle ? 3 : 1) || remainingBudget < 100) break;
+    const size = Math.min(candidate.size_usd, remainingBudget);
+    if (size < 100) continue;
+    selected.push({
+      token: candidate.token,
+      signal: candidate.signal,
+      size_usd: size,
+      score: candidate.score,
+    });
+    remainingBudget -= size;
+  }
+  return selected;
+}
+
+function cleanWalletScoutCandidate(state: Web3TradingState): CleanWalletScoutCandidate | null {
+  return cleanWalletScoutCandidates(state)[0] ?? null;
 }
 
 function isCleanWalletScoutHardRiskFlag(flag: string) {
@@ -10652,23 +10671,26 @@ function shouldRunCleanWalletScoutTick(input: TradingStateInput, account: Tradin
     Boolean(cleanWalletScoutCandidate(state));
 }
 
-function applyCleanWalletScoutTick(state: Web3TradingState, candidate: CleanWalletScoutCandidate) {
+function applyCleanWalletScoutTick(state: Web3TradingState, candidates: CleanWalletScoutCandidate[]) {
   const now = new Date().toISOString();
   const current = readLedger() ?? createLedger(now);
   const data = parseLedgerData(current.data);
-  if (data.positions.length > 0 || data.trades.length > 0) return null;
+  if (data.positions.length > 0 || data.trades.length > 0 || candidates.length === 0) return null;
   const nextCycle = current.cycle + 1;
-  const trade: AutonomousTrade = {
-    id: `paper-clean-wallet-scout-${nextCycle}-${candidate.token.symbol}-0`,
-    side: "buy",
-    symbol: candidate.token.symbol,
-    size_usd: candidate.size_usd,
-    price_usd: candidate.token.price_usd,
-    status: "paper-filled",
-    reason: `Clean-wallet scout score ${candidate.score}: ${candidate.signal.thesis} Bounded to ${formatCompactValue(candidate.size_usd)} in local paper mode before any scale-up.`,
-    created_at: now,
-  };
-  const applied = applyArbiterPaperTradeToLedger(current, state.market, trade);
+  let applied = current;
+  for (const [index, candidate] of candidates.entries()) {
+    const trade: AutonomousTrade = {
+      id: `paper-clean-wallet-scout-${nextCycle}-${candidate.token.symbol}-${index}`,
+      side: "buy",
+      symbol: candidate.token.symbol,
+      size_usd: candidate.size_usd,
+      price_usd: candidate.token.price_usd,
+      status: "paper-filled",
+      reason: `Clean-wallet scout bundle score ${candidate.score}: ${candidate.signal.thesis} Bounded to ${formatCompactValue(candidate.size_usd)} in local paper mode before any scale-up.`,
+      created_at: now,
+    };
+    applied = applyArbiterPaperTradeToLedger(applied, state.market, trade);
+  }
   if (applied === current) return null;
   store().upsertWeb3PaperLedger({
     ...applied,
@@ -10788,10 +10810,12 @@ async function runAutonomousLoopTick(input: TradingStateInput): Promise<Web3Trad
     return attachAutonomousLoopTick(sessionState, report, account);
   }
 
-  const cleanWalletScout = cleanWalletScoutCandidate(baseline);
-  if (cleanWalletScout && shouldRunCleanWalletScoutTick(input, account, baseline)) {
-    const scoutState = applyCleanWalletScoutTick(baseline, cleanWalletScout);
+  const cleanWalletScouts = cleanWalletScoutCandidates(baseline);
+  if (cleanWalletScouts.length > 0 && shouldRunCleanWalletScoutTick(input, account, baseline)) {
+    const scoutState = applyCleanWalletScoutTick(baseline, cleanWalletScouts);
     if (scoutState) {
+      const leader = cleanWalletScouts[0];
+      const totalScoutNotional = cleanWalletScouts.reduce((sum, candidate) => sum + candidate.size_usd, 0);
       const report = {
         ...buildAutonomousLoopTickReport({
           baseline,
@@ -10803,8 +10827,8 @@ async function runAutonomousLoopTick(input: TradingStateInput): Promise<Web3Trad
         }),
         fill_count: Math.max(1, scoutState.paper_daemon.filled_count),
         blocked_count: scoutState.paper_daemon.blocked_count,
-        summary: `Backend daemon opened one bounded clean-wallet scout in ${cleanWalletScout.token.symbol} for ${formatCompactValue(cleanWalletScout.size_usd)} local paper notional; live signing, custody, and submission stayed locked.`,
-        next_action: `Monitor ${cleanWalletScout.token.symbol} PnL, stop, liquidity, and buy-flow before any scale-up.`,
+        summary: `Backend daemon opened ${cleanWalletScouts.length} bounded clean-wallet scout fills led by ${leader.token.symbol} for ${formatCompactValue(totalScoutNotional)} local paper notional; live signing, custody, and submission stayed locked.`,
+        next_action: `Monitor ${cleanWalletScouts.map((candidate) => candidate.token.symbol).join(", ")} PnL, stops, liquidity, and buy-flow before any scale-up.`,
       } satisfies AutonomousLoopTickReport;
       return attachAutonomousLoopTick(scoutState, report, account);
     }
@@ -23742,7 +23766,7 @@ function applyArbiterPaperTradeToLedger(
       scaled = true;
     }
     if (!scaled) {
-      nextPositions.push(...positions, {
+      nextPositions.push({
         id: `pos-${token.id}`,
         token_id: token.id,
         symbol: token.symbol,
