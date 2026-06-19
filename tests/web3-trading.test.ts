@@ -6180,8 +6180,10 @@ describe("Web3 autonomous trading subsystem", () => {
 
   test("GIVEN dry-run readiness WHEN Jupiter v2 order returns an unsigned transaction THEN the plan records order metadata only", async () => {
     process.env.JUPITER_API_KEY = "test-key";
+    const requestedUrls: string[] = [];
     const fetchImpl = async (input: RequestInfo | URL) => {
       const url = String(input);
+      requestedUrls.push(url);
       if (url.includes("/token-boosts/top/v1")) {
         return Response.json([
           { chainId: "solana", tokenAddress: "TokenLive111", amount: 6, totalAmount: 9 },
@@ -6261,6 +6263,14 @@ describe("Web3 autonomous trading subsystem", () => {
 
     expect(state.execution_readiness.config.mode).toBe("dry-run");
     expect(state.execution_readiness.checks.every((check) => check.status !== "fail")).toBe(true);
+    expect(state.discovery_tape.sources.find((source) => source.id === "portfolio-watch")).toMatchObject({
+      status: "ok",
+      count: 3,
+    });
+    expect(requestedUrls.some((url) =>
+      url.includes("/tokens/v1/solana/") &&
+      url.includes("DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263")
+    )).toBe(true);
     expect(plan?.input_amount_usd).toBe(500);
     expect(plan).toMatchObject({
       quoted_at: expect.any(String),

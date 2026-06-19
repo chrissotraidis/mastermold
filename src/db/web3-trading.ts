@@ -12,6 +12,33 @@ const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const JUPITER_QUOTE_BASE_URL = "https://lite-api.jup.ag/swap/v1/quote";
 const JUPITER_V2_BASE_URL = "https://api.jup.ag/swap/v2";
 const JUPITER_TRIGGER_BASE_URL = "https://api.jup.ag/trigger/v2";
+const HELD_POSITION_DEX_WATCHLIST: DexWatchlistToken[] = [
+  {
+    chainId: "solana",
+    tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    symbol: "BONK",
+    tokenId: "bonk-sol",
+  },
+  {
+    chainId: "solana",
+    tokenAddress: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+    symbol: "WIF",
+    tokenId: "wif-sol",
+  },
+  {
+    chainId: "solana",
+    tokenAddress: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+    symbol: "POPCAT",
+    tokenId: "popcat-sol",
+  },
+];
+
+type DexWatchlistToken = {
+  chainId: string;
+  tokenAddress: string;
+  symbol: string;
+  tokenId: string;
+};
 
 export type MemecoinMarket = {
   id: string;
@@ -779,7 +806,8 @@ export type DiscoverySourceId =
   | "dex-latest-boosts"
   | "dex-latest-profiles"
   | "dex-community-takeovers"
-  | "dex-latest-ads";
+  | "dex-latest-ads"
+  | "portfolio-watch";
 
 export type DiscoverySourceStatus = "ok" | "degraded" | "failed";
 
@@ -9372,6 +9400,8 @@ type DexPaidOrderAuditResult = {
 type DexDiscoveryItem = {
   chainId: string;
   tokenAddress: string;
+  watchSymbol?: string;
+  watchTokenId?: string;
   sources: DiscoverySourceId[];
   amount: number;
   totalAmount: number;
@@ -15562,7 +15592,7 @@ function buildWeb3TradingState({
 }
 
 async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLike): Promise<Web3TradingState> {
-  const plans = await buildExecutionPlans(state.market, state.signals, state.portfolio, state.execution_readiness, fetchImpl);
+  const plans = await buildExecutionPlans(state.market, state.signals, state.portfolio, state.trade_tape, state.execution_readiness, fetchImpl);
   const profit_optimizer = reconcileOptimizerFills(
     buildProfitOptimizer(
       state.market,
@@ -20886,6 +20916,7 @@ async function buildExecutionPlans(
   market: MemecoinMarket[],
   signals: TradingSignal[],
   portfolio: TradingPortfolio,
+  recentTrades: AutonomousTrade[],
   readiness: ExecutionReadiness,
   fetchImpl: FetchLike,
 ): Promise<ExecutionPlan[]> {
@@ -20907,7 +20938,7 @@ async function buildExecutionPlans(
     }),
   );
   const sellPlans = await Promise.all(
-    protectiveSellCandidates(market, portfolio)
+    protectiveSellCandidates(market, portfolio, recentTrades)
       .slice(0, 3)
       .map(({ position, token }) => quoteJupiterSellPlan(token, position, readiness, fetchImpl)),
   );
@@ -21148,15 +21179,48 @@ function localPositionSellPlan(
   };
 }
 
-function protectiveSellCandidates(market: MemecoinMarket[], portfolio: TradingPortfolio) {
+function protectiveSellCandidates(market: MemecoinMarket[], portfolio: TradingPortfolio, recentTrades: AutonomousTrade[] = []) {
   const byId = new Map(market.map((token) => [token.id, token]));
-  const bySymbol = new Map(market.map((token) => [token.symbol.toUpperCase(), token]));
-  return portfolio.open_positions
+  const bySymbol = new Map(market.map((token) => [normalizeTradingSymbol(token.symbol), token]));
+  const openPositionCandidates = portfolio.open_positions
     .flatMap((position) => {
-      const token = byId.get(position.token_id) ?? bySymbol.get(position.symbol.toUpperCase());
+      const token = byId.get(position.token_id) ?? bySymbol.get(normalizeTradingSymbol(position.symbol));
       return token && position.value_usd > 0 ? [{ position, token }] : [];
-    })
+    });
+  const openSymbols = new Set(openPositionCandidates.map(({ position }) => normalizeTradingSymbol(position.symbol)));
+  const paperExitCandidates = recentTrades
+    .filter((trade) => trade.side === "sell" && trade.size_usd > 0 && !openSymbols.has(normalizeTradingSymbol(trade.symbol)))
+    .flatMap((trade) => {
+      const token = bySymbol.get(normalizeTradingSymbol(trade.symbol));
+      if (!token) return [];
+      return [{
+        token,
+        position: positionFromPaperExit(trade, token),
+      }];
+    });
+  return [...openPositionCandidates, ...paperExitCandidates]
     .sort((a, b) => protectiveSellPressure(b.position, b.token) - protectiveSellPressure(a.position, a.token));
+}
+
+function positionFromPaperExit(trade: AutonomousTrade, token: MemecoinMarket): TradingPosition {
+  const mark = trade.price_usd > 0 ? trade.price_usd : Math.max(token.price_usd, 0);
+  const value = Math.max(0, trade.size_usd);
+  return {
+    id: `paper-exit-${trade.id}`,
+    token_id: token.id,
+    symbol: token.symbol,
+    quantity: mark > 0 ? value / mark : 0,
+    entry_price_usd: mark,
+    mark_price_usd: mark,
+    peak_price_usd: mark,
+    trailing_stop_price_usd: trailingStopPrice(mark, -8),
+    value_usd: value,
+    pnl_usd: 0,
+    pnl_pct: 0,
+    stop_loss_pct: -8,
+    take_profit_pct: 18,
+    opened_at: trade.created_at,
+  };
 }
 
 function protectiveSellPressure(position: TradingPosition, token: MemecoinMarket) {
@@ -21179,14 +21243,14 @@ export async function fetchDexScreenerMarkets(
   const fetchedAt = new Date().toISOString();
   try {
     const discovery = await getDexScreenerDiscovery(fetchImpl);
-    const candidateTokens = discovery.candidates.slice(0, 36);
+    const candidateTokens = appendHeldPositionWatchCandidates(discovery.candidates.slice(0, 36));
     const auditedCandidateTokens = await enrichDexScreenerPaidOrders(fetchImpl, candidateTokens);
     const pairs = await getDexScreenerPairs(fetchImpl, auditedCandidateTokens);
-    const markets = dexPairsToMarkets(pairs, auditedCandidateTokens, fetchedAt).slice(0, 8);
+    const markets = prioritizePortfolioWatchMarkets(dexPairsToMarkets(pairs, auditedCandidateTokens, fetchedAt), auditedCandidateTokens).slice(0, 12);
     return {
       market: markets,
       fetchedAt,
-      discovery: buildDiscoveryTape("live", markets, discovery.sources, discovery.tokensConsidered, auditedCandidateTokens),
+      discovery: buildDiscoveryTape("live", markets, appendPortfolioWatchSource(discovery.sources), discovery.tokensConsidered, auditedCandidateTokens),
     };
   } catch (error) {
     return {
@@ -21196,6 +21260,38 @@ export async function fetchDexScreenerMarkets(
       error: error instanceof Error ? error.message : "DEX Screener fetch failed.",
     };
   }
+}
+
+function prioritizePortfolioWatchMarkets(markets: MemecoinMarket[], candidates: DexDiscoveryItem[]) {
+  const watched = new Set(
+    candidates
+      .filter((candidate) => candidate.sources.includes("portfolio-watch"))
+      .map((candidate) => `${candidate.chainId}-${candidate.tokenAddress}`.toLowerCase()),
+  );
+  return [...markets].sort((a, b) => {
+    const aWatched = watched.has(`${chainIdForMarket(a.chain)}-${a.token_address}`.toLowerCase()) ? 1 : 0;
+    const bWatched = watched.has(`${chainIdForMarket(b.chain)}-${b.token_address}`.toLowerCase()) ? 1 : 0;
+    return bWatched - aWatched || marketQuality(b) - marketQuality(a);
+  });
+}
+
+function chainIdForMarket(chain: MemecoinMarket["chain"]) {
+  if (chain === "ethereum") return "ethereum";
+  return chain;
+}
+
+function appendPortfolioWatchSource(sources: DiscoverySource[]): DiscoverySource[] {
+  if (sources.some((source) => source.id === "portfolio-watch")) return sources;
+  return [
+    ...sources,
+    {
+      id: "portfolio-watch",
+      label: "Held coin watch",
+      status: "ok",
+      count: HELD_POSITION_DEX_WATCHLIST.length,
+      detail: "Read-only DEX pair refresh for held paper positions that need protective exit monitoring.",
+    },
+  ];
 }
 
 export function dexPairsToMarkets(
@@ -21229,9 +21325,9 @@ export function dexPairsToMarkets(
       const riskFlags = liveRiskFlags(pair, candidate, ageMinutes, liquidity);
       if (!chain || !pair.baseToken?.address || !pair.baseToken.symbol) return null;
       return {
-        id: `${pair.chainId}-${pair.baseToken.address}`.toLowerCase(),
+        id: candidate?.watchTokenId ?? `${pair.chainId}-${pair.baseToken.address}`.toLowerCase(),
         chain,
-        symbol: pair.baseToken.symbol,
+        symbol: candidate?.watchSymbol ?? pair.baseToken.symbol,
         name: pair.baseToken.name ?? pair.baseToken.symbol,
         token_address: pair.baseToken.address,
         pair_address: pair.pairAddress ?? `${pair.chainId}-${pair.baseToken.address}`,
@@ -21360,7 +21456,7 @@ function buildPortfolio(market: MemecoinMarket[]): TradingPortfolio {
   ];
   const open_positions = positionInputs.flatMap((position) => {
     const token = market.find((item) => item.id === position.token_id)
-      ?? market.find((item) => item.symbol.toUpperCase() === position.symbol.toUpperCase());
+      ?? market.find((item) => normalizeTradingSymbol(item.symbol) === normalizeTradingSymbol(position.symbol));
     if (!token) return [];
     const mark = token?.price_usd ?? position.entry_price_usd;
     const peak = Math.max(position.entry_price_usd, mark);
@@ -26338,9 +26434,9 @@ function bestStopStep(item: PositionExitLadderItem) {
 function triggerMarketByPosition(positions: TradingPosition[], market: MemecoinMarket[]) {
   const byPosition = new Map<string, MemecoinMarket>();
   const byId = new Map(market.map((token) => [token.id, token]));
-  const bySymbol = new Map(market.map((token) => [token.symbol, token]));
+  const bySymbol = new Map(market.map((token) => [normalizeTradingSymbol(token.symbol), token]));
   for (const position of positions) {
-    const token = byId.get(position.token_id) ?? bySymbol.get(position.symbol);
+    const token = byId.get(position.token_id) ?? bySymbol.get(normalizeTradingSymbol(position.symbol));
     if (token) byPosition.set(position.id, token);
   }
   return byPosition;
@@ -33544,7 +33640,7 @@ function buildDiscoveryEdgeSupervisor({
   feedIntegrity: MarketFeedIntegrity;
 }): DiscoveryEdgeSupervisor {
   const expectedSources = discoveryTape.status === "sample" ? 1 : 5;
-  const healthySources = discoveryTape.sources.filter((source) => source.status === "ok").length;
+  const healthySources = discoveryTape.sources.filter((source) => source.id !== "portfolio-watch" && source.status === "ok").length;
   const sourceCoveragePct = clamp(Math.round((healthySources / Math.max(1, expectedSources)) * 100), 0, 100);
   const mappedCoveragePct = discoveryTape.tokens_considered > 0
     ? clamp(Math.round((discoveryTape.pairs_mapped / discoveryTape.tokens_considered) * 100), 0, 100)
@@ -79362,6 +79458,41 @@ async function getDexScreenerDiscovery(fetchImpl: FetchLike): Promise<DexDiscove
   };
 }
 
+function appendHeldPositionWatchCandidates(candidates: DexDiscoveryItem[]) {
+  const candidateMap = new Map(candidates.map((candidate) => [discoveryItemKey(candidate), candidate]));
+  for (const watch of HELD_POSITION_DEX_WATCHLIST) {
+    const key = discoveryItemKey(watch);
+    const current = candidateMap.get(key);
+    if (current) {
+      candidateMap.set(key, {
+        ...current,
+        watchSymbol: watch.symbol,
+        watchTokenId: watch.tokenId,
+        sources: [...new Set([...current.sources, "portfolio-watch" as DiscoverySourceId])],
+      });
+      continue;
+    }
+    candidateMap.set(key, {
+      chainId: watch.chainId,
+      tokenAddress: watch.tokenAddress,
+      watchSymbol: watch.symbol,
+      watchTokenId: watch.tokenId,
+      sources: ["portfolio-watch"],
+      amount: 0,
+      totalAmount: 0,
+      adImpressions: 0,
+      paidOrderChecked: false,
+      activePaidOrderCount: 0,
+      approvedPaidOrderCount: 0,
+      paidAdOrderCount: 0,
+      paidOrderStatuses: [],
+      description: `Held-position watchlist feed for ${watch.symbol}.`,
+      url: null,
+    });
+  }
+  return [...candidateMap.values()];
+}
+
 async function enrichDexScreenerPaidOrders(
   fetchImpl: FetchLike,
   candidates: DexDiscoveryItem[],
@@ -79478,19 +79609,29 @@ async function getDexScreenerPairs(
   }
 
   const responses = await Promise.all(
-    [...byChain.entries()].map(async ([chainId, addresses]) => {
-      const tokens = addresses.slice(0, 30).join(",");
-      const response = await fetchImpl(`${DEX_SCREENER_BASE_URL}/tokens/v1/${chainId}/${tokens}`, {
-        headers: { accept: "application/json" },
-      });
-      if (!response.ok) {
-        throw new Error(`DEX Screener pairs failed with ${response.status}.`);
-      }
-      const json = await response.json();
-      return Array.isArray(json) ? (json as DexScreenerPair[]) : [];
-    }),
+    [...byChain.entries()].flatMap(([chainId, addresses]) =>
+      chunk(addresses, 30).map(async (addressBatch) => {
+        const tokens = addressBatch.join(",");
+        const response = await fetchImpl(`${DEX_SCREENER_BASE_URL}/tokens/v1/${chainId}/${tokens}`, {
+          headers: { accept: "application/json" },
+        });
+        if (!response.ok) {
+          throw new Error(`DEX Screener pairs failed with ${response.status}.`);
+        }
+        const json = await response.json();
+        return Array.isArray(json) ? (json as DexScreenerPair[]) : [];
+      }),
+    ),
   );
   return responses.flat();
+}
+
+function chunk<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
 }
 
 function sampleMarketSource(): Web3TradingState["market_source"] {
@@ -79607,6 +79748,9 @@ function discoveryCandidate(token: MemecoinMarket, exactDiscovery?: DexDiscovery
 function discoverySourcesForMarket(token: MemecoinMarket): DiscoverySourceId[] {
   if (token.token_address.endsWith("sample")) return ["sample-seed"];
   const sources: DiscoverySourceId[] = [];
+  if (HELD_POSITION_DEX_WATCHLIST.some((item) => item.tokenAddress.toLowerCase() === token.token_address.toLowerCase())) {
+    sources.push("portfolio-watch");
+  }
   if (token.boosts > 0 || token.paid_orders > 0) sources.push("dex-top-boosts");
   if (token.age_minutes < 240 || token.boosts > 0) sources.push("dex-latest-boosts");
   if (token.risk_flags.includes("community-takeover")) sources.push("dex-community-takeovers");
@@ -85907,6 +86051,7 @@ function sourceLabelForModel(source: DiscoverySourceId) {
   if (source === "dex-latest-profiles") return "profile";
   if (source === "dex-community-takeovers") return "community takeover";
   if (source === "dex-latest-ads") return "ad";
+  if (source === "portfolio-watch") return "portfolio watch";
   return "sample";
 }
 
@@ -86370,6 +86515,10 @@ function numberOrZero(value: unknown): number {
 function numberOrNull(value: unknown): number | null {
   const number = typeof value === "string" ? Number(value) : typeof value === "number" ? value : NaN;
   return Number.isFinite(number) ? number : null;
+}
+
+function normalizeTradingSymbol(value: string) {
+  return value.replace(/^[^a-z0-9]+/i, "").toUpperCase();
 }
 
 function positiveNumber(value: unknown, fallback: number) {

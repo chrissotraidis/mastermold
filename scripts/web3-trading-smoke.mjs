@@ -4121,7 +4121,7 @@ async function main() {
   const orderRehearsal = await postTrading({
     scenario: "breakout",
     source: "live-dex",
-    account: "persistent",
+    account: "ephemeral",
     advance: false,
     execution: {
       mode: "dry-run",
@@ -4141,6 +4141,20 @@ async function main() {
   assert(orderRehearsal.payload.execution_readiness.config.daily_spend_cap_usd === 10_000, "Order rehearsal should carry enough dry-run cap for route/order proof.", orderRehearsal.payload.execution_readiness.config);
   assert(orderRehearsal.payload.pre_submit_rehearsal?.mode === "pre-submit-rehearsal", "Order rehearsal should expose pre-submit rehearsal evidence.", orderRehearsal.payload.pre_submit_rehearsal);
   assert(orderRehearsal.payload.autonomous_order_handoff?.mode === "autonomous-order-handoff", "Order rehearsal should expose order handoff evidence.", orderRehearsal.payload.autonomous_order_handoff);
+  assert(
+    orderRehearsal.payload.discovery_tape?.sources?.some((source) => source.id === "portfolio-watch" && source.status === "ok"),
+    "Order rehearsal should include held-position watchlist market refresh evidence.",
+    orderRehearsal.payload.discovery_tape,
+  );
+  assert(
+    orderRehearsal.payload.execution_plans?.some((plan) =>
+      plan.side === "sell" &&
+      plan.source === "jupiter" &&
+      plan.output_mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+    ),
+    "Order rehearsal should quote at least one held-position protective sell route to USDC.",
+    orderRehearsal.payload.execution_plans,
+  );
   assert(orderRehearsal.payload.execution_gate.live_execution_enabled === false, "Order rehearsal must not enable live execution.", orderRehearsal.payload.execution_gate);
   assert(orderRehearsal.payload.autonomous_live_autonomy_readiness.can_trade_real_capital === false, "Order rehearsal must not permit real-capital trading.", orderRehearsal.payload.autonomous_live_autonomy_readiness);
 
