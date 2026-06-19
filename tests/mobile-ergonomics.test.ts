@@ -814,6 +814,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("health.checks.slice(0, 7)");
     expect(settingsPage).toContain("health.safe_commands.slice(0, 5)");
     expect(settingsPage).toContain("Doctor receipts are local, sanitized, and status-only");
+    expect(settingsPage).toContain("SettingsSignerCredentialPacketPanel");
+    expect(settingsPage).toContain("Signer credential packet");
+    expect(settingsPage).toContain("Manual external wallet");
+    expect(settingsPage).toContain("Privy server wallet");
+    expect(settingsPage).toContain("Turnkey policy wallet");
+    expect(settingsPage).toContain("Session-key vault");
+    expect(settingsPage).toContain("No private keys, seed phrases, raw transactions");
+    expect(settingsPage).toContain("provider accounts are operator-owned outside the app");
     expect(settingsPage).toContain("Live credential queue");
     expect(settingsPage).toContain("What is left before supervised trading review");
     expect(settingsPage).toContain("buildWeb3CredentialActionQueue");
@@ -863,6 +871,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("acquisition.items.map");
     expect(source("src/db/web3-account-acquisition.ts")).toContain("https://dev.jup.ag/docs/swap/v2/order-and-execute");
     expect(source("src/db/web3-account-acquisition.ts")).toContain("Swap V2 /order and /execute");
+    expect(source("src/db/web3-signer-credential-packet.ts")).toContain("web3-signer-credential-packet");
+    expect(source("src/db/web3-signer-credential-packet.ts")).toContain("PRIVY_SOLANA_WALLET_ID");
+    expect(source("src/db/web3-signer-credential-packet.ts")).toContain("TURNKEY_SOLANA_WALLET_ACCOUNT");
+    expect(source("src/db/web3-signer-credential-packet.ts")).toContain("private_key_storage");
+    expect(source("app/api/web3-signer-credential-packet/route.ts")).toContain("buildWeb3SignerCredentialPacket");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-signer-credential-packet");
     expect(settingsConsole).toContain("Credential action console");
     expect(settingsConsole).toContain("Session-only provider tests");
     expect(settingsConsole).toContain("Local credential installer");

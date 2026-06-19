@@ -729,6 +729,7 @@ const disclosureSections = [
       "On-chain wallet, via Zerion — wallet test and fungible-position snapshot import exist.",
       "Web3 credentials — Settings shows the Helius/Solana read rail, Jupiter Swap V2 order rail, dedicated public wallet, hash-only wallet ownership proof, signer posture, emergency-stop ops, and accounting lanes with setup links, ignored-env targets, safe test commands, and redacted status only.",
       "Jupiter setup is explicit but still credential-gated: the app can point the operator to the Jupiter Developer Platform, install `JUPITER_API_KEY` into ignored local env in trusted local development, and rehearse quote/order evidence, but it withholds unsigned transaction bytes and keeps execute, signing, submission, live execution, and wallet mutation blocked.",
+      "Signer setup is now an explicit credential packet in Settings: manual external wallet, Privy server wallet, Turnkey policy wallet, and future session-key paths show env target names, selected-path status, missing evidence, and no-secret boundaries without creating provider accounts or requesting signatures.",
       "Account imports are one-time snapshots in this build; import again before relying on balances.",
       "Live chat can be tested and used when a key is saved.",
     ],

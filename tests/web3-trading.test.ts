@@ -14,6 +14,7 @@ import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
+import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
@@ -1172,6 +1173,96 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("Private keys"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
     expect(JSON.stringify(receipt)).not.toContain("test-jupiter-secret");
+  });
+
+  test("GIVEN signer custody setup is incomplete WHEN the signer credential packet route runs THEN it returns provider choices without secrets", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";
+
+    const rejected = await SIGNER_CREDENTIAL_PACKET_GET(new Request("http://localhost/api/web3-signer-credential-packet?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await SIGNER_CREDENTIAL_PACKET_GET(new Request("http://localhost/api/web3-signer-credential-packet?scenario=base&source=sample&account=ephemeral&cycles=2"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      active_provider: string;
+      recommended_provider: string;
+      provider_readiness_status: string;
+      provider_readiness_score: number;
+      selected_path: {
+        id: string;
+        label: string;
+        env_targets: string[];
+        credential_storage: string;
+        signing_model: string;
+        requires_user_presence: boolean;
+        can_auto_sign_after_review: boolean;
+      };
+      paths: Array<{
+        id: string;
+        label: string;
+        env_targets: string[];
+        credential_storage: string;
+        configured: boolean;
+        security_rule: string;
+      }>;
+      missing_required: string[];
+      required_evidence: string[];
+      external_account_permission: string;
+      in_app_provider_signup_permission: string;
+      credential_storage_permission: string;
+      secret_echo_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      raw_transaction_storage: string;
+      signed_payload_storage: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-signer-credential-packet");
+    expect(["missing-wallet", "needs-provider-choice", "needs-provider-credentials", "needs-policy", "needs-signer-request", "review-ready", "blocked"]).toContain(packet.status);
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.active_provider).toBe("external-wallet");
+    expect(packet.recommended_provider).toBe("external-wallet");
+    expect(packet.provider_readiness_score).toBeGreaterThanOrEqual(0);
+    expect(packet.selected_path).toMatchObject({
+      id: "external-wallet",
+      credential_storage: "external-wallet",
+      signing_model: "wallet-prompt",
+      requires_user_presence: true,
+      can_auto_sign_after_review: false,
+    });
+    expect(packet.selected_path.env_targets).toContain("MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER=external-wallet");
+    expect(packet.paths.map((path) => path.id)).toEqual([
+      "external-wallet",
+      "privy-server-wallet",
+      "turnkey-policy-wallet",
+      "session-key-vault",
+    ]);
+    expect(packet.paths.find((path) => path.id === "privy-server-wallet")?.env_targets).toContain("PRIVY_SOLANA_WALLET_ID");
+    expect(packet.paths.find((path) => path.id === "turnkey-policy-wallet")?.env_targets).toContain("TURNKEY_SOLANA_WALLET_ACCOUNT");
+    expect(packet.paths.find((path) => path.id === "session-key-vault")?.security_rule).toContain("do not store session private keys");
+    expect(packet.missing_required).toContain("Dedicated public trading wallet");
+    expect(packet.required_evidence).toContain("Manual live-executor review before any real signature or submit path");
+    expect(packet.external_account_permission).toBe("operator-external-only");
+    expect(packet.in_app_provider_signup_permission).toBe("blocked");
+    expect(packet.credential_storage_permission).toBe("external-wallet-or-provider-vault-only");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(packet.private_key_storage).toBe("blocked");
+    expect(packet.seed_phrase_storage).toBe("blocked");
+    expect(packet.raw_transaction_storage).toBe("blocked");
+    expect(packet.signed_payload_storage).toBe("blocked");
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.controls.some((control) => control.includes("Private keys"))).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain("test-helius-secret");
+    expect(JSON.stringify(packet)).not.toContain("test-jupiter-secret");
   });
 
   test("GIVEN a browser wallet signs the ownership challenge WHEN the ownership route verifies it THEN it returns a hash-only blocked receipt", async () => {

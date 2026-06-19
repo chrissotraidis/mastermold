@@ -21,6 +21,7 @@ import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
+import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
 
 const statusLabels: Record<IntegrationStatusJson["status"], string> = {
@@ -47,6 +48,7 @@ export default async function IntegrationsSettingsPage() {
   const brainState = toPublicBrainState(brainStateRaw);
   const web3AccountReceipt = buildWeb3AccountSetupReceipt(web3State);
   const web3AcquisitionReceipt = buildWeb3AccountAcquisitionReceipt(web3State);
+  const web3SignerPacket = buildWeb3SignerCredentialPacket(web3State);
   const web3CredentialDoctor = getWeb3CredentialDoctorHealth();
   const web3LaunchChecklist = buildWeb3AutonomyLaunchChecklist(
     web3State,
@@ -72,6 +74,7 @@ export default async function IntegrationsSettingsPage() {
           <Web3CredentialsRunwayCard
             receipt={web3AccountReceipt}
             acquisition={web3AcquisitionReceipt}
+            signerPacket={web3SignerPacket}
             credentialDoctor={web3CredentialDoctor}
             launchChecklist={web3LaunchChecklist}
             state={web3State}
@@ -114,12 +117,14 @@ export default async function IntegrationsSettingsPage() {
 function Web3CredentialsRunwayCard({
   receipt,
   acquisition,
+  signerPacket,
   credentialDoctor,
   launchChecklist,
   state,
 }: {
   receipt: Web3AccountSetupReceipt;
   acquisition: Web3AccountAcquisitionReceipt;
+  signerPacket: Web3SignerCredentialPacket;
   credentialDoctor: Web3CredentialDoctorHealth;
   launchChecklist: Web3AutonomyLaunchChecklist;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
@@ -245,6 +250,8 @@ function Web3CredentialsRunwayCard({
           ) : null}
 
           <SettingsCredentialDoctorPanel health={credentialDoctor} />
+
+          <SettingsSignerCredentialPacketPanel packet={signerPacket} />
 
           <div className="rounded-md border border-engine/25 bg-surface-dim/35 p-3" aria-label="Live Web3 credential queue">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -690,6 +697,95 @@ function SettingsCredentialDoctorPanel({ health }: { health: Web3CredentialDocto
       </p>
       <p className="sr-only" aria-label="Web3 credential doctor security boundary">
         Web3 credential doctor live execution blocked; wallet mutation blocked; transaction submission blocked; private key storage blocked; seed phrase storage blocked; secret echo blocked.
+      </p>
+    </div>
+  );
+}
+
+function SettingsSignerCredentialPacketPanel({ packet }: { packet: Web3SignerCredentialPacket }) {
+  const selected = packet.selected_path;
+  const openCount = packet.missing_required.length;
+  return (
+    <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Web3 signer credential packet">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Signer credential packet</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {selected.label} · {packet.status.replaceAll("-", " ")}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{packet.summary}</p>
+        </div>
+        <LaunchQueueBadge status={packet.status === "review-ready" ? "watch" : packet.status === "blocked" ? "fail" : "watch"} label={`${openCount} open`} />
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Selected path</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">{selected.signing_model.replaceAll("-", " ")}</p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">{selected.next_action}</p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Evidence</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">{packet.provider_readiness_score}/100 · {packet.provider_readiness_status.replaceAll("-", " ")}</p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            Wallet proof {packet.wallet_ownership_proved ? "ready" : "missing"} · policy {packet.policy_hash_present ? "ready" : "missing"} · request {packet.request_id_present ? "ready" : "missing"}
+          </p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Boundary</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">Live signing blocked</p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            No private keys, seed phrases, raw transactions, signed payloads, live execution, or wallet mutation.
+          </p>
+        </div>
+      </div>
+      {packet.missing_required.length > 0 ? (
+        <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.035] p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next signer inputs</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {packet.missing_required.map((item) => (
+              <span key={item} className="rounded-md border border-caution/30 bg-caution/10 px-2 py-1 text-[11px] leading-4 text-caution">
+                {item}
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{packet.next_action}</p>
+        </div>
+      ) : null}
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {packet.paths.map((path) => (
+          <div key={path.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{path.label}</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {path.status} · {path.credential_storage.replaceAll("-", " ")}
+                </p>
+              </div>
+              <CredentialStateBadge configured={path.configured} status={path.configured ? "configured" : path.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">{path.security_rule}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {path.env_targets.map((target) => (
+                <span key={target} className="rounded-md border border-outline-variant/25 bg-void/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {target}
+                </span>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <a href={path.setup_url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-semibold text-engine hover:text-engine/80">
+                Setup
+                <ExternalLink aria-hidden="true" className="size-3" />
+              </a>
+              <a href={path.docs_url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-semibold text-violet hover:text-violet/80">
+                Docs
+                <ExternalLink aria-hidden="true" className="size-3" />
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-5 text-outline">
+        This packet is credential planning only; provider accounts are operator-owned outside the app and real-capital execution remains externally reviewed.
       </p>
     </div>
   );
