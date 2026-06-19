@@ -6788,7 +6788,7 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(supervisedChecklist.cutover_runway.find((step) => step.id === "production-supervision")).toMatchObject({
       status: "review",
-      command: "npm run supervise:web3",
+      command: "npm run supervise:web3 -- --base-url=http://localhost:4010 --rounds=1 --ticks-per-round=1 --target-net-pnl=1 --max-drawdown=250 --json",
     });
     const repeatProfitChecklist = buildWeb3AutonomyLaunchChecklist(state, {
       status: "target-hit",

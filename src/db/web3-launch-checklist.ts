@@ -547,7 +547,7 @@ function buildCutoverRunway({
       id: "production-supervision",
       label: "Supervise runner",
       status: supervisorStatus,
-      command: "npm run supervise:web3",
+      command: "npm run supervise:web3 -- --base-url=http://localhost:4010 --rounds=1 --ticks-per-round=1 --target-net-pnl=1 --max-drawdown=250 --json",
       evidence: `${productionSupervisor.status.replaceAll("-", " ")} supervisor, score ${productionSupervisor.readiness_score}/100.`,
       next_action: productionSupervisor.next_action,
       blocks_live_capital: true,

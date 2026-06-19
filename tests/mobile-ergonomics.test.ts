@@ -853,6 +853,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run supervise:web3 -- --base-url=http://localhost:4010 --rounds=1 --ticks-per-round=1 --target-net-pnl=1 --max-drawdown=250 --json");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("--target-net-pnl=1 --max-drawdown=250 --json");
     expect(source("docs/web3-credentials-runbook.md")).toContain("strict verifier runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("read-only DEX scanner testing");
     expect(source("docs/web3-credentials-runbook.md")).toContain("browser-wallet public-address detection");
@@ -906,6 +908,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("hard blockers, review gates, and the next cutover step");
+    expect(source("components/review-readiness.tsx")).toContain("hardened local paper command");
     expect(source("components/review-readiness.tsx")).toContain("compact DEX discovery receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings now shows a strict verifier runway");
     expect(source("components/review-readiness.tsx")).toContain("configured Helius/Solana provider-health proof");
