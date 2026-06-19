@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import {
@@ -24,7 +25,11 @@ export async function GET(request: Request): Promise<NextResponse<Web3AutonomyLa
       account,
       advance: false,
     });
-    return NextResponse.json(buildWeb3AutonomyLaunchChecklist(state, getWeb3PromotedPaperAutopilotHealth()));
+    return NextResponse.json(buildWeb3AutonomyLaunchChecklist(
+      state,
+      getWeb3PromotedPaperAutopilotHealth(),
+      getWeb3DaemonSupervisorHealth(),
+    ));
   } catch {
     return NextResponse.json({ error: "Web3 autonomy launch checklist could not be built." }, { status: 500 });
   }

@@ -60,6 +60,11 @@ async function main() {
   assert(!("receipt_path" in health.web3_daemon_supervisor), "Supervisor health should not expose local receipt paths.", health.web3_daemon_supervisor);
   assert(typeof health.web3_daemon_supervisor.net_pnl_usd === "number", "Supervisor health should expose sanitized paper PnL.", health.web3_daemon_supervisor);
   assert(typeof health.web3_daemon_supervisor.max_drawdown_usd === "number", "Supervisor health should expose sanitized drawdown.", health.web3_daemon_supervisor);
+  assert(health.web3_production_supervisor?.mode === "web3-production-supervisor-readiness", "Health endpoint should expose production supervisor readiness.", health.web3_production_supervisor);
+  assert(health.web3_production_supervisor.live_execution_permission === "blocked", "Production supervisor readiness should keep live execution blocked.", health.web3_production_supervisor);
+  assert(health.web3_production_supervisor.wallet_mutation_permission === "blocked", "Production supervisor readiness should keep wallet mutation blocked.", health.web3_production_supervisor);
+  assert(health.web3_production_supervisor.can_satisfy_process_gate === false, "Production supervisor readiness should not self-satisfy the process gate.", health.web3_production_supervisor);
+  assert(!("receipt_path" in health.web3_production_supervisor), "Production supervisor readiness should not expose local receipt paths.", health.web3_production_supervisor);
   assert(health.web3_promoted_paper_autopilot, "Health endpoint should expose promoted paper autopilot health.", health);
   assert(["absent", "blocked", "target-hit", "completed", "running", "paper-guarded", "not-started"].includes(health.web3_promoted_paper_autopilot.status), "Promoted paper autopilot health should return a known status.", health.web3_promoted_paper_autopilot);
   assert(health.web3_promoted_paper_autopilot.live_execution_permission === "blocked", "Promoted paper autopilot health should keep live execution blocked.", health.web3_promoted_paper_autopilot);

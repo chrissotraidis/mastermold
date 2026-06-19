@@ -5482,7 +5482,14 @@ describe("Web3 autonomous trading subsystem", () => {
       "profit-proof",
       "live-boundary",
     ]);
-    expect(launchChecklist.items.find((item) => item.id === "process-supervision")?.blocker).toContain("production worker");
+    expect(launchChecklist.production_supervisor_readiness).toMatchObject({
+      mode: "web3-production-supervisor-readiness",
+      status: "missing",
+      can_satisfy_process_gate: false,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(launchChecklist.items.find((item) => item.id === "process-supervision")?.blocker).toContain("supervise:web3");
     expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("custody/provider credentials");
     expect(launchChecklist.items.find((item) => item.id === "wallet-accounting")?.blocker).toContain("wallet holdings");
     expect(launchChecklist.items.find((item) => item.id === "profit-proof")?.blocker).toContain("long-horizon promoted paper proof");
@@ -5495,6 +5502,26 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(launchChecklist.controls.some((control) => control.includes("launch-readiness contract"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("process-supervision"))).toBe(true);
     expect(launchChecklist.controls.some((control) => control.includes("does not sign"))).toBe(true);
+    const supervisedChecklist = buildWeb3AutonomyLaunchChecklist(state, undefined, {
+      status: "completed",
+      updated_at: new Date().toISOString(),
+      runner_id: "test-supervisor",
+      summary: "Supervisor completed a hardened paper run.",
+      net_pnl_usd: 12,
+      target_net_pnl_usd: 10,
+      last_equity_usd: 10_012,
+      max_drawdown_usd: 1,
+      max_drawdown_limit_usd: 50,
+      profit_target_hit: true,
+      loss_brake_tripped: false,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(supervisedChecklist.production_supervisor_readiness.status).toBe("production-gated");
+    expect(supervisedChecklist.items.find((item) => item.id === "process-supervision")).toMatchObject({
+      status: "watch",
+      blocker: "Move this to external production-worker review with process manager, restart policy, alerts, and secret scope documented.",
+    });
     expect(state.autonomous_daemon_handoff.mode).toBe("autonomous-daemon-handoff");
     expect(["ready", "observe-only", "refresh-first", "protect-only", "paused", "blocked"]).toContain(state.autonomous_daemon_handoff.status);
     expect(state.autonomous_daemon_handoff.runner_role).toBe("external-scheduler");

@@ -7,6 +7,7 @@ import { Activity, CandlestickChart, KeyRound, LineChart, Pause, Play, RefreshCw
 import { Chip } from "@/components/sentinel";
 import type { Web3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import type { Web3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
@@ -43,6 +44,7 @@ type QuickAgentActionOutcome = {
 type HealthPayload = {
   status: "ok";
   web3_daemon_supervisor?: Web3DaemonSupervisorHealth;
+  web3_production_supervisor?: Web3ProductionSupervisorReadiness;
   web3_promoted_paper_autopilot?: Web3PromotedPaperAutopilotHealth;
 };
 type PromotedPaperAutopilotReceipt = {
@@ -660,7 +662,7 @@ export function Web3TradingWorkspaceLoader({
   const daemonHandoff = state.autonomous_daemon_handoff;
   const marketIngestion = state.market_ingestion_plan;
   const marketIntake = state.autonomous_market_intake_plan;
-  const launchChecklist = buildWeb3AutonomyLaunchChecklist(state, promotedAutopilotHealth);
+  const launchChecklist = buildWeb3AutonomyLaunchChecklist(state, promotedAutopilotHealth, supervisorHealth);
   const sprintTapeItems = state.autonomous_market_evidence_fusion.items.slice(0, 2);
   const holdingSentryItems = state.autonomous_portfolio_mark_board.items.slice(0, 2);
   const priceActionItems = buildQuickPriceActionTape(state);
