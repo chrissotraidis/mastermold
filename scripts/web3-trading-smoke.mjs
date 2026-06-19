@@ -5104,6 +5104,7 @@ async function main() {
   assert(blockedFillReconcile.payload.settlement_fill_reconciliation?.mode === "settlement-fill-reconciliation", "Settlement fill reconciliation should return a dedicated report.", blockedFillReconcile.payload.settlement_fill_reconciliation);
   assert(blockedFillReconcile.payload.settlement_fill_reconciliation.status === "blocked", "Settlement fill reconciliation should block without confirmed signed settlement evidence.", blockedFillReconcile.payload.settlement_fill_reconciliation);
   assert(blockedFillReconcile.payload.settlement_fill_reconciliation.live_execution_permission === "blocked" && blockedFillReconcile.payload.settlement_fill_reconciliation.wallet_mutation_permission === "blocked", "Settlement fill reconciliation should not grant live or wallet mutation permission.", blockedFillReconcile.payload.settlement_fill_reconciliation);
+  assert(blockedFillReconcile.payload.settlement_fill_reconciliation.portfolio_mirror_permission === "blocked" && blockedFillReconcile.payload.settlement_fill_reconciliation.mirror_apply_request === null, "Settlement fill reconciliation should not emit a mirror apply request while blocked.", blockedFillReconcile.payload.settlement_fill_reconciliation);
   assert(blockedFillReconcile.payload.settlement_fill_reconciliation.blockers.some((blocker) => blocker.includes("stored relayed signature")), "Settlement fill reconciliation should explain missing relayed signature evidence.", blockedFillReconcile.payload.settlement_fill_reconciliation);
 
   const summary = {
@@ -5134,6 +5135,7 @@ async function main() {
     portfolioMirrorApply: blockedMirrorApply.payload.portfolio_mirror_apply.status,
     confirmationPoll: blockedConfirmationPoll.payload.signature_confirmation_poll.status,
     fillReconcile: blockedFillReconcile.payload.settlement_fill_reconciliation.status,
+    fillMirrorRequest: Boolean(blockedFillReconcile.payload.settlement_fill_reconciliation.mirror_apply_request),
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

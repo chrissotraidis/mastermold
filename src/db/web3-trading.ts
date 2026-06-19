@@ -8381,11 +8381,15 @@ export type SettlementFillReconciliationReport = {
   commitment: "confirmed" | "finalized";
   input_mint: string | null;
   output_mint: string | null;
+  fill_side: "buy" | "sell" | null;
+  fill_mint: string | null;
+  fill_amount: number;
   input_amount: number;
   output_amount: number;
   input_usd: number | null;
   output_usd: number | null;
   estimated_fill_price_usd: number | null;
+  mirror_apply_request: PortfolioMirrorApplyRequest | null;
   token_delta_count: number;
   max_fill_usd: number;
   live_execution_permission: "blocked";
@@ -20176,11 +20180,14 @@ async function fetchSettlementFillDetails(
     const outputUsd = output?.mint === USDC_MINT ? output.delta : null;
     const fillUsd = inputUsd ?? outputUsd;
     const tokenAmount = tokenDelta ? Math.abs(tokenDelta.delta) : null;
+    const fillSide = usdcDelta?.delta === undefined ? null : usdcDelta.delta < 0 ? "buy" : "sell";
+    const estimatedFillPrice = fillUsd !== null && tokenAmount && tokenAmount > 0 ? fillUsd / tokenAmount : null;
     const blockers = [
       nonZero.length < 2 ? "getTransaction token balances did not contain enough non-zero deltas to infer a swap fill." : null,
       !input || !output ? "Could not infer both input and output token balance deltas." : null,
       !usdcDelta ? "No USDC balance delta was found, so USD fill notional is not proven." : null,
       !tokenDelta ? "No non-USDC token delta was found for the memecoin leg." : null,
+      !fillSide ? "Could not infer buy/sell side from the USDC token delta." : null,
       fillUsd !== null && fillUsd > maxFillUsd ? `Inferred fill ${formatCompactValue(fillUsd)} exceeds the ${formatCompactValue(maxFillUsd)} reconciliation cap.` : null,
       nonZero.length > 4 ? "More than four token balance deltas were found; fill is too complex for automatic mirror sizing." : null,
     ].filter((item): item is string => Boolean(item));
@@ -20193,11 +20200,22 @@ async function fetchSettlementFillDetails(
       blockTime: blockTimeIso(transaction.blockTime),
       inputMint: input?.mint ?? null,
       outputMint: output?.mint ?? null,
+      fillSide,
+      fillMint: tokenDelta?.mint ?? null,
+      fillAmount: tokenAmount ?? 0,
       inputAmount: input ? Math.abs(input.delta) : 0,
       outputAmount: output ? output.delta : 0,
       inputUsd,
       outputUsd,
-      estimatedFillPriceUsd: fillUsd !== null && tokenAmount && tokenAmount > 0 ? fillUsd / tokenAmount : null,
+      estimatedFillPriceUsd: estimatedFillPrice,
+      mirrorApplyRequest: blockers.length === 0 && estimatedFillPrice && tokenAmount
+        ? {
+            action: "apply",
+            max_fill_usd: maxFillUsd,
+            fill_price_usd: estimatedFillPrice,
+            filled_quantity: tokenAmount,
+          }
+        : null,
       tokenDeltaCount: nonZero.length,
       blockers,
     });
@@ -20253,11 +20271,15 @@ function settlementFillReconciliationReport({
   blockTime = null,
   inputMint = null,
   outputMint = null,
+  fillSide = null,
+  fillMint = null,
+  fillAmount = 0,
   inputAmount = 0,
   outputAmount = 0,
   inputUsd = null,
   outputUsd = null,
   estimatedFillPriceUsd = null,
+  mirrorApplyRequest = null,
   tokenDeltaCount = 0,
 }: {
   status: SettlementFillReconciliationReport["status"];
@@ -20269,11 +20291,15 @@ function settlementFillReconciliationReport({
   blockTime?: string | null;
   inputMint?: string | null;
   outputMint?: string | null;
+  fillSide?: "buy" | "sell" | null;
+  fillMint?: string | null;
+  fillAmount?: number;
   inputAmount?: number;
   outputAmount?: number;
   inputUsd?: number | null;
   outputUsd?: number | null;
   estimatedFillPriceUsd?: number | null;
+  mirrorApplyRequest?: PortfolioMirrorApplyRequest | null;
   tokenDeltaCount?: number;
 }): SettlementFillReconciliationReport {
   return {
@@ -20286,11 +20312,22 @@ function settlementFillReconciliationReport({
     commitment,
     input_mint: inputMint,
     output_mint: outputMint,
+    fill_side: fillSide,
+    fill_mint: fillMint,
+    fill_amount: roundMetric(fillAmount),
     input_amount: roundMetric(inputAmount),
     output_amount: roundMetric(outputAmount),
     input_usd: inputUsd === null ? null : roundMetric(inputUsd),
     output_usd: outputUsd === null ? null : roundMetric(outputUsd),
     estimated_fill_price_usd: estimatedFillPriceUsd === null ? null : roundMetric(estimatedFillPriceUsd),
+    mirror_apply_request: mirrorApplyRequest === null
+      ? null
+      : {
+          action: "apply",
+          max_fill_usd: mirrorApplyRequest.max_fill_usd,
+          fill_price_usd: mirrorApplyRequest.fill_price_usd === undefined ? undefined : roundMetric(mirrorApplyRequest.fill_price_usd),
+          filled_quantity: mirrorApplyRequest.filled_quantity === undefined ? undefined : roundMetric(mirrorApplyRequest.filled_quantity),
+        },
     token_delta_count: tokenDeltaCount,
     max_fill_usd: maxFillUsd,
     live_execution_permission: "blocked",
@@ -20317,7 +20354,7 @@ function settlementFillSummary(status: SettlementFillReconciliationReport["statu
 }
 
 function settlementFillNextAction(status: SettlementFillReconciliationReport["status"], blockers: string[]) {
-  if (status === "reconciled") return "Review fill price and quantity, then use guarded portfolio_mirror apply if the notional matches the handoff.";
+  if (status === "reconciled") return "Review the generated mirror_apply_request, then pass it to guarded portfolio_mirror apply if the handoff notional matches.";
   if (status === "pending") return "Poll getTransaction again after confirmation data propagates.";
   if (status === "ambiguous") return blockers[0] ?? "Use provider fill details before portfolio mirroring.";
   if (status === "failed") return blockers[0] ?? "Investigate failed transaction metadata before any mirror action.";
