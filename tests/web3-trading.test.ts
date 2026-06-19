@@ -4026,7 +4026,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_profit_accountability.fill_count).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_profit_accountability.blocked_count).toBeGreaterThanOrEqual(0);
     expect(state.autonomous_profit_accountability.repair_plan.mode).toBe("local-paper-accountability-repair-plan");
-    expect(["complete", "refresh-first", "run-paper-session", "protect-first", "blocked"]).toContain(state.autonomous_profit_accountability.repair_plan.status);
+    expect(["complete", "refresh-first", "preflight-repair", "run-paper-session", "protect-first", "blocked"]).toContain(state.autonomous_profit_accountability.repair_plan.status);
     expect(state.autonomous_profit_accountability.repair_plan.target_score).toBe(70);
     expect(state.autonomous_profit_accountability.repair_plan.score_gap).toBe(Math.max(0, 70 - state.autonomous_profit_accountability.accountability_score));
     expect(["wallet", "scorecard", "fills", "burst", "directive", "session"]).toContain(state.autonomous_profit_accountability.repair_plan.weakest_item_id);
@@ -7199,12 +7199,28 @@ describe("Web3 autonomous trading subsystem", () => {
       wallet_mutation_permission: "blocked",
     });
     expect(state.autonomous_route_refresh_execution.local_rehearsal?.summary).toContain("paper repair");
-    expect(state.autonomous_profit_accountability.repair_plan.status).toBe("blocked");
+    expect(state.autonomous_profit_accountability.repair_plan.status).toBe("preflight-repair");
     expect(state.autonomous_profit_accountability.repair_plan.route_refresh_required).toBe(false);
     expect(state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_ready).toBe(true);
     expect(state.autonomous_profit_accountability.repair_plan.local_route_rehearsal_summary).toContain("paper repair");
     expect(state.autonomous_profit_accountability.repair_plan.blocking_reason).toBeTruthy();
-    expect(state.autonomous_profit_accountability.repair_plan.request).toBeNull();
+    expect(state.autonomous_profit_accountability.repair_plan.can_run_local_paper).toBe(true);
+    expect(state.autonomous_profit_accountability.repair_plan.request).toMatchObject({
+      endpoint: "/api/web3-trading",
+      method: "POST",
+      body: {
+        source: "sample",
+        account: "persistent",
+        advance: true,
+        autonomous_session: {
+          action: "run",
+          policy_mode: "manual",
+          ticks: 1,
+          protect_book: true,
+          max_total_fills: 1,
+        },
+      },
+    });
     expect(state.autonomous_profit_accountability.repair_plan.live_execution_permission).toBe("blocked");
     expect(state.autonomous_profit_accountability.repair_plan.wallet_mutation_permission).toBe("blocked");
   });

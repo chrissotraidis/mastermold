@@ -78,6 +78,7 @@ export async function runWeb3LocalAccountabilityRepair(input = {}) {
     currentState = nextState;
 
     if (nextAccount?.making_money && (nextAccount.accountability_score ?? 0) >= config.targetScore) break;
+    if (requestKind === "preflight-repair" && (nextAccount?.accountability_score ?? beforeScore) <= beforeScore) break;
     if (nextAccount?.repair_plan?.status === "blocked" || !nextAccount?.repair_plan?.request) break;
   }
 
@@ -151,6 +152,7 @@ export function buildLocalAccountabilityRepairReport({ config, startedAt, initia
     controls: [
       "Consumes only the backend-authored local paper accountability repair plan from /api/web3-trading.",
       "Allows read-only route refresh and bounded autonomous_session paper requests; it does not build trade bodies locally.",
+      "Stops after one preflight diagnostic tick if accountability does not improve, instead of repeating low-signal churn.",
       "Refuses non-sample sources, live execution permission, wallet mutation permission, private keys, signed transactions, and real-capital authority.",
     ],
   };
@@ -172,6 +174,7 @@ function buildRepairRequestBody(plan, config) {
 
 function repairRequestKind(body) {
   if (body.route_refresh) return "route-refresh";
+  if (body.autonomous_session?.policy_mode === "manual" && body.autonomous_session?.protect_book === true) return "preflight-repair";
   if (body.autonomous_session) return "paper-session";
   return "unknown";
 }

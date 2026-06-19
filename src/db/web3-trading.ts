@@ -6811,7 +6811,7 @@ export type AutonomousProfitAccountabilityItem = {
 
 export type AutonomousProfitAccountabilityRepairPlan = {
   mode: "local-paper-accountability-repair-plan";
-  status: "complete" | "refresh-first" | "run-paper-session" | "protect-first" | "blocked";
+  status: "complete" | "refresh-first" | "preflight-repair" | "run-paper-session" | "protect-first" | "blocked";
   target_score: number;
   score_gap: number;
   weakest_item_id: AutonomousProfitAccountabilityItem["id"];
@@ -52718,11 +52718,26 @@ function buildAutonomousProfitAccountabilityRepairPlan({
       directive.next_action,
     ].filter(Boolean).join(" "));
   const routeRefreshRequired = routeRefreshPressure && !localRouteRehearsalReady;
-  const complete = makingMoney && accountabilityScore >= targetScore;
   const hardBlocked = status === "blocked" ||
     profitRunGuard.status === "blocked" ||
     dailyProfitLock.loop_permission === "stand-down" ||
     dailyProfitLock.loop_permission === "paused";
+  const blockingReason = hardBlocked
+    ? profitRunGuard.stop_reason ??
+      dailyProfitLock.stop_reason ??
+      profitRunGuard.next_action ??
+      dailyProfitLock.next_action
+    : null;
+  const preflightRepairable = hardBlocked &&
+    localRouteRehearsalReady &&
+    /preflight/i.test([
+      blockingReason,
+      profitRunGuard.stop_reason,
+      profitRunGuard.next_action,
+      dailyProfitLock.stop_reason,
+      dailyProfitLock.next_action,
+    ].filter(Boolean).join(" "));
+  const complete = makingMoney && accountabilityScore >= targetScore;
   const protectFirst = status === "protect" ||
     action === "protect-wallet" ||
     dailyProfitLock.loop_permission === "protect-only" ||
@@ -52741,18 +52756,17 @@ function buildAutonomousProfitAccountabilityRepairPlan({
   const recommendedProtectiveSells = complete
     ? 0
     : Math.max(1, Math.min(2, dailyProfitLock.max_next_fills || recommendedMaxTotalFills || 1));
-  const canRunLocalPaper = !complete && !hardBlocked && !routeRefreshRequired && recommendedMaxTotalFills > 0;
-  const blockingReason = hardBlocked
-    ? profitRunGuard.stop_reason ??
-      dailyProfitLock.stop_reason ??
-      profitRunGuard.next_action ??
-      dailyProfitLock.next_action
-    : null;
+  const canRunLocalPaper = !complete &&
+    (!hardBlocked || preflightRepairable) &&
+    !routeRefreshRequired &&
+    recommendedMaxTotalFills > 0;
   const planStatus: AutonomousProfitAccountabilityRepairPlan["status"] = complete
     ? "complete"
     : routeRefreshRequired
       ? "refresh-first"
-      : hardBlocked
+      : preflightRepairable
+        ? "preflight-repair"
+        : hardBlocked
         ? "blocked"
         : protectFirst
           ? "protect-first"
@@ -52777,12 +52791,12 @@ function buildAutonomousProfitAccountabilityRepairPlan({
               advance: true,
               autonomous_session: {
                 action: "run" as const,
-                policy_mode: "auto" as const,
-                ticks: recommendedTicks,
-                protect_book: protectFirst,
-                max_protective_sells: recommendedProtectiveSells,
+                policy_mode: planStatus === "preflight-repair" ? "manual" as const : "auto" as const,
+                ticks: planStatus === "preflight-repair" ? 1 : recommendedTicks,
+                protect_book: protectFirst || planStatus === "preflight-repair",
+                max_protective_sells: planStatus === "preflight-repair" ? 1 : recommendedProtectiveSells,
                 min_release_usd: 10,
-                max_total_fills: recommendedMaxTotalFills,
+                max_total_fills: planStatus === "preflight-repair" ? 1 : recommendedMaxTotalFills,
               },
             },
       };
@@ -52812,6 +52826,7 @@ function buildAutonomousProfitAccountabilityRepairPlan({
     controls: [
       "Repairs the local paper-accountability score by targeting the weakest evidence row before any higher-frequency paper loop can scale.",
       "Uses read-only route refresh first when route or preflight proof is stale, then bounded paper sessions with explicit tick and fill caps.",
+      "If route rehearsal is accepted but preflight still blocks deployment, it can run one protect-first manual paper tick as a diagnostic repair while live execution stays locked.",
       "This is local paper repair only; live execution and wallet mutation remain blocked until the separate launch checklist gates pass.",
     ],
   };
@@ -55196,6 +55211,7 @@ function autonomousProfitAccountabilityRepairSummary(
 ) {
   if (status === "complete") return `Local paper accountability clears review at ${score}/100 against the ${targetScore}/100 target.`;
   if (status === "refresh-first") return `Local paper accountability is ${score}/100; refresh route proof before repairing ${weakestLabel.toLowerCase()} at ${weakestScore}/100.`;
+  if (status === "preflight-repair") return `Local paper accountability is ${score}/100; route rehearsal is ready, so run one protect-first paper tick to repair preflight evidence for ${weakestLabel.toLowerCase()}.`;
   if (status === "protect-first") return `Local paper accountability is ${score}/100; repair ${weakestLabel.toLowerCase()} with a protect-first paper session before any fresh buy.`;
   if (status === "blocked") {
     const routeNote = localRouteRehearsalReady ? " Local route rehearsal is ready; " : " ";
@@ -55214,6 +55230,7 @@ function autonomousProfitAccountabilityRepairNextAction(
 ) {
   if (status === "complete") return "Keep collecting paper accountability evidence while live-wallet gates remain blocked.";
   if (status === "refresh-first") return "Request read-only route proof, then rerun the accountability repair plan before spending more paper capital.";
+  if (status === "preflight-repair") return `Run one protect-first diagnostic paper tick with at most ${fills} fill, then rescore ${weakestLabel.toLowerCase()} and keep live execution blocked.`;
   if (status === "protect-first") return `Run ${ticks} protect-first paper tick with at most ${fills} fill, then rescore ${weakestLabel.toLowerCase()}.`;
   if (status === "blocked") return localRouteRehearsalReady
     ? `${blockingReason ?? "Run guard or daily lock still blocks paper movement."} Keep the route rehearsal, then repair preflight/profit-lock evidence before another paper session.`
