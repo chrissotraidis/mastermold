@@ -581,6 +581,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("external signup permission blocked");
     expect(web3Workspace).toContain("Provider health receipt");
     expect(web3Workspace).toContain("Test provider health");
+    expect(web3Workspace).toContain("Jupiter rehearsal receipt");
+    expect(web3Workspace).toContain("Rehearse Jupiter order");
+    expect(web3Workspace).toContain("one-shot key not saved");
+    expect(web3Workspace).toContain("unsigned transaction return withheld");
     expect(web3Workspace).toContain("inline-flex min-h-11 items-center justify-center gap-1.5");
     expect(web3Workspace).toContain("secret echo blocked");
     expect(web3Workspace).toContain("Signer handoff receipt");

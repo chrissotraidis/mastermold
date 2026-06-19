@@ -14,6 +14,7 @@ import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } fr
 import type { Web3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import type { Web3ProviderHealthReceipt } from "@/src/db/web3-provider-health";
+import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3SignerHandoffReceipt } from "@/src/db/web3-signer-handoff";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
@@ -2332,7 +2333,9 @@ function QuickWeb3CredentialsSetupPanel({
   }));
   const [loaded, setLoaded] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [rehearsingJupiter, setRehearsingJupiter] = useState(false);
   const [result, setResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
+  const [jupiterRehearsal, setJupiterRehearsal] = useState<Web3JupiterRehearsalReceipt | null>(null);
   const [message, setMessage] = useState("Not tested yet. Leave secret fields blank to use server environment values.");
 
   useEffect(() => {
@@ -2357,6 +2360,7 @@ function QuickWeb3CredentialsSetupPanel({
     setDraft(next);
     window.localStorage.setItem(storageKey, JSON.stringify(storedCredentialsDraft(next)));
     setResult(null);
+    setJupiterRehearsal(null);
     setMessage(field === "helius_api_key" || field === "jupiter_api_key"
       ? "Secret value is held only in this page session. It is not saved in browser storage."
       : "Saved non-secret settings in this browser. Test credentials before applying the dry-run profile.");
@@ -2388,6 +2392,38 @@ function QuickWeb3CredentialsSetupPanel({
       setMessage(error instanceof Error ? error.message : "Web3 credential test failed.");
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function rehearseJupiterOrder() {
+    setRehearsingJupiter(true);
+    setMessage("Rehearsing Jupiter quote and order readiness without saving keys or returning transaction bytes...");
+    try {
+      const params = new URLSearchParams({
+        scenario: state.scenario,
+        source: state.market_source.mode,
+        account: state.paper_account.mode,
+        cycles: String(state.paper_account.cycle),
+      });
+      const response = await fetch(`/api/web3-jupiter-rehearsal?${params.toString()}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          jupiter_api_key: draft.jupiter_api_key,
+          wallet_public_key: draft.wallet_public_key,
+          max_slippage_bps: Number(draft.max_slippage_bps),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as Web3JupiterRehearsalReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Jupiter rehearsal failed.");
+      }
+      setJupiterRehearsal(payload);
+      setMessage(payload.narrative);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Jupiter rehearsal failed.");
+    } finally {
+      setRehearsingJupiter(false);
     }
   }
 
@@ -2510,11 +2546,20 @@ function QuickWeb3CredentialsSetupPanel({
           <button
             type="button"
             onClick={testCredentials}
-            disabled={!loaded || disabled || testing}
+            disabled={!loaded || disabled || testing || rehearsingJupiter}
             className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
           >
             <RefreshCw className={cn("h-3.5 w-3.5 shrink-0", testing && "animate-spin")} aria-hidden="true" />
             {testing ? "Testing" : "Test credentials"}
+          </button>
+          <button
+            type="button"
+            onClick={rehearseJupiterOrder}
+            disabled={!loaded || disabled || testing || rehearsingJupiter}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-violet/45 bg-violet/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-violet transition hover:bg-violet/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Zap className={cn("h-3.5 w-3.5 shrink-0", rehearsingJupiter && "animate-pulse")} aria-hidden="true" />
+            {rehearsingJupiter ? "Rehearsing" : "Rehearse Jupiter order"}
           </button>
           <button
             type="button"
@@ -2531,6 +2576,83 @@ function QuickWeb3CredentialsSetupPanel({
       <p className="mt-2 text-xs leading-5 text-on-surface-variant" aria-live="polite">
         {message}
       </p>
+
+      <div className="mt-3 rounded-md border border-violet/25 bg-violet/[0.04] p-3" aria-label="Jupiter rehearsal receipt">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Jupiter rehearsal receipt</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">One-shot order readiness, no transaction handoff</p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+              {jupiterRehearsal?.narrative ?? "Use the session-only Jupiter key field or server env to prove quote and order readiness. The receipt withholds unsigned transaction bytes, blocks execute, and never saves or echoes the API key."}
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Chip tone={jupiterRehearsalTone(jupiterRehearsal?.status)}>{jupiterRehearsal?.status.replaceAll("-", " ") ?? "not rehearsed"}</Chip>
+            <Chip tone={jupiterRehearsal?.one_shot_key_used ? "caution" : jupiterRehearsal?.server_key_configured ? "engine" : "demo"}>
+              {jupiterRehearsal?.key_source.replace("-", " ") ?? "key source pending"}
+            </Chip>
+            <Chip tone="demo">execute blocked</Chip>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+          <ProfitMetric
+            label="Quote"
+            value={jupiterRehearsal?.summary.jupiter_quote_ready ? "ready" : "gated"}
+            detail="SOL to USDC"
+            tone={jupiterRehearsal?.summary.jupiter_quote_ready ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Order"
+            value={jupiterRehearsal?.summary.jupiter_order_ready ? "ready" : "gated"}
+            detail={jupiterRehearsal?.summary.order_request_hash ? jupiterRehearsal.summary.order_request_hash.slice(0, 8) : "request hash"}
+            tone={jupiterRehearsal?.summary.jupiter_order_ready ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Wallet"
+            value={jupiterRehearsal?.summary.wallet_valid ? "valid" : draft.wallet_public_key ? "check" : "missing"}
+            detail={jupiterRehearsal?.wallet_public_key_preview ?? "public key"}
+            tone={jupiterRehearsal?.summary.wallet_valid ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Key"
+            value={jupiterRehearsal?.summary.jupiter_key_configured ? "scoped" : "missing"}
+            detail={jupiterRehearsal?.key_source.replace("-", " ") ?? "session/env"}
+            tone={jupiterRehearsal?.summary.jupiter_key_configured ? "engine" : "caution"}
+          />
+          <ProfitMetric
+            label="Tx bytes"
+            value={jupiterRehearsal?.summary.transaction_body_detected ? "withheld" : "none"}
+            detail="browser return"
+            tone="neutral"
+          />
+          <ProfitMetric
+            label="Slippage"
+            value={`${jupiterRehearsal?.summary.max_slippage_bps ?? (Number(draft.max_slippage_bps) || 150)} bps`}
+            detail="rehearsal cap"
+            tone="neutral"
+          />
+        </div>
+
+        {jupiterRehearsal ? (
+          <div className="mt-3 grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
+            {jupiterRehearsal.checks.map((check) => (
+              <div key={check.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{check.label}</p>
+                  <span className={cn("h-2 w-2 shrink-0 rounded-full", jupiterRehearsalCheckDotClass(check.status))} />
+                </div>
+                <p className={cn("mt-1 text-xs font-semibold", jupiterRehearsalCheckTextClass(check.status))}>{check.status}</p>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-outline">{check.detail}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        <p className="sr-only" aria-label="Jupiter rehearsal receipt status">
+          Jupiter rehearsal receipt uses one-shot key not saved or server env; API key secret echo blocked; unsigned transaction return withheld; execute blocked; live execution blocked; wallet mutation blocked.
+        </p>
+      </div>
 
       {result ? (
         <>
@@ -2881,6 +3003,25 @@ function providerHealthPlaceholderChecks(state: Web3TradingState): Web3ProviderH
       detail: "Provider health cannot sign, submit, or mutate wallets.",
     },
   ];
+}
+
+function jupiterRehearsalTone(status: Web3JupiterRehearsalReceipt["status"] | undefined): QuickChipTone {
+  if (status === "order-ready" || status === "quote-ready") return "engine";
+  if (status === "key-gated" || status === "wallet-gated" || status === "order-gated") return "caution";
+  if (status === "blocked") return "critical";
+  return "demo";
+}
+
+function jupiterRehearsalCheckDotClass(status: Web3JupiterRehearsalReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "bg-engine";
+  if (status === "watch") return "bg-caution";
+  return "bg-critical";
+}
+
+function jupiterRehearsalCheckTextClass(status: Web3JupiterRehearsalReceipt["checks"][number]["status"]) {
+  if (status === "pass") return "text-engine";
+  if (status === "watch") return "text-caution";
+  return "text-critical";
 }
 
 function accountingCheckDotClass(status: Web3AccountingLedgerReceipt["checks"][number]["status"]) {

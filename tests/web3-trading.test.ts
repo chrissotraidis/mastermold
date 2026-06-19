@@ -9,6 +9,7 @@ import { GET as ACCOUNT_ACQUISITION_GET } from "@/app/api/web3-account-acquisiti
 import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
+import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
 import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
@@ -663,6 +664,126 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.checks.find((check) => check.id === "secret-boundary")).toMatchObject({ status: "pass" });
     expect(receipt.controls.some((control) => control.includes("read-only network checks"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
+  });
+
+  test("GIVEN one-shot Jupiter credentials WHEN rehearsal runs THEN it proves order readiness without leaking secrets or transaction bytes", async () => {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("lite-api.jup.ag")) {
+        return new Response(JSON.stringify({ outAmount: "1000000", routePlan: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.includes("api.jup.ag/swap/v2/order")) {
+        expect((init?.headers as Record<string, string>)["x-api-key"]).toBe("test-jupiter-one-shot");
+        return new Response(JSON.stringify({
+          requestId: "raw-request-id-secret",
+          transaction: "raw-unsigned-transaction-body",
+          router: "metis",
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "unexpected Jupiter rehearsal request" }), { status: 500 });
+    }) as typeof fetch;
+
+    const rejected = await JUPITER_REHEARSAL_POST(new Request("http://localhost/api/web3-jupiter-rehearsal?cycles=99", {
+      method: "POST",
+      body: JSON.stringify({ jupiter_api_key: "test-jupiter-one-shot" }),
+    }));
+    expect(rejected.status).toBe(422);
+
+    const privateRejected = await JUPITER_REHEARSAL_POST(new Request("http://localhost/api/web3-jupiter-rehearsal", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ private_key: "never-accept-this" }),
+    }));
+    expect(privateRejected.status).toBe(422);
+
+    const response = await JUPITER_REHEARSAL_POST(new Request("http://localhost/api/web3-jupiter-rehearsal?scenario=breakout&source=sample&account=ephemeral&cycles=2", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jupiter_api_key: "test-jupiter-one-shot",
+        wallet_public_key: "11111111111111111111111111111111",
+        max_slippage_bps: 150,
+      }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      key_source: string;
+      one_shot_key_used: boolean;
+      server_key_configured: boolean;
+      wallet_public_key_preview: string | null;
+      summary: {
+        wallet_scoped: boolean;
+        wallet_valid: boolean;
+        jupiter_key_configured: boolean;
+        jupiter_quote_ready: boolean;
+        jupiter_order_ready: boolean;
+        order_request_hash: string | null;
+        transaction_body_detected: boolean;
+        max_slippage_bps: number;
+      };
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      secret_echo_permission: string;
+      private_key_storage: string;
+      transaction_body_storage: string;
+      unsigned_transaction_return: string;
+      signed_transaction_return: string;
+      execute_permission: string;
+      checks: Array<{ id: string; status: string; detail: string }>;
+      controls: string[];
+      narrative: string;
+      next_action: string;
+    }>(response);
+
+    const serialized = JSON.stringify(receipt);
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-jupiter-rehearsal-receipt");
+    expect(receipt.status).toBe("order-ready");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.key_source).toBe("one-shot");
+    expect(receipt.one_shot_key_used).toBe(true);
+    expect(receipt.server_key_configured).toBe(false);
+    expect(receipt.wallet_public_key_preview).toBe("11111111...1111");
+    expect(receipt.summary.wallet_scoped).toBe(true);
+    expect(receipt.summary.wallet_valid).toBe(true);
+    expect(receipt.summary.jupiter_key_configured).toBe(true);
+    expect(receipt.summary.jupiter_quote_ready).toBe(true);
+    expect(receipt.summary.jupiter_order_ready).toBe(true);
+    expect(receipt.summary.order_request_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.summary.transaction_body_detected).toBe(true);
+    expect(receipt.summary.max_slippage_bps).toBe(150);
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.transaction_body_storage).toBe("blocked");
+    expect(receipt.unsigned_transaction_return).toBe("withheld");
+    expect(receipt.signed_transaction_return).toBe("blocked");
+    expect(receipt.execute_permission).toBe("blocked");
+    expect(receipt.checks.map((check) => check.id)).toEqual([
+      "wallet-scope",
+      "jupiter-key",
+      "quote",
+      "order",
+      "transaction-boundary",
+      "secret-boundary",
+      "live-boundary",
+    ]);
+    expect(receipt.checks.find((check) => check.id === "transaction-boundary")).toMatchObject({ status: "pass" });
+    expect(receipt.controls.some((control) => control.includes("one-shot POST body"))).toBe(true);
+    expect(receipt.narrative).toContain("transaction bytes are withheld");
+    expect(serialized).not.toContain("test-jupiter-one-shot");
+    expect(serialized).not.toContain("raw-request-id-secret");
+    expect(serialized).not.toContain("raw-unsigned-transaction-body");
+    expect(serialized).not.toContain("never-accept-this");
   });
 
   test("GIVEN emergency-stop ops are configured WHEN the drill route runs THEN it records a blocked no-secrets receipt", async () => {
