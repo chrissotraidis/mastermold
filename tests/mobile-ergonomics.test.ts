@@ -1141,6 +1141,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-dex-discovery.ts")).toContain("token-pair backfill is budgeted separately as 300 requests/minute");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyProviderHealthReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyWalletOwnershipReceipt");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyUsabilityStatusReceipt");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-usability-status?source=live-dex&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("usability-status-receipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("recorded candle fallback");

@@ -391,6 +391,30 @@ async function verifyProviderHealthReceipt() {
   record("provider-health-read-rail", "warn", "read rail not configured on the running app");
 }
 
+async function verifyUsabilityStatusReceipt() {
+  const { response, json } = await requestJson("/api/web3-usability-status?source=live-dex&account=persistent");
+  assert(response.status === 200, "Web3 usability status should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-usability-status", "Web3 usability status should expose the expected mode.", json);
+  assert(["paper-usable", "dry-run-gated", "supervised-live-gated", "autonomous-live-locked"].includes(json.status), "Web3 usability status should use a known status.", json);
+  assert(["copilot", "paper-autonomy", "dry-run-rehearsal", "supervised-live-review", "autonomous-live"].includes(json.current_mode), "Web3 usability status should name the current mode.", json);
+  assert(Array.isArray(json.capabilities) && json.capabilities.length >= 7, "Web3 usability status should include capability lanes.", json);
+  assert(json.capabilities.some((item) => item.id === "copilot" && item.status === "usable"), "Web3 usability status should mark copilot usable.", json.capabilities);
+  assert(json.capabilities.some((item) => item.id === "paper-autonomy" && ["usable", "watch", "gated"].includes(item.status)), "Web3 usability status should report paper autonomy.", json.capabilities);
+  assert(json.capabilities.some((item) => item.id === "jupiter-dry-run"), "Web3 usability status should report the Jupiter dry-run lane.", json.capabilities);
+  assert(json.capabilities.some((item) => item.id === "supervised-live"), "Web3 usability status should report the supervised live lane.", json.capabilities);
+  assert(json.capabilities.some((item) => item.id === "autonomous-live" && item.status === "locked"), "Web3 usability status should keep autonomous live locked.", json.capabilities);
+  assert(typeof json.next_gate_label === "string" && json.next_gate_label.length > 0, "Web3 usability status should name the next gate.", json);
+  assert(typeof json.next_gate_action === "string" && json.next_gate_action.length > 0, "Web3 usability status should name the next action.", json);
+  assert(json.live_execution_permission === "blocked", "Web3 usability status must keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Web3 usability status must keep wallet mutation blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "Web3 usability status must keep transaction submission blocked.", json);
+  assert(json.private_key_storage === "blocked", "Web3 usability status must keep private key storage blocked.", json);
+  assert(json.seed_phrase_storage === "blocked", "Web3 usability status must keep seed phrase storage blocked.", json);
+  assert(json.secret_echo_permission === "blocked", "Web3 usability status must keep secret echo blocked.", json);
+  assert(Array.isArray(json.safe_commands) && json.safe_commands.includes("npm run doctor:web3 -- --json"), "Web3 usability status should include safe verifier/doctor commands.", json.safe_commands);
+  record("usability-status-receipt", "pass", `${json.current_mode}; next gate ${json.next_gate_label}`);
+}
+
 function assertDexDiscoveryBoundary(json, label) {
   assert(json.mode === "web3-dex-discovery-receipt", `${label} should expose the expected receipt mode.`, json);
   assert(json.provider === "DEX Screener", `${label} should identify the DEX Screener provider.`, json);
@@ -594,6 +618,7 @@ async function main() {
   await verifyWalletOwnershipReceipt();
   await verifyCredentialValidateOnly();
   await verifyProviderHealthReceipt();
+  await verifyUsabilityStatusReceipt();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();
   await verifyJupiterRehearsalBoundary();
