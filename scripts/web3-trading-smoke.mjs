@@ -4141,6 +4141,8 @@ async function main() {
   assert(orderRehearsal.payload.execution_readiness.config.daily_spend_cap_usd === 10_000, "Order rehearsal should carry enough dry-run cap for route/order proof.", orderRehearsal.payload.execution_readiness.config);
   assert(orderRehearsal.payload.pre_submit_rehearsal?.mode === "pre-submit-rehearsal", "Order rehearsal should expose pre-submit rehearsal evidence.", orderRehearsal.payload.pre_submit_rehearsal);
   assert(orderRehearsal.payload.autonomous_order_handoff?.mode === "autonomous-order-handoff", "Order rehearsal should expose order handoff evidence.", orderRehearsal.payload.autonomous_order_handoff);
+  assert(orderRehearsal.payload.wallet_holdings_adapter?.mode === "read-only-wallet-holdings", "Order rehearsal should expose the read-only wallet holdings adapter.", orderRehearsal.payload.wallet_holdings_adapter);
+  assert(orderRehearsal.payload.wallet_holdings_adapter?.controls?.some((control) => control.includes("Does not request signatures")), "Wallet holdings adapter must disclose the no-signing boundary.", orderRehearsal.payload.wallet_holdings_adapter);
   assert(
     orderRehearsal.payload.discovery_tape?.sources?.some((source) => source.id === "portfolio-watch" && source.status === "ok"),
     "Order rehearsal should include held-position watchlist market refresh evidence.",

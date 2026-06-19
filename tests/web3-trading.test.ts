@@ -6180,10 +6180,54 @@ describe("Web3 autonomous trading subsystem", () => {
 
   test("GIVEN dry-run readiness WHEN Jupiter v2 order returns an unsigned transaction THEN the plan records order metadata only", async () => {
     process.env.JUPITER_API_KEY = "test-key";
+    const previousRpcUrl = process.env.SOLANA_RPC_URL;
+    process.env.SOLANA_RPC_URL = "https://solana-rpc.test";
     const requestedUrls: string[] = [];
-    const fetchImpl = async (input: RequestInfo | URL) => {
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       requestedUrls.push(url);
+      if (url === "https://solana-rpc.test") {
+        const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+        if (body.method === "getTokenAccountsByOwner") {
+          const mint = body.params?.[1]?.mint;
+          return Response.json({
+            jsonrpc: "2.0",
+            id: body.id,
+            result: {
+              context: { slot: 284_001_338 },
+              value: mint === "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+                ? [{
+                    pubkey: "BonkTokenAccount111",
+                    account: {
+                      data: {
+                        program: "spl-token",
+                        parsed: {
+                          type: "account",
+                          info: {
+                            mint,
+                            tokenAmount: {
+                              amount: "10000000000000",
+                              decimals: 5,
+                              uiAmount: 100_000_000,
+                              uiAmountString: "100000000",
+                            },
+                          },
+                        },
+                      },
+                    },
+                  }]
+                : [],
+            },
+          });
+        }
+        if (body.method === "getTokenSupply") {
+          return Response.json({
+            jsonrpc: "2.0",
+            id: body.id,
+            result: { context: { slot: 284_001_339 }, value: { amount: "10000000000000", decimals: 5, uiAmountString: "100000000" } },
+          });
+        }
+      }
       if (url.includes("/token-boosts/top/v1")) {
         return Response.json([
           { chainId: "solana", tokenAddress: "TokenLive111", amount: 6, totalAmount: 9 },
@@ -6273,6 +6317,8 @@ describe("Web3 autonomous trading subsystem", () => {
         max_slippage_bps: 150,
       },
     });
+    if (previousRpcUrl === undefined) delete process.env.SOLANA_RPC_URL;
+    else process.env.SOLANA_RPC_URL = previousRpcUrl;
     const plan = state.execution_plans.find((item) => item.symbol === "LIVE");
     const sellPlan = state.execution_plans.find((item) => item.symbol === "BONK" && item.side === "sell");
 
@@ -6286,6 +6332,25 @@ describe("Web3 autonomous trading subsystem", () => {
       url.includes("/tokens/v1/solana/") &&
       url.includes("DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263")
     )).toBe(true);
+    expect(requestedUrls.filter((url) => url === "https://solana-rpc.test").length).toBeGreaterThanOrEqual(2);
+    expect(state.wallet_holdings_adapter).toMatchObject({
+      status: "synced",
+      rpc_configured: true,
+      matched_position_count: 1,
+      portfolio_applied: true,
+      total_value_usd: 2360,
+    });
+    expect(state.wallet_holdings_adapter.items.find((item) => item.symbol === "BONK")).toMatchObject({
+      quantity: 100_000_000,
+      decimals: 5,
+      token_account: "BonkTokenAccount111",
+    });
+    expect(state.portfolio.open_positions).toHaveLength(1);
+    expect(state.portfolio.open_positions[0]).toMatchObject({
+      symbol: "BONK",
+      quantity: 100_000_000,
+      value_usd: 2360,
+    });
     expect(plan?.input_amount_usd).toBe(500);
     expect(plan).toMatchObject({
       quoted_at: expect.any(String),
@@ -6386,7 +6451,7 @@ describe("Web3 autonomous trading subsystem", () => {
       input_mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       output_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       input_token_decimals: 5,
-      input_amount_source: "watchlist",
+      input_amount_source: "solana-rpc",
       quote_context_slot: 284_001_337,
       dry_run: {
         status: "order-built",

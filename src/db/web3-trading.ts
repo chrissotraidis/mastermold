@@ -8318,6 +8318,33 @@ export type TradingPortfolio = {
   open_positions: TradingPosition[];
 };
 
+export type WalletHoldingsAdapterItem = {
+  token_id: string;
+  symbol: string;
+  mint: string;
+  token_account: string | null;
+  quantity: number;
+  decimals: number;
+  value_usd: number;
+  price_usd: number;
+};
+
+export type WalletHoldingsAdapter = {
+  mode: "read-only-wallet-holdings";
+  status: "idle" | "blocked" | "synced" | "empty";
+  wallet_public_key: string | null;
+  rpc_configured: boolean;
+  matched_position_count: number;
+  token_account_count: number;
+  total_value_usd: number;
+  portfolio_applied: boolean;
+  summary: string;
+  next_action: string;
+  blockers: string[];
+  controls: string[];
+  items: WalletHoldingsAdapterItem[];
+};
+
 export type ExecutionGate = {
   mode: ExecutionMode;
   live_execution_enabled: false;
@@ -8979,6 +9006,7 @@ export type Web3TradingState = {
   signals: TradingSignal[];
   execution_plans: ExecutionPlan[];
   portfolio: TradingPortfolio;
+  wallet_holdings_adapter: WalletHoldingsAdapter;
   position_watch: PositionWatch[];
   position_exit_ladder: PositionExitLadderEngine;
   liquidity_exit_sentinel: LiquidityExitSentinel;
@@ -12972,6 +13000,8 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
 
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
   if (live.market.length === 0) {
+    const fallbackFetchImpl = input.fetchImpl ?? fetch;
+    const fallbackWalletHoldings = await buildReadOnlyWalletHoldingsAdapter(applyScenario(baseMarket, scenario, cycles), executionConfig, fallbackFetchImpl);
     const fallbackState = buildWeb3TradingState({
       scenario,
       cycles,
@@ -12986,6 +13016,8 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       discoveryTape: live.discovery ?? fallbackDiscoveryTape("fallback", live.error),
       accountMode,
       executionConfig,
+      portfolioOverride: fallbackWalletHoldings.portfolio ?? undefined,
+      walletHoldingsAdapter: fallbackWalletHoldings.report,
     });
     applyOnchainEventSignals(fallbackState, parseLedgerData(readLedger()?.data).onchain_events);
     const requestedAdvanceMode = persistentPaperAdvanceMode(input, fallbackState, daemonRequested);
@@ -13002,6 +13034,8 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const walletHoldings = await buildReadOnlyWalletHoldingsAdapter(live.market, executionConfig, fetchImpl);
   const liveState = buildWeb3TradingState({
     scenario,
     cycles,
@@ -13016,12 +13050,13 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     discoveryTape: live.discovery,
     accountMode,
     executionConfig,
+    portfolioOverride: walletHoldings.portfolio ?? undefined,
+    walletHoldingsAdapter: walletHoldings.report,
   });
   applyOnchainEventSignals(liveState, parseLedgerData(readLedger()?.data).onchain_events);
   const requestedAdvanceMode = persistentPaperAdvanceMode(input, liveState, daemonRequested);
   const advanceMode = resolveDaemonLeaseAdvanceMode(input, liveState, requestedAdvanceMode, daemonRequested, accountMode, now);
   const ledgerState = accountMode === "persistent" ? applyPersistentLedger(liveState, advanceMode, portfolioSweep, input.autonomous_burst?.max_child_fills) : liveState;
-  const fetchImpl = input.fetchImpl ?? fetch;
   const plannedState = await attachExecutionPlans(ledgerState, fetchImpl);
   const routeRefreshedState = await maybeApplyRouteRefreshRequest({
     state: plannedState,
@@ -13066,6 +13101,8 @@ function buildWeb3TradingState({
   discoveryTape,
   accountMode,
   executionConfig,
+  portfolioOverride,
+  walletHoldingsAdapter,
 }: {
   scenario: TradingScenario;
   cycles: number;
@@ -13074,9 +13111,12 @@ function buildWeb3TradingState({
   discoveryTape?: DiscoveryTape;
   accountMode: TradingAccountMode;
   executionConfig: ExecutionConfig;
+  portfolioOverride?: TradingPortfolio;
+  walletHoldingsAdapter?: WalletHoldingsAdapter;
 }): Web3TradingState {
   const signals = market.map(scoreMarket).sort((a, b) => b.score - a.score);
-  const portfolio = buildPortfolio(market);
+  const portfolio = portfolioOverride ?? buildPortfolio(market);
+  const wallet_holdings_adapter = walletHoldingsAdapter ?? idleWalletHoldingsAdapter(executionConfig.wallet_public_key);
   const strategy_lab = buildStrategyLab();
   const discovery_tape = discoveryTape ?? sampleDiscoveryTape(market);
   const trend_catalyst = buildTrendCatalystIntelligence(market, discovery_tape);
@@ -15239,6 +15279,7 @@ function buildWeb3TradingState({
     signals,
     execution_plans,
     portfolio: appliedPortfolio,
+    wallet_holdings_adapter,
     position_watch,
     position_exit_ladder,
     liquidity_exit_sentinel,
@@ -15537,6 +15578,11 @@ function buildWeb3TradingState({
         label: "Solana transaction signatures",
         use: "Signature and blockhash requirements that make autonomous custody a separate policy boundary before submission.",
         href: "https://solana.com/docs/core/transactions",
+      },
+      {
+        label: "Solana token accounts by owner",
+        use: "Read-only SPL token account balance lookup for wallet holdings and protected-position sizing.",
+        href: "https://solana.com/docs/rpc/http/gettokenaccountsbyowner",
       },
       {
         label: "Privy Solana wallet signing",
@@ -21534,6 +21580,157 @@ function buildPortfolio(market: MemecoinMarket[]): TradingPortfolio {
     max_drawdown_pct: 2.8,
     open_positions,
   };
+}
+
+async function buildReadOnlyWalletHoldingsAdapter(
+  market: MemecoinMarket[],
+  config: ExecutionConfig,
+  fetchImpl: FetchLike,
+): Promise<{ report: WalletHoldingsAdapter; portfolio: TradingPortfolio | null }> {
+  const wallet = config.wallet_public_key;
+  const endpoint = solanaRpcUrl();
+  if (!wallet || !isLikelySolanaPublicKey(wallet)) {
+    return { report: idleWalletHoldingsAdapter(wallet), portfolio: null };
+  }
+  if (!endpoint) {
+    return {
+      report: {
+        ...idleWalletHoldingsAdapter(wallet),
+        status: "blocked",
+        rpc_configured: false,
+        summary: "Wallet holdings were not read because Solana RPC is not configured.",
+        next_action: "Configure SOLANA_RPC_URL for read-only wallet balance monitoring.",
+        blockers: ["Solana RPC endpoint is not configured."],
+      },
+      portfolio: null,
+    };
+  }
+
+  try {
+    const accounts = await Promise.all(
+      HELD_POSITION_DEX_WATCHLIST.map((watch) => fetchWalletTokenBalance(wallet, watch, fetchImpl)),
+    );
+    const byId = new Map(market.map((token) => [token.id, token]));
+    const byMint = new Map(market.map((token) => [token.token_address.toLowerCase(), token]));
+    const items = accounts.flatMap((account): WalletHoldingsAdapterItem[] => {
+      if (!account || account.quantity <= 0) return [];
+      const token = byId.get(account.watch.tokenId) ?? byMint.get(account.watch.tokenAddress.toLowerCase());
+      if (!token) return [];
+      return [{
+        token_id: token.id,
+        symbol: token.symbol,
+        mint: account.watch.tokenAddress,
+        token_account: account.tokenAccount,
+        quantity: account.quantity,
+        decimals: account.decimals,
+        value_usd: roundMetric(account.quantity * token.price_usd),
+        price_usd: token.price_usd,
+      }];
+    });
+    const positions = items.map((item): TradingPosition => ({
+      id: `wallet-${item.token_id}`,
+      token_id: item.token_id,
+      symbol: item.symbol,
+      quantity: item.quantity,
+      entry_price_usd: item.price_usd,
+      mark_price_usd: item.price_usd,
+      peak_price_usd: item.price_usd,
+      trailing_stop_price_usd: trailingStopPrice(item.price_usd, -8),
+      value_usd: item.value_usd,
+      pnl_usd: 0,
+      pnl_pct: 0,
+      stop_loss_pct: -8,
+      take_profit_pct: 18,
+      opened_at: new Date().toISOString(),
+    }));
+    const portfolio = positions.length > 0 ? portfolioFromParts(0, 0, 0, positions) : null;
+    const report: WalletHoldingsAdapter = {
+      mode: "read-only-wallet-holdings",
+      status: positions.length > 0 ? "synced" : "empty",
+      wallet_public_key: wallet,
+      rpc_configured: true,
+      matched_position_count: positions.length,
+      token_account_count: accounts.filter((account) => account !== null).length,
+      total_value_usd: roundMetric(items.reduce((sum, item) => sum + item.value_usd, 0)),
+      portfolio_applied: portfolio !== null,
+      summary: positions.length > 0
+        ? `Read ${positions.length} watched wallet holding${positions.length === 1 ? "" : "s"} without signing authority.`
+        : "Wallet token accounts were read, but no watched memecoin balances were found.",
+      next_action: positions.length > 0
+        ? "Use read-only wallet balances for position protection and dry-run route rehearsal."
+        : "Keep paper seed positions until the wallet holds a watched memecoin balance.",
+      blockers: [],
+      controls: walletHoldingsControls(),
+      items,
+    };
+    return { report, portfolio };
+  } catch (error) {
+    return {
+      report: {
+        ...idleWalletHoldingsAdapter(wallet),
+        status: "blocked",
+        rpc_configured: true,
+        summary: "Wallet holdings read failed before any portfolio mutation.",
+        next_action: "Retry the read-only wallet balance request or check RPC access.",
+        blockers: [error instanceof Error ? error.message : "Read-only wallet holdings request failed."],
+      },
+      portfolio: null,
+    };
+  }
+}
+
+async function fetchWalletTokenBalance(
+  wallet: string,
+  watch: DexWatchlistToken,
+  fetchImpl: FetchLike,
+): Promise<{ watch: DexWatchlistToken; quantity: number; decimals: number; tokenAccount: string | null } | null> {
+  const response = await solanaRpc(fetchImpl, solanaRpcUrl() ?? "", "getTokenAccountsByOwner", [
+    wallet,
+    { mint: watch.tokenAddress },
+    { commitment: "confirmed", encoding: "jsonParsed" },
+  ]);
+  const rows = Array.isArray(response.result?.value) ? response.result.value : [];
+  let quantity = 0;
+  let tokenAccount: string | null = null;
+  let decimals = watch.decimals;
+  for (const row of rows) {
+    const parsed = row?.account?.data?.parsed?.info;
+    const amount = parsed?.tokenAmount;
+    const uiAmountString = typeof amount?.uiAmountString === "string" ? amount.uiAmountString : null;
+    const parsedQuantity = uiAmountString ? Number(uiAmountString) : numberOrZero(amount?.uiAmount);
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) continue;
+    quantity += parsedQuantity;
+    decimals = typeof amount?.decimals === "number" ? amount.decimals : decimals;
+    tokenAccount = typeof row?.pubkey === "string" ? row.pubkey : tokenAccount;
+  }
+  return quantity > 0 ? { watch, quantity, decimals, tokenAccount } : null;
+}
+
+function idleWalletHoldingsAdapter(wallet: string | null): WalletHoldingsAdapter {
+  return {
+    mode: "read-only-wallet-holdings",
+    status: "idle",
+    wallet_public_key: wallet,
+    rpc_configured: Boolean(solanaRpcUrl()),
+    matched_position_count: 0,
+    token_account_count: 0,
+    total_value_usd: 0,
+    portfolio_applied: false,
+    summary: wallet ? "Read-only wallet holdings adapter is waiting for live DEX/RPC mode." : "No wallet public key is scoped for holdings reads.",
+    next_action: wallet ? "Use live DEX dry-run with Solana RPC to read watched token balances." : "Scope a public wallet key before reading balances.",
+    blockers: wallet ? [] : ["Wallet public key is missing or malformed."],
+    controls: walletHoldingsControls(),
+    items: [],
+  };
+}
+
+function walletHoldingsControls() {
+  return [
+    "Reads SPL token account balances with getTokenAccountsByOwner and jsonParsed encoding.",
+    "Filters to watched memecoin mints only; it does not scan arbitrary wallet assets yet.",
+    "Does not request signatures, private keys, transaction bodies, transfers, approvals, or wallet mutation.",
+    "Applies balances only to local state for protection, sizing, and dry-run route rehearsal.",
+  ];
 }
 
 function defaultExecutionConfig(now: string): ExecutionConfig {
