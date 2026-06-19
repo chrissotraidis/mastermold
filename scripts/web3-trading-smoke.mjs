@@ -4150,9 +4150,11 @@ async function main() {
     orderRehearsal.payload.execution_plans?.some((plan) =>
       plan.side === "sell" &&
       plan.source === "jupiter" &&
-      plan.output_mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      plan.output_mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" &&
+      plan.input_amount_source === "watchlist" &&
+      [5, 6, 9].includes(plan.input_token_decimals)
     ),
-    "Order rehearsal should quote at least one held-position protective sell route to USDC.",
+    "Order rehearsal should quote at least one decimal-aware held-position protective sell route to USDC.",
     orderRehearsal.payload.execution_plans,
   );
   assert(orderRehearsal.payload.execution_gate.live_execution_enabled === false, "Order rehearsal must not enable live execution.", orderRehearsal.payload.execution_gate);

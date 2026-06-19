@@ -6222,6 +6222,21 @@ describe("Web3 autonomous trading subsystem", () => {
             pairCreatedAt: Date.now() - 1_400_000 * 60 * 1000,
             boosts: { active: 2 },
           },
+          {
+            chainId: "solana",
+            dexId: "raydium",
+            pairAddress: "PairBonkWatch111",
+            baseToken: { address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", name: "Bonk", symbol: "Bonk" },
+            quoteToken: { address: "So11111111111111111111111111111111111111112", name: "Wrapped SOL", symbol: "SOL" },
+            priceUsd: "0.0000236",
+            txns: { m5: { buys: 742, sells: 501 } },
+            volume: { m5: 1_240_000, h1: 13_800_000, h24: 151_000_000 },
+            priceChange: { m5: -3.4, h1: -7.1, h6: 12.5 },
+            liquidity: { usd: 31_200_000 },
+            marketCap: 1_840_000_000,
+            pairCreatedAt: Date.now() - 1_400_000 * 60 * 1000,
+            boosts: { active: 2 },
+          },
         ]);
       }
       if (url.includes("lite-api.jup.ag/swap/v1/quote")) {
@@ -6368,8 +6383,10 @@ describe("Web3 autonomous trading subsystem", () => {
       side: "sell",
       source: "jupiter",
       status: "quoted",
-      input_mint: "BonkReal1111111111111111111111111111111",
+      input_mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
       output_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      input_token_decimals: 5,
+      input_amount_source: "watchlist",
       quote_context_slot: 284_001_337,
       dry_run: {
         status: "order-built",
@@ -6378,6 +6395,7 @@ describe("Web3 autonomous trading subsystem", () => {
       },
     });
     expect(sellPlan?.input_amount_usd).toBe(500);
+    expect(sellPlan?.input_amount_raw).toBe("2118644067");
     expect(state.pre_submit_rehearsal.items.find((item) => item.symbol === "BONK")).toMatchObject({
       plan_id: sellPlan?.id,
       request_id: "order-123",

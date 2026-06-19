@@ -18,18 +18,21 @@ const HELD_POSITION_DEX_WATCHLIST: DexWatchlistToken[] = [
     tokenAddress: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
     symbol: "BONK",
     tokenId: "bonk-sol",
+    decimals: 5,
   },
   {
     chainId: "solana",
     tokenAddress: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
     symbol: "WIF",
     tokenId: "wif-sol",
+    decimals: 6,
   },
   {
     chainId: "solana",
     tokenAddress: "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
     symbol: "POPCAT",
     tokenId: "popcat-sol",
+    decimals: 9,
   },
 ];
 
@@ -38,6 +41,7 @@ type DexWatchlistToken = {
   tokenAddress: string;
   symbol: string;
   tokenId: string;
+  decimals: number;
 };
 
 export type MemecoinMarket = {
@@ -8021,6 +8025,8 @@ export type ExecutionPlan = {
   output_mint: string | null;
   input_amount_usd: number;
   input_amount_raw: string | null;
+  input_token_decimals: number | null;
+  input_amount_source: "usdc" | "solana-rpc" | "watchlist" | "assumed" | "none";
   estimated_output_raw: string | null;
   price_impact_pct: number | null;
   quoted_at: string | null;
@@ -20818,6 +20824,37 @@ function solanaRpcUrl() {
   return process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || null;
 }
 
+async function resolveTokenDecimals(
+  mint: string,
+  fetchImpl: FetchLike,
+): Promise<{ decimals: number; source: ExecutionPlan["input_amount_source"] }> {
+  const known = knownTokenDecimals(mint);
+  if (known.source === "usdc") return known;
+  const endpoint = solanaRpcUrl();
+  if (endpoint) {
+    try {
+      const response = await solanaRpc(fetchImpl, endpoint, "getTokenSupply", [
+        mint,
+        { commitment: "confirmed" },
+      ]);
+      const decimals = response.result?.value?.decimals;
+      if (typeof decimals === "number" && Number.isInteger(decimals) && decimals >= 0 && decimals <= 18) {
+        return { decimals, source: "solana-rpc" };
+      }
+    } catch {
+      return known;
+    }
+  }
+  return known;
+}
+
+function knownTokenDecimals(mint: string): { decimals: number; source: ExecutionPlan["input_amount_source"] } {
+  if (mint === USDC_MINT) return { decimals: 6, source: "usdc" };
+  const watched = HELD_POSITION_DEX_WATCHLIST.find((token) => token.tokenAddress.toLowerCase() === mint.toLowerCase());
+  if (watched) return { decimals: watched.decimals, source: "watchlist" };
+  return { decimals: 6, source: "assumed" };
+}
+
 function drillStatus(
   plan: ExecutionPlan | null,
   blockers: string[],
@@ -21009,6 +21046,8 @@ async function quoteJupiterPlan(
       output_mint: token.token_address,
       input_amount_usd: size,
       input_amount_raw: amountRaw,
+      input_token_decimals: 6,
+      input_amount_source: "usdc",
       estimated_output_raw: quote.outAmount,
       price_impact_pct: numberOrNull(quote.priceImpactPct),
       quoted_at: quotedAt,
@@ -21042,7 +21081,8 @@ async function quoteJupiterSellPlan(
     return localPositionSellPlan(token, position, readiness, "unsupported-chain", "Jupiter sell quote planning is only available for Solana tokens.");
   }
   const size = cappedSellSize(position, readiness);
-  const amountRaw = triggerOrderInputAmountRaw(position, size, token);
+  const decimals = await resolveTokenDecimals(token.token_address, fetchImpl);
+  const amountRaw = positionInputAmountRaw(position, size, token, decimals.decimals);
   if (size <= 0 || !amountRaw) {
     return localPositionSellPlan(token, position, readiness, "blocked", "Position sizing returned zero, so no sell quote was requested.");
   }
@@ -21089,6 +21129,8 @@ async function quoteJupiterSellPlan(
       output_mint: USDC_MINT,
       input_amount_usd: size,
       input_amount_raw: amountRaw,
+      input_token_decimals: decimals.decimals,
+      input_amount_source: decimals.source,
       estimated_output_raw: quote.outAmount,
       price_impact_pct: numberOrNull(quote.priceImpactPct),
       quoted_at: quotedAt,
@@ -21132,6 +21174,8 @@ function localPlan(
     output_mint: token.chain === "solana" ? side === "sell" ? USDC_MINT : token.token_address : null,
     input_amount_usd: size,
     input_amount_raw: size > 0 ? String(size * 1_000_000) : null,
+    input_token_decimals: token.chain === "solana" ? side === "sell" ? knownTokenDecimals(token.token_address).decimals : 6 : null,
+    input_amount_source: token.chain === "solana" ? side === "sell" ? knownTokenDecimals(token.token_address).source : "usdc" : "none",
     estimated_output_raw: null,
     price_impact_pct: null,
     quoted_at: null,
@@ -21154,6 +21198,7 @@ function localPositionSellPlan(
   message: string,
 ): ExecutionPlan {
   const size = cappedSellSize(position, readiness);
+  const decimals = knownTokenDecimals(token.token_address);
   return {
     id: `plan-sell-${token.id}`,
     token_id: token.id,
@@ -21164,7 +21209,9 @@ function localPositionSellPlan(
     input_mint: token.chain === "solana" ? token.token_address : null,
     output_mint: token.chain === "solana" ? USDC_MINT : null,
     input_amount_usd: size,
-    input_amount_raw: triggerOrderInputAmountRaw(position, size, token),
+    input_amount_raw: positionInputAmountRaw(position, size, token, decimals.decimals),
+    input_token_decimals: token.chain === "solana" ? decimals.decimals : null,
+    input_amount_source: token.chain === "solana" ? decimals.source : "none",
     estimated_output_raw: null,
     price_impact_pct: null,
     quoted_at: null,
@@ -26443,11 +26490,14 @@ function triggerMarketByPosition(positions: TradingPosition[], market: MemecoinM
 }
 
 function triggerOrderInputAmountRaw(position: TradingPosition, depositUsd: number, token: MemecoinMarket | undefined) {
+  return positionInputAmountRaw(position, depositUsd, token, token ? knownTokenDecimals(token.token_address).decimals : 6);
+}
+
+function positionInputAmountRaw(position: TradingPosition, depositUsd: number, token: MemecoinMarket | undefined, decimals: number) {
   if (!token || token.price_usd <= 0 || depositUsd <= 0) return null;
   const sellQuantity = Math.min(position.quantity, depositUsd / token.price_usd);
   if (!Number.isFinite(sellQuantity) || sellQuantity <= 0) return null;
-  const assumedDecimals = 6;
-  return Math.max(1, Math.floor(sellQuantity * 10 ** assumedDecimals)).toString();
+  return Math.max(1, Math.floor(sellQuantity * 10 ** decimals)).toString();
 }
 
 function triggerOrderDepositUsd(item: PositionExitLadderItem, orderType: TriggerOrderPlan["order_type"]) {
