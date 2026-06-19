@@ -89,7 +89,7 @@ The Web3 trading workspace can be driven without the browser by the bounded pape
 npm run daemon:web3 -- --base-url=http://localhost:4010 --ticks=1 --heartbeat-when-gated --json
 npm run forward:web3 -- --base-url=http://localhost:4010 --ticks=6 --min-net-pnl=0 --json
 npm run forward-suite:web3 -- --base-url=http://localhost:4010 --ticks=2 --min-net-pnl=0 --json
-npm run forward-repeat:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=3 --min-net-pnl=0 --json
+npm run forward-repeat:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=3 --min-net-pnl=0 --min-hit-rate-pct=100 --min-deployed-alpha=0 --max-drawdown=1000 --min-consistency-score=80 --json
 ```
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
@@ -104,6 +104,9 @@ deployed-capital alpha versus the best visible coin; add `--fail-under-target` w
 report should gate deployment. The repeat proof reruns the bounded suite or scenario with
 `--runs=N` and reports hit rate, average PnL, cumulative drawdown, consistency score, and
 repeat deployed-capital alpha so a single lucky tape is harder to mistake for durable edge.
+When `--fail-under-target` is set on repeat proof, net PnL, hit rate, drawdown, deployed
+alpha, and consistency thresholds all have to pass before the report grants paper-promotion
+permission.
 
 ## Architecture: the engine and the app
 

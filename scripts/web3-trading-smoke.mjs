@@ -1,5 +1,5 @@
 import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
-import { runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
+import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
 
@@ -4774,7 +4774,29 @@ async function main() {
   assert(typeof repeatRun.hit_rate_pct === "number" && typeof repeatRun.consistency_score === "number", "Autonomous repeat proof should quantify hit rate and consistency.", repeatRun);
   assert(typeof repeatRun.max_cumulative_drawdown_usd === "number" && typeof repeatRun.average_net_pnl_usd === "number", "Autonomous repeat proof should quantify drawdown and average PnL.", repeatRun);
   assert(typeof repeatRun.deployed_hot_coin_alpha_usd === "number" && ["beat-deployed-hot-coin-repeat", "lagged-deployed-hot-coin-repeat"].includes(repeatRun.deployed_hot_coin_baseline_verdict), "Autonomous repeat proof should compare repeat deployed capital against the same-notional hot-coin baseline.", repeatRun);
+  assert(repeatRun.proof_gate_status === "passed" && repeatRun.promotion_permission === "paper-promote", "Autonomous repeat proof should expose a passed paper-promotion gate when all thresholds are met.", repeatRun);
+  assert(repeatRun.hit_rate_met === true && repeatRun.drawdown_met === true && repeatRun.deployed_alpha_met === true && repeatRun.consistency_met === true, "Autonomous repeat proof should disclose each promotion threshold result.", repeatRun);
+  assert(Array.isArray(repeatRun.proof_gate_blockers) && repeatRun.proof_gate_blockers.length === 0, "Autonomous repeat proof should not carry blockers when the proof gate passes.", repeatRun);
   assert(repeatRun.runs.every((report) => report.mode === "web3-autonomous-forward-suite" && report.scenario_count === 3), "Autonomous repeat proof should rerun the multi-regime suite by default.", repeatRun.runs);
+  const blockedRepeatGate = buildForwardRepeatReport({
+    config: {
+      baseUrl,
+      scenario: "all",
+      source: "sample",
+      runnerId: "smoke-blocked-repeat-gate",
+      runs: 1,
+      ticks: 2,
+      minNetPnlUsd: 0,
+      minHitRatePct: 100,
+      minDeployedAlphaUsd: 10_000,
+      maxDrawdownUsd: 0,
+      minConsistencyScore: 100,
+    },
+    startedAt: new Date(0).toISOString(),
+    runs: [forwardRun],
+  });
+  assert(blockedRepeatGate.proof_gate_status === "blocked" && blockedRepeatGate.target_met === false, "Autonomous repeat proof should block promotion when deployed-alpha thresholds are not met.", blockedRepeatGate);
+  assert(blockedRepeatGate.proof_gate_blockers.some((blocker) => blocker.includes("deployed alpha")), "Autonomous repeat proof should explain deployed-alpha gate failures.", blockedRepeatGate);
 
   const summary = {
     baseUrl,
@@ -4794,6 +4816,7 @@ async function main() {
     repeatHitRate: repeatRun.hit_rate_pct,
     repeatDrawdown: repeatRun.max_cumulative_drawdown_usd,
     repeatDeployedAlpha: repeatRun.deployed_hot_coin_alpha_usd,
+    repeatGate: repeatRun.proof_gate_status,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

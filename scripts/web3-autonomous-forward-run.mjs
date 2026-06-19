@@ -22,6 +22,10 @@ export function parseForwardRunArgs(argv = [], env = process.env) {
     ticks: boundedInteger(flags.get("ticks") ?? env.WEB3_FORWARD_TICKS, 6, 1, 120),
     intervalMs: boundedInteger(flags.get("interval-ms") ?? env.WEB3_FORWARD_INTERVAL_MS, 0, 0, 120_000),
     minNetPnlUsd: boundedNumber(flags.get("min-net-pnl") ?? env.WEB3_FORWARD_MIN_NET_PNL_USD, 0, -1_000_000, 1_000_000),
+    minHitRatePct: boundedNumber(flags.get("min-hit-rate-pct") ?? env.WEB3_FORWARD_MIN_HIT_RATE_PCT, 100, 0, 100),
+    minDeployedAlphaUsd: boundedNumber(flags.get("min-deployed-alpha") ?? env.WEB3_FORWARD_MIN_DEPLOYED_ALPHA_USD, 0, -1_000_000, 1_000_000),
+    maxDrawdownUsd: boundedNumber(flags.get("max-drawdown") ?? env.WEB3_FORWARD_MAX_DRAWDOWN_USD, 1_000, 0, 1_000_000),
+    minConsistencyScore: boundedNumber(flags.get("min-consistency-score") ?? env.WEB3_FORWARD_MIN_CONSISTENCY_SCORE, 80, 0, 100),
     heartbeatWhenGated: booleanFlag(flags.get("heartbeat-when-gated") ?? env.WEB3_FORWARD_HEARTBEAT_WHEN_GATED, true),
     failUnderTarget: booleanFlag(flags.get("fail-under-target") ?? env.WEB3_FORWARD_FAIL_UNDER_TARGET, false),
     json: booleanFlag(flags.get("json") ?? env.WEB3_FORWARD_JSON, false),
@@ -40,6 +44,10 @@ export async function runWeb3AutonomousForwardRun(input = {}) {
     ticks: boundedInteger(input.ticks, 6, 1, 120),
     intervalMs: boundedInteger(input.intervalMs, 0, 0, 120_000),
     minNetPnlUsd: boundedNumber(input.minNetPnlUsd, 0, -1_000_000, 1_000_000),
+    minHitRatePct: boundedNumber(input.minHitRatePct, 100, 0, 100),
+    minDeployedAlphaUsd: boundedNumber(input.minDeployedAlphaUsd, 0, -1_000_000, 1_000_000),
+    maxDrawdownUsd: boundedNumber(input.maxDrawdownUsd, 1_000, 0, 1_000_000),
+    minConsistencyScore: boundedNumber(input.minConsistencyScore, 80, 0, 100),
     heartbeatWhenGated: input.heartbeatWhenGated !== false,
     failUnderTarget: Boolean(input.failUnderTarget),
   };
@@ -47,7 +55,7 @@ export async function runWeb3AutonomousForwardRun(input = {}) {
   if (config.runs > 1) {
     const report = await runWeb3AutonomousForwardRepeat(config);
     if (config.failUnderTarget && !report.target_met) {
-      const error = new Error(`Autonomous repeat forward proof missed target by ${formatCurrency(report.target_gap_usd)}.`);
+      const error = new Error(repeatProofFailureMessage(report));
       error.report = report;
       throw error;
     }
@@ -110,6 +118,10 @@ export async function runWeb3AutonomousForwardRepeat(input = {}) {
     ticks: boundedInteger(input.ticks, 6, 1, 120),
     intervalMs: boundedInteger(input.intervalMs, 0, 0, 120_000),
     minNetPnlUsd: boundedNumber(input.minNetPnlUsd, 0, -1_000_000, 1_000_000),
+    minHitRatePct: boundedNumber(input.minHitRatePct, 100, 0, 100),
+    minDeployedAlphaUsd: boundedNumber(input.minDeployedAlphaUsd, 0, -1_000_000, 1_000_000),
+    maxDrawdownUsd: boundedNumber(input.maxDrawdownUsd, 1_000, 0, 1_000_000),
+    minConsistencyScore: boundedNumber(input.minConsistencyScore, 80, 0, 100),
     heartbeatWhenGated: input.heartbeatWhenGated !== false,
     failUnderTarget: Boolean(input.failUnderTarget),
   };
@@ -131,7 +143,7 @@ export async function runWeb3AutonomousForwardRepeat(input = {}) {
     runs,
   });
   if (config.failUnderTarget && !report.target_met) {
-    const error = new Error(`Autonomous repeat forward proof missed target by ${formatCurrency(report.target_gap_usd)}.`);
+    const error = new Error(repeatProofFailureMessage(report));
     error.report = report;
     throw error;
   }
@@ -198,14 +210,28 @@ export function buildForwardRepeatReport({
   const bestRun = [...runs].sort((a, b) => Number(b.net_pnl_usd ?? 0) - Number(a.net_pnl_usd ?? 0))[0] ?? null;
   const worstRun = [...runs].sort((a, b) => Number(a.net_pnl_usd ?? 0) - Number(b.net_pnl_usd ?? 0))[0] ?? null;
   const targetGap = roundMoney(netPnl - (Number(config.minNetPnlUsd ?? 0) * runs.length));
-  const targetMet = targetGap >= 0 && targetMetCount === runs.length;
   const maxDrawdown = maxCumulativeDrawdown(pnlValues);
+  const hitRatePct = roundMoney((profitableRunCount / Math.max(1, runs.length)) * 100);
+  const targetHitRatePct = roundMoney((targetMetCount / Math.max(1, runs.length)) * 100);
   const consistencyScore = roundMoney(
     (profitableRunCount / Math.max(1, runs.length)) * 55
     + (targetMetCount / Math.max(1, runs.length)) * 25
     + (deployedHotCoinAlpha >= 0 ? 15 : 0)
     + (maxDrawdown <= Math.max(25, Math.abs(netPnl) * 0.25) ? 5 : 0),
   );
+  const netTargetMet = targetGap >= 0 && targetMetCount === runs.length;
+  const hitRateMet = hitRatePct >= Number(config.minHitRatePct ?? 100);
+  const drawdownMet = maxDrawdown <= Number(config.maxDrawdownUsd ?? 1_000);
+  const deployedAlphaMet = deployedHotCoinAlpha >= Number(config.minDeployedAlphaUsd ?? 0);
+  const consistencyMet = consistencyScore >= Number(config.minConsistencyScore ?? 80);
+  const proofGateBlockers = [
+    netTargetMet ? null : `net target gap is ${formatCurrency(targetGap)}`,
+    hitRateMet ? null : `hit rate ${hitRatePct}% is below ${roundMoney(config.minHitRatePct)}%`,
+    drawdownMet ? null : `drawdown ${formatCurrency(-maxDrawdown)} exceeds ${formatCurrency(-Number(config.maxDrawdownUsd ?? 1_000))}`,
+    deployedAlphaMet ? null : `deployed alpha ${formatCurrency(deployedHotCoinAlpha)} is below ${formatCurrency(config.minDeployedAlphaUsd ?? 0)}`,
+    consistencyMet ? null : `consistency score ${consistencyScore}/100 is below ${roundMoney(config.minConsistencyScore)}/100`,
+  ].filter(Boolean);
+  const targetMet = proofGateBlockers.length === 0;
   const verdict = targetMet && profitableRunCount === runs.length && deployedHotCoinAlpha >= 0
     ? "repeat-profitable-deployed-alpha"
     : netPnl > 0 && deployedHotCoinAlpha >= 0
@@ -236,13 +262,25 @@ export function buildForwardRepeatReport({
     worst_run_pnl_usd: worstRun ? roundMoney(worstRun.net_pnl_usd) : 0,
     max_cumulative_drawdown_usd: maxDrawdown,
     profitable_run_count: profitableRunCount,
-    hit_rate_pct: roundMoney((profitableRunCount / Math.max(1, runs.length)) * 100),
+    hit_rate_pct: hitRatePct,
     min_net_pnl_usd: roundMoney(config.minNetPnlUsd),
     target_gap_usd: targetGap,
     target_met: targetMet,
+    net_target_met: netTargetMet,
     target_met_count: targetMetCount,
-    target_hit_rate_pct: roundMoney((targetMetCount / Math.max(1, runs.length)) * 100),
+    target_hit_rate_pct: targetHitRatePct,
+    minimum_hit_rate_pct: roundMoney(config.minHitRatePct),
+    hit_rate_met: hitRateMet,
+    maximum_drawdown_usd: roundMoney(config.maxDrawdownUsd),
+    drawdown_met: drawdownMet,
+    minimum_deployed_hot_coin_alpha_usd: roundMoney(config.minDeployedAlphaUsd),
+    deployed_alpha_met: deployedAlphaMet,
+    minimum_consistency_score: roundMoney(config.minConsistencyScore),
     consistency_score: consistencyScore,
+    consistency_met: consistencyMet,
+    proof_gate_status: targetMet ? "passed" : "blocked",
+    proof_gate_blockers: proofGateBlockers,
+    promotion_permission: targetMet ? "paper-promote" : "blocked",
     verdict,
     hot_coin_baseline_pnl_usd: hotCoinBaselinePnl,
     hot_coin_alpha_usd: hotCoinAlpha,
@@ -575,6 +613,14 @@ function formatCurrency(value) {
   return `${value >= 0 ? "+" : "-"}$${Math.abs(value).toFixed(2)}`;
 }
 
+function repeatProofFailureMessage(report) {
+  const blockers = Array.isArray(report?.proof_gate_blockers) ? report.proof_gate_blockers : [];
+  if (blockers.length > 0) {
+    return `Autonomous repeat forward proof failed promotion gate: ${blockers.join("; ")}.`;
+  }
+  return `Autonomous repeat forward proof missed target by ${formatCurrency(report?.target_gap_usd ?? 0)}.`;
+}
+
 async function main() {
   const config = parseForwardRunArgs(process.argv.slice(2), process.env);
   try {
@@ -585,7 +631,7 @@ async function main() {
     }
     if (report.mode === "web3-autonomous-forward-repeat") {
       console.log(`${report.verdict}: ${formatCurrency(report.net_pnl_usd)} across ${report.run_count} repeated ${report.scenario} run(s), ${report.hit_rate_pct}% hit rate.`);
-      console.log(`Deployed-alpha: ${formatCurrency(report.deployed_hot_coin_alpha_usd)}; drawdown: ${formatCurrency(-report.max_cumulative_drawdown_usd)}; consistency: ${report.consistency_score}/100.`);
+      console.log(`Gate: ${report.proof_gate_status}; deployed-alpha: ${formatCurrency(report.deployed_hot_coin_alpha_usd)}; drawdown: ${formatCurrency(-report.max_cumulative_drawdown_usd)}; consistency: ${report.consistency_score}/100.`);
       return;
     }
     if (report.mode === "web3-autonomous-forward-suite") {
