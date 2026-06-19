@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { IntegrationKeyInput } from "@/components/integration-key-input";
 import { ManualHoldingsPanel } from "@/components/manual-holdings-panel";
 import { ProfileSettings } from "@/components/profile-settings";
+import { SettingsWeb3CredentialConsole } from "@/components/settings-web3-credential-console";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { productProvenanceLabel } from "@/lib/provenance-copy";
@@ -58,7 +59,7 @@ export default async function IntegrationsSettingsPage() {
         </div>
 
         <div className="mb-8">
-          <Web3CredentialsRunwayCard receipt={web3AccountReceipt} acquisition={web3AcquisitionReceipt} />
+          <Web3CredentialsRunwayCard receipt={web3AccountReceipt} acquisition={web3AcquisitionReceipt} state={web3State} />
         </div>
 
         <div className="mb-8">
@@ -97,9 +98,11 @@ export default async function IntegrationsSettingsPage() {
 function Web3CredentialsRunwayCard({
   receipt,
   acquisition,
+  state,
 }: {
   receipt: Web3AccountSetupReceipt;
   acquisition: Web3AccountAcquisitionReceipt;
+  state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
   const requiredConfigured = receipt.environment_summary.required_configured_count;
   const requiredTotal = receipt.environment_summary.required_account_count;
@@ -107,6 +110,10 @@ function Web3CredentialsRunwayCard({
   const primaryItems = receipt.items.filter((item) =>
     ["helius-read-rail", "jupiter-execution-rail", "dedicated-trading-wallet", "external-signer", "emergency-stop", "tax-ledger"].includes(item.id),
   );
+  const scopedWallet = state.autonomous_custody_mandate.wallet_public_key ??
+    state.live_wallet_accounting_readiness.wallet_public_key ??
+    state.execution_readiness.config.wallet_public_key ??
+    "";
 
   return (
     <section aria-labelledby="web3-credential-runway-title">
@@ -184,6 +191,18 @@ function Web3CredentialsRunwayCard({
               External account setup is operator owned; in app signup blocked; private key storage blocked; seed phrase storage blocked; live execution blocked; wallet mutation blocked; secret echo blocked.
             </p>
           </div>
+
+          <SettingsWeb3CredentialConsole
+            walletPublicKeyPreview={receipt.wallet_summary.wallet_public_key_preview}
+            defaultWalletPublicKey={scopedWallet}
+            maxTradeUsd={state.execution_readiness.config.max_trade_usd}
+            dailySpendCapUsd={state.execution_readiness.config.daily_spend_cap_usd}
+            maxSlippageBps={state.execution_readiness.config.max_slippage_bps}
+            scenario={state.scenario}
+            source={state.market_source.mode}
+            account={state.paper_account.mode}
+            cycles={state.paper_account.cycle}
+          />
 
           <div className="grid gap-2 sm:grid-cols-2">
             {primaryItems.map((item) => (

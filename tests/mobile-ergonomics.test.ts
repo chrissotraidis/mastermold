@@ -757,6 +757,7 @@ describe("mobile ergonomics source contracts", () => {
 
   test("GIVEN Settings connection cards render WHEN source copy is checked THEN import is explicit and read-only", () => {
     const settingsPage = source("app/settings/integrations/page.tsx");
+    const settingsConsole = source("components/settings-web3-credential-console.tsx");
     const input = source("components/integration-key-input.tsx");
     const integrations = source("src/db/integrations.ts");
     const imports = source("src/db/portfolio-imports.ts");
@@ -773,6 +774,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).not.toContain("selected chat provider");
     expect(settingsPage).toContain("Web3 trading credentials");
     expect(settingsPage).toContain("Secure setup state for the autonomous Web3 paper desk");
+    expect(settingsPage).toContain("SettingsWeb3CredentialConsole");
+    expect(settingsConsole).toContain("Credential action console");
+    expect(settingsConsole).toContain("Session-only provider tests");
+    expect(settingsConsole).toContain("Test credentials");
+    expect(settingsConsole).toContain("Rehearse Jupiter");
+    expect(settingsConsole).toContain("no browser storage for Helius or Jupiter keys");
+    expect(settingsConsole).toContain("unsigned transaction return withheld");
     expect(settingsPage).toContain("Open Web3 wiring");
     expect(settingsPage).toContain("live execution blocked");
     expect(settingsPage).toContain("wallet mutation blocked");
@@ -836,7 +844,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(imports).toContain("/balances?pageSize=250");
     expect(imports).toContain("https://api.zerion.io/v1/wallets/");
     expect(imports).toContain("/api/v1/accounts");
-    expect(`${settingsPage}\n${input}\n${integrations}\n${imports}`).not.toMatch(/live sync|synced portfolio|place checked|brokerage\/orders|(?<!cannot )sign transaction|withdraw|test prompt|\\.env\\.local|account keys|chat inference keys|label: "Provider"|placeholder: "Provider"/i);
+    expect(`${settingsPage}\n${settingsConsole}\n${input}\n${integrations}\n${imports}`).not.toMatch(/live sync|synced portfolio|place checked|brokerage\/orders|(?<!cannot )sign transaction|withdraw|test prompt|\\.env\\.local|account keys|chat inference keys|label: "Provider"|placeholder: "Provider"/i);
     expect(`${input}\n${integrations}`).not.toMatch(/Advanced Trade account credential|SnapTrade read credentials|Basic Auth against|Typed fields are saved|temporary AI key|AI service|Optional model override|Optional model name|Inference key|Inference service|Test AI|Chat inference|label: "Model"|placeholder: "Optional"/i);
     expect(integrations).not.toContain("Bearer token / JWT");
   });
