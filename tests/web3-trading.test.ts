@@ -691,6 +691,13 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(breakout.onchain_event_inbox.source_status).toBe("empty");
     expect(breakout.wallet_event_reactor.mode).toBe("wallet-event-reactor");
     expect(breakout.wallet_event_reactor.status).toBe("idle");
+    expect(breakout.wallet_activity_history).toMatchObject({
+      mode: "read-only-wallet-activity-history",
+      status: "missing-wallet",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      signature_count: 0,
+    });
     expect(["follow", "probe", "defensive", "exit", "idle"]).toContain(breakout.smart_money_sentinel.status);
     expect(breakout.smart_money_sentinel.items.length).toBeGreaterThan(0);
     expect(breakout.smart_money_sentinel.items.every((item) =>
@@ -6857,6 +6864,30 @@ describe("Web3 autonomous trading subsystem", () => {
             },
           });
         }
+        if (body.method === "getSignaturesForAddress") {
+          return Response.json({
+            jsonrpc: "2.0",
+            id: body.id,
+            result: [
+              {
+                signature: "5WalletActivitySig1111111111111111111111111111111111111",
+                slot: 284_001_400,
+                err: null,
+                memo: null,
+                blockTime: 1_781_893_200,
+                confirmationStatus: "confirmed",
+              },
+              {
+                signature: "5WalletActivitySig2222222222222222222222222222222222222",
+                slot: 284_001_350,
+                err: { InstructionError: [1, "Custom"] },
+                memo: "failed swap",
+                blockTime: 1_781_893_000,
+                confirmationStatus: "finalized",
+              },
+            ],
+          });
+        }
         if (body.method === "getTokenSupply") {
           return Response.json({
             jsonrpc: "2.0",
@@ -7011,6 +7042,25 @@ describe("Web3 autonomous trading subsystem", () => {
       portfolio_applied: true,
       total_value_usd: 2960,
     });
+    expect(state.wallet_activity_history).toMatchObject({
+      mode: "read-only-wallet-activity-history",
+      status: "ready",
+      rpc_configured: true,
+      signature_count: 2,
+      failed_signature_count: 1,
+      newest_slot: "284001400",
+      oldest_slot: "284001350",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(state.wallet_activity_history.items[0]).toMatchObject({
+      signature_preview: "5Walle...111111",
+      signature_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      confirmation_status: "confirmed",
+      failed: false,
+      memo_present: false,
+    });
+    expect(JSON.stringify(state.wallet_activity_history)).not.toContain("5WalletActivitySig1111111111111111111111111111111111111");
     expect(state.live_wallet_accounting_readiness).toMatchObject({
       mode: "live-wallet-accounting-readiness",
       status: "pricing-gapped",

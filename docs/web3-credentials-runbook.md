@@ -58,6 +58,8 @@ When `HELIUS_API_KEY` is set, the app can derive the Helius mainnet RPC endpoint
 
 The launch checklist now separates provider readiness into a read-provider rail and a signer-provider rail. `HELIUS_API_KEY` or `SOLANA_RPC_URL` plus `JUPITER_API_KEY` can make the read rail ready for wallet, route, and order rehearsal evidence, but signer/custody credentials, policy hashes, user approval, settlement, and manual live review are still separate gates.
 
+Live DEX dry-run reads also expose a read-only wallet activity history receipt when a public wallet and Solana RPC are scoped. It uses `getSignaturesForAddress` to summarize recent signatures, slots, block times, and failure counts with signature previews and hashes only. It does not return raw transaction bodies, sign, submit, decode full swaps, or mutate balances.
+
 ## API
 
 The setup UI posts to:

@@ -8412,6 +8412,36 @@ export type WalletHoldingsAdapter = {
   items: WalletHoldingsAdapterItem[];
 };
 
+export type WalletActivityHistoryItem = {
+  signature_preview: string;
+  signature_hash: string;
+  slot: string | null;
+  block_time: string | null;
+  confirmation_status: "processed" | "confirmed" | "finalized" | null;
+  failed: boolean;
+  memo_present: boolean;
+};
+
+export type WalletActivityHistory = {
+  mode: "read-only-wallet-activity-history";
+  status: "missing-wallet" | "not-configured" | "ready" | "empty" | "blocked";
+  wallet_public_key: string | null;
+  rpc_configured: boolean;
+  history_source: "solana-rpc-getSignaturesForAddress";
+  signature_count: number;
+  failed_signature_count: number;
+  newest_slot: string | null;
+  oldest_slot: string | null;
+  newest_block_time: string | null;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  summary: string;
+  next_action: string;
+  blockers: string[];
+  controls: string[];
+  items: WalletActivityHistoryItem[];
+};
+
 export type ExecutionGate = {
   mode: ExecutionMode;
   live_execution_enabled: false;
@@ -9265,6 +9295,7 @@ export type Web3TradingState = {
   execution_plans: ExecutionPlan[];
   portfolio: TradingPortfolio;
   wallet_holdings_adapter: WalletHoldingsAdapter;
+  wallet_activity_history: WalletActivityHistory;
   live_wallet_accounting_readiness: LiveWalletAccountingReadiness;
   position_watch: PositionWatch[];
   position_exit_ladder: PositionExitLadderEngine;
@@ -13271,6 +13302,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
   if (live.market.length === 0) {
     const fallbackFetchImpl = input.fetchImpl ?? fetch;
     const fallbackWalletHoldings = await buildReadOnlyWalletHoldingsAdapter(applyScenario(baseMarket, scenario, cycles), executionConfig, fallbackFetchImpl, live.discovery);
+    const fallbackWalletActivityHistory = await fetchReadOnlyWalletActivityHistory(executionConfig, fallbackFetchImpl);
     const fallbackState = buildWeb3TradingState({
       scenario,
       cycles,
@@ -13287,6 +13319,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       executionConfig,
       portfolioOverride: fallbackWalletHoldings.portfolio ?? undefined,
       walletHoldingsAdapter: fallbackWalletHoldings.report,
+      walletActivityHistory: fallbackWalletActivityHistory,
     });
     applyOnchainEventSignals(fallbackState, parseLedgerData(readLedger()?.data).onchain_events);
     const requestedAdvanceMode = persistentPaperAdvanceMode(input, fallbackState, daemonRequested);
@@ -13305,6 +13338,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
 
   const fetchImpl = input.fetchImpl ?? fetch;
   const walletHoldings = await buildReadOnlyWalletHoldingsAdapter(live.market, executionConfig, fetchImpl, live.discovery);
+  const walletActivityHistory = await fetchReadOnlyWalletActivityHistory(executionConfig, fetchImpl);
   const liveState = buildWeb3TradingState({
     scenario,
     cycles,
@@ -13321,6 +13355,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     executionConfig,
     portfolioOverride: walletHoldings.portfolio ?? undefined,
     walletHoldingsAdapter: walletHoldings.report,
+    walletActivityHistory,
   });
   applyOnchainEventSignals(liveState, parseLedgerData(readLedger()?.data).onchain_events);
   const requestedAdvanceMode = persistentPaperAdvanceMode(input, liveState, daemonRequested);
@@ -13372,6 +13407,7 @@ function buildWeb3TradingState({
   executionConfig,
   portfolioOverride,
   walletHoldingsAdapter,
+  walletActivityHistory,
 }: {
   scenario: TradingScenario;
   cycles: number;
@@ -13382,10 +13418,12 @@ function buildWeb3TradingState({
   executionConfig: ExecutionConfig;
   portfolioOverride?: TradingPortfolio;
   walletHoldingsAdapter?: WalletHoldingsAdapter;
+  walletActivityHistory?: WalletActivityHistory;
 }): Web3TradingState {
   const signals = market.map(scoreMarket).sort((a, b) => b.score - a.score);
   const portfolio = portfolioOverride ?? buildPortfolio(market);
   const wallet_holdings_adapter = walletHoldingsAdapter ?? idleWalletHoldingsAdapter(executionConfig.wallet_public_key);
+  const wallet_activity_history = walletActivityHistory ?? idleWalletActivityHistory(executionConfig.wallet_public_key);
   const live_wallet_accounting_readiness = buildLiveWalletAccountingReadiness({ walletHoldings: wallet_holdings_adapter });
   const strategy_lab = buildStrategyLab();
   const discovery_tape = discoveryTape ?? sampleDiscoveryTape(market);
@@ -15552,6 +15590,7 @@ function buildWeb3TradingState({
     execution_plans,
     portfolio: appliedPortfolio,
     wallet_holdings_adapter,
+    wallet_activity_history,
     live_wallet_accounting_readiness,
     position_watch,
     position_exit_ladder,
@@ -21583,6 +21622,142 @@ function isHeliusRpcEndpoint(value: string) {
   } catch {
     return false;
   }
+}
+
+type SolanaSignatureHistoryRow = {
+  signature?: string;
+  slot?: number;
+  err?: unknown;
+  memo?: string | null;
+  blockTime?: number | null;
+  confirmationStatus?: unknown;
+};
+
+async function fetchReadOnlyWalletActivityHistory(
+  executionConfig: ExecutionConfig,
+  fetchImpl: FetchLike,
+): Promise<WalletActivityHistory> {
+  const wallet = executionConfig.wallet_public_key;
+  const endpoint = solanaRpcUrl();
+  if (!wallet || !isLikelySolanaPublicKey(wallet)) {
+    return idleWalletActivityHistory(wallet);
+  }
+  if (!endpoint) {
+    return {
+      ...idleWalletActivityHistory(wallet),
+      status: "not-configured",
+      rpc_configured: false,
+      summary: "Wallet activity history was not read because Solana RPC is not configured.",
+      next_action: "Configure HELIUS_API_KEY or SOLANA_RPC_URL to read recent wallet signatures.",
+      blockers: ["Solana RPC endpoint is not configured."],
+    };
+  }
+
+  try {
+    const response = await solanaRpc(fetchImpl, endpoint, "getSignaturesForAddress", [
+      wallet,
+      { limit: 10 },
+    ]);
+    const rows = Array.isArray(response.result) ? response.result as SolanaSignatureHistoryRow[] : [];
+    const items = rows
+      .filter((row) => typeof row.signature === "string" && row.signature.length > 0)
+      .slice(0, 10)
+      .map((row): WalletActivityHistoryItem => {
+        const signature = row.signature ?? "";
+        return {
+          signature_preview: redactSignature(signature),
+          signature_hash: createHash("sha256").update(signature).digest("hex"),
+          slot: typeof row.slot === "number" ? String(row.slot) : null,
+          block_time: typeof row.blockTime === "number" ? new Date(row.blockTime * 1_000).toISOString() : null,
+          confirmation_status: isConfirmationStatus(row.confirmationStatus) ? row.confirmationStatus : null,
+          failed: row.err !== null && row.err !== undefined,
+          memo_present: typeof row.memo === "string" && row.memo.length > 0,
+        };
+      });
+    const slots = items.map((item) => Number(item.slot)).filter((slot) => Number.isFinite(slot));
+    const failedCount = items.filter((item) => item.failed).length;
+    const newestBlockTime = items
+      .map((item) => item.block_time)
+      .filter((item): item is string => Boolean(item))
+      .sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
+    const status: WalletActivityHistory["status"] = items.length > 0 ? "ready" : "empty";
+    return {
+      mode: "read-only-wallet-activity-history",
+      status,
+      wallet_public_key: wallet,
+      rpc_configured: true,
+      history_source: "solana-rpc-getSignaturesForAddress",
+      signature_count: items.length,
+      failed_signature_count: failedCount,
+      newest_slot: slots.length > 0 ? String(Math.max(...slots)) : null,
+      oldest_slot: slots.length > 0 ? String(Math.min(...slots)) : null,
+      newest_block_time: newestBlockTime,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      summary: items.length > 0
+        ? `Read ${items.length} recent wallet signature${items.length === 1 ? "" : "s"} via Solana RPC; ${failedCount} reported execution error${failedCount === 1 ? "" : "s"}.`
+        : "Solana RPC returned no recent wallet signatures for this public key.",
+      next_action: items.length > 0
+        ? "Use recent wallet activity as read-only context for wallet monitoring and future fill reconciliation review."
+        : "Keep wallet monitoring armed; no recent signature history was returned.",
+      blockers: [],
+      controls: walletActivityHistoryControls(),
+      items,
+    };
+  } catch (error) {
+    return {
+      ...idleWalletActivityHistory(wallet),
+      status: "blocked",
+      rpc_configured: true,
+      summary: error instanceof Error ? error.message : "Solana RPC wallet activity history read failed.",
+      next_action: "Retry the read-only wallet activity history fetch before trusting wallet-event coverage.",
+      blockers: [error instanceof Error ? error.message : "Solana RPC wallet activity history read failed."],
+    };
+  }
+}
+
+function idleWalletActivityHistory(wallet: string | null): WalletActivityHistory {
+  const rpcConfigured = Boolean(solanaRpcUrl());
+  return {
+    mode: "read-only-wallet-activity-history",
+    status: wallet ? rpcConfigured ? "empty" : "not-configured" : "missing-wallet",
+    wallet_public_key: wallet,
+    rpc_configured: rpcConfigured,
+    history_source: "solana-rpc-getSignaturesForAddress",
+    signature_count: 0,
+    failed_signature_count: 0,
+    newest_slot: null,
+    oldest_slot: null,
+    newest_block_time: null,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    summary: wallet
+      ? rpcConfigured
+        ? "Wallet activity history has not been fetched for this state."
+        : "Wallet activity history is waiting for HELIUS_API_KEY or SOLANA_RPC_URL."
+      : "Wallet activity history is waiting for a public wallet key.",
+    next_action: wallet
+      ? rpcConfigured
+        ? "Run a live DEX/RPC read to fetch recent wallet signatures."
+        : "Configure HELIUS_API_KEY or SOLANA_RPC_URL to read recent wallet signatures."
+      : "Scope a public wallet key before reading recent wallet activity.",
+    blockers: wallet ? rpcConfigured ? [] : ["Solana RPC endpoint is not configured."] : ["Public wallet key is not configured."],
+    controls: walletActivityHistoryControls(),
+    items: [],
+  };
+}
+
+function walletActivityHistoryControls() {
+  return [
+    "Reads recent wallet signatures through Solana RPC only; it never signs, submits, approves, transfers, or mutates wallet funds.",
+    "Raw transaction bodies and full signatures are not returned; activity rows use previews and hashes for review continuity.",
+    "History evidence can inform monitoring and reconciliation, but it cannot prove current balances or unlock live execution.",
+  ];
+}
+
+function redactSignature(signature: string) {
+  if (signature.length <= 16) return signature;
+  return `${signature.slice(0, 6)}...${signature.slice(-6)}`;
 }
 
 async function resolveTokenDecimals(

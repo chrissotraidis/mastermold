@@ -6327,6 +6327,60 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
           <Panel tint="act" className="p-4 sm:p-5">
             <PanelHeader
               as="h2"
+              icon={Wallet}
+              title="Wallet activity history"
+              right={<Chip tone={walletActivityTone(state.wallet_activity_history.status)}>{state.wallet_activity_history.status.replace("-", " ")}</Chip>}
+            />
+            <div className="relative z-10 grid gap-3 lg:grid-cols-[0.78fr_1.22fr]">
+              <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-4">
+                <p className="text-sm leading-6 text-on-surface-variant">{state.wallet_activity_history.summary}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <MiniStat label="Signatures" value={state.wallet_activity_history.signature_count.toString()} valueClassName={cn("text-sm leading-5", state.wallet_activity_history.signature_count > 0 ? "text-engine" : "text-outline")} />
+                  <MiniStat label="Failed" value={state.wallet_activity_history.failed_signature_count.toString()} valueClassName={cn("text-sm leading-5", state.wallet_activity_history.failed_signature_count > 0 ? "text-critical" : "text-outline")} />
+                  <MiniStat label="Newest slot" value={state.wallet_activity_history.newest_slot ?? "none"} valueClassName="text-sm leading-5" />
+                  <MiniStat label="Oldest slot" value={state.wallet_activity_history.oldest_slot ?? "none"} valueClassName="text-sm leading-5" />
+                  <MiniStat label="RPC" value={state.wallet_activity_history.rpc_configured ? "ready" : "missing"} valueClassName={cn("text-sm leading-5", state.wallet_activity_history.rpc_configured ? "text-engine" : "text-caution")} />
+                  <MiniStat label="Boundary" value={state.wallet_activity_history.wallet_mutation_permission} valueClassName="text-sm leading-5 text-demo" />
+                </div>
+                <p className="mt-3 rounded-md border border-outline-variant/40 bg-void/30 px-3 py-2 text-xs leading-5 text-outline">
+                  {state.wallet_activity_history.next_action}
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                {state.wallet_activity_history.items.length > 0 ? (
+                  state.wallet_activity_history.items.slice(0, 6).map((item) => (
+                    <article key={item.signature_hash} className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-display text-base font-semibold text-on-surface">{item.signature_preview}</p>
+                          <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                            {item.confirmation_status ?? "unknown"} · slot {item.slot ?? "unknown"}{item.memo_present ? " · memo" : ""}
+                          </p>
+                        </div>
+                        <span className={cn("rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-telemetry", item.failed ? "border-critical/40 bg-critical/10 text-critical" : "border-engine/40 bg-engine/10 text-engine")}>
+                          {item.failed ? "failed" : "ok"}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <MiniStat label="Hash" value={shortHash(item.signature_hash)} valueClassName="text-sm leading-5 break-words" />
+                        <MiniStat label="Block time" value={item.block_time ? item.block_time.slice(0, 10) : "none"} valueClassName="text-sm leading-5" />
+                        <MiniStat label="Mutation" value="blocked" valueClassName="text-sm leading-5 text-demo" />
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-sm leading-6 text-outline">
+                    No read-only wallet signatures have been fetched yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          </Panel>
+
+          <Panel tint="act" className="p-4 sm:p-5">
+            <PanelHeader
+              as="h2"
               icon={RefreshCw}
               title="Route refresh queue"
               right={<Chip tone={routeRefreshQueueTone(state.route_refresh_queue.status)}>{state.route_refresh_queue.status.replace("-", " ")}</Chip>}
@@ -17611,6 +17665,13 @@ function onchainEventTone(status: Web3TradingState["onchain_event_inbox"]["statu
   if (status === "accumulation") return "engine";
   if (status === "distribution" || status === "listening") return "caution";
   if (status === "risk") return "critical";
+  return "neutral";
+}
+
+function walletActivityTone(status: Web3TradingState["wallet_activity_history"]["status"]) {
+  if (status === "ready") return "engine";
+  if (status === "blocked") return "critical";
+  if (status === "not-configured" || status === "missing-wallet") return "caution";
   return "neutral";
 }
 
