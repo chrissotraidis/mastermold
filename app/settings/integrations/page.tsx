@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { getBrainStateAfterDueScheduleCheck } from "@/src/db/brain";
 import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/integrations";
 import { getPortfolio } from "@/src/db/portfolio";
+import { buildWeb3AccountAcquisitionReceipt, type Web3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
 import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
 
@@ -40,6 +41,7 @@ export default async function IntegrationsSettingsPage() {
   ]);
   const brainState = toPublicBrainState(brainStateRaw);
   const web3AccountReceipt = buildWeb3AccountSetupReceipt(web3State);
+  const web3AcquisitionReceipt = buildWeb3AccountAcquisitionReceipt(web3State);
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -56,7 +58,7 @@ export default async function IntegrationsSettingsPage() {
         </div>
 
         <div className="mb-8">
-          <Web3CredentialsRunwayCard receipt={web3AccountReceipt} />
+          <Web3CredentialsRunwayCard receipt={web3AccountReceipt} acquisition={web3AcquisitionReceipt} />
         </div>
 
         <div className="mb-8">
@@ -92,7 +94,13 @@ export default async function IntegrationsSettingsPage() {
   );
 }
 
-function Web3CredentialsRunwayCard({ receipt }: { receipt: Web3AccountSetupReceipt }) {
+function Web3CredentialsRunwayCard({
+  receipt,
+  acquisition,
+}: {
+  receipt: Web3AccountSetupReceipt;
+  acquisition: Web3AccountAcquisitionReceipt;
+}) {
   const requiredConfigured = receipt.environment_summary.required_configured_count;
   const requiredTotal = receipt.environment_summary.required_account_count;
   const liveReady = receipt.status === "live-review-blocked";
@@ -131,6 +139,51 @@ function Web3CredentialsRunwayCard({ receipt }: { receipt: Web3AccountSetupRecei
           <p className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-sm leading-6 text-on-surface-variant">
             {receipt.summary} {receipt.next_action}
           </p>
+
+          <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Web3 external account setup packet">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">External setup packet</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{acquisition.summary}</p>
+                <p className="mt-1 text-xs leading-5 text-outline">{acquisition.next_external_action}</p>
+              </div>
+              <CredentialStateBadge configured={acquisition.status === "ready-for-order-rehearsal"} status={acquisition.status} />
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {acquisition.items.slice(0, 4).map((item) => (
+                <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/35 bg-surface-dim/45 p-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                    <CredentialStateBadge configured={item.status === "configured"} status={item.status} />
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{item.security_rule}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <a
+                      href={item.setup_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-semibold text-engine hover:text-engine/80"
+                    >
+                      Setup
+                      <ExternalLink aria-hidden="true" className="size-3" />
+                    </a>
+                    <a
+                      href={item.docs_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-semibold text-violet hover:text-violet/80"
+                    >
+                      Docs
+                      <ExternalLink aria-hidden="true" className="size-3" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="sr-only" aria-label="Web3 external account setup security boundary">
+              External account setup is operator owned; in app signup blocked; private key storage blocked; seed phrase storage blocked; live execution blocked; wallet mutation blocked; secret echo blocked.
+            </p>
+          </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
             {primaryItems.map((item) => (

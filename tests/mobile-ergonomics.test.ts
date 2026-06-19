@@ -773,6 +773,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("live execution blocked");
     expect(settingsPage).toContain("wallet mutation blocked");
     expect(settingsPage).toContain("secret echo blocked");
+    expect(settingsPage).toContain("External setup packet");
+    expect(settingsPage).toContain("Web3 external account setup packet");
+    expect(settingsPage).toContain("in app signup blocked");
+    expect(settingsPage).toContain("setup_url");
+    expect(settingsPage).toContain("https://developers.jup.ag/portal");
     expect(settingsPage.indexOf("<Web3CredentialsRunwayCard")).toBeLessThan(
       settingsPage.indexOf("<ConnectionChecks"),
     );

@@ -63,7 +63,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 16. Review the Wiring focus `Production worker review` panel after `npm run supervise:web3` writes a sanitized paper-supervisor receipt. It checks receipt freshness, circuit state, profit target, drawdown brake, and the live-boundary process gate, but it cannot install a process manager or authorize live capital from inside the app.
 17. Use the Wiring focus `Run stop drill` control to record a local dry-run emergency-stop receipt. The drill halts browser Auto Watch and verifies ops target status, but it does not send webhooks, stop external processes by itself, sign, submit, or mutate wallets.
 
-The Settings page also includes a `Web3 trading credentials` runway card. It shows the same account-setup receipt as configured/missing status for Helius/Solana, Jupiter, dedicated wallet, signer posture, emergency-stop ops, and accounting targets, then links back to `/trading` for provider tests and dry-run receipts. This Settings card is read-only: it does not accept API keys, persist secrets, create external accounts, sign, submit, or mutate wallets.
+The Settings page also includes a `Web3 trading credentials` runway card. It shows the same account-setup receipt as configured/missing status for Helius/Solana, Jupiter, dedicated wallet, signer posture, emergency-stop ops, and accounting targets, then links back to `/trading` for provider tests and dry-run receipts. It also shows an external setup packet with official setup/docs links, required env names, and the next external operator action. This Settings card is read-only: it does not accept API keys, persist secrets, create external accounts, sign, submit, or mutate wallets.
 
 ## Researched Default Stack
 
@@ -89,12 +89,15 @@ The response also includes a provider account runway. It turns the researched st
 The Wiring focus also exposes:
 
 ```text
+GET /api/web3-account-acquisition
 GET /api/web3-account-setup
 GET /api/web3-accounting-ledger
 GET /api/web3-provider-health
 GET /api/web3-signer-handoff
 POST /api/web3-emergency-stop/drill
 ```
+
+The account acquisition route returns the external setup packet used by Settings. It can name official setup/docs links for Helius, Jupiter, wallet, signer, emergency stop, and accounting work; report configured/needed/blocked/future status; and emit a redacted env template with target variable names only. It cannot create external accounts, submit signup forms, store credentials, sign, submit, custody funds, or mutate wallets.
 
 The account setup route returns a redacted receipt with provider-account status for Helius/Solana reads, Jupiter execution rehearsal, the dedicated public wallet, signer posture, emergency-stop ops, accounting, and optional market-feed lanes. It detects whether expected local env targets are configured but never returns their values. It does not create third-party accounts, submit signup forms, store secrets, sign, submit, custody funds, or mutate wallets; external account creation remains operator-owned outside the app.
 

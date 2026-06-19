@@ -5,6 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GET, POST } from "@/app/api/web3-trading/route";
+import { GET as ACCOUNT_ACQUISITION_GET } from "@/app/api/web3-account-acquisition/route";
 import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
@@ -493,6 +494,75 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("does not create third-party accounts"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
     expect(JSON.stringify(receipt)).not.toContain("test-birdeye-secret");
+  });
+
+  test("GIVEN missing Jupiter setup WHEN account acquisition runs THEN it returns external-only setup actions without leaking secrets", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";
+
+    const rejected = await ACCOUNT_ACQUISITION_GET(new Request("http://localhost/api/web3-account-acquisition?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await ACCOUNT_ACQUISITION_GET(new Request("http://localhost/api/web3-account-acquisition?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      account_creation_permission: string;
+      in_app_signup_permission: string;
+      credential_storage_permission: string;
+      secret_echo_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      required_configured_count: number;
+      required_account_count: number;
+      missing_required: string[];
+      next_external_action: string;
+      env_template: string[];
+      items: Array<{
+        id: string;
+        status: string;
+        setup_url: string;
+        docs_url: string;
+        env_targets: string[];
+        app_permission: string;
+        security_rule: string;
+        test_action: string;
+      }>;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-account-acquisition-receipt");
+    expect(receipt.status).toBe("needs-jupiter");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.account_creation_permission).toBe("operator-external-only");
+    expect(receipt.in_app_signup_permission).toBe("blocked");
+    expect(receipt.credential_storage_permission).toBe("server-env-or-session-only");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.required_account_count).toBe(3);
+    expect(receipt.missing_required).toContain("Jupiter execution rehearsal");
+    expect(receipt.next_external_action).toContain("Jupiter Developer Platform");
+    expect(receipt.env_template).toContain("JUPITER_API_KEY=<set in ignored local env>");
+    expect(receipt.items.find((item) => item.id === "helius")).toMatchObject({
+      status: "configured",
+      app_permission: "inspect-config-only",
+    });
+    expect(receipt.items.find((item) => item.id === "jupiter")).toMatchObject({
+      status: "needed",
+      setup_url: "https://developers.jup.ag/portal",
+      docs_url: "https://dev.jup.ag/docs/swap",
+      env_targets: ["JUPITER_API_KEY"],
+    });
+    expect(receipt.items.find((item) => item.id === "dedicated-wallet")?.security_rule).toContain("Never paste the private key");
+    expect(receipt.controls.some((control) => control.includes("cannot create accounts"))).toBe(true);
+    expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
   });
 
   test("GIVEN env-backed provider checks WHEN provider health runs THEN it proves read rails without leaking secrets", async () => {
