@@ -253,7 +253,7 @@ export function buildWeb3AutonomyLaunchChecklist(
       label: "Provider credentials",
       status: providerCredentialsPass ? "pass" : providerCredentialsWatch ? "watch" : "fail",
       score: providerCredentialsPass ? 90 : providerCredentialsWatch ? Math.max(48, providerCredentials.readiness_score) : Math.min(30, providerCredentials.readiness_score),
-      detail: `${providerCredentials.status.replaceAll("-", " ")}; ${providerCredentials.provider.replaceAll("-", " ")} via ${providerCredentials.request_transport.replaceAll("-", " ")}, packet ${providerCredentials.adapter_status.replaceAll("-", " ")}.`,
+      detail: `${providerCredentials.status.replaceAll("-", " ")}; read rail ${providerCredentials.read_provider_status}, ${providerCredentials.provider.replaceAll("-", " ")} via ${providerCredentials.request_transport.replaceAll("-", " ")}, packet ${providerCredentials.adapter_status.replaceAll("-", " ")}.`,
       blocker: providerCredentialsPass ? null : providerCredentials.next_action,
     },
     {

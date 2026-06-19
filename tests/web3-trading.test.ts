@@ -5635,12 +5635,16 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(launchChecklist.provider_credentials_readiness).toMatchObject({
       mode: "web3-provider-credentials-readiness",
       status: "missing-wallet",
+      read_provider_status: "missing",
+      helius_rpc_configured: false,
+      jupiter_configured: false,
       can_satisfy_provider_gate: false,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
     expect(launchChecklist.provider_credentials_readiness.checks.map((check) => check.id)).toEqual([
       "wallet-scope",
+      "read-provider-rail",
       "provider-secret-scope",
       "policy-hash",
       "custody-envelope",
@@ -5685,6 +5689,13 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     process.env.HELIUS_API_KEY = "test-helius-key";
     const envReadyChecklist = buildWeb3AutonomyLaunchChecklist(state);
+    expect(envReadyChecklist.provider_credentials_readiness).toMatchObject({
+      read_provider_status: "partial",
+      helius_rpc_configured: true,
+      jupiter_configured: false,
+      can_satisfy_provider_gate: false,
+    });
+    expect(envReadyChecklist.items.find((item) => item.id === "provider-credentials")?.detail).toContain("read rail partial");
     expect(envReadyChecklist.research_decisions.find((decision) => decision.id === "provider-stack")).toMatchObject({
       status: "chosen",
       needs_user_input: [],

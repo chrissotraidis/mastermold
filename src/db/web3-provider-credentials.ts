@@ -11,6 +11,7 @@ export type Web3ProviderCredentialsReadinessStatus =
 export type Web3ProviderCredentialsReadinessCheck = {
   id:
     | "wallet-scope"
+    | "read-provider-rail"
     | "provider-secret-scope"
     | "policy-hash"
     | "custody-envelope"
@@ -30,6 +31,9 @@ export type Web3ProviderCredentialsReadiness = {
   provider: AutonomousSignerOps["active_provider"];
   signer_scope: AutonomousCustodyMandate["signer_scope"];
   wallet_public_key: string | null;
+  read_provider_status: "missing" | "partial" | "ready";
+  helius_rpc_configured: boolean;
+  jupiter_configured: boolean;
   provider_configured: boolean;
   credential_configured: boolean;
   policy_hash: string | null;
@@ -64,6 +68,13 @@ export function buildWeb3ProviderCredentialsReadiness({
   const adapter = signer.provider_adapter;
   const packet = adapter.provider_request_packet;
   const walletScoped = Boolean(custody.wallet_public_key);
+  const heliusRpcConfigured = Boolean(process.env.HELIUS_API_KEY || process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL);
+  const jupiterConfigured = Boolean(process.env.JUPITER_API_KEY);
+  const readProviderStatus: Web3ProviderCredentialsReadiness["read_provider_status"] = heliusRpcConfigured && jupiterConfigured
+    ? "ready"
+    : heliusRpcConfigured || jupiterConfigured
+      ? "partial"
+      : "missing";
   const policyHash = adapter.policy_hash ?? signer.policy_hash ?? custody.policy_hash ?? null;
   const policyHashValid = typeof policyHash === "string" && /^[0-9a-f]{64}$/i.test(policyHash);
   const providerConfigured = custody.provider_configured || signer.active_provider === "external-wallet";
@@ -87,6 +98,9 @@ export function buildWeb3ProviderCredentialsReadiness({
     custody,
     signer,
     walletScoped,
+    readProviderStatus,
+    heliusRpcConfigured,
+    jupiterConfigured,
     providerConfigured,
     credentialConfigured,
     policyHashValid,
@@ -119,6 +133,9 @@ export function buildWeb3ProviderCredentialsReadiness({
     provider: signer.active_provider,
     signer_scope: custody.signer_scope,
     wallet_public_key: custody.wallet_public_key,
+    read_provider_status: readProviderStatus,
+    helius_rpc_configured: heliusRpcConfigured,
+    jupiter_configured: jupiterConfigured,
     provider_configured: providerConfigured,
     credential_configured: credentialConfigured,
     policy_hash: policyHash,
@@ -142,6 +159,7 @@ export function buildWeb3ProviderCredentialsReadiness({
     checks,
     controls: [
       "Provider credentials readiness is a redacted evidence receipt; it never exposes secrets, private keys, raw transactions, or signed payloads.",
+      "Read-provider rail evidence can prove Helius/Solana and Jupiter credentials are present, but it cannot replace signer custody or authorize trades.",
       "Live review requires provider credential scope, wallet scope, policy hash continuity, custody envelope, signer request, and provider packet evidence.",
       "This gate can make a signer request reviewable, but it cannot unlock real-capital trading or wallet mutation by itself.",
     ],
@@ -152,6 +170,9 @@ function providerCredentialChecks(evidence: {
   custody: AutonomousCustodyMandate;
   signer: AutonomousSignerOps;
   walletScoped: boolean;
+  readProviderStatus: Web3ProviderCredentialsReadiness["read_provider_status"];
+  heliusRpcConfigured: boolean;
+  jupiterConfigured: boolean;
   providerConfigured: boolean;
   credentialConfigured: boolean;
   policyHashValid: boolean;
@@ -170,6 +191,16 @@ function providerCredentialChecks(evidence: {
       label: "Wallet scope",
       status: evidence.walletScoped ? "pass" : "fail",
       detail: evidence.walletScoped ? "A public wallet key scopes every provider credential and signer request." : "A public wallet key is required before provider credentials can be reviewed.",
+    },
+    {
+      id: "read-provider-rail",
+      label: "Read provider rail",
+      status: evidence.readProviderStatus === "ready" ? "pass" : evidence.readProviderStatus === "partial" ? "watch" : "fail",
+      detail: evidence.readProviderStatus === "ready"
+        ? "Helius/Solana reads and Jupiter route/order rehearsal credentials are present in server scope."
+        : evidence.readProviderStatus === "partial"
+          ? `${evidence.heliusRpcConfigured ? "Helius/Solana read rail is configured" : "Helius/Solana read rail is missing"}; ${evidence.jupiterConfigured ? "Jupiter route/order rail is configured" : "Jupiter route/order rail is missing"}.`
+          : "Add HELIUS_API_KEY or SOLANA_RPC_URL plus JUPITER_API_KEY before provider-backed route and wallet evidence can be fully reviewed.",
     },
     {
       id: "provider-secret-scope",
