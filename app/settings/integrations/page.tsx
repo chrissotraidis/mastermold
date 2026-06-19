@@ -28,6 +28,7 @@ import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-li
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
+import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
 
 const statusLabels: Record<IntegrationStatusJson["status"], string> = {
@@ -67,6 +68,13 @@ export default async function IntegrationsSettingsPage() {
     emergencyStop: buildWeb3EmergencyStopDrillReceipt({ reason: "settings preview", operator_ack: true }),
     accounting: web3AccountingReceipt,
   });
+  const web3SupervisedLiveRunway = buildWeb3SupervisedLiveRunway({
+    state: web3State,
+    wallet: web3DedicatedWalletPacket,
+    jupiter: web3JupiterOrderPacket,
+    signer: web3SignerPacket,
+    liveOps: web3LiveOpsPacket,
+  });
   const web3LaunchChecklist = buildWeb3AutonomyLaunchChecklist(
     web3State,
     getWeb3PromotedPaperAutopilotHealth(),
@@ -95,6 +103,7 @@ export default async function IntegrationsSettingsPage() {
             jupiterOrderPacket={web3JupiterOrderPacket}
             signerPacket={web3SignerPacket}
             liveOpsPacket={web3LiveOpsPacket}
+            supervisedLiveRunway={web3SupervisedLiveRunway}
             credentialDoctor={web3CredentialDoctor}
             launchChecklist={web3LaunchChecklist}
             state={web3State}
@@ -141,6 +150,7 @@ function Web3CredentialsRunwayCard({
   jupiterOrderPacket,
   signerPacket,
   liveOpsPacket,
+  supervisedLiveRunway,
   credentialDoctor,
   launchChecklist,
   state,
@@ -151,6 +161,7 @@ function Web3CredentialsRunwayCard({
   jupiterOrderPacket: Web3JupiterOrderPacket;
   signerPacket: Web3SignerCredentialPacket;
   liveOpsPacket: Web3LiveOpsPacket;
+  supervisedLiveRunway: Web3SupervisedLiveRunway;
   credentialDoctor: Web3CredentialDoctorHealth;
   launchChecklist: Web3AutonomyLaunchChecklist;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
@@ -224,6 +235,8 @@ function Web3CredentialsRunwayCard({
               Secure credential handoff shows configured or missing status only; Helius and Jupiter secrets stay out of browser storage; private keys and seed phrases are never accepted; live execution and wallet mutation remain blocked.
             </p>
           </div>
+
+          <SettingsSupervisedLiveRunwayPanel runway={supervisedLiveRunway} />
 
           {jupiterAcquisition && jupiterAcquisition.status !== "configured" ? (
             <div className="rounded-md border border-caution/30 bg-caution/[0.04] p-3" aria-label="Jupiter Swap V2 setup action">
@@ -508,6 +521,69 @@ function ConnectionChecks({ integrations }: { integrations: SettingsIntegrationS
         ))}
       </div>
     </section>
+  );
+}
+
+function SettingsSupervisedLiveRunwayPanel({ runway }: { runway: Web3SupervisedLiveRunway }) {
+  const openCount = runway.total_lane_count - runway.ready_lane_count;
+  return (
+    <div className="rounded-md border border-engine/30 bg-engine/[0.04] p-3" aria-label="Web3 supervised live runway">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Supervised live runway</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {runway.status.replaceAll("-", " ")} · {runway.ready_lane_count}/{runway.total_lane_count} lanes ready
+          </p>
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-engine">
+            {runway.launch_model}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{runway.summary}</p>
+        </div>
+        <LaunchQueueBadge status={runway.can_request_live_review ? "watch" : openCount > 0 ? "fail" : "watch"} label={runway.can_request_live_review ? "review" : `${openCount} open`} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.035] p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next supervised-live action</p>
+        <p className="mt-1 text-xs leading-5 text-on-surface-variant">{runway.next_action}</p>
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {runway.lanes.map((lane) => (
+          <div key={lane.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{lane.label}</p>
+                <p className="mt-0.5 text-[11px] leading-4 text-outline">{lane.detail}</p>
+              </div>
+              <CredentialStateBadge configured={lane.status === "ready" || lane.status === "review"} status={lane.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{lane.next_action}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {lane.evidence.map((item) => (
+                <span key={item} className="max-w-full break-words rounded-md border border-outline-variant/25 bg-surface-dim/30 px-2 py-1 text-[11px] leading-4 text-outline">
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-black/15 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe verifier commands</p>
+        <div className="mt-2 grid gap-1">
+          {runway.safe_commands.map((command) => (
+            <code key={command} className="break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {command}
+            </code>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Supervised live runway keeps transaction submission, live execution, wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
+      </p>
+    </div>
   );
 }
 

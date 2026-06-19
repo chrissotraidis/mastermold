@@ -820,6 +820,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Production worker review");
     expect(settingsPage).toContain("Ops target missing");
     expect(settingsPage).toContain("External dispatch");
+    expect(settingsPage).toContain("buildWeb3SupervisedLiveRunway");
+    expect(settingsPage).toContain("SettingsSupervisedLiveRunwayPanel");
+    expect(settingsPage).toContain("Supervised live runway");
+    expect(settingsPage).toContain("Next supervised-live action");
+    expect(settingsPage).toContain("supervised-external-wallet-first");
     expect(settingsPage).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(settingsPage).toContain("buildWeb3DedicatedWalletPacket");
     expect(settingsPage).toContain("SettingsDedicatedWalletPacketPanel");
@@ -972,6 +977,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-ops-packet.ts")).toContain("configured/missing booleans only");
     expect(source("src/db/web3-live-ops-packet.ts")).toContain("external_dispatch_permission: \"blocked\"");
     expect(source("app/api/web3-live-ops-packet/route.ts")).toContain("buildWeb3LiveOpsPacket");
+    expect(source("src/db/web3-supervised-live-runway.ts")).toContain("web3-supervised-live-runway");
+    expect(source("src/db/web3-supervised-live-runway.ts")).toContain("supervised-external-wallet-first");
+    expect(source("src/db/web3-supervised-live-runway.ts")).toContain("transaction_submission_permission: \"blocked\"");
+    expect(source("app/api/web3-supervised-live-runway/route.ts")).toContain("buildWeb3SupervisedLiveRunway");
     expect(source("src/db/web3-provider-credentials.ts")).toContain("demo-only and cannot satisfy operator wallet scope");
     expect(source("components/web3-trading-workspace-loader.tsx")).toContain("demo-only");
     expect(settingsPage).toContain("jupiterConfigured={receipt.environment_summary.jupiter_configured}");
@@ -990,9 +999,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dedicated-wallet-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-jupiter-order-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-ops-packet");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-supervised-live-runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Dedicated wallet packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Jupiter order packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Live ops packet");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Supervised live runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-capital-preflight");
     expect(source("docs/web3-credentials-runbook.md")).toContain("launch-blocker queue");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Operator input packet");

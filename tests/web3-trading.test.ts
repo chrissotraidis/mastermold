@@ -19,6 +19,7 @@ import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
+import { GET as SUPERVISED_LIVE_RUNWAY_GET } from "@/app/api/web3-supervised-live-runway/route";
 import { POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
@@ -1229,6 +1230,68 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(packet)).not.toContain("live-stop-secret");
     expect(JSON.stringify(packet)).not.toContain("ops-secret@example.test");
     expect(JSON.stringify(packet)).not.toContain("tax-ledger-secret");
+  });
+
+  test("GIVEN supervised live is reviewed WHEN the runway route runs THEN it consolidates blocked launch lanes without secrets", async () => {
+    process.env.JUPITER_API_KEY = "test-jupiter-supervised-secret";
+    process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL = "https://ops.example.test/supervised-stop-secret";
+    process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = "supervised-secret@example.test";
+    process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = "/tmp/mastermold-supervised-tax-secret";
+
+    const rejected = await SUPERVISED_LIVE_RUNWAY_GET(new Request("http://localhost/api/web3-supervised-live-runway?account=bad-account"));
+    expect(rejected.status).toBe(422);
+
+    const response = await SUPERVISED_LIVE_RUNWAY_GET(new Request("http://localhost/api/web3-supervised-live-runway?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      launch_model: string;
+      can_request_live_review: boolean;
+      ready_lane_count: number;
+      total_lane_count: number;
+      lanes: Array<{ id: string; status: string; evidence: string[]; next_action: string }>;
+      safe_commands: string[];
+      missing_required: string[];
+      wallet_packet_status: string;
+      jupiter_packet_status: string;
+      signer_packet_status: string;
+      live_ops_packet_status: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-supervised-live-runway");
+    expect(packet.status).toBe("missing-wallet");
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.launch_model).toBe("supervised-external-wallet-first");
+    expect(packet.can_request_live_review).toBe(false);
+    expect(packet.total_lane_count).toBe(6);
+    expect(packet.ready_lane_count).toBeGreaterThanOrEqual(1);
+    expect(packet.lanes.map((lane) => lane.id)).toEqual(["wallet", "jupiter", "signer", "ops", "accounting", "manual-review"]);
+    expect(packet.safe_commands).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
+    expect(packet.safe_commands.some((command) => command.includes("--require-operator-wallet"))).toBe(true);
+    expect(packet.safe_commands.some((command) => command.includes("--require-jupiter-order"))).toBe(true);
+    expect(packet.jupiter_packet_status).toBe("wallet-needed");
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.transaction_submission_permission).toBe("blocked");
+    expect(packet.signing_permission).toBe("external-wallet-prompt-only");
+    expect(packet.private_key_storage).toBe("blocked");
+    expect(packet.seed_phrase_storage).toBe("blocked");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(packet.controls.some((control) => control.includes("review checklist only"))).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain("test-jupiter-supervised-secret");
+    expect(JSON.stringify(packet)).not.toContain("supervised-stop-secret");
+    expect(JSON.stringify(packet)).not.toContain("supervised-secret@example.test");
+    expect(JSON.stringify(packet)).not.toContain("mastermold-supervised-tax-secret");
   });
 
   test("GIVEN signer readiness state WHEN the signer handoff route runs THEN it returns a redacted blocked receipt", async () => {
