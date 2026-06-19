@@ -108,7 +108,7 @@ export async function runWeb3DaemonSupervisor(input = {}) {
         baseUrl: config.baseUrl,
         scenario: config.scenario,
         source: config.source,
-        runnerId: `${config.runnerId}-r${round}`,
+        runnerId: config.runnerId,
         maxTicks: config.ticksPerRound,
         intervalMs: config.intervalMs,
         heartbeatWhenGated: config.heartbeatWhenGated,
@@ -272,6 +272,7 @@ export function buildSupervisorReceipt({
     next_action: supervisorNextAction(status, stopReason, lastAction),
     controls: [
       "Runs only the existing paper daemon endpoint and read-only market refresh requests.",
+      "Uses one stable runner id across rounds so the same external paper runner can renew its lease.",
       "Refuses wallet mutation, live execution, private keys, raw signed payload storage, and autonomous real-capital authority.",
       "Stops itself with a circuit-open receipt after repeated blocked/error rounds or configured paper drawdown.",
       "Can stop after a configured paper profit target so unattended runs preserve simulated gains for review.",

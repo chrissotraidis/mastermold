@@ -4751,25 +4751,35 @@ async function main() {
   assert(["ready", "refresh-first", "sample-only", "throttled", "blocked", "idle"].includes(daemonRun.events[0].market_worker), "Autonomous daemon smoke run should report a known market worker status.", daemonRun);
   assert(typeof daemonRun.events[0].market_worker_lane === "string" && daemonRun.events[0].market_worker_lane.length > 0, "Autonomous daemon smoke run should report the market worker lane.", daemonRun);
   assert(daemonRun.events[0].settlement_watchdog === "not-requested", "Autonomous daemon should not request settlement watchdog without relayed signature evidence.", daemonRun);
+
+  await postTrading({
+    scenario: "base",
+    source: "sample",
+    account: "persistent",
+    reset: true,
+    advance: false,
+  });
+
   const supervisorRun = await runWeb3DaemonSupervisor({
     baseUrl,
     scenario: "base",
     source: "sample",
     runnerId: "smoke-supervisor-runner",
-    rounds: 1,
+    rounds: 2,
     ticksPerRound: 1,
     intervalMs: 0,
     roundDelayMs: 0,
     statusPath: "/tmp/mastermold-web3-daemon-supervisor-smoke.json",
   });
   assert(supervisorRun.mode === "web3-daemon-supervisor", "Supervisor should return a durable receipt shape.", supervisorRun);
-  assert(supervisorRun.status === "completed", "Supervisor should complete a one-round paper run.", supervisorRun);
+  assert(supervisorRun.status === "completed", "Supervisor should complete a two-round paper run.", supervisorRun);
   assert(supervisorRun.paper_only === true, "Supervisor must remain paper-only.", supervisorRun);
   assert(supervisorRun.live_execution_permission === "blocked" && supervisorRun.wallet_mutation_permission === "blocked", "Supervisor receipt should block live execution and wallet mutation.", supervisorRun);
-  assert(supervisorRun.round === 1 && supervisorRun.posted_ticks >= 1, "Supervisor should post at least one leased paper daemon tick.", supervisorRun);
+  assert(supervisorRun.round === 2 && supervisorRun.posted_ticks >= 2, "Supervisor should renew one stable runner lease across two paper daemon ticks.", supervisorRun);
   assert(typeof supervisorRun.net_pnl_usd === "number" && typeof supervisorRun.max_drawdown_usd === "number", "Supervisor should track paper PnL and drawdown fields.", supervisorRun);
-  assert(supervisorRun.loss_brake_tripped === false, "One-round smoke supervisor should not trip the loss brake.", supervisorRun);
+  assert(supervisorRun.loss_brake_tripped === false, "Two-round smoke supervisor should not trip the loss brake.", supervisorRun);
   assert(supervisorRun.controls.some((control) => control.includes("paper daemon")), "Supervisor receipt should disclose its paper daemon boundary.", supervisorRun);
+  assert(supervisorRun.controls.some((control) => control.includes("stable runner id")), "Supervisor receipt should disclose stable lease ownership.", supervisorRun);
   const targetReceipt = buildSupervisorReceipt({
     config: {
       runnerId: "synthetic-target-runner",
