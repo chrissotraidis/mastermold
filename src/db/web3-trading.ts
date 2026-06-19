@@ -8872,6 +8872,27 @@ export type AutonomousSignerRequestEnvelope = {
   controls: string[];
 };
 
+export type AutonomousSignerProviderAdapter = {
+  mode: "signer-provider-adapter";
+  status: "idle" | "blocked" | "ready-to-request";
+  provider: AutonomousSignerOpsProvider;
+  signer_scope: AutonomousCustodyMandate["signer_scope"];
+  request_transport: "none" | "external-wallet-prompt" | "provider-api" | "session-key";
+  credential_configured: boolean;
+  policy_hash: string | null;
+  request_id: string | null;
+  payload_hash: string | null;
+  request_body_hash: string | null;
+  expected_response: "signed-transaction-base64" | "none";
+  can_request_provider_signature: boolean;
+  can_auto_submit_after_signature: false;
+  raw_transaction_included: false;
+  signed_payload_included: false;
+  private_key_required: false;
+  blockers: string[];
+  controls: string[];
+};
+
 export type AutonomousSignerOps = {
   mode: "autonomous-signer-ops";
   status: "ready" | "signature-needed" | "setup-required" | "blocked" | "idle";
@@ -8886,6 +8907,7 @@ export type AutonomousSignerOps = {
   requires_user_presence: boolean;
   policy_hash: string;
   active_request: AutonomousSignerRequestEnvelope | null;
+  provider_adapter: AutonomousSignerProviderAdapter;
   next_action: string;
   controls: string[];
   items: AutonomousSignerOpsItem[];
@@ -63415,6 +63437,12 @@ function buildAutonomousSignerOps({
     orderHandoff,
     preSubmitRehearsal,
   });
+  const providerAdapter = buildAutonomousSignerProviderAdapter({
+    active,
+    activeRequest,
+    status,
+    custodyMandate,
+  });
 
   return {
     mode: "autonomous-signer-ops",
@@ -63430,6 +63458,7 @@ function buildAutonomousSignerOps({
     requires_user_presence: active.requires_user_presence,
     policy_hash: active.policy_hash,
     active_request: activeRequest,
+    provider_adapter: providerAdapter,
     next_action: autonomousSignerOpsNextAction(status, active, liveArming),
     controls: [
       "Signer ops stores policy hashes and request metadata only; private keys and raw transaction bodies stay outside the app.",
@@ -63438,6 +63467,92 @@ function buildAutonomousSignerOps({
       "Any request outside the active policy envelope is blocked before signature or relay.",
     ],
     items,
+  };
+}
+
+function buildAutonomousSignerProviderAdapter({
+  active,
+  activeRequest,
+  status,
+  custodyMandate,
+}: {
+  active: AutonomousSignerOpsItem;
+  activeRequest: AutonomousSignerRequestEnvelope | null;
+  status: AutonomousSignerOps["status"];
+  custodyMandate: AutonomousCustodyMandate;
+}): AutonomousSignerProviderAdapter {
+  const credentialConfigured = autonomousSignerOpsProviderConfigured(active.provider, custodyMandate);
+  const requestTransport: AutonomousSignerProviderAdapter["request_transport"] = !activeRequest
+    ? "none"
+    : active.provider === "external-wallet"
+      ? "external-wallet-prompt"
+      : active.provider === "session-key-vault"
+        ? "session-key"
+        : "provider-api";
+  const requestBody = activeRequest
+    ? {
+      mode: "redacted-signer-provider-request",
+      provider: activeRequest.provider,
+      signerScope: activeRequest.signer_scope,
+      walletPublicKey: activeRequest.wallet_public_key,
+      policyHash: activeRequest.policy_hash,
+      requestId: activeRequest.request_id,
+      payloadHash: activeRequest.payload_hash,
+      handoffId: activeRequest.handoff_id,
+      planId: activeRequest.plan_id,
+      symbol: activeRequest.symbol,
+      side: activeRequest.side,
+      path: activeRequest.path,
+      notionalUsd: activeRequest.notional_usd,
+      maxSlippageBps: activeRequest.max_slippage_bps,
+      expiresAt: activeRequest.expires_at,
+    }
+    : null;
+  const requestBodyHash = requestBody ? createHash("sha256").update(JSON.stringify(requestBody)).digest("hex") : null;
+  const blockers = [
+    !activeRequest ? "No hash-only signer request is active." : null,
+    activeRequest && activeRequest.status !== "ready" ? `Signer request is ${activeRequest.status}.` : null,
+    !credentialConfigured ? `${active.provider.replaceAll("-", " ")} credentials or wallet scope are not configured.` : null,
+    active.signer_scope === "none" ? "Signer scope is not delegated to a wallet prompt, policy wallet, or session key." : null,
+    !active.wallet_public_key ? "Provider adapter requires a wallet public key." : null,
+    !active.policy_hash ? "Provider adapter requires a policy hash." : null,
+    activeRequest && !activeRequest.request_id ? "Provider adapter requires a provider request id." : null,
+    activeRequest && !activeRequest.payload_hash ? "Provider adapter requires a payload hash." : null,
+    status === "idle" ? "Signer ops are idle." : null,
+    status === "setup-required" ? "Signer provider setup is incomplete." : null,
+    status === "blocked" ? "Signer ops are blocked by the active policy, route, payload, or live gates." : null,
+  ].filter((item): item is string => Boolean(item));
+  const canRequestProviderSignature = Boolean(
+    activeRequest &&
+    activeRequest.status === "ready" &&
+    blockers.length === 0 &&
+    (active.can_request_signature || active.can_auto_sign),
+  );
+
+  return {
+    mode: "signer-provider-adapter",
+    status: !activeRequest ? "idle" : canRequestProviderSignature ? "ready-to-request" : "blocked",
+    provider: active.provider,
+    signer_scope: active.signer_scope,
+    request_transport: requestTransport,
+    credential_configured: credentialConfigured,
+    policy_hash: active.policy_hash || null,
+    request_id: activeRequest?.request_id ?? null,
+    payload_hash: activeRequest?.payload_hash ?? null,
+    request_body_hash: requestBodyHash,
+    expected_response: activeRequest ? "signed-transaction-base64" : "none",
+    can_request_provider_signature: canRequestProviderSignature,
+    can_auto_submit_after_signature: false,
+    raw_transaction_included: false,
+    signed_payload_included: false,
+    private_key_required: false,
+    blockers: blockers.slice(0, 8),
+    controls: [
+      "Adapter state is a redacted provider-call contract; it contains hashes and policy metadata only.",
+      "Raw unsigned transactions, signed payloads, private keys, provider secrets, and approvals are not stored in this state.",
+      "A real provider must enforce the wallet, policy hash, payload hash, route, token, notional, slippage, expiry, and revocation window before returning a signed transaction.",
+      "Returned signatures still flow through the signed relay, confirmation polling, and settlement reconciliation gates before any portfolio mirror is considered.",
+    ],
   };
 }
 

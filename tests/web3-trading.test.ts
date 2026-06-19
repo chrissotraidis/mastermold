@@ -5397,6 +5397,14 @@ describe("Web3 autonomous trading subsystem", () => {
       item.readiness_score >= 0 &&
       item.readiness_score <= 100
     )).toBe(true);
+    expect(state.autonomous_signer_ops.provider_adapter).toMatchObject({
+      mode: "signer-provider-adapter",
+      provider: state.autonomous_signer_ops.active_provider,
+      raw_transaction_included: false,
+      signed_payload_included: false,
+      private_key_required: false,
+      can_auto_submit_after_signature: false,
+    });
     expect(state.autonomous_signer_ops.controls.some((control) => control.includes("private keys"))).toBe(true);
     expect(state.autonomous_live_autonomy_readiness.mode).toBe("autonomous-live-autonomy-readiness");
     expect(["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"]).toContain(state.autonomous_live_autonomy_readiness.status);
@@ -6874,6 +6882,23 @@ describe("Web3 autonomous trading subsystem", () => {
       signed_payload_included: false,
       private_key_required: false,
     });
+    expect(state.autonomous_signer_ops.provider_adapter).toMatchObject({
+      mode: "signer-provider-adapter",
+      provider: "privy-server-wallet",
+      signer_scope: "policy-wallet",
+      request_transport: "provider-api",
+      credential_configured: true,
+      policy_hash: state.autonomous_custody_mandate.policy_hash,
+      request_id: "order-123",
+      payload_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      expected_response: "signed-transaction-base64",
+      raw_transaction_included: false,
+      signed_payload_included: false,
+      private_key_required: false,
+      can_auto_submit_after_signature: false,
+    });
+    expect(["blocked", "ready-to-request"]).toContain(state.autonomous_signer_ops.provider_adapter.status);
+    expect(state.autonomous_signer_ops.provider_adapter.request_body_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(["ready", "blocked"]).toContain(state.autonomous_signer_ops.status);
     expect(state.autonomous_signer_ops.items.find((item) => item.provider === "privy-server-wallet")?.checks.every((check) => check.status !== "fail")).toBe(true);
     expect(state.autonomous_live_autonomy_readiness.status).toBe("paper-only");
