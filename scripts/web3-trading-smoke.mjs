@@ -1,6 +1,7 @@
 import { runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
+import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
 import { buildSettlementReconciliationReport } from "./web3-settlement-reconciliation.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
@@ -4918,6 +4919,110 @@ async function main() {
     },
   });
   assert(unsafeConfirmedSettlement.status === "blocked" && unsafeConfirmedSettlement.blockers.some((blocker) => blocker.includes("landed lifecycle")), "Settlement reconciliation should require a landed lifecycle before treating confirmation as reconciled.", unsafeConfirmedSettlement);
+  const portfolioMirrorGuard = buildPortfolioMirrorGuardReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      maxMirrorFillUsd: 1_000,
+      requireReconciledFill: false,
+    },
+    state: tick.payload,
+  });
+  assert(portfolioMirrorGuard.mode === "web3-portfolio-mirror-guard", "Portfolio mirror guard should publish a dedicated report mode.", portfolioMirrorGuard);
+  assert(portfolioMirrorGuard.paper_only === true && portfolioMirrorGuard.live_execution_permission === "blocked", "Portfolio mirror guard should never grant live execution permission.", portfolioMirrorGuard);
+  assert(portfolioMirrorGuard.status === "blocked-as-expected" && portfolioMirrorGuard.portfolio_mirror_permission === "blocked", "Default local portfolio mirror should remain blocked without landed signed fill evidence.", portfolioMirrorGuard);
+  const landedMirrorState = {
+    ...tick.payload,
+    signed_transaction_relay: {
+      ...tick.payload.signed_transaction_relay,
+      status: "confirmed",
+      latest_plan_id: "smoke-plan",
+      latest_symbol: "BONK",
+      latest_side: "buy",
+      latest_signature: "5yntheticSignatureForMirrorSmoke",
+      request_id: "smoke-request",
+      payload_hash: "sha256:smoke",
+      confirmation_status: "confirmed",
+    },
+    execution_audit: {
+      ...tick.payload.execution_audit,
+      latest: {
+        ...(tick.payload.execution_audit.latest ?? {}),
+        status: "confirmed",
+        plan_id: "smoke-plan",
+        symbol: "BONK",
+        side: "buy",
+        relay_signature: "5yntheticSignatureForMirrorSmoke",
+        request_id: "smoke-request",
+        payload_hash: "sha256:smoke",
+        confirmation_status: "confirmed",
+      },
+    },
+    transaction_lifecycle: {
+      ...tick.payload.transaction_lifecycle,
+      status: "confirming",
+      items: [
+        {
+          id: "tx-life-smoke",
+          plan_id: "smoke-plan",
+          symbol: "BONK",
+          side: "buy",
+          stage: "landed",
+          status_label: "landed",
+          request_id: "smoke-request",
+          payload_hash: "sha256:smoke",
+          simulated_signature: null,
+          signed_transaction_required: true,
+          last_valid_block_height: null,
+          expires_in_seconds: null,
+          submit_path: "solana-rpc",
+          retry_after: null,
+          next_step: "Record fill, update portfolio, and close the lifecycle item.",
+          blockers: [],
+        },
+      ],
+    },
+    autonomous_order_handoff: {
+      ...tick.payload.autonomous_order_handoff,
+      items: [
+        {
+          id: "handoff-smoke",
+          plan_id: "smoke-plan",
+          symbol: "BONK",
+          side: "buy",
+          action: "poll-confirmation",
+          request_id: "smoke-request",
+          payload_hash: "sha256:smoke",
+          notional_usd: 250,
+          blockers: [],
+        },
+      ],
+    },
+  };
+  const mirrorReady = buildPortfolioMirrorGuardReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      maxMirrorFillUsd: 1_000,
+      requireReconciledFill: true,
+    },
+    state: landedMirrorState,
+  });
+  assert(mirrorReady.status === "mirror-ready" && mirrorReady.portfolio_mirror_permission === "audit-ready", "Portfolio mirror guard should allow only fully evidenced, landed, bounded fills to reach audit-ready state.", mirrorReady);
+  assert(mirrorReady.idempotency_key && mirrorReady.fill_notional_usd === 250, "Portfolio mirror guard should expose idempotency and fill-notional evidence.", mirrorReady);
+  const oversizedMirror = buildPortfolioMirrorGuardReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      maxMirrorFillUsd: 100,
+      requireReconciledFill: true,
+    },
+    state: landedMirrorState,
+  });
+  assert(oversizedMirror.status === "blocked" && oversizedMirror.blockers.some((blocker) => blocker.includes("guard cap")), "Portfolio mirror guard should fail closed when landed fill notional exceeds the mirror cap.", oversizedMirror);
 
   const summary = {
     baseUrl,
@@ -4942,6 +5047,8 @@ async function main() {
     livePreflightPermission: livePreflight.live_execution_permission,
     settlement: settlementReconciliation.status,
     settlementPermission: settlementReconciliation.live_execution_permission,
+    portfolioMirror: portfolioMirrorGuard.status,
+    portfolioMirrorPermission: portfolioMirrorGuard.portfolio_mirror_permission,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

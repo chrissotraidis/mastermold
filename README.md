@@ -92,6 +92,7 @@ npm run forward-suite:web3 -- --base-url=http://localhost:4010 --ticks=2 --min-n
 npm run forward-repeat:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=3 --min-net-pnl=0 --min-hit-rate-pct=100 --min-deployed-alpha=0 --max-drawdown=1000 --min-consistency-score=80 --json
 npm run preflight-live:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=2 --json
 npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
+npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
 ```
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
@@ -114,7 +115,10 @@ appears without explicit `--allow-live-ready` review, and it never signs, submit
 funds. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
 metadata; it requires relayed transactions to keep signature/request/payload evidence and
 requires confirmed transactions to map to a landed lifecycle before any portfolio mirror
-could be treated as reconciled.
+could be treated as reconciled. The portfolio mirror guard then requires that landed fill
+to also have relay signature, request id, payload hash, a deterministic idempotency key,
+and bounded autonomous handoff notional before a future reviewed mirror writer could treat
+the fill as audit-ready.
 
 ## Architecture: the engine and the app
 
