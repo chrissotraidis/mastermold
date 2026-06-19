@@ -16,6 +16,7 @@ import {
   type PortfolioMirrorApplyRequest,
   type PortfolioSweepRequest,
   type RouteRefreshRequest,
+  type SignatureConfirmationPollRequest,
   type SignedTransactionRelayRequest,
   type TriggerOrderHistoryFilter,
   type TriggerOrderRequest,
@@ -37,6 +38,7 @@ type TradingRequest = {
   drill?: boolean;
   execution?: ExecutionUpdate;
   relay?: SignedTransactionRelayRequest;
+  confirmation_poll?: SignatureConfirmationPollRequest;
   trigger_order?: TriggerOrderRequest;
   trigger_history?: TriggerOrderHistoryFilter;
   trigger_reconcile?: TriggerReconciliationPatchRequest;
@@ -107,6 +109,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
   const drill = record.drill === true;
   const execution = record.execution === undefined ? undefined : parseExecutionUpdate(record.execution);
   const relay = record.relay === undefined ? undefined : parseSignedRelayRequest(record.relay);
+  const confirmationPoll = record.confirmation_poll === undefined ? undefined : parseSignatureConfirmationPollRequest(record.confirmation_poll);
   const triggerOrder = record.trigger_order === undefined ? undefined : parseTriggerOrderRequest(record.trigger_order);
   const triggerHistory = record.trigger_history === undefined ? undefined : parseTriggerHistoryFilter(record.trigger_history);
   const triggerReconcile = record.trigger_reconcile === undefined ? undefined : parseTriggerReconcileRequest(record.trigger_reconcile);
@@ -154,6 +157,10 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
 
   if (relay && !relay.ok) {
     return { ok: false, error: relay.error };
+  }
+
+  if (confirmationPoll && !confirmationPoll.ok) {
+    return { ok: false, error: confirmationPoll.error };
   }
 
   if (triggerOrder && !triggerOrder.ok) {
@@ -217,6 +224,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       drill,
       execution: execution?.value,
       relay: relay?.value,
+      confirmation_poll: confirmationPoll?.value,
       trigger_order: triggerOrder?.value,
       trigger_history: triggerHistory?.value,
       trigger_reconcile: triggerReconcile?.value,
@@ -744,6 +752,39 @@ function parseSignedRelayRequest(value: unknown):
       request_id: typeof record.request_id === "string" ? record.request_id : undefined,
       last_valid_block_height: typeof record.last_valid_block_height === "string" ? record.last_valid_block_height : undefined,
       route: record.route === "jupiter-swap-v2" || record.route === "solana-rpc" ? record.route : undefined,
+    },
+  };
+}
+
+function parseSignatureConfirmationPollRequest(value: unknown):
+  | { ok: true; value: SignatureConfirmationPollRequest }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "confirmation_poll must be an object." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.action !== "poll") {
+    return { ok: false, error: "confirmation_poll.action must be poll." };
+  }
+  if (record.signature !== undefined) {
+    if (typeof record.signature !== "string" || record.signature.trim().length === 0) {
+      return { ok: false, error: "confirmation_poll.signature must be a non-empty string when provided." };
+    }
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,120}$/.test(record.signature.trim())) {
+      return { ok: false, error: "confirmation_poll.signature must look like a base58 Solana transaction signature." };
+    }
+  }
+  if (record.search_transaction_history !== undefined && typeof record.search_transaction_history !== "boolean") {
+    return { ok: false, error: "confirmation_poll.search_transaction_history must be boolean when provided." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      action: "poll",
+      signature: typeof record.signature === "string" ? record.signature.trim() : undefined,
+      search_transaction_history: typeof record.search_transaction_history === "boolean" ? record.search_transaction_history : undefined,
     },
   };
 }

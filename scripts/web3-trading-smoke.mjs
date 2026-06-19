@@ -5052,6 +5052,32 @@ async function main() {
   assert(blockedMirrorApply.payload.portfolio_mirror_apply.status === "blocked", "Portfolio mirror apply should block without confirmed signed settlement evidence.", blockedMirrorApply.payload.portfolio_mirror_apply);
   assert(blockedMirrorApply.payload.portfolio_mirror_apply.live_execution_permission === "blocked" && blockedMirrorApply.payload.portfolio_mirror_apply.wallet_mutation_permission === "blocked", "Portfolio mirror apply should not grant live or wallet mutation permission.", blockedMirrorApply.payload.portfolio_mirror_apply);
   assert(blockedMirrorApply.payload.portfolio_mirror_apply.blockers.some((blocker) => blocker.includes("confirmed signed relay")), "Portfolio mirror apply should explain missing confirmed relay evidence.", blockedMirrorApply.payload.portfolio_mirror_apply);
+  const invalidConfirmationPoll = await postTrading({
+    scenario: "breakout",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    confirmation_poll: {
+      action: "peek",
+    },
+  });
+  assert(invalidConfirmationPoll.response.status === 422, "Signature confirmation polling should reject unknown actions at the API boundary.", invalidConfirmationPoll.payload);
+  assert(String(invalidConfirmationPoll.payload.error ?? "").includes("confirmation_poll.action"), "Signature confirmation polling validation should explain invalid actions.", invalidConfirmationPoll.payload);
+  const blockedConfirmationPoll = await postTrading({
+    scenario: "breakout",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    confirmation_poll: {
+      action: "poll",
+      search_transaction_history: true,
+    },
+  });
+  assert(blockedConfirmationPoll.response.status === 200, "Blocked signature confirmation poll should return the current trading state.", blockedConfirmationPoll.payload);
+  assert(blockedConfirmationPoll.payload.signature_confirmation_poll?.mode === "signature-confirmation-poll", "Signature confirmation polling should return a dedicated report.", blockedConfirmationPoll.payload.signature_confirmation_poll);
+  assert(blockedConfirmationPoll.payload.signature_confirmation_poll.status === "blocked", "Signature confirmation polling should block without a stored relayed signature.", blockedConfirmationPoll.payload.signature_confirmation_poll);
+  assert(blockedConfirmationPoll.payload.signature_confirmation_poll.live_execution_permission === "blocked" && blockedConfirmationPoll.payload.signature_confirmation_poll.wallet_mutation_permission === "blocked", "Signature confirmation polling should not grant live or wallet mutation permission.", blockedConfirmationPoll.payload.signature_confirmation_poll);
+  assert(blockedConfirmationPoll.payload.signature_confirmation_poll.blockers.some((blocker) => blocker.includes("stored relayed signature")), "Signature confirmation polling should explain missing relayed signature evidence.", blockedConfirmationPoll.payload.signature_confirmation_poll);
 
   const summary = {
     baseUrl,
@@ -5079,6 +5105,7 @@ async function main() {
     portfolioMirror: portfolioMirrorGuard.status,
     portfolioMirrorPermission: portfolioMirrorGuard.portfolio_mirror_permission,
     portfolioMirrorApply: blockedMirrorApply.payload.portfolio_mirror_apply.status,
+    confirmationPoll: blockedConfirmationPoll.payload.signature_confirmation_poll.status,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,

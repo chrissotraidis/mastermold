@@ -8341,6 +8341,29 @@ export type SignedTransactionRelayRequest = {
   route?: "jupiter-swap-v2" | "solana-rpc";
 };
 
+export type SignatureConfirmationPollRequest = {
+  action: "poll";
+  signature?: string;
+  search_transaction_history?: boolean;
+};
+
+export type SignatureConfirmationPollReport = {
+  mode: "signature-confirmation-poll";
+  requested: boolean;
+  status: "blocked" | "pending" | "confirmed" | "failed";
+  signature: string | null;
+  slot: string | null;
+  confirmation_status: ExecutionAuditEntry["confirmation_status"];
+  rpc_configured: boolean;
+  search_transaction_history: boolean;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  blockers: string[];
+  summary: string;
+  next_action: string;
+  controls: string[];
+};
+
 export type ExecutionAuditEntry = {
   id: string;
   created_at: string;
@@ -9048,6 +9071,7 @@ export type Web3TradingState = {
   signed_transaction_relay: SignedTransactionRelay;
   autonomous_order_handoff: AutonomousOrderHandoff;
   portfolio_mirror_apply?: PortfolioMirrorApplyReport;
+  signature_confirmation_poll?: SignatureConfirmationPollReport;
   pre_submit_rehearsal: PreSubmitRehearsal;
   autonomous_execution_adapter_readiness: AutonomousExecutionAdapterReadiness;
   autonomous_custody_mandate: AutonomousCustodyMandate;
@@ -9204,6 +9228,7 @@ export type TradingStateInput = {
   drill?: boolean;
   execution?: ExecutionUpdate;
   relay?: SignedTransactionRelayRequest;
+  confirmation_poll?: SignatureConfirmationPollRequest;
   trigger_order?: TriggerOrderRequest;
   trigger_history?: TriggerOrderHistoryFilter;
   trigger_reconcile?: TriggerReconciliationPatchRequest;
@@ -12818,7 +12843,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: configuredState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
@@ -12850,7 +12875,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: fallbackState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const liveState = buildWeb3TradingState({
@@ -12888,7 +12913,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
     monitorDecision: liveState.autonomous_monitor,
   });
-  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
+  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
 }
 
 async function maybeApplyRouteRefreshRequest({
@@ -17689,6 +17714,7 @@ async function finalizeExecutionAudit(
   state: Web3TradingState,
   drill: boolean,
   relay: SignedTransactionRelayRequest | undefined,
+  confirmationPoll: SignatureConfirmationPollRequest | undefined,
   triggerOrder: TriggerOrderRequest | undefined,
   triggerHistory: TriggerOrderHistoryFilter | undefined,
   triggerReconcile: TriggerReconciliationPatchRequest | undefined,
@@ -17706,9 +17732,12 @@ async function finalizeExecutionAudit(
     }
     : current;
   const auditState = attachExecutionAuditState(state, execution_audit);
-  const triggerState = triggerOrder
-    ? attachTriggerOrderExecution(auditState, await runTriggerOrderRequest(auditState, triggerOrder, fetchImpl))
+  const confirmationState = confirmationPoll
+    ? await applySignatureConfirmationPoll(auditState, confirmationPoll, fetchImpl)
     : auditState;
+  const triggerState = triggerOrder
+    ? attachTriggerOrderExecution(confirmationState, await runTriggerOrderRequest(confirmationState, triggerOrder, fetchImpl))
+    : confirmationState;
   const historyState = triggerHistory
     ? attachTriggerOrderHistory(triggerState, await syncTriggerOrderHistory(triggerState, triggerHistory, fetchImpl))
     : triggerState;
@@ -19782,6 +19811,231 @@ function signedRelayBlockers(
   if (route === "jupiter-swap-v2" && !process.env.JUPITER_API_KEY) blockers.push("JUPITER_API_KEY is required for Jupiter signed execution.");
   if (route === "solana-rpc" && !solanaRpcUrl()) blockers.push("SOLANA_RPC_URL is required for Solana RPC relay.");
   return [...new Set(blockers)];
+}
+
+async function applySignatureConfirmationPoll(
+  state: Web3TradingState,
+  request: SignatureConfirmationPollRequest,
+  fetchImpl: FetchLike,
+): Promise<Web3TradingState> {
+  const latest = state.execution_audit.latest;
+  const storedSignature = state.signed_transaction_relay.latest_signature || latest?.relay_signature || null;
+  const signature = request.signature ?? storedSignature;
+  const blockers = [
+    request.action !== "poll" ? "confirmation_poll.action must be poll." : null,
+    !storedSignature ? "Confirmation polling requires a stored relayed signature." : null,
+    request.signature && storedSignature && request.signature !== storedSignature ? "Requested signature does not match the latest audited relay signature." : null,
+    !signature ? "Confirmation polling requires a transaction signature." : null,
+    !solanaRpcUrl() ? "SOLANA_RPC_URL is required for signature confirmation polling." : null,
+  ].filter((item): item is string => Boolean(item));
+
+  if (blockers.length > 0) {
+    return {
+      ...state,
+      signature_confirmation_poll: signatureConfirmationPollReport({
+        status: "blocked",
+        signature,
+        slot: null,
+        confirmationStatus: null,
+        searchTransactionHistory: request.search_transaction_history !== false,
+        blockers,
+      }),
+    };
+  }
+
+  const searchTransactionHistory = request.search_transaction_history !== false;
+  const result = await pollSolanaSignatureStatus(fetchImpl, signature!, searchTransactionHistory);
+  const report = signatureConfirmationPollReport({
+    status: result.status,
+    signature: signature!,
+    slot: result.slot,
+    confirmationStatus: result.confirmationStatus,
+    searchTransactionHistory,
+    blockers: result.blockers,
+  });
+
+  if (result.status !== "confirmed" && result.status !== "failed") {
+    return {
+      ...state,
+      signature_confirmation_poll: report,
+    };
+  }
+
+  const now = new Date().toISOString();
+  const entry: ExecutionAuditEntry = {
+    ...(latest ?? {
+      id: `web3-confirmation-poll-seed-${Date.parse(now)}`,
+      created_at: now,
+      nonce: "web3-confirmation-poll-seed",
+      plan_id: null,
+      symbol: null,
+      side: null,
+      attempt: 0,
+      max_attempts: 3,
+      retry_window_seconds: 90,
+      next_retry_at: null,
+      request_id: null,
+      router: null,
+      relay_path: "solana-rpc",
+      transaction_ready: false,
+      payload_hash: null,
+      payload_bytes: null,
+      simulated_signature: null,
+      signer_session_label: null,
+      signer_network: null,
+      kill_switch: state.execution_readiness.config.kill_switch,
+    }),
+    id: `web3-confirmation-poll-${Date.parse(now)}`,
+    created_at: now,
+    nonce: `web3-confirmation-poll-${Date.parse(now)}`,
+    status: result.status === "confirmed" ? "confirmed" : "relay-failed",
+    relay_signature: signature!,
+    relay_slot: result.slot,
+    confirmation_status: result.confirmationStatus,
+    attempt: (latest?.attempt ?? 0) + 1,
+    next_retry_at: result.status === "failed" ? new Date(Date.parse(now) + 20_000).toISOString() : null,
+    reason: result.reason,
+  };
+  store().appendWeb3ExecutionAudit({
+    id: entry.id,
+    created_at: entry.created_at,
+    data: entry,
+  } satisfies Web3ExecutionAuditRow);
+  const current = readExecutionAudit();
+  return {
+    ...attachExecutionAuditState(state, {
+      entries: [entry, ...current.entries.filter((item) => item.id !== entry.id)].slice(0, 25),
+      latest: entry,
+    }),
+    signature_confirmation_poll: report,
+  };
+}
+
+async function pollSolanaSignatureStatus(
+  fetchImpl: FetchLike,
+  signature: string,
+  searchTransactionHistory: boolean,
+): Promise<{
+  status: SignatureConfirmationPollReport["status"];
+  slot: string | null;
+  confirmationStatus: ExecutionAuditEntry["confirmation_status"];
+  blockers: string[];
+  reason: string;
+}> {
+  const endpoint = solanaRpcUrl();
+  if (!endpoint) {
+    return {
+      status: "blocked",
+      slot: null,
+      confirmationStatus: null,
+      blockers: ["SOLANA_RPC_URL is required for signature confirmation polling."],
+      reason: "Solana RPC endpoint is not configured.",
+    };
+  }
+
+  try {
+    const response = await solanaRpc(fetchImpl, endpoint, "getSignatureStatuses", [
+      [signature],
+      { searchTransactionHistory },
+    ]);
+    const value = Array.isArray(response.result?.value) ? response.result.value[0] : null;
+    const error = value?.err ?? null;
+    const confirmationStatus = isConfirmationStatus(value?.confirmationStatus) ? value.confirmationStatus : null;
+    const slot = typeof value?.slot === "number" ? String(value.slot) : null;
+    if (error) {
+      return {
+        status: "failed",
+        slot,
+        confirmationStatus,
+        blockers: ["Solana RPC returned an error for the relayed signature."],
+        reason: `Solana RPC signature status returned an execution error: ${JSON.stringify(error).slice(0, 180)}.`,
+      };
+    }
+    if (confirmationStatus === "confirmed" || confirmationStatus === "finalized") {
+      return {
+        status: "confirmed",
+        slot,
+        confirmationStatus,
+        blockers: [],
+        reason: `Solana RPC returned ${confirmationStatus} confirmation for the relayed signature.`,
+      };
+    }
+    return {
+      status: "pending",
+      slot,
+      confirmationStatus,
+      blockers: [],
+      reason: confirmationStatus === "processed"
+        ? "Solana RPC reports the signature as processed; wait for confirmed or finalized before settlement."
+        : "Solana RPC did not find a confirmed status for the relayed signature yet.",
+    };
+  } catch (error) {
+    return {
+      status: "failed",
+      slot: null,
+      confirmationStatus: null,
+      blockers: [error instanceof Error ? error.message : "Solana RPC signature poll failed."],
+      reason: error instanceof Error ? error.message : "Solana RPC signature poll failed.",
+    };
+  }
+}
+
+function signatureConfirmationPollReport({
+  status,
+  signature,
+  slot,
+  confirmationStatus,
+  searchTransactionHistory,
+  blockers,
+}: {
+  status: SignatureConfirmationPollReport["status"];
+  signature: string | null;
+  slot: string | null;
+  confirmationStatus: ExecutionAuditEntry["confirmation_status"];
+  searchTransactionHistory: boolean;
+  blockers: string[];
+}): SignatureConfirmationPollReport {
+  return {
+    mode: "signature-confirmation-poll",
+    requested: true,
+    status,
+    signature,
+    slot,
+    confirmation_status: confirmationStatus,
+    rpc_configured: Boolean(solanaRpcUrl()),
+    search_transaction_history: searchTransactionHistory,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    blockers,
+    summary: signatureConfirmationSummary(status, confirmationStatus, blockers),
+    next_action: signatureConfirmationNextAction(status, blockers),
+    controls: [
+      "Polls Solana RPC getSignatureStatuses only for the latest audited relayed signature.",
+      "Confirmed or finalized status updates local audit and lifecycle evidence; pending status does not imply settlement.",
+      "The poll is read-only and never signs, submits, rebroadcasts, stores transaction bodies, or moves wallet funds.",
+      "Portfolio mirror updates remain blocked until separate fill reconciliation and idempotency checks pass.",
+    ],
+  };
+}
+
+function signatureConfirmationSummary(
+  status: SignatureConfirmationPollReport["status"],
+  confirmationStatus: ExecutionAuditEntry["confirmation_status"],
+  blockers: string[],
+) {
+  if (status === "confirmed") return `Relayed signature is ${confirmationStatus ?? "confirmed"} according to Solana RPC.`;
+  if (status === "pending") return confirmationStatus === "processed"
+    ? "Relayed signature is processed but not yet confirmed."
+    : "Relayed signature is still pending or absent from the searched RPC status cache.";
+  if (status === "failed") return blockers[0] ?? "Signature confirmation polling failed.";
+  return blockers[0] ?? "Signature confirmation polling is blocked.";
+}
+
+function signatureConfirmationNextAction(status: SignatureConfirmationPollReport["status"], blockers: string[]) {
+  if (status === "confirmed") return "Reconcile provider fill details before any portfolio mirror apply.";
+  if (status === "pending") return "Poll again until confirmed, finalized, failed, or expired.";
+  if (status === "failed") return blockers[0] ?? "Investigate the failed signature before another live action.";
+  return blockers[0] ?? "Store a relayed signature and configure SOLANA_RPC_URL before polling.";
 }
 
 async function relaySignedTransaction(

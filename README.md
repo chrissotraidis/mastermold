@@ -114,8 +114,10 @@ handoff boundary, and repeat proof gate; by default it fails closed if real-capi
 appears without explicit `--allow-live-ready` review, and it never signs, submits, or moves
 funds. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
 metadata; it requires relayed transactions to keep signature/request/payload evidence and
-requires confirmed transactions to map to a landed lifecycle before any portfolio mirror
-could be treated as reconciled. The portfolio mirror guard then requires that landed fill
+can poll the latest audited relayed signature with Solana `getSignatureStatuses` through
+the guarded `confirmation_poll` API path. Confirmed transactions must map to a landed
+lifecycle before any portfolio mirror could be treated as reconciled. The portfolio mirror
+guard then requires that landed fill
 to also have relay signature, request id, payload hash, a deterministic idempotency key,
 and bounded autonomous handoff notional before a future reviewed mirror writer could treat
 the fill as audit-ready. The Web3 trading API also accepts a guarded `portfolio_mirror`
