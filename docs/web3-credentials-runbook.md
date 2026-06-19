@@ -60,6 +60,8 @@ The launch checklist now separates provider readiness into a read-provider rail 
 
 Live DEX dry-run reads also expose a read-only wallet activity history receipt when a public wallet and Solana RPC are scoped. It uses `getSignaturesForAddress` to summarize recent signatures, slots, block times, and failure counts with signature previews and hashes only. It does not return raw transaction bodies, sign, submit, decode full swaps, or mutate balances.
 
+The credential setup response now includes a credential vault plan with four explicit levels: read-only wallet sync, dry-run order rehearsal, supervised live review, and autonomous live trading. Only the first two levels can become ready in the app today. Supervised live and autonomous live stay blocked until signer custody, worker operations, emergency stop, settlement/accounting proof, long-horizon profit proof, and manual live review are separately completed. The plan also labels each input by storage rule: server environment, one-shot session input, browser-safe non-secret, future signer vault, or never-store. Private keys and seed phrases are always `never-store`.
+
 ## API
 
 The setup UI posts to:
@@ -83,6 +85,8 @@ Useful request fields:
 - `test_mode`: `network` or `validate-only`
 
 The response is redacted. It returns host-level endpoint information only and never returns API keys, private keys, unsigned transaction bytes, signed transaction bytes, or wallet secrets. The browser form also scrubs Helius and Jupiter API key fields from its saved draft.
+
+The response also returns `credential_plan`, which should be used by the UI and reviewers to see which mode is actually available. `ready-for-read-only` means provider and wallet scope can support read-only accounting. `ready-for-dry-run` means route/order rehearsal can be tested. Neither status grants live signing or wallet mutation.
 
 Reference: Helius documents `getAssetsByOwner` as the DAS method for retrieving Solana wallet-owned assets with pagination: https://www.helius.dev/docs/api-reference/das/getassetsbyowner
 

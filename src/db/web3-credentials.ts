@@ -36,6 +36,47 @@ export type Web3CredentialsSetupCheck = {
   detail: string;
 };
 
+export type Web3CredentialLevel = {
+  id: "read-only-sync" | "dry-run-rehearsal" | "supervised-live" | "autonomous-live";
+  label: string;
+  status: "ready" | "partial" | "blocked";
+  unlocks: string;
+  required_inputs: string[];
+  missing_inputs: string[];
+  storage_rule: string;
+  boundary: string;
+  next_action: string;
+};
+
+export type Web3CredentialPlanItem = {
+  id:
+    | "helius-api-key"
+    | "solana-rpc-url"
+    | "solana-websocket-url"
+    | "jupiter-api-key"
+    | "wallet-public-key"
+    | "signer-provider"
+    | "risk-caps"
+    | "manual-approval"
+    | "private-key"
+    | "live-execution-flags";
+  label: string;
+  status: "ready" | "missing" | "optional" | "blocked" | "future";
+  storage: "server-env" | "session-only" | "browser-non-secret" | "never-store" | "future-vault";
+  detail: string;
+};
+
+export type Web3CredentialPlan = {
+  mode: "web3-credential-vault-plan";
+  status: "ready-for-read-only" | "ready-for-dry-run" | "blocked";
+  active_level: Web3CredentialLevel["id"];
+  levels: Web3CredentialLevel[];
+  items: Web3CredentialPlanItem[];
+  summary: string;
+  next_action: string;
+  controls: string[];
+};
+
 export type Web3CredentialsSetupReadiness = {
   mode: "web3-credentials-setup-readiness";
   status: "configured" | "partial" | "blocked";
@@ -72,6 +113,7 @@ export type Web3CredentialsSetupReadiness = {
   next_action: string;
   blockers: string[];
   checks: Web3CredentialsSetupCheck[];
+  credential_plan: Web3CredentialPlan;
   controls: string[];
   env_targets: string[];
 };
@@ -156,6 +198,24 @@ export function buildWeb3CredentialsSetupReadiness(
     : canSupportManualLiveReview
       ? "configured"
       : "partial";
+  const credentialPlan = buildCredentialPlan({
+    status,
+    rpcUrl,
+    wsUrl,
+    heliusApiKey,
+    walletValid,
+    walletPublicKey,
+    jupiterConfigured,
+    signerMode,
+    requireManualConfirmation,
+    dailySpendCapUsd,
+    maxTradeUsd,
+    maxSlippageBps,
+    canSupportReadonlyWalletSync,
+    canSupportWalletAssetSnapshot,
+    canSupportRouteOrderRehearsal,
+    canSupportManualLiveReview,
+  });
 
   return {
     mode: "web3-credentials-setup-readiness",
@@ -193,6 +253,7 @@ export function buildWeb3CredentialsSetupReadiness(
     next_action: credentialSetupNextAction(status, checks),
     blockers: blockers.slice(0, 6),
     checks,
+    credential_plan: credentialPlan,
     controls: [
       "Credential setup validates provider, wallet, route, and risk-policy readiness only; it never signs, submits, stores private keys, or moves funds.",
       "API keys are accepted only as test inputs or server environment values and are never returned in the response.",
@@ -207,6 +268,208 @@ export function buildWeb3CredentialsSetupReadiness(
       "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
     ],
   };
+}
+
+function buildCredentialPlan(input: {
+  status: Web3CredentialsSetupReadiness["status"];
+  rpcUrl: string | null;
+  wsUrl: string | null;
+  heliusApiKey: string;
+  walletValid: boolean;
+  walletPublicKey: string | null;
+  jupiterConfigured: boolean;
+  signerMode: Web3SignerSetupMode;
+  requireManualConfirmation: boolean;
+  dailySpendCapUsd: number;
+  maxTradeUsd: number;
+  maxSlippageBps: number;
+  canSupportReadonlyWalletSync: boolean;
+  canSupportWalletAssetSnapshot: boolean;
+  canSupportRouteOrderRehearsal: boolean;
+  canSupportManualLiveReview: boolean;
+}): Web3CredentialPlan {
+  const riskCapsReady = input.dailySpendCapUsd >= input.maxTradeUsd && input.maxSlippageBps <= 250;
+  const readOnlyMissing = [
+    !input.rpcUrl ? "Helius API key or Solana RPC URL" : null,
+    !input.walletValid ? "Solana wallet public address" : null,
+  ].filter((item): item is string => Boolean(item));
+  const dryRunMissing = [
+    ...readOnlyMissing,
+    !input.jupiterConfigured ? "Jupiter API key for Swap V2 order rehearsal" : null,
+    !riskCapsReady ? "Conservative risk caps" : null,
+  ].filter((item): item is string => Boolean(item));
+  const supervisedMissing = [
+    ...dryRunMissing,
+    input.signerMode !== "external-wallet" ? "Manual external wallet signer for first live review" : null,
+    !input.requireManualConfirmation ? "Manual approval required toggle" : null,
+    "Reviewed live executor and kill-switch operations",
+  ].filter((item): item is string => Boolean(item));
+  const autonomousMissing = [
+    ...supervisedMissing,
+    "Policy signer or audited session-key vault",
+    "Production worker supervision and alerting",
+    "Long-horizon positive paper proof after fees and failed fills",
+    "Legal, tax, and operational review",
+  ];
+  const activeLevel: Web3CredentialLevel["id"] = input.canSupportRouteOrderRehearsal
+    ? "dry-run-rehearsal"
+    : input.canSupportReadonlyWalletSync
+      ? "read-only-sync"
+      : "read-only-sync";
+  const planStatus: Web3CredentialPlan["status"] = input.canSupportRouteOrderRehearsal
+    ? "ready-for-dry-run"
+    : input.canSupportReadonlyWalletSync
+      ? "ready-for-read-only"
+      : "blocked";
+
+  const levels: Web3CredentialLevel[] = [
+    {
+      id: "read-only-sync",
+      label: "Read-only wallet sync",
+      status: readOnlyMissing.length === 0 && input.canSupportReadonlyWalletSync ? "ready" : readOnlyMissing.length < 2 ? "partial" : "blocked",
+      unlocks: "RPC health, wallet balance, recent signature history, and aggregate Helius asset visibility.",
+      required_inputs: ["Helius API key or Solana RPC URL", "Solana wallet public address"],
+      missing_inputs: readOnlyMissing,
+      storage_rule: "Provider secrets belong in server env or one-shot session input; the wallet address may be saved as non-secret browser state.",
+      boundary: "Read-only chain calls only; no signing, no transaction bodies, no wallet mutation.",
+      next_action: readOnlyMissing[0] ?? "Run the network credential test and confirm wallet balance/assets are visible.",
+    },
+    {
+      id: "dry-run-rehearsal",
+      label: "Dry-run order rehearsal",
+      status: input.canSupportRouteOrderRehearsal && riskCapsReady ? "ready" : dryRunMissing.length < 3 ? "partial" : "blocked",
+      unlocks: "Jupiter quote proof, unsigned order rehearsal, route/cost checks, and dry-run execution profile.",
+      required_inputs: ["Read-only wallet sync", "Jupiter API key", "Max trade", "Daily cap", "Max slippage"],
+      missing_inputs: dryRunMissing,
+      storage_rule: "Jupiter keys stay in server env or session-only form input; risk caps and wallet scope may be saved locally.",
+      boundary: "Unsigned rehearsal only; live submission and external signer handoff remain blocked.",
+      next_action: dryRunMissing[0] ?? "Apply the dry-run profile and run the Web3 landing drill.",
+    },
+    {
+      id: "supervised-live",
+      label: "Supervised live review",
+      status: "blocked",
+      unlocks: "A human-reviewed signer prompt and one-off live executor review after proof gates pass.",
+      required_inputs: ["Dry-run order rehearsal", "Manual external wallet signer", "Reviewed executor ops", "Emergency stop"],
+      missing_inputs: supervisedMissing,
+      storage_rule: "No private keys in the app; signer credentials must live in the wallet/provider policy surface, not browser storage.",
+      boundary: "Still blocked in this app until a separate manual live review deliberately enables an executor.",
+      next_action: "Finish dry-run evidence, signer policy, worker supervision, and manual live review before any real-capital path.",
+    },
+    {
+      id: "autonomous-live",
+      label: "Autonomous live trading",
+      status: "blocked",
+      unlocks: "Fully autonomous real-capital trading only after audited custody, ops, and profit proof.",
+      required_inputs: ["Policy signer", "Production supervisor", "Out-of-sample profit proof", "Legal/tax review"],
+      missing_inputs: autonomousMissing,
+      storage_rule: "Use an audited signer/provider vault with policy limits; never store seed phrases or private keys in Master Mold.",
+      boundary: "Not enabled. Paper autonomy can keep running while real-capital autonomy stays locked.",
+      next_action: "Keep compounding only in paper until signer, settlement, accounting, and operational proof are externally reviewed.",
+    },
+  ];
+
+  const items: Web3CredentialPlanItem[] = [
+    {
+      id: "helius-api-key",
+      label: "Helius API key",
+      status: input.heliusApiKey || isHeliusEndpoint(input.rpcUrl ?? "") ? "ready" : "missing",
+      storage: "server-env",
+      detail: input.heliusApiKey
+        ? "Configured for deriving read-only mainnet RPC/WebSocket endpoints; the key is never returned to the browser."
+        : "Needed for the preferred Solana read rail, DAS asset snapshots, and wallet activity reads.",
+    },
+    {
+      id: "solana-rpc-url",
+      label: "Solana RPC URL",
+      status: input.rpcUrl ? "ready" : "missing",
+      storage: input.heliusApiKey ? "server-env" : "session-only",
+      detail: input.rpcUrl ? `Resolved as ${redactEndpoint(input.rpcUrl)}.` : "Provide a Helius key or a custom RPC endpoint.",
+    },
+    {
+      id: "solana-websocket-url",
+      label: "Solana WebSocket URL",
+      status: input.wsUrl ? "ready" : "optional",
+      storage: input.heliusApiKey ? "server-env" : "session-only",
+      detail: input.wsUrl ? `Resolved as ${redactEndpoint(input.wsUrl)}.` : "Optional for later live subscription workers; current setup can proceed with HTTP RPC.",
+    },
+    {
+      id: "jupiter-api-key",
+      label: "Jupiter API key",
+      status: input.jupiterConfigured ? "ready" : "missing",
+      storage: "server-env",
+      detail: input.jupiterConfigured
+        ? "Configured for Swap V2 order rehearsal; the key is not returned in API responses."
+        : "Required before unsigned Swap V2 order rehearsal can be armed.",
+    },
+    {
+      id: "wallet-public-key",
+      label: "Wallet public address",
+      status: input.walletValid ? "ready" : input.walletPublicKey ? "blocked" : "missing",
+      storage: "browser-non-secret",
+      detail: input.walletValid ? "Public address is valid-looking and can be saved as non-secret scope." : "Enter a Solana public address only.",
+    },
+    {
+      id: "signer-provider",
+      label: "Signer provider",
+      status: input.signerMode === "external-wallet" ? "ready" : "future",
+      storage: "future-vault",
+      detail: input.signerMode === "external-wallet"
+        ? "Manual external wallet is the first reviewed live posture."
+        : `${input.signerMode.replaceAll("-", " ")} needs separate provider policy review before use.`,
+    },
+    {
+      id: "risk-caps",
+      label: "Risk caps",
+      status: riskCapsReady ? "ready" : "blocked",
+      storage: "browser-non-secret",
+      detail: `$${input.maxTradeUsd.toLocaleString()} max trade, $${input.dailySpendCapUsd.toLocaleString()} daily cap, ${input.maxSlippageBps} bps max slippage.`,
+    },
+    {
+      id: "manual-approval",
+      label: "Manual approval",
+      status: input.requireManualConfirmation ? "ready" : "blocked",
+      storage: "browser-non-secret",
+      detail: input.requireManualConfirmation ? "Required before any live review." : "Turn manual approval back on before live review.",
+    },
+    {
+      id: "private-key",
+      label: "Private key / seed phrase",
+      status: "blocked",
+      storage: "never-store",
+      detail: "Never enter or store private keys, seed phrases, or raw signer secrets in this app.",
+    },
+    {
+      id: "live-execution-flags",
+      label: "Live execution flags",
+      status: "blocked",
+      storage: "server-env",
+      detail: "Keep live execution flags unset until a separate manual live review approves an executor.",
+    },
+  ];
+
+  return {
+    mode: "web3-credential-vault-plan",
+    status: planStatus,
+    active_level: activeLevel,
+    levels,
+    items,
+    summary: credentialPlanSummary(planStatus, input.canSupportWalletAssetSnapshot),
+    next_action: levels.find((level) => level.id === activeLevel)?.next_action ?? "Start with read-only wallet sync.",
+    controls: [
+      "The app can save only non-secret wallet/risk preferences in browser storage.",
+      "Provider API keys must stay in server env or one-shot session input.",
+      "Private keys, seed phrases, signed transactions, and custody authority are never accepted by this setup flow.",
+      "Live execution remains blocked even when read-only and dry-run credentials are ready.",
+    ],
+  };
+}
+
+function credentialPlanSummary(status: Web3CredentialPlan["status"], walletAssetsReady: boolean) {
+  if (status === "ready-for-dry-run") return "Credential plan is ready for dry-run order rehearsal; live execution remains locked.";
+  if (status === "ready-for-read-only" && walletAssetsReady) return "Credential plan is ready for read-only wallet accounting and asset snapshots.";
+  if (status === "ready-for-read-only") return "Credential plan is ready for basic read-only wallet/RPC checks; asset snapshots or route rehearsal still need evidence.";
+  return "Credential plan is blocked until provider and wallet scope are supplied.";
 }
 
 export function deriveHeliusMainnetRpcUrl(apiKey: string) {
@@ -428,6 +691,14 @@ function isWebsocketUrl(value: string) {
   try {
     const url = new URL(value);
     return url.protocol === "wss:" || url.protocol === "ws:";
+  } catch {
+    return false;
+  }
+}
+
+function isHeliusEndpoint(value: string) {
+  try {
+    return new URL(value).hostname.endsWith("helius-rpc.com");
   } catch {
     return false;
   }

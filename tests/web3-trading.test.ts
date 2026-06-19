@@ -252,6 +252,25 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(readiness.can_support_manual_live_review).toBe(true);
     expect(readiness.live_execution_permission).toBe("blocked");
     expect(readiness.wallet_mutation_permission).toBe("blocked");
+    expect(readiness.credential_plan).toMatchObject({
+      mode: "web3-credential-vault-plan",
+      status: "ready-for-dry-run",
+      active_level: "dry-run-rehearsal",
+    });
+    expect(readiness.credential_plan.levels.map((level) => level.id)).toEqual([
+      "read-only-sync",
+      "dry-run-rehearsal",
+      "supervised-live",
+      "autonomous-live",
+    ]);
+    expect(readiness.credential_plan.levels.find((level) => level.id === "supervised-live")).toMatchObject({
+      status: "blocked",
+      boundary: expect.stringContaining("blocked"),
+    });
+    expect(readiness.credential_plan.items.find((item) => item.id === "private-key")).toMatchObject({
+      status: "blocked",
+      storage: "never-store",
+    });
     expect(JSON.stringify(readiness)).not.toContain("test-key");
     expect(readiness.checks.find((check) => check.id === "live-boundary")).toMatchObject({
       status: "pass",

@@ -1597,32 +1597,74 @@ function QuickWeb3CredentialsSetupPanel({
       </p>
 
       {result ? (
-        <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-4" aria-label="Read-only wallet asset snapshot">
-          <ProfitMetric
-            label="DAS assets"
-            value={result.helius_das_ready ? `${result.wallet_asset_count ?? 0}` : "not ready"}
-            detail="Helius wallet snapshot"
-            tone={result.helius_das_ready ? "engine" : "caution"}
-          />
-          <ProfitMetric
-            label="Fungibles"
-            value={`${result.wallet_fungible_asset_count ?? 0}`}
-            detail="first page tokens"
-            tone={result.helius_das_ready ? "engine" : "neutral"}
-          />
-          <ProfitMetric
-            label="Priced"
-            value={`${result.wallet_priced_asset_count ?? 0}`}
-            detail={formatCurrency(result.wallet_priced_value_usd ?? 0)}
-            tone={(result.wallet_priced_asset_count ?? 0) > 0 ? "engine" : "neutral"}
-          />
-          <ProfitMetric
-            label="Wallet sync"
-            value={result.can_support_wallet_asset_snapshot ? "ready" : "gated"}
-            detail={result.can_support_readonly_wallet_sync ? "balance ok" : "needs RPC/wallet"}
-            tone={result.can_support_wallet_asset_snapshot ? "engine" : "caution"}
-          />
-        </div>
+        <>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-4" aria-label="Read-only wallet asset snapshot">
+            <ProfitMetric
+              label="DAS assets"
+              value={result.helius_das_ready ? `${result.wallet_asset_count ?? 0}` : "not ready"}
+              detail="Helius wallet snapshot"
+              tone={result.helius_das_ready ? "engine" : "caution"}
+            />
+            <ProfitMetric
+              label="Fungibles"
+              value={`${result.wallet_fungible_asset_count ?? 0}`}
+              detail="first page tokens"
+              tone={result.helius_das_ready ? "engine" : "neutral"}
+            />
+            <ProfitMetric
+              label="Priced"
+              value={`${result.wallet_priced_asset_count ?? 0}`}
+              detail={formatCurrency(result.wallet_priced_value_usd ?? 0)}
+              tone={(result.wallet_priced_asset_count ?? 0) > 0 ? "engine" : "neutral"}
+            />
+            <ProfitMetric
+              label="Wallet sync"
+              value={result.can_support_wallet_asset_snapshot ? "ready" : "gated"}
+              detail={result.can_support_readonly_wallet_sync ? "balance ok" : "needs RPC/wallet"}
+              tone={result.can_support_wallet_asset_snapshot ? "engine" : "caution"}
+            />
+          </div>
+
+          <div className="mt-3 rounded-md border border-outline-variant/30 bg-void/25 p-3" aria-label="Credential vault plan">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Credential vault plan</p>
+                <p className="mt-1 text-xs leading-5 text-on-surface-variant">{result.credential_plan.summary}</p>
+              </div>
+              <Chip tone={credentialPlanTone(result.credential_plan.status)}>{result.credential_plan.status.replaceAll("-", " ")}</Chip>
+            </div>
+            <div className="mt-3 grid gap-2 lg:grid-cols-4">
+              {result.credential_plan.levels.map((level) => (
+                <article key={level.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-display text-sm font-semibold text-on-surface">{level.label}</p>
+                    <span className={cn("rounded-md border px-2 py-1 font-mono text-[10px] uppercase tracking-telemetry", credentialLevelClass(level.status))}>
+                      {level.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-on-surface-variant">{level.unlocks}</p>
+                  <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-outline">{level.next_action}</p>
+                  <p className="mt-2 font-mono text-[10px] uppercase tracking-telemetry text-outline">
+                    {level.missing_inputs.length > 0 ? `${level.missing_inputs.length} missing` : "inputs ready"}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <div className="mt-3 grid gap-1 sm:grid-cols-2 xl:grid-cols-5">
+              {result.credential_plan.items.map((item) => (
+                <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.label}</p>
+                    <span className={cn("h-2 w-2 shrink-0 rounded-full", credentialItemDotClass(item.status))} />
+                  </div>
+                  <p className={cn("mt-1 text-xs font-semibold", credentialItemTextClass(item.status))}>{item.status.replace("-", " ")}</p>
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-telemetry text-outline">{item.storage.replace("-", " ")}</p>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       ) : null}
 
       {checks.length > 0 ? (
@@ -1641,7 +1683,7 @@ function QuickWeb3CredentialsSetupPanel({
       ) : null}
 
       <p className="sr-only" aria-label="Web3 credential setup receipt">
-        Web3 credential setup tests Helius or Solana RPC, Helius DAS wallet assets, Jupiter quote and order readiness, wallet public key scope, signer mode, and risk caps. It never asks for private keys, keeps API keys session-only, does not save secrets in browser storage, and cannot enable live trading.
+        Web3 credential setup tests Helius or Solana RPC, Helius DAS wallet assets, Jupiter quote and order readiness, wallet public key scope, signer mode, risk caps, and the credential vault plan. It never asks for private keys, keeps API keys session-only, does not save secrets in browser storage, and cannot enable live trading.
       </p>
     </section>
   );
@@ -1713,6 +1755,30 @@ function credentialSetupDotClass(status: Web3CredentialsSetupReadiness["checks"]
 function credentialSetupTextClass(status: Web3CredentialsSetupReadiness["checks"][number]["status"]) {
   if (status === "pass") return "text-engine";
   if (status === "watch") return "text-caution";
+  return "text-critical";
+}
+
+function credentialPlanTone(status: Web3CredentialsSetupReadiness["credential_plan"]["status"]) {
+  if (status === "ready-for-dry-run") return "engine";
+  if (status === "ready-for-read-only") return "caution";
+  return "critical";
+}
+
+function credentialLevelClass(status: Web3CredentialsSetupReadiness["credential_plan"]["levels"][number]["status"]) {
+  if (status === "ready") return "border-engine/40 bg-engine/10 text-engine";
+  if (status === "partial") return "border-caution/40 bg-caution/10 text-caution";
+  return "border-critical/40 bg-critical/10 text-critical";
+}
+
+function credentialItemDotClass(status: Web3CredentialsSetupReadiness["credential_plan"]["items"][number]["status"]) {
+  if (status === "ready") return "bg-engine";
+  if (status === "optional" || status === "future") return "bg-caution";
+  return "bg-critical";
+}
+
+function credentialItemTextClass(status: Web3CredentialsSetupReadiness["credential_plan"]["items"][number]["status"]) {
+  if (status === "ready") return "text-engine";
+  if (status === "optional" || status === "future") return "text-caution";
   return "text-critical";
 }
 

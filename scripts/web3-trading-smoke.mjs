@@ -149,6 +149,13 @@ async function main() {
   assert(!JSON.stringify(credentialSetup).includes("api-key="), "Credential setup response should not expose provider secrets.", credentialSetup);
   assert(credentialSetup.checks.some((check) => check.id === "wallet-assets"), "Credential setup should expose the Helius DAS wallet asset check.", credentialSetup);
   assert(Array.isArray(credentialSetup.checks) && credentialSetup.checks.some((check) => check.id === "live-boundary"), "Credential setup should expose the live-boundary check.", credentialSetup);
+  assert(credentialSetup.credential_plan?.mode === "web3-credential-vault-plan", "Credential setup should expose the credential vault plan.", credentialSetup);
+  assert(["blocked", "ready-for-read-only", "ready-for-dry-run"].includes(credentialSetup.credential_plan?.status), "Credential vault plan should expose a valid status.", credentialSetup.credential_plan);
+  assert(credentialSetup.credential_plan?.levels?.some((level) => level.id === "read-only-sync"), "Credential vault plan should include read-only sync level.", credentialSetup.credential_plan);
+  assert(credentialSetup.credential_plan?.levels?.some((level) => level.id === "dry-run-rehearsal"), "Credential vault plan should include dry-run rehearsal level.", credentialSetup.credential_plan);
+  assert(credentialSetup.credential_plan?.levels?.some((level) => level.id === "supervised-live" && level.status === "blocked"), "Credential vault plan should keep supervised live blocked.", credentialSetup.credential_plan);
+  assert(credentialSetup.credential_plan?.levels?.some((level) => level.id === "autonomous-live" && level.status === "blocked"), "Credential vault plan should keep autonomous live blocked.", credentialSetup.credential_plan);
+  assert(credentialSetup.credential_plan?.items?.some((item) => item.id === "private-key" && item.storage === "never-store" && item.status === "blocked"), "Credential vault plan should reject private key storage.", credentialSetup.credential_plan);
 
   const page = await request("/trading");
   const html = await page.text();
