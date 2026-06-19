@@ -7,6 +7,7 @@ import { buildPaperPromotionGuardReport, parsePaperPromotionGuardArgs } from "./
 import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
 import { buildPromotedPaperAutopilotReport, parsePromotedPaperAutopilotArgs } from "./web3-promoted-paper-autopilot.mjs";
 import { buildSettlementReconciliationReport } from "./web3-settlement-reconciliation.mjs";
+import { buildLocalAccountabilityRepairReport, parseLocalAccountabilityRepairArgs } from "./web3-local-accountability-repair.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
 
@@ -82,6 +83,7 @@ async function main() {
   assert(health.web3_profit_proof.wallet_mutation_permission === "blocked", "Profit-proof readiness should keep wallet mutation blocked.", health.web3_profit_proof);
   assert(Array.isArray(health.web3_profit_proof.checks) && health.web3_profit_proof.checks.some((check) => check.id === "target-hit-rate"), "Profit-proof readiness should expose target-hit evidence.", health.web3_profit_proof);
   assert(health.web3_profit_proof.proof_plan?.mode === "promoted-paper-proof-plan", "Profit-proof readiness should expose a promoted paper proof plan.", health.web3_profit_proof);
+  assert(health.web3_profit_proof.proof_plan.local_accountability_repair_command === "npm run repair-accountability:web3", "Profit-proof plan should expose the safe local accountability repair command.", health.web3_profit_proof.proof_plan);
   assert(health.web3_profit_proof.proof_plan.live_execution_permission === "blocked", "Profit-proof plan should keep live execution blocked.", health.web3_profit_proof.proof_plan);
   assert(health.web3_profit_proof.proof_plan.wallet_mutation_permission === "blocked", "Profit-proof plan should keep wallet mutation blocked.", health.web3_profit_proof.proof_plan);
 
@@ -103,6 +105,7 @@ async function main() {
   assert(launchChecklist.profit_proof_readiness.live_execution_permission === "blocked", "Checklist profit-proof readiness should keep live execution blocked.", launchChecklist.profit_proof_readiness);
   assert(launchChecklist.profit_proof_readiness.wallet_mutation_permission === "blocked", "Checklist profit-proof readiness should keep wallet mutation blocked.", launchChecklist.profit_proof_readiness);
   assert(launchChecklist.profit_proof_readiness.proof_plan?.safe_command === "npm run autopilot-paper:web3", "Checklist profit-proof readiness should expose the safe promoted proof command.", launchChecklist.profit_proof_readiness.proof_plan);
+  assert(launchChecklist.profit_proof_readiness.proof_plan.local_accountability_repair_command === "npm run repair-accountability:web3", "Checklist profit-proof readiness should expose the safe local accountability repair command.", launchChecklist.profit_proof_readiness.proof_plan);
   assert(typeof launchChecklist.profit_proof_readiness.proof_plan.remaining_promoted_runs === "number", "Checklist profit-proof readiness should expose remaining promoted proof runs.", launchChecklist.profit_proof_readiness.proof_plan);
   assert(launchChecklist.provider_credentials_readiness?.mode === "web3-provider-credentials-readiness", "Web3 launch checklist should expose provider credential readiness.", launchChecklist);
   assert(launchChecklist.provider_credentials_readiness.live_execution_permission === "blocked", "Provider credential readiness should keep live execution blocked.", launchChecklist.provider_credentials_readiness);
@@ -5110,6 +5113,8 @@ async function main() {
   assert(oneRunPromotionGuardArgs.runs === 1, "Paper promotion guard should support exact one-run proof gaps.", oneRunPromotionGuardArgs);
   const oneRunAutopilotArgs = parsePromotedPaperAutopilotArgs(["--promotion-runs=1"], {});
   assert(oneRunAutopilotArgs.promotionRuns === 1, "Promoted paper autopilot should support exact one-window proof gaps.", oneRunAutopilotArgs);
+  const localRepairArgs = parseLocalAccountabilityRepairArgs(["--attempts=2", "--target-score=70"], {});
+  assert(localRepairArgs.maxAttempts === 2 && localRepairArgs.targetScore === 70 && localRepairArgs.source === "sample", "Local accountability repair should parse bounded sample-only attempts.", localRepairArgs);
   const promotedAutopilotReceipt = buildPromotedPaperAutopilotReport({
     config: {
       baseUrl,
@@ -5142,6 +5147,108 @@ async function main() {
   assert(promotedAutopilotReceipt.paper_only === true && promotedAutopilotReceipt.live_execution_permission === "blocked", "Promoted paper autopilot must stay paper-only.", promotedAutopilotReceipt);
   assert(promotedAutopilotReceipt.status === "completed" && promotedAutopilotReceipt.applied_supervisor_rounds === 2, "Promoted paper autopilot should apply bounded supervisor rounds when promotion passes.", promotedAutopilotReceipt);
   assert(promotedAutopilotReceipt.promotion_permission === promotionGuard.promotion_permission && promotedAutopilotReceipt.posted_ticks === 2, "Promoted paper autopilot should connect promotion permission to posted supervisor ticks.", promotedAutopilotReceipt);
+  const localRepairInitialState = {
+    autonomous_profit_accountability: {
+      making_money: false,
+      accountability_score: 46,
+      net_pnl_usd: 9,
+      repair_plan: {
+        mode: "local-paper-accountability-repair-plan",
+        status: "run-paper-session",
+        next_action: "Run a bounded paper session.",
+        blocking_reason: null,
+        live_execution_permission: "blocked",
+        wallet_mutation_permission: "blocked",
+      },
+    },
+  };
+  const localRepairFinalState = {
+    autonomous_profit_accountability: {
+      making_money: true,
+      accountability_score: 72,
+      net_pnl_usd: 24,
+      repair_plan: {
+        mode: "local-paper-accountability-repair-plan",
+        status: "complete",
+        next_action: "Keep collecting paper accountability evidence.",
+        blocking_reason: null,
+        live_execution_permission: "blocked",
+        wallet_mutation_permission: "blocked",
+      },
+    },
+  };
+  const localRepairReceipt = buildLocalAccountabilityRepairReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      runnerId: "synthetic-local-accountability-repair",
+      maxAttempts: 2,
+      targetScore: 70,
+    },
+    startedAt: new Date(0).toISOString(),
+    initialState: localRepairInitialState,
+    finalState: localRepairFinalState,
+    events: [{
+      attempt: 1,
+      status: "posted",
+      request_kind: "paper-session",
+      before_score: 46,
+      after_score: 72,
+      score_delta: 26,
+      before_repair_status: "run-paper-session",
+      after_repair_status: "complete",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      reason: "Paper repair completed.",
+    }],
+  });
+  assert(localRepairReceipt.mode === "web3-local-accountability-repair", "Local accountability repair should publish a dedicated receipt mode.", localRepairReceipt);
+  assert(localRepairReceipt.paper_only === true && localRepairReceipt.live_execution_permission === "blocked" && localRepairReceipt.wallet_mutation_permission === "blocked", "Local accountability repair must stay paper-only.", localRepairReceipt);
+  assert(localRepairReceipt.status === "complete" && localRepairReceipt.final_accountability_score >= 70 && localRepairReceipt.score_delta > 0, "Local accountability repair should classify a successful paper repair as complete.", localRepairReceipt);
+  assert(localRepairReceipt.controls.some((control) => control.includes("backend-authored local paper accountability repair plan")), "Local accountability repair should disclose that it consumes backend-authored repair requests.", localRepairReceipt);
+  const blockedLocalRepair = buildLocalAccountabilityRepairReport({
+    config: {
+      baseUrl,
+      scenario: "breakout",
+      source: "sample",
+      runnerId: "synthetic-blocked-local-accountability-repair",
+      maxAttempts: 2,
+      targetScore: 70,
+    },
+    startedAt: new Date(0).toISOString(),
+    initialState: localRepairInitialState,
+    finalState: {
+      autonomous_profit_accountability: {
+        making_money: false,
+        accountability_score: 46,
+        net_pnl_usd: 9,
+        repair_plan: {
+          mode: "local-paper-accountability-repair-plan",
+          status: "blocked",
+          next_action: "Preflight blocks all deployable routes.",
+          blocking_reason: "Preflight blocks all deployable routes.",
+          live_execution_permission: "blocked",
+          wallet_mutation_permission: "blocked",
+        },
+      },
+    },
+    events: [{
+      attempt: 1,
+      status: "blocked",
+      request_kind: "none",
+      before_score: 46,
+      after_score: 46,
+      score_delta: 0,
+      before_repair_status: "blocked",
+      after_repair_status: "blocked",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      reason: "Preflight blocks all deployable routes.",
+    }],
+  });
+  assert(blockedLocalRepair.status === "blocked" && blockedLocalRepair.exit_code === 1, "Local accountability repair should stop when the backend repair plan is blocked.", blockedLocalRepair);
+  assert(blockedLocalRepair.blockers.some((blocker) => blocker.includes("Preflight")), "Blocked local accountability repair should preserve the backend blocker.", blockedLocalRepair);
   const blockedRepeatGate = buildForwardRepeatReport({
     config: {
       baseUrl,

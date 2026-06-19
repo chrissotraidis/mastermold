@@ -5566,6 +5566,7 @@ describe("Web3 autonomous trading subsystem", () => {
       required_target_hit_rate_pct: 70,
       suggested_next_runs: 2,
       safe_command: "npm run autopilot-paper:web3",
+      local_accountability_repair_command: "npm run repair-accountability:web3",
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
@@ -5670,6 +5671,7 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "complete",
       remaining_promoted_runs: 0,
       suggested_next_runs: 0,
+      local_accountability_repair_command: "npm run repair-accountability:web3",
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
@@ -5720,6 +5722,7 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "blocked",
       observed_recent_positive_runs: 1,
       remaining_promoted_runs: 0,
+      local_accountability_repair_command: "npm run repair-accountability:web3",
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
@@ -5766,6 +5769,7 @@ describe("Web3 autonomous trading subsystem", () => {
       remaining_promoted_runs: 0,
       suggested_next_runs: 0,
       observed_recent_positive_runs: 3,
+      local_accountability_repair_command: "npm run repair-accountability:web3",
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
@@ -5976,6 +5980,7 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "needs-runs",
       remaining_promoted_runs: 2,
       suggested_next_runs: 1,
+      local_accountability_repair_command: "npm run repair-accountability:web3",
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });

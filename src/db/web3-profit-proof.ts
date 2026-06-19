@@ -30,6 +30,7 @@ export type Web3ProfitProofRunPlan = {
   observed_recent_positive_runs: number;
   suggested_next_runs: number;
   safe_command: "npm run autopilot-paper:web3";
+  local_accountability_repair_command: "npm run repair-accountability:web3";
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
   summary: string;
@@ -221,6 +222,7 @@ function buildProfitProofRunPlan(evidence: {
     observed_recent_positive_runs: evidence.recentPositiveCount,
     suggested_next_runs: suggestedNextRuns,
     safe_command: "npm run autopilot-paper:web3",
+    local_accountability_repair_command: "npm run repair-accountability:web3",
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     summary: profitProofRunPlanSummary(status, evidence.runCount, remainingRuns, evidence.hitRate, evidence.totalPnl),
