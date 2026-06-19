@@ -10208,9 +10208,13 @@ function buildAutonomousSessionTickReport(
   baseline: Web3TradingState,
   previous: Web3TradingState,
   current: Web3TradingState,
+  remainingFillCap?: number,
 ): AutonomousSessionTickReport {
   const previousTradeIds = new Set(previous.trade_tape.map((trade) => trade.id));
   const newTrades = current.trade_tape.filter((trade) => !previousTradeIds.has(trade.id));
+  const fillCap = remainingFillCap === undefined ? Number.POSITIVE_INFINITY : Math.max(0, Math.trunc(remainingFillCap));
+  const countedTrades = newTrades.filter((trade) => trade.status === "paper-filled").slice(0, fillCap);
+  const filledCount = countedTrades.length;
   return {
     tick,
     cycle: current.paper_account.cycle,
@@ -10223,9 +10227,9 @@ function buildAutonomousSessionTickReport(
     cash_usd: roundMetric(current.portfolio.cash_usd),
     exposure_usd: roundMetric(current.portfolio.exposure_usd),
     net_pnl_usd: roundMetric(current.portfolio.equity_usd - baseline.portfolio.equity_usd),
-    filled_count: current.paper_daemon.filled_count,
-    blocked_count: current.paper_daemon.blocked_count,
-    protective_sell_count: newTrades.filter(isProtectivePaperSellTrade).length,
+    filled_count: filledCount,
+    blocked_count: Math.max(0, current.paper_daemon.blocked_count - previous.paper_daemon.blocked_count),
+    protective_sell_count: countedTrades.filter(isProtectivePaperSellTrade).length,
     next_action: current.autonomous_trade_mission.next_action || current.autonomous_burst_scheduler.next_action,
   };
 }
@@ -10892,7 +10896,7 @@ async function runAutonomousSession(input: TradingStateInput): Promise<Web3Tradi
         max_child_fills: remainingFills,
       },
     });
-    const tickReport = buildAutonomousSessionTickReport(index + 1, baseline, current, next);
+    const tickReport = buildAutonomousSessionTickReport(index + 1, baseline, current, next, remainingFills);
     ticks.push(tickReport);
     sessionFillCount += tickReport.filled_count;
     current = next;
@@ -11865,6 +11869,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       profitLoop: configuredState.profit_loop_controller,
       compounder: configuredState.autonomous_compounder,
       routeProfitGate: configuredState.route_profit_gate,
+      routeQuoteSampler: configuredState.route_quote_sampler,
       riskGovernor: configuredState.autonomy_risk_governor,
       executionPreflight: configuredState.execution_preflight,
       paperExecutionQuality: configuredState.paper_execution_quality,
@@ -14088,6 +14093,7 @@ function buildWeb3TradingState({
     profitLoop: profit_loop_controller,
     compounder: autonomous_compounder,
     routeProfitGate: route_profit_gate,
+    routeQuoteSampler: route_quote_sampler,
     riskGovernor: autonomy_risk_governor,
     executionPreflight: execution_preflight,
     paperExecutionQuality: paper_execution_quality,
@@ -16439,6 +16445,7 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     profitLoop: profit_loop_controller,
     compounder: state.autonomous_compounder,
     routeProfitGate: route_profit_gate,
+    routeQuoteSampler: route_quote_sampler,
     riskGovernor: autonomy_risk_governor,
     executionPreflight: execution_preflight,
     paperExecutionQuality: paper_execution_quality,
@@ -18269,6 +18276,7 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     profitLoop: state.profit_loop_controller,
     compounder: state.autonomous_compounder,
     routeProfitGate: state.route_profit_gate,
+    routeQuoteSampler: state.route_quote_sampler,
     riskGovernor: state.autonomy_risk_governor,
     executionPreflight: state.execution_preflight,
     paperExecutionQuality: state.paper_execution_quality,
@@ -23008,7 +23016,10 @@ function applyPersistentLedger(
         max_total_fills: Math.max(0, Math.trunc(burstMaxChildFillsOverride)),
       };
   const next = shouldAdvanceCycle ? advanceLedger(current, state.market, state.signals, state.as_of, state.discovery_tape, state.scenario, advancePolicy) : current;
-  const advanceFillDelta = Math.max(0, ledgerTrades(next).length - ledgerTrades(current).length);
+  const currentTradeIds = new Set(ledgerTrades(current).map((trade) => trade.id));
+  const advanceFillDelta = ledgerTrades(next)
+    .filter((trade) => trade.status === "paper-filled" && !currentTradeIds.has(trade.id))
+    .length;
   const remainingBurstFillsAfterAdvance = burstMaxChildFillsOverride === undefined
     ? undefined
     : Math.max(0, Math.trunc(burstMaxChildFillsOverride) - advanceFillDelta);
@@ -23619,6 +23630,7 @@ function applyPersistentLedger(
     profitLoop: profit_loop_controller,
     compounder: autonomous_compounder,
     routeProfitGate: route_profit_gate,
+    routeQuoteSampler: route_quote_sampler,
     riskGovernor: autonomy_risk_governor,
     executionPreflight: execution_preflight,
     paperExecutionQuality: paper_execution_quality,
@@ -28928,10 +28940,14 @@ function buildAutonomousProfitRunwayGovernor({
     exitBracket.status === "repair" ||
     exitBracket.status === "protect" ||
     exitBracket.status === "blocked";
+  const localPaperRepairQueued = routeRefreshExecution.local_rehearsal_ready &&
+    tickGovernor.can_auto_advance &&
+    tickGovernor.max_paper_trades > 0 &&
+    (tickGovernor.status === "protect-first" || tickGovernor.action === "protect");
   const blocked = validator.permission === "stand-down" ||
     orderTicket.status === "blocked" ||
     tickGovernor.status === "blocked" ||
-    (routeRefreshExecution.status === "blocked" && actionQueueExecution.status === "blocked");
+    (routeRefreshExecution.status === "blocked" && actionQueueExecution.status === "blocked" && !localPaperRepairQueued);
   const learning = !blocked &&
     !protectFirst &&
     !routeNeedsRefresh &&
@@ -51115,14 +51131,27 @@ function buildAutonomousRunEnvelope({
   walletTelemetry: AutonomousWalletTelemetry;
   daemonMemory: PaperDaemonMemory;
 }): AutonomousRunEnvelope {
-  const hardBlockers = [
-    ...sessionSupervisor.blockers,
-    ...tickGovernor.blockers,
+  const burstAllowsLocalPaper = burstScheduler.client_should_run ||
+    tickGovernor.can_auto_advance &&
+      tickGovernor.max_paper_trades > 0 &&
+      autonomousRunEnvelopePaperRepairBlocker(burstScheduler.next_action);
+  const canRunBoundedLocalPaper = sessionSupervisor.should_keep_running &&
+    loopDirector.client_should_run &&
+    burstAllowsLocalPaper &&
+    !daemonMemory.pause_new_entries &&
+    tickGovernor.can_auto_advance &&
+    tickGovernor.max_paper_trades > 0;
+  const candidateHardBlockers = [
+    ...(sessionSupervisor.status === "blocked" ? sessionSupervisor.blockers : []),
+    ...(tickGovernor.status === "blocked" ? tickGovernor.blockers : []),
     ...(loopDirector.stop_reason ? [loopDirector.stop_reason] : []),
     ...(landingOptimizer.status === "blocked" && reactionLoop.status !== "protect" ? [landingOptimizer.next_action] : []),
     ...(profitVelocity.loop_permission === "blocked" ? [profitVelocity.next_action] : []),
     ...(daemonMemory.pause_new_entries ? [daemonMemory.recommended_action] : []),
-  ].filter(Boolean).slice(0, 6);
+  ].filter(Boolean);
+  const hardBlockers = candidateHardBlockers
+    .filter((blocker) => !(canRunBoundedLocalPaper && autonomousRunEnvelopePaperRepairBlocker(blocker)))
+    .slice(0, 6);
   const shouldProtect = tickGovernor.should_protect_first ||
     reactionLoop.status === "protect" ||
     sessionPlanner.status === "protect" ||
@@ -51140,7 +51169,7 @@ function buildAutonomousRunEnvelope({
     tickGovernor.rearm_mode === "cooldown";
   const keepRunning = sessionSupervisor.should_keep_running &&
     loopDirector.client_should_run &&
-    burstScheduler.client_should_run &&
+    burstAllowsLocalPaper &&
     !daemonMemory.pause_new_entries &&
     tickGovernor.status !== "paused";
   const runEnabled = keepRunning &&
@@ -51239,6 +51268,15 @@ function buildAutonomousRunEnvelope({
       runConfidenceScore,
     }),
   };
+}
+
+function autonomousRunEnvelopeLiveOnlyBlocker(blocker: string) {
+  return /external wallet|policy signer|autonomous signing|jupiter_api_key|swap v2|live swap|live execution/i.test(blocker);
+}
+
+function autonomousRunEnvelopePaperRepairBlocker(blocker: string) {
+  return autonomousRunEnvelopeLiveOnlyBlocker(blocker) ||
+    /must use reduced size until holder flow improves/i.test(blocker);
 }
 
 function autonomousRunEnvelopeStatus({
@@ -51550,12 +51588,16 @@ function buildAutonomousProfitRunGuard({
       laneScore * 0.1 +
       runScore * 0.05,
   ), 0, 100);
+  const diagnosticPaperRepairReady = runEnvelope.run_enabled &&
+    runEnvelope.status === "protect" &&
+    runEnvelope.max_session_fills > 0 &&
+    churnEfficiency.next_action === "Fill quality score is 0/100.";
   const hardBlockers = [
     runEnvelope.status === "blocked" ? runEnvelope.stop_reason ?? runEnvelope.next_action : null,
     profitRunway.trade_permission === "blocked" ? profitRunway.next_action : null,
     profitVelocity.loop_permission === "blocked" ? profitVelocity.next_action : null,
     forecast.status === "blocked" || forecastFeedback.status === "blocked" ? forecastFeedback.next_action : null,
-    churnEfficiency.entry_permission === "blocked" ? churnEfficiency.next_action : null,
+    churnEfficiency.entry_permission === "blocked" && !diagnosticPaperRepairReady ? churnEfficiency.next_action : null,
     daemonMemory.status === "halted" ? daemonMemory.recommended_action : null,
   ].filter((value): value is string => Boolean(value));
   const protectRequested = walletPerformance.protective_sell_only ||
@@ -62053,6 +62095,7 @@ function buildAutonomousCapitalAllocator({
   profitLoop,
   compounder,
   routeProfitGate,
+  routeQuoteSampler,
   riskGovernor,
   executionPreflight,
   paperExecutionQuality,
@@ -62066,6 +62109,7 @@ function buildAutonomousCapitalAllocator({
   profitLoop: ProfitLoopController;
   compounder: AutonomousCompounder;
   routeProfitGate: RouteProfitGate;
+  routeQuoteSampler?: RouteQuoteSampler;
   riskGovernor: AutonomyRiskGovernor;
   executionPreflight: ExecutionPreflightReport;
   paperExecutionQuality: PaperExecutionQuality;
@@ -62086,13 +62130,23 @@ function buildAutonomousCapitalAllocator({
         ? 0.55
         : 0;
   const freeCash = Math.max(0, Math.round(portfolio.cash_usd - riskBuffer));
-  const deployCeiling = Math.max(0, Math.min(
+  const baseDeployCeiling = Math.max(0, Math.min(
     freeCash,
     riskGovernor.allowed_trade_usd,
     compounder.next_order_cap_usd,
     scalpingController.scalp_budget_usd,
     profitLoop.max_cycle_deploy_usd,
   ));
+  const scoutDeployCeiling = autonomousCapitalAllocatorScoutBudget({
+    freeCash,
+    riskGovernor,
+    executionPreflight,
+    paperExecutionQuality,
+    postTradeReview,
+    profitLoop,
+    routeQuoteSampler,
+  });
+  const deployCeiling = Math.max(baseDeployCeiling, scoutDeployCeiling);
   const deployBudget = Math.round(deployCeiling * reviewMultiplier);
   const releaseBudget = Math.round(Math.max(
     profitLoop.max_cycle_release_usd,
@@ -62105,10 +62159,12 @@ function buildAutonomousCapitalAllocator({
     capitalRotation,
     scalpingController,
     routeProfitGate,
+    routeQuoteSampler,
     profitLock,
     riskGovernor,
     executionPreflight,
     postTradeReview,
+    scoutDeployBudget: Math.round(scoutDeployCeiling * reviewMultiplier),
   });
   const blockers = autonomousCapitalAllocatorBlockers({
     riskGovernor,
@@ -62193,20 +62249,24 @@ function autonomousCapitalAllocatorItems({
   capitalRotation,
   scalpingController,
   routeProfitGate,
+  routeQuoteSampler,
   profitLock,
   riskGovernor,
   executionPreflight,
   postTradeReview,
+  scoutDeployBudget,
 }: {
   deployBudget: number;
   releaseBudget: number;
   capitalRotation: CapitalRotationEngine;
   scalpingController: ScalpingController;
   routeProfitGate: RouteProfitGate;
+  routeQuoteSampler?: RouteQuoteSampler;
   profitLock: ProfitLockAutopilot;
   riskGovernor: AutonomyRiskGovernor;
   executionPreflight: ExecutionPreflightReport;
   postTradeReview: PostTradeReview;
+  scoutDeployBudget: number;
 }): AutonomousCapitalAllocatorItem[] {
   const deployBlockers = autonomousCapitalAllocatorDeployBlockers(deployBudget, riskGovernor, executionPreflight, postTradeReview);
   const releaseItems = capitalRotation.items
@@ -62276,6 +62336,36 @@ function autonomousCapitalAllocatorItems({
         blockers: [...new Set(itemBlockers)].slice(0, 4),
       };
     });
+  const scoutItems = scoutDeployBudget > 0
+    ? (routeQuoteSampler?.items ?? [])
+      .filter((item) =>
+        item.side === "buy" &&
+        (item.action === "probe" || item.action === "confirm") &&
+        !hasHardRouteQuoteSamplerBlocker(item.blockers)
+      )
+      .slice(0, 1)
+      .map((item): AutonomousCapitalAllocatorItem => {
+        const size = Math.round(Math.min(
+          scoutDeployBudget,
+          Math.max(item.recommended_size_usd, item.action === "confirm" ? 75 : 45),
+        ));
+        return {
+          id: `allocator-scout-${item.id}`,
+          lane: "deploy",
+          symbol: item.symbol,
+          side: "buy",
+          action: size > 0 ? "deploy" : "hold",
+          priority: "next",
+          score: clamp(Math.round(item.route_confidence_score - Math.min(18, item.impact_drift_bps / 12)), 0, 100),
+          size_usd: size,
+          expected_profit_usd: Math.round(size * Math.max(0, routeProfitGate.average_route_net_edge_pct) / 100),
+          confidence: item.route_confidence_score,
+          source: "route-quote-sampler",
+          reason: `${item.symbol ?? "Route"} gets a bounded paper scout budget from repairable route evidence; live swaps remain gated.`,
+          blockers: [],
+        };
+      })
+    : [];
   const reserveItem: AutonomousCapitalAllocatorItem = {
     id: "allocator-reserve-cash",
     lane: "reserve",
@@ -62292,9 +62382,42 @@ function autonomousCapitalAllocatorItems({
     blockers: riskGovernor.status === "halted" ? riskGovernor.actions.slice(0, 3) : [],
   };
 
-  return [...lockItems, ...releaseItems, ...deployItems, reserveItem]
+  return [...lockItems, ...releaseItems, ...scoutItems, ...deployItems, reserveItem]
     .sort((a, b) => autonomousCapitalAllocatorItemRank(b) - autonomousCapitalAllocatorItemRank(a))
     .slice(0, 8);
+}
+
+function autonomousCapitalAllocatorScoutBudget({
+  freeCash,
+  riskGovernor,
+  executionPreflight,
+  paperExecutionQuality,
+  postTradeReview,
+  profitLoop,
+  routeQuoteSampler,
+}: {
+  freeCash: number;
+  riskGovernor: AutonomyRiskGovernor;
+  executionPreflight: ExecutionPreflightReport;
+  paperExecutionQuality: PaperExecutionQuality;
+  postTradeReview: PostTradeReview;
+  profitLoop: ProfitLoopController;
+  routeQuoteSampler?: RouteQuoteSampler;
+}) {
+  if (!routeQuoteSampler) return 0;
+  if (!riskGovernor.allow_paper_advance || riskGovernor.allowed_trade_usd < 25 || riskGovernor.message_budget_remaining <= 0) return 0;
+  if (postTradeReview.pause_new_entries || postTradeReview.decision === "exit-only") return 0;
+  if (paperExecutionQuality.status === "poor" || profitLoop.status === "stand-down") return 0;
+  if (executionPreflight.status !== "ready" && executionPreflight.status !== "watch" && executionPreflight.status !== "paper") return 0;
+  const repairable = routeQuoteSampler.items.find((item) =>
+    item.side === "buy" &&
+    (item.action === "probe" || item.action === "confirm") &&
+    item.route_confidence_score >= 54 &&
+    !hasHardRouteQuoteSamplerBlocker(item.blockers)
+  );
+  if (!repairable) return 0;
+  const requested = Math.max(repairable.recommended_size_usd, repairable.action === "confirm" ? 75 : 45);
+  return Math.round(Math.max(0, Math.min(freeCash, riskGovernor.allowed_trade_usd, requested, repairable.action === "confirm" ? 150 : 75)));
 }
 
 function autonomousCapitalAllocatorDeployBlockers(
@@ -62362,6 +62485,7 @@ function autonomousCapitalAllocatorStatus({
   if (blockers.length > 0 && deployBudget <= 0 && releaseBudget <= 0) return "blocked";
   if (releaseBudget > 0 && actionableReleaseCount > 0) return profitLoop.status === "harvest" || profitLoop.status === "protect" ? "harvest" : "rebalance";
   if (deployBudget > 0 && actionableDeployCount > 0 && (profitLoop.status === "compound" || profitLoop.status === "attack")) return "deploy";
+  if (deployBudget > 0 && actionableDeployCount > 0 && profitLoop.allows_paper_advance && riskGovernor.allow_paper_advance && !postTradeReview.pause_new_entries) return "deploy";
   if (postTradeReview.pause_new_entries || profitLoop.status === "cooldown" || riskGovernor.status === "cooldown") return "cooldown";
   if (deployBudget <= 0 && releaseBudget <= 0) return "reserve";
   return "idle";
@@ -70877,6 +71001,7 @@ function attachPaperDaemonTick(
     profitLoop: state.profit_loop_controller,
     compounder: state.autonomous_compounder,
     routeProfitGate: state.route_profit_gate,
+    routeQuoteSampler: state.route_quote_sampler,
     riskGovernor: state.autonomy_risk_governor,
     executionPreflight: state.execution_preflight,
     paperExecutionQuality: state.paper_execution_quality,
@@ -71779,6 +71904,7 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     profitLoop: state.profit_loop_controller,
     compounder: state.autonomous_compounder,
     routeProfitGate: state.route_profit_gate,
+    routeQuoteSampler: state.route_quote_sampler,
     riskGovernor: state.autonomy_risk_governor,
     executionPreflight: state.execution_preflight,
     paperExecutionQuality: state.paper_execution_quality,
