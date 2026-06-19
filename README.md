@@ -158,6 +158,11 @@ the researched real-capital path: operator wallet, provider rail, live DEX scann
 Jupiter order rehearsal, risk caps, kill switch, signer/custody, settlement, profit proof,
 and manual review. It reports blockers and next actions while still refusing signing,
 transaction submission, account creation, private-key storage, and wallet mutation.
+`/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
+operators and external research agents. It lists allowed inputs, never-requested fields,
+safe collection surfaces, env target names, next input, verifier commands, and the same
+live-execution/wallet-mutation/transaction-submission/private-key/seed-phrase/secret-echo
+blocks without returning raw secrets.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.

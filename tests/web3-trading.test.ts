@@ -17,6 +17,7 @@ import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wal
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
+import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { GET as SUPERVISED_LIVE_RUNWAY_GET } from "@/app/api/web3-supervised-live-runway/route";
@@ -744,6 +745,90 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("does not create third-party accounts"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
     expect(JSON.stringify(receipt)).not.toContain("test-birdeye-secret");
+  });
+
+  test("GIVEN operator credential setup gaps WHEN the handoff route runs THEN it returns safe inputs without live authority", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";
+
+    const rejected = await OPERATOR_CREDENTIAL_HANDOFF_GET(new Request("http://localhost/api/web3-operator-credential-handoff?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await OPERATOR_CREDENTIAL_HANDOFF_GET(new Request("http://localhost/api/web3-operator-credential-handoff?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      next_input: { id: string; label: string; can_enter_in_app: boolean; verifier_command: string | null } | null;
+      inputs: Array<{ id: string; input_kind: string; safe_collection_surface: string; env_targets: string[]; storage: string; secret_handling: string }>;
+      allowed_inputs: string[];
+      never_request: string[];
+      safe_commands: string[];
+      account_creation_permission: string;
+      external_signup_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+    const text = JSON.stringify(receipt);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-operator-credential-handoff");
+    expect(receipt.status).toBe("needs-operator-input");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.account_creation_permission).toBe("operator-external-only");
+    expect(receipt.external_signup_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.next_input?.id).toBe("jupiter-route-order-key");
+    expect(receipt.inputs.find((item) => item.id === "helius-solana-read-rail")).toMatchObject({
+      input_kind: "api-key",
+      safe_collection_surface: "settings-console",
+      storage: "server-env",
+      env_targets: expect.arrayContaining(["HELIUS_API_KEY", "SOLANA_RPC_URL"]),
+    });
+    expect(receipt.inputs.find((item) => item.id === "jupiter-route-order-key")).toMatchObject({
+      input_kind: "api-key",
+      safe_collection_surface: "settings-console",
+      env_targets: expect.arrayContaining(["JUPITER_API_KEY"]),
+      storage: "server-env",
+    });
+    expect(receipt.inputs.find((item) => item.id === "dedicated-trading-wallet")).toMatchObject({
+      input_kind: "public-wallet",
+      safe_collection_surface: "settings-console",
+      storage: "browser-public-scope",
+    });
+    expect(receipt.inputs.find((item) => item.id === "wallet-ownership-proof")).toMatchObject({
+      input_kind: "wallet-proof",
+      safe_collection_surface: "browser-wallet",
+      storage: "hash-only-local-receipt",
+    });
+    expect(receipt.allowed_inputs).toEqual(expect.arrayContaining([
+      "JUPITER_API_KEY in ignored server env or one-shot credential test",
+      "Dedicated Solana public wallet address",
+      "Browser-wallet text-message ownership proof",
+    ]));
+    expect(receipt.never_request).toEqual(expect.arrayContaining([
+      "Wallet private key",
+      "Seed phrase or mnemonic",
+      "Raw keypair JSON",
+    ]));
+    expect(receipt.safe_commands).toEqual(expect.arrayContaining([
+      "npm run verify:web3 -- --base-url=http://localhost:4010",
+      "npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json",
+    ]));
+    expect(receipt.controls.some((control) => control.includes("credential handoff contract"))).toBe(true);
+    expect(text).not.toContain("test-helius-secret");
+    expect(text).not.toContain("private_key");
+    expect(text).not.toContain("seed_phrase");
   });
 
   test("GIVEN Settings saves public wallet scope WHEN account setup is rebuilt THEN dry-run wallet readiness is scoped without secrets", async () => {

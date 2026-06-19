@@ -1044,6 +1044,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-jupiter-order-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-ops-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-supervised-live-runway");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-operator-credential-handoff");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Dedicated wallet packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Jupiter order packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Live ops packet");
@@ -1137,7 +1138,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-jupiter-order gate");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-dex-live gate");
     expect(source("components/review-readiness.tsx")).toContain("production-worker target setup");
+    expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-credential-handoff");
     expect(settingsPage).toContain("Open Web3 wiring");
+    expect(settingsPage).toContain("Operator credential handoff receipt");
+    expect(settingsPage).toContain("Next safe input");
+    expect(settingsPage).toContain("Allowed inputs");
+    expect(settingsPage).toContain("Never request");
+    expect(settingsPage).toContain("buildWeb3OperatorCredentialHandoffReceipt");
     expect(settingsPage).toContain("live execution blocked");
     expect(settingsPage).toContain("wallet mutation blocked");
     expect(settingsPage).toContain("secret echo blocked");

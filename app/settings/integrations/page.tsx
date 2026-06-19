@@ -25,6 +25,10 @@ import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop
 import { buildWeb3JupiterOrderPacket, type Web3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import {
+  buildWeb3OperatorCredentialHandoffReceipt,
+  type Web3OperatorCredentialHandoffReceipt,
+} from "@/src/db/web3-operator-credential-handoff";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
@@ -80,6 +84,11 @@ export default async function IntegrationsSettingsPage() {
     getWeb3PromotedPaperAutopilotHealth(),
     web3DaemonSupervisorHealth,
   );
+  const web3OperatorCredentialHandoff = buildWeb3OperatorCredentialHandoffReceipt({
+    accountSetup: web3AccountReceipt,
+    acquisition: web3AcquisitionReceipt,
+    launchChecklist: web3LaunchChecklist,
+  });
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -106,6 +115,7 @@ export default async function IntegrationsSettingsPage() {
             supervisedLiveRunway={web3SupervisedLiveRunway}
             credentialDoctor={web3CredentialDoctor}
             launchChecklist={web3LaunchChecklist}
+            operatorCredentialHandoff={web3OperatorCredentialHandoff}
             state={web3State}
           />
         </div>
@@ -153,6 +163,7 @@ function Web3CredentialsRunwayCard({
   supervisedLiveRunway,
   credentialDoctor,
   launchChecklist,
+  operatorCredentialHandoff,
   state,
 }: {
   receipt: Web3AccountSetupReceipt;
@@ -164,6 +175,7 @@ function Web3CredentialsRunwayCard({
   supervisedLiveRunway: Web3SupervisedLiveRunway;
   credentialDoctor: Web3CredentialDoctorHealth;
   launchChecklist: Web3AutonomyLaunchChecklist;
+  operatorCredentialHandoff: Web3OperatorCredentialHandoffReceipt;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
   const requiredConfigured = receipt.environment_summary.required_configured_count;
@@ -235,6 +247,8 @@ function Web3CredentialsRunwayCard({
               Secure credential handoff shows configured or missing status only; Helius and Jupiter secrets stay out of browser storage; private keys and seed phrases are never accepted; live execution and wallet mutation remain blocked.
             </p>
           </div>
+
+          <SettingsOperatorCredentialHandoffReceiptPanel receipt={operatorCredentialHandoff} />
 
           <SettingsSupervisedLiveRunwayPanel runway={supervisedLiveRunway} />
 
@@ -737,6 +751,90 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
       </div>
       <p className="mt-2 text-xs leading-5 text-outline">
         Settings shows this queue for planning only; the app still blocks live execution, wallet mutation, private-key storage, and transaction submission.
+      </p>
+    </div>
+  );
+}
+
+function SettingsOperatorCredentialHandoffReceiptPanel({ receipt }: { receipt: Web3OperatorCredentialHandoffReceipt }) {
+  const nextInput = receipt.next_input;
+  const visibleInputs = receipt.inputs.slice(0, 8);
+  return (
+    <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Operator credential handoff receipt">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Operator credential handoff receipt</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">{receipt.status.replaceAll("-", " ")}</p>
+          <p className="mt-1 text-xs leading-5 text-outline">{receipt.summary}</p>
+        </div>
+        <CredentialStateBadge configured={receipt.open_required_count === 0} status={`${receipt.ready_count}/${receipt.inputs.length} ready`} />
+      </div>
+      {nextInput ? (
+        <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.04] p-2" aria-label="Next safe credential input">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next safe input</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{nextInput.label}</p>
+            </div>
+            <LaunchQueueBadge status={operatorInputBadgeStatus(nextInput.status)} label={nextInput.priority.replaceAll("-", " ")} />
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{nextInput.next_action}</p>
+          <p className="mt-1 text-[10px] leading-4 text-outline">
+            Surface: {nextInput.safe_collection_surface.replaceAll("-", " ")} · storage: {nextInput.storage.replaceAll("-", " ")}
+          </p>
+        </div>
+      ) : null}
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {visibleInputs.map((item) => (
+          <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {item.input_kind.replaceAll("-", " ")} · {item.can_enter_in_app ? "app guided" : "external"}
+                </p>
+              </div>
+              <LaunchQueueBadge status={operatorInputBadgeStatus(item.status)} label={item.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">{item.detail}</p>
+            {item.env_targets.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {item.env_targets.slice(0, 4).map((target) => (
+                  <span key={target} className="max-w-full break-all rounded-md border border-outline-variant/25 bg-black/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                    {target}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <div className="rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe commands</p>
+          <div className="mt-2 space-y-1">
+            {receipt.safe_commands.slice(0, 3).map((command) => (
+              <code key={command} className="block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[10px] leading-4 text-on-surface-variant">
+                {command}
+              </code>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-surface-dim/25 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Allowed inputs</p>
+          <ul className="mt-2 space-y-1 text-[11px] leading-4 text-on-surface-variant">
+            {receipt.allowed_inputs.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+        <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Never request</p>
+          <ul className="mt-2 space-y-1 text-[11px] leading-4 text-on-surface-variant">
+            {receipt.never_request.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Handoff receipt {receipt.receipt_hash.slice(0, 12)} keeps live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
       </p>
     </div>
   );
