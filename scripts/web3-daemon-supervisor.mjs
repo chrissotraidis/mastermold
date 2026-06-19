@@ -35,6 +35,8 @@ export function parseSupervisorArgs(argv = [], env = process.env) {
     ticksPerRound: boundedInteger(flags.get("ticks-per-round") ?? env.WEB3_SUPERVISOR_TICKS_PER_ROUND, 1, 1, 24),
     intervalMs: boundedInteger(flags.get("interval-ms") ?? env.WEB3_SUPERVISOR_INTERVAL_MS, 5_000, 0, 300_000),
     roundDelayMs: boundedInteger(flags.get("round-delay-ms") ?? env.WEB3_SUPERVISOR_ROUND_DELAY_MS, 0, 0, 300_000),
+    targetNetPnlUsd: boundedNumber(flags.get("target-net-pnl") ?? env.WEB3_SUPERVISOR_TARGET_NET_PNL_USD, 0, 0, 1_000_000),
+    maxDrawdownUsd: boundedNumber(flags.get("max-drawdown") ?? env.WEB3_SUPERVISOR_MAX_DRAWDOWN_USD, 250, 0, 1_000_000),
     maxConsecutiveBlockedRounds: boundedInteger(flags.get("max-blocked-rounds") ?? env.WEB3_SUPERVISOR_MAX_BLOCKED_ROUNDS, 5, 1, 100),
     maxConsecutiveErrorRounds: boundedInteger(flags.get("max-error-rounds") ?? env.WEB3_SUPERVISOR_MAX_ERROR_ROUNDS, 3, 1, 100),
     heartbeatWhenGated: booleanFlag(flags.get("heartbeat-when-gated") ?? env.WEB3_SUPERVISOR_HEARTBEAT_WHEN_GATED, true),
@@ -56,6 +58,8 @@ export async function runWeb3DaemonSupervisor(input = {}) {
     ticksPerRound: boundedInteger(input.ticksPerRound, 1, 1, 24),
     intervalMs: boundedInteger(input.intervalMs, 5_000, 0, 300_000),
     roundDelayMs: boundedInteger(input.roundDelayMs, 0, 0, 300_000),
+    targetNetPnlUsd: boundedNumber(input.targetNetPnlUsd, 0, 0, 1_000_000),
+    maxDrawdownUsd: boundedNumber(input.maxDrawdownUsd, 250, 0, 1_000_000),
     maxConsecutiveBlockedRounds: boundedInteger(input.maxConsecutiveBlockedRounds, 5, 1, 100),
     maxConsecutiveErrorRounds: boundedInteger(input.maxConsecutiveErrorRounds, 3, 1, 100),
     heartbeatWhenGated: input.heartbeatWhenGated !== false,
@@ -70,6 +74,10 @@ export async function runWeb3DaemonSupervisor(input = {}) {
     routeRefreshRequests: 0,
     consecutiveBlockedRounds: 0,
     consecutiveErrorRounds: 0,
+    startEquityUsd: null,
+    lastEquityUsd: null,
+    peakEquityUsd: null,
+    maxObservedDrawdownUsd: 0,
     lastEvent: null,
     lastError: null,
   };
@@ -151,6 +159,28 @@ export async function runWeb3DaemonSupervisor(input = {}) {
       });
       break;
     }
+    if (supervisorDrawdownBreached(config, aggregate)) {
+      receipt = writeSupervisorReceipt({
+        config,
+        startedAt,
+        aggregate,
+        round,
+        status: "circuit-open",
+        stopReason: `Loss brake opened after ${formatCurrency(supervisorNetPnl(aggregate))} paper PnL and ${formatCurrency(aggregate.maxObservedDrawdownUsd)} max drawdown.`,
+      });
+      break;
+    }
+    if (supervisorTargetHit(config, aggregate)) {
+      receipt = writeSupervisorReceipt({
+        config,
+        startedAt,
+        aggregate,
+        round,
+        status: "completed",
+        stopReason: `Paper profit target hit at ${formatCurrency(supervisorNetPnl(aggregate))}.`,
+      });
+      break;
+    }
     if (round === config.rounds) {
       receipt = writeSupervisorReceipt({
         config,
@@ -178,6 +208,13 @@ export function applyRunToAggregate(aggregate, run) {
   aggregate.dryRunTicks += dryRun;
   aggregate.routeRefreshRequests += events.filter((event) => event.market_worker_route_refresh_requested === true).length;
   aggregate.lastEvent = events[events.length - 1] ?? aggregate.lastEvent;
+  for (const event of events) {
+    if (typeof event.equity_usd !== "number" || !Number.isFinite(event.equity_usd)) continue;
+    if (aggregate.startEquityUsd === null) aggregate.startEquityUsd = event.equity_usd;
+    aggregate.lastEquityUsd = event.equity_usd;
+    aggregate.peakEquityUsd = Math.max(aggregate.peakEquityUsd ?? event.equity_usd, event.equity_usd);
+    aggregate.maxObservedDrawdownUsd = Math.max(aggregate.maxObservedDrawdownUsd, Math.max(0, (aggregate.peakEquityUsd ?? event.equity_usd) - event.equity_usd));
+  }
   aggregate.consecutiveErrorRounds = 0;
   if (events.length > 0 && blocked === events.length) {
     aggregate.consecutiveBlockedRounds += 1;
@@ -220,15 +257,24 @@ export function buildSupervisorReceipt({
     consecutive_error_rounds: aggregate.consecutiveErrorRounds,
     max_consecutive_blocked_rounds: config.maxConsecutiveBlockedRounds,
     max_consecutive_error_rounds: config.maxConsecutiveErrorRounds,
+    target_net_pnl_usd: roundMoney(config.targetNetPnlUsd),
+    max_drawdown_limit_usd: roundMoney(config.maxDrawdownUsd),
+    start_equity_usd: aggregate.startEquityUsd === null ? null : roundMoney(aggregate.startEquityUsd),
+    last_equity_usd: aggregate.lastEquityUsd === null ? null : roundMoney(aggregate.lastEquityUsd),
+    net_pnl_usd: roundMoney(supervisorNetPnl(aggregate)),
+    peak_equity_usd: aggregate.peakEquityUsd === null ? null : roundMoney(aggregate.peakEquityUsd),
+    max_drawdown_usd: roundMoney(aggregate.maxObservedDrawdownUsd),
+    profit_target_hit: supervisorTargetHit(config, aggregate),
+    loss_brake_tripped: supervisorDrawdownBreached(config, aggregate),
     last_event_status: lastEvent.status ?? "none",
     last_event_action: lastAction,
-    last_equity_usd: typeof lastEvent.equity_usd === "number" ? lastEvent.equity_usd : null,
     stop_reason: stopReason,
     next_action: supervisorNextAction(status, stopReason, lastAction),
     controls: [
       "Runs only the existing paper daemon endpoint and read-only market refresh requests.",
       "Refuses wallet mutation, live execution, private keys, raw signed payload storage, and autonomous real-capital authority.",
-      "Stops itself with a circuit-open receipt after repeated blocked or error rounds.",
+      "Stops itself with a circuit-open receipt after repeated blocked/error rounds or configured paper drawdown.",
+      "Can stop after a configured paper profit target so unattended runs preserve simulated gains for review.",
     ],
   };
 }
@@ -249,6 +295,29 @@ function supervisorNextAction(status, stopReason, lastAction) {
   return lastAction;
 }
 
+function supervisorNetPnl(aggregate) {
+  if (aggregate.startEquityUsd === null || aggregate.lastEquityUsd === null) return 0;
+  return aggregate.lastEquityUsd - aggregate.startEquityUsd;
+}
+
+function supervisorTargetHit(config, aggregate) {
+  return config.targetNetPnlUsd > 0 && supervisorNetPnl(aggregate) >= config.targetNetPnlUsd;
+}
+
+function supervisorDrawdownBreached(config, aggregate) {
+  return config.maxDrawdownUsd > 0 && aggregate.maxObservedDrawdownUsd >= config.maxDrawdownUsd;
+}
+
+function roundMoney(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
+}
+
+function formatCurrency(value) {
+  const absValue = Math.abs(roundMoney(value));
+  return `${value < 0 ? "-" : ""}$${absValue.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+}
+
 function normalizeBaseUrl(value) {
   return String(value || DEFAULT_BASE_URL).replace(/\/$/, "");
 }
@@ -261,6 +330,12 @@ function boundedInteger(value, fallback, min, max) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
+function boundedNumber(value, fallback, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
 }
 
 function booleanFlag(value, fallback) {

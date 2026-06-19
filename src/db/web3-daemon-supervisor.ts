@@ -33,9 +33,17 @@ export type Web3DaemonSupervisorReceipt = {
   consecutive_error_rounds: number;
   max_consecutive_blocked_rounds: number;
   max_consecutive_error_rounds: number;
+  target_net_pnl_usd: number;
+  max_drawdown_limit_usd: number;
+  start_equity_usd: number | null;
   last_event_status: string;
   last_event_action: string;
   last_equity_usd: number | null;
+  net_pnl_usd: number;
+  peak_equity_usd: number | null;
+  max_drawdown_usd: number;
+  profit_target_hit: boolean;
+  loss_brake_tripped: boolean;
   stop_reason: string | null;
   next_action: string;
   controls: string[];
@@ -46,6 +54,13 @@ export type Web3DaemonSupervisorHealth = {
   updated_at: string | null;
   runner_id: string | null;
   summary: string;
+  net_pnl_usd: number;
+  target_net_pnl_usd: number;
+  last_equity_usd: number | null;
+  max_drawdown_usd: number;
+  max_drawdown_limit_usd: number;
+  profit_target_hit: boolean;
+  loss_brake_tripped: boolean;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
 };
@@ -82,6 +97,13 @@ export function getWeb3DaemonSupervisorHealth(path = web3DaemonSupervisorReceipt
       updated_at: null,
       runner_id: null,
       summary: "No local Web3 daemon supervisor receipt has been written yet.",
+      net_pnl_usd: 0,
+      target_net_pnl_usd: 0,
+      last_equity_usd: null,
+      max_drawdown_usd: 0,
+      max_drawdown_limit_usd: 0,
+      profit_target_hit: false,
+      loss_brake_tripped: false,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     };
@@ -92,6 +114,13 @@ export function getWeb3DaemonSupervisorHealth(path = web3DaemonSupervisorReceipt
     updated_at: receipt.updated_at,
     runner_id: receipt.runner_id,
     summary: web3DaemonSupervisorSummary(receipt),
+    net_pnl_usd: receipt.net_pnl_usd,
+    target_net_pnl_usd: receipt.target_net_pnl_usd,
+    last_equity_usd: receipt.last_equity_usd,
+    max_drawdown_usd: receipt.max_drawdown_usd,
+    max_drawdown_limit_usd: receipt.max_drawdown_limit_usd,
+    profit_target_hit: receipt.profit_target_hit,
+    loss_brake_tripped: receipt.loss_brake_tripped,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
   };
@@ -133,11 +162,17 @@ function sanitizeWeb3DaemonSupervisorReceipt(value: unknown): Web3DaemonSupervis
     consecutive_error_rounds: cleanCount(row.consecutive_error_rounds),
     max_consecutive_blocked_rounds: cleanCount(row.max_consecutive_blocked_rounds),
     max_consecutive_error_rounds: cleanCount(row.max_consecutive_error_rounds),
+    target_net_pnl_usd: cleanMoney(row.target_net_pnl_usd),
+    max_drawdown_limit_usd: cleanMoney(row.max_drawdown_limit_usd),
+    start_equity_usd: cleanNullableMoney(row.start_equity_usd),
     last_event_status: cleanText(row.last_event_status, "unknown", 80),
     last_event_action: cleanText(row.last_event_action, "none", 240),
-    last_equity_usd: typeof row.last_equity_usd === "number" && Number.isFinite(row.last_equity_usd)
-      ? row.last_equity_usd
-      : null,
+    last_equity_usd: cleanNullableMoney(row.last_equity_usd),
+    net_pnl_usd: cleanMoney(row.net_pnl_usd),
+    peak_equity_usd: cleanNullableMoney(row.peak_equity_usd),
+    max_drawdown_usd: cleanMoney(row.max_drawdown_usd),
+    profit_target_hit: row.profit_target_hit === true,
+    loss_brake_tripped: row.loss_brake_tripped === true,
     stop_reason: row.stop_reason ? cleanText(row.stop_reason, "stopped", 240) : null,
     next_action: cleanText(row.next_action, "Start the supervisor to record autonomous paper daemon health.", 320),
     controls: Array.isArray(row.controls)
@@ -148,11 +183,15 @@ function sanitizeWeb3DaemonSupervisorReceipt(value: unknown): Web3DaemonSupervis
 
 function web3DaemonSupervisorSummary(receipt: Web3DaemonSupervisorReceipt) {
   if (receipt.status === "circuit-open") {
+    if (receipt.loss_brake_tripped) {
+      return `Supervisor loss brake is open after ${formatSignedCompactValue(receipt.net_pnl_usd)} paper PnL and ${formatCompactValue(receipt.max_drawdown_usd)} drawdown.`;
+    }
     return `Supervisor circuit is open after ${receipt.consecutive_blocked_rounds} blocked and ${receipt.consecutive_error_rounds} error round${receipt.consecutive_error_rounds === 1 ? "" : "s"}.`;
   }
   if (receipt.status === "error") return receipt.stop_reason ?? "Supervisor stopped after an error.";
-  if (receipt.status === "completed") return `Supervisor completed ${receipt.round}/${receipt.requested_rounds} round${receipt.requested_rounds === 1 ? "" : "s"} with ${receipt.posted_ticks} posted paper tick${receipt.posted_ticks === 1 ? "" : "s"}.`;
-  if (receipt.status === "running") return `Supervisor is running ${receipt.source} ${receipt.scenario}, ${receipt.posted_ticks} posted paper tick${receipt.posted_ticks === 1 ? "" : "s"} so far.`;
+  if (receipt.profit_target_hit) return `Supervisor hit the paper profit target at ${formatSignedCompactValue(receipt.net_pnl_usd)} after ${receipt.posted_ticks} posted tick${receipt.posted_ticks === 1 ? "" : "s"}.`;
+  if (receipt.status === "completed") return `Supervisor completed ${receipt.round}/${receipt.requested_rounds} round${receipt.requested_rounds === 1 ? "" : "s"} with ${formatSignedCompactValue(receipt.net_pnl_usd)} paper PnL.`;
+  if (receipt.status === "running") return `Supervisor is running ${receipt.source} ${receipt.scenario}: ${formatSignedCompactValue(receipt.net_pnl_usd)} paper PnL, ${formatCompactValue(receipt.max_drawdown_usd)} drawdown.`;
   return `Supervisor is idle after ${receipt.round} round${receipt.round === 1 ? "" : "s"}; ${receipt.next_action}`;
 }
 
@@ -173,10 +212,38 @@ function cleanCount(value: unknown) {
   return Math.max(0, Math.trunc(parsed));
 }
 
+function cleanMoney(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.round(parsed * 100) / 100;
+}
+
+function cleanNullableMoney(value: unknown) {
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.round(parsed * 100) / 100;
+}
+
+function formatCompactValue(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: Math.abs(value) >= 1_000 ? 1 : 0,
+  }).format(value);
+}
+
+function formatSignedCompactValue(value: number) {
+  const sign = value >= 0 ? "+" : "-";
+  return `${sign}${formatCompactValue(Math.abs(value))}`;
+}
+
 export function supervisorControls() {
   return [
     "Runs only the existing paper daemon endpoint and read-only market refresh requests.",
     "Refuses wallet mutation, live execution, private keys, raw signed payload storage, and autonomous real-capital authority.",
-    "Stops itself with a circuit-open receipt after repeated blocked or error rounds.",
+    "Stops itself with a circuit-open receipt after repeated blocked/error rounds or configured paper drawdown.",
+    "Can stop after a configured paper profit target so unattended runs preserve simulated gains for review.",
   ];
 }

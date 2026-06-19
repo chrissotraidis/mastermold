@@ -100,6 +100,13 @@ export function Web3TradingWorkspaceLoader({
             updated_at: null,
             runner_id: null,
             summary: "Supervisor health could not be refreshed from the local health endpoint.",
+            net_pnl_usd: 0,
+            target_net_pnl_usd: 0,
+            last_equity_usd: null,
+            max_drawdown_usd: 0,
+            max_drawdown_limit_usd: 0,
+            profit_target_hit: false,
+            loss_brake_tripped: false,
             live_execution_permission: "blocked",
             wallet_mutation_permission: "blocked",
           });
@@ -6747,6 +6754,10 @@ function QuickDaemonSupervisorPanel({
   const updatedAt = health?.updated_at ? compactIsoTime(health.updated_at) : "no receipt";
   const runner = health?.runner_id ?? "not running";
   const summary = health?.summary ?? "No local Web3 daemon supervisor receipt has been written yet.";
+  const netPnl = health?.net_pnl_usd ?? 0;
+  const targetPnl = health?.target_net_pnl_usd ?? 0;
+  const drawdown = health?.max_drawdown_usd ?? 0;
+  const drawdownLimit = health?.max_drawdown_limit_usd ?? 0;
 
   return (
     <section className="rounded-md border border-outline-variant/30 bg-surface-dim/15 p-2 sm:p-3" aria-label="Web3 daemon supervisor">
@@ -6762,12 +6773,15 @@ function QuickDaemonSupervisorPanel({
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           <Chip tone={tone}>{status.replaceAll("-", " ")}</Chip>
+          <Chip tone={health?.profit_target_hit ? "engine" : netPnl >= 0 ? "caution" : "critical"}>{formatCompactSignedCurrency(netPnl)}</Chip>
           <Chip tone="demo">paper only</Chip>
           <Chip tone={health?.live_execution_permission === "blocked" ? "demo" : "critical"}>live locked</Chip>
         </div>
       </div>
-      <div className="mt-2 grid gap-1 sm:grid-cols-4" aria-label="Web3 daemon supervisor metrics">
+      <div className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6" aria-label="Web3 daemon supervisor metrics">
         <ProfitMetric label="Runner" value={runner} detail="external paper runner" tone={status === "running" ? "engine" : "neutral"} />
+        <ProfitMetric label="Paper PnL" value={formatCompactSignedCurrency(netPnl)} detail={targetPnl > 0 ? `${formatCompactCurrency(targetPnl)} target` : "target off"} tone={health?.profit_target_hit || netPnl > 0 ? "engine" : netPnl < 0 ? "critical" : "neutral"} />
+        <ProfitMetric label="Drawdown" value={formatCompactCurrency(drawdown)} detail={drawdownLimit > 0 ? `${formatCompactCurrency(drawdownLimit)} brake` : "brake off"} tone={health?.loss_brake_tripped ? "critical" : drawdownLimit > 0 && drawdown > drawdownLimit * 0.65 ? "caution" : "engine"} />
         <ProfitMetric label="Updated" value={updatedAt} detail="local health receipt" tone={status === "absent" ? "neutral" : "engine"} />
         <ProfitMetric label="Circuit" value={status === "circuit-open" ? "open" : "closed"} detail="fail-closed guard" tone={status === "circuit-open" || status === "error" ? "critical" : "engine"} />
         <ProfitMetric label="Wallet" value={health?.wallet_mutation_permission ?? "blocked"} detail="mutation permission" tone="demo" />
@@ -6776,7 +6790,7 @@ function QuickDaemonSupervisorPanel({
         Use <span className="font-mono">npm run supervise:web3</span> to run repeated leased paper ticks outside the browser; it still cannot sign, submit, custody funds, or move real capital.
       </p>
       <span className="sr-only" aria-label="Web3 daemon supervisor receipt">
-        Web3 daemon supervisor status {status}; runner {runner}; updated {updatedAt}; live execution permission {health?.live_execution_permission ?? "blocked"}; wallet mutation permission {health?.wallet_mutation_permission ?? "blocked"}; summary {summary}.
+        Web3 daemon supervisor status {status}; runner {runner}; updated {updatedAt}; paper PnL {formatSignedCurrency(netPnl)}; target {formatCurrency(targetPnl)}; max drawdown {formatCurrency(drawdown)}; drawdown brake {formatCurrency(drawdownLimit)}; target hit {health?.profit_target_hit ? "yes" : "no"}; loss brake tripped {health?.loss_brake_tripped ? "yes" : "no"}; live execution permission {health?.live_execution_permission ?? "blocked"}; wallet mutation permission {health?.wallet_mutation_permission ?? "blocked"}; summary {summary}.
       </span>
     </section>
   );

@@ -1,5 +1,5 @@
 import { buildDaemonTickBody, runWeb3AutonomousDaemon } from "./web3-autonomous-daemon.mjs";
-import { runWeb3DaemonSupervisor } from "./web3-daemon-supervisor.mjs";
+import { buildSupervisorReceipt, runWeb3DaemonSupervisor } from "./web3-daemon-supervisor.mjs";
 import { buildForwardRepeatReport, runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 import { buildLiveCapitalPreflightReport } from "./web3-live-capital-preflight.mjs";
 import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.mjs";
@@ -55,6 +55,8 @@ async function main() {
   assert(health.web3_daemon_supervisor.live_execution_permission === "blocked", "Supervisor health should keep live execution blocked.", health.web3_daemon_supervisor);
   assert(health.web3_daemon_supervisor.wallet_mutation_permission === "blocked", "Supervisor health should keep wallet mutation blocked.", health.web3_daemon_supervisor);
   assert(!("receipt_path" in health.web3_daemon_supervisor), "Supervisor health should not expose local receipt paths.", health.web3_daemon_supervisor);
+  assert(typeof health.web3_daemon_supervisor.net_pnl_usd === "number", "Supervisor health should expose sanitized paper PnL.", health.web3_daemon_supervisor);
+  assert(typeof health.web3_daemon_supervisor.max_drawdown_usd === "number", "Supervisor health should expose sanitized drawdown.", health.web3_daemon_supervisor);
 
   const page = await request("/trading");
   const html = await page.text();
@@ -4765,7 +4767,75 @@ async function main() {
   assert(supervisorRun.paper_only === true, "Supervisor must remain paper-only.", supervisorRun);
   assert(supervisorRun.live_execution_permission === "blocked" && supervisorRun.wallet_mutation_permission === "blocked", "Supervisor receipt should block live execution and wallet mutation.", supervisorRun);
   assert(supervisorRun.round === 1 && supervisorRun.posted_ticks >= 1, "Supervisor should post at least one leased paper daemon tick.", supervisorRun);
+  assert(typeof supervisorRun.net_pnl_usd === "number" && typeof supervisorRun.max_drawdown_usd === "number", "Supervisor should track paper PnL and drawdown fields.", supervisorRun);
+  assert(supervisorRun.loss_brake_tripped === false, "One-round smoke supervisor should not trip the loss brake.", supervisorRun);
   assert(supervisorRun.controls.some((control) => control.includes("paper daemon")), "Supervisor receipt should disclose its paper daemon boundary.", supervisorRun);
+  const targetReceipt = buildSupervisorReceipt({
+    config: {
+      runnerId: "synthetic-target-runner",
+      baseUrl,
+      scenario: "base",
+      source: "sample",
+      rounds: 3,
+      ticksPerRound: 1,
+      targetNetPnlUsd: 10,
+      maxDrawdownUsd: 100,
+      maxConsecutiveBlockedRounds: 5,
+      maxConsecutiveErrorRounds: 3,
+    },
+    startedAt: new Date(0).toISOString(),
+    aggregate: {
+      postedTicks: 2,
+      blockedTicks: 0,
+      dryRunTicks: 0,
+      routeRefreshRequests: 0,
+      consecutiveBlockedRounds: 0,
+      consecutiveErrorRounds: 0,
+      startEquityUsd: 1_000,
+      lastEquityUsd: 1_015,
+      peakEquityUsd: 1_015,
+      maxObservedDrawdownUsd: 0,
+      lastEvent: { status: "posted", next_action: "Profit target held.", equity_usd: 1_015 },
+      lastError: null,
+    },
+    round: 2,
+    status: "completed",
+    stopReason: "Paper profit target hit at $15.",
+  });
+  assert(targetReceipt.profit_target_hit === true && targetReceipt.net_pnl_usd === 15, "Supervisor receipt should mark target-hit paper PnL.", targetReceipt);
+  const brakeReceipt = buildSupervisorReceipt({
+    config: {
+      runnerId: "synthetic-brake-runner",
+      baseUrl,
+      scenario: "base",
+      source: "sample",
+      rounds: 3,
+      ticksPerRound: 1,
+      targetNetPnlUsd: 25,
+      maxDrawdownUsd: 10,
+      maxConsecutiveBlockedRounds: 5,
+      maxConsecutiveErrorRounds: 3,
+    },
+    startedAt: new Date(0).toISOString(),
+    aggregate: {
+      postedTicks: 2,
+      blockedTicks: 0,
+      dryRunTicks: 0,
+      routeRefreshRequests: 0,
+      consecutiveBlockedRounds: 0,
+      consecutiveErrorRounds: 0,
+      startEquityUsd: 1_000,
+      lastEquityUsd: 990,
+      peakEquityUsd: 1_005,
+      maxObservedDrawdownUsd: 15,
+      lastEvent: { status: "posted", next_action: "Loss brake held.", equity_usd: 990 },
+      lastError: null,
+    },
+    round: 2,
+    status: "circuit-open",
+    stopReason: "Loss brake opened after -$10 paper PnL and $15 max drawdown.",
+  });
+  assert(brakeReceipt.loss_brake_tripped === true && brakeReceipt.status === "circuit-open", "Supervisor receipt should trip the drawdown loss brake.", brakeReceipt);
   const forwardRun = await runWeb3AutonomousForwardRun({
     baseUrl,
     scenario: "all",
