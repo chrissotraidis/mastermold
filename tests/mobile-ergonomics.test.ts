@@ -782,14 +782,21 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("acquisition.items.map");
     expect(settingsConsole).toContain("Credential action console");
     expect(settingsConsole).toContain("Session-only provider tests");
+    expect(settingsConsole).toContain("DEX scanner evidence");
     expect(settingsConsole).toContain("Save public scope");
     expect(settingsConsole).toContain("Saved public scope");
     expect(settingsConsole).toContain("API keys are not sent in this action");
     expect(settingsConsole).toContain("valid public Solana wallet address");
     expect(settingsConsole).toContain("Test credentials");
+    expect(settingsConsole).toContain("Test DEX scanner");
+    expect(settingsConsole).toContain("/api/web3-dex-discovery?");
+    expect(settingsConsole).toContain("source: \"live-dex\"");
+    expect(settingsConsole).toContain("Settings DEX discovery receipt");
+    expect(settingsConsole).toContain("scanner evidence only");
     expect(settingsConsole).toContain("Rehearse Jupiter");
     expect(settingsConsole).toContain("no browser storage for Helius or Jupiter keys");
     expect(settingsConsole).toContain("unsigned transaction return withheld");
+    expect(settingsConsole).toContain("DEX scanner receipt is read-only paper evidence");
     expect(settingsConsole).toContain("Strict verifier runway");
     expect(settingsConsole).toContain("Operator wallet and Jupiter order gates");
     expect(settingsConsole).toContain("Wallet + order gate");
@@ -800,6 +807,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order");
     expect(source("docs/web3-credentials-runbook.md")).toContain("strict verifier runway");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("read-only DEX scanner testing");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-dex-discovery");
     expect(source("README.md")).toContain("/api/web3-dex-discovery?source=live-dex");
     expect(source("app/api/web3-dex-discovery/route.ts")).toContain("buildWeb3DexDiscoveryReceipt");
@@ -814,6 +822,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-jupiter-order");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run verify:web3 gate");
     expect(source("components/review-readiness.tsx")).toContain("full credential checklist");
+    expect(source("components/review-readiness.tsx")).toContain("read-only DEX scanner evidence");
     expect(source("components/review-readiness.tsx")).toContain("compact DEX discovery receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings now shows a strict verifier runway");
     expect(source("components/review-readiness.tsx")).toContain("configured Helius/Solana provider-health proof");

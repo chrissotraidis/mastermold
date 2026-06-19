@@ -5,6 +5,7 @@ import { Activity, Save, ShieldCheck, Terminal, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
+import type { Web3DexDiscoveryReceipt } from "@/src/db/web3-dex-discovery";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3TradingState } from "@/src/db/web3-trading";
 
@@ -56,9 +57,10 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"credentials" | "jupiter" | "scope" | null>(null);
+  const [busy, setBusy] = useState<"credentials" | "dex" | "jupiter" | "scope" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
+  const [dexReceipt, setDexReceipt] = useState<Web3DexDiscoveryReceipt | null>(null);
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
 
@@ -131,6 +133,30 @@ export function SettingsWeb3CredentialConsole({
     }
   }
 
+  async function testDexDiscovery() {
+    setBusy("dex");
+    setMessage("Testing read-only DEX Screener scanner evidence without wallet authority...");
+    try {
+      const params = new URLSearchParams({
+        scenario,
+        source: "live-dex",
+        account,
+        cycles: String(cycles),
+      });
+      const response = await fetch(`/api/web3-dex-discovery?${params.toString()}`);
+      const payload = (await response.json().catch(() => null)) as Web3DexDiscoveryReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "DEX scanner test failed.");
+      }
+      setDexReceipt(payload);
+      setMessage(payload.summary);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "DEX scanner test failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function savePublicScope() {
     const wallet = draft.wallet_public_key.trim();
     if (!wallet || !isLikelySolanaPublicKey(wallet)) {
@@ -197,7 +223,7 @@ export function SettingsWeb3CredentialConsole({
           <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Credential action console</p>
           <h3 className="mt-1 text-base font-semibold text-on-surface">Session-only provider tests</h3>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
-            Test Helius/Solana, wallet scope, and Jupiter order readiness from Settings. API keys are never saved to browser storage; private keys and seed phrases are not accepted.
+            Test Helius/Solana, DEX scanner evidence, wallet scope, and Jupiter order readiness from Settings. API keys are never saved to browser storage; private keys and seed phrases are not accepted.
           </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
@@ -286,6 +312,15 @@ export function SettingsWeb3CredentialConsole({
           </button>
           <button
             type="button"
+            onClick={testDexDiscovery}
+            disabled={disabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Activity className={cn("size-3.5 shrink-0", busy === "dex" && "animate-pulse")} aria-hidden="true" />
+            {busy === "dex" ? "Scanning" : "Test DEX scanner"}
+          </button>
+          <button
+            type="button"
             onClick={rehearseJupiter}
             disabled={disabled}
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-violet/45 bg-violet/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-violet transition hover:bg-violet/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
@@ -345,6 +380,11 @@ export function SettingsWeb3CredentialConsole({
           tone={jupiterReceipt?.summary.jupiter_order_ready ? "engine" : "caution"}
         />
         <ConsoleMetric
+          label="DEX scanner"
+          value={dexReceipt ? dexReceipt.status.replace("-", " ") : "untested"}
+          tone={dexReceipt?.status === "live-ready" || dexReceipt?.status === "live-watch" ? "engine" : dexReceipt ? "caution" : "neutral"}
+        />
+        <ConsoleMetric
           label="Execution"
           value={savedScope ? "dry-run saved" : "blocked"}
           tone={savedScope ? "engine" : "neutral"}
@@ -381,6 +421,33 @@ export function SettingsWeb3CredentialConsole({
         </div>
       ) : null}
 
+      {dexReceipt ? (
+        <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings DEX discovery receipt">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">DEX discovery receipt</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{dexReceipt.status.replace("-", " ")}</p>
+            </div>
+            <Badge variant="outline" className="border-engine/35 bg-engine/10 text-engine">
+              {dexReceipt.provider}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <ConsoleMetric label="Pairs mapped" value={String(dexReceipt.source_summary.pairs_mapped)} tone="engine" />
+            <ConsoleMetric label="Candidates" value={String(dexReceipt.source_summary.tokens_considered)} tone="engine" />
+            <ConsoleMetric label="Paid hype" value={String(dexReceipt.source_summary.paid_hype_count)} tone={dexReceipt.source_summary.paid_hype_count > 0 ? "caution" : "engine"} />
+            <ConsoleMetric label="Failed sources" value={String(dexReceipt.source_summary.failed_source_count)} tone={dexReceipt.source_summary.failed_source_count > 0 ? "caution" : "engine"} />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">{dexReceipt.next_action}</p>
+          <p className="mt-1 text-xs leading-5 text-outline">
+            Top symbols: {dexReceipt.source_summary.top_symbols.slice(0, 5).join(", ") || "none"} · live execution {dexReceipt.live_execution_permission} · wallet mutation {dexReceipt.wallet_mutation_permission}
+          </p>
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+            receipt {dexReceipt.receipt_hash.slice(0, 10)} · scanner evidence only
+          </p>
+        </div>
+      ) : null}
+
       {credentialChecks.length > 0 ? (
         <div className="mt-3 grid gap-1 sm:grid-cols-2 xl:grid-cols-4" aria-label="Settings Web3 credential readiness checks">
           {credentialChecks.map((check) => (
@@ -397,7 +464,7 @@ export function SettingsWeb3CredentialConsole({
       ) : null}
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
-        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; live execution blocked; wallet mutation blocked.
+        Settings Web3 credential console keeps API keys session only; no browser storage for Helius or Jupiter keys; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live execution blocked; wallet mutation blocked.
       </p>
     </section>
   );
