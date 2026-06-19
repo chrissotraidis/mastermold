@@ -4758,6 +4758,23 @@ async function main() {
   assert(forwardRun.scenarios.every((report) => typeof report.deployed_notional_usd === "number" && typeof report.deployed_hot_coin_alpha_usd === "number"), "Every forward scenario should expose same-notional deployed alpha metrics.", forwardRun.scenarios);
   assert(forwardRun.scenarios.find((report) => report.scenario === "breakout")?.events?.[0]?.next_action?.includes("FARTCOIN"), "Breakout forward run should scout the visible momentum leader instead of defaulting to the safest large cap.", forwardRun.scenarios);
   assert(["all-profitable", "mixed-target-met", "flat-target-met", "profitable-below-target", "not-profitable"].includes(forwardRun.verdict), "Autonomous forward suite should publish a known profit verdict.", forwardRun);
+  const repeatRun = await runWeb3AutonomousForwardRun({
+    baseUrl,
+    scenario: "all",
+    source: "sample",
+    runnerId: "smoke-repeat-runner",
+    runs: 2,
+    ticks: 2,
+    intervalMs: 0,
+    heartbeatWhenGated: true,
+    minNetPnlUsd: 0,
+  });
+  assert(repeatRun.mode === "web3-autonomous-forward-repeat", "Autonomous repeat proof should return a repeatability report.", repeatRun);
+  assert(repeatRun.paper_only === true && repeatRun.run_count === 2, "Autonomous repeat proof should stay paper-only and run the requested count.", repeatRun);
+  assert(typeof repeatRun.hit_rate_pct === "number" && typeof repeatRun.consistency_score === "number", "Autonomous repeat proof should quantify hit rate and consistency.", repeatRun);
+  assert(typeof repeatRun.max_cumulative_drawdown_usd === "number" && typeof repeatRun.average_net_pnl_usd === "number", "Autonomous repeat proof should quantify drawdown and average PnL.", repeatRun);
+  assert(typeof repeatRun.deployed_hot_coin_alpha_usd === "number" && ["beat-deployed-hot-coin-repeat", "lagged-deployed-hot-coin-repeat"].includes(repeatRun.deployed_hot_coin_baseline_verdict), "Autonomous repeat proof should compare repeat deployed capital against the same-notional hot-coin baseline.", repeatRun);
+  assert(repeatRun.runs.every((report) => report.mode === "web3-autonomous-forward-suite" && report.scenario_count === 3), "Autonomous repeat proof should rerun the multi-regime suite by default.", repeatRun.runs);
 
   const summary = {
     baseUrl,
@@ -4773,6 +4790,10 @@ async function main() {
     forwardHotCoinVerdict: forwardRun.hot_coin_baseline_verdict,
     forwardDeployedAlpha: forwardRun.deployed_hot_coin_alpha_usd,
     forwardDeployedVerdict: forwardRun.deployed_hot_coin_baseline_verdict,
+    repeatVerdict: repeatRun.verdict,
+    repeatHitRate: repeatRun.hit_rate_pct,
+    repeatDrawdown: repeatRun.max_cumulative_drawdown_usd,
+    repeatDeployedAlpha: repeatRun.deployed_hot_coin_alpha_usd,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,
