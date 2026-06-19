@@ -5495,6 +5495,23 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
+    expect(launchChecklist.provider_credentials_readiness).toMatchObject({
+      mode: "web3-provider-credentials-readiness",
+      status: "missing-wallet",
+      can_satisfy_provider_gate: false,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(launchChecklist.provider_credentials_readiness.checks.map((check) => check.id)).toEqual([
+      "wallet-scope",
+      "provider-secret-scope",
+      "policy-hash",
+      "custody-envelope",
+      "signer-request",
+      "provider-packet",
+      "user-presence",
+      "live-boundary",
+    ]);
     expect(launchChecklist.profit_proof_readiness.checks.map((check) => check.id)).toEqual([
       "local-paper",
       "promoted-memory",
@@ -5504,7 +5521,7 @@ describe("Web3 autonomous trading subsystem", () => {
       "live-boundary",
     ]);
     expect(launchChecklist.items.find((item) => item.id === "process-supervision")?.blocker).toContain("supervise:web3");
-    expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("custody/provider credentials");
+    expect(launchChecklist.items.find((item) => item.id === "provider-credentials")?.blocker).toContain("public wallet key");
     expect(launchChecklist.items.find((item) => item.id === "wallet-accounting")?.blocker).toContain("wallet holdings");
     expect(launchChecklist.items.find((item) => item.id === "profit-proof")?.blocker).toContain("promoted paper");
     expect(launchChecklist.remaining_work.map((item) => item.id)).toEqual(expect.arrayContaining([

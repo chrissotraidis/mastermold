@@ -99,6 +99,10 @@ async function main() {
   assert(launchChecklist.profit_proof_readiness?.mode === "web3-profit-proof-readiness", "Web3 launch checklist should expose profit-proof readiness.", launchChecklist);
   assert(launchChecklist.profit_proof_readiness.live_execution_permission === "blocked", "Checklist profit-proof readiness should keep live execution blocked.", launchChecklist.profit_proof_readiness);
   assert(launchChecklist.profit_proof_readiness.wallet_mutation_permission === "blocked", "Checklist profit-proof readiness should keep wallet mutation blocked.", launchChecklist.profit_proof_readiness);
+  assert(launchChecklist.provider_credentials_readiness?.mode === "web3-provider-credentials-readiness", "Web3 launch checklist should expose provider credential readiness.", launchChecklist);
+  assert(launchChecklist.provider_credentials_readiness.live_execution_permission === "blocked", "Provider credential readiness should keep live execution blocked.", launchChecklist.provider_credentials_readiness);
+  assert(launchChecklist.provider_credentials_readiness.wallet_mutation_permission === "blocked", "Provider credential readiness should keep wallet mutation blocked.", launchChecklist.provider_credentials_readiness);
+  assert(Array.isArray(launchChecklist.provider_credentials_readiness.checks) && launchChecklist.provider_credentials_readiness.checks.some((check) => check.id === "provider-packet"), "Provider credential readiness should expose provider packet evidence.", launchChecklist.provider_credentials_readiness);
   assert(launchChecklist.remaining_work_count === launchChecklist.remaining_work.length, "Web3 launch checklist remaining work count should match remaining work rows.", launchChecklist);
   assert(launchChecklist.completed_proof_count + launchChecklist.remaining_work_count === launchChecklist.items.length, "Web3 launch checklist proof counts should reconcile.", launchChecklist);
   assert(launchChecklist.remaining_work.every((item) => ["required", "review"].includes(item.priority) && item.next_action.length > 0), "Web3 launch checklist remaining work rows should include priority and next action.", launchChecklist);

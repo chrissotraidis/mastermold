@@ -2,6 +2,7 @@ import type { Web3PromotedPaperAutopilotHealth } from "./web3-promoted-paper-aut
 import type { Web3DaemonSupervisorHealth } from "./web3-daemon-supervisor";
 import { buildWeb3ProductionSupervisorReadiness, type Web3ProductionSupervisorReadiness } from "./web3-production-supervisor";
 import { buildWeb3ProfitProofReadiness, type Web3ProfitProofReadiness } from "./web3-profit-proof";
+import { buildWeb3ProviderCredentialsReadiness, type Web3ProviderCredentialsReadiness } from "./web3-provider-credentials";
 import type { Web3TradingState } from "./web3-trading";
 
 export type Web3AutonomyLaunchChecklistStatus =
@@ -61,6 +62,7 @@ export type Web3AutonomyLaunchChecklist = {
   hard_blockers: string[];
   production_supervisor_readiness: Web3ProductionSupervisorReadiness;
   profit_proof_readiness: Web3ProfitProofReadiness;
+  provider_credentials_readiness: Web3ProviderCredentialsReadiness;
   controls: string[];
   items: Web3AutonomyLaunchChecklistItem[];
   remaining_work: Web3AutonomyLaunchRemainingWorkItem[];
@@ -85,6 +87,7 @@ export function buildWeb3AutonomyLaunchChecklist(
   const walletAccounting = state.live_wallet_accounting_readiness;
   const productionSupervisor = buildWeb3ProductionSupervisorReadiness(supervisorHealth);
   const profitProof = buildWeb3ProfitProofReadiness({ paperProfit, promotedHealth });
+  const providerCredentials = buildWeb3ProviderCredentialsReadiness({ custody, signer });
   const killSwitchFail = state.execution_readiness.checks.some((check) => check.id === "kill-switch" && check.status === "fail");
   const memoryStatus = promotedHealth?.run_memory_status ?? "learning";
   const promotedRunCount = promotedHealth?.run_count ?? 0;
@@ -103,8 +106,10 @@ export function buildWeb3AutonomyLaunchChecklist(
   const settlementPass = lifecycle.status === "confirming" || lifecycle.items.some((item) => item.stage === "landed");
   const processSupervisionPass = productionSupervisor.can_satisfy_process_gate;
   const processSupervisionWatch = productionSupervisor.status === "production-gated" || productionSupervisor.status === "paper-supervised";
-  const providerCredentialsPass = custody.status === "armed" && signer.can_request_signature && signer.provider_adapter.credential_configured;
-  const providerCredentialsWatch = custody.status === "bounded-ready" || signer.ready_count > 0 || signer.can_request_signature;
+  const providerCredentialsPass = providerCredentials.can_satisfy_provider_gate;
+  const providerCredentialsWatch = providerCredentials.status === "policy-gated" ||
+    providerCredentials.status === "request-gated" ||
+    providerCredentials.status === "provider-ready";
   const walletAccountingPass = walletAccounting.can_trust_live_pnl;
   const walletAccountingWatch = walletAccounting.status !== "missing-wallet" && walletAccounting.status !== "rpc-gated" && walletAccounting.status !== "blocked";
   const profitProofPass = profitProof.can_satisfy_profit_gate;
@@ -204,9 +209,9 @@ export function buildWeb3AutonomyLaunchChecklist(
       id: "provider-credentials",
       label: "Provider credentials",
       status: providerCredentialsPass ? "pass" : providerCredentialsWatch ? "watch" : "fail",
-      score: providerCredentialsPass ? 90 : providerCredentialsWatch ? 56 : 16,
-      detail: `${signer.active_provider.replaceAll("-", " ")} credentials ${signer.provider_adapter.credential_configured ? "configured" : "missing"}; custody ${custody.status.replaceAll("-", " ")}; signature ${signer.can_request_signature ? "requestable" : "locked"}.`,
-      blocker: providerCredentialsPass ? null : "Configure reviewed custody/provider credentials, policy ids, wallet scope, and request signing before live-capital review.",
+      score: providerCredentialsPass ? 90 : providerCredentialsWatch ? Math.max(48, providerCredentials.readiness_score) : Math.min(30, providerCredentials.readiness_score),
+      detail: `${providerCredentials.status.replaceAll("-", " ")}; ${providerCredentials.provider.replaceAll("-", " ")} via ${providerCredentials.request_transport.replaceAll("-", " ")}, packet ${providerCredentials.adapter_status.replaceAll("-", " ")}.`,
+      blocker: providerCredentialsPass ? null : providerCredentials.next_action,
     },
     {
       id: "wallet-accounting",
@@ -291,6 +296,7 @@ export function buildWeb3AutonomyLaunchChecklist(
     hard_blockers: hardBlockers,
     production_supervisor_readiness: productionSupervisor,
     profit_proof_readiness: profitProof,
+    provider_credentials_readiness: providerCredentials,
     controls: [
       "This checklist is a launch-readiness contract; it does not sign, submit, custody funds, or unlock real-capital trading.",
       "Paper scale requires current paper profit proof, market freshness, promoted-run memory that is not protecting, and a clear kill switch.",
