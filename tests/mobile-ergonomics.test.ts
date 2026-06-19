@@ -555,6 +555,7 @@ describe("mobile ergonomics source contracts", () => {
     const paperPage = source("app/paper/page.tsx");
     const paperWorkspace = source("components/paper-workspace.tsx");
     const web3Workspace = source("components/web3-trading-workspace-loader.tsx");
+    const tradingPage = source("app/trading/page.tsx");
 
     expect(paperPage).toContain("Try a market call with simulator dollars");
     expect(paperPage).toContain("compare the result after the close date");
@@ -671,6 +672,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("provider budget {marketIntake.provider_budget_status}");
     expect(web3Workspace).toContain("risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}");
     expect(web3Workspace).toContain("profit alpha {formatSignedCurrency(state.autonomous_profit_benchmark.cash_alpha_usd)}");
+    expect(tradingPage).toContain("UsabilityStatusPanel");
+    expect(tradingPage).toContain("Usability status");
+    expect(tradingPage).toContain("Next gate");
+    expect(tradingPage).toContain("buildWeb3UsabilityStatus");
+    expect(source("src/db/web3-usability-status.ts")).toContain("web3-usability-status");
+    expect(source("src/db/web3-usability-status.ts")).toContain("Copilot and paper autonomy can be usable while dry-run orders");
+    expect(source("app/api/web3-usability-status/route.ts")).toContain("buildWeb3UsabilityStatus");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved for later review.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved from the Paper form.");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved to review the mobile Paper flow.");

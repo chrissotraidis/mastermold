@@ -137,6 +137,7 @@ GET /api/web3-provider-health
 GET /api/web3-signer-credential-packet
 GET /api/web3-signer-handoff
 GET /api/web3-supervised-live-runway
+GET /api/web3-usability-status
 POST /api/web3-emergency-stop/drill
 POST /api/web3-jupiter-rehearsal
 POST /api/web3-wallet-ownership
@@ -159,6 +160,8 @@ The Jupiter rehearsal history route, `GET /api/web3-jupiter-rehearsal-history`, 
 The live ops packet route returns a redacted production-operations receipt. It consolidates sanitized production-supervisor readiness, emergency-stop target status, accounting/export status, settlement/mirror status, safe commands, process-manager review, production-worker process/owner/alert/restart target status, and manual live-review blockers. It reports webhook/contact/accounting/worker targets only as configured or missing booleans and cannot send external dispatches, start workers, install process managers, approve live execution, submit transactions, or mutate wallets.
 
 The Supervised live runway route returns a single redacted first-live-review checklist across the dedicated wallet packet, Jupiter order packet, signer credential packet, live ops packet, and accounting/export target. It uses the `supervised-external-wallet-first` launch model, names the next missing lane, emits safe verifier commands, and keeps signing limited to future external wallet prompts while transaction submission, live execution, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.
+
+The usability status route, `GET /api/web3-usability-status`, returns the concise "what works now" receipt shown at the top of `/trading`. It separates copilot, paper autonomy, live DEX reads, wallet net worth, Jupiter dry-run orders, supervised live review, and autonomous live trading into usable/watch/gated/locked lanes, then names the next safe credential or review gate. It never returns provider keys, private keys, seed phrases, raw transactions, unsigned transactions, signed payloads, live execution permission, transaction submission permission, or wallet mutation authority.
 
 The provider health route returns a redacted receipt from live read-only provider checks. It can derive Helius mainnet RPC from `HELIUS_API_KEY`, test Solana `getHealth`, `getLatestBlockhash`, and `getSlot`, test Helius DAS `getAssetsByOwner` only when a public wallet is scoped, and test Jupiter quote/order readiness. It returns endpoint host/path, status booleans, aggregate wallet counts, and a receipt hash only; API keys, private keys, raw holdings, unsigned transactions, signed transactions, signatures, and wallet authority are never returned. Live execution and wallet mutation remain blocked even when all provider checks pass.
 

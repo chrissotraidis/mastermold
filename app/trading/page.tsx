@@ -16,6 +16,7 @@ import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
+import { buildWeb3UsabilityStatus, type Web3UsabilityStatusReceipt } from "@/src/db/web3-usability-status";
 import { getWeb3TradingStateAsync, isTradingAccountMode, isTradingMarketSource } from "@/src/db/web3-trading";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,11 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     signer: buildWeb3SignerCredentialPacket(initialState),
     liveOps,
   });
+  const usabilityStatus = buildWeb3UsabilityStatus({
+    state: initialState,
+    launchChecklist,
+    supervisedRunway: supervisedLiveRunway,
+  });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -75,6 +81,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
         />
 
         <div className="w-full min-w-0 space-y-4">
+          <UsabilityStatusPanel status={usabilityStatus} />
           <SupervisedLiveRunwayPanel runway={supervisedLiveRunway} />
           <MarketMonitorHistoryPanel history={monitorHistory} />
 
@@ -88,6 +95,90 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
       </div>
     </AppShell>
   );
+}
+
+function UsabilityStatusPanel({ status }: { status: Web3UsabilityStatusReceipt }) {
+  const nextCapability = status.capabilities.find((capability) => capability.status === "gated") ??
+    status.capabilities.find((capability) => capability.status === "watch") ??
+    status.capabilities[0];
+
+  return (
+    <section
+      aria-labelledby="trading-usability-status-title"
+      className="rounded-md border border-engine/25 bg-engine/[0.04] p-4 sm:p-5"
+    >
+      <div className="grid gap-4 lg:grid-cols-[1fr_1.25fr]">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-engine/30 bg-engine/10 text-engine">
+              <ArrowRight aria-hidden="true" className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Usability status</p>
+              <h2 id="trading-usability-status-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
+                {status.current_mode.replaceAll("-", " ")}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-on-surface-variant">{status.summary}</p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <UsabilityStat label="Usable" value={`${status.usable_count}`} tone="engine" />
+            <UsabilityStat label="Gated" value={`${status.gated_count}`} tone={status.gated_count > 0 ? "caution" : "engine"} />
+            <UsabilityStat label="Locked" value={`${status.locked_count}`} tone="demo" />
+          </div>
+
+          <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.04] p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next gate</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">{status.next_gate_label}</p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{status.next_gate_action}</p>
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+          {status.capabilities.map((capability) => (
+            <div key={capability.id} className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-on-surface">{capability.label}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">{capability.detail}</p>
+                </div>
+                <span className={usabilityCapabilityClassName(capability.status)}>
+                  {capability.status}
+                </span>
+              </div>
+              {nextCapability?.id === capability.id ? (
+                <p className="mt-2 line-clamp-2 border-t border-outline/15 pt-2 text-[11px] leading-4 text-outline">
+                  {capability.next_action}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className="mt-3 text-xs leading-5 text-outline">
+        Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.
+      </p>
+    </section>
+  );
+}
+
+function UsabilityStat({ label, value, tone }: { label: string; value: string; tone: "engine" | "caution" | "demo" }) {
+  const valueClassName = tone === "engine" ? "text-engine" : tone === "caution" ? "text-caution" : "text-demo";
+  return (
+    <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold ${valueClassName}`}>{value}</p>
+    </div>
+  );
+}
+
+function usabilityCapabilityClassName(status: Web3UsabilityStatusReceipt["capabilities"][number]["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "usable") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  if (status === "gated") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-outline/20 bg-surface text-outline`;
 }
 
 function MarketMonitorHistoryPanel({ history }: { history: Web3MarketMonitorHistory }) {
