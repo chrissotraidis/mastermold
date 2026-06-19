@@ -137,6 +137,7 @@ function Web3CredentialsRunwayCard({
   const nextMissing = credentialQueue.find((item) => item.status === "missing" || item.status === "blocked") ??
     credentialQueue.find((item) => item.status === "review") ??
     credentialQueue[0];
+  const jupiterAcquisition = acquisition.items.find((item) => item.id === "jupiter");
 
   return (
     <section aria-labelledby="web3-credential-runway-title">
@@ -192,6 +193,56 @@ function Web3CredentialsRunwayCard({
               Secure credential handoff shows configured or missing status only; Helius and Jupiter secrets stay out of browser storage; private keys and seed phrases are never accepted; live execution and wallet mutation remain blocked.
             </p>
           </div>
+
+          {jupiterAcquisition && jupiterAcquisition.status !== "configured" ? (
+            <div className="rounded-md border border-caution/30 bg-caution/[0.04] p-3" aria-label="Jupiter Swap V2 setup action">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Jupiter Swap V2 setup</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{jupiterAcquisition.label}</p>
+                  <p className="mt-1 text-xs leading-5 text-on-surface-variant">{jupiterAcquisition.next_action}</p>
+                </div>
+                <CredentialStateBadge configured={false} status={jupiterAcquisition.status} />
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe install</p>
+                  <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">
+                    Paste the key into the Settings credential console and press Install local env, or add JUPITER_API_KEY to ignored local env manually.
+                  </p>
+                </div>
+                <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Proof command</p>
+                  <code className="mt-1 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+                    npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
+                  </code>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a
+                  href={jupiterAcquisition.setup_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-semibold text-engine hover:text-engine/80"
+                >
+                  Jupiter portal
+                  <ExternalLink aria-hidden="true" className="size-3" />
+                </a>
+                <a
+                  href={jupiterAcquisition.docs_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-xs font-semibold text-violet hover:text-violet/80"
+                >
+                  Swap V2 docs
+                  <ExternalLink aria-hidden="true" className="size-3" />
+                </a>
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-outline">
+                This is order-rehearsal evidence only. Mastermind still withholds transaction bytes, never stores the key in browser storage, and keeps signing, submission, live execution, and wallet mutation blocked.
+              </p>
+            </div>
+          ) : null}
 
           <SettingsCredentialDoctorPanel health={credentialDoctor} />
 

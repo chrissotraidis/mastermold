@@ -802,6 +802,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Next input:");
     expect(settingsPage).toContain("buildWeb3CredentialHandoffRows");
     expect(settingsPage).toContain("Helius read checks can be local server-env evidence");
+    expect(settingsPage).toContain("Jupiter Swap V2 setup");
+    expect(settingsPage).toContain("Jupiter Swap V2 order rail");
+    expect(settingsPage).toContain("Jupiter portal");
+    expect(settingsPage).toContain("Swap V2 docs");
+    expect(settingsPage).toContain("--require-jupiter-order");
     expect(settingsPage).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(settingsPage).toContain("SettingsCredentialDoctorPanel");
     expect(settingsPage).toContain("Credential doctor receipt");
@@ -856,6 +861,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 credential environment template");
     expect(settingsPage).toContain("Test: {item.test_action}");
     expect(settingsPage).toContain("acquisition.items.map");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("https://dev.jup.ag/docs/swap/v2/order-and-execute");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("Swap V2 /order and /execute");
     expect(settingsConsole).toContain("Credential action console");
     expect(settingsConsole).toContain("Session-only provider tests");
     expect(settingsConsole).toContain("Local credential installer");

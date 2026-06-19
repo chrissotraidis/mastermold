@@ -15903,9 +15903,9 @@ function buildWeb3TradingState({
         href: "https://www.fia.org/sites/default/files/2024-07/FIA_WP_AUTOMATED%20TRADING%20RISK%20CONTROLS_FINAL_0.pdf",
       },
       {
-        label: "Jupiter Swap API",
+        label: "Jupiter Swap V2 order/execute",
         use: "Quote, route-plan, price-impact, order, and execute path for route sampling and a future signed transaction executor.",
-        href: "https://dev.jup.ag/docs/swap",
+        href: "https://dev.jup.ag/docs/swap/v2/order-and-execute",
       },
       {
         label: "Jupiter Ultra execution",

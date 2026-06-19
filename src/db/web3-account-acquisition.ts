@@ -123,19 +123,19 @@ function buildAcquisitionItems(setup: Web3AccountSetupReceipt): Web3AccountAcqui
     },
     {
       id: "jupiter",
-      label: "Jupiter execution rehearsal",
+      label: "Jupiter Swap V2 order rail",
       status: env.jupiter_configured ? "configured" : "needed",
       priority: "required-now",
       setup_url: "https://developers.jup.ag/portal",
-      docs_url: "https://dev.jup.ag/docs/swap",
+      docs_url: "https://dev.jup.ag/docs/swap/v2/order-and-execute",
       env_targets: ["JUPITER_API_KEY"],
       account_owner: "operator",
       app_permission: "inspect-config-only",
       next_action: env.jupiter_configured
-        ? "Run provider health and dry-run order rehearsal; keep signing and submission blocked."
-        : "Create or open the Jupiter Developer Platform externally, generate an API key, and add JUPITER_API_KEY to ignored server env.",
+        ? "Run provider health, Rehearse Jupiter, and strict order verification; keep signing and submission blocked."
+        : "Create or open the Jupiter Developer Platform externally, generate an API key for Swap V2 /order and /execute, then add JUPITER_API_KEY to ignored server env.",
       security_rule: "Use the key only server-side or as a one-shot test input; never save it to browser storage.",
-      test_action: "Run Test provider health and confirm Jupiter order changes from gated to ready with wallet scope.",
+      test_action: "Run Rehearse Jupiter, then npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order after a dedicated public wallet is scoped.",
     },
     {
       id: "dedicated-wallet",

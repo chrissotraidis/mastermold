@@ -396,7 +396,7 @@ function configuredSignerProvider(): Web3SignerSetupMode {
 
 function accountSetupSummary(status: Web3AccountSetupReceiptStatus, configured: number, required: number) {
   if (status === "missing-read-rail") return `Account setup has ${configured}/${required} required rails configured; Helius or Solana RPC is still missing.`;
-  if (status === "missing-execution-rail") return `Account setup has ${configured}/${required} required rails configured; Jupiter execution rehearsal is still missing.`;
+  if (status === "missing-execution-rail") return `Account setup has ${configured}/${required} required rails configured; Jupiter Swap V2 order rail is still missing.`;
   if (status === "missing-wallet") return `Account setup has ${configured}/${required} required rails configured; a dedicated public trading wallet is still missing.`;
   if (status === "ops-gated") return "Core provider accounts are present, but emergency-stop operations are not configured for supervised live review.";
   if (status === "dry-run-ready") return "Core provider accounts are present for dry-run review; live trading still needs ops, settlement, accounting, and manual review.";

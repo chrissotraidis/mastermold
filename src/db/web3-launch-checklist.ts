@@ -821,7 +821,7 @@ function buildResearchDecisions({
       id: "execution-stack",
       label: "Execution stack",
       status: routePass && adapterOrderReady ? "chosen" : jupiterConfigured ? "needs-review" : "needs-credential",
-      decision: "Use Jupiter quote/order rehearsal as the first execution path, with no signing or submit until manual live review.",
+      decision: "Use Jupiter Swap V2 quote/order rehearsal as the first execution path, with no signing or submit until manual live review.",
       evidence: `Route proof ${routePass ? "passes" : "is gated"}; Swap V2 order ${adapterOrderReady ? "ready" : "not ready"}.`,
       next_action: routePass && adapterOrderReady
         ? "Continue read-only order rehearsal and landing drills before any live executor review."

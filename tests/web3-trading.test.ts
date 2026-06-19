@@ -733,7 +733,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");
     expect(receipt.required_account_count).toBe(3);
-    expect(receipt.missing_required).toContain("Jupiter execution rehearsal");
+    expect(receipt.missing_required).toContain("Jupiter Swap V2 order rail");
     expect(receipt.next_external_action).toContain("Jupiter Developer Platform");
     expect(receipt.env_template).toContain("JUPITER_API_KEY=<set in ignored local env>");
     expect(receipt.items.find((item) => item.id === "helius")).toMatchObject({
@@ -743,8 +743,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.items.find((item) => item.id === "jupiter")).toMatchObject({
       status: "needed",
       setup_url: "https://developers.jup.ag/portal",
-      docs_url: "https://dev.jup.ag/docs/swap",
+      docs_url: "https://dev.jup.ag/docs/swap/v2/order-and-execute",
       env_targets: ["JUPITER_API_KEY"],
+      test_action: expect.stringContaining("--require-jupiter-order"),
     });
     expect(receipt.items.find((item) => item.id === "dedicated-wallet")?.security_rule).toContain("Never paste the private key");
     expect(receipt.controls.some((control) => control.includes("cannot create accounts"))).toBe(true);
