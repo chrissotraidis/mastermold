@@ -159,6 +159,7 @@ async function main() {
   assert(html.includes("Profit proof"), "Trading page should expose whether the autonomous paper loop is making money before the long workbench.");
   assert(html.includes("Autonomous profit accountability chart"), "Trading page should chart paper PnL, win rate, fills, loop feedback, and outcome memory before the long workbench.");
   assert(html.includes("Profit accountability loop receipt"), "Trading page should expose a review receipt for paper profit accountability, loop feedback, outcome memory, and live-gate status.");
+  assert(html.includes("Accountability repair plan"), "Trading page should expose the local paper accountability repair plan in the compact cockpit.");
   assert(html.includes("Profit integrity circuit"), "Trading page should expose the closed-loop profit integrity permission before the long workbench.");
   assert(html.includes("Execution quality"), "Trading page should expose execution quality before the long workbench.");
   assert(html.includes("Autonomous execution quality gate chart"), "Trading page should chart execution, route cost, landing path, MEV/slippage, and token safety before the long workbench.");
@@ -2186,6 +2187,17 @@ async function main() {
   assert(profitAccountability.next_size_multiplier >= 0 && profitAccountability.next_size_multiplier <= 1.5, "Autonomous profit accountability next multiplier should be bounded.", profitAccountability);
   assert(profitAccountability.max_next_fills >= 0 && profitAccountability.max_next_fills <= 6, "Autonomous profit accountability next fills should be bounded.", profitAccountability);
   assert(profitAccountability.fill_count >= 0 && profitAccountability.blocked_count >= 0, "Autonomous profit accountability should publish non-negative fill/block counts.", profitAccountability);
+  assert(profitAccountability.repair_plan?.mode === "local-paper-accountability-repair-plan", "Autonomous profit accountability should expose a local paper repair plan.", profitAccountability);
+  assert(["complete", "refresh-first", "run-paper-session", "protect-first", "blocked"].includes(profitAccountability.repair_plan.status), "Autonomous profit accountability repair should expose a known status.", profitAccountability.repair_plan);
+  assert(profitAccountability.repair_plan.target_score === 70 && profitAccountability.repair_plan.score_gap === Math.max(0, 70 - profitAccountability.accountability_score), "Autonomous profit accountability repair should quantify the score gap.", profitAccountability.repair_plan);
+  assert(["wallet", "scorecard", "fills", "burst", "directive", "session"].includes(profitAccountability.repair_plan.weakest_item_id), "Autonomous profit accountability repair should name the weakest evidence row.", profitAccountability.repair_plan);
+  assert(profitAccountability.repair_plan.recommended_ticks >= 0 && profitAccountability.repair_plan.recommended_ticks <= 3, "Autonomous profit accountability repair should bound recommended ticks.", profitAccountability.repair_plan);
+  assert(profitAccountability.repair_plan.recommended_max_total_fills >= 0 && profitAccountability.repair_plan.recommended_max_total_fills <= 3, "Autonomous profit accountability repair should bound recommended fills.", profitAccountability.repair_plan);
+  assert(profitAccountability.repair_plan.live_execution_permission === "blocked" && profitAccountability.repair_plan.wallet_mutation_permission === "blocked", "Autonomous profit accountability repair should keep live wallet permissions blocked.", profitAccountability.repair_plan);
+  if (profitAccountability.repair_plan.request) {
+    assert(profitAccountability.repair_plan.request.endpoint === "/api/web3-trading" && profitAccountability.repair_plan.request.method === "POST", "Autonomous profit accountability repair should point to the guarded paper API.", profitAccountability.repair_plan.request);
+    assert(profitAccountability.repair_plan.request.body.account === "persistent" && profitAccountability.repair_plan.request.body.source === "sample", "Autonomous profit accountability repair should remain local persistent paper by default.", profitAccountability.repair_plan.request);
+  }
   assert(profitAccountability.items.length === 6, "Autonomous profit accountability should expose six evidence rows.", profitAccountability);
   assert(
     ["wallet", "scorecard", "fills", "burst", "directive", "session"].every((id) =>

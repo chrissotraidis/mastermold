@@ -6790,6 +6790,39 @@ export type AutonomousProfitAccountabilityItem = {
   detail: string;
 };
 
+export type AutonomousProfitAccountabilityRepairPlan = {
+  mode: "local-paper-accountability-repair-plan";
+  status: "complete" | "refresh-first" | "run-paper-session" | "protect-first" | "blocked";
+  target_score: number;
+  score_gap: number;
+  weakest_item_id: AutonomousProfitAccountabilityItem["id"];
+  weakest_item_label: string;
+  weakest_item_score: number;
+  recommended_ticks: number;
+  recommended_max_total_fills: number;
+  recommended_max_protective_sells: number;
+  recommended_size_multiplier: number;
+  route_refresh_required: boolean;
+  can_run_local_paper: boolean;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  request: {
+    endpoint: "/api/web3-trading";
+    method: "POST";
+    body: {
+      scenario: TradingScenario;
+      source: TradingMarketSource;
+      account: "persistent";
+      advance: boolean;
+      route_refresh?: RouteRefreshRequest;
+      autonomous_session?: AutonomousSessionRunRequest;
+    };
+  } | null;
+  summary: string;
+  next_action: string;
+  controls: string[];
+};
+
 export type AutonomousProfitAccountability = {
   mode: "autonomous-profit-accountability";
   status: "press" | "compound" | "tighten" | "protect" | "blocked" | "learning";
@@ -6813,6 +6846,7 @@ export type AutonomousProfitAccountability = {
   next_action: string;
   controls: string[];
   items: AutonomousProfitAccountabilityItem[];
+  repair_plan: AutonomousProfitAccountabilityRepairPlan;
 };
 
 export type AutonomousMinuteProfitDisciplineItem = {
@@ -52564,6 +52598,19 @@ function buildAutonomousProfitAccountability({
         : "No bounded paper session has run in this local request.",
     },
   ];
+  const repairPlan = buildAutonomousProfitAccountabilityRepairPlan({
+    status,
+    action,
+    makingMoney,
+    accountabilityScore,
+    nextSizeMultiplier,
+    maxNextFills,
+    profitRunGuard,
+    dailyProfitLock,
+    burstOutcomeFeedback,
+    directive,
+    items,
+  });
 
   return {
     mode: "autonomous-profit-accountability",
@@ -52593,6 +52640,137 @@ function buildAutonomousProfitAccountability({
       "Local paper-accountability only; it cannot prove future profit, sign transactions, submit swaps, custody funds, or guarantee that frequent trading will make money.",
     ],
     items,
+    repair_plan: repairPlan,
+  };
+}
+
+function buildAutonomousProfitAccountabilityRepairPlan({
+  status,
+  action,
+  makingMoney,
+  accountabilityScore,
+  nextSizeMultiplier,
+  maxNextFills,
+  profitRunGuard,
+  dailyProfitLock,
+  burstOutcomeFeedback,
+  directive,
+  items,
+}: {
+  status: AutonomousProfitAccountability["status"];
+  action: AutonomousProfitAccountability["action"];
+  makingMoney: boolean;
+  accountabilityScore: number;
+  nextSizeMultiplier: number;
+  maxNextFills: number;
+  profitRunGuard: AutonomousProfitRunGuard;
+  dailyProfitLock: AutonomousDailyProfitLock;
+  burstOutcomeFeedback: AutonomousBurstOutcomeFeedback;
+  directive: AutonomousTradingDirective;
+  items: AutonomousProfitAccountabilityItem[];
+}): AutonomousProfitAccountabilityRepairPlan {
+  const targetScore = 70;
+  const weakest = [...items].sort((a, b) => a.score - b.score)[0] ?? {
+    id: "wallet" as const,
+    label: "Wallet PnL",
+    score: 0,
+  };
+  const scoreGap = Math.max(0, targetScore - accountabilityScore);
+  const routeRefreshRequired = directive.read_only_refresh_required ||
+    action === "refresh-proof" ||
+    /route|quote|preflight/i.test([
+      profitRunGuard.stop_reason,
+      profitRunGuard.next_action,
+      burstOutcomeFeedback.next_action,
+      directive.next_action,
+    ].filter(Boolean).join(" "));
+  const complete = makingMoney && accountabilityScore >= targetScore;
+  const hardBlocked = status === "blocked" ||
+    profitRunGuard.status === "blocked" ||
+    dailyProfitLock.loop_permission === "stand-down" ||
+    dailyProfitLock.loop_permission === "paused";
+  const protectFirst = status === "protect" ||
+    action === "protect-wallet" ||
+    dailyProfitLock.loop_permission === "protect-only" ||
+    dailyProfitLock.loop_permission === "harvest-only" ||
+    burstOutcomeFeedback.blocks_fresh_buy;
+  const recommendedTicks = complete
+    ? 0
+    : protectFirst
+      ? 1
+      : Math.max(1, Math.min(3, Math.ceil(scoreGap / 12)));
+  const recommendedMaxTotalFills = complete
+    ? 0
+    : protectFirst
+      ? 1
+      : Math.max(1, Math.min(3, maxNextFills || profitRunGuard.max_next_fills || 1));
+  const recommendedProtectiveSells = complete
+    ? 0
+    : Math.max(1, Math.min(2, dailyProfitLock.max_next_fills || recommendedMaxTotalFills || 1));
+  const canRunLocalPaper = !complete && !hardBlocked && !routeRefreshRequired && recommendedMaxTotalFills > 0;
+  const planStatus: AutonomousProfitAccountabilityRepairPlan["status"] = complete
+    ? "complete"
+    : routeRefreshRequired
+      ? "refresh-first"
+      : hardBlocked
+        ? "blocked"
+        : protectFirst
+          ? "protect-first"
+          : "run-paper-session";
+  const request = complete || planStatus === "blocked"
+    ? null
+    : {
+        endpoint: "/api/web3-trading" as const,
+        method: "POST" as const,
+        body: planStatus === "refresh-first"
+          ? {
+              scenario: "breakout" as const,
+              source: "sample" as const,
+              account: "persistent" as const,
+              advance: false,
+              route_refresh: { action: "request-quote" as const },
+            }
+          : {
+              scenario: "breakout" as const,
+              source: "sample" as const,
+              account: "persistent" as const,
+              advance: true,
+              autonomous_session: {
+                action: "run" as const,
+                policy_mode: "auto" as const,
+                ticks: recommendedTicks,
+                protect_book: protectFirst,
+                max_protective_sells: recommendedProtectiveSells,
+                min_release_usd: 10,
+                max_total_fills: recommendedMaxTotalFills,
+              },
+            },
+      };
+
+  return {
+    mode: "local-paper-accountability-repair-plan",
+    status: planStatus,
+    target_score: targetScore,
+    score_gap: scoreGap,
+    weakest_item_id: weakest.id,
+    weakest_item_label: weakest.label,
+    weakest_item_score: weakest.score,
+    recommended_ticks: recommendedTicks,
+    recommended_max_total_fills: recommendedMaxTotalFills,
+    recommended_max_protective_sells: recommendedProtectiveSells,
+    recommended_size_multiplier: roundMetric(Math.max(0, Math.min(1, nextSizeMultiplier || (protectFirst ? 0.2 : 0.35)))),
+    route_refresh_required: routeRefreshRequired,
+    can_run_local_paper: canRunLocalPaper,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    request,
+    summary: autonomousProfitAccountabilityRepairSummary(planStatus, accountabilityScore, targetScore, weakest.label, weakest.score),
+    next_action: autonomousProfitAccountabilityRepairNextAction(planStatus, recommendedTicks, recommendedMaxTotalFills, weakest.label),
+    controls: [
+      "Repairs the local paper-accountability score by targeting the weakest evidence row before any higher-frequency paper loop can scale.",
+      "Uses read-only route refresh first when route or preflight proof is stale, then bounded paper sessions with explicit tick and fill caps.",
+      "This is local paper repair only; live execution and wallet mutation remain blocked until the separate launch checklist gates pass.",
+    ],
   };
 }
 
@@ -54962,6 +55140,33 @@ function autonomousProfitAccountabilityNextAction(
   if (status === "protect") return dailyProfitLock.next_action || "Protect wallet equity, prefer sells or harvests, and pause fresh buys until accountability repairs.";
   if (status === "blocked") return profitRunGuard.stop_reason ?? burstOutcomeFeedback.next_action ?? directive.next_action;
   return action === "refresh-proof" ? "Refresh route, candle, and wallet proof before allowing autonomous spend." : "Observe until the paper wallet has enough evidence.";
+}
+
+function autonomousProfitAccountabilityRepairSummary(
+  status: AutonomousProfitAccountabilityRepairPlan["status"],
+  score: number,
+  targetScore: number,
+  weakestLabel: string,
+  weakestScore: number,
+) {
+  if (status === "complete") return `Local paper accountability clears review at ${score}/100 against the ${targetScore}/100 target.`;
+  if (status === "refresh-first") return `Local paper accountability is ${score}/100; refresh route proof before repairing ${weakestLabel.toLowerCase()} at ${weakestScore}/100.`;
+  if (status === "protect-first") return `Local paper accountability is ${score}/100; repair ${weakestLabel.toLowerCase()} with a protect-first paper session before any fresh buy.`;
+  if (status === "blocked") return `Local paper accountability is ${score}/100, but the repair loop is blocked until the run guard or daily lock clears.`;
+  return `Local paper accountability is ${score}/100; run a bounded paper session to repair ${weakestLabel.toLowerCase()} at ${weakestScore}/100.`;
+}
+
+function autonomousProfitAccountabilityRepairNextAction(
+  status: AutonomousProfitAccountabilityRepairPlan["status"],
+  ticks: number,
+  fills: number,
+  weakestLabel: string,
+) {
+  if (status === "complete") return "Keep collecting paper accountability evidence while live-wallet gates remain blocked.";
+  if (status === "refresh-first") return "Request read-only route proof, then rerun the accountability repair plan before spending more paper capital.";
+  if (status === "protect-first") return `Run ${ticks} protect-first paper tick with at most ${fills} fill, then rescore ${weakestLabel.toLowerCase()}.`;
+  if (status === "blocked") return "Stand down from local repair until the profit run guard and daily lock permit paper movement again.";
+  return `Run ${ticks} bounded paper tick${ticks === 1 ? "" : "s"} with at most ${fills} fill${fills === 1 ? "" : "s"}, then rescore ${weakestLabel.toLowerCase()}.`;
 }
 
 function autonomousBurstFillPlanChildren({
