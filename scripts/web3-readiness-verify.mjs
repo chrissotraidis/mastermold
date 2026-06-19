@@ -8,11 +8,14 @@ const CANARY_SECRET = "codex-private-key-canary-never-echo";
 const config = parseArgs(process.argv.slice(2));
 const baseUrl = (config.baseUrl || process.env.WEB3_VERIFY_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
 const walletPublicKey = config.wallet || process.env.WEB3_VERIFY_WALLET_PUBLIC_KEY || DEFAULT_WALLET;
+const requireJupiterOrder = config.requireJupiterOrder || process.env.WEB3_VERIFY_REQUIRE_JUPITER_ORDER === "1";
+const strictJupiterKey = process.env.WEB3_VERIFY_JUPITER_API_KEY || process.env.JUPITER_API_KEY || "";
 const secretValues = [
   { label: "jupiter canary", value: CANARY_JUPITER_KEY },
   { label: "private-field canary", value: CANARY_SECRET },
   { label: "helius env", value: process.env.HELIUS_API_KEY },
   { label: "jupiter env", value: process.env.JUPITER_API_KEY },
+  { label: "verify jupiter env", value: process.env.WEB3_VERIFY_JUPITER_API_KEY },
 ].filter((item) => typeof item.value === "string" && item.value.length > 0);
 
 const results = [];
@@ -22,6 +25,7 @@ function parseArgs(args) {
   for (const arg of args) {
     if (arg.startsWith("--base-url=")) parsed.baseUrl = arg.slice("--base-url=".length);
     if (arg.startsWith("--wallet=")) parsed.wallet = arg.slice("--wallet=".length);
+    if (arg === "--require-jupiter-order") parsed.requireJupiterOrder = true;
     if (arg === "--json") parsed.json = true;
   }
   return parsed;
@@ -242,6 +246,38 @@ async function verifyJupiterPrivateFieldRejection() {
   record("jupiter-private-field-rejection", "pass", "seed/private fields are rejected");
 }
 
+async function verifyStrictJupiterOrderReadiness() {
+  if (!requireJupiterOrder) {
+    record("jupiter-order-strict", "skipped", "run with --require-jupiter-order after adding a Jupiter key");
+    return;
+  }
+
+  assert(
+    strictJupiterKey.length > 0,
+    "Strict Jupiter order verification requires JUPITER_API_KEY or WEB3_VERIFY_JUPITER_API_KEY in local environment.",
+  );
+
+  const { response, json } = await postJson("/api/web3-jupiter-rehearsal?source=sample&account=persistent", {
+    jupiter_api_key: strictJupiterKey,
+    wallet_public_key: walletPublicKey,
+    max_slippage_bps: 150,
+  });
+  assert(response.status === 200, "Strict Jupiter order rehearsal should return a redacted receipt.", { status: response.status, json });
+  assert(json.mode === "web3-jupiter-rehearsal-receipt", "Strict Jupiter order rehearsal should expose the expected receipt mode.", json);
+  assert(json.status === "order-ready", "Strict Jupiter order rehearsal should prove order-ready status.", json);
+  assert(json.summary?.jupiter_key_configured === true, "Strict Jupiter order rehearsal should see a Jupiter key.", json.summary);
+  assert(json.summary?.wallet_valid === true, "Strict Jupiter order rehearsal should use a valid public wallet.", json.summary);
+  assert(json.summary?.jupiter_quote_ready === true, "Strict Jupiter order rehearsal should prove quote readiness.", json.summary);
+  assert(json.summary?.jupiter_order_ready === true, "Strict Jupiter order rehearsal should prove unsigned order readiness.", json.summary);
+  assert(typeof json.summary?.order_request_hash === "string" && json.summary.order_request_hash.length > 0, "Strict Jupiter order rehearsal should return a hashed order request id.", json.summary);
+  assert(json.unsigned_transaction_return === "withheld", "Strict Jupiter order rehearsal should still withhold unsigned transaction bytes.", json);
+  assert(json.transaction_body_storage === "blocked", "Strict Jupiter order rehearsal should still block transaction body storage.", json);
+  assert(json.execute_permission === "blocked", "Strict Jupiter order rehearsal should still block execute permission.", json);
+  assert(json.live_execution_permission === "blocked", "Strict Jupiter order rehearsal should still block live execution.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Strict Jupiter order rehearsal should still block wallet mutation.", json);
+  record("jupiter-order-strict", "pass", "Jupiter quote and unsigned order readiness proved with transaction bytes withheld");
+}
+
 async function main() {
   await verifyHealth();
   await verifyRejectedExecutionInputs();
@@ -251,11 +287,13 @@ async function main() {
   await verifyProviderHealthReceipt();
   await verifyJupiterRehearsalBoundary();
   await verifyJupiterPrivateFieldRejection();
+  await verifyStrictJupiterOrderReadiness();
 
   const report = {
     mode: "web3-readiness-verify",
     base_url: baseUrl,
     wallet_scope: walletPublicKey === DEFAULT_WALLET ? "sample-system-wallet" : "operator-public-wallet",
+    strict_jupiter_order_required: requireJupiterOrder,
     checked_at: new Date().toISOString(),
     result: "pass",
     checks: results,

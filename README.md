@@ -94,6 +94,7 @@ npm run preflight-live:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs
 npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
 npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
 npm run verify:web3 -- --base-url=http://localhost:4010
+npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
 ```
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
@@ -131,7 +132,9 @@ it never grants live execution or wallet mutation permission. `verify:web3` is a
 operator check for machines without Bun: against a running app, it proves health receipts,
 execution input validation, public-wallet dry-run scope save, credential validate-only
 redaction, one-shot Jupiter rehearsal redaction, private-field rejection, and the live
-execution/wallet mutation locks.
+execution/wallet mutation locks. Add `--require-jupiter-order` after a `JUPITER_API_KEY`
+or `WEB3_VERIFY_JUPITER_API_KEY` is available to fail closed until quote and unsigned-order
+readiness are both proven without returning transaction bytes.
 
 ## Architecture: the engine and the app
 
