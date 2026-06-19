@@ -16,6 +16,7 @@ import {
   type PortfolioMirrorApplyRequest,
   type PortfolioSweepRequest,
   type RouteRefreshRequest,
+  type SettlementFillReconciliationRequest,
   type SignatureConfirmationPollRequest,
   type SignedTransactionRelayRequest,
   type TriggerOrderHistoryFilter,
@@ -39,6 +40,7 @@ type TradingRequest = {
   execution?: ExecutionUpdate;
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
+  fill_reconcile?: SettlementFillReconciliationRequest;
   trigger_order?: TriggerOrderRequest;
   trigger_history?: TriggerOrderHistoryFilter;
   trigger_reconcile?: TriggerReconciliationPatchRequest;
@@ -110,6 +112,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
   const execution = record.execution === undefined ? undefined : parseExecutionUpdate(record.execution);
   const relay = record.relay === undefined ? undefined : parseSignedRelayRequest(record.relay);
   const confirmationPoll = record.confirmation_poll === undefined ? undefined : parseSignatureConfirmationPollRequest(record.confirmation_poll);
+  const fillReconcile = record.fill_reconcile === undefined ? undefined : parseSettlementFillReconciliationRequest(record.fill_reconcile);
   const triggerOrder = record.trigger_order === undefined ? undefined : parseTriggerOrderRequest(record.trigger_order);
   const triggerHistory = record.trigger_history === undefined ? undefined : parseTriggerHistoryFilter(record.trigger_history);
   const triggerReconcile = record.trigger_reconcile === undefined ? undefined : parseTriggerReconcileRequest(record.trigger_reconcile);
@@ -161,6 +164,10 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
 
   if (confirmationPoll && !confirmationPoll.ok) {
     return { ok: false, error: confirmationPoll.error };
+  }
+
+  if (fillReconcile && !fillReconcile.ok) {
+    return { ok: false, error: fillReconcile.error };
   }
 
   if (triggerOrder && !triggerOrder.ok) {
@@ -225,6 +232,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       execution: execution?.value,
       relay: relay?.value,
       confirmation_poll: confirmationPoll?.value,
+      fill_reconcile: fillReconcile?.value,
       trigger_order: triggerOrder?.value,
       trigger_history: triggerHistory?.value,
       trigger_reconcile: triggerReconcile?.value,
@@ -785,6 +793,44 @@ function parseSignatureConfirmationPollRequest(value: unknown):
       action: "poll",
       signature: typeof record.signature === "string" ? record.signature.trim() : undefined,
       search_transaction_history: typeof record.search_transaction_history === "boolean" ? record.search_transaction_history : undefined,
+    },
+  };
+}
+
+function parseSettlementFillReconciliationRequest(value: unknown):
+  | { ok: true; value: SettlementFillReconciliationRequest }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "fill_reconcile must be an object." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.action !== "reconcile") {
+    return { ok: false, error: "fill_reconcile.action must be reconcile." };
+  }
+  if (record.signature !== undefined) {
+    if (typeof record.signature !== "string" || record.signature.trim().length === 0) {
+      return { ok: false, error: "fill_reconcile.signature must be a non-empty string when provided." };
+    }
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,120}$/.test(record.signature.trim())) {
+      return { ok: false, error: "fill_reconcile.signature must look like a base58 Solana transaction signature." };
+    }
+  }
+  if (record.commitment !== undefined && record.commitment !== "confirmed" && record.commitment !== "finalized") {
+    return { ok: false, error: "fill_reconcile.commitment must be confirmed or finalized." };
+  }
+  const maxFillUsd = record.max_fill_usd === undefined ? undefined : Number(record.max_fill_usd);
+  if (maxFillUsd !== undefined && (!Number.isFinite(maxFillUsd) || maxFillUsd < 10 || maxFillUsd > 10_000)) {
+    return { ok: false, error: "fill_reconcile.max_fill_usd must be from 10 to 10000." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      action: "reconcile",
+      signature: typeof record.signature === "string" ? record.signature.trim() : undefined,
+      commitment: record.commitment === "confirmed" || record.commitment === "finalized" ? record.commitment : undefined,
+      max_fill_usd: maxFillUsd,
     },
   };
 }

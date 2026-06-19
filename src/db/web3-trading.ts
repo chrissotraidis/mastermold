@@ -8364,6 +8364,39 @@ export type SignatureConfirmationPollReport = {
   controls: string[];
 };
 
+export type SettlementFillReconciliationRequest = {
+  action: "reconcile";
+  signature?: string;
+  commitment?: "confirmed" | "finalized";
+  max_fill_usd?: number;
+};
+
+export type SettlementFillReconciliationReport = {
+  mode: "settlement-fill-reconciliation";
+  requested: boolean;
+  status: "blocked" | "pending" | "reconciled" | "ambiguous" | "failed";
+  signature: string | null;
+  slot: string | null;
+  block_time: string | null;
+  commitment: "confirmed" | "finalized";
+  input_mint: string | null;
+  output_mint: string | null;
+  input_amount: number;
+  output_amount: number;
+  input_usd: number | null;
+  output_usd: number | null;
+  estimated_fill_price_usd: number | null;
+  token_delta_count: number;
+  max_fill_usd: number;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  portfolio_mirror_permission: "blocked";
+  blockers: string[];
+  summary: string;
+  next_action: string;
+  controls: string[];
+};
+
 export type ExecutionAuditEntry = {
   id: string;
   created_at: string;
@@ -9072,6 +9105,7 @@ export type Web3TradingState = {
   autonomous_order_handoff: AutonomousOrderHandoff;
   portfolio_mirror_apply?: PortfolioMirrorApplyReport;
   signature_confirmation_poll?: SignatureConfirmationPollReport;
+  settlement_fill_reconciliation?: SettlementFillReconciliationReport;
   pre_submit_rehearsal: PreSubmitRehearsal;
   autonomous_execution_adapter_readiness: AutonomousExecutionAdapterReadiness;
   autonomous_custody_mandate: AutonomousCustodyMandate;
@@ -9229,6 +9263,7 @@ export type TradingStateInput = {
   execution?: ExecutionUpdate;
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
+  fill_reconcile?: SettlementFillReconciliationRequest;
   trigger_order?: TriggerOrderRequest;
   trigger_history?: TriggerOrderHistoryFilter;
   trigger_reconcile?: TriggerReconciliationPatchRequest;
@@ -12843,7 +12878,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: configuredState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
@@ -12875,7 +12910,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: fallbackState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const liveState = buildWeb3TradingState({
@@ -12913,7 +12948,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
     monitorDecision: liveState.autonomous_monitor,
   });
-  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
+  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
 }
 
 async function maybeApplyRouteRefreshRequest({
@@ -17715,6 +17750,7 @@ async function finalizeExecutionAudit(
   drill: boolean,
   relay: SignedTransactionRelayRequest | undefined,
   confirmationPoll: SignatureConfirmationPollRequest | undefined,
+  fillReconcile: SettlementFillReconciliationRequest | undefined,
   triggerOrder: TriggerOrderRequest | undefined,
   triggerHistory: TriggerOrderHistoryFilter | undefined,
   triggerReconcile: TriggerReconciliationPatchRequest | undefined,
@@ -17735,9 +17771,12 @@ async function finalizeExecutionAudit(
   const confirmationState = confirmationPoll
     ? await applySignatureConfirmationPoll(auditState, confirmationPoll, fetchImpl)
     : auditState;
-  const triggerState = triggerOrder
-    ? attachTriggerOrderExecution(confirmationState, await runTriggerOrderRequest(confirmationState, triggerOrder, fetchImpl))
+  const fillState = fillReconcile
+    ? await applySettlementFillReconciliation(confirmationState, fillReconcile, fetchImpl)
     : confirmationState;
+  const triggerState = triggerOrder
+    ? attachTriggerOrderExecution(fillState, await runTriggerOrderRequest(fillState, triggerOrder, fetchImpl))
+    : fillState;
   const historyState = triggerHistory
     ? attachTriggerOrderHistory(triggerState, await syncTriggerOrderHistory(triggerState, triggerHistory, fetchImpl))
     : triggerState;
@@ -20036,6 +20075,264 @@ function signatureConfirmationNextAction(status: SignatureConfirmationPollReport
   if (status === "pending") return "Poll again until confirmed, finalized, failed, or expired.";
   if (status === "failed") return blockers[0] ?? "Investigate the failed signature before another live action.";
   return blockers[0] ?? "Store a relayed signature and configure SOLANA_RPC_URL before polling.";
+}
+
+async function applySettlementFillReconciliation(
+  state: Web3TradingState,
+  request: SettlementFillReconciliationRequest,
+  fetchImpl: FetchLike,
+): Promise<Web3TradingState> {
+  const latest = state.execution_audit.latest;
+  const storedSignature = state.signed_transaction_relay.latest_signature || latest?.relay_signature || null;
+  const signature = request.signature ?? storedSignature;
+  const commitment = request.commitment ?? "confirmed";
+  const maxFillUsd = Math.max(10, Math.min(10_000, request.max_fill_usd ?? 1_000));
+  const blockers = [
+    request.action !== "reconcile" ? "fill_reconcile.action must be reconcile." : null,
+    !storedSignature ? "Fill reconciliation requires a stored relayed signature." : null,
+    request.signature && storedSignature && request.signature !== storedSignature ? "Requested signature does not match the latest audited relay signature." : null,
+    !signature ? "Fill reconciliation requires a transaction signature." : null,
+    state.signed_transaction_relay.status !== "confirmed" && latest?.status !== "confirmed" ? "Fill reconciliation requires confirmed signature evidence first." : null,
+    !isConfirmationStatus(state.signed_transaction_relay.confirmation_status ?? latest?.confirmation_status) ? "Fill reconciliation requires confirmed or finalized confirmation metadata." : null,
+    !solanaRpcUrl() ? "SOLANA_RPC_URL is required for getTransaction fill reconciliation." : null,
+  ].filter((item): item is string => Boolean(item));
+
+  if (blockers.length > 0) {
+    return {
+      ...state,
+      settlement_fill_reconciliation: settlementFillReconciliationReport({
+        status: "blocked",
+        signature,
+        commitment,
+        maxFillUsd,
+        blockers,
+      }),
+    };
+  }
+
+  const result = await fetchSettlementFillDetails(fetchImpl, signature!, commitment, maxFillUsd);
+  return {
+    ...state,
+    settlement_fill_reconciliation: result,
+  };
+}
+
+async function fetchSettlementFillDetails(
+  fetchImpl: FetchLike,
+  signature: string,
+  commitment: "confirmed" | "finalized",
+  maxFillUsd: number,
+): Promise<SettlementFillReconciliationReport> {
+  try {
+    const response = await solanaRpc(fetchImpl, solanaRpcUrl()!, "getTransaction", [
+      signature,
+      {
+        encoding: "jsonParsed",
+        commitment,
+        maxSupportedTransactionVersion: 0,
+      },
+    ]);
+    const transaction = response.result && typeof response.result === "object" ? response.result as Record<string, any> : null;
+    if (!transaction) {
+      return settlementFillReconciliationReport({
+        status: "pending",
+        signature,
+        commitment,
+        maxFillUsd,
+        blockers: ["getTransaction did not return transaction details yet."],
+      });
+    }
+    const meta = transaction.meta && typeof transaction.meta === "object" ? transaction.meta as Record<string, any> : null;
+    if (!meta) {
+      return settlementFillReconciliationReport({
+        status: "ambiguous",
+        signature,
+        commitment,
+        maxFillUsd,
+        slot: stringOrNumber(transaction.slot),
+        blockTime: blockTimeIso(transaction.blockTime),
+        blockers: ["getTransaction did not include transaction metadata."],
+      });
+    }
+    if (meta.err) {
+      return settlementFillReconciliationReport({
+        status: "failed",
+        signature,
+        commitment,
+        maxFillUsd,
+        slot: stringOrNumber(transaction.slot),
+        blockTime: blockTimeIso(transaction.blockTime),
+        blockers: ["Landed transaction metadata contains an execution error."],
+      });
+    }
+    const deltas = tokenBalanceDeltas(meta);
+    const nonZero = deltas.filter((delta) => Math.abs(delta.delta) > 0);
+    const sorted = [...nonZero].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+    const input = sorted.find((delta) => delta.delta < 0) ?? null;
+    const output = sorted.find((delta) => delta.delta > 0) ?? null;
+    const usdcDelta = nonZero.find((delta) => delta.mint === USDC_MINT) ?? null;
+    const tokenDelta = nonZero.find((delta) => delta.mint !== USDC_MINT) ?? null;
+    const inputUsd = input?.mint === USDC_MINT ? Math.abs(input.delta) : null;
+    const outputUsd = output?.mint === USDC_MINT ? output.delta : null;
+    const fillUsd = inputUsd ?? outputUsd;
+    const tokenAmount = tokenDelta ? Math.abs(tokenDelta.delta) : null;
+    const blockers = [
+      nonZero.length < 2 ? "getTransaction token balances did not contain enough non-zero deltas to infer a swap fill." : null,
+      !input || !output ? "Could not infer both input and output token balance deltas." : null,
+      !usdcDelta ? "No USDC balance delta was found, so USD fill notional is not proven." : null,
+      !tokenDelta ? "No non-USDC token delta was found for the memecoin leg." : null,
+      fillUsd !== null && fillUsd > maxFillUsd ? `Inferred fill ${formatCompactValue(fillUsd)} exceeds the ${formatCompactValue(maxFillUsd)} reconciliation cap.` : null,
+      nonZero.length > 4 ? "More than four token balance deltas were found; fill is too complex for automatic mirror sizing." : null,
+    ].filter((item): item is string => Boolean(item));
+    return settlementFillReconciliationReport({
+      status: blockers.length > 0 ? "ambiguous" : "reconciled",
+      signature,
+      commitment,
+      maxFillUsd,
+      slot: stringOrNumber(transaction.slot),
+      blockTime: blockTimeIso(transaction.blockTime),
+      inputMint: input?.mint ?? null,
+      outputMint: output?.mint ?? null,
+      inputAmount: input ? Math.abs(input.delta) : 0,
+      outputAmount: output ? output.delta : 0,
+      inputUsd,
+      outputUsd,
+      estimatedFillPriceUsd: fillUsd !== null && tokenAmount && tokenAmount > 0 ? fillUsd / tokenAmount : null,
+      tokenDeltaCount: nonZero.length,
+      blockers,
+    });
+  } catch (error) {
+    return settlementFillReconciliationReport({
+      status: "failed",
+      signature,
+      commitment,
+      maxFillUsd,
+      blockers: [error instanceof Error ? error.message : "getTransaction fill reconciliation failed."],
+    });
+  }
+}
+
+function tokenBalanceDeltas(meta: Record<string, any>) {
+  const byMint = new Map<string, number>();
+  const add = (balance: any, sign: 1 | -1) => {
+    if (!balance || typeof balance !== "object") return;
+    const mint = typeof balance.mint === "string" ? balance.mint : null;
+    const amount = tokenBalanceUiAmount(balance);
+    if (!mint || amount === null) return;
+    byMint.set(mint, (byMint.get(mint) ?? 0) + sign * amount);
+  };
+  const pre = Array.isArray(meta.preTokenBalances) ? meta.preTokenBalances : [];
+  const post = Array.isArray(meta.postTokenBalances) ? meta.postTokenBalances : [];
+  pre.forEach((balance) => add(balance, -1));
+  post.forEach((balance) => add(balance, 1));
+  return [...byMint.entries()].map(([mint, delta]) => ({ mint, delta: roundMetric(delta) }));
+}
+
+function tokenBalanceUiAmount(balance: any) {
+  const tokenAmount = balance.uiTokenAmount && typeof balance.uiTokenAmount === "object" ? balance.uiTokenAmount : null;
+  const uiAmount = typeof tokenAmount?.uiAmount === "number" ? tokenAmount.uiAmount : null;
+  if (uiAmount !== null) return uiAmount;
+  if (typeof tokenAmount?.uiAmountString === "string") {
+    const parsed = Number(tokenAmount.uiAmountString);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  if (typeof tokenAmount?.amount === "string" && typeof tokenAmount?.decimals === "number") {
+    const parsed = Number(tokenAmount.amount);
+    if (Number.isFinite(parsed)) return parsed / Math.pow(10, tokenAmount.decimals);
+  }
+  return null;
+}
+
+function settlementFillReconciliationReport({
+  status,
+  signature,
+  commitment,
+  maxFillUsd,
+  blockers,
+  slot = null,
+  blockTime = null,
+  inputMint = null,
+  outputMint = null,
+  inputAmount = 0,
+  outputAmount = 0,
+  inputUsd = null,
+  outputUsd = null,
+  estimatedFillPriceUsd = null,
+  tokenDeltaCount = 0,
+}: {
+  status: SettlementFillReconciliationReport["status"];
+  signature: string | null;
+  commitment: "confirmed" | "finalized";
+  maxFillUsd: number;
+  blockers: string[];
+  slot?: string | null;
+  blockTime?: string | null;
+  inputMint?: string | null;
+  outputMint?: string | null;
+  inputAmount?: number;
+  outputAmount?: number;
+  inputUsd?: number | null;
+  outputUsd?: number | null;
+  estimatedFillPriceUsd?: number | null;
+  tokenDeltaCount?: number;
+}): SettlementFillReconciliationReport {
+  return {
+    mode: "settlement-fill-reconciliation",
+    requested: true,
+    status,
+    signature,
+    slot,
+    block_time: blockTime,
+    commitment,
+    input_mint: inputMint,
+    output_mint: outputMint,
+    input_amount: roundMetric(inputAmount),
+    output_amount: roundMetric(outputAmount),
+    input_usd: inputUsd === null ? null : roundMetric(inputUsd),
+    output_usd: outputUsd === null ? null : roundMetric(outputUsd),
+    estimated_fill_price_usd: estimatedFillPriceUsd === null ? null : roundMetric(estimatedFillPriceUsd),
+    token_delta_count: tokenDeltaCount,
+    max_fill_usd: maxFillUsd,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    portfolio_mirror_permission: "blocked",
+    blockers,
+    summary: settlementFillSummary(status, blockers, inputUsd ?? outputUsd),
+    next_action: settlementFillNextAction(status, blockers),
+    controls: [
+      "Reads Solana getTransaction metadata for the latest audited confirmed signature only.",
+      "Uses token balance deltas as fill evidence and blocks when deltas are missing, ambiguous, complex, failed, or over cap.",
+      "Does not sign, submit, rebroadcast, store transaction bodies, or mutate a wallet.",
+      "Portfolio mirror apply remains a separate idempotent step after fill price and quantity are reviewed.",
+    ],
+  };
+}
+
+function settlementFillSummary(status: SettlementFillReconciliationReport["status"], blockers: string[], fillUsd: number | null) {
+  if (status === "reconciled") return `Transaction fill details reconcile to about ${formatCompactValue(fillUsd ?? 0)} from token balance deltas.`;
+  if (status === "pending") return blockers[0] ?? "Transaction details are not available yet.";
+  if (status === "ambiguous") return blockers[0] ?? "Transaction token deltas are ambiguous for automatic fill sizing.";
+  if (status === "failed") return blockers[0] ?? "Transaction fill reconciliation failed.";
+  return blockers[0] ?? "Transaction fill reconciliation is blocked.";
+}
+
+function settlementFillNextAction(status: SettlementFillReconciliationReport["status"], blockers: string[]) {
+  if (status === "reconciled") return "Review fill price and quantity, then use guarded portfolio_mirror apply if the notional matches the handoff.";
+  if (status === "pending") return "Poll getTransaction again after confirmation data propagates.";
+  if (status === "ambiguous") return blockers[0] ?? "Use provider fill details before portfolio mirroring.";
+  if (status === "failed") return blockers[0] ?? "Investigate failed transaction metadata before any mirror action.";
+  return blockers[0] ?? "Confirm the relayed signature before reconciling fill details.";
+}
+
+function stringOrNumber(value: unknown) {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function blockTimeIso(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return new Date(value * 1_000).toISOString();
 }
 
 async function relaySignedTransaction(

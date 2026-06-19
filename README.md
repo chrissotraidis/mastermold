@@ -116,8 +116,10 @@ funds. The settlement reconciliation drill inspects only local relay, lifecycle,
 metadata; it requires relayed transactions to keep signature/request/payload evidence and
 can poll the latest audited relayed signature with Solana `getSignatureStatuses` through
 the guarded `confirmation_poll` API path. Confirmed transactions must map to a landed
-lifecycle before any portfolio mirror could be treated as reconciled. The portfolio mirror
-guard then requires that landed fill
+lifecycle before any portfolio mirror could be treated as reconciled. A guarded
+`fill_reconcile` path can then read Solana `getTransaction` metadata for token-balance
+deltas, but it blocks ambiguous, missing, failed, or over-cap fills instead of guessing.
+The portfolio mirror guard then requires that landed fill
 to also have relay signature, request id, payload hash, a deterministic idempotency key,
 and bounded autonomous handoff notional before a future reviewed mirror writer could treat
 the fill as audit-ready. The Web3 trading API also accepts a guarded `portfolio_mirror`

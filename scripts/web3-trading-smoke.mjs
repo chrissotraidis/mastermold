@@ -5078,6 +5078,33 @@ async function main() {
   assert(blockedConfirmationPoll.payload.signature_confirmation_poll.status === "blocked", "Signature confirmation polling should block without a stored relayed signature.", blockedConfirmationPoll.payload.signature_confirmation_poll);
   assert(blockedConfirmationPoll.payload.signature_confirmation_poll.live_execution_permission === "blocked" && blockedConfirmationPoll.payload.signature_confirmation_poll.wallet_mutation_permission === "blocked", "Signature confirmation polling should not grant live or wallet mutation permission.", blockedConfirmationPoll.payload.signature_confirmation_poll);
   assert(blockedConfirmationPoll.payload.signature_confirmation_poll.blockers.some((blocker) => blocker.includes("stored relayed signature")), "Signature confirmation polling should explain missing relayed signature evidence.", blockedConfirmationPoll.payload.signature_confirmation_poll);
+  const invalidFillReconcile = await postTrading({
+    scenario: "breakout",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    fill_reconcile: {
+      action: "inspect",
+    },
+  });
+  assert(invalidFillReconcile.response.status === 422, "Settlement fill reconciliation should reject unknown actions at the API boundary.", invalidFillReconcile.payload);
+  assert(String(invalidFillReconcile.payload.error ?? "").includes("fill_reconcile.action"), "Settlement fill reconciliation validation should explain invalid actions.", invalidFillReconcile.payload);
+  const blockedFillReconcile = await postTrading({
+    scenario: "breakout",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    fill_reconcile: {
+      action: "reconcile",
+      commitment: "confirmed",
+      max_fill_usd: 1_000,
+    },
+  });
+  assert(blockedFillReconcile.response.status === 200, "Blocked settlement fill reconciliation should return the current trading state.", blockedFillReconcile.payload);
+  assert(blockedFillReconcile.payload.settlement_fill_reconciliation?.mode === "settlement-fill-reconciliation", "Settlement fill reconciliation should return a dedicated report.", blockedFillReconcile.payload.settlement_fill_reconciliation);
+  assert(blockedFillReconcile.payload.settlement_fill_reconciliation.status === "blocked", "Settlement fill reconciliation should block without confirmed signed settlement evidence.", blockedFillReconcile.payload.settlement_fill_reconciliation);
+  assert(blockedFillReconcile.payload.settlement_fill_reconciliation.live_execution_permission === "blocked" && blockedFillReconcile.payload.settlement_fill_reconciliation.wallet_mutation_permission === "blocked", "Settlement fill reconciliation should not grant live or wallet mutation permission.", blockedFillReconcile.payload.settlement_fill_reconciliation);
+  assert(blockedFillReconcile.payload.settlement_fill_reconciliation.blockers.some((blocker) => blocker.includes("stored relayed signature")), "Settlement fill reconciliation should explain missing relayed signature evidence.", blockedFillReconcile.payload.settlement_fill_reconciliation);
 
   const summary = {
     baseUrl,
@@ -5106,6 +5133,7 @@ async function main() {
     portfolioMirrorPermission: portfolioMirrorGuard.portfolio_mirror_permission,
     portfolioMirrorApply: blockedMirrorApply.payload.portfolio_mirror_apply.status,
     confirmationPoll: blockedConfirmationPoll.payload.signature_confirmation_poll.status,
+    fillReconcile: blockedFillReconcile.payload.settlement_fill_reconciliation.status,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,
