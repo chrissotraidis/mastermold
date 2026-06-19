@@ -8401,6 +8401,34 @@ export type SettlementFillReconciliationReport = {
   controls: string[];
 };
 
+export type AutonomousSettlementWatchdogRequest = {
+  action: "run";
+  apply_mirror?: boolean;
+  commitment?: "confirmed" | "finalized";
+  max_fill_usd?: number;
+  search_transaction_history?: boolean;
+};
+
+export type AutonomousSettlementWatchdogReport = {
+  mode: "autonomous-settlement-watchdog";
+  requested: boolean;
+  status: "idle" | "blocked" | "pending" | "confirmed" | "reconciled" | "mirrored" | "duplicate" | "ambiguous" | "failed";
+  action: "stand-down" | "poll" | "reconcile" | "review" | "mirror" | "complete";
+  signature: string | null;
+  apply_mirror_requested: boolean;
+  poll_status: SignatureConfirmationPollReport["status"] | "not-run";
+  fill_status: SettlementFillReconciliationReport["status"] | "not-run";
+  mirror_status: PortfolioMirrorApplyReport["status"] | "not-run";
+  mirror_trade_id: string | null;
+  max_fill_usd: number;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  blockers: string[];
+  summary: string;
+  next_action: string;
+  controls: string[];
+};
+
 export type ExecutionAuditEntry = {
   id: string;
   created_at: string;
@@ -9110,6 +9138,7 @@ export type Web3TradingState = {
   portfolio_mirror_apply?: PortfolioMirrorApplyReport;
   signature_confirmation_poll?: SignatureConfirmationPollReport;
   settlement_fill_reconciliation?: SettlementFillReconciliationReport;
+  autonomous_settlement_watchdog?: AutonomousSettlementWatchdogReport;
   pre_submit_rehearsal: PreSubmitRehearsal;
   autonomous_execution_adapter_readiness: AutonomousExecutionAdapterReadiness;
   autonomous_custody_mandate: AutonomousCustodyMandate;
@@ -9268,6 +9297,7 @@ export type TradingStateInput = {
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
   fill_reconcile?: SettlementFillReconciliationRequest;
+  settlement_watchdog?: AutonomousSettlementWatchdogRequest;
   trigger_order?: TriggerOrderRequest;
   trigger_history?: TriggerOrderHistoryFilter;
   trigger_reconcile?: TriggerReconciliationPatchRequest;
@@ -12882,7 +12912,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: configuredState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const live = await fetchDexScreenerMarkets(input.fetchImpl ?? fetch);
@@ -12914,7 +12944,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
       monitorDecision: fallbackState.autonomous_monitor,
     });
-    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
+    return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, input.fetchImpl ?? fetch);
   }
 
   const liveState = buildWeb3TradingState({
@@ -12952,7 +12982,7 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
     advanced: daemonRequested && accountMode === "persistent" && advanceMode !== "off",
     monitorDecision: liveState.autonomous_monitor,
   });
-  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
+  return await finalizeExecutionAudit(recordPaperDaemonMemory(tickedState), input.drill ?? false, input.relay, input.confirmation_poll, input.fill_reconcile, input.settlement_watchdog, input.trigger_order, input.trigger_history, input.trigger_reconcile, input.portfolio_mirror, fetchImpl);
 }
 
 async function maybeApplyRouteRefreshRequest({
@@ -17755,6 +17785,7 @@ async function finalizeExecutionAudit(
   relay: SignedTransactionRelayRequest | undefined,
   confirmationPoll: SignatureConfirmationPollRequest | undefined,
   fillReconcile: SettlementFillReconciliationRequest | undefined,
+  settlementWatchdog: AutonomousSettlementWatchdogRequest | undefined,
   triggerOrder: TriggerOrderRequest | undefined,
   triggerHistory: TriggerOrderHistoryFilter | undefined,
   triggerReconcile: TriggerReconciliationPatchRequest | undefined,
@@ -17778,9 +17809,12 @@ async function finalizeExecutionAudit(
   const fillState = fillReconcile
     ? await applySettlementFillReconciliation(confirmationState, fillReconcile, fetchImpl)
     : confirmationState;
-  const triggerState = triggerOrder
-    ? attachTriggerOrderExecution(fillState, await runTriggerOrderRequest(fillState, triggerOrder, fetchImpl))
+  const watchdogState = settlementWatchdog
+    ? await applyAutonomousSettlementWatchdog(fillState, settlementWatchdog, fetchImpl)
     : fillState;
+  const triggerState = triggerOrder
+    ? attachTriggerOrderExecution(watchdogState, await runTriggerOrderRequest(watchdogState, triggerOrder, fetchImpl))
+    : watchdogState;
   const historyState = triggerHistory
     ? attachTriggerOrderHistory(triggerState, await syncTriggerOrderHistory(triggerState, triggerHistory, fetchImpl))
     : triggerState;
@@ -20228,6 +20262,199 @@ async function fetchSettlementFillDetails(
       blockers: [error instanceof Error ? error.message : "getTransaction fill reconciliation failed."],
     });
   }
+}
+
+async function applyAutonomousSettlementWatchdog(
+  state: Web3TradingState,
+  request: AutonomousSettlementWatchdogRequest,
+  fetchImpl: FetchLike,
+): Promise<Web3TradingState> {
+  const maxFillUsd = Math.max(10, Math.min(10_000, request.max_fill_usd ?? state.execution_readiness.config.max_trade_usd ?? 1_000));
+  const storedSignature = state.signed_transaction_relay.latest_signature || state.execution_audit.latest?.relay_signature || null;
+
+  if (request.action !== "run") {
+    return {
+      ...state,
+      autonomous_settlement_watchdog: autonomousSettlementWatchdogReport({
+        status: "blocked",
+        action: "stand-down",
+        signature: storedSignature,
+        maxFillUsd,
+        applyMirrorRequested: request.apply_mirror === true,
+        blockers: ["settlement_watchdog.action must be run."],
+      }),
+    };
+  }
+
+  const pollState = await applySignatureConfirmationPoll(state, {
+    action: "poll",
+    search_transaction_history: request.search_transaction_history,
+  }, fetchImpl);
+  const poll = pollState.signature_confirmation_poll;
+  if (!poll || poll.status !== "confirmed") {
+    return {
+      ...pollState,
+      autonomous_settlement_watchdog: autonomousSettlementWatchdogReport({
+        status: poll?.status === "pending" ? "pending" : poll?.status === "failed" ? "failed" : "blocked",
+        action: poll?.status === "pending" ? "poll" : "stand-down",
+        signature: poll?.signature ?? storedSignature,
+        maxFillUsd,
+        applyMirrorRequested: request.apply_mirror === true,
+        pollStatus: poll?.status ?? "not-run",
+        blockers: poll?.blockers ?? ["No confirmation poll report was produced."],
+      }),
+    };
+  }
+
+  const fillState = await applySettlementFillReconciliation(pollState, {
+    action: "reconcile",
+    commitment: request.commitment ?? "confirmed",
+    max_fill_usd: maxFillUsd,
+  }, fetchImpl);
+  const fill = fillState.settlement_fill_reconciliation;
+  if (!fill || fill.status !== "reconciled") {
+    return {
+      ...fillState,
+      autonomous_settlement_watchdog: autonomousSettlementWatchdogReport({
+        status: fill?.status === "pending" ? "pending" : fill?.status === "ambiguous" ? "ambiguous" : fill?.status === "failed" ? "failed" : "blocked",
+        action: fill?.status === "pending" ? "reconcile" : "stand-down",
+        signature: poll.signature,
+        maxFillUsd,
+        applyMirrorRequested: request.apply_mirror === true,
+        pollStatus: poll.status,
+        fillStatus: fill?.status ?? "not-run",
+        blockers: fill?.blockers ?? ["No settlement fill reconciliation report was produced."],
+      }),
+    };
+  }
+
+  if (request.apply_mirror !== true) {
+    return {
+      ...fillState,
+      autonomous_settlement_watchdog: autonomousSettlementWatchdogReport({
+        status: "reconciled",
+        action: "review",
+        signature: poll.signature,
+        maxFillUsd,
+        applyMirrorRequested: false,
+        pollStatus: poll.status,
+        fillStatus: fill.status,
+        blockers: [],
+      }),
+    };
+  }
+
+  if (!fill.mirror_apply_request) {
+    return {
+      ...fillState,
+      autonomous_settlement_watchdog: autonomousSettlementWatchdogReport({
+        status: "blocked",
+        action: "stand-down",
+        signature: poll.signature,
+        maxFillUsd,
+        applyMirrorRequested: true,
+        pollStatus: poll.status,
+        fillStatus: fill.status,
+        blockers: ["Settlement reconciliation did not emit a reviewed mirror apply request."],
+      }),
+    };
+  }
+
+  const mirroredState = applyPortfolioMirrorPatch(fillState, fill.mirror_apply_request);
+  const mirror = mirroredState.portfolio_mirror_apply;
+  return {
+    ...mirroredState,
+    autonomous_settlement_watchdog: autonomousSettlementWatchdogReport({
+      status: mirror?.status === "applied" ? "mirrored" : mirror?.status === "duplicate" ? "duplicate" : "blocked",
+      action: mirror?.status === "applied" || mirror?.status === "duplicate" ? "complete" : "mirror",
+      signature: poll.signature,
+      maxFillUsd,
+      applyMirrorRequested: true,
+      pollStatus: poll.status,
+      fillStatus: fill.status,
+      mirrorStatus: mirror?.status ?? "not-run",
+      mirrorTradeId: mirror?.trade_id ?? null,
+      blockers: mirror?.blockers ?? ["Portfolio mirror apply did not return a report."],
+    }),
+  };
+}
+
+function autonomousSettlementWatchdogReport({
+  status,
+  action,
+  signature,
+  maxFillUsd,
+  applyMirrorRequested,
+  pollStatus = "not-run",
+  fillStatus = "not-run",
+  mirrorStatus = "not-run",
+  mirrorTradeId = null,
+  blockers,
+}: {
+  status: AutonomousSettlementWatchdogReport["status"];
+  action: AutonomousSettlementWatchdogReport["action"];
+  signature: string | null;
+  maxFillUsd: number;
+  applyMirrorRequested: boolean;
+  pollStatus?: AutonomousSettlementWatchdogReport["poll_status"];
+  fillStatus?: AutonomousSettlementWatchdogReport["fill_status"];
+  mirrorStatus?: AutonomousSettlementWatchdogReport["mirror_status"];
+  mirrorTradeId?: string | null;
+  blockers: string[];
+}): AutonomousSettlementWatchdogReport {
+  return {
+    mode: "autonomous-settlement-watchdog",
+    requested: true,
+    status,
+    action,
+    signature,
+    apply_mirror_requested: applyMirrorRequested,
+    poll_status: pollStatus,
+    fill_status: fillStatus,
+    mirror_status: mirrorStatus,
+    mirror_trade_id: mirrorTradeId,
+    max_fill_usd: maxFillUsd,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    blockers,
+    summary: autonomousSettlementWatchdogSummary(status, action, blockers),
+    next_action: autonomousSettlementWatchdogNextAction(status, action, blockers),
+    controls: [
+      "Runs the settlement chain only after a signed relay is already in local audit evidence.",
+      "Poll and fill reconciliation are read-only RPC checks; mirror apply is local paper-portfolio accounting only.",
+      "Mirror apply must be explicitly requested and requires a reviewed fill price, quantity, landed lifecycle, handoff match, cap, and idempotency key.",
+      "The watchdog never signs, submits, rebroadcasts, stores signed transaction bodies, or moves wallet funds.",
+    ],
+  };
+}
+
+function autonomousSettlementWatchdogSummary(
+  status: AutonomousSettlementWatchdogReport["status"],
+  action: AutonomousSettlementWatchdogReport["action"],
+  blockers: string[],
+) {
+  if (status === "mirrored") return "Autonomous settlement watchdog confirmed, reconciled, and mirrored the fill into the local paper portfolio.";
+  if (status === "duplicate") return "Autonomous settlement watchdog found this fill was already mirrored; no duplicate portfolio update was applied.";
+  if (status === "reconciled") return "Autonomous settlement watchdog confirmed and reconciled the fill; mirror apply is waiting for explicit approval.";
+  if (status === "confirmed") return "Autonomous settlement watchdog confirmed the signature and is ready to reconcile fill details.";
+  if (status === "pending") return "Autonomous settlement watchdog is waiting for confirmation or transaction metadata to propagate.";
+  if (status === "ambiguous") return blockers[0] ?? "Autonomous settlement watchdog found ambiguous fill evidence.";
+  if (status === "failed") return blockers[0] ?? "Autonomous settlement watchdog failed while checking settlement evidence.";
+  if (action === "mirror") return blockers[0] ?? "Autonomous settlement watchdog could not mirror the reconciled fill.";
+  return blockers[0] ?? "Autonomous settlement watchdog is blocked.";
+}
+
+function autonomousSettlementWatchdogNextAction(
+  status: AutonomousSettlementWatchdogReport["status"],
+  action: AutonomousSettlementWatchdogReport["action"],
+  blockers: string[],
+) {
+  if (status === "mirrored") return "Continue monitoring the mirrored position and keep live wallet mutation blocked.";
+  if (status === "duplicate") return "Keep watching for the next relayed signature; this fill is already accounted for.";
+  if (status === "reconciled") return "Review the generated mirror_apply_request or rerun the watchdog with apply_mirror enabled.";
+  if (status === "pending" && action === "poll") return "Poll again until Solana RPC reports confirmed, finalized, failed, or expired.";
+  if (status === "pending" && action === "reconcile") return "Retry getTransaction reconciliation after transaction metadata propagates.";
+  return blockers[0] ?? "Clear settlement blockers before allowing autonomous mirror accounting.";
 }
 
 function tokenBalanceDeltas(meta: Record<string, any>) {

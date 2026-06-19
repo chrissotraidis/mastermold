@@ -6623,6 +6623,193 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(state.execution_audit.latest)).not.toContain("signed-transaction-redacted-by-engine");
   });
 
+  test("GIVEN a confirmed signed relay WHEN the autonomous settlement watchdog runs THEN it reconciles and mirrors the fill once", async () => {
+    process.env.JUPITER_API_KEY = "test-key";
+    process.env.SOLANA_RPC_URL = "https://rpc.test.invalid";
+    process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION = "true";
+    process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL = "I_UNDERSTAND_REAL_FUNDS";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "privy";
+    process.env.PRIVY_APP_ID = "test-privy-app";
+    process.env.PRIVY_APP_SECRET = "test-privy-secret";
+    process.env.PRIVY_SOLANA_WALLET_ID = "wallet-live-1";
+    const signature = "5NfRelaySignature111111111111111111111111111111111111111";
+    const signedPayload = Buffer.from("signed-transaction-redacted-by-engine").toString("base64");
+    const tokenBalance = 20_833.333333;
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/token-boosts/top/v1")) {
+        return Response.json([
+          { chainId: "solana", tokenAddress: "TokenLive111", amount: 6, totalAmount: 9 },
+        ]);
+      }
+      if (url.includes("/token-boosts/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress: "TokenLive111", amount: 2, totalAmount: 9 }]);
+      }
+      if (url.includes("/token-profiles/latest/v1")) {
+        return Response.json([{ chainId: "solana", tokenAddress: "TokenLive111", description: "Live Coin profile" }]);
+      }
+      if (url.includes("/community-takeovers/latest/v1") || url.includes("/ads/latest/v1")) {
+        return Response.json([]);
+      }
+      if (url.includes("/tokens/v1/solana/TokenLive111")) {
+        return Response.json([
+          {
+            chainId: "solana",
+            dexId: "raydium",
+            pairAddress: "PairLive111",
+            baseToken: { address: "TokenLive111", name: "Live Coin", symbol: "LIVE" },
+            quoteToken: { address: "So11111111111111111111111111111111111111112", name: "Wrapped SOL", symbol: "SOL" },
+            priceUsd: "0.024",
+            txns: { m5: { buys: 120, sells: 41 } },
+            volume: { m5: 85_000, h1: 410_000, h24: 1_800_000 },
+            priceChange: { m5: 8.5, h1: 24.2, h6: 55.1 },
+            liquidity: { usd: 950_000 },
+            marketCap: 9_200_000,
+            pairCreatedAt: Date.now() - 4 * 60 * 60 * 1000,
+            boosts: { active: 6 },
+          },
+        ]);
+      }
+      if (url.includes("lite-api.jup.ag/swap/v1/quote")) {
+        return Response.json({
+          outAmount: "124000000000",
+          priceImpactPct: "0.42",
+          routePlan: [{ swapInfo: { label: "Raydium" } }],
+        });
+      }
+      if (url.includes("api.jup.ag/swap/v2/order")) {
+        return Response.json({
+          transaction: Buffer.from("unsigned-transaction-redacted-by-engine").toString("base64"),
+          requestId: "order-123",
+          router: "metis",
+          outAmount: "123",
+          mode: "manual",
+          feeBps: 10,
+        });
+      }
+      if (url.includes("api.jup.ag/swap/v2/execute")) {
+        return Response.json({
+          status: "Success",
+          signature,
+          slot: "341197933",
+          code: 0,
+        });
+      }
+      if (url === "https://rpc.test.invalid") {
+        const body = JSON.parse(String(init?.body));
+        if (body.method === "getSignatureStatuses") {
+          return Response.json({
+            jsonrpc: "2.0",
+            id: body.id,
+            result: {
+              value: [{ slot: 341_197_933, confirmationStatus: "confirmed", err: null }],
+            },
+          });
+        }
+        if (body.method === "getTransaction") {
+          return Response.json({
+            jsonrpc: "2.0",
+            id: body.id,
+            result: {
+              slot: 341_197_933,
+              blockTime: 1_718_000_000,
+              meta: {
+                err: null,
+                preTokenBalances: [
+                  { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", uiTokenAmount: { uiAmount: 500, decimals: 6 } },
+                  { mint: "TokenLive111", uiTokenAmount: { uiAmount: 0, decimals: 6 } },
+                ],
+                postTokenBalances: [
+                  { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", uiTokenAmount: { uiAmount: 0, decimals: 6 } },
+                  { mint: "TokenLive111", uiTokenAmount: { uiAmount: tokenBalance, decimals: 6 } },
+                ],
+              },
+            },
+          });
+        }
+      }
+      return Response.json([], { status: 404 });
+    };
+
+    const state = await getWeb3TradingStateAsync({
+      source: "live-dex",
+      account: "persistent",
+      reset: true,
+      fetchImpl,
+      execution: {
+        mode: "dry-run",
+        kill_switch: false,
+        wallet_public_key: "11111111111111111111111111111111",
+        max_trade_usd: 500,
+        daily_spend_cap_usd: 2_500,
+        max_slippage_bps: 150,
+      },
+      relay: {
+        signed_transaction: signedPayload,
+        request_id: "order-123",
+        route: "jupiter-swap-v2",
+      },
+      settlement_watchdog: {
+        action: "run",
+        apply_mirror: true,
+        max_fill_usd: 500,
+      },
+    });
+
+    expect(state.autonomous_settlement_watchdog).toMatchObject({
+      mode: "autonomous-settlement-watchdog",
+      status: "mirrored",
+      action: "complete",
+      poll_status: "confirmed",
+      fill_status: "reconciled",
+      mirror_status: "applied",
+      apply_mirror_requested: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(state.signature_confirmation_poll?.status).toBe("confirmed");
+    expect(state.settlement_fill_reconciliation?.mirror_apply_request).toMatchObject({
+      action: "apply",
+      max_fill_usd: 500,
+      fill_price_usd: expect.any(Number),
+      filled_quantity: tokenBalance,
+    });
+    expect(state.portfolio_mirror_apply).toMatchObject({
+      status: "applied",
+      symbol: "LIVE",
+      side: "buy",
+      fill_notional_usd: 500,
+      portfolio_mirror_permission: "applied",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+    });
+    expect(state.trade_tape.some((trade) => trade.id === state.portfolio_mirror_apply?.trade_id)).toBe(true);
+    expect(JSON.stringify(state.execution_audit.latest)).not.toContain("signed-transaction-redacted-by-engine");
+
+    const duplicate = await getWeb3TradingStateAsync({
+      source: "live-dex",
+      account: "persistent",
+      fetchImpl,
+      execution: {
+        mode: "dry-run",
+        kill_switch: false,
+        wallet_public_key: "11111111111111111111111111111111",
+        max_trade_usd: 500,
+        daily_spend_cap_usd: 2_500,
+        max_slippage_bps: 150,
+      },
+      settlement_watchdog: {
+        action: "run",
+        apply_mirror: true,
+        max_fill_usd: 500,
+      },
+    });
+
+    expect(duplicate.autonomous_settlement_watchdog?.status).toBe("duplicate");
+    expect(duplicate.portfolio_mirror_apply?.status).toBe("duplicate");
+    expect(duplicate.trade_tape.filter((trade) => trade.id === state.portfolio_mirror_apply?.trade_id)).toHaveLength(1);
+  });
+
   test("GIVEN a dry-run profile with the kill switch on WHEN plans are built THEN unsigned orders stay blocked", async () => {
     const state = await getWeb3TradingStateAsync({
       execution: {

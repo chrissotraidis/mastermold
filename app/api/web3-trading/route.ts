@@ -11,6 +11,7 @@ import {
   type AutonomousDaemonLeaseRequest,
   type AutonomousLoopTickRequest,
   type AutonomousSessionRunRequest,
+  type AutonomousSettlementWatchdogRequest,
   type ExecutionUpdate,
   type OnchainEventIngestRequest,
   type PortfolioMirrorApplyRequest,
@@ -41,6 +42,7 @@ type TradingRequest = {
   relay?: SignedTransactionRelayRequest;
   confirmation_poll?: SignatureConfirmationPollRequest;
   fill_reconcile?: SettlementFillReconciliationRequest;
+  settlement_watchdog?: AutonomousSettlementWatchdogRequest;
   trigger_order?: TriggerOrderRequest;
   trigger_history?: TriggerOrderHistoryFilter;
   trigger_reconcile?: TriggerReconciliationPatchRequest;
@@ -113,6 +115,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
   const relay = record.relay === undefined ? undefined : parseSignedRelayRequest(record.relay);
   const confirmationPoll = record.confirmation_poll === undefined ? undefined : parseSignatureConfirmationPollRequest(record.confirmation_poll);
   const fillReconcile = record.fill_reconcile === undefined ? undefined : parseSettlementFillReconciliationRequest(record.fill_reconcile);
+  const settlementWatchdog = record.settlement_watchdog === undefined ? undefined : parseAutonomousSettlementWatchdogRequest(record.settlement_watchdog);
   const triggerOrder = record.trigger_order === undefined ? undefined : parseTriggerOrderRequest(record.trigger_order);
   const triggerHistory = record.trigger_history === undefined ? undefined : parseTriggerHistoryFilter(record.trigger_history);
   const triggerReconcile = record.trigger_reconcile === undefined ? undefined : parseTriggerReconcileRequest(record.trigger_reconcile);
@@ -168,6 +171,10 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
 
   if (fillReconcile && !fillReconcile.ok) {
     return { ok: false, error: fillReconcile.error };
+  }
+
+  if (settlementWatchdog && !settlementWatchdog.ok) {
+    return { ok: false, error: settlementWatchdog.error };
   }
 
   if (triggerOrder && !triggerOrder.ok) {
@@ -233,6 +240,7 @@ function parseTradingRequest(value: unknown, defaultAdvance: boolean):
       relay: relay?.value,
       confirmation_poll: confirmationPoll?.value,
       fill_reconcile: fillReconcile?.value,
+      settlement_watchdog: settlementWatchdog?.value,
       trigger_order: triggerOrder?.value,
       trigger_history: triggerHistory?.value,
       trigger_reconcile: triggerReconcile?.value,
@@ -831,6 +839,43 @@ function parseSettlementFillReconciliationRequest(value: unknown):
       signature: typeof record.signature === "string" ? record.signature.trim() : undefined,
       commitment: record.commitment === "confirmed" || record.commitment === "finalized" ? record.commitment : undefined,
       max_fill_usd: maxFillUsd,
+    },
+  };
+}
+
+function parseAutonomousSettlementWatchdogRequest(value: unknown):
+  | { ok: true; value: AutonomousSettlementWatchdogRequest }
+  | { ok: false; error: string } {
+  if (!value || typeof value !== "object") {
+    return { ok: false, error: "settlement_watchdog must be an object." };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.action !== "run") {
+    return { ok: false, error: "settlement_watchdog.action must be run." };
+  }
+  if (record.apply_mirror !== undefined && typeof record.apply_mirror !== "boolean") {
+    return { ok: false, error: "settlement_watchdog.apply_mirror must be boolean when provided." };
+  }
+  if (record.search_transaction_history !== undefined && typeof record.search_transaction_history !== "boolean") {
+    return { ok: false, error: "settlement_watchdog.search_transaction_history must be boolean when provided." };
+  }
+  if (record.commitment !== undefined && record.commitment !== "confirmed" && record.commitment !== "finalized") {
+    return { ok: false, error: "settlement_watchdog.commitment must be confirmed or finalized." };
+  }
+  const maxFillUsd = record.max_fill_usd === undefined ? undefined : Number(record.max_fill_usd);
+  if (maxFillUsd !== undefined && (!Number.isFinite(maxFillUsd) || maxFillUsd < 10 || maxFillUsd > 10_000)) {
+    return { ok: false, error: "settlement_watchdog.max_fill_usd must be from 10 to 10000." };
+  }
+
+  return {
+    ok: true,
+    value: {
+      action: "run",
+      apply_mirror: typeof record.apply_mirror === "boolean" ? record.apply_mirror : undefined,
+      commitment: record.commitment === "confirmed" || record.commitment === "finalized" ? record.commitment : undefined,
+      max_fill_usd: maxFillUsd,
+      search_transaction_history: typeof record.search_transaction_history === "boolean" ? record.search_transaction_history : undefined,
     },
   };
 }

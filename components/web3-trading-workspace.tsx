@@ -839,6 +839,13 @@ function portfolioMirrorApplyTone(status: NonNullable<Web3TradingState["portfoli
   return "neutral";
 }
 
+function autonomousSettlementWatchdogTone(status: NonNullable<Web3TradingState["autonomous_settlement_watchdog"]>["status"] | "idle"): ChipTone {
+  if (status === "mirrored" || status === "duplicate" || status === "reconciled" || status === "confirmed") return "engine";
+  if (status === "pending") return "caution";
+  if (status === "blocked" || status === "ambiguous" || status === "failed") return "critical";
+  return "neutral";
+}
+
 function protectiveTriggerCoverageTone(status: Web3TradingState["protective_trigger_coverage"]["status"]) {
   if (status === "covered" || status === "plan-ready") return "engine";
   if (status === "auth-required") return "caution";
@@ -1799,6 +1806,40 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
       setState(payload);
       setExecutionDraft(draftFromReadiness(payload));
       setNotice(payload.settlement_fill_reconciliation?.summary ?? "Settlement fill reconciliation completed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runSettlementWatchdog() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/web3-trading", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario,
+          cycles,
+          source: marketSource,
+          account: "persistent",
+          advance: false,
+          settlement_watchdog: {
+            action: "run",
+            apply_mirror: true,
+            commitment: "confirmed",
+            max_fill_usd: state.execution_readiness.config.max_trade_usd,
+            search_transaction_history: true,
+          },
+        }),
+      });
+      const payload = (await response.json()) as Web3TradingState | { error: string };
+      if (!response.ok || "error" in payload) {
+        setNotice("Autonomous settlement watchdog was rejected.");
+        return;
+      }
+      setState(payload);
+      setExecutionDraft(draftFromReadiness(payload));
+      setNotice(payload.autonomous_settlement_watchdog?.summary ?? "Autonomous settlement watchdog completed.");
     } finally {
       setLoading(false);
     }
@@ -4688,6 +4729,7 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
                 loading={loading}
                 onPollSignature={runSignatureConfirmationPoll}
                 onReconcileFill={runSettlementFillReconcile}
+                onRunWatchdog={runSettlementWatchdog}
                 onApplyMirror={applyReviewedMirrorRequest}
               />
               <ExecutionPathTimeline state={state} handoffPaperTrade={handoffPaperTrade} />
@@ -16490,22 +16532,33 @@ function SettlementChainPanel({
   loading,
   onPollSignature,
   onReconcileFill,
+  onRunWatchdog,
   onApplyMirror,
 }: {
   state: Web3TradingState;
   loading: boolean;
   onPollSignature: () => void;
   onReconcileFill: () => void;
+  onRunWatchdog: () => void;
   onApplyMirror: () => void;
 }) {
+  const watchdog = state.autonomous_settlement_watchdog;
   const poll = state.signature_confirmation_poll;
   const fill = state.settlement_fill_reconciliation;
   const mirror = state.portfolio_mirror_apply;
   const mirrorRequest = fill?.mirror_apply_request ?? null;
+  const watchdogStatus = watchdog?.status ?? "idle";
   const pollStatus = poll?.status ?? "idle";
   const fillStatus = fill?.status ?? "idle";
   const mirrorStatus = mirror?.status ?? (mirrorRequest ? "ready" : "idle");
   const settlementRows = [
+    {
+      label: "Watchdog",
+      status: watchdogStatus,
+      tone: autonomousSettlementWatchdogTone(watchdogStatus),
+      value: watchdog?.action ?? "stand-by",
+      detail: watchdog?.summary ?? "Autonomous chain has not run for the latest relay.",
+    },
     {
       label: "Signature",
       status: pollStatus,
@@ -16542,7 +16595,7 @@ function SettlementChainPanel({
           {mirrorRequest ? "payload ready" : "gated"}
         </Chip>
       </div>
-      <div className="mt-3 grid gap-2 md:grid-cols-3">
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         {settlementRows.map((row) => (
           <div key={row.label} className="min-w-0 rounded-md border border-outline-variant/40 bg-void/30 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -16568,6 +16621,10 @@ function SettlementChainPanel({
         <Button type="button" onClick={onReconcileFill} disabled={loading} variant="outline" className="border-outline-variant/60 bg-surface-dim/50 text-on-surface">
           <ClipboardCheck aria-hidden="true" />
           Reconcile
+        </Button>
+        <Button type="button" onClick={onRunWatchdog} disabled={loading} variant="outline" className="border-engine/50 bg-engine/10 text-engine hover:bg-engine/15">
+          <Bot aria-hidden="true" />
+          Watchdog
         </Button>
         <Button type="button" onClick={onApplyMirror} disabled={loading || !mirrorRequest} className={cn(mirrorRequest ? "bg-engine text-void hover:bg-engine" : "bg-surface-high text-outline")}>
           <Wallet aria-hidden="true" />

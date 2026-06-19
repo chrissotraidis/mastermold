@@ -5106,6 +5106,35 @@ async function main() {
   assert(blockedFillReconcile.payload.settlement_fill_reconciliation.live_execution_permission === "blocked" && blockedFillReconcile.payload.settlement_fill_reconciliation.wallet_mutation_permission === "blocked", "Settlement fill reconciliation should not grant live or wallet mutation permission.", blockedFillReconcile.payload.settlement_fill_reconciliation);
   assert(blockedFillReconcile.payload.settlement_fill_reconciliation.portfolio_mirror_permission === "blocked" && blockedFillReconcile.payload.settlement_fill_reconciliation.mirror_apply_request === null, "Settlement fill reconciliation should not emit a mirror apply request while blocked.", blockedFillReconcile.payload.settlement_fill_reconciliation);
   assert(blockedFillReconcile.payload.settlement_fill_reconciliation.blockers.some((blocker) => blocker.includes("stored relayed signature")), "Settlement fill reconciliation should explain missing relayed signature evidence.", blockedFillReconcile.payload.settlement_fill_reconciliation);
+  const invalidSettlementWatchdog = await postTrading({
+    scenario: "breakout",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    settlement_watchdog: {
+      action: "inspect",
+    },
+  });
+  assert(invalidSettlementWatchdog.response.status === 422, "Autonomous settlement watchdog should reject unknown actions at the API boundary.", invalidSettlementWatchdog.payload);
+  assert(String(invalidSettlementWatchdog.payload.error ?? "").includes("settlement_watchdog.action"), "Settlement watchdog validation should explain invalid actions.", invalidSettlementWatchdog.payload);
+  const blockedSettlementWatchdog = await postTrading({
+    scenario: "breakout",
+    source: "sample",
+    account: "persistent",
+    advance: false,
+    settlement_watchdog: {
+      action: "run",
+      apply_mirror: true,
+      max_fill_usd: 1_000,
+      search_transaction_history: true,
+    },
+  });
+  assert(blockedSettlementWatchdog.response.status === 200, "Blocked autonomous settlement watchdog should return the current trading state.", blockedSettlementWatchdog.payload);
+  assert(blockedSettlementWatchdog.payload.autonomous_settlement_watchdog?.mode === "autonomous-settlement-watchdog", "Settlement watchdog should return a dedicated report.", blockedSettlementWatchdog.payload.autonomous_settlement_watchdog);
+  assert(blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.status === "blocked", "Settlement watchdog should block without a stored relayed signature.", blockedSettlementWatchdog.payload.autonomous_settlement_watchdog);
+  assert(blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.live_execution_permission === "blocked" && blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.wallet_mutation_permission === "blocked", "Settlement watchdog should not grant live or wallet mutation permission.", blockedSettlementWatchdog.payload.autonomous_settlement_watchdog);
+  assert(blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.poll_status === "blocked", "Settlement watchdog should expose the blocked poll status.", blockedSettlementWatchdog.payload.autonomous_settlement_watchdog);
+  assert(blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.blockers.some((blocker) => blocker.includes("stored relayed signature")), "Settlement watchdog should explain missing relayed signature evidence.", blockedSettlementWatchdog.payload.autonomous_settlement_watchdog);
 
   const summary = {
     baseUrl,
@@ -5136,6 +5165,8 @@ async function main() {
     confirmationPoll: blockedConfirmationPoll.payload.signature_confirmation_poll.status,
     fillReconcile: blockedFillReconcile.payload.settlement_fill_reconciliation.status,
     fillMirrorRequest: Boolean(blockedFillReconcile.payload.settlement_fill_reconciliation.mirror_apply_request),
+    settlementWatchdog: blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.status,
+    settlementWatchdogAction: blockedSettlementWatchdog.payload.autonomous_settlement_watchdog.action,
     daemonStatus: tick.payload.paper_daemon.status,
     mission: tick.payload.autonomous_trade_mission.status,
     burst: tick.payload.autonomous_burst_scheduler.status,
