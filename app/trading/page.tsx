@@ -20,6 +20,8 @@ import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-pape
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
+import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
@@ -88,11 +90,27 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     state: initialState,
     checklist: launchChecklist,
   });
+  const manualLiveReview = buildWeb3ManualLiveReviewPacket({
+    state: initialState,
+    checklist: launchChecklist,
+    preflight: liveCapitalPreflight,
+    liveOps,
+    runway: supervisedLiveRunway,
+  });
   const operatorRunbook = buildWeb3OperatorRunbook({
     state: initialState,
     usability: usabilityStatus,
     cutover: cutoverBlockerBoard,
     preflight: liveCapitalPreflight,
+    runway: supervisedLiveRunway,
+  });
+  const liveUsabilityBlockers = buildWeb3LiveUsabilityBlockersReceipt({
+    state: initialState,
+    usability: usabilityStatus,
+    cutover: cutoverBlockerBoard,
+    runbook: operatorRunbook,
+    preflight: liveCapitalPreflight,
+    manualLiveReview,
     runway: supervisedLiveRunway,
   });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
@@ -120,8 +138,10 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
             cutover={cutoverBlockerBoard}
             runbook={operatorRunbook}
             preflight={liveCapitalPreflight}
+            liveUsabilityBlockers={liveUsabilityBlockers}
           />
           <ReadinessReceiptsDrawer>
+            <LiveUsabilityBlockersPanel receipt={liveUsabilityBlockers} source={source} account={account} />
             <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
             <CutoverBlockerBoardPanel board={cutoverBlockerBoard} source={source} account={account} />
             <OperatorRunbookPanel runbook={operatorRunbook} source={source} account={account} />
@@ -224,6 +244,7 @@ function TradingCommandBoard({
   cutover,
   runbook,
   preflight,
+  liveUsabilityBlockers,
 }: {
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
   status: Web3UsabilityStatusReceipt;
@@ -232,6 +253,7 @@ function TradingCommandBoard({
   cutover: Web3CutoverBlockerBoard;
   runbook: Web3OperatorRunbookReceipt;
   preflight: ReturnType<typeof buildWeb3LiveCapitalPreflightReceipt>;
+  liveUsabilityBlockers: Web3LiveUsabilityBlockersReceipt;
 }) {
   const wallet = state.autonomous_wallet_telemetry;
   const decision = state.autonomous_now_decision;
@@ -351,6 +373,25 @@ function TradingCommandBoard({
               </div>
               <p className="mt-2 line-clamp-3 text-xs leading-5 text-on-surface-variant">{runway.next_action}</p>
             </div>
+          </div>
+
+          <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Real-money usability</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{liveUsabilityBlockers.status.replaceAll("-", " ")}</p>
+              </div>
+              <span className={liveUsabilityStatusClassName(liveUsabilityBlockers.status)}>
+                live blocked
+              </span>
+            </div>
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">{liveUsabilityBlockers.summary}</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <CommandBoardMetric label="Missing" value={`${liveUsabilityBlockers.missing_for_live_usability.length}`} detail="top rows" tone={liveUsabilityBlockers.missing_for_live_usability.length > 0 ? "critical" : "engine"} />
+              <CommandBoardMetric label="Signoffs" value={`${liveUsabilityBlockers.passed_signoff_count}/${liveUsabilityBlockers.required_signoff_count}`} detail={`${liveUsabilityBlockers.failed_or_watch_signoff_count} open`} tone={liveUsabilityBlockers.failed_or_watch_signoff_count > 0 ? "caution" : "engine"} />
+              <CommandBoardMetric label="Actions" value={`${liveUsabilityBlockers.safe_action_count}`} detail={`${liveUsabilityBlockers.gated_action_count} gated`} tone="engine" />
+            </div>
+            <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">{liveUsabilityBlockers.next_action}</p>
           </div>
 
           <div className="rounded-md border border-outline/15 bg-surface/65 p-3">
@@ -664,6 +705,108 @@ function usabilityCapabilityClassName(status: Web3UsabilityStatusReceipt["capabi
   if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
   if (status === "gated") return `${base} border-caution/30 bg-caution/10 text-caution`;
   return `${base} border-outline/20 bg-surface text-outline`;
+}
+
+function LiveUsabilityBlockersPanel({
+  receipt,
+  source,
+  account,
+}: {
+  receipt: Web3LiveUsabilityBlockersReceipt;
+  source: "sample" | "live-dex";
+  account: "persistent" | "ephemeral";
+}) {
+  const params = new URLSearchParams({ source, account, scenario: receipt.scenario, cycles: "0" });
+  const href = `/api/web3-live-usability-blockers?${params.toString()}`;
+  const missing = receipt.missing_for_live_usability.slice(0, 6);
+
+  return (
+    <section
+      aria-labelledby="web3-live-usability-blockers-title"
+      className="rounded-md border border-critical/25 bg-critical/[0.025] p-3 sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">What is left</p>
+              <h2 id="web3-live-usability-blockers-title" className="mt-1 font-display text-lg font-semibold text-on-surface">
+                {receipt.status.replaceAll("-", " ")}
+              </h2>
+              <p className="mt-1 line-clamp-3 text-sm leading-6 text-on-surface-variant">{receipt.summary}</p>
+            </div>
+            <Link
+              href={href}
+              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open blockers JSON
+            </Link>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <LiveUsabilityStat label="Inputs" value={`${receipt.open_operator_input_count}`} tone={receipt.open_operator_input_count > 0 ? "caution" : "engine"} />
+            <LiveUsabilityStat label="Capital blockers" value={`${receipt.real_capital_blocker_count}`} tone={receipt.real_capital_blocker_count > 0 ? "critical" : "engine"} />
+            <LiveUsabilityStat label="Live lanes" value={`${receipt.ready_live_lane_count}/${receipt.total_live_lane_count}`} tone={receipt.ready_live_lane_count === receipt.total_live_lane_count ? "engine" : "caution"} />
+          </div>
+
+          <div className="mt-3 rounded-md border border-outline/15 bg-surface/50 p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Next action</p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{receipt.next_action}</p>
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-2">
+          {missing.length > 0 ? missing.map((item) => (
+            <div key={item.id} className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5 sm:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)_auto] sm:items-center">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-on-surface">{item.label}</p>
+                <p className="mt-0.5 truncate text-[11px] text-outline">{item.owner.replace("-", " ")} · {item.source.replace("-", " ")}</p>
+              </div>
+              <p className="line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+              <span className={liveUsabilityMissingStatusClassName(item.status)}>{item.status}</span>
+            </div>
+          )) : (
+            <p className="rounded-md border border-outline/15 bg-surface-dim/45 p-3 text-xs leading-5 text-on-surface-variant">
+              No missing rows are listed. Keep autonomous live trading blocked until external review approves the executor boundary.
+            </p>
+          )}
+
+          <div className="rounded-md border border-outline/15 bg-surface/50 p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe actions</p>
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
+              {receipt.safe_next_actions.map((action) => action.label).join(" · ") || "Review the readiness receipts before running more checks."}
+            </p>
+          </div>
+        </div>
+      </div>
+      <p className="mt-3 line-clamp-2 text-xs leading-5 text-outline">
+        This receipt answers readiness only. Live execution, signing, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo stay blocked.
+      </p>
+    </section>
+  );
+}
+
+function LiveUsabilityStat({ label, value, tone }: { label: string; value: string; tone: "engine" | "caution" | "critical" }) {
+  const valueClassName = tone === "engine" ? "text-engine" : tone === "critical" ? "text-critical" : "text-caution";
+  return (
+    <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold ${valueClassName}`}>{value}</p>
+    </div>
+  );
+}
+
+function liveUsabilityStatusClassName(status: Web3LiveUsabilityBlockersReceipt["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "live-review-ready") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  if (status === "autonomous-live-locked") return `${base} border-critical/30 bg-critical/10 text-critical`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
+function liveUsabilityMissingStatusClassName(status: Web3LiveUsabilityBlockersReceipt["missing_for_live_usability"][number]["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "needed" || status === "watch" || status === "review") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
 function CutoverBlockerBoardPanel({

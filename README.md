@@ -170,6 +170,12 @@ the researched real-capital path: operator wallet, provider rail, live DEX scann
 Jupiter order rehearsal, risk caps, kill switch, signer/custody, settlement, profit proof,
 and manual review. It reports blockers and next actions while still refusing signing,
 transaction submission, account creation, private-key storage, and wallet mutation.
+`/api/web3-live-usability-blockers?source=live-dex` is the single "what is left"
+receipt for real-money Web3 usability. It reconciles the usability status, cutover
+board, operator runbook, live-capital preflight, supervised runway, and manual live-review
+packet into missing operator inputs, signoff counts, safe next actions, verifier commands,
+and live-lane readiness while keeping autonomous live trading, signing, submission,
+wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and the same

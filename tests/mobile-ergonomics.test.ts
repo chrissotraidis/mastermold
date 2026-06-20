@@ -699,6 +699,9 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<ReadinessReceiptsDrawer"),
     );
     expect(tradingPage.indexOf("<ReadinessReceiptsDrawer")).toBeLessThan(
+      tradingPage.indexOf("<LiveUsabilityBlockersPanel"),
+    );
+    expect(tradingPage.indexOf("<LiveUsabilityBlockersPanel")).toBeLessThan(
       tradingPage.indexOf("<UsabilityStatusPanel"),
     );
     expect(tradingPage.indexOf("<UsabilityStatusPanel")).toBeLessThan(
@@ -712,6 +715,14 @@ describe("mobile ergonomics source contracts", () => {
     );
     expect(tradingPage).toContain("ReadinessReceiptsDrawer");
     expect(tradingPage).toContain("Readiness receipts and runbook");
+    expect(tradingPage).toContain("LiveUsabilityBlockersPanel");
+    expect(tradingPage).toContain("Real-money usability");
+    expect(tradingPage).toContain("What is left");
+    expect(tradingPage).toContain("Open blockers JSON");
+    expect(tradingPage).toContain("/api/web3-live-usability-blockers?${params.toString()}");
+    expect(tradingPage).toContain("missing_for_live_usability");
+    expect(tradingPage).toContain("safe_next_actions");
+    expect(tradingPage).toContain("This receipt answers readiness only.");
     expect(tradingPage).toContain("Web3 market source switch");
     expect(tradingPage).toContain("Choose Web3 market source");
     expect(tradingPage).toContain("Sample tape");
@@ -762,6 +773,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("no secrets here");
     expect(tradingPage).toContain("This command board is paper and read-only evidence.");
     expect(tradingPage).toContain("cannot sign, submit, store wallet authority, or mutate balances");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("web3-live-usability-blockers");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("what is left before real-money Web3 usability");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("Autonomous live trading remains locked in-app");
+    expect(source("app/api/web3-live-usability-blockers/route.ts")).toContain("buildWeb3LiveUsabilityBlockersReceipt");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-usability-blockers?source=live-dex&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-usability-blockers");
     expect(tradingPage).toContain("buildWeb3UsabilityStatus");
     expect(source("src/db/web3-usability-status.ts")).toContain("web3-usability-status");
     expect(source("src/db/web3-usability-status.ts")).toContain("Copilot and paper autonomy can be usable while dry-run orders");
@@ -1408,6 +1425,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("browser Solana wallet only far enough to read the public address");
     expect(source("components/review-readiness.tsx")).toContain("text-only wallet ownership proof");
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
+    expect(source("components/review-readiness.tsx")).toContain("/api/web3-live-usability-blockers");
+    expect(source("README.md")).toContain("/api/web3-live-usability-blockers?source=live-dex");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-usability-blockers");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");

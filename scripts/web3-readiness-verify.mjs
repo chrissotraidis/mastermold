@@ -420,6 +420,43 @@ async function verifyUsabilityStatusReceipt() {
   record("usability-status-receipt", "pass", `${json.current_mode}; next gate ${json.next_gate_label}`);
 }
 
+async function verifyLiveUsabilityBlockersReceipt() {
+  const { response, json } = await requestJson("/api/web3-live-usability-blockers?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Live usability blockers receipt should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-live-usability-blockers", "Live usability blockers should expose the expected mode.", json);
+  assert(
+    ["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(json.status),
+    "Live usability blockers should use a known status.",
+    json,
+  );
+  assertReceiptHash("Live usability blockers", json.receipt_hash);
+  assert(["copilot", "paper-autonomy", "dry-run-rehearsal", "supervised-live-review", "autonomous-live"].includes(json.current_mode), "Live usability blockers should include current mode.", json);
+  assert(typeof json.paper_usable === "boolean", "Live usability blockers should state whether paper is usable.", json);
+  assert(typeof json.dry_run_usable === "boolean", "Live usability blockers should state whether dry-run is usable.", json);
+  assert(json.autonomous_live_locked === true, "Live usability blockers should explicitly lock autonomous live trading.", json);
+  assert(typeof json.open_operator_input_count === "number", "Live usability blockers should count open operator inputs.", json);
+  assert(typeof json.real_capital_blocker_count === "number", "Live usability blockers should count real-capital blockers.", json);
+  assert(json.ready_live_lane_count <= json.total_live_lane_count, "Live usability blockers live-lane counts should reconcile.", json);
+  assert(
+    json.passed_signoff_count + json.failed_or_watch_signoff_count === json.required_signoff_count,
+    "Live usability blockers signoff counts should reconcile.",
+    json,
+  );
+  assert(Array.isArray(json.missing_for_live_usability), "Live usability blockers should include missing-for-usability rows.", json);
+  assert(json.missing_for_live_usability.every((item) => typeof item.next_action === "string" && item.next_action.length > 0), "Live usability blocker rows should name next actions.", json.missing_for_live_usability);
+  assert(Array.isArray(json.safe_next_actions) && json.safe_next_actions.length > 0, "Live usability blockers should include safe next actions.", json.safe_next_actions);
+  assert(Array.isArray(json.verifier_commands) && json.verifier_commands.some((command) => command.includes("verify:web3")), "Live usability blockers should include verifier commands.", json.verifier_commands);
+  assert(Array.isArray(json.evidence_endpoints) && json.evidence_endpoints.includes("GET /api/web3-manual-live-review-packet"), "Live usability blockers should link manual live review evidence.", json.evidence_endpoints);
+  assert(Array.isArray(json.safe_to_provide) && json.safe_to_provide.includes("Dedicated Solana public wallet address"), "Live usability blockers should list safe operator inputs.", json.safe_to_provide);
+  assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Live usability blockers should keep seed phrases in never-provide list.", json.never_provide);
+  assertBlockedAuthority("Live usability blockers", json);
+  record(
+    "live-usability-blockers",
+    "pass",
+    `${json.status}; ${json.missing_for_live_usability.length} missing rows; ${json.safe_action_count} safe actions`,
+  );
+}
+
 function assertReceiptHash(label, value) {
   assert(typeof value === "string" && /^[0-9a-f]{64}$/.test(value), `${label} should include a 64-character receipt hash.`, value);
 }
@@ -974,6 +1011,7 @@ async function main() {
   await verifyCredentialValidateOnly();
   await verifyProviderHealthReceipt();
   await verifyUsabilityStatusReceipt();
+  await verifyLiveUsabilityBlockersReceipt();
   await verifyLiveReadinessPackets();
   await verifyOperatorSetupPackets();
   await verifyManualLiveReviewPacket();
