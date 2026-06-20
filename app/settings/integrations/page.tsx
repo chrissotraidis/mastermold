@@ -35,6 +35,7 @@ import {
   buildWeb3OperatorCredentialHandoffReceipt,
   type Web3OperatorCredentialHandoffReceipt,
 } from "@/src/db/web3-operator-credential-handoff";
+import { buildWeb3OperatorRequestPacket, type Web3OperatorRequestPacket } from "@/src/db/web3-operator-request-packet";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
@@ -107,6 +108,7 @@ export default async function IntegrationsSettingsPage() {
     acquisition: web3AcquisitionReceipt,
     launchChecklist: web3LaunchChecklist,
   });
+  const web3OperatorRequestPacket = buildWeb3OperatorRequestPacket(web3OperatorCredentialHandoff);
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -136,6 +138,7 @@ export default async function IntegrationsSettingsPage() {
             credentialDoctor={web3CredentialDoctor}
             launchChecklist={web3LaunchChecklist}
             operatorCredentialHandoff={web3OperatorCredentialHandoff}
+            operatorRequestPacket={web3OperatorRequestPacket}
             state={web3State}
           />
         </div>
@@ -186,6 +189,7 @@ function Web3CredentialsRunwayCard({
   credentialDoctor,
   launchChecklist,
   operatorCredentialHandoff,
+  operatorRequestPacket,
   state,
 }: {
   receipt: Web3AccountSetupReceipt;
@@ -200,6 +204,7 @@ function Web3CredentialsRunwayCard({
   credentialDoctor: Web3CredentialDoctorHealth;
   launchChecklist: Web3AutonomyLaunchChecklist;
   operatorCredentialHandoff: Web3OperatorCredentialHandoffReceipt;
+  operatorRequestPacket: Web3OperatorRequestPacket;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
   const requiredConfigured = receipt.environment_summary.required_configured_count;
@@ -240,6 +245,7 @@ function Web3CredentialsRunwayCard({
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0">
           <SettingsWeb3OperatorIntakeBoard receipt={operatorCredentialHandoff} />
+          <SettingsWeb3OperatorRequestPacketPanel packet={operatorRequestPacket} />
 
           <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Secure Web3 credential handoff">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -617,6 +623,73 @@ function SettingsWeb3OperatorIntakeBoard({ receipt }: { receipt: Web3OperatorCre
 
       <p className="mt-2 text-xs leading-5 text-outline">
         Operator intake is a setup guide only; it cannot create accounts, sign, submit, custody funds, echo secrets, or mutate wallets.
+      </p>
+    </div>
+  );
+}
+
+function SettingsWeb3OperatorRequestPacketPanel({ packet }: { packet: Web3OperatorRequestPacket }) {
+  const openInputs = packet.required_inputs.slice(0, 4);
+  const nextInput = packet.next_input;
+  return (
+    <div className="rounded-md border border-engine/25 bg-surface-dim/30 p-3" aria-label="Web3 operator share packet">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Share packet</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {nextInput ? `Ask for ${nextInput.label}` : "Required inputs are ready"}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{packet.summary}</p>
+        </div>
+        <LaunchQueueBadge status={packet.status === "needs-input" ? "watch" : "pass"} label={`${packet.required_inputs.length} open`} />
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {openInputs.length > 0 ? openInputs.map((item) => (
+          <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {item.safe_collection_surface.replaceAll("-", " ")} · {item.storage.replaceAll("-", " ")}
+                </p>
+              </div>
+              <LaunchQueueBadge status={operatorInputBadgeStatus(item.status)} label={item.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+            {item.env_targets.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {item.env_targets.slice(0, 3).map((target) => (
+                  <span key={target} className="max-w-full break-all rounded-md border border-outline-variant/25 bg-black/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                    {target}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        )) : (
+          <p className="rounded-md border border-outline-variant/25 bg-void/20 p-2 text-xs leading-5 text-on-surface-variant">
+            No required setup inputs are open; manual review remains external.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-black/20 p-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Redacted request text</p>
+          <Link
+            href="/api/web3-operator-request-packet?source=live-dex&account=persistent"
+            className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
+          >
+            Open JSON
+          </Link>
+        </div>
+        <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-outline-variant/20 bg-void/50 p-2 text-[11px] leading-5 text-on-surface-variant">
+          {packet.text_packet}
+        </pre>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Packet {packet.receipt_hash.slice(0, 12)} keeps live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
       </p>
     </div>
   );

@@ -21,6 +21,7 @@ import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route
 import { GET as MANUAL_LIVE_REVIEW_PACKET_GET } from "@/app/api/web3-manual-live-review-packet/route";
 import { GET as MARKET_MONITOR_HISTORY_GET } from "@/app/api/web3-market-monitor-history/route";
 import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
+import { GET as OPERATOR_REQUEST_PACKET_GET } from "@/app/api/web3-operator-request-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { POST as SUPERVISOR_REFRESH_POST } from "@/app/api/web3-supervisor-refresh/route";
@@ -873,6 +874,75 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(text).not.toContain("test-helius-secret");
     expect(receipt.private_key_storage).toBe("blocked");
     expect(receipt.seed_phrase_storage).toBe("blocked");
+  });
+
+  test("GIVEN an operator needs setup help WHEN the request packet route runs THEN it returns a shareable redacted packet", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-request-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";
+
+    const rejected = await OPERATOR_REQUEST_PACKET_GET(new Request("http://localhost/api/web3-operator-request-packet?source=bad"));
+    expect(rejected.status).toBe(422);
+
+    const response = await OPERATOR_REQUEST_PACKET_GET(new Request("http://localhost/api/web3-operator-request-packet?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      handoff_receipt_hash: string;
+      next_input: { id: string; label: string; next_action: string } | null;
+      required_inputs: Array<{ id: string; env_targets: string[]; storage: string; safe_collection_surface: string; verifier_command: string | null }>;
+      review_inputs: Array<{ id: string }>;
+      safe_to_provide: string[];
+      never_provide: string[];
+      verifier_commands: string[];
+      text_packet: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+    const text = JSON.stringify(packet);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-operator-request-packet");
+    expect(packet.status).toBe("needs-input");
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.handoff_receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.next_input?.id).toBe("jupiter-route-order-key");
+    expect(packet.required_inputs.map((item) => item.id)).toEqual(expect.arrayContaining([
+      "jupiter-route-order-key",
+      "dedicated-trading-wallet",
+      "emergency-stop-target",
+      "production-worker-ops",
+      "accounting-export-target",
+    ]));
+    expect(packet.required_inputs.find((item) => item.id === "production-worker-ops")?.env_targets).toEqual(expect.arrayContaining([
+      "MASTERMOLD_WEB3_PROCESS_MANAGER",
+      "MASTERMOLD_WEB3_WORKER_OWNER",
+      "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+      "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+    ]));
+    expect(packet.safe_to_provide).toContain("Dedicated Solana public wallet address");
+    expect(packet.never_provide).toContain("Seed phrase or mnemonic");
+    expect(packet.verifier_commands).toEqual(expect.arrayContaining([
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+      "npm run doctor:web3 -- --json",
+    ]));
+    expect(packet.text_packet).toContain("# Mastermind Web3 Operator Request Packet");
+    expect(packet.text_packet).toContain("JUPITER_API_KEY");
+    expect(packet.text_packet).toContain("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL");
+    expect(packet.text_packet).toContain("Never Provide");
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.transaction_submission_permission).toBe("blocked");
+    expect(packet.private_key_storage).toBe("blocked");
+    expect(packet.seed_phrase_storage).toBe("blocked");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(packet.controls.some((control) => control.includes("safe to share"))).toBe(true);
+    expect(text).not.toContain("test-helius-request-secret");
   });
 
   test("GIVEN Settings saves public wallet scope WHEN account setup is rebuilt THEN dry-run wallet readiness is scoped without secrets", async () => {

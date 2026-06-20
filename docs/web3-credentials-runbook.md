@@ -137,6 +137,7 @@ GET /api/web3-live-ops-packet
 GET /api/web3-manual-live-review-packet
 GET /api/web3-market-monitor-history
 GET /api/web3-ohlcv
+GET /api/web3-operator-request-packet
 GET /api/web3-provider-health
 GET /api/web3-signer-credential-packet
 GET /api/web3-signer-handoff
@@ -153,6 +154,8 @@ The account acquisition route returns the external setup packet used by Settings
 The account setup route returns a redacted receipt with provider-account status for Helius/Solana reads, Jupiter Swap V2 order rehearsal, the dedicated public wallet, signer posture, emergency-stop ops, accounting, and optional market-feed lanes. It detects whether expected local env targets are configured but never returns their values. It also separates `wallet_scoped` from `dedicated_wallet_scoped`, so a demo all-ones wallet can prove the save path without satisfying live-readiness review. It does not create third-party accounts, submit signup forms, store secrets, sign, submit, custody funds, or mutate wallets; external account creation remains operator-owned outside the app.
 
 The operator credential handoff route, `GET /api/web3-operator-credential-handoff`, returns the machine-readable version of the Settings handoff packet. It names safe inputs, never-requested fields, collection surfaces, env targets, next input, and verifier commands for Helius/Solana, Jupiter, dedicated wallet, wallet ownership proof, signer provider, emergency stop, production-worker ops targets, accounting/export target, settlement/accounting review, and manual live approval. It can guide another agent or reviewer through setup without returning raw secrets, private keys, seed phrases, transaction bodies, signed payloads, live execution permission, or wallet mutation authority.
+
+The operator request packet route, `GET /api/web3-operator-request-packet`, turns the same handoff contract into a shareable redacted request packet for another helper or reviewer. It includes required input rows, review rows, safe-to-provide values, never-provide values, verifier commands, and a text packet that can be pasted into research or setup workflows. It returns only env target names and status text; it does not echo configured secrets, accept private keys, sign, submit, mutate wallets, or grant live execution.
 
 The monitor-history route, `GET /api/web3-market-monitor-history`, returns the latest sanitized `npm run monitor:web3` tape: run count, latest symbol, candle confidence, paper action, provider-degraded count, and recent read-only rows. The local file stores no API keys, private keys, seed phrases, transaction bodies, signed payloads, live execution permission, or wallet mutation authority, and rejects rows that do not preserve those blocked permissions.
 

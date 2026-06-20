@@ -861,6 +861,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Operator intake");
     expect(settingsPage).toContain("Next safe input:");
     expect(settingsPage).toContain("Web3 operator request packet");
+    expect(settingsPage).toContain("SettingsWeb3OperatorRequestPacketPanel");
+    expect(settingsPage).toContain("Web3 operator share packet");
+    expect(settingsPage).toContain("Redacted request text");
+    expect(settingsPage).toContain("/api/web3-operator-request-packet?source=live-dex&account=persistent");
     expect(settingsPage).toContain("Safe to provide");
     expect(settingsPage).toContain("Open required lanes");
     expect(settingsPage).toContain("receipt.allowed_inputs.slice(0, 5)");
@@ -961,6 +965,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("MASTERMOLD_WEB3_PROCESS_MANAGER");
     expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("MASTERMOLD_TAX_LEDGER_EXPORT_PATH");
     expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("this app cannot start workers or dispatch alerts");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("web3-operator-request-packet");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("# Mastermind Web3 Operator Request Packet");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("Live execution: blocked");
+    expect(source("app/api/web3-operator-request-packet/route.ts")).toContain("buildWeb3OperatorRequestPacket");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("Dedicated trading wallet");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("Jupiter route/order key");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("Signer/custody choice");
