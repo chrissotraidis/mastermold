@@ -1,0 +1,317 @@
+import { createHash } from "node:crypto";
+import type { Web3ResearchHandoffPacket, Web3ResearchQuestion } from "./web3-research-handoff-packet";
+
+export type Web3ResearchAnswerLaneStatus = "answered" | "partial" | "missing";
+
+export type Web3ResearchAnswerLane = {
+  id: Web3ResearchQuestion["id"];
+  label: string;
+  category: Web3ResearchQuestion["category"];
+  priority: Web3ResearchQuestion["priority"];
+  status: Web3ResearchAnswerLaneStatus;
+  matched_terms: string[];
+  missing_terms: string[];
+  decision_needed: string;
+  next_action: string;
+  answer_storage: "local-session-only" | "not-stored";
+};
+
+export type Web3ResearchAnswerIntakeReceipt = {
+  mode: "web3-research-answer-intake";
+  status: "waiting-for-answers" | "needs-follow-up" | "decision-ready";
+  generated_at: string;
+  receipt_hash: string;
+  handoff_receipt_hash: string;
+  answer_hash: string | null;
+  answer_length: number;
+  answered_count: number;
+  partial_count: number;
+  missing_count: number;
+  decision_ready_count: number;
+  lanes: Web3ResearchAnswerLane[];
+  next_missing_question: string;
+  decision_summary: string;
+  safe_next_actions: string[];
+  redacted_preview: string;
+  safe_to_paste: string[];
+  never_paste: string[];
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  signing_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+  controls: string[];
+};
+
+type ResearchAnswerLaneSpec = {
+  id: Web3ResearchQuestion["id"];
+  label: string;
+  required_terms: string[];
+  helpful_terms: string[];
+  decision_needed: string;
+  next_action: string;
+};
+
+const LANE_SPECS: ResearchAnswerLaneSpec[] = [
+  {
+    id: "custody-architecture",
+    label: "Signer and custody architecture",
+    required_terms: ["turnkey", "privy", "external wallet", "policy", "private key", "seed phrase"],
+    helpful_terms: ["session key", "multisig", "revocation", "caps"],
+    decision_needed: "Choose the first supervised-live signer path without letting Mastermind store wallet secrets.",
+    next_action: "Pick manual external wallet or a reviewed policy-wallet provider, then build signer evidence only from provider-safe target names.",
+  },
+  {
+    id: "provider-stack",
+    label: "Read and market provider stack",
+    required_terms: ["helius", "jupiter", "birdeye", "dex screener", "geckoterminal"],
+    helpful_terms: ["yellowstone", "grpc", "pump.fun", "raydium", "meteora"],
+    decision_needed: "Confirm the read-provider stack for wallet reads, route proof, and live market discovery.",
+    next_action: "Map each provider to read-only wallet, discovery, OHLCV, route, and low-latency roles before adding more keys.",
+  },
+  {
+    id: "moonshot-data-sources",
+    label: "Moonshot-style signal sources",
+    required_terms: ["trending", "launch", "holder", "liquidity", "rug"],
+    helpful_terms: ["promotion", "boost", "creator", "whale", "social"],
+    decision_needed: "Decide which sources make a coin high-signal enough for paper or supervised-live review.",
+    next_action: "Turn the source list into scanner lanes with freshness, rate limit, and trust caveat rows.",
+  },
+  {
+    id: "latency-budget",
+    label: "Latency and staleness budget",
+    required_terms: ["latency", "milliseconds", "seconds", "stale", "refresh"],
+    helpful_terms: ["quote age", "confirmation", "expiry", "priority fee"],
+    decision_needed: "Set max age thresholds for discovery, quote, signing, submission, and exit protection.",
+    next_action: "Add fail-closed staleness thresholds before allowing any live order review.",
+  },
+  {
+    id: "first-live-mode",
+    label: "First real-money mode",
+    required_terms: ["manual", "supervised", "caps", "approval", "rollback"],
+    helpful_terms: ["copilot", "policy wallet", "external review", "single trade"],
+    decision_needed: "Select the smallest real-money launch mode that is safer than autonomous live trading.",
+    next_action: "Convert the recommendation into a manual-live review checklist with caps and rollback rules.",
+  },
+  {
+    id: "compliance-boundaries",
+    label: "Compliance and product copy",
+    required_terms: ["disclosure", "risk", "jurisdiction", "tax", "not financial advice"],
+    helpful_terms: ["consumer", "terms", "regulatory", "claims"],
+    decision_needed: "Define what the product can claim before it helps with live crypto trading.",
+    next_action: "Keep UI copy from promising profit and add required review/disclosure gates before live mode.",
+  },
+  {
+    id: "risk-gates",
+    label: "Live risk gates",
+    required_terms: ["slippage", "daily cap", "drawdown", "liquidity", "holder"],
+    helpful_terms: ["token age", "authority", "mev", "kill switch", "trade size"],
+    decision_needed: "Define hard blocks and resize rules before any signer-bound step.",
+    next_action: "Turn thresholds into verifier checks for size, slippage, drawdown, liquidity, holder risk, and stale quotes.",
+  },
+  {
+    id: "settlement-accounting",
+    label: "Settlement and accounting proof",
+    required_terms: ["gettransaction", "confirmation", "token balance", "fees", "tax"],
+    helpful_terms: ["idempotency", "lot", "pnl", "export", "reconciliation"],
+    decision_needed: "Define evidence required before real PnL can be trusted.",
+    next_action: "Require confirmation polling, token delta parsing, fee accounting, idempotency, and export review before live fills are mirrored.",
+  },
+  {
+    id: "credential-storage",
+    label: "Credential storage contract",
+    required_terms: ["server env", "browser", "never store", "redaction", "verifier"],
+    helpful_terms: ["one-shot", "target name", "api key", "private key"],
+    decision_needed: "Classify every credential by allowed surface and storage rule.",
+    next_action: "Update Settings copy and verifier rules only for credentials that are safe to collect.",
+  },
+  {
+    id: "go-live-checklist",
+    label: "Go-live checklist",
+    required_terms: ["checklist", "operator", "security", "ops", "accounting"],
+    helpful_terms: ["strategy", "pass", "fail", "owner", "rollback"],
+    decision_needed: "Define objective pass/fail evidence before one supervised live trade can be reviewed.",
+    next_action: "Turn the checklist into owner-grouped gates for operator, security, ops, accounting, and strategy.",
+  },
+  {
+    id: "cockpit-dashboard",
+    label: "Operator cockpit dashboard",
+    required_terms: ["chart", "dashboard", "pnl", "drawdown", "position"],
+    helpful_terms: ["first screen", "alert", "timeline", "diagnostics", "mobile"],
+    decision_needed: "Decide what the non-technical operator must see first to trust or stop the agent.",
+    next_action: "Promote wallet equity, position risk, next action, and blocked-live authority into the first viewport.",
+  },
+  {
+    id: "profit-proof",
+    label: "Paper profit proof",
+    required_terms: ["run count", "hit rate", "drawdown", "profit factor", "out-of-sample"],
+    helpful_terms: ["slippage", "baseline", "regime", "promotion", "threshold"],
+    decision_needed: "Define how much paper evidence is enough before risking real capital.",
+    next_action: "Encode proof thresholds into the paper-promotion guard before manual live review can pass.",
+  },
+];
+
+export function buildWeb3ResearchAnswerIntakeReceipt(input: {
+  handoff: Web3ResearchHandoffPacket;
+  answersText?: string;
+  now?: Date;
+}): Web3ResearchAnswerIntakeReceipt {
+  const generatedAt = (input.now ?? new Date()).toISOString();
+  const cleaned = sanitizeAnswerText(input.answersText ?? "");
+  const normalized = cleaned.toLowerCase();
+  const lanes = LANE_SPECS.map((spec) => buildLane(spec, input.handoff, normalized));
+  const answeredCount = lanes.filter((lane) => lane.status === "answered").length;
+  const partialCount = lanes.filter((lane) => lane.status === "partial").length;
+  const missingCount = lanes.filter((lane) => lane.status === "missing").length;
+  const status: Web3ResearchAnswerIntakeReceipt["status"] = cleaned.length === 0
+    ? "waiting-for-answers"
+    : missingCount > 0 || partialCount > 0
+      ? "needs-follow-up"
+      : "decision-ready";
+  const nextMissing = lanes.find((lane) => lane.status !== "answered");
+  const receiptBase = {
+    mode: "web3-research-answer-intake" as const,
+    status,
+    generated_at: generatedAt,
+    handoff_receipt_hash: input.handoff.receipt_hash,
+    answer_hash: cleaned.length > 0 ? hashText(cleaned) : null,
+    answer_length: cleaned.length,
+    answered_count: answeredCount,
+    partial_count: partialCount,
+    missing_count: missingCount,
+    decision_ready_count: answeredCount,
+    lanes,
+    next_missing_question: nextMissing
+      ? input.handoff.research_questions.find((question) => question.id === nextMissing.id)?.question ?? nextMissing.decision_needed
+      : "Research answers cover every tracked decision lane; review manually before changing live gates.",
+    decision_summary: answerDecisionSummary(status, answeredCount, partialCount, missingCount),
+    safe_next_actions: buildSafeNextActions(status, lanes),
+    redacted_preview: cleaned.length > 0 ? cleaned.slice(0, 900) : "Paste research answers from the helper bot to score launch-decision coverage.",
+    safe_to_paste: [
+      "Provider recommendations and docs links",
+      "Custody architecture comparison",
+      "Risk thresholds and launch checklist ideas",
+      "Accounting, ops, and dashboard recommendations",
+      "Public wallet addresses or env target names only when needed",
+    ],
+    never_paste: [
+      "Seed phrases or mnemonics",
+      "Wallet private keys or keypair JSON",
+      "Raw API key values, bearer tokens, or webhook secrets",
+      "Unsigned or signed transaction payloads",
+      "Anything that would let another system move funds",
+    ],
+    live_execution_permission: "blocked" as const,
+    wallet_mutation_permission: "blocked" as const,
+    transaction_submission_permission: "blocked" as const,
+    signing_permission: "blocked" as const,
+    private_key_storage: "blocked" as const,
+    seed_phrase_storage: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
+    controls: [
+      "Research answer intake is local review only; it does not store answers server-side.",
+      "Secret-looking pasted values are rejected before a receipt is returned.",
+      "A decision-ready receipt can inform product work, but it cannot unlock live execution, signing, transaction submission, or wallet mutation.",
+    ],
+  };
+
+  return {
+    ...receiptBase,
+    receipt_hash: hashJson(receiptBase),
+  };
+}
+
+export function assertResearchAnswerTextIsSafe(value: unknown): string {
+  if (typeof value !== "string") return "";
+  if (value.length > 24000) throw new Error("Research answers must be 24,000 characters or fewer.");
+  const unsafe = findUnsafeResearchAnswerPattern(value);
+  if (unsafe) {
+    throw new Error(`Research answers include a secret-looking ${unsafe}; remove it and paste only redacted research.`);
+  }
+  return value;
+}
+
+function buildLane(spec: ResearchAnswerLaneSpec, handoff: Web3ResearchHandoffPacket, normalized: string): Web3ResearchAnswerLane {
+  const question = handoff.research_questions.find((item) => item.id === spec.id);
+  const matchedRequired = spec.required_terms.filter((term) => normalized.includes(term));
+  const matchedHelpful = spec.helpful_terms.filter((term) => normalized.includes(term));
+  const status: Web3ResearchAnswerLaneStatus = normalized.length === 0
+    ? "missing"
+    : matchedRequired.length >= Math.min(3, spec.required_terms.length)
+      ? "answered"
+      : matchedRequired.length > 0 || matchedHelpful.length > 0
+        ? "partial"
+        : "missing";
+
+  return {
+    id: spec.id,
+    label: spec.label,
+    category: question?.category ?? "ops",
+    priority: question?.priority ?? "before-live",
+    status,
+    matched_terms: [...matchedRequired, ...matchedHelpful].slice(0, 8),
+    missing_terms: spec.required_terms.filter((term) => !matchedRequired.includes(term)).slice(0, 8),
+    decision_needed: spec.decision_needed,
+    next_action: status === "answered"
+      ? "Review this recommendation, choose the app decision deliberately, and keep live gates blocked until implementation evidence exists."
+      : spec.next_action,
+    answer_storage: normalized.length > 0 ? "local-session-only" : "not-stored",
+  };
+}
+
+function sanitizeAnswerText(value: string) {
+  return value
+    .replace(/([?&](?:api[-_]?key|token|secret|signature)=)[^&\s]+/gi, "$1<redacted>")
+    .replace(/\b(?:sk|pk|jup|helius)_[A-Za-z0-9_-]{16,}\b/g, "<redacted-secret>")
+    .replace(/\b[A-Za-z0-9+/]{80,}={0,2}\b/g, "<redacted-long-value>")
+    .replace(/[^\w\s.,:/?=&%+<>|()[\]{}'"`!*@#$^-]/g, "")
+    .trim();
+}
+
+function findUnsafeResearchAnswerPattern(value: string) {
+  const patterns: Array<[string, RegExp]> = [
+    ["seed phrase", /(?:seed phrase|mnemonic)\s*[:=]\s*(?:[a-z]+\s+){5,}[a-z]+/i],
+    ["private key", /(?:private[_\s-]?key|keypair)\s*[:=]\s*[A-Za-z0-9_[\]{}"',:/+=-]{24,}/i],
+    ["API key", /(?:api[_\s-]?key|bearer token|webhook secret|app secret)\s*[:=]\s*[A-Za-z0-9_.:/?=&%+-]{16,}/i],
+    ["API-key query value", /api-key=[A-Za-z0-9_-]{16,}/i],
+    ["secret token", /\b(?:sk|pk|jup|helius)_[A-Za-z0-9_-]{16,}\b/g],
+  ];
+  return patterns.find(([, pattern]) => pattern.test(value))?.[0] ?? null;
+}
+
+function answerDecisionSummary(status: Web3ResearchAnswerIntakeReceipt["status"], answered: number, partial: number, missing: number) {
+  if (status === "waiting-for-answers") {
+    return "No research answers have been pasted yet; every launch-decision lane is still waiting for helper output.";
+  }
+  if (status === "decision-ready") {
+    return `Research answers cover all ${answered} tracked launch-decision lanes; review choices manually before changing any live gate.`;
+  }
+  return `Research answers cover ${answered} lane${answered === 1 ? "" : "s"}, partially cover ${partial}, and still miss ${missing}; follow up before supervised live review.`;
+}
+
+function buildSafeNextActions(status: Web3ResearchAnswerIntakeReceipt["status"], lanes: Web3ResearchAnswerLane[]) {
+  if (status === "waiting-for-answers") {
+    return [
+      "Export the Web3 research handoff packet.",
+      "Ask the helper bot to answer every research question without secrets.",
+      "Paste the redacted answer back into this intake console.",
+    ];
+  }
+  const gaps = lanes.filter((lane) => lane.status !== "answered").slice(0, 4);
+  if (gaps.length > 0) return gaps.map((lane) => `${lane.label}: ${lane.next_action}`);
+  return [
+    "Convert covered research decisions into provider, custody, risk, ops, accounting, and dashboard implementation tasks.",
+    "Run strict Web3 verification after each implementation task.",
+    "Keep live execution blocked until manual live review independently passes.",
+  ];
+}
+
+function hashText(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function hashJson(value: unknown) {
+  return hashText(JSON.stringify(value));
+}

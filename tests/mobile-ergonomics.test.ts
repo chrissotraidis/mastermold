@@ -912,6 +912,7 @@ describe("mobile ergonomics source contracts", () => {
     );
     expect(settingsPage).toContain("buildWeb3ResearchHandoffPacket");
     expect(settingsPage).toContain("SettingsWeb3ResearchHandoffPanel");
+    expect(settingsPage).toContain("SettingsWeb3ResearchAnswerConsole");
     expect(settingsPage).toContain("Settings Web3 research handoff packet");
     expect(settingsPage).toContain("Settings Web3 research questions");
     expect(settingsPage).toContain("Settings Web3 research open blockers");
@@ -920,6 +921,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
     expect(settingsPage).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
     expect(settingsPage).toContain("validated export commands only");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Settings Web3 research answer intake");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("/api/web3-research-answer-intake");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Turn helper answers into launch-decision coverage");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Answer intake is a review surface only");
     expect(settingsPage.indexOf("<SettingsWeb3OperatorIntakeBoard")).toBeLessThan(
       settingsPage.indexOf("aria-label=\"Secure Web3 credential handoff\""),
     );
@@ -1380,6 +1385,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("safe_export_commands");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("## Local Export Commands");
+    expect(source("src/db/web3-research-answer-intake.ts")).toContain("web3-research-answer-intake");
+    expect(source("src/db/web3-research-answer-intake.ts")).toContain("Secret-looking pasted values are rejected");
+    expect(source("app/api/web3-research-answer-intake/route.ts")).toContain("assertResearchAnswerTextIsSafe");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("What is the safest Solana custody architecture");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_execution_permission: \"blocked\"");
     expect(source("components/review-readiness.tsx")).toContain("Settings now renders that same Web3 cutover blocker board");

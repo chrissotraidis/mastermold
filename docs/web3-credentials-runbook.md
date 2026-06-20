@@ -141,6 +141,7 @@ GET /api/web3-market-monitor-history
 GET /api/web3-ohlcv
 GET /api/web3-operator-request-packet
 GET /api/web3-operator-runbook
+POST /api/web3-research-answer-intake
 GET /api/web3-research-handoff-packet
 GET /api/web3-provider-health
 GET /api/web3-signer-credential-packet
@@ -166,6 +167,8 @@ The cutover blocker board route, `GET /api/web3-cutover-blocker-board`, reconcil
 The operator runbook route, `GET /api/web3-operator-runbook`, turns usability, cutover, preflight, and supervised-live receipts into a safe action map. It names which app links or local commands can run now, which actions are gated, which real-capital gates still block live trading, and the primary next safe action. It returns only permission scopes, links, commands, target names, and status text; it cannot sign, submit, custody funds, mutate wallets, echo secrets, or approve autonomous live trading. The `/trading` cockpit renders it between the cutover board and command board, and Settings renders the same runbook inside the credential runway before the deeper credential handoff.
 
 The research handoff route, `GET /api/web3-research-handoff-packet`, composes the usability receipt, operator request packet, cutover board, operator runbook, live-capital preflight, supervised-live runway, and manual live-review packet into a shareable research brief. It summarizes current app state, open operator inputs, live-capital blockers, source endpoints, validated export commands, verifier commands, and the provider/custody/risk/ops/product/profit-proof questions that another helper should answer. It returns status, target names, commands, and questions only; it cannot echo configured secrets, accept private keys, sign, submit, mutate wallets, or unlock live trading. Settings renders the same packet after the credential command center so the operator can open the redacted JSON or run the local Markdown/JSON export command before sending work to another helper.
+
+The research answer intake route, `POST /api/web3-research-answer-intake`, accepts redacted helper answers and scores whether they cover the custody, provider, Moonshot-style signal, latency, first-live-mode, compliance, risk, settlement/accounting, credential-storage, go-live, cockpit, and profit-proof decision lanes. It returns a local-session receipt with answered/partial/missing counts, next missing question, safe next actions, and blocked live/signing/wallet permissions. It rejects secret-looking seed phrases, private keys, API keys, tokens, webhook secrets, and API-key query values, does not persist the answer server-side, and cannot sign, submit, mutate wallets, or unlock live trading. Settings renders this answer intake below the research handoff export commands so external research can be turned into app-visible decisions.
 
 `/api/health` also exposes a compact `web3_research_handoff` health summary with question counts, open operator input count, live blocker count, the next research question, and the redacted packet endpoint. It does not include the full text packet, configured secrets, transaction bytes, wallet authority, or live execution permission.
 

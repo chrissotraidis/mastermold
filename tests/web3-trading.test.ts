@@ -24,6 +24,7 @@ import { GET as MARKET_MONITOR_HISTORY_GET } from "@/app/api/web3-market-monitor
 import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
 import { GET as OPERATOR_REQUEST_PACKET_GET } from "@/app/api/web3-operator-request-packet/route";
 import { GET as OPERATOR_RUNBOOK_GET } from "@/app/api/web3-operator-runbook/route";
+import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
@@ -1040,6 +1041,76 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.controls.some((control) => control.includes("safe to share"))).toBe(true);
     expect(text).not.toContain("test-helius-research-secret");
     expect(text).not.toContain("test-jupiter-research-secret");
+  });
+
+  test("GIVEN helper research answers are pasted WHEN answer intake runs THEN it scores decision coverage without live authority", async () => {
+    const answer = [
+      "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
+      "Provider stack: use Helius, Jupiter, Birdeye, DEX Screener, GeckoTerminal, Yellowstone gRPC, Pump.fun, Raydium, and Meteora by role.",
+      "Moonshot data sources should cover trending launches, holder concentration, liquidity, promotion boosts, creator risk, whale flow, and rug flags.",
+      "Latency budget should set milliseconds or seconds limits for stale discovery, quote age, refresh, confirmation, expiry, and priority fee.",
+      "First live mode should be manual supervised approval with caps, rollback, and external review before policy wallet autonomy.",
+      "Compliance boundaries need disclosure, risk, jurisdiction, tax, not financial advice, terms, and prohibited profit claims.",
+      "Risk gates should include slippage, daily cap, drawdown, liquidity, holder concentration, token age, authority, MEV, kill switch, and trade size.",
+      "Settlement accounting should use getTransaction, confirmation, token balance deltas, fees, tax lots, PnL export, idempotency, and reconciliation.",
+      "Credential storage should classify server env, browser public fields, never store, redaction, verifier, one-shot API key, and target name handling.",
+      "Go-live checklist needs operator, security, ops, accounting, strategy, pass fail evidence, owner, and rollback.",
+      "Cockpit dashboard should show chart, dashboard, PnL, drawdown, position, first screen alerts, timeline, diagnostics, and mobile layout.",
+      "Profit proof needs run count, hit rate, drawdown, profit factor, out-of-sample baseline, slippage, regime, promotion threshold.",
+    ].join("\n");
+    const response = await RESEARCH_ANSWER_INTAKE_POST(new Request("http://localhost/api/web3-research-answer-intake?scenario=breakout&source=sample&account=ephemeral", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ answers_text: answer }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      answer_hash: string;
+      answered_count: number;
+      missing_count: number;
+      lanes: Array<{ id: string; status: string; answer_storage: string }>;
+      safe_next_actions: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-research-answer-intake");
+    expect(receipt.status).toBe("decision-ready");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.answer_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.answered_count).toBe(12);
+    expect(receipt.missing_count).toBe(0);
+    expect(receipt.lanes.every((lane) => lane.status === "answered")).toBe(true);
+    expect(receipt.lanes.every((lane) => lane.answer_storage === "local-session-only")).toBe(true);
+    expect(receipt.safe_next_actions).toEqual(expect.arrayContaining([
+      "Keep live execution blocked until manual live review independently passes.",
+    ]));
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.signing_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.some((control) => control.includes("does not store answers server-side"))).toBe(true);
+
+    const rejected = await RESEARCH_ANSWER_INTAKE_POST(new Request("http://localhost/api/web3-research-answer-intake", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ answers_text: "seed phrase: alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu" }),
+    }));
+    const rejectedBody = await json<{ error: string }>(rejected);
+    expect(rejected.status).toBe(422);
+    expect(rejectedBody.error).toContain("secret-looking seed phrase");
   });
 
   test("GIVEN the trading cockpit needs a readiness dossier WHEN usability status is requested THEN it returns compact redacted capability gates", async () => {

@@ -7,6 +7,7 @@ import { IntegrationKeyInput } from "@/components/integration-key-input";
 import { ManualHoldingsPanel } from "@/components/manual-holdings-panel";
 import { ProfileSettings } from "@/components/profile-settings";
 import { SettingsWeb3CredentialConsole } from "@/components/settings-web3-credential-console";
+import { SettingsWeb3ResearchAnswerConsole } from "@/components/settings-web3-research-answer-console";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { productProvenanceLabel } from "@/lib/provenance-copy";
@@ -766,6 +767,15 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
         <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-md border border-outline-variant/20 bg-void/50 p-2 text-[11px] leading-5 text-on-surface-variant">
           {packet.text_packet}
         </pre>
+      </div>
+
+      <div className="mt-3">
+        <SettingsWeb3ResearchAnswerConsole
+          scenario={packet.scenario}
+          source={packet.source}
+          account={packet.account}
+          cycles={0}
+        />
       </div>
 
       <p className="mt-2 text-xs leading-5 text-outline">
