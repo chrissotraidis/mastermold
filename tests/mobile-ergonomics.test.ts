@@ -925,6 +925,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("/api/web3-research-answer-intake");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Turn helper answers into launch-decision coverage");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Answer intake is a review surface only");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Settings Web3 research implementation queue");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("implementation_decisions");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("live authority blocked");
     expect(settingsPage.indexOf("<SettingsWeb3OperatorIntakeBoard")).toBeLessThan(
       settingsPage.indexOf("aria-label=\"Secure Web3 credential handoff\""),
     );
@@ -1387,6 +1390,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("## Local Export Commands");
     expect(source("src/db/web3-research-answer-intake.ts")).toContain("web3-research-answer-intake");
     expect(source("src/db/web3-research-answer-intake.ts")).toContain("Secret-looking pasted values are rejected");
+    expect(source("src/db/web3-research-answer-intake.ts")).toContain("implementation_decisions");
+    expect(source("src/db/web3-research-answer-intake.ts")).toContain("live_authority: \"blocked\"");
     expect(source("app/api/web3-research-answer-intake/route.ts")).toContain("assertResearchAnswerTextIsSafe");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("What is the safest Solana custody architecture");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_execution_permission: \"blocked\"");

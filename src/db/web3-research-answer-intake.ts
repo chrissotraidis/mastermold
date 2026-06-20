@@ -16,6 +16,30 @@ export type Web3ResearchAnswerLane = {
   answer_storage: "local-session-only" | "not-stored";
 };
 
+export type Web3ResearchImplementationDecision = {
+  id:
+    | "custody-signer-path"
+    | "provider-stack"
+    | "signal-quality-stack"
+    | "latency-execution-budget"
+    | "first-live-mode"
+    | "compliance-copy"
+    | "risk-gate-thresholds"
+    | "settlement-accounting-proof"
+    | "credential-storage-contract"
+    | "manual-go-live-checklist"
+    | "operator-cockpit-dashboard"
+    | "profit-proof-threshold";
+  label: string;
+  owner: "security" | "engineering" | "ops" | "accounting" | "product" | "strategy";
+  phase: "now" | "before-live" | "review";
+  status: "ready-to-spec" | "needs-research" | "blocked";
+  source_lanes: Web3ResearchQuestion["id"][];
+  implementation_step: string;
+  verification_command: string;
+  live_authority: "blocked";
+};
+
 export type Web3ResearchAnswerIntakeReceipt = {
   mode: "web3-research-answer-intake";
   status: "waiting-for-answers" | "needs-follow-up" | "decision-ready";
@@ -29,6 +53,9 @@ export type Web3ResearchAnswerIntakeReceipt = {
   missing_count: number;
   decision_ready_count: number;
   lanes: Web3ResearchAnswerLane[];
+  implementation_decisions: Web3ResearchImplementationDecision[];
+  ready_decision_count: number;
+  blocked_decision_count: number;
   next_missing_question: string;
   decision_summary: string;
   safe_next_actions: string[];
@@ -53,6 +80,8 @@ type ResearchAnswerLaneSpec = {
   decision_needed: string;
   next_action: string;
 };
+
+type ResearchImplementationDecisionSpec = Omit<Web3ResearchImplementationDecision, "status" | "live_authority">;
 
 const LANE_SPECS: ResearchAnswerLaneSpec[] = [
   {
@@ -153,6 +182,117 @@ const LANE_SPECS: ResearchAnswerLaneSpec[] = [
   },
 ];
 
+const IMPLEMENTATION_DECISION_SPECS: ResearchImplementationDecisionSpec[] = [
+  {
+    id: "custody-signer-path",
+    label: "Choose signer and custody path",
+    owner: "security",
+    phase: "now",
+    source_lanes: ["custody-architecture", "credential-storage"],
+    implementation_step: "Convert the selected manual-wallet, Privy, Turnkey, or session-key recommendation into a signer policy envelope with no private-key collection.",
+    verification_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet",
+  },
+  {
+    id: "provider-stack",
+    label: "Lock read and route provider stack",
+    owner: "engineering",
+    phase: "now",
+    source_lanes: ["provider-stack", "moonshot-data-sources"],
+    implementation_step: "Map each provider to wallet reads, launch discovery, OHLCV proof, route quotes, order rehearsal, and optional low-latency stream roles.",
+    verification_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live",
+  },
+  {
+    id: "signal-quality-stack",
+    label: "Define high-signal memecoin filters",
+    owner: "strategy",
+    phase: "now",
+    source_lanes: ["moonshot-data-sources", "risk-gates"],
+    implementation_step: "Turn Moonshot-style research into source-quality, holder-flow, liquidity, promotion, creator, and rug-risk score thresholds.",
+    verification_command: "npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json",
+  },
+  {
+    id: "latency-execution-budget",
+    label: "Set staleness and execution age budgets",
+    owner: "engineering",
+    phase: "before-live",
+    source_lanes: ["latency-budget", "risk-gates"],
+    implementation_step: "Encode max ages for discovery, candle proof, route quote, unsigned order, signature prompt, submit relay, and confirmation polling.",
+    verification_command: "npm run landing-drill:web3",
+  },
+  {
+    id: "first-live-mode",
+    label: "Pick first real-money mode",
+    owner: "ops",
+    phase: "review",
+    source_lanes: ["first-live-mode", "go-live-checklist"],
+    implementation_step: "Translate the smallest approved live mode into capped manual-review steps with rollback and kill-switch requirements.",
+    verification_command: "npm run verify:web3 -- --base-url=http://localhost:4010",
+  },
+  {
+    id: "compliance-copy",
+    label: "Finalize live-trading product copy",
+    owner: "product",
+    phase: "before-live",
+    source_lanes: ["compliance-boundaries", "first-live-mode"],
+    implementation_step: "Replace any profit-promising language with reviewed risk, jurisdiction, tax, autonomy, and not-financial-advice boundaries.",
+    verification_command: "npm run typecheck",
+  },
+  {
+    id: "risk-gate-thresholds",
+    label: "Encode hard risk gates",
+    owner: "strategy",
+    phase: "now",
+    source_lanes: ["risk-gates", "latency-budget", "moonshot-data-sources"],
+    implementation_step: "Implement threshold constants for slippage, daily cap, drawdown, liquidity, holder concentration, authority risk, token age, and MEV exposure.",
+    verification_command: "npm run verify:web3 -- --base-url=http://localhost:4010",
+  },
+  {
+    id: "settlement-accounting-proof",
+    label: "Prove settlement and accounting",
+    owner: "accounting",
+    phase: "before-live",
+    source_lanes: ["settlement-accounting", "credential-storage"],
+    implementation_step: "Require confirmation polling, owner-scoped token deltas, fee accounting, lot/idempotency handling, and reviewed export readiness before mirroring live fills.",
+    verification_command: "npm run doctor:web3 -- --json",
+  },
+  {
+    id: "credential-storage-contract",
+    label: "Publish credential storage contract",
+    owner: "security",
+    phase: "now",
+    source_lanes: ["credential-storage", "custody-architecture"],
+    implementation_step: "Update the credential form and runbook with server-env, session-only, browser-public, hash-only, future-vault, and never-store rules.",
+    verification_command: "npm run verify:web3 -- --base-url=http://localhost:4010",
+  },
+  {
+    id: "manual-go-live-checklist",
+    label: "Build manual go-live checklist",
+    owner: "ops",
+    phase: "review",
+    source_lanes: ["go-live-checklist", "first-live-mode", "settlement-accounting"],
+    implementation_step: "Convert research into owner-grouped pass/fail gates for operator, security, ops, accounting, product, and strategy signoff.",
+    verification_command: "npm run doctor:web3 -- --json",
+  },
+  {
+    id: "operator-cockpit-dashboard",
+    label: "Tighten operator cockpit first viewport",
+    owner: "product",
+    phase: "now",
+    source_lanes: ["cockpit-dashboard", "risk-gates", "profit-proof"],
+    implementation_step: "Promote wallet net worth, PnL, drawdown, exposure, held-position pressure, next action, queue status, and live authority blocked state into the first screen.",
+    verification_command: "npm run typecheck",
+  },
+  {
+    id: "profit-proof-threshold",
+    label: "Set paper profit proof threshold",
+    owner: "strategy",
+    phase: "before-live",
+    source_lanes: ["profit-proof", "go-live-checklist"],
+    implementation_step: "Encode required run count, hit rate, max drawdown, profit factor, regime coverage, baseline alpha, and out-of-sample proof into the promotion guard.",
+    verification_command: "npm run forward-repeat:web3 -- --base-url=http://localhost:4010 --json",
+  },
+];
+
 export function buildWeb3ResearchAnswerIntakeReceipt(input: {
   handoff: Web3ResearchHandoffPacket;
   answersText?: string;
@@ -165,6 +305,9 @@ export function buildWeb3ResearchAnswerIntakeReceipt(input: {
   const answeredCount = lanes.filter((lane) => lane.status === "answered").length;
   const partialCount = lanes.filter((lane) => lane.status === "partial").length;
   const missingCount = lanes.filter((lane) => lane.status === "missing").length;
+  const implementationDecisions = buildImplementationDecisions(lanes);
+  const readyDecisionCount = implementationDecisions.filter((decision) => decision.status === "ready-to-spec").length;
+  const blockedDecisionCount = implementationDecisions.filter((decision) => decision.status === "blocked").length;
   const status: Web3ResearchAnswerIntakeReceipt["status"] = cleaned.length === 0
     ? "waiting-for-answers"
     : missingCount > 0 || partialCount > 0
@@ -183,11 +326,14 @@ export function buildWeb3ResearchAnswerIntakeReceipt(input: {
     missing_count: missingCount,
     decision_ready_count: answeredCount,
     lanes,
+    implementation_decisions: implementationDecisions,
+    ready_decision_count: readyDecisionCount,
+    blocked_decision_count: blockedDecisionCount,
     next_missing_question: nextMissing
       ? input.handoff.research_questions.find((question) => question.id === nextMissing.id)?.question ?? nextMissing.decision_needed
       : "Research answers cover every tracked decision lane; review manually before changing live gates.",
     decision_summary: answerDecisionSummary(status, answeredCount, partialCount, missingCount),
-    safe_next_actions: buildSafeNextActions(status, lanes),
+    safe_next_actions: buildSafeNextActions(status, lanes, implementationDecisions),
     redacted_preview: cleaned.length > 0 ? cleaned.slice(0, 900) : "Paste research answers from the helper bot to score launch-decision coverage.",
     safe_to_paste: [
       "Provider recommendations and docs links",
@@ -261,6 +407,26 @@ function buildLane(spec: ResearchAnswerLaneSpec, handoff: Web3ResearchHandoffPac
   };
 }
 
+function buildImplementationDecisions(lanes: Web3ResearchAnswerLane[]): Web3ResearchImplementationDecision[] {
+  const laneById = new Map(lanes.map((lane) => [lane.id, lane]));
+  return IMPLEMENTATION_DECISION_SPECS.map((spec) => {
+    const sourceLanes = spec.source_lanes.map((laneId) => laneById.get(laneId));
+    const missing = sourceLanes.some((lane) => !lane || lane.status === "missing");
+    const partial = sourceLanes.some((lane) => lane?.status === "partial");
+    const status: Web3ResearchImplementationDecision["status"] = missing
+      ? "blocked"
+      : partial
+        ? "needs-research"
+        : "ready-to-spec";
+
+    return {
+      ...spec,
+      status,
+      live_authority: "blocked",
+    };
+  });
+}
+
 function sanitizeAnswerText(value: string) {
   return value
     .replace(/([?&](?:api[-_]?key|token|secret|signature)=)[^&\s]+/gi, "$1<redacted>")
@@ -291,7 +457,11 @@ function answerDecisionSummary(status: Web3ResearchAnswerIntakeReceipt["status"]
   return `Research answers cover ${answered} lane${answered === 1 ? "" : "s"}, partially cover ${partial}, and still miss ${missing}; follow up before supervised live review.`;
 }
 
-function buildSafeNextActions(status: Web3ResearchAnswerIntakeReceipt["status"], lanes: Web3ResearchAnswerLane[]) {
+function buildSafeNextActions(
+  status: Web3ResearchAnswerIntakeReceipt["status"],
+  lanes: Web3ResearchAnswerLane[],
+  implementationDecisions: Web3ResearchImplementationDecision[],
+) {
   if (status === "waiting-for-answers") {
     return [
       "Export the Web3 research handoff packet.",
@@ -301,7 +471,12 @@ function buildSafeNextActions(status: Web3ResearchAnswerIntakeReceipt["status"],
   }
   const gaps = lanes.filter((lane) => lane.status !== "answered").slice(0, 4);
   if (gaps.length > 0) return gaps.map((lane) => `${lane.label}: ${lane.next_action}`);
+  const readySteps = implementationDecisions
+    .filter((decision) => decision.status === "ready-to-spec")
+    .slice(0, 3)
+    .map((decision) => decision.implementation_step);
   return [
+    ...readySteps,
     "Convert covered research decisions into provider, custody, risk, ops, accounting, and dashboard implementation tasks.",
     "Run strict Web3 verification after each implementation task.",
     "Keep live execution blocked until manual live review independently passes.",

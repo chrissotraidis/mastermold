@@ -1071,6 +1071,17 @@ describe("Web3 autonomous trading subsystem", () => {
       answered_count: number;
       missing_count: number;
       lanes: Array<{ id: string; status: string; answer_storage: string }>;
+      implementation_decisions: Array<{
+        id: string;
+        label: string;
+        owner: string;
+        phase: string;
+        status: string;
+        verification_command: string;
+        live_authority: string;
+      }>;
+      ready_decision_count: number;
+      blocked_decision_count: number;
       safe_next_actions: string[];
       live_execution_permission: string;
       wallet_mutation_permission: string;
@@ -1091,7 +1102,21 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.missing_count).toBe(0);
     expect(receipt.lanes.every((lane) => lane.status === "answered")).toBe(true);
     expect(receipt.lanes.every((lane) => lane.answer_storage === "local-session-only")).toBe(true);
+    expect(receipt.ready_decision_count).toBe(12);
+    expect(receipt.blocked_decision_count).toBe(0);
+    expect(receipt.implementation_decisions.map((decision) => decision.id)).toEqual(expect.arrayContaining([
+      "custody-signer-path",
+      "provider-stack",
+      "risk-gate-thresholds",
+      "settlement-accounting-proof",
+      "operator-cockpit-dashboard",
+      "profit-proof-threshold",
+    ]));
+    expect(receipt.implementation_decisions.every((decision) => decision.status === "ready-to-spec")).toBe(true);
+    expect(receipt.implementation_decisions.every((decision) => decision.live_authority === "blocked")).toBe(true);
+    expect(receipt.implementation_decisions.some((decision) => decision.verification_command.includes("npm run verify:web3"))).toBe(true);
     expect(receipt.safe_next_actions).toEqual(expect.arrayContaining([
+      "Convert the selected manual-wallet, Privy, Turnkey, or session-key recommendation into a signer policy envelope with no private-key collection.",
       "Keep live execution blocked until manual live review independently passes.",
     ]));
     expect(receipt.live_execution_permission).toBe("blocked");

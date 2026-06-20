@@ -53,6 +53,7 @@ export function SettingsWeb3ResearchAnswerConsole({
   }
 
   const visibleLanes = receipt?.lanes.slice(0, 6) ?? [];
+  const visibleDecisions = receipt?.implementation_decisions.slice(0, 6) ?? [];
 
   return (
     <div className="rounded-md border border-violet/25 bg-surface-dim/30 p-3" aria-label="Settings Web3 research answer intake">
@@ -101,7 +102,7 @@ export function SettingsWeb3ResearchAnswerConsole({
             <ResearchMetric label="Answered" value={String(receipt.answered_count)} />
             <ResearchMetric label="Partial" value={String(receipt.partial_count)} />
             <ResearchMetric label="Missing" value={String(receipt.missing_count)} />
-            <ResearchMetric label="Decision lanes" value={String(receipt.lanes.length)} />
+            <ResearchMetric label="Ready tasks" value={String(receipt.ready_decision_count)} />
           </div>
 
           <div className="grid gap-2 md:grid-cols-2" aria-label="Settings Web3 research answer decision lanes">
@@ -120,6 +121,35 @@ export function SettingsWeb3ResearchAnswerConsole({
                 <p className="mt-1 text-[11px] leading-4 text-outline">{lane.next_action}</p>
               </div>
             ))}
+          </div>
+
+          <div className="rounded-md border border-outline-variant/25 bg-black/15 p-2" aria-label="Settings Web3 research implementation queue">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Implementation queue</p>
+                <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                  {receipt.ready_decision_count} ready · {receipt.blocked_decision_count} blocked · live authority blocked
+                </p>
+              </div>
+              <Badge variant="outline" className="border-critical/35 bg-critical/10 text-xs text-critical">live authority blocked</Badge>
+            </div>
+            <div className="mt-2 grid gap-2 lg:grid-cols-2">
+              {visibleDecisions.map((decision) => (
+                <div key={decision.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-on-surface">{decision.label}</p>
+                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                        {decision.owner} · {decision.phase}
+                      </p>
+                    </div>
+                    <DecisionStatusBadge status={decision.status} />
+                  </div>
+                  <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{decision.implementation_step}</p>
+                  <p className="mt-1 break-words font-mono text-[10px] leading-4 text-outline">{decision.verification_command}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="rounded-md border border-outline-variant/25 bg-black/15 p-2" aria-label="Settings Web3 research answer next action">
@@ -173,6 +203,22 @@ function LaneStatusBadge({ status }: { status: Web3ResearchAnswerIntakeReceipt["
       )}
     >
       {status}
+    </Badge>
+  );
+}
+
+function DecisionStatusBadge({ status }: { status: Web3ResearchAnswerIntakeReceipt["implementation_decisions"][number]["status"] }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "border text-xs",
+        status === "ready-to-spec" && "border-engine/35 bg-engine/10 text-engine",
+        status === "needs-research" && "border-caution/40 bg-caution/10 text-caution",
+        status === "blocked" && "border-critical/35 bg-critical/10 text-critical",
+      )}
+    >
+      {status.replaceAll("-", " ")}
     </Badge>
   );
 }
