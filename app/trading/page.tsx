@@ -112,15 +112,20 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
 
         <div className="w-full min-w-0 space-y-4">
           <TradingSourceSwitch source={source} account={account} />
-          <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
-          <CutoverBlockerBoardPanel board={cutoverBlockerBoard} source={source} account={account} />
-          <OperatorRunbookPanel runbook={operatorRunbook} source={source} account={account} />
           <TradingCommandBoard
             state={initialState}
             status={usabilityStatus}
             runway={supervisedLiveRunway}
             launchChecklist={launchChecklist}
+            cutover={cutoverBlockerBoard}
+            runbook={operatorRunbook}
+            preflight={liveCapitalPreflight}
           />
+          <ReadinessReceiptsDrawer>
+            <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
+            <CutoverBlockerBoardPanel board={cutoverBlockerBoard} source={source} account={account} />
+            <OperatorRunbookPanel runbook={operatorRunbook} source={source} account={account} />
+          </ReadinessReceiptsDrawer>
           <MarketMonitorHistoryPanel history={monitorHistory} />
 
           <Web3TradingWorkspaceLoader
@@ -216,16 +221,23 @@ function TradingCommandBoard({
   status,
   runway,
   launchChecklist,
+  cutover,
+  runbook,
+  preflight,
 }: {
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
   status: Web3UsabilityStatusReceipt;
   runway: Web3SupervisedLiveRunway;
   launchChecklist: ReturnType<typeof buildWeb3AutonomyLaunchChecklist>;
+  cutover: Web3CutoverBlockerBoard;
+  runbook: Web3OperatorRunbookReceipt;
+  preflight: ReturnType<typeof buildWeb3LiveCapitalPreflightReceipt>;
 }) {
   const wallet = state.autonomous_wallet_telemetry;
   const decision = state.autonomous_now_decision;
   const fusion = state.autonomous_market_evidence_fusion;
   const route = state.autonomous_route_refresh_execution;
+  const primaryAction = runbook.primary_safe_action;
   const nextGate = status.capabilities.find((capability) => capability.status === "gated") ??
     status.capabilities.find((capability) => capability.status === "watch") ??
     status.capabilities[0];
@@ -288,23 +300,57 @@ function TradingCommandBoard({
         </div>
 
         <div className="grid min-w-0 gap-3">
-          <div className="rounded-md border border-caution/25 bg-caution/[0.04] p-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next usable gate</p>
-            <p className="mt-1 text-sm font-semibold text-on-surface">{nextGate?.label ?? status.next_gate_label}</p>
-            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{nextGate?.next_action ?? status.next_gate_action}</p>
+          <div className="rounded-md border border-engine/25 bg-surface/55 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Primary safe action</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{primaryAction?.label ?? "Review setup first"}</p>
+              </div>
+              <span className={operatorRunbookActionClassName(primaryAction?.status ?? "gated")}>{primaryAction?.status ?? "gated"}</span>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              {primaryAction?.next_action ?? runbook.next_safe_input?.next_action ?? runbook.next_live_lane_action}
+            </p>
+            {primaryAction?.command ? (
+              <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                {primaryAction.command}
+              </code>
+            ) : primaryAction?.href ? (
+              <Link
+                href={primaryAction.href}
+                className="mt-2 inline-flex min-h-10 items-center justify-center rounded-md border border-engine/30 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine"
+              >
+                Open safe surface
+              </Link>
+            ) : null}
           </div>
 
-          <div className="rounded-md border border-outline/15 bg-surface-dim/45 p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Live review lanes</p>
-                <p className="mt-1 text-sm font-semibold text-on-surface">
-                  {runway.ready_lane_count}/{runway.total_lane_count} ready
-                </p>
-              </div>
-              <span className={runwayStatusClassName(runway.status)}>{runway.status.replaceAll("-", " ")}</span>
+          <div className="grid grid-cols-2 gap-2">
+            <CommandBoardMetric label="Can run" value={`${runbook.allowed_now_count}`} detail={`${runbook.gated_count} gated`} tone="engine" />
+            <CommandBoardMetric label="Live lanes" value={`${runway.ready_lane_count}/${runway.total_lane_count}`} detail={runway.status.replaceAll("-", " ")} tone={runway.ready_lane_count === runway.total_lane_count ? "engine" : "caution"} />
+            <CommandBoardMetric label="Open blockers" value={`${cutover.open_blocker_count}`} detail={cutover.next_safe_input?.label ?? "review queue"} tone={cutover.open_blocker_count > 0 ? "caution" : "engine"} />
+            <CommandBoardMetric label="Preflight" value={`${preflight.launch_readiness_score}/100`} detail={`${preflight.blocker_count} blockers`} tone={preflight.live_review_permitted ? "engine" : preflight.failed_gate_count > 0 ? "critical" : "caution"} />
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="rounded-md border border-caution/25 bg-caution/[0.04] p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next usable gate</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{nextGate?.label ?? status.next_gate_label}</p>
+              <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">{nextGate?.next_action ?? status.next_gate_action}</p>
             </div>
-            <p className="mt-2 text-xs leading-5 text-on-surface-variant">{runway.next_action}</p>
+
+            <div className="rounded-md border border-outline/15 bg-surface-dim/45 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Live review lanes</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">
+                    {runway.ready_lane_count}/{runway.total_lane_count} ready
+                  </p>
+                </div>
+                <span className={runwayStatusClassName(runway.status)}>{runway.status.replaceAll("-", " ")}</span>
+              </div>
+              <p className="mt-2 line-clamp-3 text-xs leading-5 text-on-surface-variant">{runway.next_action}</p>
+            </div>
           </div>
 
           <div className="rounded-md border border-outline/15 bg-surface/65 p-3">
@@ -477,6 +523,25 @@ function formatTradingCompactCurrency(value: number) {
     notation: "compact",
     maximumFractionDigits: Math.abs(value) >= 10_000 ? 1 : 0,
   }).format(value);
+}
+
+function ReadinessReceiptsDrawer({ children }: { children: React.ReactNode }) {
+  return (
+    <details className="group min-w-0">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-md border border-outline/15 bg-surface/70 px-3 py-2 text-sm font-semibold text-on-surface transition hover:border-engine/35 hover:text-engine">
+        <span>Readiness receipts and runbook</span>
+        <span className="rounded-md border border-outline/20 bg-surface-dim/55 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline group-open:hidden">
+          open
+        </span>
+        <span className="hidden rounded-md border border-engine/25 bg-engine/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-engine group-open:inline-flex">
+          shown
+        </span>
+      </summary>
+      <div className="mt-3 space-y-3">
+        {children}
+      </div>
+    </details>
+  );
 }
 
 function UsabilityStatusPanel({

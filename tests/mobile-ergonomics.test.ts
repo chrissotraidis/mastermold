@@ -693,6 +693,12 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<MarketMonitorHistoryPanel"),
     );
     expect(tradingPage.indexOf("<TradingSourceSwitch")).toBeLessThan(
+      tradingPage.indexOf("<TradingCommandBoard"),
+    );
+    expect(tradingPage.indexOf("<TradingCommandBoard")).toBeLessThan(
+      tradingPage.indexOf("<ReadinessReceiptsDrawer"),
+    );
+    expect(tradingPage.indexOf("<ReadinessReceiptsDrawer")).toBeLessThan(
       tradingPage.indexOf("<UsabilityStatusPanel"),
     );
     expect(tradingPage.indexOf("<UsabilityStatusPanel")).toBeLessThan(
@@ -702,8 +708,10 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<OperatorRunbookPanel"),
     );
     expect(tradingPage.indexOf("<OperatorRunbookPanel")).toBeLessThan(
-      tradingPage.indexOf("<TradingCommandBoard"),
+      tradingPage.indexOf("<MarketMonitorHistoryPanel"),
     );
+    expect(tradingPage).toContain("ReadinessReceiptsDrawer");
+    expect(tradingPage).toContain("Readiness receipts and runbook");
     expect(tradingPage).toContain("Web3 market source switch");
     expect(tradingPage).toContain("Choose Web3 market source");
     expect(tradingPage).toContain("Sample tape");
@@ -745,6 +753,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Command board");
     expect(tradingPage).toContain("WalletNetWorthCurve");
     expect(tradingPage).toContain("First-screen Web3 wallet net worth curve");
+    expect(tradingPage).toContain("Can run");
+    expect(tradingPage).toContain("Open blockers");
+    expect(tradingPage).toContain("Preflight");
     expect(tradingPage).toContain("Next usable gate");
     expect(tradingPage).toContain("Live review lanes");
     expect(tradingPage).toContain("Inputs still needed");
