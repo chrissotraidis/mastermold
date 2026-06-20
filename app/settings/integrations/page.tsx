@@ -1380,7 +1380,7 @@ function SettingsLiveOpsPacketPanel({ packet }: { packet: Web3LiveOpsPacket }) {
 }
 
 function SettingsCredentialDoctorPanel({ health }: { health: Web3CredentialDoctorHealth }) {
-  const topChecks = health.checks.slice(0, 9);
+  const doctorChecks = health.checks;
   return (
     <div className="rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3" aria-label="Web3 credential doctor receipt">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1397,7 +1397,7 @@ function SettingsCredentialDoctorPanel({ health }: { health: Web3CredentialDocto
         />
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {topChecks.length > 0 ? topChecks.map((item) => (
+        {doctorChecks.length > 0 ? doctorChecks.map((item) => (
           <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">

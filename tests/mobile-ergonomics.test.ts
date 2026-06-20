@@ -891,7 +891,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsCredentialDoctorPanel");
     expect(settingsPage).toContain("Credential doctor receipt");
     expect(settingsPage).toContain("npm run doctor:web3 -- --json");
-    expect(settingsPage).toContain("health.checks.slice(0, 9)");
+    expect(settingsPage).toContain("const doctorChecks = health.checks");
     expect(settingsPage).toContain("health.safe_commands.slice(0, 5)");
     expect(settingsPage).toContain("Doctor receipts are local, sanitized, and status-only");
     expect(settingsPage).toContain("SettingsSignerCredentialPacketPanel");
