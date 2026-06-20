@@ -55,6 +55,8 @@ export type Web3JupiterOrderPacket = {
   key_storage: "server-env-or-one-shot-only";
   browser_storage_permission: "blocked";
   secret_echo_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
   unsigned_transaction_return: "withheld";
   transaction_body_storage: "blocked";
   execute_permission: "blocked";
@@ -139,6 +141,8 @@ export function buildWeb3JupiterOrderPacket(state: Web3TradingState): Web3Jupite
     key_storage: "server-env-or-one-shot-only" as const,
     browser_storage_permission: "blocked" as const,
     secret_echo_permission: "blocked" as const,
+    private_key_storage: "blocked" as const,
+    seed_phrase_storage: "blocked" as const,
     unsigned_transaction_return: "withheld" as const,
     transaction_body_storage: "blocked" as const,
     execute_permission: "blocked" as const,

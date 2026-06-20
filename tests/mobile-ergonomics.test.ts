@@ -1330,6 +1330,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyUsabilityStatusReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-usability-status?source=live-dex&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("usability-status-receipt");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyLiveReadinessPackets");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-dedicated-wallet-packet?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-jupiter-order-packet?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-signer-credential-packet?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-ops-packet?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-capital-preflight?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-accounting-ledger?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-readiness-packets");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyOperatorSetupPackets");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-operator-request-packet?source=live-dex&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-cutover-blocker-board?source=live-dex&account=persistent");

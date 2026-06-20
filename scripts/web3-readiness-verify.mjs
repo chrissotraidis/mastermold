@@ -420,6 +420,139 @@ async function verifyUsabilityStatusReceipt() {
   record("usability-status-receipt", "pass", `${json.current_mode}; next gate ${json.next_gate_label}`);
 }
 
+function assertReceiptHash(label, value) {
+  assert(typeof value === "string" && /^[0-9a-f]{64}$/.test(value), `${label} should include a 64-character receipt hash.`, value);
+}
+
+function assertBlockedWhenPresent(label, json, fields) {
+  for (const field of fields) {
+    if (field in json) {
+      assert(json[field] === "blocked", `${label} must keep ${field.replaceAll("_", " ")} blocked.`, json);
+    }
+  }
+}
+
+async function verifyLiveReadinessPackets() {
+  const wallet = await requestJson("/api/web3-dedicated-wallet-packet?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(wallet.response.status === 200, "Dedicated wallet packet should return 200.", {
+    status: wallet.response.status,
+    json: wallet.json,
+  });
+  assert(wallet.json.mode === "web3-dedicated-wallet-packet", "Dedicated wallet packet should expose the expected mode.", wallet.json);
+  assert(["missing-wallet", "sample-wallet", "ownership-needed", "strict-verifier-ready", "review-ready"].includes(wallet.json.status), "Dedicated wallet packet should use a known status.", wallet.json);
+  assertReceiptHash("Dedicated wallet packet", wallet.json.receipt_hash);
+  assert(wallet.json.strict_verifier_command?.includes("--require-operator-wallet"), "Dedicated wallet packet should expose the strict operator-wallet verifier.", wallet.json);
+  assert(Array.isArray(wallet.json.steps) && wallet.json.steps.some((step) => step.id === "keep-secrets-out"), "Dedicated wallet packet should include the keep-secrets-out step.", wallet.json.steps);
+  assert(Array.isArray(wallet.json.setup_links) && wallet.json.setup_links.some((link) => String(link.url).includes("solana.com/wallets")), "Dedicated wallet packet should link external wallet setup docs.", wallet.json.setup_links);
+  assertBlockedAuthority("Dedicated wallet packet", wallet.json);
+
+  const jupiter = await requestJson("/api/web3-jupiter-order-packet?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(jupiter.response.status === 200, "Jupiter order packet should return 200.", {
+    status: jupiter.response.status,
+    json: jupiter.json,
+  });
+  assert(jupiter.json.mode === "web3-jupiter-order-packet", "Jupiter order packet should expose the expected mode.", jupiter.json);
+  assert(["missing-key", "wallet-needed", "rehearsal-needed", "review-ready"].includes(jupiter.json.status), "Jupiter order packet should use a known status.", jupiter.json);
+  assertReceiptHash("Jupiter order packet", jupiter.json.receipt_hash);
+  assert(Array.isArray(jupiter.json.env_targets) && jupiter.json.env_targets.includes("JUPITER_API_KEY"), "Jupiter order packet should name the server env target.", jupiter.json.env_targets);
+  assert(jupiter.json.strict_verifier_command?.includes("--require-jupiter-order"), "Jupiter order packet should expose the strict Jupiter verifier.", jupiter.json);
+  assert(jupiter.json.rehearsal_endpoint === "POST /api/web3-jupiter-rehearsal", "Jupiter order packet should point to the rehearsal endpoint.", jupiter.json);
+  assert(jupiter.json.unsigned_transaction_return === "withheld", "Jupiter order packet should withhold unsigned transaction bytes.", jupiter.json);
+  assert(jupiter.json.transaction_body_storage === "blocked", "Jupiter order packet should block transaction body storage.", jupiter.json);
+  assert(jupiter.json.execute_permission === "blocked", "Jupiter order packet should block execute permission.", jupiter.json);
+  assertBlockedAuthority("Jupiter order packet", jupiter.json);
+
+  const signer = await requestJson("/api/web3-signer-credential-packet?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(signer.response.status === 200, "Signer credential packet should return 200.", {
+    status: signer.response.status,
+    json: signer.json,
+  });
+  assert(signer.json.mode === "web3-signer-credential-packet", "Signer credential packet should expose the expected mode.", signer.json);
+  assert(
+    ["missing-wallet", "needs-provider-choice", "needs-provider-credentials", "needs-policy", "needs-signer-request", "review-ready", "blocked"].includes(signer.json.status),
+    "Signer credential packet should use a known status.",
+    signer.json,
+  );
+  assertReceiptHash("Signer credential packet", signer.json.receipt_hash);
+  assert(signer.json.recommended_provider === "external-wallet", "Signer credential packet should recommend external wallet first.", signer.json);
+  assert(Array.isArray(signer.json.paths) && signer.json.paths.some((path) => path.id === "external-wallet" && path.requires_user_presence === true), "Signer credential packet should include a user-present external wallet path.", signer.json.paths);
+  assert(Array.isArray(signer.json.required_evidence) && signer.json.required_evidence.some((item) => item.includes("Manual live-executor review")), "Signer credential packet should require manual live-executor review.", signer.json.required_evidence);
+  assert(signer.json.external_account_permission === "operator-external-only", "Signer credential packet should keep provider accounts external.", signer.json);
+  assert(signer.json.in_app_provider_signup_permission === "blocked", "Signer credential packet should block in-app provider signup.", signer.json);
+  assert(signer.json.raw_transaction_storage === "blocked", "Signer credential packet should block raw transaction storage.", signer.json);
+  assert(signer.json.signed_payload_storage === "blocked", "Signer credential packet should block signed payload storage.", signer.json);
+  assertBlockedWhenPresent("Signer credential packet", signer.json, [
+    "live_execution_permission",
+    "wallet_mutation_permission",
+    "private_key_storage",
+    "seed_phrase_storage",
+    "secret_echo_permission",
+  ]);
+
+  const liveOps = await requestJson("/api/web3-live-ops-packet?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(liveOps.response.status === 200, "Live ops packet should return 200.", {
+    status: liveOps.response.status,
+    json: liveOps.json,
+  });
+  assert(liveOps.json.mode === "web3-live-ops-packet", "Live ops packet should expose the expected mode.", liveOps.json);
+  assert(
+    ["missing-supervisor", "stale-supervisor", "missing-emergency-stop", "accounting-needed", "process-review-needed", "manual-review-needed", "blocked"].includes(liveOps.json.status),
+    "Live ops packet should use a known status.",
+    liveOps.json,
+  );
+  assertReceiptHash("Live ops packet", liveOps.json.receipt_hash);
+  assert(liveOps.json.can_satisfy_process_gate === false, "Live ops packet must not satisfy the production process gate from inside the app.", liveOps.json);
+  assert(liveOps.json.manual_live_review_required === true, "Live ops packet should require manual live review.", liveOps.json);
+  assert(Array.isArray(liveOps.json.safe_commands) && liveOps.json.safe_commands.some((command) => command.includes("verify:web3")), "Live ops packet should include safe verifier commands.", liveOps.json.safe_commands);
+  assert(liveOps.json.external_dispatch_permission === "blocked", "Live ops packet should block external dispatch.", liveOps.json);
+  assertBlockedAuthority("Live ops packet", liveOps.json);
+
+  const preflight = await requestJson("/api/web3-live-capital-preflight?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(preflight.response.status === 200, "Live-capital preflight should return 200.", {
+    status: preflight.response.status,
+    json: preflight.json,
+  });
+  assert(preflight.json.mode === "web3-live-capital-preflight-receipt", "Live-capital preflight should expose the expected mode.", preflight.json);
+  assert(["blocked", "blocked-as-expected", "manual-live-review"].includes(preflight.json.status), "Live-capital preflight should use a known status.", preflight.json);
+  assertReceiptHash("Live-capital preflight", preflight.json.receipt_hash);
+  assert(Array.isArray(preflight.json.gates) && preflight.json.gates.length >= 10, "Live-capital preflight should include gate rows.", preflight.json.gates);
+  assert(
+    ["operator-wallet", "provider-read-rail", "live-dex", "jupiter-order", "risk-policy", "kill-switch", "signer-custody", "settlement", "profit-proof", "manual-live-review"].every((id) =>
+      preflight.json.gates.some((gate) => gate.id === id),
+    ),
+    "Live-capital preflight should cover every real-capital gate.",
+    preflight.json.gates,
+  );
+  assert(preflight.json.passed_gate_count + preflight.json.watch_gate_count + preflight.json.failed_gate_count === preflight.json.gates.length, "Live-capital preflight gate totals should reconcile.", preflight.json);
+  assert(preflight.json.wallet_mutation_permission === "blocked", "Live-capital preflight must keep wallet mutation blocked.", preflight.json);
+  assert(preflight.json.transaction_submission_permission === "blocked", "Live-capital preflight must keep transaction submission blocked.", preflight.json);
+  assert(preflight.json.private_key_storage === "blocked", "Live-capital preflight must block private-key storage.", preflight.json);
+  assert(preflight.json.secret_echo_permission === "blocked", "Live-capital preflight must block secret echo.", preflight.json);
+  assert(preflight.json.real_capital_blocked === true || preflight.json.live_execution_permission === "manual-live-executor-review", "Live-capital preflight should never grant direct real-capital authority.", preflight.json);
+
+  const accounting = await requestJson("/api/web3-accounting-ledger?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(accounting.response.status === 200, "Accounting ledger receipt should return 200.", {
+    status: accounting.response.status,
+    json: accounting.json,
+  });
+  assert(accounting.json.mode === "web3-accounting-ledger-receipt", "Accounting ledger receipt should expose the expected mode.", accounting.json);
+  assert(["paper-ledger-ready", "missing-paper-fills", "live-accounting-gated", "settlement-review", "blocked"].includes(accounting.json.status), "Accounting ledger receipt should use a known status.", accounting.json);
+  assertReceiptHash("Accounting ledger receipt", accounting.json.receipt_hash);
+  assert(accounting.json.export_scope === "paper-ledger-and-redacted-readiness", "Accounting ledger receipt should use the redacted export scope.", accounting.json);
+  assert(accounting.json.accounting_boundary === "paper-only", "Accounting ledger receipt should keep accounting paper-only.", accounting.json);
+  assert(Array.isArray(accounting.json.export_columns) && accounting.json.export_columns.includes("source_id_hash"), "Accounting ledger receipt should export hashed source ids.", accounting.json.export_columns);
+  assert(Array.isArray(accounting.json.checks) && accounting.json.checks.some((check) => check.id === "live-boundary"), "Accounting ledger receipt should include live-boundary checks.", accounting.json.checks);
+  assert(accounting.json.live_execution_permission === "blocked", "Accounting ledger receipt must keep live execution blocked.", accounting.json);
+  assert(accounting.json.wallet_mutation_permission === "blocked", "Accounting ledger receipt must keep wallet mutation blocked.", accounting.json);
+  assert(["paper-only", "blocked"].includes(accounting.json.tax_export_permission), "Accounting ledger receipt should keep tax export paper-only or blocked.", accounting.json);
+
+  record(
+    "live-readiness-packets",
+    "pass",
+    `wallet ${wallet.json.status}; jupiter ${jupiter.json.status}; signer ${signer.json.status}; ops ${liveOps.json.status}; preflight ${preflight.json.blocker_count} blockers; accounting ${accounting.json.status}`,
+  );
+}
+
 async function verifyOperatorSetupPackets() {
   const requestPacket = await requestJson("/api/web3-operator-request-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0");
   assert(requestPacket.response.status === 200, "Operator request packet should return 200.", {
@@ -841,6 +974,7 @@ async function main() {
   await verifyCredentialValidateOnly();
   await verifyProviderHealthReceipt();
   await verifyUsabilityStatusReceipt();
+  await verifyLiveReadinessPackets();
   await verifyOperatorSetupPackets();
   await verifyManualLiveReviewPacket();
   await verifyResearchHandoffPacket();
