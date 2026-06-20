@@ -1336,6 +1336,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchHandoffPacket");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-research-handoff-packet?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("research-handoff-packet");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchAnswerIntake");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-research-answer-intake?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("implementation_decisions");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("secret-looking answers rejected");
     expect(source("app/api/health/route.ts")).toContain("web3_research_handoff");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3ResearchHandoffHealth");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_research_handoff");

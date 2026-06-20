@@ -490,6 +490,61 @@ async function verifyResearchHandoffPacket() {
   record("research-handoff-packet", "pass", `${json.status}; ${json.research_questions.length} questions; ${json.live_capital_blockers.length} live blockers`);
 }
 
+async function verifyResearchAnswerIntake() {
+  const answer = [
+    "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
+    "Provider stack: use Helius, Jupiter, Birdeye, DEX Screener, GeckoTerminal, Yellowstone gRPC, Pump.fun, Raydium, and Meteora by role.",
+    "Moonshot data sources should cover trending launches, holder concentration, liquidity, promotion boosts, creator risk, whale flow, and rug flags.",
+    "Latency budget should set milliseconds or seconds limits for stale discovery, quote age, refresh, confirmation, expiry, and priority fee.",
+    "First live mode should be manual supervised approval with caps, rollback, and external review before policy wallet autonomy.",
+    "Compliance boundaries need disclosure, risk, jurisdiction, tax, not financial advice, terms, and prohibited profit claims.",
+    "Risk gates should include slippage, daily cap, drawdown, liquidity, holder concentration, token age, authority, MEV, kill switch, and trade size.",
+    "Settlement accounting should use getTransaction, confirmation, token balance deltas, fees, tax lots, PnL export, idempotency, and reconciliation.",
+    "Credential storage should classify server env, browser public fields, never store, redaction, verifier, one-shot API key, and target name handling.",
+    "Go-live checklist needs operator, security, ops, accounting, strategy, pass fail evidence, owner, and rollback.",
+    "Cockpit dashboard should show chart, dashboard, PnL, drawdown, position, first screen alerts, timeline, diagnostics, and mobile layout.",
+    "Profit proof needs run count, hit rate, drawdown, profit factor, out-of-sample baseline, slippage, regime, promotion threshold.",
+  ].join("\n");
+
+  const { response, json } = await postJson("/api/web3-research-answer-intake?source=sample&account=persistent&scenario=breakout&cycles=0", {
+    answers_text: answer,
+  });
+  assert(response.status === 200, "Research answer intake should return a receipt for redacted answers.", { status: response.status, json });
+  assert(json.mode === "web3-research-answer-intake", "Research answer intake should expose the expected mode.", json);
+  assert(json.status === "decision-ready", "Research answer intake should mark complete answers decision-ready.", json);
+  assert(typeof json.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(json.receipt_hash), "Research answer intake should include a receipt hash.", json);
+  assert(json.answered_count >= 12 && json.missing_count === 0, "Research answer intake should score every tracked lane as answered.", json);
+  assert(Array.isArray(json.implementation_decisions) && json.implementation_decisions.length >= 12, "Research answer intake should return the implementation decision queue.", json.implementation_decisions);
+  assert(json.ready_decision_count >= 12, "Research answer intake should mark complete implementation decisions ready-to-spec.", json);
+  assert(json.blocked_decision_count === 0, "Research answer intake should not block complete redacted implementation decisions.", json);
+  assert(
+    ["custody-signer-path", "provider-stack", "risk-gate-thresholds", "settlement-accounting-proof", "operator-cockpit-dashboard", "profit-proof-threshold"].every((id) =>
+      json.implementation_decisions.some((item) => item.id === id && item.live_authority === "blocked"),
+    ),
+    "Research answer intake should cover critical implementation decisions while keeping live authority blocked.",
+    json.implementation_decisions,
+  );
+  assert(json.implementation_decisions.every((item) => item.live_authority === "blocked"), "Every research implementation decision should keep live authority blocked.", json.implementation_decisions);
+  assert(json.safe_next_actions.some((action) => action.includes("signer policy envelope")), "Research answer intake should turn complete answers into implementation next actions.", json.safe_next_actions);
+  assert(json.live_execution_permission === "blocked", "Research answer intake must keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Research answer intake must keep wallet mutation blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "Research answer intake must keep transaction submission blocked.", json);
+  assert(json.signing_permission === "blocked", "Research answer intake must keep signing blocked.", json);
+  assert(json.private_key_storage === "blocked", "Research answer intake must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "Research answer intake must block seed-phrase storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Research answer intake must block secret echo.", json);
+
+  const rejected = await postJson("/api/web3-research-answer-intake?source=sample&account=persistent&scenario=breakout&cycles=0", {
+    answers_text: `api key: ${CANARY_JUPITER_KEY}`,
+  });
+  assert(rejected.response.status === 422, "Research answer intake should reject secret-looking pasted answers.", {
+    status: rejected.response.status,
+    json: rejected.json,
+  });
+  assert(/secret-looking API key/i.test(rejected.json?.error ?? ""), "Research answer intake rejection should name the secret-looking API key.", rejected.json);
+  record("research-answer-intake", "pass", `${json.ready_decision_count} implementation decisions; secret-looking answers rejected`);
+}
+
 function assertDexDiscoveryBoundary(json, label) {
   assert(json.mode === "web3-dex-discovery-receipt", `${label} should expose the expected receipt mode.`, json);
   assert(json.provider === "DEX Screener", `${label} should identify the DEX Screener provider.`, json);
@@ -696,6 +751,7 @@ async function main() {
   await verifyUsabilityStatusReceipt();
   await verifyManualLiveReviewPacket();
   await verifyResearchHandoffPacket();
+  await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();
   await verifyJupiterRehearsalBoundary();
