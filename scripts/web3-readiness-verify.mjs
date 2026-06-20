@@ -415,6 +415,42 @@ async function verifyUsabilityStatusReceipt() {
   record("usability-status-receipt", "pass", `${json.current_mode}; next gate ${json.next_gate_label}`);
 }
 
+async function verifyManualLiveReviewPacket() {
+  const { response, json } = await requestJson("/api/web3-manual-live-review-packet?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Manual live-review packet should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-manual-live-review-packet", "Manual live-review packet should expose the expected mode.", json);
+  assert(["blocked", "waiting-for-operator-input", "ready-for-external-review"].includes(json.status), "Manual live-review packet should use a known status.", json);
+  assert(typeof json.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(json.receipt_hash), "Manual live-review packet should include a receipt hash.", json);
+  assert(json.external_review_only === true, "Manual live-review packet should be external-review-only.", json);
+  assert(Array.isArray(json.signoffs) && json.signoffs.length >= 12, "Manual live-review packet should include consolidated signoff rows.", json.signoffs);
+  assert(json.required_signoff_count === json.signoffs.length, "Manual live-review packet signoff count should match rows.", json);
+  assert(
+    json.passed_signoff_count + json.watch_signoff_count + json.failed_signoff_count === json.signoffs.length,
+    "Manual live-review packet signoff totals should reconcile.",
+    json,
+  );
+  assert(
+    ["operator-wallet", "jupiter-order", "manual-live-review", "supervised-runway", "live-ops"].every((id) => json.signoffs.some((item) => item.id === id)),
+    "Manual live-review packet should cover wallet, route, manual-review, runway, and ops signoffs.",
+    json.signoffs,
+  );
+  assert(json.signoffs.every((item) => typeof item.next_action === "string" && item.next_action.length > 0), "Manual live-review packet signoffs should name next actions.", json.signoffs);
+  assert(Array.isArray(json.evidence_links) && json.evidence_links.includes("GET /api/web3-live-capital-preflight"), "Manual live-review packet should link live-capital preflight evidence.", json.evidence_links);
+  assert(Array.isArray(json.evidence_links) && json.evidence_links.includes("GET /api/web3-supervised-live-runway"), "Manual live-review packet should link supervised runway evidence.", json.evidence_links);
+  assert(
+    json.live_execution_permission === "blocked" || json.live_execution_permission === "manual-live-executor-review",
+    "Manual live-review packet should never grant direct live execution authority.",
+    json,
+  );
+  assert(json.wallet_mutation_permission === "blocked", "Manual live-review packet must keep wallet mutation blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "Manual live-review packet must keep transaction submission blocked.", json);
+  assert(json.private_key_storage === "blocked", "Manual live-review packet must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "Manual live-review packet must block seed-phrase storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Manual live-review packet must block secret echo.", json);
+  assert(Array.isArray(json.controls) && json.controls.some((control) => control.includes("human review checklist")), "Manual live-review packet should describe itself as a human review checklist.", json.controls);
+  record("manual-live-review-packet", "pass", `${json.status}; ${json.passed_signoff_count}/${json.required_signoff_count} signoffs passing`);
+}
+
 function assertDexDiscoveryBoundary(json, label) {
   assert(json.mode === "web3-dex-discovery-receipt", `${label} should expose the expected receipt mode.`, json);
   assert(json.provider === "DEX Screener", `${label} should identify the DEX Screener provider.`, json);
@@ -619,6 +655,7 @@ async function main() {
   await verifyCredentialValidateOnly();
   await verifyProviderHealthReceipt();
   await verifyUsabilityStatusReceipt();
+  await verifyManualLiveReviewPacket();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();
   await verifyJupiterRehearsalBoundary();
