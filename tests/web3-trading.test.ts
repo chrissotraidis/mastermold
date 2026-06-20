@@ -978,6 +978,7 @@ describe("Web3 autonomous trading subsystem", () => {
       safe_to_share: string[];
       never_provide: string[];
       source_endpoints: string[];
+      safe_export_commands: string[];
       verifier_commands: string[];
       text_packet: string;
       live_execution_permission: string;
@@ -1016,11 +1017,18 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.research_questions.find((item) => item.id === "credential-storage")?.expected_answer_format).toContain("credential names");
     expect(packet.safe_to_share).toContain("Dedicated Solana public wallet address");
     expect(packet.never_provide).toContain("Seed phrase or mnemonic");
+    expect(packet.source_endpoints).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
     expect(packet.source_endpoints).toContain("/api/web3-operator-runbook?source=live-dex&account=persistent");
+    expect(packet.safe_export_commands).toEqual(expect.arrayContaining([
+      "npm run --silent research:web3 -- --base-url=http://localhost:4010",
+      "npm run --silent research:web3 -- --base-url=http://localhost:4010 --json",
+    ]));
     expect(packet.verifier_commands).toEqual(expect.arrayContaining([
       "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live",
     ]));
     expect(packet.text_packet).toContain("# Mastermind Web3 Research Handoff Packet");
+    expect(packet.text_packet).toContain("## Local Export Commands");
+    expect(packet.text_packet).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
     expect(packet.text_packet).toContain("What is the safest Solana custody architecture");
     expect(packet.text_packet).toContain("Live Capital Blockers");
     expect(packet.live_execution_permission).toBe("blocked");

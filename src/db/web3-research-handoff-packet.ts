@@ -72,6 +72,7 @@ export type Web3ResearchHandoffPacket = {
   safe_to_share: string[];
   never_provide: string[];
   source_endpoints: string[];
+  safe_export_commands: string[];
   verifier_commands: string[];
   text_packet: string;
   live_execution_permission: "blocked";
@@ -184,12 +185,17 @@ export function buildWeb3ResearchHandoffPacket(input: {
     safe_to_share: input.requestPacket.safe_to_provide,
     never_provide: input.requestPacket.never_provide,
     source_endpoints: [
+      "/api/web3-research-handoff-packet?source=live-dex&account=persistent",
       "/api/web3-operator-request-packet?source=live-dex&account=persistent",
       "/api/web3-operator-runbook?source=live-dex&account=persistent",
       "/api/web3-cutover-blocker-board?source=live-dex&account=persistent",
       "/api/web3-live-capital-preflight?source=live-dex&account=persistent",
       "/api/web3-manual-live-review-packet?source=live-dex&account=persistent",
       "/api/web3-usability-status?source=live-dex&account=persistent",
+    ],
+    safe_export_commands: [
+      "npm run --silent research:web3 -- --base-url=http://localhost:4010",
+      "npm run --silent research:web3 -- --base-url=http://localhost:4010 --json",
     ],
     verifier_commands: verifierCommands,
     live_execution_permission: "blocked" as const,
@@ -416,6 +422,9 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
     "",
     "## Safe To Share",
     ...packet.safe_to_share.map((item) => `- ${item}`),
+    "",
+    "## Local Export Commands",
+    ...packet.safe_export_commands.map((command) => `- ${command}`),
     "",
     "## Never Provide",
     ...packet.never_provide.map((item) => `- ${item}`),

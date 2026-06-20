@@ -915,8 +915,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings Web3 research handoff packet");
     expect(settingsPage).toContain("Settings Web3 research questions");
     expect(settingsPage).toContain("Settings Web3 research open blockers");
+    expect(settingsPage).toContain("Settings Web3 research export commands");
+    expect(settingsPage).toContain("packet.safe_export_commands.map");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
     expect(settingsPage).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
-    expect(settingsPage).toContain("Research handoff is safe to share with another helper");
+    expect(settingsPage).toContain("validated export commands only");
     expect(settingsPage.indexOf("<SettingsWeb3OperatorIntakeBoard")).toBeLessThan(
       settingsPage.indexOf("aria-label=\"Secure Web3 credential handoff\""),
     );
@@ -1375,6 +1378,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("paste-ready Markdown");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-research-handoff-packet");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("# Mastermind Web3 Research Handoff Packet");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("safe_export_commands");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("## Local Export Commands");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("What is the safest Solana custody architecture");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_execution_permission: \"blocked\"");
     expect(source("components/review-readiness.tsx")).toContain("Settings now renders that same Web3 cutover blocker board");

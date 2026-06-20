@@ -756,13 +756,20 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
             Open research JSON
           </Link>
         </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-2" aria-label="Settings Web3 research export commands">
+          {packet.safe_export_commands.map((command) => (
+            <code key={command} className="block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {command}
+            </code>
+          ))}
+        </div>
         <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-md border border-outline-variant/20 bg-void/50 p-2 text-[11px] leading-5 text-on-surface-variant">
           {packet.text_packet}
         </pre>
       </div>
 
       <p className="mt-2 text-xs leading-5 text-outline">
-        Research handoff is safe to share with another helper because it contains status, target names, and questions only; it cannot echo secrets, sign, submit, mutate wallets, or unlock live trading.
+        Research handoff is safe to share with another helper because it contains status, target names, questions, and validated export commands only; it cannot echo secrets, sign, submit, mutate wallets, or unlock live trading.
       </p>
     </div>
   );
