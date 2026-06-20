@@ -72,6 +72,7 @@ export async function runWeb3MarketMonitor(input) {
   }
 
   if (!ohlcv) {
+    const failureCopy = candleFailureCopy(ohlcvError, discovery.status);
     return {
       mode: "web3-market-monitor",
       status: "observed",
@@ -100,8 +101,8 @@ export async function runWeb3MarketMonitor(input) {
       wallet_mutation_permission: "blocked",
       transaction_submission_permission: "blocked",
       secret_echo_permission: "blocked",
-      summary: `DEX discovery ${discovery.status}; candle proof unavailable from GeckoTerminal.`,
-      next_action: "Retry the monitor after the public candle provider rate limit clears; keep fresh paper buys blocked until candle proof records.",
+      summary: failureCopy.summary,
+      next_action: failureCopy.nextAction,
       controls: [
         "Uses only public DEX discovery and GeckoTerminal OHLCV reads.",
         "When candle proof is unavailable, records an observed/degraded receipt instead of enabling trading.",
@@ -200,6 +201,20 @@ function buildCandleRecordBody(input, ohlcv, symbol, lastPrice) {
         blockers: ohlcv.paper_decision?.blockers ?? [],
       },
     },
+  };
+}
+
+function candleFailureCopy(error, discoveryStatus) {
+  const text = typeof error === "string" ? error : "";
+  if (text.includes("No current live DEX candidate pool")) {
+    return {
+      summary: `DEX discovery ${discoveryStatus}; live DEX candle proof is blocked because the scanner did not keep a current live pool through auto-resolution.`,
+      nextAction: "Refresh live DEX discovery, then retry monitor:web3; keep fresh paper buys blocked until a current live pool records candle proof.",
+    };
+  }
+  return {
+    summary: `DEX discovery ${discoveryStatus}; candle proof unavailable from GeckoTerminal.`,
+    nextAction: "Retry the monitor after the public candle provider rate limit clears; keep fresh paper buys blocked until candle proof records.",
   };
 }
 

@@ -106,6 +106,7 @@ const GECKOTERMINAL_BASE_URL = "https://api.geckoterminal.com/api/v2";
 type OhlcvPoolResolution = {
   mode: "manual-pool" | "auto-dex-candidate";
   source: TradingMarketSource | "manual";
+  source_status: string | null;
   scenario: TradingScenario | null;
   account: TradingAccountMode | null;
   cycles: number | null;
@@ -372,6 +373,7 @@ async function resolveOhlcvPools(input: {
           resolution: {
             mode: "manual-pool",
             source: "manual",
+            source_status: null,
             scenario: null,
             account: null,
             cycles: null,
@@ -395,10 +397,17 @@ async function resolveOhlcvPools(input: {
     cycles: input.cycles,
     advance: false,
   });
+  if (input.source === "live-dex" && state.market_source.status !== "live") {
+    return {
+      ok: false,
+      error: `No current live DEX candidate pool is available for auto OHLCV resolution; market source is ${state.market_source.status}.`,
+    };
+  }
   const candidates = state.market
     .filter((market) => (
       market.chain === "solana" &&
       isSafePoolId(market.pair_address) &&
+      (input.source !== "live-dex" || isLiveDexPoolId(market.pair_address)) &&
       market.price_usd > 0 &&
       market.liquidity_usd > 0
     ))
@@ -417,6 +426,7 @@ async function resolveOhlcvPools(input: {
         resolution: {
           mode: "auto-dex-candidate" as const,
           source: input.source,
+          source_status: state.market_source.status,
           scenario: input.scenario,
           account: input.account,
           cycles: input.cycles,
@@ -822,4 +832,9 @@ function isSafePoolId(value: string) {
     !value.includes("/") &&
     !value.includes("?") &&
     !value.includes("#");
+}
+
+function isLiveDexPoolId(value: string) {
+  const text = value.trim().toLowerCase();
+  return text.length > 0 && !text.includes("sample") && !text.endsWith("-fallback");
 }

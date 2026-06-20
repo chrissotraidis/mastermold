@@ -12460,6 +12460,30 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(body.paper_decision.safeguards).toContain("no signer request");
   });
 
+  test("GET /api/web3-ohlcv live auto mode refuses fallback sample pools before GeckoTerminal", async () => {
+    const requestedUrls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      requestedUrls.push(url);
+      if (url.includes("geckoterminal.com")) {
+        throw new Error("GeckoTerminal should not be called for live-dex fallback sample pools.");
+      }
+      return new Response(JSON.stringify({ error: "dex unavailable" }), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const response = await OHLCV_GET(
+      new Request("http://localhost/api/web3-ohlcv?auto=true&source=live-dex&scenario=breakout&account=ephemeral&cycles=0&timeframe=minute&limit=6"),
+    );
+    const body = await json<{ error: string }>(response);
+
+    expect(response.status).toBe(422);
+    expect(body.error).toBe("No current live DEX candidate pool is available for auto OHLCV resolution; market source is fallback.");
+    expect(requestedUrls.some((url) => url.includes("geckoterminal.com"))).toBe(false);
+  });
+
   test("GET /api/web3-ohlcv sorts candles and returns a local candle decision", async () => {
     globalThis.fetch = (async (_input: RequestInfo | URL) => {
       return new Response(JSON.stringify({
