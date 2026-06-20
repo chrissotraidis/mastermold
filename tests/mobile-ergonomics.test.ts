@@ -916,8 +916,21 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Open runbook");
     expect(settingsPage).toContain("The command center is a safe-entry map only");
     expect(settingsPage.indexOf("<SettingsWeb3CredentialCommandCenter")).toBeLessThan(
+      settingsPage.indexOf("<SettingsWeb3CredentialSafetyMatrix"),
+    );
+    expect(settingsPage.indexOf("<SettingsWeb3CredentialSafetyMatrix")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3ResearchHandoffPanel"),
     );
+    expect(settingsPage).toContain("SettingsWeb3CredentialSafetyMatrix");
+    expect(settingsPage).toContain("Settings Web3 credential safety matrix");
+    expect(settingsPage).toContain("Credential safety matrix");
+    expect(settingsPage).toContain("Where each input belongs before live review");
+    expect(settingsPage).toContain("buildCredentialSafetyMatrix");
+    expect(settingsPage).toContain("Settings console");
+    expect(settingsPage).toContain("Server env only");
+    expect(settingsPage).toContain("Browser wallet");
+    expect(settingsPage).toContain("External review");
+    expect(settingsPage).toContain("Never accepted");
     expect(settingsPage.indexOf("<SettingsWeb3ResearchHandoffPanel")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3OperatorIntakeBoard"),
     );

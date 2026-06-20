@@ -292,6 +292,7 @@ function Web3CredentialsRunwayCard({
             runbook={operatorRunbook}
             cutover={cutoverBlockerBoard}
           />
+          <SettingsWeb3CredentialSafetyMatrix handoff={operatorCredentialHandoff} requestPacket={operatorRequestPacket} />
           <SettingsWeb3ResearchHandoffPanel packet={researchHandoffPacket} />
           <SettingsWeb3OperatorIntakeBoard receipt={operatorCredentialHandoff} />
           <SettingsWeb3OperatorRequestPacketPanel packet={operatorRequestPacket} />
@@ -686,6 +687,54 @@ function SettingsWeb3CredentialCommandCenter({
 
       <p className="mt-2 text-xs leading-5 text-outline">
         The command center is a safe-entry map only; it cannot store private keys, store seed phrases, sign, submit, mutate wallets, or approve autonomous live trading.
+      </p>
+    </div>
+  );
+}
+
+function SettingsWeb3CredentialSafetyMatrix({
+  handoff,
+  requestPacket,
+}: {
+  handoff: Web3OperatorCredentialHandoffReceipt;
+  requestPacket: Web3OperatorRequestPacket;
+}) {
+  const matrix = buildCredentialSafetyMatrix(handoff, requestPacket);
+  return (
+    <div className="rounded-md border border-outline-variant/30 bg-surface-dim/35 p-3" aria-label="Settings Web3 credential safety matrix">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Credential safety matrix</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">Where each input belongs before live review</p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+            This matrix is a read-only contract. It groups safe setup lanes by collection surface and repeats the never-accepted boundary before any credential fields appear.
+          </p>
+        </div>
+        <CredentialStateBadge configured={handoff.open_required_count === 0} status={`${handoff.open_required_count} required open`} />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-5">
+        {matrix.map((group) => (
+          <div key={group.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{group.label}</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{group.count_label}</p>
+              </div>
+              <LaunchQueueBadge status={group.status} label={group.badge_label} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">{group.rule}</p>
+            <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-on-surface-variant">
+              {group.items.map((item) => (
+                <li key={item} className="truncate">{item}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Matrix receipts expose target names and status only. API key values, private keys, seed phrases, raw keypairs, transaction bodies, signed payloads, and live trading authority remain outside this app.
       </p>
     </div>
   );
@@ -2166,6 +2215,16 @@ function LaunchQueueBadge({
 
 type CredentialQueueStatus = "ready" | "missing" | "review" | "blocked";
 
+type CredentialSafetyMatrixGroup = {
+  id: string;
+  label: string;
+  count_label: string;
+  badge_label: string;
+  status: "pass" | "watch" | "fail";
+  rule: string;
+  items: string[];
+};
+
 type CredentialQueueItem = {
   id: string;
   label: string;
@@ -2201,6 +2260,71 @@ function buildWeb3CredentialHandoffRows(queue: CredentialQueueItem[]): Credentia
       label: "Review only",
       value: `${review.length} review`,
       detail: review.length > 0 ? review.map((item) => item.label).slice(0, 3).join(", ") : "No review-only lanes are waiting.",
+    },
+  ];
+}
+
+function buildCredentialSafetyMatrix(
+  handoff: Web3OperatorCredentialHandoffReceipt,
+  requestPacket: Web3OperatorRequestPacket,
+): CredentialSafetyMatrixGroup[] {
+  const settingsRows = handoff.inputs.filter((input) => input.safe_collection_surface === "settings-console" && input.can_enter_in_app);
+  const browserRows = handoff.inputs.filter((input) => input.safe_collection_surface === "browser-wallet" || input.storage === "browser-public-scope" || input.storage === "hash-only-local-receipt");
+  const reviewRows = handoff.inputs.filter((input) => input.safe_collection_surface === "external-system" || input.safe_collection_surface === "manual-review" || !input.can_enter_in_app);
+  const envTargets = Array.from(new Set(
+    handoff.inputs
+      .filter((input) => input.storage === "server-env" || input.storage === "future-signer-vault")
+      .flatMap((input) => input.env_targets),
+  ));
+  const settingsOpen = settingsRows.filter((input) => input.status !== "ready").length;
+  const browserOpen = browserRows.filter((input) => input.status !== "ready").length;
+  const reviewOpen = reviewRows.filter((input) => input.status !== "ready").length;
+
+  return [
+    {
+      id: "settings-console",
+      label: "Settings console",
+      count_label: `${settingsRows.length - settingsOpen}/${settingsRows.length} ready`,
+      badge_label: settingsOpen > 0 ? `${settingsOpen} open` : "ready",
+      status: settingsOpen > 0 ? "watch" : "pass",
+      rule: "Use for public wallet scope, one-shot tests, and ignored local env target installation.",
+      items: settingsRows.map((input) => input.label).slice(0, 4),
+    },
+    {
+      id: "server-env",
+      label: "Server env only",
+      count_label: `${envTargets.length} targets`,
+      badge_label: envTargets.length > 0 ? "env" : "none",
+      status: envTargets.length > 0 ? "watch" : "pass",
+      rule: "Secrets and ops targets belong in ignored server env or provider vaults, never browser storage.",
+      items: envTargets.slice(0, 4),
+    },
+    {
+      id: "browser-wallet",
+      label: "Browser wallet",
+      count_label: `${browserRows.length - browserOpen}/${browserRows.length} ready`,
+      badge_label: browserOpen > 0 ? `${browserOpen} open` : "ready",
+      status: browserOpen > 0 ? "watch" : "pass",
+      rule: "Public address and text-message ownership proof only; no transaction signature for setup proof.",
+      items: browserRows.map((input) => input.label).slice(0, 4),
+    },
+    {
+      id: "external-review",
+      label: "External review",
+      count_label: `${reviewRows.length - reviewOpen}/${reviewRows.length} ready`,
+      badge_label: reviewOpen > 0 ? `${reviewOpen} open` : "review",
+      status: reviewOpen > 0 ? "fail" : "watch",
+      rule: "Signer policy, settlement, and manual live approval require separate human/provider review.",
+      items: reviewRows.map((input) => input.label).slice(0, 4),
+    },
+    {
+      id: "never-accepted",
+      label: "Never accepted",
+      count_label: `${requestPacket.never_provide.length} blocked`,
+      badge_label: "blocked",
+      status: "fail",
+      rule: "These values must not be pasted into Settings, chat, files, browser storage, or helper packets.",
+      items: requestPacket.never_provide.slice(0, 4),
     },
   ];
 }
