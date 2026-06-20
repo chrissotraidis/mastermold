@@ -451,6 +451,40 @@ async function verifyManualLiveReviewPacket() {
   record("manual-live-review-packet", "pass", `${json.status}; ${json.passed_signoff_count}/${json.required_signoff_count} signoffs passing`);
 }
 
+async function verifyResearchHandoffPacket() {
+  const { response, json } = await requestJson("/api/web3-research-handoff-packet?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Research handoff packet should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-research-handoff-packet", "Research handoff packet should expose the expected mode.", json);
+  assert(["research-needed", "ready-for-operator-input", "ready-for-external-review"].includes(json.status), "Research handoff packet should use a known status.", json);
+  assert(typeof json.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(json.receipt_hash), "Research handoff packet should include a receipt hash.", json);
+  assert(json.app_state && typeof json.app_state === "object", "Research handoff packet should include app state.", json);
+  assert(Array.isArray(json.current_capabilities) && json.current_capabilities.length >= 4, "Research handoff packet should summarize current capabilities.", json.current_capabilities);
+  assert(Array.isArray(json.open_operator_inputs), "Research handoff packet should include open operator inputs.", json.open_operator_inputs);
+  assert(Array.isArray(json.live_capital_blockers), "Research handoff packet should include live-capital blockers.", json.live_capital_blockers);
+  assert(Array.isArray(json.research_questions) && json.research_questions.length >= 10, "Research handoff packet should include the research question set.", json.research_questions);
+  assert(
+    ["custody-architecture", "provider-stack", "moonshot-data-sources", "risk-gates", "credential-storage", "profit-proof"].every((id) =>
+      json.research_questions.some((item) => item.id === id && typeof item.question === "string" && item.question.length > 0),
+    ),
+    "Research handoff packet should cover custody, provider, market-data, risk, credential, and profit-proof questions.",
+    json.research_questions,
+  );
+  assert(Array.isArray(json.safe_to_share) && json.safe_to_share.includes("Dedicated Solana public wallet address"), "Research handoff packet should list safe-to-share operator inputs.", json.safe_to_share);
+  assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Research handoff packet should keep seed phrases in never-provide list.", json.never_provide);
+  assert(Array.isArray(json.source_endpoints) && json.source_endpoints.includes("/api/web3-operator-runbook?source=live-dex&account=persistent"), "Research handoff packet should link source endpoints.", json.source_endpoints);
+  assert(Array.isArray(json.verifier_commands) && json.verifier_commands.some((command) => command.includes("--require-operator-wallet")), "Research handoff packet should include strict verifier commands.", json.verifier_commands);
+  assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind Web3 Research Handoff Packet"), "Research handoff packet should include pasteable text.", json.text_packet);
+  assert(json.text_packet.includes("Never Provide"), "Research handoff text should include never-provide boundary.", json.text_packet);
+  assert(json.live_execution_permission === "blocked", "Research handoff packet must keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Research handoff packet must keep wallet mutation blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "Research handoff packet must keep transaction submission blocked.", json);
+  assert(json.private_key_storage === "blocked", "Research handoff packet must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "Research handoff packet must block seed-phrase storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Research handoff packet must block secret echo.", json);
+  assert(Array.isArray(json.controls) && json.controls.some((control) => control.includes("safe to share")), "Research handoff packet should describe safe sharing controls.", json.controls);
+  record("research-handoff-packet", "pass", `${json.status}; ${json.research_questions.length} questions; ${json.live_capital_blockers.length} live blockers`);
+}
+
 function assertDexDiscoveryBoundary(json, label) {
   assert(json.mode === "web3-dex-discovery-receipt", `${label} should expose the expected receipt mode.`, json);
   assert(json.provider === "DEX Screener", `${label} should identify the DEX Screener provider.`, json);
@@ -656,6 +690,7 @@ async function main() {
   await verifyProviderHealthReceipt();
   await verifyUsabilityStatusReceipt();
   await verifyManualLiveReviewPacket();
+  await verifyResearchHandoffPacket();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();
   await verifyJupiterRehearsalBoundary();
