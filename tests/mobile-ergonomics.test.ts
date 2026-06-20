@@ -1413,6 +1413,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/health/route.ts")).toContain("web3_live_usability");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_research_handoff");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_live_usability?.mode === \"web3-live-usability-health\"");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("Live-usability health should keep signing blocked");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_research_handoff");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_live_usability?.mode === \"web3-live-usability-health\"");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");

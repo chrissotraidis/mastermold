@@ -92,6 +92,18 @@ async function main() {
   assert(health.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", health.web3_research_handoff);
   assert(health.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", health.web3_research_handoff);
   assert(health.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", health.web3_research_handoff);
+  assert(health.web3_live_usability?.mode === "web3-live-usability-health", "Health endpoint should expose Web3 live-usability health.", health.web3_live_usability);
+  assert(["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(health.web3_live_usability.status), "Live-usability health should return a known status.", health.web3_live_usability);
+  assert(typeof health.web3_live_usability.receipt_hash === "string" && health.web3_live_usability.receipt_hash.length === 64, "Live-usability health should expose a receipt hash.", health.web3_live_usability);
+  assert(typeof health.web3_live_usability.open_operator_input_count === "number", "Live-usability health should expose missing operator input count.", health.web3_live_usability);
+  assert(typeof health.web3_live_usability.real_capital_blocker_count === "number", "Live-usability health should expose real-capital blocker count.", health.web3_live_usability);
+  assert(health.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", health.web3_live_usability);
+  assert(health.web3_live_usability.transaction_submission_permission === "blocked", "Live-usability health should keep transaction submission blocked.", health.web3_live_usability);
+  assert(health.web3_live_usability.wallet_mutation_permission === "blocked", "Live-usability health should keep wallet mutation blocked.", health.web3_live_usability);
+  assert(health.web3_live_usability.signing_permission === "blocked", "Live-usability health should keep signing blocked.", health.web3_live_usability);
+  assert(health.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", health.web3_live_usability);
+  assert(health.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", health.web3_live_usability);
+  assert(health.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", health.web3_live_usability);
 
   const launchChecklistResponse = await request("/api/web3-launch-checklist?scenario=breakout&source=sample&account=persistent");
   const launchChecklist = await readJson(launchChecklistResponse);
