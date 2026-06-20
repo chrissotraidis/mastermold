@@ -140,9 +140,12 @@ describe("mobile ergonomics source contracts", () => {
     ].join("\n");
 
     expect(provenanceChip).toContain('return "Saved market read";');
+    expect(provenanceChip).toContain('return "Read-only public DEX market evidence";');
+    expect(provenanceChip).toContain('isLiveDex ? "Live DEX read"');
     expect(provenanceChip).toContain('return "Sample data for review and testing";');
     expect(appShell).toContain("type DataModeLabel = ProductProvenanceLabel;");
     expect(appShell).toContain('dataMode = "Sample data"');
+    expect(appShell).toContain('isLiveDex ? "Live DEX"');
     expect(briefingCard).toContain("<ProvenanceChip label={provenance.label} title={provenance.source} />");
     expect(briefingDetail).toContain("label={publicProvenanceLabel}");
     expect(briefingDetail).toContain("title={productProvenanceSource(card.provenance.label, card.provenance.source)}");
@@ -681,6 +684,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Choose Web3 market source");
     expect(tradingPage).toContain("Sample tape");
     expect(tradingPage).toContain("Live DEX read");
+    expect(tradingPage).toContain('const provenanceLabel = source === "live-dex" ? "Live DEX read" : "Sample data"');
+    expect(tradingPage).toContain("dataMode={provenanceLabel}");
+    expect(tradingPage).toContain("provenance={provenanceLabel}");
     expect(tradingPage).toContain('tradingSourceHref("live-dex", account)');
     expect(tradingPage).toContain("Source switching changes read-only market evidence only");
     expect(tradingPage).toContain("TradingCommandBoard");
@@ -1244,6 +1250,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-credential-handoff");
     expect(source("components/review-readiness.tsx")).toContain("compact safe-to-provide request packet");
     expect(source("components/review-readiness.tsx")).toContain("read-only live DEX cockpit");
+    expect(source("components/review-readiness.tsx")).toContain("provenance chip now switch from Sample to Live DEX read");
     expect(settingsPage).toContain("Open Web3 wiring");
     expect(settingsPage).toContain('href="/trading?source=sample"');
     expect(settingsPage).toContain('href="/trading?source=live-dex"');

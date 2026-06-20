@@ -69,14 +69,15 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
+  const provenanceLabel = source === "live-dex" ? "Live DEX read" : "Sample data";
 
   return (
-    <AppShell dataMode="Sample data">
+    <AppShell dataMode={provenanceLabel}>
       <div className="mx-auto w-full min-w-0 max-w-6xl">
         <PageHeader
           title="Web3 Autopilot"
           subtitle="Autonomous Web3 trading desk and copilot for high-signal memecoin monitoring, wallet growth, route checks, and local paper fills."
-          provenance="Sample data"
+          provenance={provenanceLabel}
           right={<Chip tone={initialState.autonomous_edge_stack_execution.status === "blocked" ? "critical" : "caution"}>{shellStatus}</Chip>}
         />
 

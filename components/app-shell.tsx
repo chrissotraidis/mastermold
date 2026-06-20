@@ -128,9 +128,10 @@ function TopBar({
   const { speaking } = useFaceActivity();
   const [q, setQ] = useState("");
   const isEngine = dataMode === "Saved read";
+  const isLiveDex = dataMode === "Live DEX read";
   const isManual = dataMode === "Manual portfolio";
   const isImported = dataMode === "Imported portfolio";
-  const dataModeLabel = isEngine ? "Saved read" : isManual ? "Manual portfolio" : isImported ? "Imported" : "Sample";
+  const dataModeLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX" : isManual ? "Manual portfolio" : isImported ? "Imported" : "Sample";
   const firstName = profile?.name.trim().split(/\s+/)[0] ?? "";
   // The command bar duplicates the hero console on the deck and the chat page itself.
   const showCommandBar = pathname !== "/" && pathname !== "/chat";
@@ -161,10 +162,10 @@ function TopBar({
         <span
           className={cn(
             "ml-2 hidden items-center gap-1.5 font-mono text-[11px] uppercase tracking-telemetry sm:inline-flex",
-            isEngine ? "text-engine" : isManual || isImported ? "text-violet" : "text-demo",
+            isEngine || isLiveDex ? "text-engine" : isManual || isImported ? "text-violet" : "text-demo",
           )}
           >
-          <span className={cn("size-1.5 rounded-full", isEngine ? "bg-engine animate-pulse" : isManual || isImported ? "bg-violet" : "bg-demo")} />
+          <span className={cn("size-1.5 rounded-full", isEngine || isLiveDex ? "bg-engine animate-pulse" : isManual || isImported ? "bg-violet" : "bg-demo")} />
           {dataModeLabel}
         </span>
         <ScanStatusLine />
