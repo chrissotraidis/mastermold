@@ -83,6 +83,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
 
         <div className="w-full min-w-0 space-y-4">
           <TradingSourceSwitch source={source} account={account} />
+          <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
           <TradingCommandBoard
             state={initialState}
             status={usabilityStatus}
@@ -447,45 +448,85 @@ function formatTradingCompactCurrency(value: number) {
   }).format(value);
 }
 
-function UsabilityStatusPanel({ status }: { status: Web3UsabilityStatusReceipt }) {
-  const nextCapability = status.capabilities.find((capability) => capability.status === "gated") ??
-    status.capabilities.find((capability) => capability.status === "watch") ??
-    status.capabilities[0];
+function UsabilityStatusPanel({
+  status,
+  source,
+  account,
+}: {
+  status: Web3UsabilityStatusReceipt;
+  source: "sample" | "live-dex";
+  account: "persistent" | "ephemeral";
+}) {
+  const params = new URLSearchParams({ source, account });
+  const receiptHref = `/api/web3-usability-status?${params.toString()}`;
 
   return (
     <section
       aria-labelledby="trading-usability-status-title"
-      className="rounded-md border border-engine/25 bg-engine/[0.04] p-4 sm:p-5"
+      className="rounded-md border border-engine/25 bg-surface/80 p-3 sm:p-4"
     >
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.25fr]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,0.58fr)]">
         <div className="min-w-0">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-engine/30 bg-engine/10 text-engine">
-              <ArrowRight aria-hidden="true" className="size-5" />
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-engine/30 bg-engine/10 text-engine">
+                <ShieldCheck aria-hidden="true" className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Live readiness dossier</p>
+                <h2 id="trading-usability-status-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
+                  {status.current_mode.replaceAll("-", " ")}
+                </h2>
+                <p className="mt-1 line-clamp-2 max-w-3xl text-sm leading-6 text-on-surface-variant">{status.summary}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Usability status</p>
-              <h2 id="trading-usability-status-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
-                {status.current_mode.replaceAll("-", " ")}
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-on-surface-variant">{status.summary}</p>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={receiptHref}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+              >
+                Open JSON
+              </Link>
+              <Link
+                href="/settings/integrations"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+              >
+                Credentials
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:max-w-md">
             <UsabilityStat label="Usable" value={`${status.usable_count}`} tone="engine" />
             <UsabilityStat label="Gated" value={`${status.gated_count}`} tone={status.gated_count > 0 ? "caution" : "engine"} />
             <UsabilityStat label="Locked" value={`${status.locked_count}`} tone="demo" />
           </div>
-
-          <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.04] p-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next gate</p>
-            <p className="mt-1 text-sm font-semibold text-on-surface">{status.next_gate_label}</p>
-            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{status.next_gate_action}</p>
-          </div>
         </div>
 
-        <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+        <div className="min-w-0 rounded-md border border-caution/25 bg-caution/[0.04] p-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next gate</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">{status.next_gate_label}</p>
+          <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">{status.next_gate_action}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex min-w-0 flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" aria-label="Web3 capability status rail">
+        {status.capabilities.map((capability) => (
+          <div key={capability.id} className="inline-flex min-h-9 min-w-0 max-w-[12rem] shrink-0 items-center gap-2 rounded-md border border-outline/15 bg-surface-dim/45 px-2.5 py-1.5 sm:max-w-full">
+            <p className="min-w-0 truncate text-xs font-semibold text-on-surface">{capability.label}</p>
+            <span className={usabilityCapabilityClassName(capability.status)}>
+              {capability.status}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <details className="mt-3 rounded-md border border-outline/15 bg-surface-dim/35 p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-on-surface">
+          Capability evidence
+        </summary>
+        <div className="mt-3 grid min-w-0 gap-2 md:grid-cols-2">
           {status.capabilities.map((capability) => (
             <div key={capability.id} className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-3">
               <div className="flex items-start justify-between gap-2">
@@ -497,16 +538,14 @@ function UsabilityStatusPanel({ status }: { status: Web3UsabilityStatusReceipt }
                   {capability.status}
                 </span>
               </div>
-              {nextCapability?.id === capability.id ? (
-                <p className="mt-2 line-clamp-2 border-t border-outline/15 pt-2 text-[11px] leading-4 text-outline">
-                  {capability.next_action}
-                </p>
-              ) : null}
+              <p className="mt-2 line-clamp-2 border-t border-outline/15 pt-2 text-[11px] leading-4 text-outline">
+                {capability.evidence.slice(0, 2).join(" · ")}
+              </p>
             </div>
           ))}
         </div>
-      </div>
-      <p className="mt-3 text-xs leading-5 text-outline">
+      </details>
+      <p className="mt-3 line-clamp-2 text-xs leading-5 text-outline">
         Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.
       </p>
     </section>

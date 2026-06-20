@@ -26,6 +26,7 @@ import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-crede
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { POST as SUPERVISOR_REFRESH_POST } from "@/app/api/web3-supervisor-refresh/route";
 import { GET as SUPERVISED_LIVE_RUNWAY_GET } from "@/app/api/web3-supervised-live-runway/route";
+import { GET as USABILITY_STATUS_GET } from "@/app/api/web3-usability-status/route";
 import { POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
@@ -943,6 +944,72 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.secret_echo_permission).toBe("blocked");
     expect(packet.controls.some((control) => control.includes("safe to share"))).toBe(true);
     expect(text).not.toContain("test-helius-request-secret");
+  });
+
+  test("GIVEN the trading cockpit needs a readiness dossier WHEN usability status is requested THEN it returns compact redacted capability gates", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-usability-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-usability-secret";
+
+    const response = await USABILITY_STATUS_GET(new Request("http://localhost/api/web3-usability-status?scenario=breakout&source=sample&account=ephemeral"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      current_mode: string;
+      usable_count: number;
+      gated_count: number;
+      locked_count: number;
+      next_gate_label: string;
+      next_gate_action: string;
+      summary: string;
+      capabilities: Array<{ id: string; label: string; status: string; next_action: string; evidence: string[] }>;
+      safe_commands: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+      receipt_hash: string;
+    }>(response);
+    const text = JSON.stringify(receipt);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-usability-status");
+    expect(receipt.status).toMatch(/paper-usable|dry-run-gated|supervised-live-gated|autonomous-live-locked/);
+    expect(receipt.current_mode).toMatch(/copilot|paper-autonomy|dry-run-rehearsal|supervised-live-review|autonomous-live/);
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.capabilities.map((capability) => capability.id)).toEqual([
+      "copilot",
+      "paper-autonomy",
+      "live-dex-read",
+      "wallet-net-worth",
+      "jupiter-dry-run",
+      "supervised-live",
+      "autonomous-live",
+    ]);
+    expect(receipt.capabilities.find((capability) => capability.id === "autonomous-live")).toMatchObject({
+      status: "locked",
+    });
+    expect(receipt.capabilities.find((capability) => capability.id === "jupiter-dry-run")?.evidence).toEqual(expect.arrayContaining([
+      expect.stringContaining("Route status"),
+    ]));
+    expect(receipt.next_gate_label.length).toBeGreaterThan(0);
+    expect(receipt.next_gate_action.length).toBeGreaterThan(0);
+    expect(receipt.usable_count + receipt.gated_count + receipt.locked_count).toBeGreaterThanOrEqual(3);
+    expect(receipt.safe_commands).toEqual(expect.arrayContaining([
+      "npm run verify:web3 -- --base-url=http://localhost:4010",
+      "npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json",
+    ]));
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.some((control) => control.includes("cannot sign, submit"))).toBe(true);
+    expect(text).not.toContain("test-helius-usability-secret");
+    expect(text).not.toContain("test-jupiter-usability-secret");
   });
 
   test("GIVEN Settings saves public wallet scope WHEN account setup is rebuilt THEN dry-run wallet readiness is scoped without secrets", async () => {

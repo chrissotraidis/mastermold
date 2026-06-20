@@ -693,6 +693,9 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<MarketMonitorHistoryPanel"),
     );
     expect(tradingPage.indexOf("<TradingSourceSwitch")).toBeLessThan(
+      tradingPage.indexOf("<UsabilityStatusPanel"),
+    );
+    expect(tradingPage.indexOf("<UsabilityStatusPanel")).toBeLessThan(
       tradingPage.indexOf("<TradingCommandBoard"),
     );
     expect(tradingPage).toContain("Web3 market source switch");
@@ -704,6 +707,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("provenance={provenanceLabel}");
     expect(tradingPage).toContain('tradingSourceHref("live-dex", account)');
     expect(tradingPage).toContain("Source switching changes read-only market evidence only");
+    expect(tradingPage).toContain("Live readiness dossier");
+    expect(tradingPage).toContain("Open JSON");
+    expect(tradingPage).toContain("Credentials");
+    expect(tradingPage).toContain("Capability evidence");
+    expect(tradingPage).toContain('aria-label="Web3 capability status rail"');
+    expect(tradingPage).toContain("flex-nowrap gap-2 overflow-x-auto");
+    expect(tradingPage).toContain("const receiptHref = `/api/web3-usability-status?${params.toString()}`");
+    expect(tradingPage).toContain("<ShieldCheck");
+    expect(tradingPage).toContain("Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.");
     expect(tradingPage).toContain("TradingCommandBoard");
     expect(tradingPage).toContain("Command board");
     expect(tradingPage).toContain("WalletNetWorthCurve");
