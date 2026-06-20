@@ -4,12 +4,17 @@ import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Chip } from "@/components/sentinel";
 import { Web3TradingWorkspaceLoader } from "@/components/web3-trading-workspace-loader";
+import { buildWeb3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
+import { buildWeb3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { buildWeb3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
+import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { getWeb3MarketMonitorHistory, type Web3MarketMonitorHistory } from "@/src/db/web3-market-monitor-history";
+import { buildWeb3OperatorCredentialHandoffReceipt } from "@/src/db/web3-operator-credential-handoff";
+import { buildWeb3OperatorRequestPacket } from "@/src/db/web3-operator-request-packet";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
@@ -44,6 +49,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
   const monitorHistory = getWeb3MarketMonitorHistory();
   const launchChecklist = buildWeb3AutonomyLaunchChecklist(initialState, promotedAutopilotHealth, supervisorHealth);
   const productionSupervisor = buildWeb3ProductionSupervisorReadiness(supervisorHealth);
+  const accountSetup = buildWeb3AccountSetupReceipt(initialState);
   const accounting = buildWeb3AccountingLedgerReceipt(initialState);
   const liveOps = buildWeb3LiveOpsPacket({
     state: initialState,
@@ -66,6 +72,16 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     launchChecklist,
     supervisedRunway: supervisedLiveRunway,
   });
+  const operatorRequestPacket = buildWeb3OperatorRequestPacket(buildWeb3OperatorCredentialHandoffReceipt({
+    accountSetup,
+    acquisition: buildWeb3AccountAcquisitionReceipt(initialState),
+    launchChecklist,
+  }));
+  const cutoverBlockerBoard = buildWeb3CutoverBlockerBoard({
+    requestPacket: operatorRequestPacket,
+    runway: supervisedLiveRunway,
+    usability: usabilityStatus,
+  });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -84,6 +100,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
         <div className="w-full min-w-0 space-y-4">
           <TradingSourceSwitch source={source} account={account} />
           <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
+          <CutoverBlockerBoardPanel board={cutoverBlockerBoard} source={source} account={account} />
           <TradingCommandBoard
             state={initialState}
             status={usabilityStatus}
@@ -568,6 +585,143 @@ function usabilityCapabilityClassName(status: Web3UsabilityStatusReceipt["capabi
   if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
   if (status === "gated") return `${base} border-caution/30 bg-caution/10 text-caution`;
   return `${base} border-outline/20 bg-surface text-outline`;
+}
+
+function CutoverBlockerBoardPanel({
+  board,
+  source,
+  account,
+}: {
+  board: Web3CutoverBlockerBoard;
+  source: "sample" | "live-dex";
+  account: "persistent" | "ephemeral";
+}) {
+  const params = new URLSearchParams({ source, account });
+  const href = `/api/web3-cutover-blocker-board?${params.toString()}`;
+  const topRows = board.rows.filter((row) => row.status !== "ready").slice(0, 5);
+  const ownerCounts: Array<{ owner: keyof Web3CutoverBlockerBoard["owner_counts"]; label: string }> = [
+    { owner: "operator", label: "Operator" },
+    { owner: "security", label: "Security" },
+    { owner: "ops", label: "Ops" },
+    { owner: "accounting", label: "Accounting" },
+    { owner: "manual-review", label: "Review" },
+  ];
+
+  return (
+    <section
+      aria-labelledby="web3-cutover-blocker-board-title"
+      className="rounded-md border border-caution/25 bg-caution/[0.035] p-3 sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Cutover blocker board</p>
+              <h2 id="web3-cutover-blocker-board-title" className="mt-1 font-display text-lg font-semibold text-on-surface">
+                {board.open_blocker_count} open setup blocker{board.open_blocker_count === 1 ? "" : "s"}
+              </h2>
+              <p className="mt-1 line-clamp-3 text-sm leading-6 text-on-surface-variant">{board.summary}</p>
+            </div>
+            <Link
+              href={href}
+              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open board JSON
+            </Link>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <CutoverBoardStat label="Now" value={`${board.now_count}`} tone={board.now_count > 0 ? "critical" : "engine"} />
+            <CutoverBoardStat label="Before live" value={`${board.before_live_count}`} tone={board.before_live_count > 0 ? "caution" : "engine"} />
+            <CutoverBoardStat label="Review" value={`${board.review_count}`} tone={board.review_count > 0 ? "demo" : "engine"} />
+          </div>
+
+          <div className="mt-3 flex min-w-0 flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" aria-label="Cutover blockers by owner">
+            {ownerCounts.map(({ owner, label }) => (
+              <div key={owner} className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-md border border-outline/15 bg-surface-dim/45 px-2.5 py-1.5">
+                <span className="text-xs font-semibold text-on-surface">{label}</span>
+                <span className={board.owner_counts[owner] > 0 ? "text-xs font-semibold text-caution" : "text-xs font-semibold text-engine"}>
+                  {board.owner_counts[owner]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="rounded-md border border-caution/25 bg-surface/50 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next safe input</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{board.next_safe_input?.label ?? "No input open"}</p>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+                {board.next_safe_input?.next_action ?? "Keep live review external and leave live flags unset."}
+              </p>
+            </div>
+            <div className="rounded-md border border-outline/15 bg-surface/50 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Next live lane</p>
+              <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">{board.next_live_lane_action}</p>
+            </div>
+          </div>
+
+          <div className="grid min-w-0 gap-2" aria-label="Top cutover blockers">
+            {topRows.length > 0 ? topRows.map((row) => (
+              <div key={row.id} className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5 sm:grid-cols-[minmax(0,0.78fr)_minmax(0,1fr)_auto] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-on-surface">{row.label}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-outline">{cutoverOwnerLabel(row.owner)} · {row.phase.replace("-", " ")}</p>
+                </div>
+                <p className="line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{row.next_action}</p>
+                <span className={cutoverRowStatusClassName(row.severity)}>{row.status}</span>
+              </div>
+            )) : (
+              <p className="rounded-md border border-outline/15 bg-surface-dim/45 p-3 text-xs leading-5 text-on-surface-variant">
+                No open rows. Keep live execution blocked until the external live review packet is approved.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+      <p className="mt-3 line-clamp-2 text-xs leading-5 text-outline">
+        The board names env targets and verifier commands only. It cannot store secrets, sign, submit, mutate a wallet, or approve autonomous live trading.
+      </p>
+    </section>
+  );
+}
+
+function CutoverBoardStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "engine" | "caution" | "critical" | "demo";
+}) {
+  const valueClassName = tone === "engine"
+    ? "text-engine"
+    : tone === "critical"
+      ? "text-critical"
+      : tone === "demo"
+        ? "text-demo"
+        : "text-caution";
+  return (
+    <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold ${valueClassName}`}>{value}</p>
+    </div>
+  );
+}
+
+function cutoverOwnerLabel(owner: Web3CutoverBlockerBoard["rows"][number]["owner"]) {
+  if (owner === "manual-review") return "Manual review";
+  return owner.charAt(0).toUpperCase() + owner.slice(1);
+}
+
+function cutoverRowStatusClassName(severity: Web3CutoverBlockerBoard["rows"][number]["severity"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (severity === "critical") return `${base} border-critical/30 bg-critical/10 text-critical`;
+  if (severity === "review") return `${base} border-violet/30 bg-violet/10 text-violet`;
+  return `${base} border-caution/30 bg-caution/10 text-caution`;
 }
 
 function MarketMonitorHistoryPanel({ history }: { history: Web3MarketMonitorHistory }) {

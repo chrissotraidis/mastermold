@@ -696,6 +696,9 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<UsabilityStatusPanel"),
     );
     expect(tradingPage.indexOf("<UsabilityStatusPanel")).toBeLessThan(
+      tradingPage.indexOf("<CutoverBlockerBoardPanel"),
+    );
+    expect(tradingPage.indexOf("<CutoverBlockerBoardPanel")).toBeLessThan(
       tradingPage.indexOf("<TradingCommandBoard"),
     );
     expect(tradingPage).toContain("Web3 market source switch");
@@ -716,6 +719,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("const receiptHref = `/api/web3-usability-status?${params.toString()}`");
     expect(tradingPage).toContain("<ShieldCheck");
     expect(tradingPage).toContain("Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.");
+    expect(tradingPage).toContain("Cutover blocker board");
+    expect(tradingPage).toContain("Open board JSON");
+    expect(tradingPage).toContain("/api/web3-cutover-blocker-board?${params.toString()}");
+    expect(tradingPage).toContain('aria-label="Cutover blockers by owner"');
+    expect(tradingPage).toContain('aria-label="Top cutover blockers"');
+    expect(tradingPage).toContain("The board names env targets and verifier commands only.");
+    expect(source("src/db/web3-cutover-blocker-board.ts")).toContain("web3-cutover-blocker-board");
+    expect(source("src/db/web3-cutover-blocker-board.ts")).toContain("The next safe input can differ from the next live-review lane");
+    expect(source("app/api/web3-cutover-blocker-board/route.ts")).toContain("buildWeb3CutoverBlockerBoard");
     expect(tradingPage).toContain("TradingCommandBoard");
     expect(tradingPage).toContain("Command board");
     expect(tradingPage).toContain("WalletNetWorthCurve");

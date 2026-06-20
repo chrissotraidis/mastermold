@@ -8,6 +8,7 @@ import { GET, POST } from "@/app/api/web3-trading/route";
 import { GET as ACCOUNT_ACQUISITION_GET } from "@/app/api/web3-account-acquisition/route";
 import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
+import { GET as CUTOVER_BLOCKER_BOARD_GET } from "@/app/api/web3-cutover-blocker-board/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
 import { GET as JUPITER_REHEARSAL_HISTORY_GET } from "@/app/api/web3-jupiter-rehearsal-history/route";
@@ -1010,6 +1011,113 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("cannot sign, submit"))).toBe(true);
     expect(text).not.toContain("test-helius-usability-secret");
     expect(text).not.toContain("test-jupiter-usability-secret");
+  });
+
+  test("GIVEN live cutover blockers remain WHEN the blocker board route runs THEN it groups safe next steps without live authority", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-cutover-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";
+
+    const rejected = await CUTOVER_BLOCKER_BOARD_GET(new Request("http://localhost/api/web3-cutover-blocker-board?account=bad"));
+    expect(rejected.status).toBe(422);
+
+    const response = await CUTOVER_BLOCKER_BOARD_GET(new Request("http://localhost/api/web3-cutover-blocker-board?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const board = await json<{
+      mode: string;
+      status: string;
+      summary: string;
+      receipt_hash: string;
+      request_packet_hash: string;
+      runway_hash: string;
+      usability_hash: string;
+      next_safe_input: { id: string; label: string; owner: string; next_action: string } | null;
+      next_live_lane_action: string;
+      open_blocker_count: number;
+      now_count: number;
+      before_live_count: number;
+      review_count: number;
+      owner_counts: Record<string, number>;
+      rows: Array<{
+        id: string;
+        label: string;
+        owner: string;
+        phase: string;
+        status: string;
+        severity: string;
+        safe_collection_surface: string;
+        storage: string;
+        env_targets: string[];
+        verifier_command: string | null;
+        live_lane: string | null;
+      }>;
+      safe_to_provide: string[];
+      never_provide: string[];
+      verifier_commands: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+    const text = JSON.stringify(board);
+
+    expect(response.status).toBe(200);
+    expect(board.mode).toBe("web3-cutover-blocker-board");
+    expect(board.status).toBe("needs-input");
+    expect(board.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(board.request_packet_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(board.runway_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(board.usability_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(board.open_blocker_count).toBeGreaterThanOrEqual(5);
+    expect(board.now_count).toBeGreaterThanOrEqual(3);
+    expect(board.before_live_count).toBeGreaterThanOrEqual(2);
+    expect(board.review_count).toBeGreaterThanOrEqual(1);
+    expect(board.next_safe_input?.id).toBe("jupiter-route-order-key");
+    expect(board.next_live_lane_action.length).toBeGreaterThan(0);
+    expect(board.owner_counts.operator).toBeGreaterThanOrEqual(3);
+    expect(board.owner_counts.ops).toBeGreaterThanOrEqual(1);
+    expect(board.owner_counts.accounting).toBeGreaterThanOrEqual(1);
+    expect(board.rows.map((row) => row.id)).toEqual(expect.arrayContaining([
+      "dedicated-trading-wallet",
+      "wallet-ownership-proof",
+      "jupiter-route-order-key",
+      "emergency-stop-target",
+      "production-worker-ops",
+      "accounting-export-target",
+      "manual-live-approval",
+    ]));
+    expect(board.rows.find((row) => row.id === "dedicated-trading-wallet")).toMatchObject({
+      owner: "operator",
+      phase: "now",
+      live_lane: "wallet",
+      storage: "browser-public-scope",
+    });
+    expect(board.rows.find((row) => row.id === "production-worker-ops")).toMatchObject({
+      owner: "ops",
+      phase: "before-live",
+      live_lane: "ops",
+      env_targets: expect.arrayContaining(["MASTERMOLD_WEB3_PROCESS_MANAGER", "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL"]),
+    });
+    expect(board.rows.find((row) => row.id === "accounting-export-target")).toMatchObject({
+      owner: "accounting",
+      phase: "before-live",
+      live_lane: "accounting",
+    });
+    expect(board.safe_to_provide).toContain("Dedicated Solana public wallet address");
+    expect(board.never_provide).toContain("Wallet private key");
+    expect(board.verifier_commands).toEqual(expect.arrayContaining([
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live",
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+    ]));
+    expect(board.live_execution_permission).toBe("blocked");
+    expect(board.wallet_mutation_permission).toBe("blocked");
+    expect(board.transaction_submission_permission).toBe("blocked");
+    expect(board.private_key_storage).toBe("blocked");
+    expect(board.seed_phrase_storage).toBe("blocked");
+    expect(board.secret_echo_permission).toBe("blocked");
+    expect(board.controls.some((control) => control.includes("operator checklist only"))).toBe(true);
+    expect(text).not.toContain("test-helius-cutover-secret");
   });
 
   test("GIVEN Settings saves public wallet scope WHEN account setup is rebuilt THEN dry-run wallet readiness is scoped without secrets", async () => {

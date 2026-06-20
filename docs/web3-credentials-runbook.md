@@ -128,6 +128,7 @@ The Wiring focus also exposes:
 GET /api/web3-account-acquisition
 GET /api/web3-account-setup
 GET /api/web3-accounting-ledger
+GET /api/web3-cutover-blocker-board
 GET /api/web3-dedicated-wallet-packet
 GET /api/web3-dex-discovery
 GET /api/web3-jupiter-order-packet
@@ -156,6 +157,8 @@ The account setup route returns a redacted receipt with provider-account status 
 The operator credential handoff route, `GET /api/web3-operator-credential-handoff`, returns the machine-readable version of the Settings handoff packet. It names safe inputs, never-requested fields, collection surfaces, env targets, next input, and verifier commands for Helius/Solana, Jupiter, dedicated wallet, wallet ownership proof, signer provider, emergency stop, production-worker ops targets, accounting/export target, settlement/accounting review, and manual live approval. It can guide another agent or reviewer through setup without returning raw secrets, private keys, seed phrases, transaction bodies, signed payloads, live execution permission, or wallet mutation authority.
 
 The operator request packet route, `GET /api/web3-operator-request-packet`, turns the same handoff contract into a shareable redacted request packet for another helper or reviewer. It includes required input rows, review rows, safe-to-provide values, never-provide values, verifier commands, and a text packet that can be pasted into research or setup workflows. It returns only env target names and status text; it does not echo configured secrets, accept private keys, sign, submit, mutate wallets, or grant live execution.
+
+The cutover blocker board route, `GET /api/web3-cutover-blocker-board`, reconciles the operator request packet, supervised-live runway, and usability receipt into one owner-grouped setup board. It separates the next safe input from the next supervised-live lane blocker, counts open work by now/before-live/review phase and by operator/security/ops/accounting/manual-review owner, lists safe collection surfaces, env target names, storage rules, live-lane dependencies, and verifier commands, and keeps live execution, signing, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked. The `/trading` cockpit renders the same board as a compact cutover blocker panel before the command board.
 
 The monitor-history route, `GET /api/web3-market-monitor-history`, returns the latest sanitized `npm run monitor:web3` tape: run count, latest symbol, candle confidence, paper action, provider-degraded count, and recent read-only rows. The local file stores no API keys, private keys, seed phrases, transaction bodies, signed payloads, live execution permission, or wallet mutation authority, and rejects rows that do not preserve those blocked permissions.
 
