@@ -10993,6 +10993,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_trade_readiness_gate.status).toBe("blocked");
     expect(state.autonomous_trade_readiness_gate.can_apply_buys).toBe(false);
     expect(state.autonomous_trade_readiness_gate.data_repair_required).toBe(true);
+    expect(state.autonomous_monitor.heartbeat_status).not.toBe("stale");
+    const fallbackHeartbeat = state.autonomous_session_supervisor.items.find((item) => item.id === "session-heartbeat");
+    expect(fallbackHeartbeat?.blocker ?? "").not.toMatch(/stale or stood down/i);
+    expect(fallbackHeartbeat?.status).not.toBe("fail");
     expect(state.autonomous_loop_director.should_issue_daemon_tick).toBe(false);
     expect(state.position_watch_clock.status).toBe("stale");
     expect(state.position_watch_clock.stale_count).toBe(state.portfolio.open_positions.length);

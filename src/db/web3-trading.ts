@@ -74173,7 +74173,8 @@ function autonomousSessionItems({
   custodyMandate: AutonomousCustodyMandate;
   liveArming: LiveExecutionArming;
 }): AutonomousSessionSupervisorItem[] {
-  const heartbeatFail = monitor.heartbeat_status === "stale" || monitor.status === "stand-down";
+  const heartbeatFail = monitor.heartbeat_status === "stale";
+  const heartbeatWatch = !heartbeatFail && (monitor.status === "stand-down" || monitor.status === "cooldown");
   const riskFail = riskGovernor.status === "halted" || riskGovernor.allow_paper_advance === false;
   const capitalFail = capitalAllocator?.status === "blocked";
   const postTradeFail = postTradeReview.decision === "exit-only" || postTradeReview.pause_new_entries;
@@ -74184,12 +74185,12 @@ function autonomousSessionItems({
       id: "session-heartbeat",
       lane: "heartbeat",
       action: heartbeatFail ? "stand-down" : monitor.should_advance_paper ? "advance" : "observe",
-      status: heartbeatFail ? "fail" : monitor.status === "cooldown" ? "watch" : "pass",
+      status: heartbeatFail ? "fail" : heartbeatWatch ? "watch" : "pass",
       symbol: monitor.watch_symbols[0] ?? null,
       score: monitor.urgency_score,
       reason: monitor.summary,
       next_review_seconds: monitor.recommended_interval_seconds,
-      blocker: heartbeatFail ? "Monitor heartbeat is stale or stood down." : null,
+      blocker: heartbeatFail ? "Monitor heartbeat is stale." : null,
     },
     {
       id: "session-capital",
