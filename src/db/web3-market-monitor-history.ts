@@ -15,6 +15,7 @@ export type Web3MarketMonitorHistoryEntry = {
   scanner_status: string;
   selected_symbol: string;
   selected_pair: string | null;
+  discovery_refresh_attempted: boolean;
   candle_count: number;
   candle_action: string;
   candle_confidence: number;
@@ -171,6 +172,7 @@ function sanitizeWeb3MarketMonitorHistoryEntry(value: unknown): Web3MarketMonito
     scanner_status: cleanText(row.scanner_status, "unknown", 80),
     selected_symbol: cleanSymbol(row.selected_symbol),
     selected_pair: cleanText(row.selected_pair, "", 96) || null,
+    discovery_refresh_attempted: row.discovery_refresh_attempted === true,
     candle_count: cleanCount(row.candle_count),
     candle_action: cleanText(row.candle_action, "unknown", 80),
     candle_confidence: cleanScore(row.candle_confidence),

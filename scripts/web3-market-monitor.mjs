@@ -41,7 +41,7 @@ export function parseArgs(argv = [], env = {}) {
 
 export async function runWeb3MarketMonitor(input) {
   const startedAt = new Date().toISOString();
-  const discovery = await requestJson(input.baseUrl, `/api/web3-dex-discovery?${query({
+  let discovery = await requestJson(input.baseUrl, `/api/web3-dex-discovery?${query({
     scenario: input.scenario,
     source: input.source,
     account: input.account,
@@ -50,29 +50,32 @@ export async function runWeb3MarketMonitor(input) {
 
   let ohlcv = null;
   let ohlcvError = "";
-  try {
-    ohlcv = await requestJson(input.baseUrl, `/api/web3-ohlcv?${query({
-      auto: "true",
-      scenario: input.scenario,
-      source: input.source,
-      account: input.account,
-      cycles: input.cycles,
-      timeframe: input.timeframe,
-      aggregate: input.aggregate,
-      limit: input.limit,
-      token: "base",
-      paper: "true",
-      cash_usd: input.cashUsd,
-      position_usd: input.positionUsd,
-      equity_usd: input.equityUsd,
-      max_trade_usd: input.maxTradeUsd,
-    })}`);
-  } catch (error) {
-    ohlcvError = error instanceof Error ? error.message : "GeckoTerminal candle proof is unavailable.";
+  let discoveryRefreshAttempted = false;
+  const firstOhlcvAttempt = await requestOhlcvProof(input);
+  if (firstOhlcvAttempt.ok) {
+    ohlcv = firstOhlcvAttempt.value;
+  } else {
+    ohlcvError = firstOhlcvAttempt.error;
+    if (shouldRetryAfterStaleLiveDiscovery(ohlcvError, input.source)) {
+      discoveryRefreshAttempted = true;
+      discovery = await requestJson(input.baseUrl, `/api/web3-dex-discovery?${query({
+        scenario: input.scenario,
+        source: input.source,
+        account: input.account,
+        cycles: input.cycles,
+      })}`);
+      const retryOhlcvAttempt = await requestOhlcvProof(input);
+      if (retryOhlcvAttempt.ok) {
+        ohlcv = retryOhlcvAttempt.value;
+        ohlcvError = "";
+      } else {
+        ohlcvError = retryOhlcvAttempt.error;
+      }
+    }
   }
 
   if (!ohlcv) {
-    const failureCopy = candleFailureCopy(ohlcvError, discovery.status);
+    const failureCopy = candleFailureCopy(ohlcvError, discovery.status, discoveryRefreshAttempted);
     return {
       mode: "web3-market-monitor",
       status: "observed",
@@ -87,6 +90,7 @@ export async function runWeb3MarketMonitor(input) {
       selected_symbol: discovery.source_summary?.top_symbols?.[0] ?? "UNKNOWN",
       selected_pair: null,
       selected_attempt_count: 0,
+      discovery_refresh_attempted: discoveryRefreshAttempted,
       candle_count: 0,
       candle_action: "unavailable",
       candle_confidence: 0,
@@ -141,6 +145,7 @@ export async function runWeb3MarketMonitor(input) {
     selected_symbol: symbol,
     selected_pair: ohlcv.resolution?.pair_address ?? ohlcv.pool,
     selected_attempt_count: ohlcv.resolution?.attempt_count ?? 1,
+    discovery_refresh_attempted: discoveryRefreshAttempted,
     candle_count: ohlcv.candles?.length ?? 0,
     candle_action: ohlcv.signal?.action ?? "unknown",
     candle_confidence: ohlcv.signal?.confidence ?? 0,
@@ -163,6 +168,39 @@ export async function runWeb3MarketMonitor(input) {
       "Does not request private keys, signatures, transaction bodies, live execution, or wallet mutation.",
     ],
   };
+}
+
+async function requestOhlcvProof(input) {
+  try {
+    return {
+      ok: true,
+      value: await requestJson(input.baseUrl, `/api/web3-ohlcv?${query({
+        auto: "true",
+        scenario: input.scenario,
+        source: input.source,
+        account: input.account,
+        cycles: input.cycles,
+        timeframe: input.timeframe,
+        aggregate: input.aggregate,
+        limit: input.limit,
+        token: "base",
+        paper: "true",
+        cash_usd: input.cashUsd,
+        position_usd: input.positionUsd,
+        equity_usd: input.equityUsd,
+        max_trade_usd: input.maxTradeUsd,
+      })}`),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "GeckoTerminal candle proof is unavailable.",
+    };
+  }
+}
+
+function shouldRetryAfterStaleLiveDiscovery(error, source) {
+  return source === "live-dex" && typeof error === "string" && error.includes("No current live DEX candidate pool");
 }
 
 function buildCandleRecordBody(input, ohlcv, symbol, lastPrice) {
@@ -204,12 +242,14 @@ function buildCandleRecordBody(input, ohlcv, symbol, lastPrice) {
   };
 }
 
-function candleFailureCopy(error, discoveryStatus) {
+function candleFailureCopy(error, discoveryStatus, discoveryRefreshAttempted = false) {
   const text = typeof error === "string" ? error : "";
   if (text.includes("No current live DEX candidate pool")) {
     return {
-      summary: `DEX discovery ${discoveryStatus}; live DEX candle proof is blocked because the scanner did not keep a current live pool through auto-resolution.`,
-      nextAction: "Refresh live DEX discovery, then retry monitor:web3; keep fresh paper buys blocked until a current live pool records candle proof.",
+      summary: `DEX discovery ${discoveryStatus}; live DEX candle proof is blocked because the scanner did not keep a current live pool through auto-resolution${discoveryRefreshAttempted ? " after one bounded refresh" : ""}.`,
+      nextAction: discoveryRefreshAttempted
+        ? "Review DEX discovery health before retrying monitor:web3; keep fresh paper buys blocked until a current live pool records candle proof."
+        : "Refresh live DEX discovery, then retry monitor:web3; keep fresh paper buys blocked until a current live pool records candle proof.",
     };
   }
   return {
@@ -346,6 +386,7 @@ function sanitizeHistoryEntry(receipt) {
     scanner_status: safeText(receipt.scanner_status, "unknown", 80),
     selected_symbol: safeSymbol(receipt.selected_symbol),
     selected_pair: safeText(receipt.selected_pair, "", 96) || null,
+    discovery_refresh_attempted: receipt.discovery_refresh_attempted === true,
     candle_count: integer(receipt.candle_count, 0, 0, 100_000),
     candle_action: safeText(receipt.candle_action, "unknown", 80),
     candle_confidence: integer(receipt.candle_confidence, 0, 0, 100),
