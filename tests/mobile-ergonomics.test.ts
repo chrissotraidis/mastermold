@@ -987,8 +987,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("/api/web3-research-answer-intake");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Turn helper answers into launch-decision coverage");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Answer intake is a review surface only");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Settings Web3 research implementation plan");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Owner coverage");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Settings Web3 research implementation queue");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("implementation_decisions");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("implementation_plan");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("live authority blocked");
     expect(settingsPage.indexOf("<SettingsWeb3OperatorIntakeBoard")).toBeLessThan(
       settingsPage.indexOf("aria-label=\"Secure Web3 credential handoff\""),
@@ -1479,6 +1482,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");
     expect(source("components/review-readiness.tsx")).toContain("Settings now starts Web3 credentials with a command center");
     expect(source("components/review-readiness.tsx")).toContain("Settings now includes a Web3 research handoff packet");
+    expect(source("components/review-readiness.tsx")).toContain("owner/phase implementation plan and queue");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run research:web3 command");
     expect(source("package.json")).toContain("\"research:web3\": \"node scripts/web3-research-handoff.mjs\"");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("/api/web3-research-handoff-packet");
@@ -1493,12 +1497,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
     expect(source("docs/web3-credentials-runbook.md")).toContain("paste-ready Markdown");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-research-handoff-packet");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("owner/phase implementation plan");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("plan is sequencing evidence only");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("safe_export_commands");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("## Local Export Commands");
     expect(source("src/db/web3-research-answer-intake.ts")).toContain("web3-research-answer-intake");
     expect(source("src/db/web3-research-answer-intake.ts")).toContain("Secret-looking pasted values are rejected");
     expect(source("src/db/web3-research-answer-intake.ts")).toContain("implementation_decisions");
+    expect(source("src/db/web3-research-answer-intake.ts")).toContain("implementation_plan");
+    expect(source("src/db/web3-research-answer-intake.ts")).toContain("Implementation plan is sequencing evidence only.");
     expect(source("src/db/web3-research-answer-intake.ts")).toContain("live_authority: \"blocked\"");
     expect(source("app/api/web3-research-answer-intake/route.ts")).toContain("assertResearchAnswerTextIsSafe");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("What is the safest Solana custody architecture");

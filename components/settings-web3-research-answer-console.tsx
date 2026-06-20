@@ -54,6 +54,7 @@ export function SettingsWeb3ResearchAnswerConsole({
 
   const visibleLanes = receipt?.lanes.slice(0, 6) ?? [];
   const visibleDecisions = receipt?.implementation_decisions.slice(0, 6) ?? [];
+  const implementationPlan = receipt?.implementation_plan ?? null;
 
   return (
     <div className="rounded-md border border-violet/25 bg-surface-dim/30 p-3" aria-label="Settings Web3 research answer intake">
@@ -104,6 +105,47 @@ export function SettingsWeb3ResearchAnswerConsole({
             <ResearchMetric label="Missing" value={String(receipt.missing_count)} />
             <ResearchMetric label="Ready tasks" value={String(receipt.ready_decision_count)} />
           </div>
+
+          {implementationPlan ? (
+            <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 research implementation plan">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Implementation plan</p>
+                  <p className="mt-1 text-xs font-semibold text-on-surface">
+                    Next owner: {implementationPlan.next_owner.replaceAll("-", " ")} · {implementationPlan.next_phase.replaceAll("-", " ")}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">
+                    {implementationPlan.next_decision?.implementation_step ?? "Export answers and cover the missing research lanes before implementation work starts."}
+                  </p>
+                </div>
+                <DecisionPlanStatusBadge status={implementationPlan.status} />
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-5" aria-label="Settings Web3 research implementation plan counts">
+                <ResearchMetric label="Now" value={String(implementationPlan.ready_now_count)} />
+                <ResearchMetric label="Before live" value={String(implementationPlan.before_live_count)} />
+                <ResearchMetric label="Review" value={String(implementationPlan.review_count)} />
+                <ResearchMetric label="Needs research" value={String(implementationPlan.needs_research_count)} />
+                <ResearchMetric label="Blocked" value={String(implementationPlan.blocked_count)} />
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Owner coverage</p>
+                  <p className="mt-1 text-[11px] leading-5 text-on-surface-variant">
+                    {implementationPlan.owner_summary.map((owner) => `${owner.owner}: ${owner.ready} ready/${owner.blocked} blocked`).join(" · ")}
+                  </p>
+                </div>
+                <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Verification</p>
+                  <p className="mt-1 break-words font-mono text-[10px] leading-4 text-on-surface-variant">
+                    {implementationPlan.next_decision?.verification_command ?? "npm run verify:web3 -- --base-url=http://localhost:4010"}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-outline">
+                {implementationPlan.safety_boundary.join(" ")}
+              </p>
+            </div>
+          ) : null}
 
           <div className="grid gap-2 md:grid-cols-2" aria-label="Settings Web3 research answer decision lanes">
             {visibleLanes.map((lane) => (
@@ -216,6 +258,22 @@ function DecisionStatusBadge({ status }: { status: Web3ResearchAnswerIntakeRecei
         status === "ready-to-spec" && "border-engine/35 bg-engine/10 text-engine",
         status === "needs-research" && "border-caution/40 bg-caution/10 text-caution",
         status === "blocked" && "border-critical/35 bg-critical/10 text-critical",
+      )}
+    >
+      {status.replaceAll("-", " ")}
+    </Badge>
+  );
+}
+
+function DecisionPlanStatusBadge({ status }: { status: Web3ResearchAnswerIntakeReceipt["implementation_plan"]["status"] }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "border text-xs",
+        status === "ready-to-spec" && "border-engine/35 bg-engine/10 text-engine",
+        status === "follow-up-needed" && "border-caution/40 bg-caution/10 text-caution",
+        status === "waiting-for-answers" && "border-outline-variant/40 bg-surface-dim/45 text-outline",
       )}
     >
       {status.replaceAll("-", " ")}

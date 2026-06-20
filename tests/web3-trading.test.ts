@@ -1080,6 +1080,29 @@ describe("Web3 autonomous trading subsystem", () => {
         verification_command: string;
         live_authority: string;
       }>;
+      implementation_plan: {
+        status: string;
+        next_owner: string;
+        next_phase: string;
+        ready_now_count: number;
+        before_live_count: number;
+        review_count: number;
+        needs_research_count: number;
+        blocked_count: number;
+        next_decision: {
+          id: string;
+          label: string;
+          owner: string;
+          phase: string;
+          status: string;
+          implementation_step: string;
+          verification_command: string;
+          live_authority: string;
+        } | null;
+        owner_summary: Array<{ owner: string; ready: number; needs_research: number; blocked: number }>;
+        phase_summary: Array<{ phase: string; ready: number; needs_research: number; blocked: number }>;
+        safety_boundary: string[];
+      };
       ready_decision_count: number;
       blocked_decision_count: number;
       safe_next_actions: string[];
@@ -1115,6 +1138,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.implementation_decisions.every((decision) => decision.status === "ready-to-spec")).toBe(true);
     expect(receipt.implementation_decisions.every((decision) => decision.live_authority === "blocked")).toBe(true);
     expect(receipt.implementation_decisions.some((decision) => decision.verification_command.includes("npm run verify:web3"))).toBe(true);
+    expect(receipt.implementation_plan.status).toBe("ready-to-spec");
+    expect(receipt.implementation_plan.next_owner).toBe("security");
+    expect(receipt.implementation_plan.next_phase).toBe("now");
+    expect(receipt.implementation_plan.ready_now_count).toBeGreaterThan(0);
+    expect(receipt.implementation_plan.before_live_count).toBeGreaterThan(0);
+    expect(receipt.implementation_plan.review_count).toBeGreaterThan(0);
+    expect(receipt.implementation_plan.needs_research_count).toBe(0);
+    expect(receipt.implementation_plan.blocked_count).toBe(0);
+    expect(receipt.implementation_plan.next_decision?.id).toBe("custody-signer-path");
+    expect(receipt.implementation_plan.next_decision?.live_authority).toBe("blocked");
+    expect(receipt.implementation_plan.owner_summary.some((owner) => owner.owner === "security" && owner.ready > 0)).toBe(true);
+    expect(receipt.implementation_plan.phase_summary.some((phase) => phase.phase === "now" && phase.ready > 0)).toBe(true);
+    expect(receipt.implementation_plan.safety_boundary.some((line) => line.includes("cannot sign, submit, mutate wallets"))).toBe(true);
     expect(receipt.safe_next_actions).toEqual(expect.arrayContaining([
       "Convert the selected manual-wallet, Privy, Turnkey, or session-key recommendation into a signer policy envelope with no private-key collection.",
       "Keep live execution blocked until manual live review independently passes.",

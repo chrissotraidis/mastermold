@@ -40,6 +40,31 @@ export type Web3ResearchImplementationDecision = {
   live_authority: "blocked";
 };
 
+export type Web3ResearchImplementationPlan = {
+  status: "waiting-for-answers" | "follow-up-needed" | "ready-to-spec";
+  next_owner: Web3ResearchImplementationDecision["owner"] | "research";
+  next_phase: Web3ResearchImplementationDecision["phase"] | "answer-intake";
+  ready_now_count: number;
+  before_live_count: number;
+  review_count: number;
+  needs_research_count: number;
+  blocked_count: number;
+  next_decision: Pick<Web3ResearchImplementationDecision, "id" | "label" | "owner" | "phase" | "status" | "implementation_step" | "verification_command" | "live_authority"> | null;
+  owner_summary: Array<{
+    owner: Web3ResearchImplementationDecision["owner"];
+    ready: number;
+    needs_research: number;
+    blocked: number;
+  }>;
+  phase_summary: Array<{
+    phase: Web3ResearchImplementationDecision["phase"];
+    ready: number;
+    needs_research: number;
+    blocked: number;
+  }>;
+  safety_boundary: string[];
+};
+
 export type Web3ResearchAnswerIntakeReceipt = {
   mode: "web3-research-answer-intake";
   status: "waiting-for-answers" | "needs-follow-up" | "decision-ready";
@@ -54,6 +79,7 @@ export type Web3ResearchAnswerIntakeReceipt = {
   decision_ready_count: number;
   lanes: Web3ResearchAnswerLane[];
   implementation_decisions: Web3ResearchImplementationDecision[];
+  implementation_plan: Web3ResearchImplementationPlan;
   ready_decision_count: number;
   blocked_decision_count: number;
   next_missing_question: string;
@@ -309,10 +335,11 @@ export function buildWeb3ResearchAnswerIntakeReceipt(input: {
   const readyDecisionCount = implementationDecisions.filter((decision) => decision.status === "ready-to-spec").length;
   const blockedDecisionCount = implementationDecisions.filter((decision) => decision.status === "blocked").length;
   const status: Web3ResearchAnswerIntakeReceipt["status"] = cleaned.length === 0
-    ? "waiting-for-answers"
-    : missingCount > 0 || partialCount > 0
-      ? "needs-follow-up"
-      : "decision-ready";
+      ? "waiting-for-answers"
+      : missingCount > 0 || partialCount > 0
+        ? "needs-follow-up"
+        : "decision-ready";
+  const implementationPlan = buildImplementationPlan(status, implementationDecisions);
   const nextMissing = lanes.find((lane) => lane.status !== "answered");
   const receiptBase = {
     mode: "web3-research-answer-intake" as const,
@@ -327,6 +354,7 @@ export function buildWeb3ResearchAnswerIntakeReceipt(input: {
     decision_ready_count: answeredCount,
     lanes,
     implementation_decisions: implementationDecisions,
+    implementation_plan: implementationPlan,
     ready_decision_count: readyDecisionCount,
     blocked_decision_count: blockedDecisionCount,
     next_missing_question: nextMissing
@@ -423,6 +451,76 @@ function buildImplementationDecisions(lanes: Web3ResearchAnswerLane[]): Web3Rese
       ...spec,
       status,
       live_authority: "blocked",
+    };
+  });
+}
+
+function buildImplementationPlan(
+  receiptStatus: Web3ResearchAnswerIntakeReceipt["status"],
+  decisions: Web3ResearchImplementationDecision[],
+): Web3ResearchImplementationPlan {
+  const followUpDecision = decisions.find((decision) => decision.status === "blocked" || decision.status === "needs-research");
+  const readyDecision = decisions.find((decision) => decision.status === "ready-to-spec");
+  const nextDecision = followUpDecision ?? readyDecision ?? null;
+  const planStatus: Web3ResearchImplementationPlan["status"] = receiptStatus === "waiting-for-answers"
+    ? "waiting-for-answers"
+    : followUpDecision
+      ? "follow-up-needed"
+      : "ready-to-spec";
+
+  return {
+    status: planStatus,
+    next_owner: nextDecision?.owner ?? "research",
+    next_phase: nextDecision?.phase ?? "answer-intake",
+    ready_now_count: decisions.filter((decision) => decision.status === "ready-to-spec" && decision.phase === "now").length,
+    before_live_count: decisions.filter((decision) => decision.status === "ready-to-spec" && decision.phase === "before-live").length,
+    review_count: decisions.filter((decision) => decision.status === "ready-to-spec" && decision.phase === "review").length,
+    needs_research_count: decisions.filter((decision) => decision.status === "needs-research").length,
+    blocked_count: decisions.filter((decision) => decision.status === "blocked").length,
+    next_decision: nextDecision
+      ? {
+          id: nextDecision.id,
+          label: nextDecision.label,
+          owner: nextDecision.owner,
+          phase: nextDecision.phase,
+          status: nextDecision.status,
+          implementation_step: nextDecision.implementation_step,
+          verification_command: nextDecision.verification_command,
+          live_authority: nextDecision.live_authority,
+        }
+      : null,
+    owner_summary: summarizeDecisionsByOwner(decisions),
+    phase_summary: summarizeDecisionsByPhase(decisions),
+    safety_boundary: [
+      "Implementation plan is sequencing evidence only.",
+      "Ready-to-spec decisions still require code, tests, operator review, and strict verification before live review.",
+      "The plan cannot sign, submit, mutate wallets, store wallet secrets, or unlock autonomous live trading.",
+    ],
+  };
+}
+
+function summarizeDecisionsByOwner(decisions: Web3ResearchImplementationDecision[]): Web3ResearchImplementationPlan["owner_summary"] {
+  const owners: Web3ResearchImplementationDecision["owner"][] = ["security", "engineering", "strategy", "ops", "accounting", "product"];
+  return owners.map((owner) => {
+    const owned = decisions.filter((decision) => decision.owner === owner);
+    return {
+      owner,
+      ready: owned.filter((decision) => decision.status === "ready-to-spec").length,
+      needs_research: owned.filter((decision) => decision.status === "needs-research").length,
+      blocked: owned.filter((decision) => decision.status === "blocked").length,
+    };
+  });
+}
+
+function summarizeDecisionsByPhase(decisions: Web3ResearchImplementationDecision[]): Web3ResearchImplementationPlan["phase_summary"] {
+  const phases: Web3ResearchImplementationDecision["phase"][] = ["now", "before-live", "review"];
+  return phases.map((phase) => {
+    const phased = decisions.filter((decision) => decision.phase === phase);
+    return {
+      phase,
+      ready: phased.filter((decision) => decision.status === "ready-to-spec").length,
+      needs_research: phased.filter((decision) => decision.status === "needs-research").length,
+      blocked: phased.filter((decision) => decision.status === "blocked").length,
     };
   });
 }
