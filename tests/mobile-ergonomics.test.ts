@@ -674,6 +674,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage.indexOf("<TradingCommandBoard")).toBeLessThan(
       tradingPage.indexOf("<MarketMonitorHistoryPanel"),
     );
+    expect(tradingPage.indexOf("<TradingSourceSwitch")).toBeLessThan(
+      tradingPage.indexOf("<TradingCommandBoard"),
+    );
+    expect(tradingPage).toContain("Web3 market source switch");
+    expect(tradingPage).toContain("Choose Web3 market source");
+    expect(tradingPage).toContain("Sample tape");
+    expect(tradingPage).toContain("Live DEX read");
+    expect(tradingPage).toContain('tradingSourceHref("live-dex", account)');
+    expect(tradingPage).toContain("Source switching changes read-only market evidence only");
     expect(tradingPage).toContain("TradingCommandBoard");
     expect(tradingPage).toContain("Command board");
     expect(tradingPage).toContain("WalletNetWorthCurve");

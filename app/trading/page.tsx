@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, BarChart3, ShieldCheck, Wallet } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Database, ShieldCheck, Wallet } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -81,6 +81,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
         />
 
         <div className="w-full min-w-0 space-y-4">
+          <TradingSourceSwitch source={source} account={account} />
           <TradingCommandBoard
             state={initialState}
             status={usabilityStatus}
@@ -99,6 +100,82 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
       </div>
     </AppShell>
   );
+}
+
+function TradingSourceSwitch({
+  source,
+  account,
+}: {
+  source: "sample" | "live-dex";
+  account: "persistent" | "ephemeral";
+}) {
+  const sourceLabel = source === "live-dex" ? "Live DEX read" : "Sample tape";
+  const sourceDetail = source === "live-dex"
+    ? "Using public DEX and read-only route evidence when providers respond."
+    : "Using seeded review data so the cockpit is safe to explore without credentials.";
+
+  return (
+    <section
+      aria-label="Web3 market source switch"
+      className="rounded-md border border-outline/15 bg-surface/70 p-3"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Market source</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">{sourceLabel}</p>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">{sourceDetail}</p>
+        </div>
+        <div className="grid min-w-0 grid-cols-2 gap-2 sm:w-auto" aria-label="Choose Web3 market source">
+          <TradingSourceLink
+            href={tradingSourceHref("sample", account)}
+            active={source === "sample"}
+            icon={<Database aria-hidden="true" className="size-4" />}
+            label="Sample tape"
+          />
+          <TradingSourceLink
+            href={tradingSourceHref("live-dex", account)}
+            active={source === "live-dex"}
+            icon={<Activity aria-hidden="true" className="size-4" />}
+            label="Live DEX read"
+          />
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] leading-4 text-outline">
+        Source switching changes read-only market evidence only; signing, submission, wallet mutation, private-key storage, and seed phrase storage stay blocked.
+      </p>
+    </section>
+  );
+}
+
+function TradingSourceLink({
+  href,
+  active,
+  icon,
+  label,
+}: {
+  href: string;
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={active
+        ? "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine"
+        : "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-outline/20 bg-surface-dim/45 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+    </Link>
+  );
+}
+
+function tradingSourceHref(source: "sample" | "live-dex", account: "persistent" | "ephemeral") {
+  const params = new URLSearchParams({ source });
+  if (account !== "persistent") params.set("account", account);
+  return `/trading?${params.toString()}`;
 }
 
 function TradingCommandBoard({
