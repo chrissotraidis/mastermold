@@ -24,6 +24,10 @@ const localOrchestrationRouteAllowlist = new Set([
   "app/api/executor/route.ts",
   // Web3 route is explicitly gated: paper by default, dry-run metadata only, and live relay/Trigger paths require env approval.
   "app/api/web3-trading/route.ts",
+  // Web3 credential checks can rehearse read-only route/order metadata but cannot sign, submit, or mutate wallets.
+  "app/api/web3-credentials/test/route.ts",
+  // Web3 Jupiter packet route is a redacted setup receipt, not an execution endpoint.
+  "app/api/web3-jupiter-order-packet/route.ts",
 ]);
 
 function collectRouteFiles(directory: string): RouteFile[] {

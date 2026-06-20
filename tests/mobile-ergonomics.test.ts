@@ -544,7 +544,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewReadiness).toContain("className=\"min-h-11 border-outline-variant/50");
     expect(reviewReadiness).toContain("nothing can trade");
     expect(reviewReadiness).toContain("Cannot move money");
-    expect(reviewReadiness).toContain("scheduled market/news reading, broader connected-portfolio coverage, source notes for every daily call, and forward scoring");
+    expect(reviewReadiness).toContain("Still missing for real-money autonomy: production process management, reviewed signer/custody provider credentials, provider-backed market and route workers, real wallet accounting, audited live submit/settlement, and out-of-sample profit proof.");
     expect(reviewReadiness).toContain("Try the app safely");
     expect(reviewReadiness).toContain("Local walkthrough account:");
     expect(reviewReadiness).toContain("Local walkthrough checklist");
@@ -598,8 +598,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("nextOperatorAction");
     expect(web3Workspace).toContain("Next operator action");
     expect(web3Workspace).toContain("openOperatorInputs");
-    expect(web3Workspace).toContain("Dedicated trading wallet");
-    expect(web3Workspace).toContain("Jupiter route/order key");
+    expect(web3Workspace).toContain("operatorInputs.map");
+    expect(web3Workspace).toContain("item.label");
+    expect(web3Workspace).toContain("item.storage.replaceAll");
     expect(web3Workspace).toContain("Private keys and seed phrases stay out of the app");
     expect(web3Workspace).toContain("operatorInputDotClass");
     expect(web3Workspace).toContain("operatorInputTextClass");
@@ -659,12 +660,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("profit benchmark, re-entry hunter, command execution");
     expect(web3Workspace).toContain("re-entry leader {state.autonomous_reentry_hunter.leader_symbol ?? \"none\"}");
     expect(web3Workspace).toContain("re-entry cap {formatCurrency(state.autonomous_reentry_hunter.max_reentry_usd)}");
-    expect(web3Workspace).toContain("Benchmark cadence:");
-    expect(web3Workspace).toContain("feedback can tighten, retarget, or press Auto watch");
-    expect(web3Workspace).toContain("Provider intake:");
-    expect(web3Workspace).toContain("refresh or defer before fresh paper size");
-    expect(web3Workspace).toContain("Execution runway:");
-    expect(web3Workspace).toContain("proof/protect gate before paper");
+    expect(web3Workspace).toContain("Alpha cadence");
+    expect(web3Workspace).toContain("alpha feedback {feedback.status}");
+    expect(web3Workspace).toContain("Provider intake {marketIntake.next_provider}");
+    expect(web3Workspace).toContain("Execution runway {executionRunway.status}");
     expect(web3Workspace).toContain("execution runway, heartbeat, loop impact, provider intake, and profit benchmark evidence");
     expect(web3Workspace).toContain("heartbeat {state.autonomous_execution_heartbeat.status}");
     expect(web3Workspace).toContain("paper lane {executionRunway.can_auto_paper ? \"clear\" : \"gated\"}");
@@ -820,7 +819,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("buildWeb3CredentialHandoffRows");
     expect(settingsPage).toContain("Helius read checks can be local server-env evidence");
     expect(settingsPage).toContain("Jupiter Swap V2 setup");
-    expect(settingsPage).toContain("Jupiter Swap V2 order rail");
+    expect(settingsPage).toContain("Jupiter order rehearsal");
     expect(settingsPage).toContain("Jupiter portal");
     expect(settingsPage).toContain("Swap V2 docs");
     expect(settingsPage).toContain("--require-jupiter-order");
@@ -832,7 +831,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Jupiter rehearsal history");
     expect(settingsPage).toContain("Swap V2 order rail");
     expect(settingsPage).toContain("Jupiter API key needed");
-    expect(settingsPage).toContain("POST /api/web3-jupiter-rehearsal");
+    expect(settingsConsole).toContain("/api/web3-jupiter-rehearsal");
     expect(settingsPage).toContain("Unsigned transaction return");
     expect(settingsPage).toContain("buildWeb3LiveOpsPacket");
     expect(settingsPage).toContain("SettingsLiveOpsPacketPanel");
@@ -844,7 +843,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsSupervisedLiveRunwayPanel");
     expect(settingsPage).toContain("Supervised live runway");
     expect(settingsPage).toContain("Next supervised-live action");
-    expect(settingsPage).toContain("supervised-external-wallet-first");
+    expect(settingsPage).toContain("{runway.launch_model}");
+    expect(source("src/db/web3-supervised-live-runway.ts")).toContain("supervised-external-wallet-first");
     expect(tradingPage).toContain("buildWeb3SupervisedLiveRunway");
     expect(tradingPage).toContain("SupervisedLiveRunwayPanel");
     expect(tradingPage).toContain("Supervised live runway");
@@ -858,7 +858,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Dedicated wallet packet");
     expect(settingsPage).toContain("Sample wallet rejected");
     expect(settingsPage).toContain("Public address only");
-    expect(settingsPage).toContain("--require-operator-wallet");
+    expect(settingsConsole).toContain("--require-operator-wallet");
+    expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--require-operator-wallet");
     expect(settingsPage).toContain("SettingsCredentialDoctorPanel");
     expect(settingsPage).toContain("Credential doctor receipt");
     expect(settingsPage).toContain("npm run doctor:web3 -- --json");
@@ -867,10 +868,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Doctor receipts are local, sanitized, and status-only");
     expect(settingsPage).toContain("SettingsSignerCredentialPacketPanel");
     expect(settingsPage).toContain("Signer credential packet");
-    expect(settingsPage).toContain("Manual external wallet");
-    expect(settingsPage).toContain("Privy server wallet");
-    expect(settingsPage).toContain("Turnkey policy wallet");
-    expect(settingsPage).toContain("Session-key vault");
+    expect(source("src/db/web3-signer-credential-packet.ts")).toContain("Manual external wallet");
+    expect(source("src/db/web3-signer-credential-packet.ts")).toContain("Privy server wallet");
+    expect(source("src/db/web3-signer-credential-packet.ts")).toContain("Turnkey policy wallet");
+    expect(source("src/db/web3-signer-credential-packet.ts")).toContain("Session-key vault");
     expect(settingsPage).toContain("No private keys, seed phrases, raw transactions");
     expect(settingsPage).toContain("provider accounts are operator-owned outside the app");
     expect(settingsPage).toContain("Live credential queue");
@@ -889,10 +890,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("What Mastermind still needs before supervised trading review");
     expect(settingsPage).toContain("next_operator_action");
     expect(settingsPage).toContain("Next operator action");
-    expect(settingsPage).toContain("Dedicated trading wallet");
-    expect(settingsPage).toContain("Jupiter route/order key");
-    expect(settingsPage).toContain("Signer/custody choice");
-    expect(settingsPage).toContain("Manual live approval");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("Dedicated trading wallet");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("Jupiter route/order key");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("Signer/custody choice");
+    expect(source("src/db/web3-launch-checklist.ts")).toContain("Manual live approval");
     expect(settingsPage).toContain("private keys and seed phrases stay out of the app");
     expect(settingsPage).toContain("Settings Web3 launch repair queue");
     expect(settingsPage).toContain("Launch repair queue");
@@ -924,10 +925,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Credential checklist");
     expect(settingsPage).toContain("Ignored env template");
     expect(settingsPage).toContain("Web3 credential environment template");
-    expect(settingsPage).toContain("Policy signer provider");
-    expect(settingsPage).toContain("PRIVY_APP_SECRET");
-    expect(settingsPage).toContain("TURNKEY_API_PRIVATE_KEY");
-    expect(settingsPage).toContain("MASTERMOLD_SESSION_POLICY_HASH");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("Policy signer provider");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("PRIVY_APP_SECRET");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("TURNKEY_API_PRIVATE_KEY");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("MASTERMOLD_SESSION_POLICY_HASH");
     expect(source("src/db/web3-account-acquisition.ts")).toContain("Production worker operations");
     expect(source("src/db/web3-account-acquisition.ts")).toContain("MASTERMOLD_WEB3_PROCESS_MANAGER");
     expect(source("src/db/web3-account-acquisition.ts")).toContain("MASTERMOLD_WEB3_ALERT_WEBHOOK_URL");
@@ -964,7 +965,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Turnkey API private key");
     expect(settingsConsole).toContain("Provider API credential, never wallet key");
     expect(settingsConsole).toContain("wallet private keys, seed phrases, session private keys");
-    expect(settingsConsole).toContain("no browser storage for Helius, Jupiter, Privy, Turnkey, or signer-provider keys");
+    expect(settingsConsole).toContain("no browser storage for Helius, Jupiter, Privy, Turnkey, signer-provider, or production alert keys");
     expect(settingsConsole).toContain("emergency_stop_webhook_url");
     expect(settingsConsole).toContain("autonomous_signer_provider");
     expect(settingsConsole).toContain("turnkey_api_private_key");
@@ -1013,7 +1014,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Settings DEX discovery receipt");
     expect(settingsConsole).toContain("scanner evidence only");
     expect(settingsConsole).toContain("Rehearse Jupiter");
-    expect(settingsConsole).toContain("no browser storage for Helius or Jupiter keys");
+    expect(settingsConsole).toContain("no browser storage for Helius, Jupiter, Privy, Turnkey, signer-provider, or production alert keys");
     expect(settingsConsole).toContain("unsigned transaction return withheld");
     expect(settingsConsole).toContain("DEX scanner receipt is read-only paper evidence");
     expect(settingsConsole).toContain("Strict verifier runway");
@@ -1123,7 +1124,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("/api/web3-wallet-ownership");
     expect(source("README.md")).toContain("detect or connect a browser Solana wallet only");
     expect(source("README.md")).toContain("snapshots the saved");
-    expect(source("README.md")).toContain("restores the saved public wallet/risk scope before exit");
+    expect(source("README.md")).toContain("then restores");
+    expect(source("README.md")).toContain("the saved public wallet/risk scope before exit");
     expect(source("app/api/web3-wallet-ownership/route.ts")).toContain("buildWeb3WalletOwnershipReceipt");
     expect(source("app/api/web3-dex-discovery/route.ts")).toContain("buildWeb3DexDiscoveryReceipt");
     expect(source("app/api/web3-live-capital-preflight/route.ts")).toContain("buildWeb3LiveCapitalPreflightReceipt");
@@ -1148,7 +1150,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("recorded candle fallback");
     expect(source("app/api/web3-ohlcv/route.ts")).toContain("live_execution_permission: \"blocked\"");
-    expect(source("README.md")).toContain("auto-resolved GeckoTerminal OHLCV proof");
+    expect(source("README.md")).toContain("auto-resolved");
+    expect(source("README.md")).toContain("GeckoTerminal OHLCV proof");
     expect(source("docs/web3-credentials-runbook.md")).toContain("auto-resolved GeckoTerminal OHLCV proof");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-provider-health?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-wallet-ownership");
@@ -1198,10 +1201,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("External setup packet");
     expect(settingsPage).toContain("Web3 external account setup packet");
     expect(settingsPage).toContain("storage rules");
-    expect(settingsPage).toContain("setup links");
+    expect(settingsPage).toContain("Setup");
+    expect(settingsPage).toContain("Docs");
+    expect(settingsPage).toContain("<ExternalLink");
     expect(settingsPage).toContain("in app signup blocked");
     expect(settingsPage).toContain("setup_url");
-    expect(settingsPage).toContain("https://developers.jup.ag/portal");
+    expect(source("src/db/web3-account-acquisition.ts")).toContain("https://developers.jup.ag/portal");
     expect(settingsPage.indexOf("<Web3CredentialsRunwayCard")).toBeLessThan(
       settingsPage.indexOf("<ConnectionChecks"),
     );
