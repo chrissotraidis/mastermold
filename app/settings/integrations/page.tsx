@@ -305,6 +305,12 @@ function Web3CredentialsRunwayCard({
             runbook={operatorRunbook}
             cutover={cutoverBlockerBoard}
           />
+          <SettingsWeb3OperatorSetupRunway
+            handoff={operatorCredentialHandoff}
+            requestPacket={operatorRequestPacket}
+            runbook={operatorRunbook}
+            liveUsability={liveUsabilityBlockers}
+          />
           <SettingsWeb3LiveUsabilityBlockersPanel receipt={liveUsabilityBlockers} />
           <SettingsWeb3CredentialSafetyMatrix handoff={operatorCredentialHandoff} requestPacket={operatorRequestPacket} />
           <SettingsWeb3ResearchHandoffPanel packet={researchHandoffPacket} />
@@ -534,18 +540,20 @@ function Web3CredentialsRunwayCard({
             </p>
           </div>
 
-          <SettingsWeb3CredentialConsole
-            walletPublicKeyPreview={receipt.wallet_summary.wallet_public_key_preview}
-            defaultWalletPublicKey={scopedWallet}
-            maxTradeUsd={state.execution_readiness.config.max_trade_usd}
-            dailySpendCapUsd={state.execution_readiness.config.daily_spend_cap_usd}
-            maxSlippageBps={state.execution_readiness.config.max_slippage_bps}
-            jupiterConfigured={receipt.environment_summary.jupiter_configured}
-            scenario={state.scenario}
-            source={state.market_source.mode}
-            account={state.paper_account.mode}
-            cycles={state.paper_account.cycle}
-          />
+          <div id="web3-credential-action-console">
+            <SettingsWeb3CredentialConsole
+              walletPublicKeyPreview={receipt.wallet_summary.wallet_public_key_preview}
+              defaultWalletPublicKey={scopedWallet}
+              maxTradeUsd={state.execution_readiness.config.max_trade_usd}
+              dailySpendCapUsd={state.execution_readiness.config.daily_spend_cap_usd}
+              maxSlippageBps={state.execution_readiness.config.max_slippage_bps}
+              jupiterConfigured={receipt.environment_summary.jupiter_configured}
+              scenario={state.scenario}
+              source={state.market_source.mode}
+              account={state.paper_account.mode}
+              cycles={state.paper_account.cycle}
+            />
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
@@ -701,6 +709,96 @@ function SettingsWeb3CredentialCommandCenter({
 
       <p className="mt-2 text-xs leading-5 text-outline">
         The command center is a safe-entry map only; it cannot store private keys, store seed phrases, sign, submit, mutate wallets, or approve autonomous live trading.
+      </p>
+    </div>
+  );
+}
+
+function SettingsWeb3OperatorSetupRunway({
+  handoff,
+  requestPacket,
+  runbook,
+  liveUsability,
+}: {
+  handoff: Web3OperatorCredentialHandoffReceipt;
+  requestPacket: Web3OperatorRequestPacket;
+  runbook: Web3OperatorRunbookReceipt;
+  liveUsability: Web3LiveUsabilityBlockersReceipt;
+}) {
+  const steps = buildSettingsOperatorSetupRunwaySteps(handoff, requestPacket, runbook, liveUsability);
+  const activeStep = steps.find((step) => step.status !== "ready") ?? steps[steps.length - 1];
+  const readyCount = steps.filter((step) => step.status === "ready").length;
+  const safeActionCount = steps.filter((step) => step.status === "ready" || step.status === "active").length;
+  return (
+    <div className="rounded-md border border-engine/30 bg-surface-dim/35 p-3" aria-label="Settings Web3 operator setup runway">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Setup runway</p>
+          <p className="mt-1 text-base font-semibold text-on-surface">
+            {activeStep ? `Next: ${activeStep.label}` : "Setup runway is ready for review"}
+          </p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            A short operator path from safe credential inputs to dry-run proof and external live review. It uses existing receipts only; it cannot collect wallet secrets or grant live authority.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={readyCount === steps.length ? "pass" : "watch"} label={`${readyCount}/${steps.length} ready`} />
+          <LaunchQueueBadge status={safeActionCount > 0 ? "pass" : "watch"} label={`${safeActionCount} safe actions`} />
+          <LaunchQueueBadge status="fail" label="live blocked" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3" aria-label="Settings Web3 setup runway metrics">
+        <SettingsMetric label="Open inputs" value={`${handoff.open_required_count}`} />
+        <SettingsMetric label="Real blockers" value={`${liveUsability.real_capital_blocker_count}`} />
+        <SettingsMetric label="Live lanes" value={`${liveUsability.ready_live_lane_count}/${liveUsability.total_live_lane_count}`} />
+      </div>
+
+      <ol className="mt-3 grid gap-2" aria-label="Settings Web3 next three safe steps">
+        {steps.map((step, index) => (
+          <li key={step.id} className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Step {index + 1}</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{step.label}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{step.storage_rule}</p>
+              </div>
+              <LaunchQueueBadge status={settingsSetupRunwayBadgeStatus(step.status)} label={step.status} />
+            </div>
+            <p className="mt-2 text-xs leading-5 text-on-surface-variant">{step.next_action}</p>
+            {step.command ? (
+              <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+                {step.command}
+              </code>
+            ) : step.href ? (
+              <Link
+                href={step.href}
+                className="mt-2 inline-flex min-h-10 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
+              >
+                Open safe surface
+              </Link>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.72fr)]">
+        <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 runway verifier">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Verifier after each change</p>
+          <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+            {requestPacket.verifier_commands[0] ?? runbook.verifier_commands[0] ?? "npm run verify:web3 -- --base-url=http://localhost:4010"}
+          </code>
+        </div>
+        <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings Web3 runway never provide">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Never provide</p>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+            {liveUsability.never_provide.slice(0, 3).join(" · ")}
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Setup runway is a guide only. Private keys, seed phrases, transaction bodies, signed payloads, signing, submission, wallet mutation, and autonomous live trading stay blocked.
       </p>
     </div>
   );
@@ -1329,6 +1427,89 @@ function SettingsWeb3OperatorRunbookPanel({ runbook }: { runbook: Web3OperatorRu
       </p>
     </div>
   );
+}
+
+type SettingsOperatorSetupRunwayStep = {
+  id: string;
+  label: string;
+  status: "ready" | "active" | "blocked" | "review";
+  storage_rule: string;
+  next_action: string;
+  href: string | null;
+  command: string | null;
+};
+
+function buildSettingsOperatorSetupRunwaySteps(
+  handoff: Web3OperatorCredentialHandoffReceipt,
+  requestPacket: Web3OperatorRequestPacket,
+  runbook: Web3OperatorRunbookReceipt,
+  liveUsability: Web3LiveUsabilityBlockersReceipt,
+): SettingsOperatorSetupRunwayStep[] {
+  const nextInput = handoff.next_input ?? requestPacket.next_input;
+  const liveDexAction = runbook.run_now.find((action) => action.id === "refresh-live-dex");
+  const orderAction = runbook.run_now.find((action) => action.id === "rehearse-jupiter-order");
+  const strictWalletVerifier = requestPacket.verifier_commands.find((command) => command.includes("--require-operator-wallet"));
+  const strictJupiterVerifier = requestPacket.verifier_commands.find((command) => command.includes("--require-jupiter-order")) ?? orderAction?.command;
+  const combinedStrictVerifier = [
+    strictWalletVerifier,
+    strictJupiterVerifier,
+    requestPacket.verifier_commands.find((command) => command.includes("--require-dex-live")),
+  ].filter(Boolean).join(" && ");
+  const verifierCommand = combinedStrictVerifier ||
+    requestPacket.verifier_commands[0] ||
+    runbook.verifier_commands[0] ||
+    "npm run verify:web3 -- --base-url=http://localhost:4010";
+
+  return [
+    {
+      id: "safe-credential-input",
+      label: nextInput ? nextInput.label : "Credential inputs are ready",
+      status: handoff.open_required_count === 0 ? "ready" : nextInput ? "active" : "blocked",
+      storage_rule: nextInput
+        ? `${nextInput.safe_collection_surface.replaceAll("-", " ")} · ${nextInput.storage.replaceAll("-", " ")}`
+        : "status-only receipt",
+      next_action: nextInput?.next_action ?? handoff.next_action,
+      href: "#web3-credential-action-console",
+      command: null,
+    },
+    {
+      id: "live-market-proof",
+      label: liveDexAction?.label ?? "Refresh read-only live DEX tape",
+      status: liveDexAction?.status === "allowed" ? "active" : liveDexAction?.status === "gated" ? "review" : "blocked",
+      storage_rule: "read-only public market data",
+      next_action: liveDexAction?.next_action ?? "Refresh public DEX discovery and candle proof without signing or wallet authority.",
+      href: liveDexAction?.href ?? null,
+      command: liveDexAction?.command ?? null,
+    },
+    {
+      id: "strict-wallet-order-proof",
+      label: "Run strict wallet/order verifier",
+      status: handoff.open_required_count === 0 && liveUsability.dry_run_usable ? "ready" : orderAction?.status === "allowed" ? "active" : "blocked",
+      storage_rule: "public wallet plus redacted order proof",
+      next_action: liveUsability.dry_run_usable
+        ? "Run the strict verifier after any credential or wallet change and keep transaction bytes withheld."
+        : orderAction?.next_action ?? "Scope a dedicated public wallet and Jupiter order rehearsal before strict dry-run proof can pass.",
+      href: null,
+      command: verifierCommand,
+    },
+    {
+      id: "external-live-review",
+      label: "Prepare external live review",
+      status: liveUsability.can_request_external_review ? "review" : "blocked",
+      storage_rule: "external approval only",
+      next_action: liveUsability.can_request_external_review
+        ? "Export the manual live-review packet for external approval; in-app live execution remains blocked."
+        : liveUsability.next_action,
+      href: "/api/web3-manual-live-review-packet?source=live-dex&account=persistent",
+      command: null,
+    },
+  ];
+}
+
+function settingsSetupRunwayBadgeStatus(status: SettingsOperatorSetupRunwayStep["status"]) {
+  if (status === "ready") return "pass";
+  if (status === "active" || status === "review") return "watch";
+  return "fail";
 }
 
 function settingsCutoverOwnerLabel(owner: Web3CutoverBlockerBoard["rows"][number]["owner"]) {

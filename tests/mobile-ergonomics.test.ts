@@ -933,8 +933,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Open runbook");
     expect(settingsPage).toContain("The command center is a safe-entry map only");
     expect(settingsPage.indexOf("<SettingsWeb3CredentialCommandCenter")).toBeLessThan(
+      settingsPage.indexOf("<SettingsWeb3OperatorSetupRunway"),
+    );
+    expect(settingsPage.indexOf("<SettingsWeb3OperatorSetupRunway")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3LiveUsabilityBlockersPanel"),
     );
+    expect(settingsPage).toContain("SettingsWeb3OperatorSetupRunway");
+    expect(settingsPage).toContain("Settings Web3 operator setup runway");
+    expect(settingsPage).toContain("Settings Web3 next three safe steps");
+    expect(settingsPage).toContain("web3-credential-action-console");
+    expect(settingsPage).toContain("Setup runway is a guide only.");
     expect(settingsPage.indexOf("<SettingsWeb3LiveUsabilityBlockersPanel")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3CredentialSafetyMatrix"),
     );
@@ -1446,11 +1454,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-live-usability-blockers");
     expect(source("components/review-readiness.tsx")).toContain("live-usability blocker summaries");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now adds a Web3 setup runway");
     expect(source("components/review-readiness.tsx")).toContain("Settings now places that same live-usability blocker receipt");
     expect(source("README.md")).toContain("/api/web3-live-usability-blockers?source=live-dex");
     expect(source("README.md")).toContain("web3_live_usability");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-usability-blockers");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_live_usability");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Setup runway");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");
