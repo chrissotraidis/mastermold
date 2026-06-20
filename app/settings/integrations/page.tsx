@@ -503,6 +503,10 @@ function Web3CredentialsRunwayCard({
 function SettingsWeb3OperatorIntakeBoard({ receipt }: { receipt: Web3OperatorCredentialHandoffReceipt }) {
   const nextInput = receipt.next_input;
   const openInputs = receipt.inputs.filter((item) => item.status !== "ready").slice(0, 2);
+  const openRequiredInputs = receipt.inputs
+    .filter((item) => item.priority !== "review-before-live" && item.status !== "ready")
+    .slice(0, 4);
+  const safeInputs = receipt.allowed_inputs.slice(0, 5);
   const verifier = nextInput?.verifier_command ?? receipt.safe_commands[0];
   const facts = [
     ["Ready lanes", `${receipt.ready_count}/${receipt.inputs.length}`],
@@ -532,6 +536,32 @@ function SettingsWeb3OperatorIntakeBoard({ receipt }: { receipt: Web3OperatorCre
             <span className="ml-1 font-semibold text-on-surface">{value}</span>
           </span>
         ))}
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.72fr)]" aria-label="Web3 operator request packet">
+        <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Safe to provide</p>
+          <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-on-surface-variant">
+            {safeInputs.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+        <div className="rounded-md border border-caution/25 bg-caution/[0.035] p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Open required lanes</p>
+          {openRequiredInputs.length > 0 ? (
+            <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-on-surface-variant">
+              {openRequiredInputs.map((item) => (
+                <li key={item.id}>
+                  <span className="font-semibold text-on-surface">{item.label}</span>
+                  <span className="text-outline"> · {item.safe_collection_surface.replaceAll("-", " ")}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+              Required dry-run lanes are ready; keep live review external and rerun the verifier.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)]">

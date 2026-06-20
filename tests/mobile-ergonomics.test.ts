@@ -839,6 +839,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 operator intake board");
     expect(settingsPage).toContain("Operator intake");
     expect(settingsPage).toContain("Next safe input:");
+    expect(settingsPage).toContain("Web3 operator request packet");
+    expect(settingsPage).toContain("Safe to provide");
+    expect(settingsPage).toContain("Open required lanes");
+    expect(settingsPage).toContain("receipt.allowed_inputs.slice(0, 5)");
+    expect(settingsPage).toContain("openRequiredInputs.map");
     expect(settingsPage).toContain("Safe verifier");
     expect(settingsPage).toContain("Never provide");
     expect(settingsPage).toContain("Operator intake is a setup guide only");
