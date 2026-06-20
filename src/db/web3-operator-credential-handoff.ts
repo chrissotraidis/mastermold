@@ -6,17 +6,23 @@ import type {
   Web3AutonomyLaunchOperatorInput,
 } from "./web3-launch-checklist";
 
+export type Web3OperatorCredentialHandoffInputId =
+  | Web3AutonomyLaunchOperatorInput["id"]
+  | "emergency-stop-target"
+  | "production-worker-ops"
+  | "accounting-export-target";
+
 export type Web3OperatorCredentialHandoffStatus =
   | "needs-operator-input"
   | "ready-for-dry-run-rehearsal"
   | "ready-for-manual-live-review";
 
 export type Web3OperatorCredentialHandoffInput = {
-  id: Web3AutonomyLaunchOperatorInput["id"];
+  id: Web3OperatorCredentialHandoffInputId;
   label: string;
   status: Web3AutonomyLaunchOperatorInput["status"];
   priority: "required-now" | "required-before-live" | "review-before-live";
-  input_kind: "api-key" | "public-wallet" | "wallet-proof" | "signer-policy" | "ops-policy" | "approval";
+  input_kind: "api-key" | "public-wallet" | "wallet-proof" | "signer-policy" | "ops-policy" | "ops-target" | "accounting-target" | "approval";
   safe_collection_surface: "settings-console" | "browser-wallet" | "external-system" | "manual-review";
   can_enter_in_app: boolean;
   env_targets: string[];
@@ -59,9 +65,12 @@ export function buildWeb3OperatorCredentialHandoffReceipt(input: {
   launchChecklist: Web3AutonomyLaunchChecklist;
 }): Web3OperatorCredentialHandoffReceipt {
   const generatedAt = new Date().toISOString();
-  const inputs = input.launchChecklist.operator_inputs_needed.map((item) =>
-    buildHandoffInput(item, input.accountSetup, input.acquisition),
-  );
+  const inputs = [
+    ...input.launchChecklist.operator_inputs_needed.map((item) =>
+      buildHandoffInput(item, input.accountSetup, input.acquisition),
+    ),
+    ...buildLiveOpsHandoffInputs(input.accountSetup),
+  ];
   const requiredInputs = inputs.filter((item) => item.priority !== "review-before-live");
   const readyCount = inputs.filter((item) => item.status === "ready").length;
   const openRequiredCount = requiredInputs.filter((item) => item.status !== "ready").length;
@@ -95,6 +104,7 @@ export function buildWeb3OperatorCredentialHandoffReceipt(input: {
       "Browser-wallet text-message ownership proof",
       "Signer provider mode plus reviewed provider API credentials",
       "Emergency-stop owner/contact or webhook target",
+      "Production worker owner, process manager, alert route, and restart-policy targets",
       "Accounting/export target for reviewed fill records",
       "Manual live-review approval outside the app",
     ],
@@ -160,38 +170,116 @@ function buildHandoffInput(
   };
 }
 
-function priorityForInput(id: Web3AutonomyLaunchOperatorInput["id"]): Web3OperatorCredentialHandoffInput["priority"] {
+function buildLiveOpsHandoffInputs(accountSetup: Web3AccountSetupReceipt): Web3OperatorCredentialHandoffInput[] {
+  const productionTargetsConfigured = hasEnv("MASTERMOLD_WEB3_PROCESS_MANAGER") &&
+    hasEnv("MASTERMOLD_WEB3_WORKER_OWNER") &&
+    hasEnv("MASTERMOLD_WEB3_ALERT_WEBHOOK_URL") &&
+    hasEnv("MASTERMOLD_WEB3_RESTART_POLICY_URL");
+  return [
+    {
+      id: "emergency-stop-target",
+      label: "Emergency-stop target",
+      status: accountSetup.environment_summary.emergency_stop_configured ? "ready" : "needed",
+      priority: "required-now",
+      input_kind: "ops-target",
+      safe_collection_surface: "settings-console",
+      can_enter_in_app: true,
+      env_targets: ["MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL", "MASTERMOLD_EMERGENCY_STOP_CONTACT"],
+      storage: "server-env",
+      detail: accountSetup.environment_summary.emergency_stop_configured
+        ? "Emergency-stop contact or webhook target is configured as server-side ops evidence."
+        : "Add an emergency-stop contact or webhook so supervised live review has a reachable stop path.",
+      next_action: accountSetup.environment_summary.emergency_stop_configured
+        ? "Run the local emergency-stop drill and keep external dispatch blocked until live-ops review."
+        : "Add MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL or MASTERMOLD_EMERGENCY_STOP_CONTACT in ignored server env, then run the stop drill.",
+      verifier_command: "curl -s -X POST http://localhost:4010/api/web3-emergency-stop/drill -H 'content-type: application/json' -d '{\"operator_ack\":true,\"reason\":\"local dry-run review\"}'",
+      secret_handling: "Emergency-stop values stay in ignored server env; receipts report configured/missing status only and do not dispatch webhooks.",
+    },
+    {
+      id: "production-worker-ops",
+      label: "Production worker ops targets",
+      status: productionTargetsConfigured ? "ready" : "needed",
+      priority: "required-before-live",
+      input_kind: "ops-target",
+      safe_collection_surface: "settings-console",
+      can_enter_in_app: true,
+      env_targets: [
+        "MASTERMOLD_WEB3_PROCESS_MANAGER",
+        "MASTERMOLD_WEB3_WORKER_OWNER",
+        "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+        "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+      ],
+      storage: "server-env",
+      detail: productionTargetsConfigured
+        ? "Production worker process, owner, alert, and restart-policy targets are configured for review."
+        : "Live review still needs the external worker owner, process manager, alert route, and restart-policy reference.",
+      next_action: productionTargetsConfigured
+        ? "Rebuild the live ops packet and keep live execution flags unset until external review."
+        : "Add production worker process, owner, alert route, and restart-policy targets in ignored server env.",
+      verifier_command: "npm run doctor:web3 -- --json",
+      secret_handling: "Worker ops targets are stored server-side and returned only as configured/missing booleans; this app cannot start workers or dispatch alerts.",
+    },
+    {
+      id: "accounting-export-target",
+      label: "Accounting export target",
+      status: accountSetup.environment_summary.tax_ledger_configured ? "ready" : "needed",
+      priority: "required-before-live",
+      input_kind: "accounting-target",
+      safe_collection_surface: "settings-console",
+      can_enter_in_app: true,
+      env_targets: ["MASTERMOLD_TAX_LEDGER_EXPORT_PATH"],
+      storage: "server-env",
+      detail: accountSetup.environment_summary.tax_ledger_configured
+        ? "Accounting export target is configured for reviewed fill records."
+        : "Real fills need a reviewed accounting/export target or an explicit external accounting workflow.",
+      next_action: accountSetup.environment_summary.tax_ledger_configured
+        ? "Use only after submitted-to-landed fill reconciliation is clean and manually reviewed."
+        : "Set MASTERMOLD_TAX_LEDGER_EXPORT_PATH or document the external accounting workflow before live review.",
+      verifier_command: "npm run doctor:web3 -- --json",
+      secret_handling: "Accounting targets stay in server env or external review notes; exports remain paper-only until settlement evidence is reviewed.",
+    },
+  ];
+}
+
+function priorityForInput(id: Web3OperatorCredentialHandoffInputId): Web3OperatorCredentialHandoffInput["priority"] {
   if (id === "manual-live-approval" || id === "settlement-accounting-review") return "review-before-live";
+  if (id === "emergency-stop-target") return "required-now";
+  if (id === "production-worker-ops" || id === "accounting-export-target") return "required-before-live";
   if (id === "signer-provider-credentials" || id === "signer-custody-choice") return "required-before-live";
   return "required-now";
 }
 
-function inputKindForInput(id: Web3AutonomyLaunchOperatorInput["id"]): Web3OperatorCredentialHandoffInput["input_kind"] {
+function inputKindForInput(id: Web3OperatorCredentialHandoffInputId): Web3OperatorCredentialHandoffInput["input_kind"] {
   if (id === "helius-solana-read-rail" || id === "jupiter-route-order-key") return "api-key";
   if (id === "dedicated-trading-wallet") return "public-wallet";
   if (id === "wallet-ownership-proof") return "wallet-proof";
   if (id === "signer-custody-choice" || id === "signer-provider-credentials") return "signer-policy";
+  if (id === "emergency-stop-target" || id === "production-worker-ops") return "ops-target";
+  if (id === "accounting-export-target") return "accounting-target";
   if (id === "settlement-accounting-review") return "ops-policy";
   return "approval";
 }
 
-function collectionSurfaceForInput(id: Web3AutonomyLaunchOperatorInput["id"]): Web3OperatorCredentialHandoffInput["safe_collection_surface"] {
+function collectionSurfaceForInput(id: Web3OperatorCredentialHandoffInputId): Web3OperatorCredentialHandoffInput["safe_collection_surface"] {
   if (id === "wallet-ownership-proof") return "browser-wallet";
   if (id === "manual-live-approval" || id === "settlement-accounting-review") return "manual-review";
   if (id === "signer-custody-choice") return "external-system";
   return "settings-console";
 }
 
-function canEnterInApp(id: Web3AutonomyLaunchOperatorInput["id"]) {
+function canEnterInApp(id: Web3OperatorCredentialHandoffInputId) {
   return id === "helius-solana-read-rail" ||
     id === "jupiter-route-order-key" ||
     id === "dedicated-trading-wallet" ||
     id === "wallet-ownership-proof" ||
-    id === "signer-provider-credentials";
+    id === "signer-provider-credentials" ||
+    id === "emergency-stop-target" ||
+    id === "production-worker-ops" ||
+    id === "accounting-export-target";
 }
 
-function envTargetsForInput(id: Web3AutonomyLaunchOperatorInput["id"]) {
-  const targets: Record<Web3AutonomyLaunchOperatorInput["id"], string[]> = {
+function envTargetsForInput(id: Web3OperatorCredentialHandoffInputId) {
+  const targets: Record<Web3OperatorCredentialHandoffInputId, string[]> = {
     "helius-solana-read-rail": ["HELIUS_API_KEY", "SOLANA_RPC_URL", "SOLANA_WS_URL"],
     "dedicated-trading-wallet": ["wallet_public_key"],
     "wallet-ownership-proof": ["hash-only wallet ownership receipt"],
@@ -209,12 +297,20 @@ function envTargetsForInput(id: Web3AutonomyLaunchOperatorInput["id"]) {
       "MASTERMOLD_SESSION_POLICY_HASH",
     ],
     "settlement-accounting-review": ["MASTERMOLD_TAX_LEDGER_EXPORT_PATH"],
+    "emergency-stop-target": ["MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL", "MASTERMOLD_EMERGENCY_STOP_CONTACT"],
+    "production-worker-ops": [
+      "MASTERMOLD_WEB3_PROCESS_MANAGER",
+      "MASTERMOLD_WEB3_WORKER_OWNER",
+      "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+      "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+    ],
+    "accounting-export-target": ["MASTERMOLD_TAX_LEDGER_EXPORT_PATH"],
     "manual-live-approval": ["MASTERMOLD_LIVE_OPERATOR_APPROVAL"],
   };
   return targets[id];
 }
 
-function verifierCommandForInput(id: Web3AutonomyLaunchOperatorInput["id"]) {
+function verifierCommandForInput(id: Web3OperatorCredentialHandoffInputId) {
   if (id === "dedicated-trading-wallet" || id === "wallet-ownership-proof") {
     return "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
   }
@@ -223,6 +319,12 @@ function verifierCommandForInput(id: Web3AutonomyLaunchOperatorInput["id"]) {
   }
   if (id === "helius-solana-read-rail") {
     return "npm run verify:web3 -- --base-url=http://localhost:4010";
+  }
+  if (id === "emergency-stop-target") {
+    return "curl -s -X POST http://localhost:4010/api/web3-emergency-stop/drill -H 'content-type: application/json' -d '{\"operator_ack\":true,\"reason\":\"local dry-run review\"}'";
+  }
+  if (id === "production-worker-ops" || id === "accounting-export-target") {
+    return "npm run doctor:web3 -- --json";
   }
   return null;
 }
@@ -264,4 +366,9 @@ function handoffSummary(
 
 function hashJson(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function hasEnv(name: string) {
+  const value = process.env[name];
+  return typeof value === "string" && value.trim().length > 0;
 }

@@ -953,6 +953,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("What Mastermind still needs before supervised trading review");
     expect(settingsPage).toContain("next_operator_action");
     expect(settingsPage).toContain("Next operator action");
+    expect(settingsPage).toContain("receipt.inputs.slice(0, 12)");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("emergency-stop-target");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("production-worker-ops");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("accounting-export-target");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("MASTERMOLD_WEB3_PROCESS_MANAGER");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("MASTERMOLD_TAX_LEDGER_EXPORT_PATH");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("this app cannot start workers or dispatch alerts");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("Dedicated trading wallet");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("Jupiter route/order key");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("Signer/custody choice");

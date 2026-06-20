@@ -830,10 +830,35 @@ describe("Web3 autonomous trading subsystem", () => {
       safe_collection_surface: "browser-wallet",
       storage: "hash-only-local-receipt",
     });
+    expect(receipt.inputs.find((item) => item.id === "emergency-stop-target")).toMatchObject({
+      input_kind: "ops-target",
+      safe_collection_surface: "settings-console",
+      env_targets: expect.arrayContaining(["MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL", "MASTERMOLD_EMERGENCY_STOP_CONTACT"]),
+      storage: "server-env",
+    });
+    expect(receipt.inputs.find((item) => item.id === "production-worker-ops")).toMatchObject({
+      input_kind: "ops-target",
+      safe_collection_surface: "settings-console",
+      env_targets: expect.arrayContaining([
+        "MASTERMOLD_WEB3_PROCESS_MANAGER",
+        "MASTERMOLD_WEB3_WORKER_OWNER",
+        "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+        "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+      ]),
+      storage: "server-env",
+    });
+    expect(receipt.inputs.find((item) => item.id === "accounting-export-target")).toMatchObject({
+      input_kind: "accounting-target",
+      safe_collection_surface: "settings-console",
+      env_targets: expect.arrayContaining(["MASTERMOLD_TAX_LEDGER_EXPORT_PATH"]),
+      storage: "server-env",
+    });
     expect(receipt.allowed_inputs).toEqual(expect.arrayContaining([
       "JUPITER_API_KEY in ignored server env or one-shot credential test",
       "Dedicated Solana public wallet address",
       "Browser-wallet text-message ownership proof",
+      "Production worker owner, process manager, alert route, and restart-policy targets",
+      "Accounting/export target for reviewed fill records",
     ]));
     expect(receipt.never_request).toEqual(expect.arrayContaining([
       "Wallet private key",

@@ -973,7 +973,7 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
 
 function SettingsOperatorCredentialHandoffReceiptPanel({ receipt }: { receipt: Web3OperatorCredentialHandoffReceipt }) {
   const nextInput = receipt.next_input;
-  const visibleInputs = receipt.inputs.slice(0, 8);
+  const visibleInputs = receipt.inputs.slice(0, 12);
   return (
     <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Operator credential handoff receipt">
       <div className="flex flex-wrap items-start justify-between gap-2">
