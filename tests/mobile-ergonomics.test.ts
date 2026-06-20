@@ -909,6 +909,9 @@ describe("mobile ergonomics source contracts", () => {
       settingsPage.indexOf("<SettingsWeb3CutoverBlockerBoardPanel"),
     );
     expect(settingsPage.indexOf("<SettingsWeb3CutoverBlockerBoardPanel")).toBeLessThan(
+      settingsPage.indexOf("<SettingsWeb3OperatorRunbookPanel"),
+    );
+    expect(settingsPage.indexOf("<SettingsWeb3OperatorRunbookPanel")).toBeLessThan(
       settingsPage.indexOf("aria-label=\"Secure Web3 credential handoff\""),
     );
     expect(settingsPage).toContain("Settings Web3 cutover blocker board");
@@ -918,6 +921,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings top Web3 cutover blockers");
     expect(settingsPage).toContain("/api/web3-cutover-blocker-board?source=live-dex&account=persistent");
     expect(settingsPage).toContain("This Settings board names env targets and verifier commands only.");
+    expect(settingsPage).toContain("buildWeb3OperatorRunbook");
+    expect(settingsPage).toContain("SettingsWeb3OperatorRunbookPanel");
+    expect(settingsPage).toContain("Settings Web3 operator runbook");
+    expect(settingsPage).toContain("Settings primary safe Web3 action");
+    expect(settingsPage).toContain("Settings safe Web3 run-now actions");
+    expect(settingsPage).toContain("Settings real-capital Web3 blockers");
+    expect(settingsPage).toContain("/api/web3-operator-runbook?source=live-dex&account=persistent");
+    expect(settingsPage).toContain("Settings runbook actions are paper, read-only, credential, verifier, or external-review steps only");
     expect(settingsPage).toContain("Safe to provide");
     expect(settingsPage).toContain("Open required lanes");
     expect(settingsPage).toContain("receipt.allowed_inputs.slice(0, 5)");
@@ -1315,6 +1326,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");
     expect(source("components/review-readiness.tsx")).toContain("Settings now renders that same Web3 cutover blocker board");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now also renders the Web3 operator runbook");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-runbook now expose a safe operator action map");
     expect(source("components/review-readiness.tsx")).toContain("manual live-review packet");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-manual-live-review-packet");

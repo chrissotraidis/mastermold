@@ -37,6 +37,7 @@ import {
   type Web3OperatorCredentialHandoffReceipt,
 } from "@/src/db/web3-operator-credential-handoff";
 import { buildWeb3OperatorRequestPacket, type Web3OperatorRequestPacket } from "@/src/db/web3-operator-request-packet";
+import { buildWeb3OperatorRunbook, type Web3OperatorRunbookReceipt } from "@/src/db/web3-operator-runbook";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
@@ -121,6 +122,13 @@ export default async function IntegrationsSettingsPage() {
     runway: web3SupervisedLiveRunway,
     usability: web3UsabilityStatus,
   });
+  const web3OperatorRunbook = buildWeb3OperatorRunbook({
+    state: web3State,
+    usability: web3UsabilityStatus,
+    cutover: web3CutoverBlockerBoard,
+    preflight: web3LiveCapitalPreflight,
+    runway: web3SupervisedLiveRunway,
+  });
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -152,6 +160,7 @@ export default async function IntegrationsSettingsPage() {
             operatorCredentialHandoff={web3OperatorCredentialHandoff}
             operatorRequestPacket={web3OperatorRequestPacket}
             cutoverBlockerBoard={web3CutoverBlockerBoard}
+            operatorRunbook={web3OperatorRunbook}
             state={web3State}
           />
         </div>
@@ -204,6 +213,7 @@ function Web3CredentialsRunwayCard({
   operatorCredentialHandoff,
   operatorRequestPacket,
   cutoverBlockerBoard,
+  operatorRunbook,
   state,
 }: {
   receipt: Web3AccountSetupReceipt;
@@ -220,6 +230,7 @@ function Web3CredentialsRunwayCard({
   operatorCredentialHandoff: Web3OperatorCredentialHandoffReceipt;
   operatorRequestPacket: Web3OperatorRequestPacket;
   cutoverBlockerBoard: Web3CutoverBlockerBoard;
+  operatorRunbook: Web3OperatorRunbookReceipt;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
   const requiredConfigured = receipt.environment_summary.required_configured_count;
@@ -262,6 +273,7 @@ function Web3CredentialsRunwayCard({
           <SettingsWeb3OperatorIntakeBoard receipt={operatorCredentialHandoff} />
           <SettingsWeb3OperatorRequestPacketPanel packet={operatorRequestPacket} />
           <SettingsWeb3CutoverBlockerBoardPanel board={cutoverBlockerBoard} />
+          <SettingsWeb3OperatorRunbookPanel runbook={operatorRunbook} />
 
           <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Secure Web3 credential handoff">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -820,9 +832,125 @@ function SettingsWeb3CutoverBlockerBoardPanel({ board }: { board: Web3CutoverBlo
   );
 }
 
+function SettingsWeb3OperatorRunbookPanel({ runbook }: { runbook: Web3OperatorRunbookReceipt }) {
+  const primary = runbook.primary_safe_action;
+  const visibleActions = runbook.run_now.slice(0, 5);
+  const blockers = runbook.real_capital_blockers.slice(0, 4);
+  return (
+    <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Settings Web3 operator runbook">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Operator runbook</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {runbook.status.replaceAll("-", " ")} · {runbook.allowed_now_count} safe now
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{runbook.summary}</p>
+        </div>
+        <LaunchQueueBadge status={runbook.allowed_now_count > 0 ? "pass" : "watch"} label={`${runbook.gated_count} gated`} />
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <SettingsMetric label="Can run" value={`${runbook.allowed_now_count}`} />
+        <SettingsMetric label="Gated" value={`${runbook.gated_count}`} />
+        <SettingsMetric label="Blocked" value={`${runbook.blocked_count}`} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-engine/25 bg-surface-dim/30 p-2" aria-label="Settings primary safe Web3 action">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Primary safe action</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">{primary?.label ?? "Review setup first"}</p>
+          </div>
+          <LaunchQueueBadge status={settingsRunbookActionBadgeStatus(primary?.status ?? "gated")} label={primary?.status ?? "gated"} />
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+          {primary?.next_action ?? runbook.next_safe_input?.next_action ?? runbook.next_live_lane_action}
+        </p>
+        {primary?.command ? (
+          <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+            {primary.command}
+          </code>
+        ) : primary?.href ? (
+          <Link
+            href={primary.href}
+            className="mt-2 inline-flex min-h-10 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
+          >
+            Open safe surface
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2" aria-label="Settings safe Web3 run-now actions">
+        {visibleActions.map((action) => (
+          <div key={action.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{action.label}</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {action.surface.replaceAll("-", " ")} · {action.kind.replace("-", " ")}
+                </p>
+              </div>
+              <LaunchQueueBadge status={settingsRunbookActionBadgeStatus(action.status)} label={action.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{action.next_action}</p>
+            <p className="mt-1 text-[10px] leading-4 text-outline">{action.permission_scope}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings real-capital Web3 blockers">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Real-capital blockers</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">Live authority remains unavailable</p>
+          </div>
+          <LaunchQueueBadge status="fail" label="live blocked" />
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {blockers.length > 0 ? blockers.map((blocker) => (
+            <div key={blocker.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="text-xs font-semibold text-on-surface">{blocker.label}</p>
+              <p className="mt-1 text-[11px] leading-4 text-outline">{blocker.next_action}</p>
+            </div>
+          )) : (
+            <p className="rounded-md border border-outline-variant/20 bg-void/20 p-2 text-xs leading-5 text-on-surface-variant">
+              No blocker rows are open in this local receipt; external live review is still required.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-black/15 p-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Runbook receipt</p>
+          <Link
+            href="/api/web3-operator-runbook?source=live-dex&account=persistent"
+            className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
+          >
+            Open runbook JSON
+          </Link>
+        </div>
+        <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+          {runbook.verifier_commands[0] ?? "npm run verify:web3 -- --base-url=http://localhost:4010"}
+        </code>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Settings runbook actions are paper, read-only, credential, verifier, or external-review steps only; they cannot store secrets, sign, submit, mutate a wallet, or approve autonomous live trading.
+      </p>
+    </div>
+  );
+}
+
 function settingsCutoverOwnerLabel(owner: Web3CutoverBlockerBoard["rows"][number]["owner"]) {
   if (owner === "manual-review") return "manual review";
   return owner;
+}
+
+function settingsRunbookActionBadgeStatus(status: Web3OperatorRunbookReceipt["run_now"][number]["status"]) {
+  if (status === "allowed") return "pass";
+  if (status === "blocked") return "fail";
+  return "watch";
 }
 
 function settingsCutoverRowBadgeStatus(status: Web3CutoverBlockerBoard["rows"][number]["status"]) {
