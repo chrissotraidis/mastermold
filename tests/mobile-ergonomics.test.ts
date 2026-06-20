@@ -1330,6 +1330,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyUsabilityStatusReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-usability-status?source=live-dex&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("usability-status-receipt");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyOperatorSetupPackets");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-operator-request-packet?source=live-dex&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-cutover-blocker-board?source=live-dex&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-supervised-live-runway?source=live-dex&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-operator-runbook?source=live-dex&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("operator-setup-packets");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyManualLiveReviewPacket");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-manual-live-review-packet?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("manual-live-review-packet");

@@ -420,6 +420,98 @@ async function verifyUsabilityStatusReceipt() {
   record("usability-status-receipt", "pass", `${json.current_mode}; next gate ${json.next_gate_label}`);
 }
 
+async function verifyOperatorSetupPackets() {
+  const requestPacket = await requestJson("/api/web3-operator-request-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(requestPacket.response.status === 200, "Operator request packet should return 200.", {
+    status: requestPacket.response.status,
+    json: requestPacket.json,
+  });
+  assert(requestPacket.json.mode === "web3-operator-request-packet", "Operator request packet should expose the expected mode.", requestPacket.json);
+  assert(["needs-input", "ready-for-review"].includes(requestPacket.json.status), "Operator request packet should use a known status.", requestPacket.json);
+  assert(typeof requestPacket.json.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(requestPacket.json.receipt_hash), "Operator request packet should include a receipt hash.", requestPacket.json);
+  assert(Array.isArray(requestPacket.json.required_inputs), "Operator request packet should include required inputs.", requestPacket.json);
+  assert(Array.isArray(requestPacket.json.review_inputs), "Operator request packet should include review inputs.", requestPacket.json);
+  assert(Array.isArray(requestPacket.json.safe_to_provide) && requestPacket.json.safe_to_provide.includes("Dedicated Solana public wallet address"), "Operator request packet should list safe operator inputs.", requestPacket.json.safe_to_provide);
+  assert(Array.isArray(requestPacket.json.never_provide) && requestPacket.json.never_provide.includes("Seed phrase or mnemonic"), "Operator request packet should keep seed phrases in never-provide list.", requestPacket.json.never_provide);
+  assert(Array.isArray(requestPacket.json.verifier_commands) && requestPacket.json.verifier_commands.some((command) => command.includes("verify:web3")), "Operator request packet should include verifier commands.", requestPacket.json.verifier_commands);
+  assert(typeof requestPacket.json.text_packet === "string" && requestPacket.json.text_packet.includes("# Mastermind Web3 Operator Request Packet"), "Operator request packet should include pasteable text.", requestPacket.json.text_packet);
+  assert(requestPacket.json.text_packet.includes("Never Provide"), "Operator request text should include the never-provide boundary.", requestPacket.json.text_packet);
+  assertBlockedAuthority("Operator request packet", requestPacket.json);
+
+  const cutover = await requestJson("/api/web3-cutover-blocker-board?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(cutover.response.status === 200, "Cutover blocker board should return 200.", {
+    status: cutover.response.status,
+    json: cutover.json,
+  });
+  assert(cutover.json.mode === "web3-cutover-blocker-board", "Cutover blocker board should expose the expected mode.", cutover.json);
+  assert(["needs-input", "ready-for-review"].includes(cutover.json.status), "Cutover blocker board should use a known status.", cutover.json);
+  assert(typeof cutover.json.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(cutover.json.receipt_hash), "Cutover blocker board should include a receipt hash.", cutover.json);
+  assert(typeof cutover.json.request_packet_hash === "string" && /^[0-9a-f]{64}$/.test(cutover.json.request_packet_hash), "Cutover board should include a request packet hash.", cutover.json);
+  assert(typeof cutover.json.runway_hash === "string" && /^[0-9a-f]{64}$/.test(cutover.json.runway_hash), "Cutover board should include a runway hash.", cutover.json);
+  assert(typeof cutover.json.usability_hash === "string" && /^[0-9a-f]{64}$/.test(cutover.json.usability_hash), "Cutover board should include a usability hash.", cutover.json);
+  assert(Array.isArray(cutover.json.rows) && cutover.json.rows.length >= requestPacket.json.required_inputs.length, "Cutover blocker board should include setup rows.", cutover.json.rows);
+  assert(typeof cutover.json.open_blocker_count === "number", "Cutover blocker board should expose open blocker count.", cutover.json);
+  assert(cutover.json.now_count + cutover.json.before_live_count + cutover.json.review_count === cutover.json.open_blocker_count, "Cutover blocker phase counts should reconcile.", cutover.json);
+  assert(cutover.json.owner_counts && typeof cutover.json.owner_counts.operator === "number", "Cutover blocker board should expose owner counts.", cutover.json.owner_counts);
+  assert(Array.isArray(cutover.json.verifier_commands) && cutover.json.verifier_commands.some((command) => command.includes("verify:web3")), "Cutover blocker board should include verifier commands.", cutover.json.verifier_commands);
+  assert(cutover.json.rows.every((row) => typeof row.next_action === "string" && row.next_action.length > 0), "Cutover rows should name next actions.", cutover.json.rows);
+  assert(cutover.json.rows.every((row) => row.secret_handling && !/private key|seed phrase/i.test(row.safe_collection_surface ?? "")), "Cutover rows should include secret-handling guidance without unsafe collection surfaces.", cutover.json.rows);
+  assertBlockedAuthority("Cutover blocker board", cutover.json);
+
+  const runway = await requestJson("/api/web3-supervised-live-runway?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(runway.response.status === 200, "Supervised live runway should return 200.", {
+    status: runway.response.status,
+    json: runway.json,
+  });
+  assert(runway.json.mode === "web3-supervised-live-runway", "Supervised live runway should expose the expected mode.", runway.json);
+  assert(runway.json.launch_model === "supervised-external-wallet-first", "Supervised live runway should use the external-wallet-first launch model.", runway.json);
+  assert(typeof runway.json.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(runway.json.receipt_hash), "Supervised live runway should include a receipt hash.", runway.json);
+  assert(Array.isArray(runway.json.lanes) && runway.json.lanes.length === runway.json.total_lane_count, "Supervised live runway should include all lane rows.", runway.json);
+  assert(
+    ["wallet", "jupiter", "signer", "ops", "accounting", "manual-review"].every((id) => runway.json.lanes.some((lane) => lane.id === id)),
+    "Supervised live runway should cover wallet, Jupiter, signer, ops, accounting, and manual review lanes.",
+    runway.json.lanes,
+  );
+  assert(runway.json.ready_lane_count <= runway.json.total_lane_count, "Supervised live runway ready count should not exceed total lanes.", runway.json);
+  assert(Array.isArray(runway.json.safe_commands) && runway.json.safe_commands.some((command) => command.includes("verify:web3")), "Supervised live runway should include safe verifier commands.", runway.json.safe_commands);
+  assert(runway.json.signing_permission === "external-wallet-prompt-only", "Supervised live runway should limit signing to future external wallet prompts.", runway.json);
+  assertBlockedAuthority("Supervised live runway", runway.json, { signingField: false });
+
+  const runbook = await requestJson("/api/web3-operator-runbook?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(runbook.response.status === 200, "Operator runbook should return 200.", {
+    status: runbook.response.status,
+    json: runbook.json,
+  });
+  assert(runbook.json.mode === "web3-operator-runbook", "Operator runbook should expose the expected mode.", runbook.json);
+  assert(["setup-needed", "paper-operable", "supervised-review-ready"].includes(runbook.json.status), "Operator runbook should use a known status.", runbook.json);
+  assert(typeof runbook.json.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(runbook.json.receipt_hash), "Operator runbook should include a receipt hash.", runbook.json);
+  assert(Array.isArray(runbook.json.run_now) && runbook.json.run_now.length >= 6, "Operator runbook should expose the run-now action map.", runbook.json.run_now);
+  assert(runbook.json.run_now.some((action) => action.id === "autonomous-live-trading" && action.status === "blocked"), "Operator runbook should keep autonomous live trading blocked.", runbook.json.run_now);
+  assert(runbook.json.allowed_now_count + runbook.json.gated_count + runbook.json.blocked_count === runbook.json.run_now.length, "Operator runbook action counts should reconcile.", runbook.json);
+  assert(Array.isArray(runbook.json.real_capital_blockers), "Operator runbook should include real-capital blockers.", runbook.json.real_capital_blockers);
+  assert(Array.isArray(runbook.json.verifier_commands) && runbook.json.verifier_commands.some((command) => command.includes("verify:web3")), "Operator runbook should include verifier commands.", runbook.json.verifier_commands);
+  assert(runbook.json.primary_safe_action === null || ["allowed", "gated", "blocked"].includes(runbook.json.primary_safe_action.status), "Operator runbook should expose a valid primary safe action.", runbook.json.primary_safe_action);
+  assertBlockedAuthority("Operator runbook", runbook.json);
+
+  record(
+    "operator-setup-packets",
+    "pass",
+    `${requestPacket.json.status}; ${cutover.json.open_blocker_count} blockers; runway ${runway.json.ready_lane_count}/${runway.json.total_lane_count}; ${runbook.json.allowed_now_count} safe actions`,
+  );
+}
+
+function assertBlockedAuthority(label, json, options = {}) {
+  assert(json.live_execution_permission === "blocked", `${label} must keep live execution blocked.`, json);
+  assert(json.wallet_mutation_permission === "blocked", `${label} must keep wallet mutation blocked.`, json);
+  assert(json.transaction_submission_permission === "blocked", `${label} must keep transaction submission blocked.`, json);
+  if (options.signingField !== false && "signing_permission" in json) {
+    assert(json.signing_permission === "blocked", `${label} must keep signing blocked.`, json);
+  }
+  assert(json.private_key_storage === "blocked", `${label} must block private-key storage.`, json);
+  assert(json.seed_phrase_storage === "blocked", `${label} must block seed-phrase storage.`, json);
+  assert(json.secret_echo_permission === "blocked", `${label} must block secret echo.`, json);
+}
+
 async function verifyManualLiveReviewPacket() {
   const { response, json } = await requestJson("/api/web3-manual-live-review-packet?source=sample&account=persistent&scenario=breakout&cycles=0");
   assert(response.status === 200, "Manual live-review packet should return 200.", { status: response.status, json });
@@ -749,6 +841,7 @@ async function main() {
   await verifyCredentialValidateOnly();
   await verifyProviderHealthReceipt();
   await verifyUsabilityStatusReceipt();
+  await verifyOperatorSetupPackets();
   await verifyManualLiveReviewPacket();
   await verifyResearchHandoffPacket();
   await verifyResearchAnswerIntake();
