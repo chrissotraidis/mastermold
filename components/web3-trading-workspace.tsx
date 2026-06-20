@@ -10282,6 +10282,9 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
                 <MiniStat label="Spent today" value={formatCurrency(state.execution_readiness.spend_today_usd)} />
                 <MiniStat label="Cap left" value={formatCurrency(state.execution_readiness.cap_remaining_usd)} />
               </div>
+              <p className="rounded-md border border-outline-variant/40 bg-void/30 p-3 text-xs leading-5 text-on-surface-variant">
+                {state.execution_readiness.cap_next_action}
+              </p>
             </div>
           </Panel>
 

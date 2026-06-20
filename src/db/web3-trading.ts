@@ -8507,6 +8507,8 @@ export type ExecutionReadiness = {
   config: ExecutionConfig;
   spend_today_usd: number;
   cap_remaining_usd: number;
+  cap_status: "ready" | "exhausted" | "too-small";
+  cap_next_action: string;
   checks: Array<{
     id: string;
     label: string;
@@ -23397,10 +23399,25 @@ function buildExecutionReadiness(config: ExecutionConfig, spendToday: number): E
   const capRemaining = Math.max(0, config.daily_spend_cap_usd - spendToday);
   const hasWallet = typeof config.wallet_public_key === "string" && isLikelySolanaPublicKey(config.wallet_public_key);
   const hasApiKey = Boolean(process.env.JUPITER_API_KEY);
+  const capTooSmall = config.max_trade_usd < 100 || config.daily_spend_cap_usd < 100;
+  const capExhausted = !capTooSmall && capRemaining < 100;
+  const capStatus: ExecutionReadiness["cap_status"] = capTooSmall ? "too-small" : capExhausted ? "exhausted" : "ready";
+  const capNextAction = capStatus === "ready"
+    ? "Dry-run spend caps have room for another paper/order rehearsal."
+    : capStatus === "exhausted"
+      ? "Reset the persistent paper account or save a higher local dry-run daily cap before another paper/order rehearsal; live execution remains blocked."
+      : "Save conservative positive dry-run caps, for example $250 max trade and $1,000 daily cap, before order rehearsal.";
+  const capDetail = capStatus === "ready"
+    ? `$${Math.round(capRemaining).toLocaleString()} daily dry-run cap remains.`
+    : capStatus === "exhausted"
+      ? `Dry-run spend is $${Math.round(spendToday).toLocaleString()} against a $${Math.round(config.daily_spend_cap_usd).toLocaleString()} daily cap; $${Math.round(capRemaining).toLocaleString()} remains.`
+      : `Dry-run caps are too small: $${Math.round(config.max_trade_usd).toLocaleString()} max trade and $${Math.round(config.daily_spend_cap_usd).toLocaleString()} daily cap.`;
   return {
     config,
     spend_today_usd: spendToday,
     cap_remaining_usd: capRemaining,
+    cap_status: capStatus,
+    cap_next_action: capNextAction,
     checks: [
       {
         id: "mode",
@@ -23423,8 +23440,8 @@ function buildExecutionReadiness(config: ExecutionConfig, spendToday: number): E
       {
         id: "caps",
         label: "Caps",
-        status: capRemaining >= 100 && config.max_trade_usd >= 100 ? "pass" : "fail",
-        detail: `$${Math.round(capRemaining).toLocaleString()} daily dry-run cap remains.`,
+        status: capStatus === "ready" ? "pass" : "fail",
+        detail: capDetail,
       },
       {
         id: "jupiter",
@@ -23447,7 +23464,9 @@ function buildExecutionReadiness(config: ExecutionConfig, spendToday: number): E
 function readinessBlockers(readiness: ExecutionReadiness): string[] {
   return readiness.checks
     .filter((check) => check.status === "fail")
-    .map((check) => `${check.label}: ${check.detail}`);
+    .map((check) => check.id === "caps"
+      ? `${check.label}: ${check.detail} ${readiness.cap_next_action}`
+      : `${check.label}: ${check.detail}`);
 }
 
 function cappedTradeSize(suggestedSize: number, readiness: ExecutionReadiness): number {
@@ -81948,12 +81967,13 @@ function applyScenario(markets: MemecoinMarket[], scenario: TradingScenario, cyc
 
 function executionGate(readiness: ExecutionReadiness): ExecutionGate {
   const readinessBlocker = readiness.checks.find((check) => check.status === "fail");
+  const firstReadinessBlocker = readinessBlockers(readiness)[0];
   return {
     mode: readiness.config.mode,
     live_execution_enabled: false,
     live_blockers: [
       readinessBlocker
-        ? `${readinessBlocker.label}: ${readinessBlocker.detail}`
+        ? firstReadinessBlocker ?? `${readinessBlocker.label}: ${readinessBlocker.detail}`
         : "Dry-run preflight passes, but live execution is still disabled.",
       "No wallet signer or temporary session key is connected.",
       "No production Jupiter or Raydium transaction builder is allowed to submit signed payloads.",

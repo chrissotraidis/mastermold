@@ -917,6 +917,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.execution_readiness.config.daily_spend_cap_usd).toBe(1000);
     expect(state.execution_readiness.config.max_slippage_bps).toBe(150);
     expect(state.execution_readiness.config.kill_switch).toBe(false);
+    expect(state.execution_readiness.cap_status).toBe("ready");
+    expect(state.execution_readiness.cap_next_action).toContain("room");
     expect(state.execution_gate.live_execution_enabled).toBe(false);
 
     const response = await ACCOUNT_SETUP_GET(new Request("http://localhost/api/web3-account-setup?scenario=breakout&source=sample&account=persistent&cycles=0"));
@@ -10447,6 +10449,61 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(state.autonomous_live_autonomy_readiness.can_trade_real_capital).toBe(false);
     expect(state.autonomous_live_autonomy_readiness.items.find((item) => item.id === "kill-switch")?.status).toBe("fail");
     expect(state.autonomous_live_autonomy_readiness.next_action).toMatch(/kill switch/i);
+  });
+
+  test("GIVEN dry-run caps are too small WHEN readiness is built THEN it returns a safe cap repair action", async () => {
+    const state = await getWeb3TradingStateAsync({
+      execution: {
+        mode: "dry-run",
+        kill_switch: false,
+        wallet_public_key: "11111111111111111111111111111111",
+        max_trade_usd: 1,
+        daily_spend_cap_usd: 1,
+        max_slippage_bps: 150,
+      },
+    });
+    const capCheck = state.execution_readiness.checks.find((check) => check.id === "caps");
+
+    expect(state.execution_readiness.cap_status).toBe("too-small");
+    expect(state.execution_readiness.cap_next_action).toContain("Save conservative positive dry-run caps");
+    expect(capCheck).toMatchObject({
+      status: "fail",
+      detail: expect.stringContaining("Dry-run caps are too small"),
+    });
+    expect(state.execution_gate.live_blockers[0]).toContain("Save conservative positive dry-run caps");
+    expect(state.execution_gate.live_execution_enabled).toBe(false);
+  });
+
+  test("GIVEN the paper account has spent the dry-run cap WHEN readiness is rebuilt THEN it returns the reset-or-raise cap action", async () => {
+    const state = await getWeb3TradingStateAsync({
+      account: "persistent",
+      reset: true,
+      scenario: "breakout",
+      advance: true,
+      autonomous_burst: {
+        action: "run",
+        max_child_fills: 4,
+      },
+      execution: {
+        mode: "dry-run",
+        kill_switch: false,
+        wallet_public_key: "11111111111111111111111111111111",
+        max_trade_usd: 500,
+        daily_spend_cap_usd: 100,
+        max_slippage_bps: 150,
+      },
+    });
+    const capCheck = state.execution_readiness.checks.find((check) => check.id === "caps");
+
+    expect(state.execution_readiness.spend_today_usd).toBeGreaterThanOrEqual(100);
+    expect(state.execution_readiness.cap_status).toBe("exhausted");
+    expect(state.execution_readiness.cap_next_action).toContain("Reset the persistent paper account");
+    expect(capCheck).toMatchObject({
+      status: "fail",
+      detail: expect.stringContaining("Dry-run spend is"),
+    });
+    expect(state.execution_gate.live_blockers[0]).toContain("Reset the persistent paper account");
+    expect(state.execution_gate.live_execution_enabled).toBe(false);
   });
 
   test("GIVEN the kill switch is on WHEN an execution drill runs THEN it records a blocked audit entry", async () => {
