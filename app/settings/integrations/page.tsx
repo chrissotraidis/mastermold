@@ -29,6 +29,7 @@ import { getWeb3JupiterRehearsalHistory, type Web3JupiterRehearsalHistory } from
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import {
   buildWeb3ManualLiveReviewPacket,
   type Web3ManualLiveReviewPacket,
@@ -131,6 +132,15 @@ export default async function IntegrationsSettingsPage() {
     preflight: web3LiveCapitalPreflight,
     runway: web3SupervisedLiveRunway,
   });
+  const web3LiveUsabilityBlockers = buildWeb3LiveUsabilityBlockersReceipt({
+    state: web3State,
+    usability: web3UsabilityStatus,
+    cutover: web3CutoverBlockerBoard,
+    runbook: web3OperatorRunbook,
+    preflight: web3LiveCapitalPreflight,
+    manualLiveReview: web3ManualLiveReviewPacket,
+    runway: web3SupervisedLiveRunway,
+  });
   const web3ResearchHandoffPacket = buildWeb3ResearchHandoffPacket({
     state: web3State,
     usability: web3UsabilityStatus,
@@ -174,6 +184,7 @@ export default async function IntegrationsSettingsPage() {
             operatorRequestPacket={web3OperatorRequestPacket}
             cutoverBlockerBoard={web3CutoverBlockerBoard}
             operatorRunbook={web3OperatorRunbook}
+            liveUsabilityBlockers={web3LiveUsabilityBlockers}
             researchHandoffPacket={web3ResearchHandoffPacket}
             state={web3State}
           />
@@ -228,6 +239,7 @@ function Web3CredentialsRunwayCard({
   operatorRequestPacket,
   cutoverBlockerBoard,
   operatorRunbook,
+  liveUsabilityBlockers,
   researchHandoffPacket,
   state,
 }: {
@@ -246,6 +258,7 @@ function Web3CredentialsRunwayCard({
   operatorRequestPacket: Web3OperatorRequestPacket;
   cutoverBlockerBoard: Web3CutoverBlockerBoard;
   operatorRunbook: Web3OperatorRunbookReceipt;
+  liveUsabilityBlockers: Web3LiveUsabilityBlockersReceipt;
   researchHandoffPacket: Web3ResearchHandoffPacket;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
@@ -292,6 +305,7 @@ function Web3CredentialsRunwayCard({
             runbook={operatorRunbook}
             cutover={cutoverBlockerBoard}
           />
+          <SettingsWeb3LiveUsabilityBlockersPanel receipt={liveUsabilityBlockers} />
           <SettingsWeb3CredentialSafetyMatrix handoff={operatorCredentialHandoff} requestPacket={operatorRequestPacket} />
           <SettingsWeb3ResearchHandoffPanel packet={researchHandoffPacket} />
           <SettingsWeb3OperatorIntakeBoard receipt={operatorCredentialHandoff} />
@@ -687,6 +701,88 @@ function SettingsWeb3CredentialCommandCenter({
 
       <p className="mt-2 text-xs leading-5 text-outline">
         The command center is a safe-entry map only; it cannot store private keys, store seed phrases, sign, submit, mutate wallets, or approve autonomous live trading.
+      </p>
+    </div>
+  );
+}
+
+function SettingsWeb3LiveUsabilityBlockersPanel({ receipt }: { receipt: Web3LiveUsabilityBlockersReceipt }) {
+  const topMissing = receipt.missing_for_live_usability.slice(0, 4);
+  const safeActions = receipt.safe_next_actions.slice(0, 3);
+  return (
+    <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Settings Web3 live usability blockers">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">What is left for real money</p>
+          <p className="mt-1 text-base font-semibold text-on-surface">{receipt.status.replaceAll("-", " ")}</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">{receipt.summary}</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={receipt.open_operator_input_count > 0 ? "fail" : "watch"} label={`${receipt.open_operator_input_count} inputs`} />
+          <LaunchQueueBadge status={receipt.failed_or_watch_signoff_count > 0 ? "fail" : "watch"} label={`${receipt.failed_or_watch_signoff_count} signoffs`} />
+          <LaunchQueueBadge status="fail" label="live blocked" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <SettingsMetric label="Capital blockers" value={`${receipt.real_capital_blocker_count}`} />
+        <SettingsMetric label="Live lanes" value={`${receipt.ready_live_lane_count}/${receipt.total_live_lane_count}`} />
+        <SettingsMetric label="Signoffs" value={`${receipt.passed_signoff_count}/${receipt.required_signoff_count}`} />
+        <SettingsMetric label="Safe actions" value={`${receipt.safe_action_count}`} />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.78fr)]">
+        <div className="rounded-md border border-critical/25 bg-surface-dim/30 p-2" aria-label="Settings real-money missing rows">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Missing before review</p>
+          <div className="mt-2 grid gap-2">
+            {topMissing.length > 0 ? topMissing.map((item) => (
+              <div key={item.id} className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                      {item.owner.replaceAll("-", " ")} · {item.source.replaceAll("-", " ")}
+                    </p>
+                  </div>
+                  <LaunchQueueBadge status={item.status === "needed" || item.status === "watch" || item.status === "review" ? "watch" : "fail"} label={item.status} />
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+              </div>
+            )) : (
+              <p className="rounded-md border border-outline-variant/20 bg-void/20 p-2 text-xs leading-5 text-on-surface-variant">
+                No missing rows are listed, but live execution still waits for external executor review.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <div className="rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Settings live usability next action">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next safe action</p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{receipt.next_action}</p>
+          </div>
+          <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings live usability safe actions">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Can do safely</p>
+            <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-on-surface-variant">
+              {safeActions.map((action) => (
+                <li key={action.id}>
+                  <span className="font-semibold text-on-surface">{action.label}</span>
+                  <span className="text-outline"> · {action.status}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <Link
+            href="/api/web3-live-usability-blockers?source=live-dex&account=persistent"
+            className="inline-flex min-h-10 items-center rounded-md px-2 text-xs font-semibold text-critical hover:text-critical/80"
+          >
+            Open what-is-left JSON
+          </Link>
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        This is a readiness receipt only. It cannot sign, submit, custody funds, mutate wallets, echo secrets, approve autonomous live trading, or store private keys or seed phrases.
       </p>
     </div>
   );

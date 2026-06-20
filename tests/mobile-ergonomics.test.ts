@@ -933,8 +933,21 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Open runbook");
     expect(settingsPage).toContain("The command center is a safe-entry map only");
     expect(settingsPage.indexOf("<SettingsWeb3CredentialCommandCenter")).toBeLessThan(
+      settingsPage.indexOf("<SettingsWeb3LiveUsabilityBlockersPanel"),
+    );
+    expect(settingsPage.indexOf("<SettingsWeb3LiveUsabilityBlockersPanel")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3CredentialSafetyMatrix"),
     );
+    expect(settingsPage).toContain("buildWeb3LiveUsabilityBlockersReceipt");
+    expect(settingsPage).toContain("SettingsWeb3LiveUsabilityBlockersPanel");
+    expect(settingsPage).toContain("Settings Web3 live usability blockers");
+    expect(settingsPage).toContain("What is left for real money");
+    expect(settingsPage).toContain("Settings real-money missing rows");
+    expect(settingsPage).toContain("Settings live usability next action");
+    expect(settingsPage).toContain("Settings live usability safe actions");
+    expect(settingsPage).toContain("Open what-is-left JSON");
+    expect(settingsPage).toContain("/api/web3-live-usability-blockers?source=live-dex&account=persistent");
+    expect(settingsPage).toContain("This is a readiness receipt only.");
     expect(settingsPage.indexOf("<SettingsWeb3CredentialSafetyMatrix")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3ResearchHandoffPanel"),
     );
@@ -1426,6 +1439,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("text-only wallet ownership proof");
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-live-usability-blockers");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now places that same live-usability blocker receipt");
     expect(source("README.md")).toContain("/api/web3-live-usability-blockers?source=live-dex");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-usability-blockers");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
