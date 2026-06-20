@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, BarChart3, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, ShieldCheck, Wallet } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
@@ -81,8 +81,12 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
         />
 
         <div className="w-full min-w-0 space-y-4">
-          <UsabilityStatusPanel status={usabilityStatus} />
-          <SupervisedLiveRunwayPanel runway={supervisedLiveRunway} />
+          <TradingCommandBoard
+            state={initialState}
+            status={usabilityStatus}
+            runway={supervisedLiveRunway}
+            launchChecklist={launchChecklist}
+          />
           <MarketMonitorHistoryPanel history={monitorHistory} />
 
           <Web3TradingWorkspaceLoader
@@ -95,6 +99,274 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
       </div>
     </AppShell>
   );
+}
+
+function TradingCommandBoard({
+  state,
+  status,
+  runway,
+  launchChecklist,
+}: {
+  state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
+  status: Web3UsabilityStatusReceipt;
+  runway: Web3SupervisedLiveRunway;
+  launchChecklist: ReturnType<typeof buildWeb3AutonomyLaunchChecklist>;
+}) {
+  const wallet = state.autonomous_wallet_telemetry;
+  const decision = state.autonomous_now_decision;
+  const fusion = state.autonomous_market_evidence_fusion;
+  const route = state.autonomous_route_refresh_execution;
+  const nextGate = status.capabilities.find((capability) => capability.status === "gated") ??
+    status.capabilities.find((capability) => capability.status === "watch") ??
+    status.capabilities[0];
+  const missingInputs = launchChecklist.operator_inputs_needed
+    .filter((input) => input.status !== "ready")
+    .slice(0, 4);
+  const commandTone = decision.status === "attack" || decision.status === "probe" || decision.status === "loop"
+    ? "engine"
+    : decision.status === "blocked"
+      ? "critical"
+      : decision.route_refresh_required || decision.chart_proof_required || decision.status === "protect"
+        ? "caution"
+        : "neutral";
+
+  return (
+    <section
+      aria-labelledby="trading-command-board-title"
+      className="rounded-md border border-engine/30 bg-engine/[0.045] p-4 sm:p-5"
+    >
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-engine/30 bg-engine/10 text-engine">
+                <Wallet aria-hidden="true" className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Command board</p>
+                <h2 id="trading-command-board-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
+                  {decision.action.replaceAll("-", " ")} {decision.target_symbol ?? fusion.leader_symbol ?? "desk"}
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">
+                  {decision.next_action}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={commandBoardBadgeClassName(commandTone)}>
+                {decision.status.replaceAll("-", " ")}
+              </span>
+              <Link
+                href="/settings/integrations"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15"
+              >
+                Fix gates
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            </div>
+          </div>
+
+          <WalletNetWorthCurve wallet={wallet} />
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <CommandBoardMetric label="Equity" value={formatTradingCurrency(wallet.equity_usd)} tone={wallet.window_pnl_usd >= 0 ? "engine" : "critical"} />
+            <CommandBoardMetric label="Window PnL" value={formatTradingSignedCurrency(wallet.window_pnl_usd)} tone={wallet.window_pnl_usd >= 0 ? "engine" : "critical"} />
+            <CommandBoardMetric label="Exposure" value={formatTradingCurrency(wallet.exposure_usd)} tone={wallet.exposure_pct > 70 ? "caution" : "engine"} />
+            <CommandBoardMetric label="Drawdown" value={`${wallet.max_drawdown_pct.toFixed(1)}%`} tone={wallet.max_drawdown_pct > 8 ? "critical" : wallet.max_drawdown_pct > 3 ? "caution" : "engine"} />
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-3">
+          <div className="rounded-md border border-caution/25 bg-caution/[0.04] p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next usable gate</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">{nextGate?.label ?? status.next_gate_label}</p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{nextGate?.next_action ?? status.next_gate_action}</p>
+          </div>
+
+          <div className="rounded-md border border-outline/15 bg-surface-dim/45 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Live review lanes</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {runway.ready_lane_count}/{runway.total_lane_count} ready
+                </p>
+              </div>
+              <span className={runwayStatusClassName(runway.status)}>{runway.status.replaceAll("-", " ")}</span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-on-surface-variant">{runway.next_action}</p>
+          </div>
+
+          <div className="rounded-md border border-outline/15 bg-surface/65 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Inputs still needed</p>
+              <span className="rounded-md border border-outline/20 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-outline">
+                no secrets here
+              </span>
+            </div>
+            <div className="mt-2 grid gap-2">
+              {missingInputs.length > 0 ? missingInputs.map((input) => (
+                <div key={input.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md border border-outline/15 bg-void/20 p-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-on-surface">{input.label}</p>
+                    <p className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-outline">{input.next_action}</p>
+                  </div>
+                  <span className={operatorInputStatusClassName(input.status)}>{input.status}</span>
+                </div>
+              )) : (
+                <p className="text-xs leading-5 text-on-surface-variant">
+                  All listed inputs are ready. Run strict verifiers before any supervised-live review.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <CommandBoardMetric label="Signal" value={`${fusion.fusion_score}/100`} detail={fusion.leader_symbol ?? "no leader"} tone={fusion.can_trade ? "engine" : "caution"} />
+            <CommandBoardMetric label="Route" value={route.status.replaceAll("-", " ")} detail={route.local_rehearsal_ready ? "rehearsed" : state.market_source.label} tone={route.status === "ready" ? "engine" : route.status === "blocked" ? "critical" : "caution"} />
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-3 text-xs leading-5 text-outline">
+        This command board is paper and read-only evidence. It cannot sign, submit, store wallet authority, or mutate balances.
+      </p>
+    </section>
+  );
+}
+
+function WalletNetWorthCurve({ wallet }: { wallet: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>["autonomous_wallet_telemetry"] }) {
+  const width = 680;
+  const height = 164;
+  const pad = { left: 28, right: 28, top: 20, bottom: 30 };
+  const points = wallet.curve.length > 0
+    ? wallet.curve.slice(-10)
+    : [{
+      id: "current",
+      label: "now",
+      recorded_at: "",
+      cycle: 0,
+      action: "current" as const,
+      equity_usd: wallet.equity_usd,
+      cash_usd: wallet.cash_usd,
+      exposure_usd: wallet.exposure_usd,
+      realized_pnl_usd: wallet.realized_pnl_usd,
+      unrealized_pnl_usd: wallet.unrealized_pnl_usd,
+      drawdown_pct: wallet.max_drawdown_pct,
+      filled_count: wallet.fill_count,
+      blocked_count: wallet.blocked_count,
+    }];
+  const values = points.flatMap((point) => [point.equity_usd, point.cash_usd, point.exposure_usd, wallet.high_watermark_usd, wallet.starting_cash_usd]);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const range = Math.max(1, maxValue - minValue);
+  const xFor = (index: number) => pad.left + (points.length <= 1 ? 0 : (index / (points.length - 1)) * (width - pad.left - pad.right));
+  const yFor = (value: number) => Math.round(pad.top + (1 - ((value - minValue) / range)) * (height - pad.top - pad.bottom));
+  const equityPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.equity_usd)}`).join(" ");
+  const cashPath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.cash_usd)}`).join(" ");
+  const exposurePath = points.map((point, index) => `${index === 0 ? "M" : "L"} ${xFor(index)} ${yFor(point.exposure_usd)}`).join(" ");
+  const highWaterY = yFor(wallet.high_watermark_usd);
+  const lastPoint = points[points.length - 1];
+  const lastX = xFor(points.length - 1);
+  const lastY = yFor(lastPoint?.equity_usd ?? wallet.equity_usd);
+  const chartTone = wallet.window_pnl_usd >= 0 ? "text-engine" : "text-critical";
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="First-screen Web3 wallet net worth curve with paper equity, cash, exposure, and fill markers"
+      className={`mt-3 h-40 w-full ${chartTone}`}
+    >
+      <rect width={width} height={height} rx="8" className="fill-surface-dim" opacity="0.32" />
+      <line x1={pad.left} x2={width - pad.right} y1={highWaterY} y2={highWaterY} stroke="currentColor" strokeDasharray="5 8" strokeOpacity="0.24" strokeWidth="2" />
+      <path d={exposurePath} fill="none" stroke="currentColor" strokeDasharray="2 8" strokeOpacity="0.24" strokeWidth="2" />
+      <path d={cashPath} fill="none" stroke="currentColor" strokeDasharray="8 8" strokeOpacity="0.36" strokeWidth="2" />
+      <path d={equityPath} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+      {points.slice(1).map((point, index) => (
+        <circle
+          key={point.id}
+          cx={xFor(index + 1)}
+          cy={yFor(point.equity_usd)}
+          r={point.blocked_count > point.filled_count ? "3.5" : "4.5"}
+          className={point.blocked_count > point.filled_count ? "fill-caution" : point.action === "stand-down" ? "fill-critical" : "fill-engine"}
+          opacity="0.86"
+        />
+      ))}
+      <circle cx={lastX} cy={lastY} r="6" className={wallet.window_pnl_usd >= 0 ? "fill-engine" : "fill-critical"} />
+      <text x={pad.left} y="16" className="fill-outline font-mono text-[10px] uppercase tracking-[0.08em]">equity solid - cash dash - exposure dots</text>
+      <text x={pad.left} y={height - 10} className="fill-outline font-mono text-[10px] uppercase tracking-[0.08em]">{points.length} ticks - paper fills only - high-water guide</text>
+      <text x={width - pad.right} y="16" textAnchor="end" className="fill-outline font-mono text-[10px] uppercase tracking-[0.08em]">{formatTradingCompactCurrency(maxValue)}</text>
+      <text x={width - pad.right} y={height - 10} textAnchor="end" className="fill-outline font-mono text-[10px] uppercase tracking-[0.08em]">{formatTradingCompactCurrency(minValue)}</text>
+    </svg>
+  );
+}
+
+function CommandBoardMetric({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  tone: "engine" | "caution" | "critical" | "neutral";
+}) {
+  const toneClassName = tone === "engine"
+    ? "text-engine"
+    : tone === "caution"
+      ? "text-caution"
+      : tone === "critical"
+        ? "text-critical"
+        : "text-on-surface";
+  return (
+    <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold ${toneClassName}`}>{value}</p>
+      {detail ? <p className="mt-0.5 truncate text-[11px] text-outline">{detail}</p> : null}
+    </div>
+  );
+}
+
+function commandBoardBadgeClassName(tone: "engine" | "caution" | "critical" | "neutral") {
+  const base = "shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold capitalize";
+  if (tone === "engine") return `${base} border-engine/35 bg-engine/10 text-engine`;
+  if (tone === "critical") return `${base} border-critical/35 bg-critical/10 text-critical`;
+  if (tone === "caution") return `${base} border-caution/35 bg-caution/10 text-caution`;
+  return `${base} border-outline/20 bg-surface text-outline`;
+}
+
+function operatorInputStatusClassName(status: ReturnType<typeof buildWeb3AutonomyLaunchChecklist>["operator_inputs_needed"][number]["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "ready") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "blocked") return `${base} border-critical/30 bg-critical/10 text-critical`;
+  if (status === "review") return `${base} border-violet/30 bg-violet/10 text-violet`;
+  return `${base} border-caution/30 bg-caution/10 text-caution`;
+}
+
+function formatTradingCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: Math.abs(value) >= 1_000 ? 0 : 2,
+  }).format(value);
+}
+
+function formatTradingSignedCurrency(value: number) {
+  const formatted = formatTradingCurrency(Math.abs(value));
+  if (value > 0) return `+${formatted}`;
+  if (value < 0) return `-${formatted}`;
+  return formatted;
+}
+
+function formatTradingCompactCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: Math.abs(value) >= 10_000 ? 1 : 0,
+  }).format(value);
 }
 
 function UsabilityStatusPanel({ status }: { status: Web3UsabilityStatusReceipt }) {

@@ -671,9 +671,19 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("provider budget {marketIntake.provider_budget_status}");
     expect(web3Workspace).toContain("risk-adjusted alpha {formatSignedCurrency(state.autonomous_profit_benchmark.risk_adjusted_alpha_usd)}");
     expect(web3Workspace).toContain("profit alpha {formatSignedCurrency(state.autonomous_profit_benchmark.cash_alpha_usd)}");
-    expect(tradingPage).toContain("UsabilityStatusPanel");
-    expect(tradingPage).toContain("Usability status");
-    expect(tradingPage).toContain("Next gate");
+    expect(tradingPage.indexOf("<TradingCommandBoard")).toBeLessThan(
+      tradingPage.indexOf("<MarketMonitorHistoryPanel"),
+    );
+    expect(tradingPage).toContain("TradingCommandBoard");
+    expect(tradingPage).toContain("Command board");
+    expect(tradingPage).toContain("WalletNetWorthCurve");
+    expect(tradingPage).toContain("First-screen Web3 wallet net worth curve");
+    expect(tradingPage).toContain("Next usable gate");
+    expect(tradingPage).toContain("Live review lanes");
+    expect(tradingPage).toContain("Inputs still needed");
+    expect(tradingPage).toContain("no secrets here");
+    expect(tradingPage).toContain("This command board is paper and read-only evidence.");
+    expect(tradingPage).toContain("cannot sign, submit, store wallet authority, or mutate balances");
     expect(tradingPage).toContain("buildWeb3UsabilityStatus");
     expect(source("src/db/web3-usability-status.ts")).toContain("web3-usability-status");
     expect(source("src/db/web3-usability-status.ts")).toContain("Copilot and paper autonomy can be usable while dry-run orders");
@@ -1175,6 +1185,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now shows the same operator input packet");
+    expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now opens with a command board");
     expect(source("components/review-readiness.tsx")).toContain("dedicated trading wallet");
     expect(source("components/review-readiness.tsx")).toContain("Jupiter route/order key");
     expect(source("components/review-readiness.tsx")).toContain("signer/custody choice");
