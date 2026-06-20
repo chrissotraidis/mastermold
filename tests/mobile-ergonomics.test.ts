@@ -1325,6 +1325,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchHandoffPacket");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-research-handoff-packet?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("research-handoff-packet");
+    expect(source("app/api/health/route.ts")).toContain("web3_research_handoff");
+    expect(source("app/api/health/route.ts")).toContain("buildWeb3ResearchHandoffHealth");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_research_handoff");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_research_handoff");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("recorded candle fallback");

@@ -168,7 +168,12 @@ async function verifyHealth() {
   assert(json.web3_daemon_supervisor?.wallet_mutation_permission === "blocked", "Daemon health should keep wallet mutation blocked.", json.web3_daemon_supervisor);
   assert(json.web3_production_supervisor?.live_execution_permission === "blocked", "Production supervisor should keep live execution blocked.", json.web3_production_supervisor);
   assert(json.web3_production_supervisor?.wallet_mutation_permission === "blocked", "Production supervisor should keep wallet mutation blocked.", json.web3_production_supervisor);
-  record("health", "pass", "live and wallet mutation locks are blocked");
+  assert(json.web3_research_handoff?.mode === "web3-research-handoff-health", "Health endpoint should expose Web3 research handoff health.", json.web3_research_handoff);
+  assert(json.web3_research_handoff.question_count >= 10, "Research handoff health should expose unresolved question count.", json.web3_research_handoff);
+  assert(json.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", json.web3_research_handoff);
+  assert(json.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", json.web3_research_handoff);
+  assert(json.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", json.web3_research_handoff);
+  record("health", "pass", "live, wallet mutation, and research handoff locks are blocked");
 }
 
 async function verifyOperatorWalletScope() {

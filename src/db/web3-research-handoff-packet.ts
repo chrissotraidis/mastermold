@@ -83,6 +83,30 @@ export type Web3ResearchHandoffPacket = {
   controls: string[];
 };
 
+export type Web3ResearchHandoffHealth = {
+  mode: "web3-research-handoff-health";
+  status: Web3ResearchHandoffPacket["status"];
+  generated_at: string;
+  receipt_hash: string;
+  source: Web3ResearchHandoffPacket["source"];
+  account: Web3ResearchHandoffPacket["account"];
+  question_count: number;
+  now_question_count: number;
+  before_live_question_count: number;
+  strategy_review_question_count: number;
+  open_operator_input_count: number;
+  live_capital_blocker_count: number;
+  next_question: string;
+  next_operator_input: string;
+  source_endpoint: string;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export function buildWeb3ResearchHandoffPacket(input: {
   state: Web3TradingState;
   usability: Web3UsabilityStatusReceipt;
@@ -190,6 +214,36 @@ export function buildWeb3ResearchHandoffPacket(input: {
   return {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
+  };
+}
+
+export function buildWeb3ResearchHandoffHealth(packet: Web3ResearchHandoffPacket): Web3ResearchHandoffHealth {
+  const nowQuestions = packet.research_questions.filter((question) => question.priority === "now");
+  const beforeLiveQuestions = packet.research_questions.filter((question) => question.priority === "before-live");
+  const strategyReviewQuestions = packet.research_questions.filter((question) => question.priority === "strategy-review");
+  const firstQuestion = nowQuestions[0] ?? beforeLiveQuestions[0] ?? strategyReviewQuestions[0];
+  return {
+    mode: "web3-research-handoff-health",
+    status: packet.status,
+    generated_at: packet.generated_at,
+    receipt_hash: packet.receipt_hash,
+    source: packet.source,
+    account: packet.account,
+    question_count: packet.research_questions.length,
+    now_question_count: nowQuestions.length,
+    before_live_question_count: beforeLiveQuestions.length,
+    strategy_review_question_count: strategyReviewQuestions.length,
+    open_operator_input_count: packet.open_operator_inputs.length,
+    live_capital_blocker_count: packet.live_capital_blockers.length,
+    next_question: firstQuestion?.question ?? "No research questions are open.",
+    next_operator_input: packet.open_operator_inputs[0]?.next_action ?? "No required operator input is open.",
+    source_endpoint: "/api/web3-research-handoff-packet?source=live-dex&account=persistent",
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    transaction_submission_permission: "blocked",
+    private_key_storage: "blocked",
+    seed_phrase_storage: "blocked",
+    secret_echo_permission: "blocked",
   };
 }
 

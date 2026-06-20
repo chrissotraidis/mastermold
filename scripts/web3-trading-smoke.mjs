@@ -86,6 +86,12 @@ async function main() {
   assert(health.web3_profit_proof.proof_plan.local_accountability_repair_command === "npm run repair-accountability:web3", "Profit-proof plan should expose the safe local accountability repair command.", health.web3_profit_proof.proof_plan);
   assert(health.web3_profit_proof.proof_plan.live_execution_permission === "blocked", "Profit-proof plan should keep live execution blocked.", health.web3_profit_proof.proof_plan);
   assert(health.web3_profit_proof.proof_plan.wallet_mutation_permission === "blocked", "Profit-proof plan should keep wallet mutation blocked.", health.web3_profit_proof.proof_plan);
+  assert(health.web3_research_handoff?.mode === "web3-research-handoff-health", "Health endpoint should expose Web3 research handoff health.", health.web3_research_handoff);
+  assert(health.web3_research_handoff.question_count >= 10, "Research handoff health should expose the research question count.", health.web3_research_handoff);
+  assert(typeof health.web3_research_handoff.next_question === "string" && health.web3_research_handoff.next_question.length > 0, "Research handoff health should expose the next research question.", health.web3_research_handoff);
+  assert(health.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", health.web3_research_handoff);
+  assert(health.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", health.web3_research_handoff);
+  assert(health.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", health.web3_research_handoff);
 
   const launchChecklistResponse = await request("/api/web3-launch-checklist?scenario=breakout&source=sample&account=persistent");
   const launchChecklist = await readJson(launchChecklistResponse);
