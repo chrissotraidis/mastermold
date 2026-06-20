@@ -1191,6 +1191,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-signer-credential-packet/route.ts")).toContain("buildWeb3SignerCredentialPacket");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-signer-credential-packet");
     expect(settingsConsole).toContain("Credential action console");
+    expect(settingsConsole).toContain("Settings Web3 credential action checklist");
+    expect(settingsConsole).toContain("Action checklist");
+    expect(settingsConsole).toContain("Next safe control:");
+    expect(settingsConsole).toContain("Provider evidence");
+    expect(settingsConsole).toContain("Public wallet scope");
+    expect(settingsConsole).toContain("Live DEX proof");
+    expect(settingsConsole).toContain("Jupiter order proof");
+    expect(settingsConsole).toContain("Live preflight");
+    expect(settingsConsole).toContain("Checklist actions use the controls below.");
+    expect(settingsConsole).toContain("buildConsoleActionChecklist");
     expect(settingsConsole).toContain("Session-only provider tests");
     expect(settingsConsole).toContain("Local credential installer");
     expect(settingsConsole).toContain("Install local env");
@@ -1448,6 +1458,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run verify:web3 gate");
     expect(source("components/review-readiness.tsx")).toContain("snapshots and restores the saved public wallet/risk scope");
     expect(source("components/review-readiness.tsx")).toContain("full credential checklist");
+    expect(source("components/review-readiness.tsx")).toContain("action checklist for provider evidence");
     expect(source("components/review-readiness.tsx")).toContain("read-only DEX scanner evidence");
     expect(source("components/review-readiness.tsx")).toContain("browser Solana wallet only far enough to read the public address");
     expect(source("components/review-readiness.tsx")).toContain("text-only wallet ownership proof");
@@ -1461,6 +1472,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-usability-blockers");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_live_usability");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Setup runway");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Action checklist");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("checklist over existing safe actions");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");

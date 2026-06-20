@@ -526,6 +526,24 @@ export function SettingsWeb3CredentialConsole({
   const operatorWalletCommand = `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${commandWallet} --require-operator-wallet`;
   const dexLiveCommand = "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live";
   const combinedStrictCommand = `${operatorWalletCommand} --require-jupiter-order --require-dex-live`;
+  const actionChecklist = buildConsoleActionChecklist({
+    hasProviderInput: [
+      draft.helius_api_key,
+      draft.rpc_url,
+      draft.ws_url,
+      draft.jupiter_api_key,
+    ].some((value) => value.trim().length > 0),
+    providerTested: Boolean(credentialResult),
+    localInstallReceipt,
+    walletReady: operatorWalletReady,
+    browserWalletConnected: browserWallet?.status === "connected",
+    ownershipProved: ownershipReceipt?.signature_verified === true,
+    dexLiveReady,
+    jupiterKeyReady,
+    jupiterOrderReady: jupiterReceipt?.summary.jupiter_order_ready === true,
+    preflightReady: Boolean(preflightReceipt),
+  });
+  const nextConsoleAction = actionChecklist.find((item) => item.status !== "ready") ?? actionChecklist[actionChecklist.length - 1];
 
   return (
     <section className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Settings Web3 credential action console">
@@ -543,6 +561,39 @@ export function SettingsWeb3CredentialConsole({
           <BoundaryBadge label="secret echo blocked" />
           <BoundaryBadge label="live blocked" />
         </div>
+      </div>
+
+      <div className="mt-3 rounded-md border border-engine/25 bg-surface-dim/30 p-2" aria-label="Settings Web3 credential action checklist">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Action checklist</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">
+              Next safe control: {nextConsoleAction.label}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-outline">{nextConsoleAction.next_action}</p>
+          </div>
+          <Badge variant="outline" className="border-outline-variant/35 bg-void/25 text-outline">
+            {actionChecklist.filter((item) => item.status === "ready").length}/{actionChecklist.length} ready
+          </Badge>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {actionChecklist.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{item.control}</p>
+                </div>
+                <ConsoleActionBadge status={item.status} />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+              <p className="mt-1 text-[10px] leading-4 text-outline">{item.boundary}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs leading-5 text-outline">
+          Checklist actions use the controls below. They can save public scope, install allowed local env targets, or build redacted receipts; they cannot sign, submit, mutate wallets, store seed phrases, or unlock live trading.
+        </p>
       </div>
 
       <div className="mt-3 grid gap-2 lg:grid-cols-2">
@@ -1055,6 +1106,103 @@ export function SettingsWeb3CredentialConsole({
         Local credential installer can write known provider, signer-provider, emergency-stop, production-worker, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
       </p>
     </section>
+  );
+}
+
+type ConsoleActionChecklistItem = {
+  id: string;
+  label: string;
+  control: string;
+  status: "ready" | "active" | "gated";
+  next_action: string;
+  boundary: string;
+};
+
+function buildConsoleActionChecklist(input: {
+  hasProviderInput: boolean;
+  providerTested: boolean;
+  localInstallReceipt: Web3LocalCredentialInstallReceipt | null;
+  walletReady: boolean;
+  browserWalletConnected: boolean;
+  ownershipProved: boolean;
+  dexLiveReady: boolean;
+  jupiterKeyReady: boolean;
+  jupiterOrderReady: boolean;
+  preflightReady: boolean;
+}): ConsoleActionChecklistItem[] {
+  return [
+    {
+      id: "install-or-test-provider",
+      label: "Provider evidence",
+      control: input.localInstallReceipt?.status === "installed" ? "test credentials" : "install local env",
+      status: input.providerTested || input.localInstallReceipt?.status === "installed" ? "ready" : input.hasProviderInput ? "active" : "gated",
+      next_action: input.providerTested
+        ? "Provider readiness has a session receipt. Re-test after changing Helius, Solana, Jupiter, signer, ops, or accounting fields."
+        : input.hasProviderInput
+          ? "Press Install local env for trusted localhost storage, or Test credentials for a session-only network check."
+          : "Enter Helius/Solana or Jupiter values, or rely on already configured server env before testing provider readiness.",
+      boundary: "Allowed provider values only; browser storage and secret echo stay blocked.",
+    },
+    {
+      id: "scope-public-wallet",
+      label: "Public wallet scope",
+      control: input.walletReady ? "save public scope" : "detect/connect wallet",
+      status: input.ownershipProved ? "ready" : input.walletReady || input.browserWalletConnected ? "active" : "gated",
+      next_action: input.ownershipProved
+        ? "Wallet ownership proof is recorded as hashes only. Save public scope again after changing risk caps."
+        : input.walletReady
+          ? "Press Save public scope, then Prove ownership with a text-only browser wallet signature."
+          : "Paste a dedicated public Solana address, or detect/connect a browser wallet public address.",
+      boundary: "Public address and text-message proof only; no private key, seed phrase, or transaction signing.",
+    },
+    {
+      id: "refresh-market-proof",
+      label: "Live DEX proof",
+      control: "test DEX scanner",
+      status: input.dexLiveReady ? "ready" : "active",
+      next_action: input.dexLiveReady
+        ? "Read-only DEX evidence is available. Re-run after provider or market-source changes."
+        : "Press Test DEX scanner to refresh public discovery evidence before strict live-DEX verification.",
+      boundary: "Public market data only; no wallet authority, order placement, or live execution.",
+    },
+    {
+      id: "rehearse-order",
+      label: "Jupiter order proof",
+      control: "rehearse Jupiter",
+      status: input.jupiterOrderReady ? "ready" : input.jupiterKeyReady && input.walletReady ? "active" : "gated",
+      next_action: input.jupiterOrderReady
+        ? "Jupiter order rehearsal has a redacted proof receipt. Run the strict verifier next."
+        : input.jupiterKeyReady && input.walletReady
+          ? "Press Rehearse Jupiter to prove quote/order readiness while withholding transaction bytes."
+          : "Add a Jupiter key and a dedicated public wallet before order rehearsal can pass.",
+      boundary: "Quote/order rehearsal only; execute, signing, submission, and transaction-byte return stay blocked.",
+    },
+    {
+      id: "run-preflight",
+      label: "Live preflight",
+      control: "run live preflight",
+      status: input.preflightReady ? "ready" : "gated",
+      next_action: input.preflightReady
+        ? "Live-capital preflight is recorded. Remaining blockers still require external review."
+        : "Run live preflight after wallet, provider, DEX, Jupiter, risk, signer, settlement, and proof receipts are refreshed.",
+      boundary: "Review receipt only; real capital, signing, submission, and wallet mutation remain blocked.",
+    },
+  ];
+}
+
+function ConsoleActionBadge({ status }: { status: ConsoleActionChecklistItem["status"] }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "border-outline-variant/35 bg-surface-dim/35 text-outline",
+        status === "ready" && "border-engine/35 bg-engine/10 text-engine",
+        status === "active" && "border-caution/35 bg-caution/10 text-caution",
+        status === "gated" && "border-outline-variant/35 bg-void/25 text-outline",
+      )}
+    >
+      {status}
+    </Badge>
   );
 }
 
