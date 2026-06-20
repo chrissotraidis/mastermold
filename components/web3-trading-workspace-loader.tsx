@@ -511,6 +511,12 @@ export function Web3TradingWorkspaceLoader({
   function prepareDryRunSignerSetup() {
     if (!state) return;
     const config = state.execution_readiness.config;
+    const safeMaxTradeUsd = Math.max(100, Math.min(500, config.max_trade_usd || 500));
+    const safeDailyCapUsd = Math.max(
+      10_000,
+      Math.ceil(state.execution_readiness.spend_today_usd + safeMaxTradeUsd),
+      config.daily_spend_cap_usd || 0,
+    );
     void submitTradingRequest("dry-run-setup", {
       scenario: state.scenario,
       cycles: state.paper_account.cycle,
@@ -524,8 +530,8 @@ export function Web3TradingWorkspaceLoader({
         signer_simulation_enabled: true,
         signer_session_label: config.signer_session_label || "browser-dry-run-rehearsal",
         signer_network: config.signer_network || "devnet",
-        max_trade_usd: Math.max(100, Math.min(500, config.max_trade_usd || 500)),
-        daily_spend_cap_usd: 10_000,
+        max_trade_usd: safeMaxTradeUsd,
+        daily_spend_cap_usd: safeDailyCapUsd,
         max_slippage_bps: Math.max(1, Math.min(250, config.max_slippage_bps || 150)),
       },
     }, "The dry-run signer rehearsal could not be prepared.");
@@ -1150,6 +1156,14 @@ export function Web3TradingWorkspaceLoader({
             {quickBusy === "reset" ? "Resetting" : "Reset paper"}
           </button>
         </div>
+
+        <QuickCapRecoveryPanel
+          state={state}
+          busy={quickBusy}
+          disabled={quickDisabled}
+          onReset={resetPaper}
+          onPrepareCaps={prepareDryRunSignerSetup}
+        />
 
         {sessionRun.requested ? (
           <p className="mt-3 line-clamp-2 border-t border-outline-variant/25 pt-3 text-xs leading-5 text-on-surface-variant">
@@ -9080,6 +9094,77 @@ function QuickExecutionReadinessBridge({
       </div>
       <span className="sr-only" aria-label="Autonomous execution readiness receipt">
         Execution bridge status {adapter.status}, active adapter {adapter.active_adapter}, quote provider {adapter.quote_provider}, readiness score {adapter.readiness_score}, quote ready {adapter.quote_request_ready ? "yes" : "no"}, Swap V2 order ready {adapter.swap_v2_order_ready ? "yes" : "no"}, signer ready {adapter.signer_ready ? "yes" : "no"}, submit ready {adapter.submit_ready ? "yes" : "no"}, paper fallback {adapter.paper_fallback_active ? "active" : "inactive"}, provider budget {ingestion.provider_budget_status} at {ingestion.provider_budget_utilization_pct} percent, live execution {liveExecutionEnabled ? "enabled" : "locked"}.
+      </span>
+    </section>
+  );
+}
+
+function QuickCapRecoveryPanel({
+  state,
+  busy,
+  disabled,
+  onReset,
+  onPrepareCaps,
+}: {
+  state: Web3TradingState;
+  busy: QuickBusyState | null;
+  disabled: boolean;
+  onReset: () => void;
+  onPrepareCaps: () => void;
+}) {
+  const readiness = state.execution_readiness;
+  if (readiness.cap_status === "ready") return null;
+
+  const tone: QuickChipTone = readiness.cap_status === "exhausted" ? "critical" : "caution";
+  const primaryAction = readiness.cap_status === "exhausted" ? "Reset paper" : "Save safe caps";
+  const primaryBusy = readiness.cap_status === "exhausted" ? busy === "reset" : busy === "dry-run-setup";
+  const secondaryAction = readiness.cap_status === "exhausted" ? "Raise cap" : "Reset paper";
+
+  return (
+    <section className="mt-3 rounded-md border border-caution/35 bg-caution/[0.07] p-2 sm:p-3" aria-label="Dry-run cap recovery">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Dry-run cap recovery</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {readiness.cap_status === "exhausted" ? "Paper budget exhausted" : "Caps too small for rehearsal"}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+            {readiness.cap_next_action}
+          </p>
+        </div>
+        <Chip tone={tone}>{readiness.cap_status.replace("-", " ")}</Chip>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Dry-run cap recovery metrics">
+        <ProfitMetric label="Spent" value={formatCurrency(readiness.spend_today_usd)} detail="local paper only" tone={readiness.spend_today_usd > 0 ? "caution" : "neutral"} />
+        <ProfitMetric label="Cap left" value={formatCurrency(readiness.cap_remaining_usd)} detail={`${formatCurrency(readiness.config.daily_spend_cap_usd)} daily`} tone={readiness.cap_remaining_usd >= 100 ? "engine" : "critical"} />
+        <ProfitMetric label="Max trade" value={formatCurrency(readiness.config.max_trade_usd)} detail="dry-run cap" tone={readiness.config.max_trade_usd >= 100 ? "engine" : "critical"} />
+        <ProfitMetric label="Live swaps" value={state.execution_gate.live_execution_enabled ? "armed" : "locked"} detail="wallet mutation blocked" tone={state.execution_gate.live_execution_enabled ? "critical" : "demo"} />
+      </div>
+
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={readiness.cap_status === "exhausted" ? onReset : onPrepareCaps}
+          disabled={disabled}
+          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-caution/45 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {readiness.cap_status === "exhausted" ? <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+          {primaryBusy ? "Working" : primaryAction}
+        </button>
+        <button
+          type="button"
+          onClick={readiness.cap_status === "exhausted" ? onPrepareCaps : onReset}
+          disabled={disabled}
+          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-outline-variant/45 bg-void/25 px-3 py-2 font-mono text-[10px] uppercase tracking-telemetry text-on-surface transition hover:border-engine/45 hover:text-engine disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {readiness.cap_status === "exhausted" ? <KeyRound className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+          {secondaryAction}
+        </button>
+      </div>
+
+      <span className="sr-only" aria-label="Dry-run cap recovery receipt">
+        Dry-run cap recovery status {readiness.cap_status}; spent {formatCurrency(readiness.spend_today_usd)}; cap left {formatCurrency(readiness.cap_remaining_usd)}; max trade {formatCurrency(readiness.config.max_trade_usd)}; daily cap {formatCurrency(readiness.config.daily_spend_cap_usd)}. Reset paper and safe cap setup are local dry-run actions only; live execution {state.execution_gate.live_execution_enabled ? "enabled" : "blocked"} and wallet mutation remain blocked.
       </span>
     </section>
   );

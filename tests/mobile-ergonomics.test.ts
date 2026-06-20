@@ -644,6 +644,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Operator wallet net worth chart with cash and exposure");
     expect(web3Workspace).toContain("Operator wallet net worth metrics");
     expect(web3Workspace).toContain("high-water and start lines");
+    expect(web3Workspace).toContain("Dry-run cap recovery");
+    expect(web3Workspace).toContain("Paper budget exhausted");
+    expect(web3Workspace).toContain("Raise cap");
+    expect(web3Workspace).toContain("Math.ceil(state.execution_readiness.spend_today_usd + safeMaxTradeUsd)");
+    expect(web3Workspace).toContain("Reset paper and safe cap setup are local dry-run actions only");
+    expect(web3Workspace).toContain("wallet mutation remain blocked");
     expect(web3Workspace).toContain("Autonomy mode ladder");
     expect(web3Workspace).toContain("Mode ladder");
     expect(web3Workspace).toContain("Dry-run orders");

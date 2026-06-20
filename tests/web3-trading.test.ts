@@ -10504,6 +10504,23 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(state.execution_gate.live_blockers[0]).toContain("Reset the persistent paper account");
     expect(state.execution_gate.live_execution_enabled).toBe(false);
+
+    const resetResponse = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        account: "persistent",
+        scenario: "breakout",
+        reset: true,
+        advance: false,
+      }),
+    }));
+    const resetState = await json<Web3TradingState>(resetResponse);
+
+    expect(resetResponse.status).toBe(200);
+    expect(resetState.execution_readiness.spend_today_usd).toBe(0);
+    expect(resetState.execution_readiness.cap_status).toBe("ready");
+    expect(resetState.execution_gate.live_execution_enabled).toBe(false);
   });
 
   test("GIVEN the kill switch is on WHEN an execution drill runs THEN it records a blocked audit entry", async () => {

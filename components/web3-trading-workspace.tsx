@@ -1720,6 +1720,27 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
     }
   }
 
+  function saveSafeDryRunCaps() {
+    const config = state.execution_readiness.config;
+    const safeMaxTradeUsd = Math.max(250, Math.min(500, config.max_trade_usd || 250));
+    const safeDailyCapUsd = Math.max(
+      1_000,
+      Math.ceil(state.execution_readiness.spend_today_usd + safeMaxTradeUsd),
+      config.daily_spend_cap_usd || 0,
+    );
+    void updateExecution({
+      mode: "dry-run",
+      kill_switch: false,
+      wallet_public_key: config.wallet_public_key ?? "11111111111111111111111111111111",
+      max_trade_usd: safeMaxTradeUsd,
+      daily_spend_cap_usd: safeDailyCapUsd,
+      max_slippage_bps: Math.max(1, Math.min(250, config.max_slippage_bps || 150)),
+      signer_simulation_enabled: true,
+      signer_session_label: config.signer_session_label || "browser-dry-run-rehearsal",
+      signer_network: config.signer_network || "devnet",
+    });
+  }
+
   async function runExecutionDrill() {
     setLoading(true);
     try {
@@ -10285,6 +10306,30 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
               <p className="rounded-md border border-outline-variant/40 bg-void/30 p-3 text-xs leading-5 text-on-surface-variant">
                 {state.execution_readiness.cap_next_action}
               </p>
+              {state.execution_readiness.cap_status !== "ready" ? (
+                <div className="grid gap-2 sm:grid-cols-2" aria-label="Dry-run cap recovery actions">
+                  <Button
+                    type="button"
+                    onClick={state.execution_readiness.cap_status === "exhausted" ? resetLedger : saveSafeDryRunCaps}
+                    disabled={loading}
+                    variant="outline"
+                    className="border-caution/45 bg-caution/10 text-caution"
+                  >
+                    {state.execution_readiness.cap_status === "exhausted" ? <TimerReset aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}
+                    {state.execution_readiness.cap_status === "exhausted" ? "Reset paper" : "Save safe caps"}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={state.execution_readiness.cap_status === "exhausted" ? saveSafeDryRunCaps : resetLedger}
+                    disabled={loading}
+                    variant="outline"
+                    className="border-outline-variant/60 bg-surface-dim/50"
+                  >
+                    {state.execution_readiness.cap_status === "exhausted" ? <SlidersHorizontal aria-hidden="true" /> : <TimerReset aria-hidden="true" />}
+                    {state.execution_readiness.cap_status === "exhausted" ? "Raise cap" : "Reset paper"}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </Panel>
 

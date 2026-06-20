@@ -68,7 +68,7 @@ MASTERMOLD_LIVE_OPERATOR_APPROVAL=
 7. Use `Prove ownership` only after the browser wallet is connected. It asks the wallet to sign a plain text Mastermind ownership challenge, posts it to `POST /api/web3-wallet-ownership`, and records a hash-only local audit receipt proving public wallet control. This is not a transaction signature and it cannot move funds.
 8. Keep signer mode on `Manual external wallet` for the first live path.
 9. Set conservative caps, for example `$250` max trade, `$1,000` daily cap, and `150` bps max slippage.
-   Execution readiness reports cap status as ready, exhausted, or too-small. If the dry-run cap is exhausted, reset the persistent paper account or save a higher local dry-run daily cap before more paper/order rehearsal; this does not unlock live execution.
+   Execution readiness reports cap status as ready, exhausted, or too-small. If the dry-run cap is exhausted, use the cockpit `Dry-run cap recovery` action to reset the persistent paper account or save a higher local dry-run daily cap before more paper/order rehearsal; this does not unlock live execution.
 10. Press `Test credentials`.
 11. Press `Apply dry-run profile` only after provider, wallet, and route evidence is acceptable.
 12. Run `npm run landing-drill:web3` to confirm the landing path is still safely blocked before live signing/submission.
