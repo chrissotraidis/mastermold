@@ -863,6 +863,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Supervised live runway");
     expect(settingsPage).toContain("Next supervised-live action");
     expect(settingsPage).toContain("{runway.launch_model}");
+    expect(settingsPage).toContain("buildWeb3ManualLiveReviewPacket");
+    expect(settingsPage).toContain("SettingsManualLiveReviewPacketPanel");
+    expect(settingsPage).toContain("Manual live-review packet");
+    expect(settingsPage).toContain("external review only");
+    expect(settingsPage).toContain("External review evidence");
+    expect(source("src/db/web3-manual-live-review-packet.ts")).toContain("web3-manual-live-review-packet");
+    expect(source("src/db/web3-manual-live-review-packet.ts")).toContain("human review checklist");
+    expect(source("app/api/web3-manual-live-review-packet/route.ts")).toContain("buildWeb3ManualLiveReviewPacket");
+    expect(source("app/api/web3-manual-live-review-packet/route.ts")).toContain("buildWeb3LiveCapitalPreflightReceipt");
     expect(source("src/db/web3-supervised-live-runway.ts")).toContain("supervised-external-wallet-first");
     expect(tradingPage).toContain("buildWeb3SupervisedLiveRunway");
     expect(tradingPage).toContain("SupervisedLiveRunwayPanel");
@@ -1101,6 +1110,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-jupiter-order-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-ops-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-supervised-live-runway");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-manual-live-review-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-operator-credential-handoff");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Dedicated wallet packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Jupiter order packet");
@@ -1194,6 +1204,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");
+    expect(source("components/review-readiness.tsx")).toContain("manual live-review packet");
+    expect(source("components/review-readiness.tsx")).toContain("/api/web3-manual-live-review-packet");
     expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now shows the same operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now opens with a command board");
     expect(source("components/review-readiness.tsx")).toContain("dedicated trading wallet");

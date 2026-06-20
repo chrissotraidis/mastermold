@@ -25,7 +25,12 @@ import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop
 import { buildWeb3JupiterOrderPacket, type Web3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { getWeb3JupiterRehearsalHistory, type Web3JupiterRehearsalHistory } from "@/src/db/web3-jupiter-rehearsal-history";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import {
+  buildWeb3ManualLiveReviewPacket,
+  type Web3ManualLiveReviewPacket,
+} from "@/src/db/web3-manual-live-review-packet";
 import {
   buildWeb3OperatorCredentialHandoffReceipt,
   type Web3OperatorCredentialHandoffReceipt,
@@ -86,6 +91,17 @@ export default async function IntegrationsSettingsPage() {
     getWeb3PromotedPaperAutopilotHealth(),
     web3DaemonSupervisorHealth,
   );
+  const web3LiveCapitalPreflight = buildWeb3LiveCapitalPreflightReceipt({
+    state: web3State,
+    checklist: web3LaunchChecklist,
+  });
+  const web3ManualLiveReviewPacket = buildWeb3ManualLiveReviewPacket({
+    state: web3State,
+    checklist: web3LaunchChecklist,
+    preflight: web3LiveCapitalPreflight,
+    liveOps: web3LiveOpsPacket,
+    runway: web3SupervisedLiveRunway,
+  });
   const web3OperatorCredentialHandoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup: web3AccountReceipt,
     acquisition: web3AcquisitionReceipt,
@@ -116,6 +132,7 @@ export default async function IntegrationsSettingsPage() {
             signerPacket={web3SignerPacket}
             liveOpsPacket={web3LiveOpsPacket}
             supervisedLiveRunway={web3SupervisedLiveRunway}
+            manualLiveReviewPacket={web3ManualLiveReviewPacket}
             credentialDoctor={web3CredentialDoctor}
             launchChecklist={web3LaunchChecklist}
             operatorCredentialHandoff={web3OperatorCredentialHandoff}
@@ -165,6 +182,7 @@ function Web3CredentialsRunwayCard({
   signerPacket,
   liveOpsPacket,
   supervisedLiveRunway,
+  manualLiveReviewPacket,
   credentialDoctor,
   launchChecklist,
   operatorCredentialHandoff,
@@ -178,6 +196,7 @@ function Web3CredentialsRunwayCard({
   signerPacket: Web3SignerCredentialPacket;
   liveOpsPacket: Web3LiveOpsPacket;
   supervisedLiveRunway: Web3SupervisedLiveRunway;
+  manualLiveReviewPacket: Web3ManualLiveReviewPacket;
   credentialDoctor: Web3CredentialDoctorHealth;
   launchChecklist: Web3AutonomyLaunchChecklist;
   operatorCredentialHandoff: Web3OperatorCredentialHandoffReceipt;
@@ -258,6 +277,8 @@ function Web3CredentialsRunwayCard({
           <SettingsOperatorCredentialHandoffReceiptPanel receipt={operatorCredentialHandoff} />
 
           <SettingsSupervisedLiveRunwayPanel runway={supervisedLiveRunway} />
+
+          <SettingsManualLiveReviewPacketPanel packet={manualLiveReviewPacket} />
 
           {jupiterAcquisition && jupiterAcquisition.status !== "configured" ? (
             <div className="rounded-md border border-caution/30 bg-caution/[0.04] p-3" aria-label="Jupiter Swap V2 setup action">
@@ -688,6 +709,71 @@ function SettingsSupervisedLiveRunwayPanel({ runway }: { runway: Web3SupervisedL
 
       <p className="mt-2 text-xs leading-5 text-outline">
         Supervised live runway keeps transaction submission, live execution, wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
+      </p>
+    </div>
+  );
+}
+
+function SettingsManualLiveReviewPacketPanel({ packet }: { packet: Web3ManualLiveReviewPacket }) {
+  const statusTone = packet.status === "ready-for-external-review"
+    ? "watch"
+    : packet.failed_signoff_count > 0
+      ? "fail"
+      : "watch";
+  const signoffs = packet.signoffs.slice(0, 6);
+  return (
+    <div className="rounded-md border border-caution/30 bg-caution/[0.035] p-3" aria-label="Manual live-review packet">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Manual live-review packet</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {packet.status.replaceAll("-", " ")} · {packet.passed_signoff_count}/{packet.required_signoff_count} signoffs passing
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{packet.summary}</p>
+        </div>
+        <LaunchQueueBadge status={statusTone} label={packet.can_request_external_review ? "external review" : "blocked"} />
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <SettingsMetric label="Launch score" value={`${packet.launch_readiness_score}/100`} />
+        <SettingsMetric label="Failed signoffs" value={`${packet.failed_signoff_count}`} />
+        <SettingsMetric label="Review signoffs" value={`${packet.watch_signoff_count}`} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.045] p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next external-review action</p>
+        <p className="mt-1 text-xs leading-5 text-on-surface-variant">{packet.next_action}</p>
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {signoffs.map((item) => (
+          <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{item.reviewer}</p>
+              </div>
+              <LaunchQueueBadge status={item.status} label={item.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">{item.evidence}</p>
+            <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-black/15 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">External review evidence</p>
+        <div className="mt-2 grid gap-1 sm:grid-cols-2">
+          {packet.evidence_links.slice(0, 4).map((item) => (
+            <code key={item} className="break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {item}
+            </code>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        This packet is external review only; it cannot sign, submit, custody funds, mutate wallets, store private keys, store seed phrases, or echo secrets.
       </p>
     </div>
   );

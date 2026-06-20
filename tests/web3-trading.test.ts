@@ -18,6 +18,7 @@ import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wal
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
+import { GET as MANUAL_LIVE_REVIEW_PACKET_GET } from "@/app/api/web3-manual-live-review-packet/route";
 import { GET as MARKET_MONITOR_HISTORY_GET } from "@/app/api/web3-market-monitor-history/route";
 import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -1612,6 +1613,73 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(packet)).not.toContain("supervised-stop-secret");
     expect(JSON.stringify(packet)).not.toContain("supervised-secret@example.test");
     expect(JSON.stringify(packet)).not.toContain("mastermold-supervised-tax-secret");
+  });
+
+  test("GIVEN manual live review is requested WHEN the packet route runs THEN it consolidates signoffs without enabling execution", async () => {
+    process.env.JUPITER_API_KEY = "test-jupiter-manual-review-secret";
+    process.env.MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL = "https://ops.example.test/manual-review-stop-secret";
+    process.env.MASTERMOLD_EMERGENCY_STOP_CONTACT = "manual-review-secret@example.test";
+    process.env.MASTERMOLD_TAX_LEDGER_EXPORT_PATH = "/tmp/mastermold-manual-review-tax-secret";
+    process.env.MASTERMOLD_WEB3_PROCESS_MANAGER = "pm2-manual-review-canary";
+    process.env.MASTERMOLD_WEB3_WORKER_OWNER = "manual-review-worker-canary@example.test";
+    process.env.MASTERMOLD_WEB3_ALERT_WEBHOOK_URL = "https://ops.example.test/manual-review-alert-canary";
+    process.env.MASTERMOLD_WEB3_RESTART_POLICY_URL = "https://ops.example.test/manual-review-restart-canary";
+
+    const rejected = await MANUAL_LIVE_REVIEW_PACKET_GET(new Request("http://localhost/api/web3-manual-live-review-packet?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await MANUAL_LIVE_REVIEW_PACKET_GET(new Request("http://localhost/api/web3-manual-live-review-packet?scenario=breakout&source=sample&account=ephemeral&cycles=2"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      live_review_permitted: boolean;
+      can_request_external_review: boolean;
+      external_review_only: boolean;
+      required_signoff_count: number;
+      passed_signoff_count: number;
+      watch_signoff_count: number;
+      failed_signoff_count: number;
+      signoffs: Array<{ id: string; status: string; reviewer: string; next_action: string }>;
+      evidence_links: string[];
+      safe_commands: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-manual-live-review-packet");
+    expect(["blocked", "waiting-for-operator-input"]).toContain(packet.status);
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.live_review_permitted).toBe(false);
+    expect(packet.can_request_external_review).toBe(false);
+    expect(packet.external_review_only).toBe(true);
+    expect(packet.required_signoff_count).toBe(packet.signoffs.length);
+    expect(packet.passed_signoff_count + packet.watch_signoff_count + packet.failed_signoff_count).toBe(packet.signoffs.length);
+    expect(["operator-wallet", "jupiter-order", "manual-live-review", "supervised-runway", "live-ops"].every((id) => packet.signoffs.some((item) => item.id === id))).toBe(true);
+    expect(packet.signoffs.every((item) => item.next_action.length > 0)).toBe(true);
+    expect(packet.evidence_links).toContain("GET /api/web3-live-capital-preflight");
+    expect(packet.evidence_links).toContain("GET /api/web3-supervised-live-runway");
+    expect(packet.safe_commands.some((command) => command.includes("--require-dex-live"))).toBe(true);
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.transaction_submission_permission).toBe("blocked");
+    expect(packet.private_key_storage).toBe("blocked");
+    expect(packet.seed_phrase_storage).toBe("blocked");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(packet.controls.some((control) => control.includes("human review checklist"))).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain("test-jupiter-manual-review-secret");
+    expect(JSON.stringify(packet)).not.toContain("manual-review-stop-secret");
+    expect(JSON.stringify(packet)).not.toContain("manual-review-secret@example.test");
+    expect(JSON.stringify(packet)).not.toContain("mastermold-manual-review-tax-secret");
+    expect(JSON.stringify(packet)).not.toContain("pm2-manual-review-canary");
+    expect(JSON.stringify(packet)).not.toContain("manual-review-alert-canary");
+    expect(JSON.stringify(packet)).not.toContain("manual-review-restart-canary");
   });
 
   test("GIVEN signer readiness state WHEN the signer handoff route runs THEN it returns a redacted blocked receipt", async () => {
