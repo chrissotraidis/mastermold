@@ -477,11 +477,18 @@ function Web3CredentialsRunwayCard({
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href="/trading"
+              href="/trading?source=sample"
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/40 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15"
             >
               <KeyRound aria-hidden="true" className="size-4" />
               Open Web3 wiring
+            </Link>
+            <Link
+              href="/trading?source=live-dex"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet/35 bg-violet/10 px-3 py-2 text-sm font-semibold text-violet transition hover:bg-violet/15"
+            >
+              <PlugZap aria-hidden="true" className="size-4" />
+              Open Live DEX read
             </Link>
             <Badge variant="outline" className="border-outline-variant/40 bg-surface-dim/45 text-outline">
               live execution blocked

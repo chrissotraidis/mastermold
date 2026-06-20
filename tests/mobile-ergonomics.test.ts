@@ -1242,7 +1242,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("fresh recorded live-dex candle proof");
     expect(source("components/review-readiness.tsx")).toContain("production-worker target setup");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-credential-handoff");
+    expect(source("components/review-readiness.tsx")).toContain("compact safe-to-provide request packet");
+    expect(source("components/review-readiness.tsx")).toContain("read-only live DEX cockpit");
     expect(settingsPage).toContain("Open Web3 wiring");
+    expect(settingsPage).toContain('href="/trading?source=sample"');
+    expect(settingsPage).toContain('href="/trading?source=live-dex"');
+    expect(settingsPage).toContain("Open Live DEX read");
     expect(settingsPage).toContain("Operator credential handoff receipt");
     expect(settingsPage).toContain("Next safe input");
     expect(settingsPage).toContain("Allowed inputs");
