@@ -19,6 +19,7 @@ import { buildWeb3AccountAcquisitionReceipt, type Web3AccountAcquisitionReceipt 
 import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { buildWeb3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
 import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
+import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
@@ -41,6 +42,7 @@ import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-pape
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
+import { buildWeb3UsabilityStatus } from "@/src/db/web3-usability-status";
 
 const statusLabels: Record<IntegrationStatusJson["status"], string> = {
   connected: "Test passed",
@@ -109,6 +111,16 @@ export default async function IntegrationsSettingsPage() {
     launchChecklist: web3LaunchChecklist,
   });
   const web3OperatorRequestPacket = buildWeb3OperatorRequestPacket(web3OperatorCredentialHandoff);
+  const web3UsabilityStatus = buildWeb3UsabilityStatus({
+    state: web3State,
+    launchChecklist: web3LaunchChecklist,
+    supervisedRunway: web3SupervisedLiveRunway,
+  });
+  const web3CutoverBlockerBoard = buildWeb3CutoverBlockerBoard({
+    requestPacket: web3OperatorRequestPacket,
+    runway: web3SupervisedLiveRunway,
+    usability: web3UsabilityStatus,
+  });
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -139,6 +151,7 @@ export default async function IntegrationsSettingsPage() {
             launchChecklist={web3LaunchChecklist}
             operatorCredentialHandoff={web3OperatorCredentialHandoff}
             operatorRequestPacket={web3OperatorRequestPacket}
+            cutoverBlockerBoard={web3CutoverBlockerBoard}
             state={web3State}
           />
         </div>
@@ -190,6 +203,7 @@ function Web3CredentialsRunwayCard({
   launchChecklist,
   operatorCredentialHandoff,
   operatorRequestPacket,
+  cutoverBlockerBoard,
   state,
 }: {
   receipt: Web3AccountSetupReceipt;
@@ -205,6 +219,7 @@ function Web3CredentialsRunwayCard({
   launchChecklist: Web3AutonomyLaunchChecklist;
   operatorCredentialHandoff: Web3OperatorCredentialHandoffReceipt;
   operatorRequestPacket: Web3OperatorRequestPacket;
+  cutoverBlockerBoard: Web3CutoverBlockerBoard;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
   const requiredConfigured = receipt.environment_summary.required_configured_count;
@@ -246,6 +261,7 @@ function Web3CredentialsRunwayCard({
         <CardContent className="space-y-4 p-5 pt-0">
           <SettingsWeb3OperatorIntakeBoard receipt={operatorCredentialHandoff} />
           <SettingsWeb3OperatorRequestPacketPanel packet={operatorRequestPacket} />
+          <SettingsWeb3CutoverBlockerBoardPanel board={cutoverBlockerBoard} />
 
           <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Secure Web3 credential handoff">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -693,6 +709,126 @@ function SettingsWeb3OperatorRequestPacketPanel({ packet }: { packet: Web3Operat
       </p>
     </div>
   );
+}
+
+function SettingsWeb3CutoverBlockerBoardPanel({ board }: { board: Web3CutoverBlockerBoard }) {
+  const nextSafeInput = board.next_safe_input;
+  const visibleRows = board.rows.filter((row) => row.status !== "ready").slice(0, 6);
+  const ownerEntries = Object.entries(board.owner_counts).filter(([, count]) => count > 0);
+  return (
+    <div className="rounded-md border border-caution/30 bg-caution/[0.035] p-3" aria-label="Settings Web3 cutover blocker board">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Cutover blocker board</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {board.open_blocker_count} open setup blockers before usable live trading
+          </p>
+          <p className="mt-1 text-xs leading-5 text-outline">{board.summary}</p>
+        </div>
+        <LaunchQueueBadge status={board.open_blocker_count > 0 ? "fail" : "watch"} label={board.status.replaceAll("-", " ")} />
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <SettingsMetric label="Need now" value={`${board.now_count}`} />
+        <SettingsMetric label="Before live" value={`${board.before_live_count}`} />
+        <SettingsMetric label="Review" value={`${board.review_count}`} />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1fr)]">
+        <div className="rounded-md border border-caution/30 bg-caution/[0.04] p-2" aria-label="Settings next safe Web3 input">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next safe input</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">
+            {nextSafeInput?.label ?? "No open setup input"}
+          </p>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+            {nextSafeInput?.next_action ?? "Keep live execution blocked until external review signs off."}
+          </p>
+          <p className="mt-2 text-[10px] leading-4 text-outline">
+            Surface: {nextSafeInput?.safe_collection_surface.replaceAll("-", " ") ?? "external review"} · storage: {nextSafeInput?.storage.replaceAll("-", " ") ?? "status only"}
+          </p>
+          {nextSafeInput?.env_targets.length ? (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {nextSafeInput.env_targets.slice(0, 3).map((target) => (
+                <span key={target} className="max-w-full break-all rounded-md border border-outline-variant/25 bg-black/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {target}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-2" aria-label="Settings next supervised-live Web3 blocker">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-violet">Next live-lane blocker</p>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">{board.next_live_lane_action}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Settings cutover blockers by owner">
+            {ownerEntries.length > 0 ? ownerEntries.map(([owner, count]) => (
+              <span key={owner} className="rounded-md border border-outline-variant/25 bg-void/20 px-2 py-1 text-[11px] leading-4 text-outline">
+                <span className="font-semibold text-on-surface">{count}</span> {settingsCutoverOwnerLabel(owner as Web3CutoverBlockerBoard["rows"][number]["owner"])}
+              </span>
+            )) : (
+              <span className="rounded-md border border-engine/25 bg-engine/[0.04] px-2 py-1 text-[11px] leading-4 text-engine">
+                No owner blockers open
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2" aria-label="Settings top Web3 cutover blockers">
+        {visibleRows.length > 0 ? visibleRows.map((row) => (
+          <div key={row.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{row.label}</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {settingsCutoverOwnerLabel(row.owner)} · {row.phase.replace("-", " ")} · {row.storage.replaceAll("-", " ")}
+                </p>
+              </div>
+              <LaunchQueueBadge status={settingsCutoverRowBadgeStatus(row.status)} label={row.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{row.next_action}</p>
+            <p className="mt-1 text-[10px] leading-4 text-outline">
+              {row.can_enter_in_app ? "Guided by Settings." : "External review only."} {row.secret_handling}
+            </p>
+          </div>
+        )) : (
+          <p className="rounded-md border border-engine/25 bg-engine/[0.04] p-2 text-xs leading-5 text-on-surface-variant">
+            No cutover blockers are open in this local receipt; live authority still waits for external review.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-black/15 p-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe verifier</p>
+          <Link
+            href="/api/web3-cutover-blocker-board?source=live-dex&account=persistent"
+            className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
+          >
+            Open board JSON
+          </Link>
+        </div>
+        <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+          {board.verifier_commands[0] ?? "npm run verify:web3 -- --base-url=http://localhost:4010"}
+        </code>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        This Settings board names env targets and verifier commands only. It cannot store secrets, sign, submit, mutate a wallet, or approve autonomous live trading.
+      </p>
+    </div>
+  );
+}
+
+function settingsCutoverOwnerLabel(owner: Web3CutoverBlockerBoard["rows"][number]["owner"]) {
+  if (owner === "manual-review") return "manual review";
+  return owner;
+}
+
+function settingsCutoverRowBadgeStatus(status: Web3CutoverBlockerBoard["rows"][number]["status"]) {
+  if (status === "ready") return "pass";
+  if (status === "review") return "watch";
+  return "fail";
 }
 
 function ConnectionChecks({ integrations }: { integrations: SettingsIntegrationStatus[] }) {

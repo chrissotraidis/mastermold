@@ -889,6 +889,22 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 operator share packet");
     expect(settingsPage).toContain("Redacted request text");
     expect(settingsPage).toContain("/api/web3-operator-request-packet?source=live-dex&account=persistent");
+    expect(settingsPage).toContain("buildWeb3CutoverBlockerBoard");
+    expect(settingsPage).toContain("buildWeb3UsabilityStatus");
+    expect(settingsPage).toContain("SettingsWeb3CutoverBlockerBoardPanel");
+    expect(settingsPage.indexOf("<SettingsWeb3OperatorRequestPacketPanel")).toBeLessThan(
+      settingsPage.indexOf("<SettingsWeb3CutoverBlockerBoardPanel"),
+    );
+    expect(settingsPage.indexOf("<SettingsWeb3CutoverBlockerBoardPanel")).toBeLessThan(
+      settingsPage.indexOf("aria-label=\"Secure Web3 credential handoff\""),
+    );
+    expect(settingsPage).toContain("Settings Web3 cutover blocker board");
+    expect(settingsPage).toContain("Settings next safe Web3 input");
+    expect(settingsPage).toContain("Settings next supervised-live Web3 blocker");
+    expect(settingsPage).toContain("Settings cutover blockers by owner");
+    expect(settingsPage).toContain("Settings top Web3 cutover blockers");
+    expect(settingsPage).toContain("/api/web3-cutover-blocker-board?source=live-dex&account=persistent");
+    expect(settingsPage).toContain("This Settings board names env targets and verifier commands only.");
     expect(settingsPage).toContain("Safe to provide");
     expect(settingsPage).toContain("Open required lanes");
     expect(settingsPage).toContain("receipt.allowed_inputs.slice(0, 5)");
@@ -1285,6 +1301,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now renders that same Web3 cutover blocker board");
     expect(source("components/review-readiness.tsx")).toContain("manual live-review packet");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-manual-live-review-packet");
     expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now shows the same operator input packet");
