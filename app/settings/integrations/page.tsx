@@ -220,6 +220,8 @@ function Web3CredentialsRunwayCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0">
+          <SettingsWeb3OperatorIntakeBoard receipt={operatorCredentialHandoff} />
+
           <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Secure Web3 credential handoff">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
@@ -474,6 +476,91 @@ function Web3CredentialsRunwayCard({
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function SettingsWeb3OperatorIntakeBoard({ receipt }: { receipt: Web3OperatorCredentialHandoffReceipt }) {
+  const nextInput = receipt.next_input;
+  const openInputs = receipt.inputs.filter((item) => item.status !== "ready").slice(0, 2);
+  const verifier = nextInput?.verifier_command ?? receipt.safe_commands[0];
+  const facts = [
+    ["Ready lanes", `${receipt.ready_count}/${receipt.inputs.length}`],
+    ["Required open", String(receipt.open_required_count)],
+    ["Surface", nextInput?.safe_collection_surface.replaceAll("-", " ") ?? "verifier"],
+    ["Storage", nextInput?.storage.replaceAll("-", " ") ?? "status only"],
+  ];
+  return (
+    <div className="rounded-md border border-engine/30 bg-engine/[0.04] p-3" aria-label="Web3 operator intake board">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Operator intake</p>
+          <h3 className="mt-1 text-base font-semibold text-on-surface">
+            {nextInput ? `Next safe input: ${nextInput.label}` : "Credential intake is ready for verifier review"}
+          </h3>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            {nextInput?.next_action ?? receipt.next_action}
+          </p>
+        </div>
+        <CredentialStateBadge configured={receipt.open_required_count === 0} status={`${receipt.open_required_count} required open`} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {facts.map(([label, value]) => (
+          <span key={label} className="max-w-full rounded-md border border-outline-variant/25 bg-surface-dim/35 px-2 py-1 text-[11px] leading-4 text-outline">
+            <span className="font-mono uppercase tracking-[0.08em]">{label}</span>
+            <span className="ml-1 font-semibold text-on-surface">{value}</span>
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)]">
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe verifier</p>
+          <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+            {verifier}
+          </code>
+          <p className="mt-2 text-[11px] leading-4 text-outline">
+            {nextInput?.secret_handling ?? "Verifier receipts report status only and keep live execution blocked."}
+          </p>
+        </div>
+        <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Never provide</p>
+          <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-on-surface-variant">
+            {receipt.never_request.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {(openInputs.length > 0 ? openInputs : receipt.inputs.slice(0, 2)).map((item) => (
+          <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/30 p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {item.input_kind.replaceAll("-", " ")} · {item.can_enter_in_app ? "guided in settings" : "external review"}
+                </p>
+              </div>
+              <LaunchQueueBadge status={operatorInputBadgeStatus(item.status)} label={item.status} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.detail}</p>
+            {item.env_targets.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {item.env_targets.slice(0, 2).map((target) => (
+                  <span key={target} className="max-w-full break-all rounded-md border border-outline-variant/25 bg-black/20 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                    {target}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Operator intake is a setup guide only; it cannot create accounts, sign, submit, custody funds, echo secrets, or mutate wallets.
+      </p>
+    </div>
   );
 }
 

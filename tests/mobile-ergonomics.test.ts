@@ -824,6 +824,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 trading credentials");
     expect(settingsPage).toContain("Secure setup state for the autonomous Web3 paper desk");
     expect(settingsPage).toContain("SettingsWeb3CredentialConsole");
+    expect(settingsPage.indexOf("<SettingsWeb3OperatorIntakeBoard")).toBeLessThan(
+      settingsPage.indexOf("aria-label=\"Secure Web3 credential handoff\""),
+    );
+    expect(settingsPage).toContain("Web3 operator intake board");
+    expect(settingsPage).toContain("Operator intake");
+    expect(settingsPage).toContain("Next safe input:");
+    expect(settingsPage).toContain("Safe verifier");
+    expect(settingsPage).toContain("Never provide");
+    expect(settingsPage).toContain("Operator intake is a setup guide only");
     expect(settingsPage).toContain("Secure credential handoff");
     expect(settingsPage).toContain("Next input:");
     expect(settingsPage).toContain("buildWeb3CredentialHandoffRows");
@@ -1184,6 +1193,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");
     expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now shows the same operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now opens with a command board");
     expect(source("components/review-readiness.tsx")).toContain("dedicated trading wallet");
