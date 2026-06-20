@@ -140,6 +140,7 @@ GET /api/web3-market-monitor-history
 GET /api/web3-ohlcv
 GET /api/web3-operator-request-packet
 GET /api/web3-operator-runbook
+GET /api/web3-research-handoff-packet
 GET /api/web3-provider-health
 GET /api/web3-signer-credential-packet
 GET /api/web3-signer-handoff
@@ -162,6 +163,8 @@ The operator request packet route, `GET /api/web3-operator-request-packet`, turn
 The cutover blocker board route, `GET /api/web3-cutover-blocker-board`, reconciles the operator request packet, supervised-live runway, and usability receipt into one owner-grouped setup board. It separates the next safe input from the next supervised-live lane blocker, counts open work by now/before-live/review phase and by operator/security/ops/accounting/manual-review owner, lists safe collection surfaces, env target names, storage rules, live-lane dependencies, and verifier commands, and keeps live execution, signing, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked. The `/trading` cockpit renders the same board as a compact cutover blocker panel before the command board.
 
 The operator runbook route, `GET /api/web3-operator-runbook`, turns usability, cutover, preflight, and supervised-live receipts into a safe action map. It names which app links or local commands can run now, which actions are gated, which real-capital gates still block live trading, and the primary next safe action. It returns only permission scopes, links, commands, target names, and status text; it cannot sign, submit, custody funds, mutate wallets, echo secrets, or approve autonomous live trading. The `/trading` cockpit renders it between the cutover board and command board, and Settings renders the same runbook inside the credential runway before the deeper credential handoff.
+
+The research handoff route, `GET /api/web3-research-handoff-packet`, composes the usability receipt, operator request packet, cutover board, operator runbook, live-capital preflight, supervised-live runway, and manual live-review packet into a shareable research brief. It summarizes current app state, open operator inputs, live-capital blockers, source endpoints, verifier commands, and the provider/custody/risk/ops/product/profit-proof questions that another helper should answer. It returns status, target names, and questions only; it cannot echo configured secrets, accept private keys, sign, submit, mutate wallets, or unlock live trading. Settings renders the same packet after the credential command center so the operator can open the redacted JSON before sending work to another helper.
 
 The monitor-history route, `GET /api/web3-market-monitor-history`, returns the latest sanitized `npm run monitor:web3` tape: run count, latest symbol, candle confidence, paper action, provider-degraded count, and recent read-only rows. The local file stores no API keys, private keys, seed phrases, transaction bodies, signed payloads, live execution permission, or wallet mutation authority, and rejects rows that do not preserve those blocked permissions.
 

@@ -24,6 +24,7 @@ import { GET as MARKET_MONITOR_HISTORY_GET } from "@/app/api/web3-market-monitor
 import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
 import { GET as OPERATOR_REQUEST_PACKET_GET } from "@/app/api/web3-operator-request-packet/route";
 import { GET as OPERATOR_RUNBOOK_GET } from "@/app/api/web3-operator-runbook/route";
+import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { POST as SUPERVISOR_REFRESH_POST } from "@/app/api/web3-supervisor-refresh/route";
@@ -946,6 +947,91 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.secret_echo_permission).toBe("blocked");
     expect(packet.controls.some((control) => control.includes("safe to share"))).toBe(true);
     expect(text).not.toContain("test-helius-request-secret");
+  });
+
+  test("GIVEN a helper bot needs context WHEN research handoff runs THEN it returns questions and redacted app state", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-research-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-research-secret";
+
+    const rejected = await RESEARCH_HANDOFF_PACKET_GET(new Request("http://localhost/api/web3-research-handoff-packet?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await RESEARCH_HANDOFF_PACKET_GET(new Request("http://localhost/api/web3-research-handoff-packet?scenario=breakout&source=sample&account=ephemeral&cycles=1"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      summary: string;
+      app_state: {
+        usability_status: string;
+        runbook_status: string;
+        cutover_status: string;
+        manual_review_status: string;
+        live_preflight_status: string;
+        ready_credential_lanes: number;
+        total_credential_lanes: number;
+      };
+      current_capabilities: string[];
+      open_operator_inputs: Array<{ id: string; env_targets: string[]; storage: string; safe_collection_surface: string }>;
+      live_capital_blockers: Array<{ id: string; label: string; status: string; next_action: string }>;
+      research_questions: Array<{ id: string; priority: string; category: string; question: string; expected_answer_format: string }>;
+      safe_to_share: string[];
+      never_provide: string[];
+      source_endpoints: string[];
+      verifier_commands: string[];
+      text_packet: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+    const text = JSON.stringify(packet);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-research-handoff-packet");
+    expect(packet.status).toBe("ready-for-operator-input");
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.summary).toContain("Research packet is ready to share");
+    expect(packet.app_state.ready_credential_lanes).toBeLessThan(packet.app_state.total_credential_lanes);
+    expect(packet.current_capabilities.some((item) => item.includes("Paper wallet telemetry"))).toBe(true);
+    expect(packet.open_operator_inputs.map((item) => item.id)).toEqual(expect.arrayContaining([
+      "dedicated-trading-wallet",
+      "emergency-stop-target",
+      "production-worker-ops",
+    ]));
+    expect(packet.live_capital_blockers.map((item) => item.id)).toEqual(expect.arrayContaining([
+      "operator-wallet",
+      "live-dex",
+      "signer-custody",
+    ]));
+    expect(packet.research_questions.map((item) => item.id)).toEqual(expect.arrayContaining([
+      "custody-architecture",
+      "provider-stack",
+      "moonshot-data-sources",
+      "profit-proof",
+    ]));
+    expect(packet.research_questions.find((item) => item.id === "credential-storage")?.expected_answer_format).toContain("credential names");
+    expect(packet.safe_to_share).toContain("Dedicated Solana public wallet address");
+    expect(packet.never_provide).toContain("Seed phrase or mnemonic");
+    expect(packet.source_endpoints).toContain("/api/web3-operator-runbook?source=live-dex&account=persistent");
+    expect(packet.verifier_commands).toEqual(expect.arrayContaining([
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live",
+    ]));
+    expect(packet.text_packet).toContain("# Mastermind Web3 Research Handoff Packet");
+    expect(packet.text_packet).toContain("What is the safest Solana custody architecture");
+    expect(packet.text_packet).toContain("Live Capital Blockers");
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.transaction_submission_permission).toBe("blocked");
+    expect(packet.private_key_storage).toBe("blocked");
+    expect(packet.seed_phrase_storage).toBe("blocked");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(packet.controls.some((control) => control.includes("safe to share"))).toBe(true);
+    expect(text).not.toContain("test-helius-research-secret");
+    expect(text).not.toContain("test-jupiter-research-secret");
   });
 
   test("GIVEN the trading cockpit needs a readiness dossier WHEN usability status is requested THEN it returns compact redacted capability gates", async () => {

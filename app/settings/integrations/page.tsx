@@ -40,6 +40,7 @@ import { buildWeb3OperatorRequestPacket, type Web3OperatorRequestPacket } from "
 import { buildWeb3OperatorRunbook, type Web3OperatorRunbookReceipt } from "@/src/db/web3-operator-runbook";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
+import { buildWeb3ResearchHandoffPacket, type Web3ResearchHandoffPacket } from "@/src/db/web3-research-handoff-packet";
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
@@ -129,6 +130,17 @@ export default async function IntegrationsSettingsPage() {
     preflight: web3LiveCapitalPreflight,
     runway: web3SupervisedLiveRunway,
   });
+  const web3ResearchHandoffPacket = buildWeb3ResearchHandoffPacket({
+    state: web3State,
+    usability: web3UsabilityStatus,
+    handoff: web3OperatorCredentialHandoff,
+    requestPacket: web3OperatorRequestPacket,
+    cutover: web3CutoverBlockerBoard,
+    runbook: web3OperatorRunbook,
+    preflight: web3LiveCapitalPreflight,
+    runway: web3SupervisedLiveRunway,
+    manualLiveReview: web3ManualLiveReviewPacket,
+  });
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -161,6 +173,7 @@ export default async function IntegrationsSettingsPage() {
             operatorRequestPacket={web3OperatorRequestPacket}
             cutoverBlockerBoard={web3CutoverBlockerBoard}
             operatorRunbook={web3OperatorRunbook}
+            researchHandoffPacket={web3ResearchHandoffPacket}
             state={web3State}
           />
         </div>
@@ -214,6 +227,7 @@ function Web3CredentialsRunwayCard({
   operatorRequestPacket,
   cutoverBlockerBoard,
   operatorRunbook,
+  researchHandoffPacket,
   state,
 }: {
   receipt: Web3AccountSetupReceipt;
@@ -231,6 +245,7 @@ function Web3CredentialsRunwayCard({
   operatorRequestPacket: Web3OperatorRequestPacket;
   cutoverBlockerBoard: Web3CutoverBlockerBoard;
   operatorRunbook: Web3OperatorRunbookReceipt;
+  researchHandoffPacket: Web3ResearchHandoffPacket;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
   const requiredConfigured = receipt.environment_summary.required_configured_count;
@@ -276,6 +291,7 @@ function Web3CredentialsRunwayCard({
             runbook={operatorRunbook}
             cutover={cutoverBlockerBoard}
           />
+          <SettingsWeb3ResearchHandoffPanel packet={researchHandoffPacket} />
           <SettingsWeb3OperatorIntakeBoard receipt={operatorCredentialHandoff} />
           <SettingsWeb3OperatorRequestPacketPanel packet={operatorRequestPacket} />
           <SettingsWeb3CutoverBlockerBoardPanel board={cutoverBlockerBoard} />
@@ -669,6 +685,84 @@ function SettingsWeb3CredentialCommandCenter({
 
       <p className="mt-2 text-xs leading-5 text-outline">
         The command center is a safe-entry map only; it cannot store private keys, store seed phrases, sign, submit, mutate wallets, or approve autonomous live trading.
+      </p>
+    </div>
+  );
+}
+
+function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHandoffPacket }) {
+  const nowQuestions = packet.research_questions.filter((question) => question.priority === "now").slice(0, 4);
+  const liveBlockers = packet.live_capital_blockers.slice(0, 4);
+  const openInputs = packet.open_operator_inputs.slice(0, 4);
+  return (
+    <div className="rounded-md border border-violet/30 bg-violet/[0.045] p-3" aria-label="Settings Web3 research handoff packet">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-violet">Research handoff</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            Shareable packet for provider, custody, risk, ops, and proof research
+          </p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">{packet.summary}</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={packet.open_operator_inputs.length > 0 ? "fail" : "watch"} label={`${packet.open_operator_inputs.length} inputs`} />
+          <LaunchQueueBadge status="watch" label={`${packet.research_questions.length} questions`} />
+          <LaunchQueueBadge status="fail" label="redacted" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <SettingsMetric label="Questions" value={`${packet.research_questions.length}`} />
+        <SettingsMetric label="Need now" value={`${nowQuestions.length}`} />
+        <SettingsMetric label="Live blockers" value={`${packet.live_capital_blockers.length}`} />
+        <SettingsMetric label="Ready lanes" value={`${packet.app_state.ready_credential_lanes}/${packet.app_state.total_credential_lanes}`} />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.86fr)]">
+        <div className="rounded-md border border-violet/25 bg-surface-dim/30 p-2" aria-label="Settings Web3 research questions">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-violet">Questions to answer first</p>
+          <div className="mt-2 grid gap-2">
+            {nowQuestions.map((question) => (
+              <div key={question.id} className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <p className="text-xs font-semibold text-on-surface">{question.question}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">
+                  {question.category} · {question.expected_answer_format}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Settings Web3 research open blockers">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Open blockers and inputs</p>
+          <div className="mt-2 grid gap-2">
+            {(liveBlockers.length > 0 ? liveBlockers : openInputs).slice(0, 4).map((item) => (
+              <div key={item.id} className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{item.next_action}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-black/15 p-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Redacted packet</p>
+          <Link
+            href="/api/web3-research-handoff-packet?source=live-dex&account=persistent"
+            className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-semibold text-violet hover:text-violet/80"
+          >
+            Open research JSON
+          </Link>
+        </div>
+        <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-words rounded-md border border-outline-variant/20 bg-void/50 p-2 text-[11px] leading-5 text-on-surface-variant">
+          {packet.text_packet}
+        </pre>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Research handoff is safe to share with another helper because it contains status, target names, and questions only; it cannot echo secrets, sign, submit, mutate wallets, or unlock live trading.
       </p>
     </div>
   );
