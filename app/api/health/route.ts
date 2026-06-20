@@ -10,6 +10,10 @@ import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet"
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import {
+  buildWeb3LiveUsabilityBlockersHealth,
+  buildWeb3LiveUsabilityBlockersReceipt,
+} from "@/src/db/web3-live-usability-blockers";
 import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3OperatorCredentialHandoffReceipt } from "@/src/db/web3-operator-credential-handoff";
 import { buildWeb3OperatorRequestPacket } from "@/src/db/web3-operator-request-packet";
@@ -82,6 +86,15 @@ export async function GET() {
     liveOps: web3LiveOps,
     runway: web3SupervisedRunway,
   });
+  const web3LiveUsability = buildWeb3LiveUsabilityBlockersReceipt({
+    state: web3State,
+    usability: web3Usability,
+    cutover: web3Cutover,
+    runbook: web3Runbook,
+    preflight: web3Preflight,
+    manualLiveReview: web3ManualLiveReview,
+    runway: web3SupervisedRunway,
+  });
   const web3ResearchHandoff = buildWeb3ResearchHandoffPacket({
     state: web3State,
     usability: web3Usability,
@@ -99,6 +112,7 @@ export async function GET() {
     web3_production_supervisor: web3ProductionSupervisor,
     web3_promoted_paper_autopilot: web3PromotedPaperAutopilot,
     web3_profit_proof: buildWeb3ProfitProofReadiness({ promotedHealth: web3PromotedPaperAutopilot }),
+    web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
   });
 }

@@ -1410,8 +1410,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("secret-looking answers rejected");
     expect(source("app/api/health/route.ts")).toContain("web3_research_handoff");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3ResearchHandoffHealth");
+    expect(source("app/api/health/route.ts")).toContain("web3_live_usability");
+    expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_research_handoff");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_research_handoff");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_live_usability?.mode === \"web3-live-usability-health\"");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("recorded candle fallback");
@@ -1439,9 +1443,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("text-only wallet ownership proof");
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-live-usability-blockers");
+    expect(source("components/review-readiness.tsx")).toContain("live-usability blocker summaries");
     expect(source("components/review-readiness.tsx")).toContain("Settings now places that same live-usability blocker receipt");
     expect(source("README.md")).toContain("/api/web3-live-usability-blockers?source=live-dex");
+    expect(source("README.md")).toContain("web3_live_usability");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-usability-blockers");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("web3_live_usability");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");

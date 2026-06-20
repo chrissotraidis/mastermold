@@ -176,6 +176,10 @@ board, operator runbook, live-capital preflight, supervised runway, and manual l
 packet into missing operator inputs, signoff counts, safe next actions, verifier commands,
 and live-lane readiness while keeping autonomous live trading, signing, submission,
 wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
+`/api/health` also exposes a compact `web3_live_usability` summary for monitors with
+the same receipt hash, missing-input counts, live-lane counts, next action, and blocked
+live-execution/signing/wallet/secret permissions without returning secrets or transaction
+bytes.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and the same

@@ -82,6 +82,31 @@ export type Web3LiveUsabilityBlockersReceipt = {
   controls: string[];
 };
 
+export type Web3LiveUsabilityBlockersHealth = {
+  mode: "web3-live-usability-health";
+  status: Web3LiveUsabilityBlockersReceipt["status"];
+  receipt_hash: string;
+  current_mode: Web3LiveUsabilityBlockersReceipt["current_mode"];
+  usability_status: Web3LiveUsabilityBlockersReceipt["usability_status"];
+  manual_review_status: Web3LiveUsabilityBlockersReceipt["manual_review_status"];
+  open_operator_input_count: number;
+  open_cutover_blocker_count: number;
+  real_capital_blocker_count: number;
+  failed_or_watch_signoff_count: number;
+  ready_live_lane_count: number;
+  total_live_lane_count: number;
+  safe_action_count: number;
+  next_operator_input_label: string | null;
+  next_action: string;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  signing_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   state: Web3TradingState;
   usability: Web3UsabilityStatusReceipt;
@@ -187,6 +212,35 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   return {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
+  };
+}
+
+export function buildWeb3LiveUsabilityBlockersHealth(
+  receipt: Web3LiveUsabilityBlockersReceipt,
+): Web3LiveUsabilityBlockersHealth {
+  return {
+    mode: "web3-live-usability-health",
+    status: receipt.status,
+    receipt_hash: receipt.receipt_hash,
+    current_mode: receipt.current_mode,
+    usability_status: receipt.usability_status,
+    manual_review_status: receipt.manual_review_status,
+    open_operator_input_count: receipt.open_operator_input_count,
+    open_cutover_blocker_count: receipt.open_cutover_blocker_count,
+    real_capital_blocker_count: receipt.real_capital_blocker_count,
+    failed_or_watch_signoff_count: receipt.failed_or_watch_signoff_count,
+    ready_live_lane_count: receipt.ready_live_lane_count,
+    total_live_lane_count: receipt.total_live_lane_count,
+    safe_action_count: receipt.safe_action_count,
+    next_operator_input_label: receipt.next_operator_input?.label ?? null,
+    next_action: receipt.next_action,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    transaction_submission_permission: "blocked",
+    signing_permission: "blocked",
+    private_key_storage: "blocked",
+    seed_phrase_storage: "blocked",
+    secret_echo_permission: "blocked",
   };
 }
 

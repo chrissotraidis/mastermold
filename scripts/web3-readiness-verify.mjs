@@ -173,7 +173,23 @@ async function verifyHealth() {
   assert(json.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", json.web3_research_handoff);
   assert(json.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", json.web3_research_handoff);
   assert(json.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", json.web3_research_handoff);
-  record("health", "pass", "live, wallet mutation, and research handoff locks are blocked");
+  assert(json.web3_live_usability?.mode === "web3-live-usability-health", "Health endpoint should expose compact Web3 live-usability health.", json.web3_live_usability);
+  assert(
+    ["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(json.web3_live_usability.status),
+    "Live-usability health should expose a known status.",
+    json.web3_live_usability,
+  );
+  assertReceiptHash("Health live usability", json.web3_live_usability.receipt_hash);
+  assert(typeof json.web3_live_usability.open_operator_input_count === "number", "Live-usability health should expose operator input count.", json.web3_live_usability);
+  assert(typeof json.web3_live_usability.real_capital_blocker_count === "number", "Live-usability health should expose real-capital blocker count.", json.web3_live_usability);
+  assert(json.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", json.web3_live_usability);
+  assert(json.web3_live_usability.wallet_mutation_permission === "blocked", "Live-usability health should keep wallet mutation blocked.", json.web3_live_usability);
+  assert(json.web3_live_usability.transaction_submission_permission === "blocked", "Live-usability health should keep transaction submission blocked.", json.web3_live_usability);
+  assert(json.web3_live_usability.signing_permission === "blocked", "Live-usability health should keep signing blocked.", json.web3_live_usability);
+  assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
+  assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
+  assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
+  record("health", "pass", "live, wallet mutation, research handoff, and live-usability locks are blocked");
 }
 
 async function verifyOperatorWalletScope() {
