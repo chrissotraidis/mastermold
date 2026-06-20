@@ -699,6 +699,9 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<CutoverBlockerBoardPanel"),
     );
     expect(tradingPage.indexOf("<CutoverBlockerBoardPanel")).toBeLessThan(
+      tradingPage.indexOf("<OperatorRunbookPanel"),
+    );
+    expect(tradingPage.indexOf("<OperatorRunbookPanel")).toBeLessThan(
       tradingPage.indexOf("<TradingCommandBoard"),
     );
     expect(tradingPage).toContain("Web3 market source switch");
@@ -728,6 +731,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-cutover-blocker-board.ts")).toContain("web3-cutover-blocker-board");
     expect(source("src/db/web3-cutover-blocker-board.ts")).toContain("The next safe input can differ from the next live-review lane");
     expect(source("app/api/web3-cutover-blocker-board/route.ts")).toContain("buildWeb3CutoverBlockerBoard");
+    expect(tradingPage).toContain("Operator runbook");
+    expect(tradingPage).toContain("Open runbook JSON");
+    expect(tradingPage).toContain("/api/web3-operator-runbook?${params.toString()}");
+    expect(tradingPage).toContain("Primary safe action");
+    expect(tradingPage).toContain('aria-label="Safe Web3 run-now actions"');
+    expect(tradingPage).toContain('aria-label="Real-capital Web3 blockers"');
+    expect(tradingPage).toContain("The runbook maps safe actions only.");
+    expect(source("src/db/web3-operator-runbook.ts")).toContain("web3-operator-runbook");
+    expect(source("src/db/web3-operator-runbook.ts")).toContain("Autonomous live trading remains blocked");
+    expect(source("app/api/web3-operator-runbook/route.ts")).toContain("buildWeb3OperatorRunbook");
     expect(tradingPage).toContain("TradingCommandBoard");
     expect(tradingPage).toContain("Command board");
     expect(tradingPage).toContain("WalletNetWorthCurve");
@@ -1302,6 +1315,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");
     expect(source("components/review-readiness.tsx")).toContain("Settings now renders that same Web3 cutover blocker board");
+    expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-runbook now expose a safe operator action map");
     expect(source("components/review-readiness.tsx")).toContain("manual live-review packet");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-manual-live-review-packet");
     expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now shows the same operator input packet");

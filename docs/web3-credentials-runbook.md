@@ -139,6 +139,7 @@ GET /api/web3-manual-live-review-packet
 GET /api/web3-market-monitor-history
 GET /api/web3-ohlcv
 GET /api/web3-operator-request-packet
+GET /api/web3-operator-runbook
 GET /api/web3-provider-health
 GET /api/web3-signer-credential-packet
 GET /api/web3-signer-handoff
@@ -159,6 +160,8 @@ The operator credential handoff route, `GET /api/web3-operator-credential-handof
 The operator request packet route, `GET /api/web3-operator-request-packet`, turns the same handoff contract into a shareable redacted request packet for another helper or reviewer. It includes required input rows, review rows, safe-to-provide values, never-provide values, verifier commands, and a text packet that can be pasted into research or setup workflows. It returns only env target names and status text; it does not echo configured secrets, accept private keys, sign, submit, mutate wallets, or grant live execution.
 
 The cutover blocker board route, `GET /api/web3-cutover-blocker-board`, reconciles the operator request packet, supervised-live runway, and usability receipt into one owner-grouped setup board. It separates the next safe input from the next supervised-live lane blocker, counts open work by now/before-live/review phase and by operator/security/ops/accounting/manual-review owner, lists safe collection surfaces, env target names, storage rules, live-lane dependencies, and verifier commands, and keeps live execution, signing, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked. The `/trading` cockpit renders the same board as a compact cutover blocker panel before the command board.
+
+The operator runbook route, `GET /api/web3-operator-runbook`, turns usability, cutover, preflight, and supervised-live receipts into a safe action map. It names which app links or local commands can run now, which actions are gated, which real-capital gates still block live trading, and the primary next safe action. It returns only permission scopes, links, commands, target names, and status text; it cannot sign, submit, custody funds, mutate wallets, echo secrets, or approve autonomous live trading. The `/trading` cockpit renders it between the cutover board and command board.
 
 The monitor-history route, `GET /api/web3-market-monitor-history`, returns the latest sanitized `npm run monitor:web3` tape: run count, latest symbol, candle confidence, paper action, provider-degraded count, and recent read-only rows. The local file stores no API keys, private keys, seed phrases, transaction bodies, signed payloads, live execution permission, or wallet mutation authority, and rejects rows that do not preserve those blocked permissions.
 

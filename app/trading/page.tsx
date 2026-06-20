@@ -15,8 +15,10 @@ import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet"
 import { getWeb3MarketMonitorHistory, type Web3MarketMonitorHistory } from "@/src/db/web3-market-monitor-history";
 import { buildWeb3OperatorCredentialHandoffReceipt } from "@/src/db/web3-operator-credential-handoff";
 import { buildWeb3OperatorRequestPacket } from "@/src/db/web3-operator-request-packet";
+import { buildWeb3OperatorRunbook, type Web3OperatorRunbookReceipt } from "@/src/db/web3-operator-runbook";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
@@ -82,6 +84,17 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     runway: supervisedLiveRunway,
     usability: usabilityStatus,
   });
+  const liveCapitalPreflight = buildWeb3LiveCapitalPreflightReceipt({
+    state: initialState,
+    checklist: launchChecklist,
+  });
+  const operatorRunbook = buildWeb3OperatorRunbook({
+    state: initialState,
+    usability: usabilityStatus,
+    cutover: cutoverBlockerBoard,
+    preflight: liveCapitalPreflight,
+    runway: supervisedLiveRunway,
+  });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -101,6 +114,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
           <TradingSourceSwitch source={source} account={account} />
           <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
           <CutoverBlockerBoardPanel board={cutoverBlockerBoard} source={source} account={account} />
+          <OperatorRunbookPanel runbook={operatorRunbook} source={source} account={account} />
           <TradingCommandBoard
             state={initialState}
             status={usabilityStatus}
@@ -686,6 +700,139 @@ function CutoverBlockerBoardPanel({
       </p>
     </section>
   );
+}
+
+function OperatorRunbookPanel({
+  runbook,
+  source,
+  account,
+}: {
+  runbook: Web3OperatorRunbookReceipt;
+  source: "sample" | "live-dex";
+  account: "persistent" | "ephemeral";
+}) {
+  const params = new URLSearchParams({ source, account });
+  const href = `/api/web3-operator-runbook?${params.toString()}`;
+  const primary = runbook.primary_safe_action;
+  const visibleActions = runbook.run_now.slice(0, 6);
+  const blockers = runbook.real_capital_blockers.slice(0, 4);
+
+  return (
+    <section
+      aria-labelledby="web3-operator-runbook-title"
+      className="rounded-md border border-engine/25 bg-engine/[0.04] p-3 sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Operator runbook</p>
+              <h2 id="web3-operator-runbook-title" className="mt-1 font-display text-lg font-semibold text-on-surface">
+                {runbook.status.replaceAll("-", " ")}
+              </h2>
+              <p className="mt-1 line-clamp-3 text-sm leading-6 text-on-surface-variant">{runbook.summary}</p>
+            </div>
+            <Link
+              href={href}
+              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open runbook JSON
+            </Link>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <RunbookStat label="Can run" value={`${runbook.allowed_now_count}`} tone="engine" />
+            <RunbookStat label="Gated" value={`${runbook.gated_count}`} tone={runbook.gated_count > 0 ? "caution" : "engine"} />
+            <RunbookStat label="Blocked" value={`${runbook.blocked_count}`} tone="critical" />
+          </div>
+
+          <div className="mt-3 rounded-md border border-engine/25 bg-surface/50 p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Primary safe action</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">{primary?.label ?? "Review setup first"}</p>
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
+              {primary?.next_action ?? runbook.next_safe_input?.next_action ?? runbook.next_live_lane_action}
+            </p>
+            {primary?.command ? (
+              <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                {primary.command}
+              </code>
+            ) : primary?.href ? (
+              <Link
+                href={primary.href}
+                className="mt-2 inline-flex min-h-10 items-center justify-center rounded-md border border-engine/30 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine"
+              >
+                Open safe surface
+              </Link>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-2">
+          <div className="grid min-w-0 gap-2" aria-label="Safe Web3 run-now actions">
+            {visibleActions.map((action) => (
+              <div key={action.id} className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_auto] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-on-surface">{action.label}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-outline">{action.surface.replaceAll("-", " ")} · {action.permission_scope}</p>
+                </div>
+                <p className="line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{action.next_action}</p>
+                <span className={operatorRunbookActionClassName(action.status)}>{action.status}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Real-capital Web3 blockers">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Real-capital blockers</p>
+              <span className="rounded-md border border-critical/30 bg-critical/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-critical">
+                live blocked
+              </span>
+            </div>
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+              {blockers.length > 0 ? blockers.map((blocker) => (
+                <div key={blocker.id} className="min-w-0 rounded-md border border-outline/15 bg-void/20 p-2">
+                  <p className="truncate text-xs font-semibold text-on-surface">{blocker.label}</p>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{blocker.next_action}</p>
+                </div>
+              )) : (
+                <p className="rounded-md border border-outline/15 bg-void/20 p-2 text-xs leading-5 text-on-surface-variant">
+                  No real-capital blocker rows are open, but live approval still requires external review.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      <p className="mt-3 line-clamp-2 text-xs leading-5 text-outline">
+        The runbook maps safe actions only. It cannot store secrets, sign, submit, mutate a wallet, or approve autonomous live trading.
+      </p>
+    </section>
+  );
+}
+
+function RunbookStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "engine" | "caution" | "critical";
+}) {
+  const valueClassName = tone === "engine" ? "text-engine" : tone === "critical" ? "text-critical" : "text-caution";
+  return (
+    <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold ${valueClassName}`}>{value}</p>
+    </div>
+  );
+}
+
+function operatorRunbookActionClassName(status: Web3OperatorRunbookReceipt["run_now"][number]["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "allowed") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "gated") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
 function CutoverBoardStat({

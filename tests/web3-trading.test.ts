@@ -23,6 +23,7 @@ import { GET as MANUAL_LIVE_REVIEW_PACKET_GET } from "@/app/api/web3-manual-live
 import { GET as MARKET_MONITOR_HISTORY_GET } from "@/app/api/web3-market-monitor-history/route";
 import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
 import { GET as OPERATOR_REQUEST_PACKET_GET } from "@/app/api/web3-operator-request-packet/route";
+import { GET as OPERATOR_RUNBOOK_GET } from "@/app/api/web3-operator-runbook/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { POST as SUPERVISOR_REFRESH_POST } from "@/app/api/web3-supervisor-refresh/route";
@@ -1118,6 +1119,103 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(board.secret_echo_permission).toBe("blocked");
     expect(board.controls.some((control) => control.includes("operator checklist only"))).toBe(true);
     expect(text).not.toContain("test-helius-cutover-secret");
+  });
+
+  test("GIVEN an operator asks what is safe to run now WHEN the runbook route runs THEN it separates paper actions from live authority", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-runbook-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-runbook-secret";
+    process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";
+
+    const rejected = await OPERATOR_RUNBOOK_GET(new Request("http://localhost/api/web3-operator-runbook?cycles=999"));
+    expect(rejected.status).toBe(422);
+
+    const response = await OPERATOR_RUNBOOK_GET(new Request("http://localhost/api/web3-operator-runbook?scenario=breakout&source=sample&account=persistent&cycles=1"));
+    const runbook = await json<{
+      mode: string;
+      status: string;
+      summary: string;
+      receipt_hash: string;
+      primary_safe_action: { id: string; status: string; permission_scope: string } | null;
+      next_safe_input: { id: string; label: string; next_action: string } | null;
+      next_live_lane_action: string;
+      allowed_now_count: number;
+      gated_count: number;
+      blocked_count: number;
+      run_now: Array<{
+        id: string;
+        label: string;
+        status: string;
+        kind: string;
+        surface: string;
+        href: string | null;
+        command: string | null;
+        permission_scope: string;
+        next_action: string;
+      }>;
+      real_capital_blockers: Array<{ id: string; label: string; status: string; next_action: string }>;
+      safe_to_provide: string[];
+      never_provide: string[];
+      verifier_commands: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+    const text = JSON.stringify(runbook);
+
+    expect(response.status).toBe(200);
+    expect(runbook.mode).toBe("web3-operator-runbook");
+    expect(runbook.status).toMatch(/setup-needed|paper-operable|supervised-review-ready/);
+    expect(runbook.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(runbook.allowed_now_count).toBeGreaterThanOrEqual(2);
+    expect(runbook.gated_count).toBeGreaterThanOrEqual(1);
+    expect(runbook.blocked_count).toBeGreaterThanOrEqual(1);
+    expect(runbook.primary_safe_action?.status).toBe("allowed");
+    expect(runbook.run_now.map((action) => action.id)).toEqual([
+      "open-copilot",
+      "run-paper-autonomy",
+      "refresh-live-dex",
+      "rehearse-jupiter-order",
+      "continue-credential-setup",
+      "request-supervised-live-review",
+      "autonomous-live-trading",
+    ]);
+    expect(runbook.run_now.find((action) => action.id === "run-paper-autonomy")).toMatchObject({
+      status: "allowed",
+      kind: "safe-command",
+      command: "npm run smoke:web3 -- --base-url=http://localhost:4010",
+    });
+    expect(runbook.run_now.find((action) => action.id === "refresh-live-dex")?.command).toBe(
+      "npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json",
+    );
+    expect(runbook.run_now.find((action) => action.id === "autonomous-live-trading")).toMatchObject({
+      status: "blocked",
+      surface: "external-review",
+    });
+    expect(runbook.real_capital_blockers.map((blocker) => blocker.id)).toEqual(expect.arrayContaining([
+      "operator-wallet",
+      "live-dex",
+      "signer-custody",
+      "manual-live-review",
+    ]));
+    expect(runbook.safe_to_provide).toContain("Dedicated Solana public wallet address");
+    expect(runbook.never_provide).toContain("Seed phrase or mnemonic");
+    expect(runbook.verifier_commands).toEqual(expect.arrayContaining([
+      "npm run verify:web3 -- --base-url=http://localhost:4010",
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+    ]));
+    expect(runbook.live_execution_permission).toBe("blocked");
+    expect(runbook.wallet_mutation_permission).toBe("blocked");
+    expect(runbook.transaction_submission_permission).toBe("blocked");
+    expect(runbook.private_key_storage).toBe("blocked");
+    expect(runbook.seed_phrase_storage).toBe("blocked");
+    expect(runbook.secret_echo_permission).toBe("blocked");
+    expect(runbook.controls.some((control) => control.includes("operator action map only"))).toBe(true);
+    expect(text).not.toContain("test-helius-runbook-secret");
+    expect(text).not.toContain("test-jupiter-runbook-secret");
   });
 
   test("GIVEN Settings saves public wallet scope WHEN account setup is rebuilt THEN dry-run wallet readiness is scoped without secrets", async () => {
