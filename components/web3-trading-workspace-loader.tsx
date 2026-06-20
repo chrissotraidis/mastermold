@@ -19,7 +19,7 @@ import type { Web3SignerHandoffReceipt } from "@/src/db/web3-signer-handoff";
 import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
-type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "account-setup" | "provider-health" | "signer-handoff" | "accounting-ledger" | "emergency-stop";
+type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "account-setup" | "provider-health" | "signer-handoff" | "accounting-ledger" | "emergency-stop" | "supervisor-refresh";
 type QuickAgentActionKind = QuickBusyState | "stand-down";
 type Web3CredentialsDraft = {
   helius_api_key: string;
@@ -90,6 +90,16 @@ type PromotedPaperAutopilotReceipt = {
   summary: string;
   next_action: string;
   blockers: string[];
+};
+type SupervisorRefreshReceipt = {
+  mode: "web3-supervisor-refresh";
+  status: "preview" | "refreshed";
+  summary: string;
+  supervisor_health: Web3DaemonSupervisorHealth;
+  production_supervisor: Web3ProductionSupervisorReadiness;
+  live_execution_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  wallet_mutation_permission: "blocked";
 };
 
 export function Web3TradingWorkspaceLoader({
@@ -481,6 +491,33 @@ export function Web3TradingWorkspaceLoader({
       setQuickNotice(payload.summary);
     } catch (error) {
       setQuickNotice(error instanceof Error ? error.message : "Emergency-stop drill failed.");
+    } finally {
+      setQuickBusy(null);
+    }
+  }
+
+  async function refreshSupervisorReceipt() {
+    if (quickBusy) return;
+    setQuickBusy("supervisor-refresh");
+    setQuickNotice("Refreshing one bounded sample-source paper supervisor receipt; live execution and wallet mutation stay locked.");
+    try {
+      const response = await fetch("/api/web3-supervisor-refresh", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario: "breakout",
+          operator_ack: true,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as SupervisorRefreshReceipt | { error: string; detail?: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.detail ?? payload.error : "Supervisor refresh failed.");
+      }
+      setSupervisorHealth(payload.supervisor_health);
+      setProductionSupervisorReadiness(payload.production_supervisor);
+      setQuickNotice(payload.summary);
+    } catch (error) {
+      setQuickNotice(error instanceof Error ? error.message : "Supervisor refresh failed.");
     } finally {
       setQuickBusy(null);
     }
@@ -1226,6 +1263,12 @@ export function Web3TradingWorkspaceLoader({
               />
               <QuickPromotedAutopilotPanel health={promotedAutopilotHealth} />
               <QuickDaemonSupervisorPanel health={supervisorHealth} />
+              <QuickProductionSupervisorReadinessPanel
+                readiness={productionReadiness}
+                busy={quickBusy === "supervisor-refresh"}
+                disabled={quickDisabled}
+                onRefresh={refreshSupervisorReceipt}
+              />
               <QuickDaemonHandoffPanel handoff={daemonHandoff} />
             </div>
           ) : null}
@@ -1404,7 +1447,12 @@ export function Web3TradingWorkspaceLoader({
                 <QuickPromotedAutopilotPanel health={promotedAutopilotHealth} />
               </div>
               <div className="xl:col-span-2">
-                <QuickProductionSupervisorReadinessPanel readiness={productionReadiness} />
+                <QuickProductionSupervisorReadinessPanel
+                  readiness={productionReadiness}
+                  busy={quickBusy === "supervisor-refresh"}
+                  disabled={quickDisabled}
+                  onRefresh={refreshSupervisorReceipt}
+                />
               </div>
               <div className="xl:col-span-2">
                 <QuickDaemonSupervisorPanel health={supervisorHealth} />
@@ -9294,8 +9342,14 @@ function QuickDaemonSupervisorPanel({
 
 function QuickProductionSupervisorReadinessPanel({
   readiness,
+  busy,
+  disabled,
+  onRefresh,
 }: {
   readiness: Web3ProductionSupervisorReadiness;
+  busy: boolean;
+  disabled: boolean;
+  onRefresh: () => void;
 }) {
   const tone = productionSupervisorTone(readiness.status);
   const receiptAge = readiness.receipt_age_seconds === null
@@ -9331,8 +9385,23 @@ function QuickProductionSupervisorReadinessPanel({
       <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         <div className="min-w-0 rounded-md border border-outline-variant/25 bg-surface-dim/20 p-2">
           <p className="text-xs leading-5 text-outline">{readiness.next_action}</p>
-          <p className="mt-2 rounded-md border border-outline-variant/20 bg-void/30 p-2 font-mono text-[10px] uppercase tracking-telemetry text-on-surface-variant">
-            npm run supervise:web3
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={disabled || busy}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:border-engine/55 hover:bg-engine/15 disabled:cursor-not-allowed disabled:opacity-55"
+              title="Run one bounded paper-only supervisor refresh"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5 shrink-0", busy ? "animate-spin" : "")} aria-hidden="true" />
+              {busy ? "Refreshing" : "Refresh paper supervisor"}
+            </button>
+            <p className="min-w-0 rounded-md border border-outline-variant/20 bg-void/30 px-2 py-1.5 font-mono text-[10px] uppercase tracking-telemetry text-on-surface-variant">
+              npm run supervise:web3
+            </p>
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-outline">
+            Runs one local sample-source paper round for freshness evidence only; live execution, transaction submission, and wallet mutation remain blocked.
           </p>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px] leading-4 text-outline">
             <span>Runner {readiness.runner_id ?? "none"}</span>

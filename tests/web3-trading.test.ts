@@ -23,6 +23,7 @@ import { GET as MARKET_MONITOR_HISTORY_GET } from "@/app/api/web3-market-monitor
 import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
 import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
+import { POST as SUPERVISOR_REFRESH_POST } from "@/app/api/web3-supervisor-refresh/route";
 import { GET as SUPERVISED_LIVE_RUNWAY_GET } from "@/app/api/web3-supervised-live-runway/route";
 import { POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
@@ -1549,6 +1550,73 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(packet)).not.toContain("worker-canary@example.test");
     expect(JSON.stringify(packet)).not.toContain("alert-canary");
     expect(JSON.stringify(packet)).not.toContain("restart-canary");
+  });
+
+  test("GIVEN an operator refreshes supervisor evidence WHEN the paper supervisor refresh route previews the run THEN it stays bounded and live-locked", async () => {
+    const noAck = await SUPERVISOR_REFRESH_POST(new Request("http://localhost/api/web3-supervisor-refresh", {
+      method: "POST",
+      body: JSON.stringify({ scenario: "breakout", preview_only: true }),
+    }));
+    expect(noAck.status).toBe(422);
+
+    const badScenario = await SUPERVISOR_REFRESH_POST(new Request("http://localhost/api/web3-supervisor-refresh", {
+      method: "POST",
+      body: JSON.stringify({ scenario: "bad", operator_ack: true, preview_only: true }),
+    }));
+    expect(badScenario.status).toBe(422);
+
+    const response = await SUPERVISOR_REFRESH_POST(new Request("http://localhost/api/web3-supervisor-refresh", {
+      method: "POST",
+      body: JSON.stringify({ scenario: "breakout", operator_ack: true, preview_only: true }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      applied_scenario: string;
+      applied_source: string;
+      applied_rounds: number;
+      applied_ticks_per_round: number;
+      applied_target_net_pnl_usd: number;
+      applied_max_drawdown_usd: number;
+      api_boundary: string;
+      supervisor_receipt: unknown;
+      supervisor_health: { live_execution_permission: string; wallet_mutation_permission: string };
+      production_supervisor: { mode: string; can_satisfy_process_gate: boolean; live_execution_permission: string; wallet_mutation_permission: string };
+      external_dispatch_permission: string;
+      live_execution_permission: string;
+      transaction_submission_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-supervisor-refresh");
+    expect(receipt.status).toBe("preview");
+    expect(receipt.applied_scenario).toBe("breakout");
+    expect(receipt.applied_source).toBe("sample");
+    expect(receipt.applied_rounds).toBe(1);
+    expect(receipt.applied_ticks_per_round).toBe(1);
+    expect(receipt.applied_target_net_pnl_usd).toBe(1);
+    expect(receipt.applied_max_drawdown_usd).toBe(250);
+    expect(receipt.api_boundary).toBe("local-paper-process");
+    expect(receipt.supervisor_receipt).toBe(null);
+    expect(receipt.supervisor_health.live_execution_permission).toBe("blocked");
+    expect(receipt.supervisor_health.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.production_supervisor.mode).toBe("web3-production-supervisor-readiness");
+    expect(receipt.production_supervisor.can_satisfy_process_gate).toBe(false);
+    expect(receipt.production_supervisor.live_execution_permission).toBe("blocked");
+    expect(receipt.production_supervisor.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.external_dispatch_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.some((control) => control.includes("one bounded sample-source paper supervisor round"))).toBe(true);
   });
 
   test("GIVEN supervised live is reviewed WHEN the runway route runs THEN it consolidates blocked launch lanes without secrets", async () => {

@@ -622,6 +622,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(web3Workspace).toContain("Production supervisor readiness receipt");
     expect(web3Workspace).toContain("process gate blocked");
     expect(web3Workspace).toContain("npm run supervise:web3");
+    expect(web3Workspace).toContain("refreshSupervisorReceipt");
+    expect(web3Workspace).toContain("/api/web3-supervisor-refresh");
+    expect(web3Workspace).toContain("Refresh paper supervisor");
+    expect(web3Workspace).toContain("Runs one local sample-source paper round for freshness evidence only");
+    expect(source("app/api/web3-supervisor-refresh/route.ts")).toContain("web3-supervisor-refresh");
+    expect(source("app/api/web3-supervisor-refresh/route.ts")).toContain("operator_ack must be true");
+    expect(source("app/api/web3-supervisor-refresh/route.ts")).toContain("--source=sample");
+    expect(source("app/api/web3-supervisor-refresh/route.ts")).toContain("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION: \"\"");
+    expect(source("app/api/web3-supervisor-refresh/route.ts")).toContain("transaction_submission_permission: \"blocked\"");
     expect(web3Workspace).toContain("Redeploy protect");
     expect(web3Workspace).toContain("Fresh entry");
     expect(web3Workspace).toContain("Paper execution priority receipt");
