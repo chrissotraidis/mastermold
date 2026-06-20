@@ -13233,6 +13233,8 @@ export async function getWeb3TradingStateAsync(input: TradingStateInput = {}): P
       fillLedgerDigest: configuredState.autonomous_fill_ledger_digest,
       profitRunGuard: configuredState.autonomous_profit_run_guard,
       dailyProfitLock: configuredState.autonomous_daily_profit_lock,
+      marketSource: configuredState.market_source,
+      monitor: configuredState.autonomous_monitor,
       burstOutcomeFeedback: configuredState.autonomous_burst_outcome_feedback,
       burstFillExecution: configuredState.autonomous_burst_fill_execution,
       directive: configuredState.autonomous_trading_directive,
@@ -15396,6 +15398,8 @@ function buildWeb3TradingState({
     fillLedgerDigest: autonomous_fill_ledger_digest,
     profitRunGuard: autonomous_profit_run_guard,
     dailyProfitLock: autonomous_daily_profit_lock,
+    marketSource,
+    monitor: autonomous_monitor,
     burstOutcomeFeedback: autonomous_burst_outcome_feedback,
     burstFillExecution: autonomous_burst_fill_execution,
     directive: autonomous_trading_directive,
@@ -17848,6 +17852,8 @@ async function attachExecutionPlans(state: Web3TradingState, fetchImpl: FetchLik
     fillLedgerDigest: autonomous_fill_ledger_digest,
     profitRunGuard: autonomous_profit_run_guard,
     dailyProfitLock: autonomous_daily_profit_lock,
+    marketSource: state.market_source,
+    monitor: state.autonomous_monitor,
     burstOutcomeFeedback: autonomous_burst_outcome_feedback,
     burstFillExecution: autonomous_burst_fill_execution,
     directive: autonomous_trading_directive,
@@ -18628,6 +18634,8 @@ function attachExecutionAuditState(state: Web3TradingState, execution_audit: Exe
     fillLedgerDigest: state.autonomous_fill_ledger_digest,
     profitRunGuard: autonomous_profit_run_guard,
     dailyProfitLock: autonomous_daily_profit_lock,
+    marketSource: state.market_source,
+    monitor: state.autonomous_monitor,
     burstOutcomeFeedback: autonomous_burst_outcome_feedback,
     burstFillExecution: autonomous_burst_fill_execution,
     directive: state.autonomous_trading_directive,
@@ -25922,6 +25930,8 @@ function applyPersistentLedger(
     fillLedgerDigest: autonomous_fill_ledger_digest,
     profitRunGuard: autonomous_profit_run_guard,
     dailyProfitLock: autonomous_daily_profit_lock,
+    marketSource: state.market_source,
+    monitor: state.autonomous_monitor,
     burstOutcomeFeedback: autonomous_burst_outcome_feedback,
     burstFillExecution: autonomous_burst_fill_execution,
     directive: autonomous_trading_directive,
@@ -53163,6 +53173,8 @@ function buildAutonomousProfitAccountability({
   fillLedgerDigest,
   profitRunGuard,
   dailyProfitLock,
+  marketSource,
+  monitor,
   burstOutcomeFeedback,
   burstFillExecution,
   directive,
@@ -53174,6 +53186,8 @@ function buildAutonomousProfitAccountability({
   fillLedgerDigest: AutonomousFillLedgerDigest;
   profitRunGuard: AutonomousProfitRunGuard;
   dailyProfitLock: AutonomousDailyProfitLock;
+  marketSource: Web3TradingState["market_source"];
+  monitor: AutonomousMonitorSchedule;
   burstOutcomeFeedback: AutonomousBurstOutcomeFeedback;
   burstFillExecution: AutonomousBurstFillExecution;
   directive: AutonomousTradingDirective;
@@ -53329,6 +53343,8 @@ function buildAutonomousProfitAccountability({
     maxNextFills,
     profitRunGuard,
     dailyProfitLock,
+    marketSource,
+    monitor,
     burstOutcomeFeedback,
     directive,
     routeRefreshExecution,
@@ -53376,6 +53392,8 @@ function buildAutonomousProfitAccountabilityRepairPlan({
   maxNextFills,
   profitRunGuard,
   dailyProfitLock,
+  marketSource,
+  monitor,
   burstOutcomeFeedback,
   directive,
   routeRefreshExecution,
@@ -53389,6 +53407,8 @@ function buildAutonomousProfitAccountabilityRepairPlan({
   maxNextFills: number;
   profitRunGuard: AutonomousProfitRunGuard;
   dailyProfitLock: AutonomousDailyProfitLock;
+  marketSource: Web3TradingState["market_source"];
+  monitor: AutonomousMonitorSchedule;
   burstOutcomeFeedback: AutonomousBurstOutcomeFeedback;
   directive: AutonomousTradingDirective;
   routeRefreshExecution?: AutonomousRouteRefreshExecution;
@@ -53401,6 +53421,7 @@ function buildAutonomousProfitAccountabilityRepairPlan({
     score: 0,
   };
   const scoreGap = Math.max(0, targetScore - accountabilityScore);
+  const liveDexRepairMode = marketSource.mode === "live-dex";
   const localRouteRehearsalReady = routeRefreshExecution?.local_rehearsal_ready === true;
   const routeRefreshPressure = directive.read_only_refresh_required ||
     action === "refresh-proof" ||
@@ -53415,13 +53436,22 @@ function buildAutonomousProfitAccountabilityRepairPlan({
     profitRunGuard.status === "blocked" ||
     dailyProfitLock.loop_permission === "stand-down" ||
     dailyProfitLock.loop_permission === "paused";
-  const blockingReason = hardBlocked
+  const rawBlockingReason = hardBlocked
     ? profitRunGuard.stop_reason ??
       dailyProfitLock.stop_reason ??
       profitRunGuard.next_action ??
       dailyProfitLock.next_action
     : null;
+  const blockingReason = autonomousProfitAccountabilityRepairBlockingReason({
+    rawBlockingReason,
+    monitor,
+    localRouteRehearsalReady,
+    routeRefreshExecution,
+    profitRunGuard,
+    dailyProfitLock,
+  });
   const preflightRepairable = hardBlocked &&
+    !liveDexRepairMode &&
     localRouteRehearsalReady &&
     /preflight/i.test([
       blockingReason,
@@ -53450,6 +53480,7 @@ function buildAutonomousProfitAccountabilityRepairPlan({
     ? 0
     : Math.max(1, Math.min(2, dailyProfitLock.max_next_fills || recommendedMaxTotalFills || 1));
   const canRunLocalPaper = !complete &&
+    !liveDexRepairMode &&
     (!hardBlocked || preflightRepairable) &&
     !routeRefreshRequired &&
     recommendedMaxTotalFills > 0;
@@ -53472,7 +53503,7 @@ function buildAutonomousProfitAccountabilityRepairPlan({
         body: planStatus === "refresh-first"
           ? {
               scenario: "breakout" as const,
-              source: "sample" as const,
+              source: liveDexRepairMode ? "live-dex" as const : "sample" as const,
               account: "persistent" as const,
               advance: false,
               route_refresh: { action: "request-quote" as const },
@@ -55893,6 +55924,39 @@ function autonomousProfitAccountabilityNextAction(
   return action === "refresh-proof" ? "Refresh route, candle, and wallet proof before allowing autonomous spend." : "Observe until the paper wallet has enough evidence.";
 }
 
+function autonomousProfitAccountabilityRepairBlockingReason({
+  rawBlockingReason,
+  monitor,
+  localRouteRehearsalReady,
+  routeRefreshExecution,
+  profitRunGuard,
+  dailyProfitLock,
+}: {
+  rawBlockingReason: string | null;
+  monitor: AutonomousMonitorSchedule;
+  localRouteRehearsalReady: boolean;
+  routeRefreshExecution?: AutonomousRouteRefreshExecution;
+  profitRunGuard: AutonomousProfitRunGuard;
+  dailyProfitLock: AutonomousDailyProfitLock;
+}) {
+  if (!rawBlockingReason) return null;
+  const staleHeartbeatText = /monitor heartbeat is stale or stood down/i.test(rawBlockingReason);
+  if (!staleHeartbeatText || monitor.heartbeat_status === "stale") return rawBlockingReason;
+  const routeBlocker = routeRefreshExecution?.blockers.find((blocker) =>
+    /route|quote|preflight|fee|mev|land|profit|lock/i.test(blocker)
+  );
+  if (localRouteRehearsalReady) {
+    if (dailyProfitLock.loop_permission === "stand-down" || dailyProfitLock.loop_permission === "paused") {
+      return "Monitor heartbeat is fresh, and route rehearsal is ready, but the daily profit lock still stands down paper movement; repair preflight/profit-lock evidence before another paper session.";
+    }
+    return routeBlocker ??
+      profitRunGuard.next_action ??
+      "Monitor heartbeat is fresh, and route rehearsal is ready, but execution preflight still blocks paper repair.";
+  }
+  return routeBlocker ??
+    "Monitor heartbeat is fresh, but route, preflight, or profit-lock evidence still blocks paper repair.";
+}
+
 function autonomousProfitAccountabilityRepairSummary(
   status: AutonomousProfitAccountabilityRepairPlan["status"],
   score: number,
@@ -55926,7 +55990,9 @@ function autonomousProfitAccountabilityRepairNextAction(
   if (status === "preflight-repair") return `Run one protect-first diagnostic paper tick with at most ${fills} fill, then rescore ${weakestLabel.toLowerCase()} and keep live execution blocked.`;
   if (status === "protect-first") return `Run ${ticks} protect-first paper tick with at most ${fills} fill, then rescore ${weakestLabel.toLowerCase()}.`;
   if (status === "blocked") return localRouteRehearsalReady
-    ? `${blockingReason ?? "Run guard or daily lock still blocks paper movement."} Keep the route rehearsal, then repair preflight/profit-lock evidence before another paper session.`
+    ? blockingReason && /repair preflight\/profit-lock evidence/i.test(blockingReason)
+      ? blockingReason
+      : `${blockingReason ?? "Run guard or daily lock still blocks paper movement."} Keep the route rehearsal, then repair preflight/profit-lock evidence before another paper session.`
     : "Stand down from local repair until the profit run guard and daily lock permit paper movement again.";
   return `Run ${ticks} bounded paper tick${ticks === 1 ? "" : "s"} with at most ${fills} fill${fills === 1 ? "" : "s"}, then rescore ${weakestLabel.toLowerCase()}.`;
 }
@@ -72247,6 +72313,8 @@ function attachPaperDaemonTick(
     fillLedgerDigest: autonomousFillLedgerDigest,
     profitRunGuard: state.autonomous_profit_run_guard,
     dailyProfitLock: state.autonomous_daily_profit_lock,
+    marketSource: state.market_source,
+    monitor: state.autonomous_monitor,
     burstOutcomeFeedback: state.autonomous_burst_outcome_feedback,
     burstFillExecution: state.autonomous_burst_fill_execution,
     directive: autonomousTradingDirective,
@@ -73115,6 +73183,8 @@ function recordPaperDaemonMemory(state: Web3TradingState): Web3TradingState {
     fillLedgerDigest: autonomousFillLedgerDigest,
     profitRunGuard: state.autonomous_profit_run_guard,
     dailyProfitLock: state.autonomous_daily_profit_lock,
+    marketSource: state.market_source,
+    monitor: state.autonomous_monitor,
     burstOutcomeFeedback: state.autonomous_burst_outcome_feedback,
     burstFillExecution: state.autonomous_burst_fill_execution,
     directive: autonomousTradingDirective,

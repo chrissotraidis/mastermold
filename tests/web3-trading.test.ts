@@ -8405,6 +8405,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(["ready", "paper-only", "exit-only", "blocked", "idle"]).toContain(state.autonomous_trade_readiness_gate.status);
     expect(state.autonomous_trade_readiness_gate.data_repair_required).toBe(false);
     expect(state.autonomous_trade_readiness_gate.checks.find((check) => check.id === "ingestion")?.status).toBe("pass");
+    expect(state.autonomous_monitor.heartbeat_status).not.toBe("stale");
+    if (state.autonomous_profit_accountability.repair_plan.blocking_reason) {
+      expect(state.autonomous_profit_accountability.repair_plan.blocking_reason).not.toMatch(/Monitor heartbeat is stale/i);
+    }
+    expect(state.autonomous_profit_accountability.repair_plan.next_action).not.toMatch(/Monitor heartbeat is stale/i);
+    expect(state.autonomous_profit_accountability.repair_plan.next_action.match(/repair preflight\/profit-lock evidence/gi)?.length ?? 0).toBeLessThanOrEqual(1);
+    expect(state.autonomous_profit_accountability.repair_plan.status).not.toBe("preflight-repair");
+    expect(state.autonomous_profit_accountability.repair_plan.can_run_local_paper).toBe(false);
+    if (state.autonomous_profit_accountability.repair_plan.request) {
+      expect(state.autonomous_profit_accountability.repair_plan.request.body.source).toBe("live-dex");
+      expect(state.autonomous_profit_accountability.repair_plan.request.body.route_refresh).toBeDefined();
+      expect(state.autonomous_profit_accountability.repair_plan.request.body.autonomous_session).toBeUndefined();
+    }
     if (state.autonomous_trade_readiness_gate.launch_timing_blocks_fresh_buys) {
       expect(state.autonomous_trade_readiness_gate.can_apply_buys).toBe(false);
     }
