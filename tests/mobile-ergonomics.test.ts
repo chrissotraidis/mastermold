@@ -943,6 +943,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-credential-doctor.mjs")).toContain("/api/web3-jupiter-rehearsal-history");
     expect(source("scripts/web3-credential-doctor.mjs")).toContain("Jupiter rehearsal tape");
     expect(source("scripts/web3-credential-doctor.mjs")).toContain("local-sanitized-jupiter-rehearsal-history");
+    expect(source("scripts/web3-credential-doctor.mjs")).toContain("/api/web3-manual-live-review-packet");
+    expect(source("scripts/web3-credential-doctor.mjs")).toContain("Manual live-review packet");
+    expect(source("scripts/web3-credential-doctor.mjs")).toContain("external-review-only-sanitized-packet");
     expect(source("scripts/web3-credential-doctor.mjs")).toContain("Paper supervisor freshness");
     expect(source("src/db/web3-credential-doctor.ts")).toContain("getWeb3CredentialDoctorHealth");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run doctor:web3 -- --json");

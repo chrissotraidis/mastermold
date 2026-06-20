@@ -41,11 +41,12 @@ export async function runWeb3CredentialDoctor(input = {}) {
     failOnBlocked: Boolean(input.failOnBlocked),
   };
   const supervisorRepair = config.refreshSupervisor ? await refreshSupervisorEvidence(config) : null;
-  const [accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, jupiterRehearsalHistory, health] = await Promise.all([
+  const [accountSetup, providerHealth, launchChecklist, livePreflight, manualLiveReviewPacket, monitorHistory, jupiterRehearsalHistory, health] = await Promise.all([
     fetchReceipt(config, "/api/web3-account-setup"),
     fetchReceipt(config, "/api/web3-provider-health"),
     fetchReceipt(config, "/api/web3-launch-checklist"),
     fetchReceipt(config, "/api/web3-live-capital-preflight"),
+    fetchReceipt(config, "/api/web3-manual-live-review-packet"),
     fetchReceipt(config, "/api/web3-market-monitor-history"),
     fetchReceipt(config, "/api/web3-jupiter-rehearsal-history"),
     fetchReceipt(config, "/api/health"),
@@ -56,6 +57,7 @@ export async function runWeb3CredentialDoctor(input = {}) {
     providerHealth,
     launchChecklist,
     livePreflight,
+    manualLiveReviewPacket,
     monitorHistory,
     jupiterRehearsalHistory,
     health,
@@ -76,12 +78,13 @@ export function buildWeb3CredentialDoctorReceipt({
   providerHealth,
   launchChecklist,
   livePreflight,
+  manualLiveReviewPacket,
   monitorHistory,
   jupiterRehearsalHistory,
   health,
   supervisorRepair,
 }) {
-  const checks = buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, jupiterRehearsalHistory, health, supervisorRepair })
+  const checks = buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, manualLiveReviewPacket, monitorHistory, jupiterRehearsalHistory, health, supervisorRepair })
     .map(redactCredentialDoctorCheck);
   const blockers = checks
     .filter((check) => check.status === "fail")
@@ -138,10 +141,21 @@ export function buildWeb3CredentialDoctorReceipt({
   };
 }
 
-function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, monitorHistory, jupiterRehearsalHistory, health, supervisorRepair }) {
+function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchChecklist, livePreflight, manualLiveReviewPacket, monitorHistory, jupiterRehearsalHistory, health, supervisorRepair }) {
   const env = accountSetup?.environment_summary ?? {};
   const wallet = accountSetup?.wallet_summary ?? {};
   const productionSupervisor = health?.web3_production_supervisor ?? {};
+  const manualPacketSafe = manualLiveReviewPacket?.mode === "web3-manual-live-review-packet" &&
+    manualLiveReviewPacket.external_review_only === true &&
+    ["blocked", "manual-live-executor-review"].includes(manualLiveReviewPacket.live_execution_permission) &&
+    manualLiveReviewPacket.wallet_mutation_permission === "blocked" &&
+    manualLiveReviewPacket.transaction_submission_permission === "blocked" &&
+    manualLiveReviewPacket.private_key_storage === "blocked" &&
+    manualLiveReviewPacket.seed_phrase_storage === "blocked" &&
+    manualLiveReviewPacket.secret_echo_permission === "blocked" &&
+    Array.isArray(manualLiveReviewPacket.signoffs) &&
+    manualLiveReviewPacket.required_signoff_count === manualLiveReviewPacket.signoffs.length &&
+    manualLiveReviewPacket.passed_signoff_count + manualLiveReviewPacket.watch_signoff_count + manualLiveReviewPacket.failed_signoff_count === manualLiveReviewPacket.signoffs.length;
   return [
     {
       id: "helius-read-rail",
@@ -246,6 +260,18 @@ function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchCheck
         : "Live-capital preflight receipt is missing.",
       next_action: "Keep live execution, transaction submission, and wallet mutation blocked until separate supervised live review.",
       storage: "external-review-only",
+    },
+    {
+      id: "manual-live-review-packet",
+      label: "Manual live-review packet",
+      status: manualPacketSafe ? "pass" : "fail",
+      detail: manualLiveReviewPacket?.mode === "web3-manual-live-review-packet"
+        ? `Manual live-review packet is ${manualLiveReviewPacket.status}; ${manualLiveReviewPacket.passed_signoff_count ?? 0}/${manualLiveReviewPacket.required_signoff_count ?? 0} signoffs passing; external review ${manualLiveReviewPacket.can_request_external_review ? "ready" : "not ready"}.`
+        : "Manual live-review packet receipt is missing.",
+      next_action: manualPacketSafe
+        ? manualLiveReviewPacket.next_action
+        : "Refresh GET /api/web3-manual-live-review-packet and keep it external-review-only with signing, submission, wallet mutation, private keys, seed phrases, and secret echo blocked.",
+      storage: "external-review-only-sanitized-packet",
     },
     {
       id: "paper-supervisor",
