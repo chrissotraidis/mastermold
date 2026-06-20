@@ -270,6 +270,12 @@ function Web3CredentialsRunwayCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0">
+          <SettingsWeb3CredentialCommandCenter
+            handoff={operatorCredentialHandoff}
+            requestPacket={operatorRequestPacket}
+            runbook={operatorRunbook}
+            cutover={cutoverBlockerBoard}
+          />
           <SettingsWeb3OperatorIntakeBoard receipt={operatorCredentialHandoff} />
           <SettingsWeb3OperatorRequestPacketPanel packet={operatorRequestPacket} />
           <SettingsWeb3CutoverBlockerBoardPanel board={cutoverBlockerBoard} />
@@ -538,6 +544,133 @@ function Web3CredentialsRunwayCard({
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function SettingsWeb3CredentialCommandCenter({
+  handoff,
+  requestPacket,
+  runbook,
+  cutover,
+}: {
+  handoff: Web3OperatorCredentialHandoffReceipt;
+  requestPacket: Web3OperatorRequestPacket;
+  runbook: Web3OperatorRunbookReceipt;
+  cutover: Web3CutoverBlockerBoard;
+}) {
+  const nextInput = handoff.next_input ?? requestPacket.next_input;
+  const safeSettingsInputs = handoff.inputs
+    .filter((input) => input.can_enter_in_app && input.status !== "ready")
+    .slice(0, 4);
+  const externalOnlyInputs = handoff.inputs
+    .filter((input) => !input.can_enter_in_app || input.safe_collection_surface === "external-system" || input.safe_collection_surface === "manual-review")
+    .filter((input) => input.status !== "ready")
+    .slice(0, 4);
+  const primaryAction = runbook.primary_safe_action;
+  const strictVerifier = requestPacket.verifier_commands.find((command) => command.includes("--require-operator-wallet")) ??
+    runbook.verifier_commands.find((command) => command.includes("verify:web3")) ??
+    "npm run verify:web3 -- --base-url=http://localhost:4010";
+  return (
+    <div className="rounded-md border border-engine/35 bg-engine/[0.055] p-3" aria-label="Settings Web3 credential command center">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Credential command center</p>
+          <p className="mt-1 text-base font-semibold text-on-surface">
+            {nextInput ? `Do next: ${nextInput.label}` : "Credential lanes are ready for strict verifier review"}
+          </p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            {nextInput?.next_action ?? runbook.next_live_lane_action}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={handoff.open_required_count > 0 ? "fail" : "watch"} label={`${handoff.open_required_count} required open`} />
+          <LaunchQueueBadge status={runbook.allowed_now_count > 0 ? "pass" : "watch"} label={`${runbook.allowed_now_count} safe now`} />
+          <LaunchQueueBadge status="fail" label="live blocked" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <SettingsMetric label="Ready lanes" value={`${handoff.ready_count}/${handoff.inputs.length}`} />
+        <SettingsMetric label="Need now" value={`${cutover.now_count}`} />
+        <SettingsMetric label="Before live" value={`${cutover.before_live_count}`} />
+        <SettingsMetric label="Review gates" value={`${cutover.review_count}`} />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1fr)]">
+        <div className="rounded-md border border-engine/25 bg-surface-dim/30 p-2" aria-label="Settings safe credential entry lanes">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Safe in Settings</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">Public or server-env setup only</p>
+            </div>
+            <LaunchQueueBadge status={safeSettingsInputs.length > 0 ? "watch" : "pass"} label={`${safeSettingsInputs.length} open`} />
+          </div>
+          <div className="mt-2 grid gap-2">
+            {(safeSettingsInputs.length > 0 ? safeSettingsInputs : handoff.inputs.filter((input) => input.can_enter_in_app).slice(0, 2)).map((input) => (
+              <div key={input.id} className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <p className="text-xs font-semibold text-on-surface">{input.label}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{input.storage.replaceAll("-", " ")} · {input.safe_collection_surface.replaceAll("-", " ")}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Settings external-only Web3 credential lanes">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">External or review only</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">Signer, settlement, and live approval stay outside the app</p>
+            </div>
+            <LaunchQueueBadge status={externalOnlyInputs.length > 0 ? "fail" : "watch"} label={`${externalOnlyInputs.length} open`} />
+          </div>
+          <div className="mt-2 grid gap-2">
+            {(externalOnlyInputs.length > 0 ? externalOnlyInputs : requestPacket.review_inputs.slice(0, 2)).map((input) => (
+              <div key={input.id} className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <p className="text-xs font-semibold text-on-surface">{input.label}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{input.storage.replaceAll("-", " ")} · {input.safe_collection_surface.replaceAll("-", " ")}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)]">
+        <div className="rounded-md border border-outline-variant/25 bg-black/15 p-2" aria-label="Settings credential strict verifier command">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Strict verifier path</p>
+          <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+            {strictVerifier}
+          </code>
+          <p className="mt-2 text-[11px] leading-4 text-outline">
+            Primary safe action: {primaryAction?.label ?? "review setup"} · {primaryAction?.status ?? "gated"}.
+          </p>
+        </div>
+        <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings credential never-provide boundary">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Never provide</p>
+          <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-on-surface-variant">
+            {handoff.never_request.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href="/api/web3-operator-request-packet?source=live-dex&account=persistent"
+          className="inline-flex min-h-10 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
+        >
+          Open share packet
+        </Link>
+        <Link
+          href="/api/web3-operator-runbook?source=live-dex&account=persistent"
+          className="inline-flex min-h-10 items-center rounded-md px-2 text-xs font-semibold text-violet hover:text-violet/80"
+        >
+          Open runbook
+        </Link>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        The command center is a safe-entry map only; it cannot store private keys, store seed phrases, sign, submit, mutate wallets, or approve autonomous live trading.
+      </p>
+    </div>
   );
 }
 
