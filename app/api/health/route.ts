@@ -15,7 +15,9 @@ import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist
 import { buildWeb3LiveActivationPlan, buildWeb3LiveActivationPlanHealth } from "@/src/db/web3-live-activation-plan";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveAutonomyReadinessHealth } from "@/src/db/web3-live-autonomy-readiness";
+import { buildWeb3LiveIgnitionHealth, buildWeb3LiveIgnitionReceipt } from "@/src/db/web3-live-ignition";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import { buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import {
   buildWeb3LiveUsabilityBlockersHealth,
   buildWeb3LiveUsabilityBlockersReceipt,
@@ -127,6 +129,11 @@ export async function GET() {
     liveUsability: web3LiveUsability,
     liveAutonomy: web3State.autonomous_live_autonomy_readiness,
   });
+  const web3LiveIgnition = buildWeb3LiveIgnitionReceipt({
+    state: web3State,
+    liveUsability: web3LiveUsability,
+    canary: buildWeb3LiveTradeCanaryReceipt(web3State),
+  });
   return NextResponse.json({
     status: "ok",
     web3_daemon_supervisor: web3DaemonSupervisor,
@@ -136,6 +143,7 @@ export async function GET() {
     web3_operator_runbook: buildWeb3OperatorRunbookHealth(web3Runbook),
     web3_live_activation: buildWeb3LiveActivationPlanHealth(web3LiveActivationPlan),
     web3_live_autonomy_readiness: buildWeb3LiveAutonomyReadinessHealth(web3State),
+    web3_live_ignition: buildWeb3LiveIgnitionHealth(web3LiveIgnition),
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
     web3_credential_requirements: buildWeb3CredentialRequirementsHealth(web3CredentialRequirements),

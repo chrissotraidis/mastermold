@@ -576,8 +576,8 @@ export function Web3LiveCanaryConsole({
               <ShieldCheck aria-hidden="true" className="size-4 text-outline" />
             </div>
             <ul className="mt-2 grid gap-1.5 text-[11px] leading-4 text-on-surface-variant">
-              {(actionReceipt?.blockers ?? unsignedReceipt?.blockers ?? preflightReceipt?.blockers ?? canaryReceipt.blockers).slice(0, 4).map((blocker) => (
-                <li key={blocker}>{blocker}</li>
+              {(actionReceipt?.blockers ?? unsignedReceipt?.blockers ?? preflightReceipt?.blockers ?? canaryReceipt.blockers).slice(0, 4).map((blocker, blockerIndex) => (
+                <li key={`${blockerIndex}-${blocker}`}>{blocker}</li>
               ))}
             </ul>
           </div>

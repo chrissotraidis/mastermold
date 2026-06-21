@@ -278,6 +278,17 @@ async function verifyHealth() {
   assert(json.web3_live_autonomy_readiness.private_key_storage === "blocked", "Live-autonomy readiness health should keep private-key storage blocked.", json.web3_live_autonomy_readiness);
   assert(json.web3_live_autonomy_readiness.seed_phrase_storage === "blocked", "Live-autonomy readiness health should keep seed-phrase storage blocked.", json.web3_live_autonomy_readiness);
   assert(json.web3_live_autonomy_readiness.secret_echo_permission === "blocked", "Live-autonomy readiness health should keep secret echo blocked.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_ignition?.mode === "web3-live-ignition-health", "Health endpoint should expose compact Web3 live ignition health.", json.web3_live_ignition);
+  assert(["blocked", "supervised-canary-ready", "canary-proven", "autonomy-ready"].includes(json.web3_live_ignition.status), "Live ignition health should expose a known status.", json.web3_live_ignition);
+  assert(json.web3_live_ignition.source_endpoint.includes("/api/web3-live-ignition"), "Live ignition health should link its standalone endpoint.", json.web3_live_ignition);
+  assert(
+    json.web3_live_ignition.live_review_source_endpoint === "/api/web3-live-ignition?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Live ignition health should expose the live-review ignition endpoint separately.",
+    json.web3_live_ignition,
+  );
+  assert(json.web3_live_ignition.can_autonomously_trade_real_money_now === false, "Live ignition health should keep autonomous real-money trading false in default verification.", json.web3_live_ignition);
+  assert(json.web3_live_ignition.actual_live_trade_tested === false, "Live ignition health should not claim a funded live canary in default verification.", json.web3_live_ignition);
+  assert(typeof json.web3_live_ignition.blocker_count === "number", "Live ignition health should expose blocker count.", json.web3_live_ignition);
   assert(json.web3_live_usability?.mode === "web3-live-usability-health", "Health endpoint should expose compact Web3 live-usability health.", json.web3_live_usability);
   assert(
     ["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(json.web3_live_usability.status),
@@ -327,7 +338,7 @@ async function verifyHealth() {
   assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
-  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, and live-usability locks are blocked");
+  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, and live-usability locks are blocked");
 }
 
 async function verifyOperatorWalletScope() {
@@ -1383,6 +1394,34 @@ async function verifyLiveTradeCanary() {
   record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}; preflight, signed payload, and unsigned handoff actions blocked safely`);
 }
 
+async function verifyLiveIgnition() {
+  const { response, json } = await requestJson("/api/web3-live-ignition?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Live ignition should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-live-ignition", "Live ignition should expose the expected mode.", json);
+  assert(["blocked", "supervised-canary-ready", "canary-proven", "autonomy-ready"].includes(json.status), "Live ignition should expose a known status.", json);
+  assertReceiptHash("Live ignition", json.receipt_hash);
+  assert(json.can_autonomously_trade_real_money_now === false, "Live ignition should not claim autonomous real-money trading in default verification.", json);
+  assert(json.actual_live_trade_tested === false, "Live ignition should not claim a funded live canary in default verification.", json);
+  assert(json.real_funds_moved_by_this_app === false, "Live ignition should not claim real funds moved in default verification.", json);
+  assert(json.first_trade_path === "blocked", "Live ignition should keep first live trade path blocked in default verification.", json);
+  assert(Array.isArray(json.checks) && json.checks.map((check) => check.id).join(",") === "live-scope,wallet-scope,route-order,signer-relay,autonomy-gate,canary-proof,safety-boundary", "Live ignition should expose the ordered ignition checks.", json.checks);
+  assert(json.checks.every((check) => ["pass", "watch", "fail"].includes(check.status) && check.detail && check.next_action && check.evidence_endpoint), "Live ignition checks should be actionable.", json.checks);
+  assert(json.checks.some((check) => check.id === "canary-proof" && check.status === "fail" && check.detail.includes("No funded live trade")), "Live ignition should name the missing funded canary proof.", json.checks);
+  assert(Array.isArray(json.blockers) && json.blockers.join(" ").includes("No funded live trade has been tested by this app yet"), "Live ignition should include missing canary evidence in blockers.", json.blockers);
+  assert(String(json.verifier_command ?? "").includes("verify:web3"), "Live ignition should expose the strict verifier command.", json);
+  assert(String(json.canary_endpoint ?? "").includes("/api/web3-live-trade-canary"), "Live ignition should link the live canary receipt.", json);
+  assert(String(json.unsigned_handoff_endpoint ?? "").includes("/api/web3-live-unsigned-order-handoff"), "Live ignition should link the unsigned handoff receipt.", json);
+  assert(String(json.live_usability_endpoint ?? "").includes("rows=all"), "Live ignition should link the full live-usability blocker board.", json);
+  assert(json.transaction_submission_permission === "blocked", "Live ignition must keep transaction submission blocked by default.", json);
+  assert(json.live_execution_permission === "blocked", "Live ignition must keep live execution blocked by default.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Live ignition must keep wallet mutation blocked.", json);
+  assert(json.private_key_storage === "blocked", "Live ignition must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "Live ignition must block seed-phrase storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Live ignition must block secret echo.", json);
+  assertNoLeak("live ignition", json);
+  record("live-ignition", "pass", `${json.status}; autonomous real-money trading: ${json.can_autonomously_trade_real_money_now}; actual live trade tested: ${json.actual_live_trade_tested}`);
+}
+
 async function verifyResearchAnswerIntake() {
   const answer = [
     "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
@@ -1653,6 +1692,7 @@ async function main() {
   await verifyLiveActivationPlanPacket();
   await verifyLiveActivationIntake();
   await verifyLiveTradeCanary();
+  await verifyLiveIgnition();
   await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();

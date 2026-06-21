@@ -19,6 +19,7 @@ import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wallet-packet/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LIVE_AUTONOMY_READINESS_GET } from "@/app/api/web3-live-autonomy-readiness/route";
+import { GET as LIVE_IGNITION_GET } from "@/app/api/web3-live-ignition/route";
 import { GET as LIVE_USABILITY_BLOCKERS_GET } from "@/app/api/web3-live-usability-blockers/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
@@ -1805,6 +1806,17 @@ describe("Web3 autonomous trading subsystem", () => {
         seed_phrase_storage: string;
         secret_echo_permission: string;
       };
+      web3_live_ignition: {
+        mode: string;
+        status: string;
+        source_endpoint: string;
+        live_review_source_endpoint: string;
+        can_autonomously_trade_real_money_now: boolean;
+        can_start_supervised_canary_now: boolean;
+        actual_live_trade_tested: boolean;
+        next_gate_label: string | null;
+        blocker_count: number;
+      };
       web3_live_usability: {
         mode: string;
         current_input: {
@@ -1996,6 +2008,13 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_autonomy_readiness.private_key_storage).toBe("blocked");
     expect(receipt.web3_live_autonomy_readiness.seed_phrase_storage).toBe("blocked");
     expect(receipt.web3_live_autonomy_readiness.secret_echo_permission).toBe("blocked");
+    expect(receipt.web3_live_ignition.mode).toBe("web3-live-ignition-health");
+    expect(["blocked", "supervised-canary-ready", "canary-proven", "autonomy-ready"]).toContain(receipt.web3_live_ignition.status);
+    expect(receipt.web3_live_ignition.source_endpoint).toContain("/api/web3-live-ignition");
+    expect(receipt.web3_live_ignition.live_review_source_endpoint).toBe("/api/web3-live-ignition?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_live_ignition.can_autonomously_trade_real_money_now).toBe(false);
+    expect(receipt.web3_live_ignition.actual_live_trade_tested).toBe(false);
+    expect(receipt.web3_live_ignition.blocker_count).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.mode).toBe("web3-live-usability-health");
     expect(receipt.web3_live_usability.current_input).not.toBeNull();
     expect(receipt.web3_live_usability.current_input).toMatchObject({
@@ -2119,6 +2138,102 @@ describe("Web3 autonomous trading subsystem", () => {
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("source must be sample or live-dex");
+  });
+
+  test("GIVEN the bot wants to ignite real-money trading WHEN the live ignition route runs THEN it returns one strict go/no-go receipt", async () => {
+    const response = await LIVE_IGNITION_GET(new Request("http://localhost/api/web3-live-ignition?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      source: string;
+      account: string;
+      scenario: string;
+      can_autonomously_trade_real_money_now: boolean;
+      can_start_supervised_canary_now: boolean;
+      actual_live_trade_tested: boolean;
+      real_funds_moved_by_this_app: boolean;
+      first_trade_path: string;
+      next_gate_id: string | null;
+      next_gate_label: string | null;
+      next_action: string;
+      blocker_count: number;
+      blockers: string[];
+      checks: Array<{
+        id: string;
+        label: string;
+        status: string;
+        detail: string;
+        next_action: string;
+        evidence_endpoint: string;
+      }>;
+      verifier_command: string;
+      canary_endpoint: string;
+      unsigned_handoff_endpoint: string;
+      live_usability_endpoint: string;
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-live-ignition");
+    expect(receipt.status).toBe("blocked");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.source).toBe("live-dex");
+    expect(receipt.account).toBe("persistent");
+    expect(receipt.scenario).toBe("breakout");
+    expect(receipt.can_autonomously_trade_real_money_now).toBe(false);
+    expect(receipt.can_start_supervised_canary_now).toBe(false);
+    expect(receipt.actual_live_trade_tested).toBe(false);
+    expect(receipt.real_funds_moved_by_this_app).toBe(false);
+    expect(receipt.first_trade_path).toBe("blocked");
+    expect(receipt.next_gate_id).not.toBeNull();
+    expect(receipt.next_gate_label?.length).toBeGreaterThan(0);
+    expect(receipt.next_action.length).toBeGreaterThan(0);
+    expect(receipt.blocker_count).toBeGreaterThan(0);
+    expect(receipt.blockers.join(" ")).toContain("No funded live trade has been tested by this app yet");
+    expect(receipt.checks.map((check) => check.id)).toEqual([
+      "live-scope",
+      "wallet-scope",
+      "route-order",
+      "signer-relay",
+      "autonomy-gate",
+      "canary-proof",
+      "safety-boundary",
+    ]);
+    expect(receipt.checks.every((check) =>
+      ["pass", "watch", "fail"].includes(check.status) &&
+      check.detail.length > 0 &&
+      check.next_action.length > 0 &&
+      check.evidence_endpoint.length > 0
+    )).toBe(true);
+    expect(receipt.checks.find((check) => check.id === "canary-proof")).toMatchObject({
+      status: "fail",
+      detail: "No funded live trade has been tested by this app yet.",
+    });
+    expect(receipt.verifier_command).toContain("verify:web3");
+    expect(receipt.verifier_command).toContain("--require-operator-wallet");
+    expect(receipt.canary_endpoint).toContain("/api/web3-live-trade-canary");
+    expect(receipt.unsigned_handoff_endpoint).toContain("/api/web3-live-unsigned-order-handoff");
+    expect(receipt.live_usability_endpoint).toContain("rows=all");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.join(" ")).toContain("bot-facing go/no-go");
+    expect(receipt.controls.join(" ")).toContain("does not sign");
+
+    const invalid = await LIVE_IGNITION_GET(new Request("http://localhost/api/web3-live-ignition?account=hot-wallet"));
+    const invalidReceipt = await json<{ error: string }>(invalid);
+    expect(invalid.status).toBe(422);
+    expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");
   });
 
   test("GIVEN an operator needs one go-live packet WHEN the live activation plan route runs THEN it orders safe milestones without activation authority", async () => {

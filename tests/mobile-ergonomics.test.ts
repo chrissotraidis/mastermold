@@ -816,6 +816,18 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("no secrets here");
     expect(tradingPage).toContain("This command board is paper and read-only evidence.");
     expect(tradingPage).toContain("cannot sign, submit, store wallet authority, or mutate balances");
+    expect(tradingPage).toContain("LiveIgnitionPanel");
+    expect(tradingPage).toContain("Live ignition gate");
+    expect(tradingPage).toContain("Autonomous live trading is blocked");
+    expect(tradingPage).toContain("Open ignition JSON");
+    expect(tradingPage).toContain("Trading live ignition checks");
+    expect(tradingPage).toContain("This is a read-only go/no-go contract for the bot.");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("web3-live-ignition");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("can_autonomously_trade_real_money_now");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("No funded live trade has been tested by this app yet.");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("bot-facing go/no-go");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("Private keys, seed phrases");
+    expect(source("app/api/web3-live-ignition/route.ts")).toContain("buildWeb3LiveIgnitionReceipt");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("web3-live-usability-blockers");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("what is left before real-money Web3 usability");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("cutover setup blocker");
@@ -1728,6 +1740,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyLiveTradeCanary");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-trade-canary?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-trade-canary");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyLiveIgnition");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-ignition?source=live-dex&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-ignition");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3-live-unsigned-order-preflight");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("unsafe preflight");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchAnswerIntake");
@@ -1744,6 +1759,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveActivationPlanHealth");
     expect(source("app/api/health/route.ts")).toContain("web3_live_autonomy_readiness");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveAutonomyReadinessHealth");
+    expect(source("app/api/health/route.ts")).toContain("web3_live_ignition");
+    expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveIgnitionHealth");
     expect(source("app/api/health/route.ts")).toContain("web3_live_usability");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth");
     expect(source("app/api/web3-live-activation-plan/route.ts")).toContain("buildWeb3LiveActivationPlan");
@@ -1753,6 +1770,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("buildWeb3LiveUnsignedOrderHandoffReceipt");
     expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("buildWeb3LiveUnsignedOrderPreflightReceipt");
     expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("safePreflightQueryKeys");
+    expect(source("app/api/web3-live-ignition/route.ts")).toContain("buildWeb3LiveIgnitionReceipt");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("web3-live-unsigned-order-handoff");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("web3-live-unsigned-order-preflight");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("can_request_one_shot_unsigned_order");

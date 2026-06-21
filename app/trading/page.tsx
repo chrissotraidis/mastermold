@@ -20,6 +20,7 @@ import { buildWeb3OperatorRunbook, type Web3OperatorRunbookReceipt } from "@/src
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
+import { buildWeb3LiveIgnitionReceipt, type Web3LiveIgnitionCheck, type Web3LiveIgnitionReceipt } from "@/src/db/web3-live-ignition";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
@@ -119,6 +120,11 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     currentInput: operatorRequestPacket.current_input,
   });
   const liveTradeCanary = buildWeb3LiveTradeCanaryReceipt(initialState);
+  const liveIgnition = buildWeb3LiveIgnitionReceipt({
+    state: initialState,
+    liveUsability: liveUsabilityBlockers,
+    canary: liveTradeCanary,
+  });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -136,6 +142,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
 
         <div className="w-full min-w-0 space-y-4">
           <TradingSourceSwitch source={source} account={account} />
+          <LiveIgnitionPanel receipt={liveIgnition} />
           <Web3LiveCanaryConsole
             receipt={liveTradeCanary}
             source={source}
@@ -219,6 +226,103 @@ function TradingSourceSwitch({
       </p>
     </section>
   );
+}
+
+function LiveIgnitionPanel({ receipt }: { receipt: Web3LiveIgnitionReceipt }) {
+  const leadingChecks = [
+    ...receipt.checks.filter((check) => check.status === "fail"),
+    ...receipt.checks.filter((check) => check.status === "watch"),
+    ...receipt.checks.filter((check) => check.status === "pass"),
+  ].slice(0, 4);
+  const canaryHref = `/api/web3-live-ignition?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`;
+
+  return (
+    <section
+      aria-labelledby="web3-live-ignition-title"
+      className="rounded-md border border-critical/25 bg-critical/[0.025] p-4 sm:p-5"
+    >
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.86fr)_minmax(22rem,1fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Live ignition gate</p>
+              <h2 id="web3-live-ignition-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
+                {receipt.can_autonomously_trade_real_money_now
+                  ? "Autonomous live trading can be reviewed"
+                  : receipt.can_start_supervised_canary_now
+                    ? "Supervised canary is ready"
+                    : "Autonomous live trading is blocked"}
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">{receipt.next_action}</p>
+            </div>
+            <span className={liveIgnitionStatusClassName(receipt.status)}>
+              {receipt.status.replaceAll("-", " ")}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <LiveUsabilityStat label="Autonomy" value={receipt.can_autonomously_trade_real_money_now ? "ready" : "blocked"} tone={receipt.can_autonomously_trade_real_money_now ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Canary" value={receipt.actual_live_trade_tested ? "tested" : "untested"} tone={receipt.actual_live_trade_tested ? "engine" : "critical"} />
+            <LiveUsabilityStat label="First path" value={receipt.first_trade_path.replaceAll("-", " ")} tone={receipt.first_trade_path === "blocked" ? "critical" : "caution"} />
+            <LiveUsabilityStat label="Blockers" value={`${receipt.blocker_count}`} tone={receipt.blocker_count > 0 ? "critical" : "engine"} />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={canaryHref}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open ignition JSON
+            </Link>
+            <Link
+              href="/settings/integrations#settings-web3-credentials-runway"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+            >
+              Fix live gates
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-outline">
+            This is a read-only go/no-go contract for the bot. It cannot sign, submit, store wallet authority, custody funds, mutate wallets, echo secrets, or count paper trades as live money.
+          </p>
+        </div>
+
+        <div className="grid min-w-0 gap-2" aria-label="Trading live ignition checks">
+          {leadingChecks.map((check) => (
+            <div key={check.id} className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface/55 p-2.5 sm:grid-cols-[minmax(0,0.44fr)_minmax(0,1fr)]">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={liveIgnitionCheckClassName(check.status)}>{check.status}</span>
+                  <p className="text-xs font-semibold text-on-surface">{check.label}</p>
+                </div>
+                <Link href={check.evidence_endpoint} className="mt-1 block truncate text-[11px] leading-4 text-outline transition hover:text-engine">
+                  {check.evidence_endpoint}
+                </Link>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] leading-4 text-on-surface-variant">{check.detail}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{check.next_action}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function liveIgnitionStatusClassName(status: Web3LiveIgnitionReceipt["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "autonomy-ready" || status === "canary-proven") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "supervised-canary-ready") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
+function liveIgnitionCheckClassName(status: Web3LiveIgnitionCheck["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
 function TradingSourceLink({
@@ -1029,8 +1133,8 @@ function LiveAutonomyReadinessPanel({
             <div className="mt-3 rounded-md border border-critical/20 bg-critical/[0.025] p-3">
               <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Blocking real-capital autonomy</p>
               <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-on-surface-variant">
-                {readiness.blockers.slice(0, 4).map((blocker) => (
-                  <li key={blocker}>{blocker}</li>
+                {readiness.blockers.slice(0, 4).map((blocker, blockerIndex) => (
+                  <li key={`${blockerIndex}-${blocker}`}>{blocker}</li>
                 ))}
               </ul>
             </div>
