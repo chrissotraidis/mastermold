@@ -1260,6 +1260,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Go to wallet field");
     expect(settingsConsole).toContain("settings-web3-wallet-public-key");
     expect(settingsConsole).toContain("Verifier after save");
+    expect(settingsPage).toContain("initialLiveUsability={liveUsabilityBlockers}");
+    expect(settingsConsole).toContain("Web3LiveUsabilityBlockersReceipt");
+    expect(settingsConsole).toContain("fetchLiveUsabilityBlockers");
+    expect(settingsConsole).toContain("/api/web3-live-usability-blockers?");
+    expect(settingsConsole).toContain("Settings Web3 what is left after latest action");
+    expect(settingsConsole).toContain("What is left after latest action");
+    expect(settingsConsole).toContain("Refresh blockers");
+    expect(settingsConsole).toContain("Inputs open");
+    expect(settingsConsole).toContain("Real blockers");
+    expect(settingsConsole).toContain("This receipt refreshes after wallet scope");
     expect(settingsPage).toContain("nextOperatorInputLabel={operatorRequestPacket.next_input?.label");
     expect(settingsConsole).toContain("Provider evidence");
     expect(settingsConsole).toContain("Public wallet scope");

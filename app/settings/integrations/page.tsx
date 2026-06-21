@@ -567,6 +567,7 @@ function Web3CredentialsRunwayCard({
               dailySpendCapUsd={state.execution_readiness.config.daily_spend_cap_usd}
               maxSlippageBps={state.execution_readiness.config.max_slippage_bps}
               jupiterConfigured={receipt.environment_summary.jupiter_configured}
+              initialLiveUsability={liveUsabilityBlockers}
               scenario={state.scenario}
               source={state.market_source.mode}
               account={state.paper_account.mode}

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Save, ShieldCheck, Terminal, Wallet, Zap } from "lucide-react";
+import { Activity, RefreshCw, Save, ShieldCheck, Terminal, Wallet, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
 import type { Web3DexDiscoveryReceipt } from "@/src/db/web3-dex-discovery";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
+import type { Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import type { Web3LocalCredentialInstallReceipt } from "@/src/db/web3-local-credential-install";
 import type { Web3TradingState } from "@/src/db/web3-trading";
 import type { Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
@@ -23,6 +24,7 @@ type SettingsWeb3CredentialConsoleProps = {
   dailySpendCapUsd: number;
   maxSlippageBps: number;
   jupiterConfigured: boolean;
+  initialLiveUsability: Web3LiveUsabilityBlockersReceipt;
   scenario: string;
   source: string;
   account: string;
@@ -91,6 +93,7 @@ export function SettingsWeb3CredentialConsole({
   dailySpendCapUsd,
   maxSlippageBps,
   jupiterConfigured,
+  initialLiveUsability,
   scenario,
   source,
   account,
@@ -124,7 +127,7 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"credentials" | "dex" | "install" | "jupiter" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
+  const [busy, setBusy] = useState<"blockers" | "credentials" | "dex" | "install" | "jupiter" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [browserWallet, setBrowserWallet] = useState<BrowserWalletReceipt | null>(null);
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
@@ -132,6 +135,7 @@ export function SettingsWeb3CredentialConsole({
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
   const [localInstallReceipt, setLocalInstallReceipt] = useState<Web3LocalCredentialInstallReceipt | null>(null);
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveCapitalPreflightReceipt | null>(null);
+  const [liveUsabilityReceipt, setLiveUsabilityReceipt] = useState<Web3LiveUsabilityBlockersReceipt>(initialLiveUsability);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
 
@@ -167,6 +171,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setCredentialResult(payload);
       setMessage(payload.summary);
+      void refreshLiveUsabilityBlockers({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Credential test failed.");
     } finally {
@@ -260,6 +265,7 @@ export function SettingsWeb3CredentialConsole({
         production_restart_policy_url: "",
       }));
       setMessage(payload.summary);
+      void refreshLiveUsabilityBlockers({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Local credential install failed.");
     } finally {
@@ -292,6 +298,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setJupiterReceipt(payload);
       setMessage(payload.narrative);
+      void refreshLiveUsabilityBlockers({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Jupiter rehearsal failed.");
     } finally {
@@ -316,6 +323,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setDexReceipt(payload);
       setMessage(payload.summary);
+      void refreshLiveUsabilityBlockers({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "DEX scanner test failed.");
     } finally {
@@ -340,6 +348,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setPreflightReceipt(payload);
       setMessage(payload.summary);
+      void refreshLiveUsabilityBlockers({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live-capital preflight failed.");
     } finally {
@@ -448,6 +457,7 @@ export function SettingsWeb3CredentialConsole({
       }));
       setOwnershipReceipt(payload);
       setMessage(payload.summary);
+      void refreshLiveUsabilityBlockers({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Wallet ownership proof failed.");
     } finally {
@@ -497,11 +507,57 @@ export function SettingsWeb3CredentialConsole({
         walletPreview: previewValue(payload.execution_readiness.config.wallet_public_key),
         updatedAt: payload.execution_readiness.config.updated_at,
       });
-      setMessage("Public wallet scope and dry-run caps are saved for Web3 rehearsal. Live execution remains blocked by the launch checklist.");
+      try {
+        const updatedBlockers = await fetchLiveUsabilityBlockers();
+        setLiveUsabilityReceipt(updatedBlockers);
+        setMessage(`Public wallet scope and dry-run caps are saved. What is left: ${updatedBlockers.next_unlock_step?.label ?? updatedBlockers.summary}.`);
+      } catch (refreshError) {
+        setMessage(refreshError instanceof Error
+          ? `Public wallet scope and dry-run caps are saved, but the what-is-left refresh failed: ${refreshError.message}`
+          : "Public wallet scope and dry-run caps are saved, but the what-is-left refresh failed.");
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Public scope could not be saved.");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function fetchLiveUsabilityBlockers() {
+    const params = new URLSearchParams({
+      scenario,
+      source: "live-dex",
+      account,
+      cycles: String(cycles),
+    });
+    const response = await fetch(`/api/web3-live-usability-blockers?${params.toString()}`);
+    const payload = (await response.json().catch(() => null)) as Web3LiveUsabilityBlockersReceipt | { error: string } | null;
+    if (!response.ok || !payload || "error" in payload) {
+      throw new Error(payload && "error" in payload ? payload.error : "What-is-left refresh failed.");
+    }
+    return payload;
+  }
+
+  async function refreshLiveUsabilityBlockers({ announce = true }: { announce?: boolean } = {}) {
+    const previousBusy = busy;
+    if (announce) {
+      setBusy("blockers");
+      setMessage("Refreshing the consolidated Web3 what-is-left receipt...");
+    }
+    try {
+      const payload = await fetchLiveUsabilityBlockers();
+      setLiveUsabilityReceipt(payload);
+      if (announce) {
+        setMessage(`What is left refreshed: ${payload.summary}`);
+      }
+    } catch (error) {
+      if (announce) {
+        setMessage(error instanceof Error ? error.message : "What-is-left refresh failed.");
+      }
+    } finally {
+      if (announce && previousBusy === null) {
+        setBusy(null);
+      }
     }
   }
 
@@ -909,6 +965,38 @@ export function SettingsWeb3CredentialConsole({
       <p className="mt-2 rounded-md border border-outline-variant/30 bg-void/20 p-2 text-xs leading-5 text-on-surface-variant" aria-live="polite">
         {message}
       </p>
+
+      <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.035] p-3" aria-label="Settings Web3 what is left after latest action">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">What is left after latest action</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">
+              {liveUsabilityReceipt.next_unlock_step?.label ?? liveUsabilityReceipt.status.replaceAll("-", " ")}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              {liveUsabilityReceipt.next_unlock_step?.next_action ?? liveUsabilityReceipt.next_action}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void refreshLiveUsabilityBlockers()}
+            disabled={disabled}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-caution/40 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <RefreshCw className={cn("size-3.5 shrink-0", busy === "blockers" && "animate-spin")} aria-hidden="true" />
+            {busy === "blockers" ? "Refreshing" : "Refresh blockers"}
+          </button>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+          <ConsoleMetric label="Inputs open" value={`${liveUsabilityReceipt.open_operator_input_count}`} tone={liveUsabilityReceipt.open_operator_input_count > 0 ? "caution" : "engine"} />
+          <ConsoleMetric label="Real blockers" value={`${liveUsabilityReceipt.real_capital_blocker_count}`} tone={liveUsabilityReceipt.real_capital_blocker_count > 0 ? "critical" : "engine"} />
+          <ConsoleMetric label="Live lanes" value={`${liveUsabilityReceipt.ready_live_lane_count}/${liveUsabilityReceipt.total_live_lane_count}`} tone={liveUsabilityReceipt.ready_live_lane_count === liveUsabilityReceipt.total_live_lane_count ? "engine" : "caution"} />
+          <ConsoleMetric label="Safe actions" value={`${liveUsabilityReceipt.safe_action_count}`} tone={liveUsabilityReceipt.safe_action_count > 0 ? "engine" : "neutral"} />
+        </div>
+        <p className="mt-2 text-xs leading-5 text-outline">
+          This receipt refreshes after wallet scope, provider checks, DEX tests, Jupiter rehearsal, wallet proof, and preflight. It names the next safe operator step only; live execution, signing, submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.
+        </p>
+      </div>
 
       <div className="mt-3 rounded-md border border-engine/25 bg-surface-dim/25 p-3" aria-label="Strict Web3 verifier runway">
         <div className="flex flex-wrap items-start justify-between gap-2">
