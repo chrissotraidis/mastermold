@@ -591,6 +591,8 @@ async function verifyWalletOwnershipReceipt() {
   assert(typeof challenge.json.message === "string" && challenge.json.message.includes(proofWalletPublicKey), "Wallet ownership challenge should include the public wallet in text.", challenge.json);
   assert(challenge.json.message_return === "returned-for-signing", "Wallet ownership challenge should return text only for signing.", challenge.json);
   assert(challenge.json.message_storage === "not-stored", "Wallet ownership challenge should not store the raw message.", challenge.json);
+  assert(typeof challenge.json.challenge_expires_at === "string", "Wallet ownership challenge should expose an expiry timestamp.", challenge.json);
+  assert(challenge.json.challenge_max_age_seconds === 600, "Wallet ownership challenge should expire after 10 minutes.", challenge.json);
   assert(challenge.json.transaction_signing_permission === "blocked", "Wallet ownership challenge must not authorize transaction signing.", challenge.json);
   assert(challenge.json.transaction_submission_permission === "blocked", "Wallet ownership challenge must not authorize transaction submission.", challenge.json);
   assert(challenge.json.wallet_mutation_permission === "blocked", "Wallet ownership challenge must not authorize wallet mutation.", challenge.json);
@@ -617,6 +619,11 @@ async function verifyWalletOwnershipReceipt() {
   assert(json.transaction_signing_permission === "blocked", "Wallet ownership proof must keep transaction signing blocked.", json);
   assert(json.private_key_storage === "blocked", "Wallet ownership proof must block private-key storage.", json);
   assert(json.message_storage === "hash-only", "Wallet ownership proof should store only message hash evidence.", json);
+  assert(typeof json.challenge_issued_at === "string", "Wallet ownership proof should record the challenge issue time.", json);
+  assert(typeof json.challenge_expires_at === "string", "Wallet ownership proof should record the challenge expiry time.", json);
+  assert(typeof json.challenge_age_seconds === "number" && json.challenge_age_seconds >= 0 && json.challenge_age_seconds <= 600, "Wallet ownership proof should report a fresh challenge age.", json);
+  assert(json.challenge_fresh === true, "Wallet ownership proof should mark the challenge fresh.", json);
+  assert(json.challenge_max_age_seconds === 600, "Wallet ownership proof should expose the freshness window.", json);
   assert(typeof json.receipt_hash === "string" && json.receipt_hash.length === 64, "Wallet ownership proof should include a receipt hash.", json);
   assert(!text.includes(message), "Wallet ownership proof response should not return the raw challenge message.", json);
   assert(!text.includes(signatureBase64), "Wallet ownership proof response should not return the raw signature.", json);
@@ -656,7 +663,24 @@ async function verifyWalletOwnershipReceipt() {
   assert(invalid.json.signature_verified === false, "Invalid wallet ownership signature should not verify.", invalid.json);
   assert(invalid.json.live_execution_permission === "blocked", "Invalid ownership receipt must keep live execution blocked.", invalid.json);
   assert(invalid.json.wallet_mutation_permission === "blocked", "Invalid ownership receipt must keep wallet mutation blocked.", invalid.json);
-  record("wallet-ownership-receipt", "pass", "text-only Ed25519 proof verifies with hash-only output");
+
+  const staleMessage = [
+    "Mastermind Web3 wallet ownership challenge",
+    `Wallet: ${proofWalletPublicKey}`,
+    "Purpose: prove public wallet control only",
+    "No transaction signing or wallet mutation is authorized.",
+    `Issued: ${new Date(Date.now() - 11 * 60 * 1_000).toISOString()}`,
+  ].join("\n");
+  const staleSignature = await subtle.sign({ name: "Ed25519" }, keyPair.privateKey, new TextEncoder().encode(staleMessage));
+  const stale = await postJson("/api/web3-wallet-ownership", {
+    wallet_public_key: proofWalletPublicKey,
+    message: staleMessage,
+    signature_base64: Buffer.from(staleSignature).toString("base64"),
+    provider: "readiness-local-ed25519",
+  });
+  assert(stale.response.status === 422, "Stale wallet ownership challenge should be rejected.", stale.json);
+  assert(String(stale.json?.error ?? "").includes("expired"), "Stale wallet ownership challenge should return the expiry reason.", stale.json);
+  record("wallet-ownership-receipt", "pass", "fresh text-only Ed25519 proof verifies with hash-only output; stale challenges are rejected");
 }
 
 async function verifyCredentialValidateOnly() {

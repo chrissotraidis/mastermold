@@ -67,6 +67,7 @@ import {
   type MemecoinMarket,
   type Web3TradingState,
 } from "@/src/db/web3-trading";
+import { buildWalletOwnershipChallenge } from "@/src/db/web3-wallet-ownership";
 import { __resetStoreForTests } from "@/src/db/store";
 
 let prevDb: string | undefined;
@@ -5636,6 +5637,8 @@ describe("Web3 autonomous trading subsystem", () => {
       private_key_storage: string;
       seed_phrase_storage: string;
       secret_echo_permission: string;
+      challenge_expires_at: string | null;
+      challenge_max_age_seconds: number;
       controls: string[];
     }>(challengeResponse);
     expect(challengeResponse.status).toBe(200);
@@ -5646,6 +5649,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(challengeReceipt.message).toContain("No transaction signing or wallet mutation is authorized.");
     expect(challengeReceipt.message_return).toBe("returned-for-signing");
     expect(challengeReceipt.message_storage).toBe("not-stored");
+    expect(challengeReceipt.challenge_expires_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(challengeReceipt.challenge_max_age_seconds).toBe(600);
     expect(challengeReceipt.transaction_signing_permission).toBe("blocked");
     expect(challengeReceipt.transaction_submission_permission).toBe("blocked");
     expect(challengeReceipt.live_execution_permission).toBe("blocked");
@@ -5654,6 +5659,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(challengeReceipt.seed_phrase_storage).toBe("blocked");
     expect(challengeReceipt.secret_echo_permission).toBe("blocked");
     expect(challengeReceipt.controls.some((control) => control.includes("plain text"))).toBe(true);
+    expect(challengeReceipt.controls.some((control) => control.includes("10 minutes"))).toBe(true);
     const malformedChallengeRequest = await WALLET_OWNERSHIP_GET(new Request("http://localhost/api/web3-wallet-ownership?wallet_public_key=not-a-wallet"));
     expect(malformedChallengeRequest.status).toBe(422);
 
@@ -5678,6 +5684,11 @@ describe("Web3 autonomous trading subsystem", () => {
       receipt_hash: string;
       wallet_public_key_preview: string;
       challenge_hash: string;
+      challenge_issued_at: string | null;
+      challenge_expires_at: string | null;
+      challenge_age_seconds: number | null;
+      challenge_fresh: boolean;
+      challenge_max_age_seconds: number;
       signature_hash: string;
       signature_verified: boolean;
       live_execution_permission: string;
@@ -5696,6 +5707,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.signature_verified).toBe(true);
     expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.challenge_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.challenge_issued_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(receipt.challenge_expires_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(receipt.challenge_age_seconds).toBeGreaterThanOrEqual(0);
+    expect(receipt.challenge_fresh).toBe(true);
+    expect(receipt.challenge_max_age_seconds).toBe(600);
     expect(receipt.signature_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.wallet_public_key_preview).toBe(`${walletPublicKey.slice(0, 8)}...${walletPublicKey.slice(-4)}`);
     expect(receipt.live_execution_permission).toBe("blocked");
@@ -5706,6 +5722,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.secret_echo_permission).toBe("blocked");
     expect(receipt.message_storage).toBe("hash-only");
     expect(receipt.controls.some((control) => control.includes("text-only"))).toBe(true);
+    expect(receipt.controls.some((control) => control.includes("10 minutes"))).toBe(true);
     expect(JSON.stringify(receipt)).not.toContain(message);
     expect(JSON.stringify(receipt)).not.toContain(signatureBase64);
 
@@ -5786,6 +5803,22 @@ describe("Web3 autonomous trading subsystem", () => {
       }),
     }));
     expect(malformedChallenge.status).toBe(422);
+
+    const staleMessage = buildWalletOwnershipChallenge(walletPublicKey, new Date(Date.now() - 11 * 60 * 1_000).toISOString());
+    const staleSignature = await globalThis.crypto.subtle.sign({ name: "Ed25519" }, keyPair.privateKey, new TextEncoder().encode(staleMessage));
+    const staleChallenge = await WALLET_OWNERSHIP_POST(new Request("http://localhost/api/web3-wallet-ownership", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        wallet_public_key: walletPublicKey,
+        message: staleMessage,
+        signature_base64: bytesToBase64ForTest(staleSignature),
+        provider: "test-browser-wallet",
+      }),
+    }));
+    const staleReceipt = await json<{ error: string }>(staleChallenge);
+    expect(staleChallenge.status).toBe(422);
+    expect(staleReceipt.error).toContain("expired");
   });
 
   test("GIVEN a paper trading state WHEN the agent scores markets THEN it buys strong setups and blocks unsafe launches", () => {

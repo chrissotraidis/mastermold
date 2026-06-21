@@ -170,7 +170,7 @@ answers. `verify:web3` is a Node-only
 operator check for machines without Bun: against a running app, it snapshots the saved
 public wallet/risk scope, proves health receipts, execution input validation, public-wallet
 dry-run scope save, credential validate-only redaction, text-only `/api/web3-wallet-ownership`
-receipt boundaries, manual live-review packet boundaries, deterministic DEX discovery receipt
+freshness and receipt boundaries, manual live-review packet boundaries, deterministic DEX discovery receipt
 boundaries, one-shot Jupiter rehearsal redaction, live canary preflight, private-field rejection, and the live
 execution/wallet mutation locks, then restores the saved public wallet/risk scope before exit. Add
 `--require-jupiter-order` after a `JUPITER_API_KEY`
@@ -323,7 +323,9 @@ It also exposes `Prove wallet` in the same live canary console, using the existi
 `/api/web3-wallet-ownership` flow so the operator can clear the next wallet-control gate without a
 transaction signature, private key, seed phrase, wallet mutation, or fund movement. That flow now
 starts with a server-issued `GET /api/web3-wallet-ownership?wallet_public_key=...` challenge
-receipt, then stores only hashes after the browser wallet signs the text challenge.
+receipt, expires that text challenge after 10 minutes, rejects stale or future-dated ownership
+messages, then stores only hashes plus issue/expiry/age metadata after the browser wallet signs the
+text challenge.
 Trading also exposes `Check wallet` beside `Prove wallet`; it fetches the same text-only challenge
 receipt for the connected or saved dedicated wallet without asking for a signature, blocks mismatched
 connected wallets, and refreshes the first-canary drill so the wallet-control gate can be diagnosed
