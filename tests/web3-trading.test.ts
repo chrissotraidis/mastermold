@@ -1536,6 +1536,15 @@ describe("Web3 autonomous trading subsystem", () => {
           seed_phrase_storage: string;
           secret_echo_permission: string;
         } | null;
+        next_blocker: {
+          id: string;
+          label: string;
+          owner: string;
+          source: string;
+          status: string;
+          next_action: string;
+          blocks_live_capital: boolean;
+        } | null;
         live_execution_permission: string;
         wallet_mutation_permission: string;
         transaction_submission_permission: string;
@@ -1623,6 +1632,14 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_usability.current_input?.target_names.join(" ")).not.toContain("test-");
     expect(receipt.web3_live_usability.current_input?.safe_collection_surface.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.current_input?.storage.length).toBeGreaterThan(0);
+    expect(receipt.web3_live_usability.next_blocker).toMatchObject({
+      id: "cutover:dedicated-trading-wallet",
+      label: "Dedicated trading wallet",
+      owner: "operator",
+      source: "cutover",
+      blocks_live_capital: true,
+    });
+    expect(receipt.web3_live_usability.next_blocker?.next_action.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.live_execution_permission).toBe("blocked");
     expect(receipt.web3_live_usability.wallet_mutation_permission).toBe("blocked");
     expect(receipt.web3_live_usability.transaction_submission_permission).toBe("blocked");
@@ -1656,6 +1673,15 @@ describe("Web3 autonomous trading subsystem", () => {
         secret_echo_permission: string;
       } | null;
       next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string } | null;
+      next_blocker: {
+        id: string;
+        label: string;
+        owner: string;
+        source: string;
+        status: string;
+        next_action: string;
+        blocks_live_capital: boolean;
+      } | null;
       operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; real_capital_blocker_count: number; first_label: string; next_action: string; sources: string[] }>;
@@ -1718,6 +1744,14 @@ describe("Web3 autonomous trading subsystem", () => {
       id: "cutover:dedicated-trading-wallet",
       label: "Dedicated trading wallet",
     });
+    expect(receipt.next_blocker).toMatchObject({
+      id: receipt.missing_for_live_usability[0].id,
+      label: receipt.missing_for_live_usability[0].label,
+      owner: "operator",
+      source: "cutover",
+      blocks_live_capital: true,
+    });
+    expect(receipt.next_blocker?.next_action).toBe(receipt.missing_for_live_usability[0].next_action);
     expect(receipt.missing_owner_summary[0]).toMatchObject({
       owner: "operator",
       first_label: "Dedicated trading wallet",
@@ -1747,6 +1781,7 @@ describe("Web3 autonomous trading subsystem", () => {
       total_live_usability_row_count: number;
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
+      next_blocker: { id: string; label: string; owner: string; source: string; status: string; next_action: string; blocks_live_capital: boolean } | null;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; first_label: string; next_action: string }>;
       missing_source_summary: Array<{ source: string; missing_count: number; first_label: string; next_action: string }>;
@@ -1762,6 +1797,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.listed_live_usability_row_count).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_for_live_usability.length).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_for_live_usability.length).toBeGreaterThanOrEqual(receipt.missing_for_live_usability.length);
+    expect(allRowsReceipt.next_blocker?.id).toBe(allRowsReceipt.missing_for_live_usability[0].id);
+    expect(allRowsReceipt.next_blocker?.label).toBe(allRowsReceipt.missing_for_live_usability[0].label);
     expect(allRowsReceipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.credential_doctor.status).toBe(receipt.credential_doctor.status);

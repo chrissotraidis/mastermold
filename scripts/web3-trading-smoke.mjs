@@ -142,6 +142,9 @@ async function main() {
   assert(health.web3_live_usability.total_live_usability_row_count >= health.web3_live_usability.listed_live_usability_row_count, "Live-usability health listed rows should not exceed total rows.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.next_unlock_step_label === "string" && health.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next unlock step.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.next_unlock_step_action === "string" && health.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", health.web3_live_usability);
+  assert(health.web3_live_usability.next_blocker?.id === "cutover:dedicated-trading-wallet", "Live-usability health should expose the next dependency-ranked blocker.", health.web3_live_usability);
+  assert(health.web3_live_usability.next_blocker?.owner === "operator" && health.web3_live_usability.next_blocker?.source === "cutover", "Live-usability health next blocker should expose owner/source routing.", health.web3_live_usability.next_blocker);
+  assert(health.web3_live_usability.next_blocker?.blocks_live_capital === true, "Live-usability health next blocker should preserve live-capital blocking status.", health.web3_live_usability.next_blocker);
   assert(health.web3_live_usability.current_input?.live_execution_permission === "blocked", "Live-usability health should expose a locked current input contract.", health.web3_live_usability);
   assert(Array.isArray(health.web3_live_usability.current_input.target_names), "Live-usability health current input should expose safe target names.", health.web3_live_usability.current_input);
   assert(health.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", health.web3_live_usability);

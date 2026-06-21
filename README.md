@@ -196,7 +196,7 @@ live-review source endpoint, verifier command, and blocked live-execution/signin
 The research health summary names the exact source/account/scenario packet being summarized and separately
 points at the live-dex persistent export packet for helper research. The live-usability
 summary carries the same receipt hash, missing-input counts, total-versus-listed live-usability row counts,
-live-lane counts, next ordered unlock step, next action, current
+live-lane counts, next ordered unlock step, next dependency blocker, next action, current
 safe input contract, and blocked live-execution/signing/wallet/secret permissions without
 returning secrets or transaction bytes.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for

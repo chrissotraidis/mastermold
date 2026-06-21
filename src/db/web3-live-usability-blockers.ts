@@ -49,6 +49,16 @@ export type Web3LiveUsabilityCredentialDoctorSummary = {
   receipt_hash: string | null;
 };
 
+export type Web3LiveUsabilityNextBlocker = {
+  id: string;
+  label: string;
+  owner: Web3LiveUsabilityBlockerOwner;
+  source: Web3LiveUsabilityMissingItem["source"];
+  status: Web3LiveUsabilityMissingItem["status"];
+  next_action: string;
+  blocks_live_capital: boolean;
+};
+
 export type Web3LiveUsabilityBlockersReceipt = {
   mode: "web3-live-usability-blockers";
   status:
@@ -90,6 +100,7 @@ export type Web3LiveUsabilityBlockersReceipt = {
     safe_collection_surface: string;
     storage: string;
   } | null;
+  next_blocker: Web3LiveUsabilityNextBlocker | null;
   next_unlock_step: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number] | null;
   next_action: string;
   summary: string;
@@ -146,6 +157,7 @@ export type Web3LiveUsabilityBlockersHealth = {
   credential_doctor_receipt_fresh: boolean;
   credential_doctor_blocked_count: number;
   credential_doctor_next_action: string;
+  next_blocker: Web3LiveUsabilityNextBlocker | null;
   next_action: string;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -200,6 +212,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   const ownerSummary = summarizeMissingByOwner(missing);
   const sourceSummary = summarizeMissingBySource(missing);
   const credentialDoctor = summarizeCredentialDoctor(input.credentialDoctor ?? getWeb3CredentialDoctorHealth());
+  const nextBlocker = summarizeNextBlocker(missing[0]);
   const verifierCommands = Array.from(new Set([
     ...input.runbook.verifier_commands,
     ...input.manualLiveReview.safe_commands,
@@ -243,6 +256,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
         storage: input.cutover.next_safe_input.storage,
       }
       : null,
+    next_blocker: nextBlocker,
     next_unlock_step: nextUnlockStep,
     next_action: liveUsabilityNextAction(status, input, missing),
     summary: liveUsabilitySummary(status, input, missing, autonomousLive?.detail),
@@ -316,6 +330,7 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     credential_doctor_receipt_fresh: receipt.credential_doctor.receipt_fresh,
     credential_doctor_blocked_count: receipt.credential_doctor.blocked_count,
     credential_doctor_next_action: receipt.credential_doctor.next_action,
+    next_blocker: receipt.next_blocker,
     next_action: receipt.next_action,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -324,6 +339,19 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     private_key_storage: "blocked",
     seed_phrase_storage: "blocked",
     secret_echo_permission: "blocked",
+  };
+}
+
+function summarizeNextBlocker(item: Web3LiveUsabilityMissingItem | undefined): Web3LiveUsabilityNextBlocker | null {
+  if (!item) return null;
+  return {
+    id: item.id,
+    label: item.label,
+    owner: item.owner,
+    source: item.source,
+    status: item.status,
+    next_action: item.next_action,
+    blocks_live_capital: item.blocks_live_capital,
   };
 }
 

@@ -278,6 +278,7 @@ function TradingCommandBoard({
         : "neutral";
   const nextUnlockStep = liveUsabilityBlockers.next_unlock_step;
   const currentInput = liveUsabilityBlockers.current_input;
+  const nextBlocker = liveUsabilityBlockers.next_blocker;
   const settingsFixHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet" || nextUnlockStep?.id === "scope-wallet"
     ? "/settings/integrations#settings-web3-wallet-public-key"
     : "/settings/integrations#settings-web3-credentials-runway";
@@ -401,6 +402,21 @@ function TradingCommandBoard({
               <CommandBoardMetric label="Signoffs" value={`${liveUsabilityBlockers.passed_signoff_count}/${liveUsabilityBlockers.required_signoff_count}`} detail={`${liveUsabilityBlockers.failed_or_watch_signoff_count} open`} tone={liveUsabilityBlockers.failed_or_watch_signoff_count > 0 ? "caution" : "engine"} />
               <CommandBoardMetric label="Actions" value={`${liveUsabilityBlockers.safe_action_count}`} detail={`${liveUsabilityBlockers.gated_action_count} gated`} tone="engine" />
             </div>
+            {nextBlocker ? (
+              <div className="mt-2 rounded-md border border-critical/20 bg-critical/[0.025] p-2" aria-label="Trading next dependency blocker">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Next blocker</p>
+                    <p className="mt-1 text-xs font-semibold text-on-surface">{nextBlocker.label}</p>
+                  </div>
+                  <span className={liveUsabilityMissingStatusClassName(nextBlocker.status)}>{nextBlocker.status}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{nextBlocker.next_action}</p>
+                <p className="mt-1 truncate text-[10px] leading-4 text-outline">
+                  {nextBlocker.owner.replaceAll("-", " ")} · {nextBlocker.source.replaceAll("-", " ")} · {nextBlocker.blocks_live_capital ? "blocks live capital" : "review item"}
+                </p>
+              </div>
+            ) : null}
             {currentInput ? (
               <div className="mt-2 rounded-md border border-caution/25 bg-caution/[0.04] p-2" aria-label="Trading current input contract">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -866,6 +882,7 @@ function LiveUsabilityBlockersPanel({
   const ownerSummary = receipt.missing_owner_summary.slice(0, 4);
   const sourceSummary = receipt.missing_source_summary.slice(0, 4);
   const currentInput = receipt.current_input;
+  const nextBlocker = receipt.next_blocker;
   const currentInputHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet"
     ? "/settings/integrations#settings-web3-wallet-public-key"
     : "/settings/integrations#settings-web3-credentials-runway";
@@ -907,6 +924,22 @@ function LiveUsabilityBlockersPanel({
               Showing {receipt.listed_live_usability_row_count}/{receipt.total_live_usability_row_count} rows here; open the JSON for every dependency-ranked blocker.
             </p>
           </div>
+
+          {nextBlocker ? (
+            <div className="mt-2 rounded-md border border-critical/20 bg-critical/[0.025] p-3" aria-label="Live usability next dependency blocker">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Next dependency blocker</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{nextBlocker.label}</p>
+                </div>
+                <span className={liveUsabilityMissingStatusClassName(nextBlocker.status)}>{nextBlocker.status}</span>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-on-surface-variant">{nextBlocker.next_action}</p>
+              <p className="mt-1 truncate text-[11px] leading-4 text-outline">
+                {nextBlocker.owner.replaceAll("-", " ")} · {nextBlocker.source.replaceAll("-", " ")} · {nextBlocker.blocks_live_capital ? "blocks live capital" : "review item"}
+              </p>
+            </div>
+          ) : null}
 
           {currentInput ? (
             <div className="mt-2 rounded-md border border-caution/25 bg-caution/[0.04] p-3" aria-label="Live usability current input contract">
