@@ -394,7 +394,7 @@ function firstCanarySafeSurface(
   },
 ) {
   if (lane.id === "dedicated-wallet") return "/settings/integrations#settings-web3-wallet-public-key";
-  if (lane.id === "wallet-ownership") return "/settings/integrations#web3-credential-action-console";
+  if (lane.id === "wallet-ownership") return "/trading?source=live-dex&account=persistent";
   if (lane.id === "jupiter-order") return "/settings/integrations#web3-credential-action-console";
   if (lane.id === "live-flags") return "/settings/integrations#web3-credential-action-console";
   if (lane.id === "unsigned-order-preflight") return "/trading?source=live-dex&account=persistent";
