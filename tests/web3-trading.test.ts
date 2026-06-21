@@ -29,6 +29,7 @@ import { GET as OPERATOR_REQUEST_PACKET_GET } from "@/app/api/web3-operator-requ
 import { GET as OPERATOR_RUNBOOK_GET } from "@/app/api/web3-operator-runbook/route";
 import { GET as CREDENTIAL_DOCTOR_GET, POST as CREDENTIAL_DOCTOR_POST } from "@/app/api/web3-credential-doctor/route";
 import { GET as CREDENTIAL_REQUIREMENTS_GET } from "@/app/api/web3-credential-requirements/route";
+import { GET as LIVE_ACTIVATION_INTAKE_GET, POST as LIVE_ACTIVATION_INTAKE_POST } from "@/app/api/web3-live-activation-intake/route";
 import { GET as LIVE_ACTIVATION_PLAN_GET } from "@/app/api/web3-live-activation-plan/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
@@ -2202,6 +2203,141 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.secret_echo_permission).toBe("blocked");
 
     const invalid = await LIVE_ACTIVATION_PLAN_GET(new Request("http://localhost/api/web3-live-activation-plan?account=hot-wallet"));
+    const invalidReceipt = await json<{ error: string }>(invalid);
+    expect(invalid.status).toBe(422);
+    expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");
+  });
+
+  test("GIVEN safe activation facts WHEN live activation intake runs THEN it validates readiness without accepting secrets or authority", async () => {
+    const schemaResponse = await LIVE_ACTIVATION_INTAKE_GET();
+    const schema = await json<{
+      mode: string;
+      endpoint: string;
+      accepted_fields: string[];
+      never_provide: string[];
+      live_execution_permission: string;
+    }>(schemaResponse);
+    expect(schemaResponse.status).toBe(200);
+    expect(schema.mode).toBe("web3-live-activation-intake-schema");
+    expect(schema.endpoint).toBe("/api/web3-live-activation-intake");
+    expect(schema.accepted_fields).toContain("wallet_public_key");
+    expect(schema.never_provide.join(" ")).toContain("Seed phrase");
+    expect(schema.live_execution_permission).toBe("blocked");
+
+    const safeWallet = "9xQeWvG816bUx9EPfYQ4mKZ8sPXc6zQnK9j8vY9J3F3";
+    const safeResponse = await LIVE_ACTIVATION_INTAKE_POST(new Request("http://localhost/api/web3-live-activation-intake?scenario=breakout&source=sample&account=persistent&cycles=0", {
+      method: "POST",
+      body: JSON.stringify({
+        operator_ack: true,
+        wallet_public_key: safeWallet,
+        wallet_ownership_proof: "completed",
+        read_provider_rail: "configured",
+        jupiter_order_rail: "configured",
+        signer_policy: {
+          provider: "external-wallet",
+          policy_reviewed: true,
+        },
+        ops_emergency_stop: {
+          contact_configured: true,
+          drill_completed: true,
+          production_worker_targets: true,
+        },
+        accounting_ledger: {
+          export_target_configured: true,
+          settlement_reconciliation_ready: true,
+        },
+        risk_policy: {
+          max_trade_usd: 250,
+          daily_spend_cap_usd: 1000,
+          max_slippage_bps: 150,
+          kill_switch_tested: true,
+        },
+        manual_live_review: {
+          requested: true,
+          approved: false,
+        },
+      }),
+    }));
+    const safeReceipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      profile_hash: string;
+      activation_plan_hash: string;
+      operator_acknowledged: boolean;
+      safe_profile: {
+        wallet_public_key_preview: string | null;
+        wallet_public_key_valid: boolean;
+      };
+      accepted_milestone_count: number;
+      next_missing: { id: string; status: string } | null;
+      milestones: Array<{ id: string; status: string; blocks_live_capital: boolean }>;
+      activation_permitted: boolean;
+      can_trade_real_capital: boolean;
+      live_execution_permitted: boolean;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+    }>(safeResponse);
+    expect(safeResponse.status).toBe(200);
+    expect(safeReceipt.mode).toBe("web3-live-activation-intake");
+    expect(safeReceipt.status).toBe("missing-required");
+    expect(safeReceipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(safeReceipt.profile_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(safeReceipt.activation_plan_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(safeReceipt.operator_acknowledged).toBe(true);
+    expect(safeReceipt.safe_profile.wallet_public_key_valid).toBe(true);
+    expect(safeReceipt.safe_profile.wallet_public_key_preview).toContain("...");
+    expect(safeReceipt.safe_profile.wallet_public_key_preview).not.toBe(safeWallet);
+    expect(safeReceipt.accepted_milestone_count).toBeGreaterThanOrEqual(8);
+    expect(safeReceipt.milestones).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "dedicated-public-wallet", status: "provided", blocks_live_capital: true }),
+      expect.objectContaining({ id: "live-autonomy-final-gate", status: "external-review", blocks_live_capital: true }),
+    ]));
+    expect(safeReceipt.next_missing).not.toBeNull();
+    expect(["manual-live-review", "live-autonomy-final-gate"]).toContain(safeReceipt.next_missing?.id ?? "");
+    expect(safeReceipt.activation_permitted).toBe(false);
+    expect(safeReceipt.can_trade_real_capital).toBe(false);
+    expect(safeReceipt.live_execution_permitted).toBe(false);
+    expect(safeReceipt.live_execution_permission).toBe("blocked");
+    expect(safeReceipt.wallet_mutation_permission).toBe("blocked");
+    expect(safeReceipt.transaction_submission_permission).toBe("blocked");
+    expect(safeReceipt.signing_permission).toBe("blocked");
+    expect(safeReceipt.private_key_storage).toBe("blocked");
+    expect(safeReceipt.seed_phrase_storage).toBe("blocked");
+    expect(safeReceipt.secret_echo_permission).toBe("blocked");
+
+    const canary = "codex-private-key-canary-never-echo";
+    const unsafeResponse = await LIVE_ACTIVATION_INTAKE_POST(new Request("http://localhost/api/web3-live-activation-intake?scenario=breakout&source=sample&account=persistent&cycles=0", {
+      method: "POST",
+      body: JSON.stringify({
+        operator_ack: true,
+        wallet_public_key: safeWallet,
+        private_key: canary,
+      }),
+    }));
+    const unsafeText = await unsafeResponse.text();
+    expect(unsafeResponse.status).toBe(422);
+    expect(unsafeText).not.toContain(canary);
+    const unsafeReceipt = JSON.parse(unsafeText) as {
+      status: string;
+      unsafe_fields: string[];
+      live_execution_permission: string;
+      secret_echo_permission: string;
+    };
+    expect(unsafeReceipt.status).toBe("unsafe-rejected");
+    expect(unsafeReceipt.unsafe_fields).toContain("private_key");
+    expect(unsafeReceipt.live_execution_permission).toBe("blocked");
+    expect(unsafeReceipt.secret_echo_permission).toBe("blocked");
+
+    const invalid = await LIVE_ACTIVATION_INTAKE_POST(new Request("http://localhost/api/web3-live-activation-intake?account=hot-wallet", {
+      method: "POST",
+      body: JSON.stringify({ operator_ack: true }),
+    }));
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");

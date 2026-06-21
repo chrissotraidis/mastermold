@@ -1164,6 +1164,80 @@ async function verifyLiveActivationPlanPacket() {
   record("live-activation-plan", "pass", `${json.status}; ${json.milestones.length} milestones`);
 }
 
+async function verifyLiveActivationIntake() {
+  const schema = await requestJson("/api/web3-live-activation-intake?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(schema.response.status === 200, "Live activation intake schema should return 200.", { status: schema.response.status, json: schema.json });
+  assert(schema.json.mode === "web3-live-activation-intake-schema", "Live activation intake schema should expose the expected mode.", schema.json);
+  assert(schema.json.endpoint === "/api/web3-live-activation-intake", "Live activation intake schema should expose its endpoint.", schema.json);
+  assert(Array.isArray(schema.json.accepted_fields) && schema.json.accepted_fields.includes("wallet_public_key"), "Live activation intake schema should list the public wallet field.", schema.json);
+  assert(Array.isArray(schema.json.never_provide) && schema.json.never_provide.includes("Seed phrase or mnemonic"), "Live activation intake schema should keep seed phrase in never-provide list.", schema.json);
+  assert(schema.json.live_execution_permission === "blocked", "Live activation intake schema must keep live execution blocked.", schema.json);
+
+  const safeWallet = "9xQeWvG816bUx9EPfYQ4mKZ8sPXc6zQnK9j8vY9J3F3";
+  const safe = await postJson("/api/web3-live-activation-intake?source=sample&account=persistent&scenario=breakout&cycles=0", {
+    operator_ack: true,
+    wallet_public_key: safeWallet,
+    wallet_ownership_proof: "completed",
+    read_provider_rail: "configured",
+    jupiter_order_rail: "configured",
+    signer_policy: {
+      provider: "external-wallet",
+      policy_reviewed: true,
+    },
+    ops_emergency_stop: {
+      contact_configured: true,
+      drill_completed: true,
+      production_worker_targets: true,
+    },
+    accounting_ledger: {
+      export_target_configured: true,
+      settlement_reconciliation_ready: true,
+    },
+    risk_policy: {
+      max_trade_usd: 250,
+      daily_spend_cap_usd: 1000,
+      max_slippage_bps: 150,
+      kill_switch_tested: true,
+    },
+    manual_live_review: {
+      requested: true,
+      approved: false,
+    },
+  });
+  assert(safe.response.status === 200, "Live activation intake should accept safe readiness facts.", { status: safe.response.status, json: safe.json });
+  assert(safe.json.mode === "web3-live-activation-intake", "Live activation intake should expose the expected mode.", safe.json);
+  assert(safe.json.status === "missing-required", "Live activation intake should still require external review gates.", safe.json);
+  assertReceiptHash("Live activation intake", safe.json.receipt_hash);
+  assertReceiptHash("Live activation intake profile", safe.json.profile_hash);
+  assertReceiptHash("Live activation intake plan", safe.json.activation_plan_hash);
+  assert(safe.json.operator_acknowledged === true, "Live activation intake should record operator acknowledgement.", safe.json);
+  assert(safe.json.safe_profile?.wallet_public_key_valid === true, "Live activation intake should validate a non-sample public wallet.", safe.json.safe_profile);
+  assert(String(safe.json.safe_profile?.wallet_public_key_preview ?? "").includes("..."), "Live activation intake should preview, not echo, the public wallet.", safe.json.safe_profile);
+  assert(safe.json.accepted_milestone_count >= 8, "Live activation intake should count provided safe milestones.", safe.json);
+  assert(safe.json.milestones.some((item) => item.id === "dedicated-public-wallet" && item.status === "provided"), "Live activation intake should mark dedicated public wallet evidence provided.", safe.json.milestones);
+  assert(safe.json.milestones.some((item) => item.id === "live-autonomy-final-gate" && item.status === "external-review"), "Live activation intake should keep the final live-autonomy gate external.", safe.json.milestones);
+  assert(safe.json.activation_permitted === false, "Live activation intake must not permit activation.", safe.json);
+  assert(safe.json.can_trade_real_capital === false, "Live activation intake must keep real capital blocked.", safe.json);
+  assert(safe.json.live_execution_permission === "blocked", "Live activation intake must keep live execution blocked.", safe.json);
+  assert(safe.json.wallet_mutation_permission === "blocked", "Live activation intake must keep wallet mutation blocked.", safe.json);
+  assert(safe.json.transaction_submission_permission === "blocked", "Live activation intake must keep transaction submission blocked.", safe.json);
+  assert(safe.json.signing_permission === "blocked", "Live activation intake must keep signing blocked.", safe.json);
+  assert(safe.json.private_key_storage === "blocked", "Live activation intake must block private-key storage.", safe.json);
+  assert(safe.json.seed_phrase_storage === "blocked", "Live activation intake must block seed-phrase storage.", safe.json);
+  assert(safe.json.secret_echo_permission === "blocked", "Live activation intake must block secret echo.", safe.json);
+
+  const unsafe = await postJson("/api/web3-live-activation-intake?source=sample&account=persistent&scenario=breakout&cycles=0", {
+    operator_ack: true,
+    wallet_public_key: safeWallet,
+    private_key: CANARY_SECRET,
+  });
+  assert(unsafe.response.status === 422, "Live activation intake should reject unsafe fields.", { status: unsafe.response.status, json: unsafe.json });
+  assert(unsafe.json.status === "unsafe-rejected", "Live activation intake should identify unsafe rejection.", unsafe.json);
+  assert(Array.isArray(unsafe.json.unsafe_fields) && unsafe.json.unsafe_fields.includes("private_key"), "Live activation intake should name unsafe field paths only.", unsafe.json);
+  assertNoLeak("live activation unsafe intake", unsafe.json);
+  record("live-activation-intake", "pass", `${safe.json.accepted_milestone_count} safe milestones; unsafe fields rejected`);
+}
+
 async function verifyResearchAnswerIntake() {
   const answer = [
     "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
@@ -1432,6 +1506,7 @@ async function main() {
   await verifyResearchHandoffPacket();
   await verifyCredentialRequirementsPacket();
   await verifyLiveActivationPlanPacket();
+  await verifyLiveActivationIntake();
   await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();

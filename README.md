@@ -219,6 +219,12 @@ milestone, strict verifier commands, paste-ready Markdown, and compact `/api/hea
 to export the same redacted plan as Markdown, or add `--json` for the full receipt. It is an activation
 plan only: activation, live execution, signing, transaction submission, wallet mutation, private-key
 storage, seed-phrase storage, and secret echo remain blocked.
+`/api/web3-live-activation-intake` is the validate-only companion for that plan. `GET` returns the
+safe activation profile schema, and `POST` accepts only public wallet scope, readiness statuses,
+signer-provider mode, ops/accounting flags, risk caps, and manual-review flags. It rejects private
+keys, seed phrases, API keys, transaction bytes, signed payloads, and secret-looking fields, echoes
+only redacted readiness evidence, and still keeps live execution, signing, transaction submission,
+wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and a compact

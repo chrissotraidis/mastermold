@@ -818,6 +818,7 @@ function SettingsWeb3SetupPriorityCard({
 function SettingsWeb3LiveActivationPlanPanel({ plan }: { plan: Web3LiveActivationPlan }) {
   const nextMilestone = plan.next_milestone;
   const topMilestones = plan.milestones.slice(0, 5);
+  const intakeEndpoint = `/api/web3-live-activation-intake?source=${plan.source}&account=${plan.account}&scenario=${plan.scenario}&cycles=0`;
 
   return (
     <section
@@ -893,6 +894,23 @@ function SettingsWeb3LiveActivationPlanPanel({ plan }: { plan: Web3LiveActivatio
           Open JSON
           <ExternalLink aria-hidden="true" className="size-3.5" />
         </Link>
+        <Link
+          href={intakeEndpoint}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-caution/35 bg-caution/10 px-2 text-xs font-semibold text-caution transition hover:bg-caution/15"
+        >
+          Open intake schema
+          <ExternalLink aria-hidden="true" className="size-3.5" />
+        </Link>
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe activation intake</p>
+        <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+          Validate public wallet scope, readiness statuses, signer mode, ops/accounting status, and risk caps without accepting secrets or unlocking live wallet authority.
+        </p>
+        <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+          {`POST ${intakeEndpoint} {"operator_ack":true,"wallet_public_key":"<public-solana-address>","wallet_ownership_proof":"planned"}`}
+        </code>
       </div>
 
       <p className="mt-3 text-xs leading-5 text-outline">

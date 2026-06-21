@@ -1671,6 +1671,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-activation-plan?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-activation-plan");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("# Mastermind Web3 Live Activation Plan");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyLiveActivationIntake");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-activation-intake?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-activation-intake");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchAnswerIntake");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-research-answer-intake?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("implementation_decisions");
@@ -1688,6 +1691,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/health/route.ts")).toContain("web3_live_usability");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth");
     expect(source("app/api/web3-live-activation-plan/route.ts")).toContain("buildWeb3LiveActivationPlan");
+    expect(source("app/api/web3-live-activation-intake/route.ts")).toContain("buildWeb3LiveActivationIntakeReceipt");
+    expect(source("src/db/web3-live-activation-intake.ts")).toContain("unsafeKeyPatterns");
+    expect(source("src/db/web3-live-activation-intake.ts")).toContain("Provider API keys or bearer tokens");
+    expect(source("src/db/web3-live-activation-intake.ts")).toContain("live_execution_permission: \"blocked\"");
     expect(source("app/api/web3-live-autonomy-readiness/route.ts")).toContain("state.autonomous_live_autonomy_readiness");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_review_source_endpoint");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("current_input: Web3OperatorRequestPacket[\"current_input\"]");
@@ -1751,6 +1758,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/settings/integrations/page.tsx")).toContain("SettingsWeb3LiveActivationPlanPanel");
     expect(source("app/settings/integrations/page.tsx")).toContain("Live activation plan");
     expect(source("app/settings/integrations/page.tsx")).toContain("Copy activation plan");
+    expect(source("app/settings/integrations/page.tsx")).toContain("/api/web3-live-activation-intake");
+    expect(source("app/settings/integrations/page.tsx")).toContain("Open intake schema");
     expect(source("src/db/web3-operator-runbook.ts")).toContain("mode: \"web3-operator-runbook-health\"");
     expect(source("src/db/web3-operator-runbook.ts")).toContain("live_review_source_endpoint");
     expect(source("README.md")).toContain("web3_operator_runbook");
@@ -1758,6 +1767,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("/api/web3-live-autonomy-readiness");
     expect(source("README.md")).toContain("web3_live_activation");
     expect(source("README.md")).toContain("/api/web3-live-activation-plan");
+    expect(source("README.md")).toContain("/api/web3-live-activation-intake");
     expect(source("README.md")).toContain("activate:web3");
     expect(source("README.md")).toContain("live-review source endpoint");
     expect(source("README.md")).toContain("next dependency blocker");
