@@ -771,6 +771,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Command board");
     expect(tradingPage).toContain("WalletNetWorthCurve");
     expect(tradingPage).toContain("First-screen Web3 wallet net worth curve");
+    expect(tradingPage).toContain('const settingsFixHref = nextUnlockStep?.id === "scope-wallet"');
+    expect(tradingPage).toContain('"/settings/integrations#settings-web3-wallet-public-key"');
+    expect(tradingPage).toContain('"/settings/integrations#settings-web3-credentials-runway"');
+    expect(tradingPage).toContain("Fix wallet gate");
+    expect(tradingPage).toContain("Open setup step");
     expect(tradingPage).toContain("Can run");
     expect(tradingPage).toContain("Open blockers");
     expect(tradingPage).toContain("Preflight");

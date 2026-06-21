@@ -274,6 +274,11 @@ function TradingCommandBoard({
       : decision.route_refresh_required || decision.chart_proof_required || decision.status === "protect"
         ? "caution"
         : "neutral";
+  const nextUnlockStep = liveUsabilityBlockers.next_unlock_step;
+  const settingsFixHref = nextUnlockStep?.id === "scope-wallet"
+    ? "/settings/integrations#settings-web3-wallet-public-key"
+    : "/settings/integrations#settings-web3-credentials-runway";
+  const settingsFixLabel = nextUnlockStep?.id === "scope-wallet" ? "Fix wallet gate" : "Fix gates";
 
   return (
     <section
@@ -303,10 +308,10 @@ function TradingCommandBoard({
                 {decision.status.replaceAll("-", " ")}
               </span>
               <Link
-                href="/settings/integrations"
+                href={settingsFixHref}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15"
               >
-                Fix gates
+                {settingsFixLabel}
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
             </div>
@@ -392,16 +397,22 @@ function TradingCommandBoard({
               <CommandBoardMetric label="Signoffs" value={`${liveUsabilityBlockers.passed_signoff_count}/${liveUsabilityBlockers.required_signoff_count}`} detail={`${liveUsabilityBlockers.failed_or_watch_signoff_count} open`} tone={liveUsabilityBlockers.failed_or_watch_signoff_count > 0 ? "caution" : "engine"} />
               <CommandBoardMetric label="Actions" value={`${liveUsabilityBlockers.safe_action_count}`} detail={`${liveUsabilityBlockers.gated_action_count} gated`} tone="engine" />
             </div>
-            {liveUsabilityBlockers.next_unlock_step ? (
+            {nextUnlockStep ? (
               <div className="mt-2 rounded-md border border-engine/20 bg-engine/[0.035] p-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Next unlock step</p>
-                  <span className={operatorUnlockStepClassName(liveUsabilityBlockers.next_unlock_step.status)}>
-                    {liveUsabilityBlockers.next_unlock_step.status}
+                  <span className={operatorUnlockStepClassName(nextUnlockStep.status)}>
+                    {nextUnlockStep.status}
                   </span>
                 </div>
-                <p className="mt-1 text-xs font-semibold text-on-surface">{liveUsabilityBlockers.next_unlock_step.label}</p>
-                <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{liveUsabilityBlockers.next_unlock_step.next_action}</p>
+                <p className="mt-1 text-xs font-semibold text-on-surface">{nextUnlockStep.label}</p>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{nextUnlockStep.next_action}</p>
+                <Link
+                  href={settingsFixHref}
+                  className="mt-2 inline-flex min-h-10 items-center justify-center rounded-md border border-engine/30 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+                >
+                  Open setup step
+                </Link>
               </div>
             ) : null}
             <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">{liveUsabilityBlockers.next_action}</p>
