@@ -398,14 +398,14 @@ function firstCanarySafeSurface(
   },
 ) {
   if (lane.id === "dedicated-wallet") return "/settings/integrations#settings-web3-wallet-public-key";
-  if (lane.id === "wallet-ownership") return "/trading?source=live-dex&account=persistent";
+  if (lane.id === "wallet-ownership") return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
   if (lane.id === "jupiter-order") return "/settings/integrations#web3-credential-action-console";
   if (lane.id === "live-flags") return "/settings/integrations#web3-credential-action-console";
-  if (lane.id === "unsigned-order-preflight") return "/trading?source=live-dex&account=persistent";
+  if (lane.id === "unsigned-order-preflight") return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
   if (lane.id === "signer-relay") return input.readiness.canary_endpoint;
   if (lane.id === "manual-live-review") return "/api/web3-manual-live-review-packet?source=live-dex&account=persistent";
-  if (lane.id === "funded-canary-proof" || lane.id === "post-signing-proof") return "/trading?source=live-dex&account=persistent";
-  if (lane.id === "live-scope") return "/trading?source=live-dex&account=persistent";
+  if (lane.id === "funded-canary-proof" || lane.id === "post-signing-proof") return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
+  if (lane.id === "live-scope") return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
   return input.liveUsability.next_blocker?.href ?? lane.evidence_endpoint;
 }
 

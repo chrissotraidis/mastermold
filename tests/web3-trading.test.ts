@@ -2974,6 +2974,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("wallet-ownership");
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("jupiter-order");
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("unsigned-order-preflight");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "wallet-ownership")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "unsigned-order-preflight")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.some((step) => step.safe_surface.includes("/settings/integrations"))).toBe(true);
     expect(receipt.operator_unblock_plan.every((step) =>
       ["done", "next", "blocked", "watch"].includes(step.status) &&

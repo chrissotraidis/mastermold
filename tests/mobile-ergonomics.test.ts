@@ -1730,6 +1730,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-first-canary-drill?");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading refreshed first canary drill status");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading refreshed first canary ordered gates");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading first canary after current gate forecast");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Funds moved");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("After current gate");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("forecast only");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("These remain blocked until the current proof succeeds");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Paper trades, DEX reads, and Jupiter rehearsals do not count");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Sign tiny canary");
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-unsigned-order-handoff?");
@@ -1752,6 +1757,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("current_input_label");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("next_lane_id");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("operator_unblock_plan");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("/trading?source=live-dex&account=persistent#web3-live-canary-console");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("next_unblock_step");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("completion_signal");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("buildFirstCanaryUnblockPlan");

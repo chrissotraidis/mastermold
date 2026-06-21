@@ -319,6 +319,10 @@ The Trading live canary console refreshes the first-canary drill after wallet pr
 preflight, tiny-canary signing, proof checks, and manual receipt refresh, so the next unblock step,
 hard-fail count, proof count, and ordered gates stay current without treating paper trades, DEX
 reads, or Jupiter rehearsals as live-trade proof.
+It also shows the actual trade, funds moved, signed-relay, unsigned-order, hard-fail, and proof
+counts in one truth strip, plus an after-current-gate forecast so the operator can see the still
+blocked Jupiter, live-flag, unsigned-preflight, signer-relay, and post-signing proof runway without
+opening JSON.
 It also exposes `Prove wallet` in the same live canary console, using the existing text-only
 `/api/web3-wallet-ownership` flow so the operator can clear the next wallet-control gate without a
 transaction signature, private key, seed phrase, wallet mutation, or fund movement. That flow now

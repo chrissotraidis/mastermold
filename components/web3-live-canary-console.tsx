@@ -108,6 +108,15 @@ export function Web3LiveCanaryConsole({
     unsignedReceipt,
     actionReceipt,
   });
+  const firstCanaryCurrentIndex = firstCanaryDrillReceipt.next_unblock_step
+    ? firstCanaryDrillReceipt.operator_unblock_plan.findIndex((step) => step.id === firstCanaryDrillReceipt.next_unblock_step?.id)
+    : firstCanaryDrillReceipt.operator_unblock_plan.findIndex((step) => step.status === "next" || step.status === "watch");
+  const firstCanaryVisibleStart = Math.max(0, firstCanaryCurrentIndex);
+  const firstCanaryVisibleSteps = firstCanaryDrillReceipt.operator_unblock_plan.slice(firstCanaryVisibleStart, firstCanaryVisibleStart + 6);
+  const firstCanaryForecastSteps = firstCanaryDrillReceipt.operator_unblock_plan
+    .slice(firstCanaryVisibleStart + 1)
+    .filter((step) => step.status === "blocked")
+    .slice(0, 5);
 
   useEffect(() => {
     if (!autoProofMonitorEnabled || !sourceReady) return;
@@ -593,12 +602,14 @@ export function Web3LiveCanaryConsole({
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <CanaryMetric label="Actual trade" value={firstCanaryDrillReceipt.actual_live_trade_tested ? "yes" : "no"} tone={firstCanaryDrillReceipt.actual_live_trade_tested ? "engine" : "critical"} />
+              <CanaryMetric label="Funds moved" value={firstCanaryDrillReceipt.real_funds_moved_by_this_app ? "yes" : "no"} tone={firstCanaryDrillReceipt.real_funds_moved_by_this_app ? "engine" : "critical"} />
               <CanaryMetric label="Proof" value={`${firstCanaryDrillReceipt.proof_pass_count}/${firstCanaryDrillReceipt.proof_required_count}`} tone={firstCanaryDrillReceipt.actual_live_trade_tested ? "engine" : "critical"} />
-              <CanaryMetric label="Hard fails" value={`${firstCanaryDrillReceipt.hard_fail_count}`} tone={firstCanaryDrillReceipt.hard_fail_count > 0 ? "critical" : "engine"} />
+              <CanaryMetric label="Relay" value={firstCanaryDrillReceipt.signed_relay_status.replaceAll("-", " ")} tone={firstCanaryDrillReceipt.signed_relay_status === "confirmed" || firstCanaryDrillReceipt.signed_relay_status === "relayed" ? "engine" : "critical"} />
               <CanaryMetric label="Unsigned" value={firstCanaryDrillReceipt.can_request_unsigned_order_now ? "ready" : "blocked"} tone={firstCanaryDrillReceipt.can_request_unsigned_order_now ? "caution" : "critical"} />
+              <CanaryMetric label="Hard fails" value={`${firstCanaryDrillReceipt.hard_fail_count}`} tone={firstCanaryDrillReceipt.hard_fail_count > 0 ? "critical" : "engine"} />
             </div>
             <div className="mt-2 grid gap-1.5" aria-label="Trading refreshed first canary ordered gates">
-              {firstCanaryDrillReceipt.operator_unblock_plan.slice(0, 4).map((step) => (
+              {firstCanaryVisibleSteps.map((step) => (
                 <div key={step.id} className="grid gap-1 rounded-md border border-outline/15 bg-surface-dim/35 p-2 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
                   <div className="flex items-center gap-2">
                     <span className={firstCanaryUnblockStepClassName(step.status)}>{step.status}</span>
@@ -608,6 +619,31 @@ export function Web3LiveCanaryConsole({
                 </div>
               ))}
             </div>
+            {firstCanaryForecastSteps.length > 0 ? (
+              <div className="mt-2 rounded-md border border-caution/20 bg-caution/[0.04] p-2" aria-label="Trading first canary after current gate forecast">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">After current gate</p>
+                  <span className="rounded-md border border-caution/30 bg-caution/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-caution">
+                    forecast only
+                  </span>
+                </div>
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {firstCanaryForecastSteps.map((step) => (
+                    <Link
+                      key={step.id}
+                      href={step.safe_surface}
+                      className="grid min-h-[4.25rem] gap-1 rounded-md border border-outline/15 bg-surface-dim/35 p-2 transition hover:border-caution/35"
+                    >
+                      <span className="truncate text-[11px] font-semibold text-on-surface">{step.label}</span>
+                      <span className="line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{step.action}</span>
+                    </Link>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-outline">
+                  These remain blocked until the current proof succeeds; this panel is a read-only runway, not live-trade permission.
+                </p>
+              </div>
+            ) : null}
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
