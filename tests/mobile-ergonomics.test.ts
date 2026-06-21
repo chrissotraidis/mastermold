@@ -1567,6 +1567,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Funded canary still not proven");
     expect(source("components/web3-live-canary-console.tsx")).toContain("The only result that counts as a live test");
     expect(source("components/web3-live-canary-console.tsx")).toContain("buildCanaryLaunchSteps");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Prove wallet");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-wallet-ownership");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading wallet ownership receipt");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("No transaction signing or wallet mutation is authorized.");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary preflight");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary preflight receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("getTrustedBrowserWalletPublicKey");

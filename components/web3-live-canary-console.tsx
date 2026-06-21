@@ -5,6 +5,7 @@ import { ArrowRight, RefreshCw, ShieldCheck, Wallet, Zap } from "lucide-react";
 import Link from "next/link";
 import type { Web3LiveTradeCanaryActionReceipt, Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import type { Web3LiveUnsignedOrderHandoffReceipt, Web3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
+import type { Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
 import type { TradingAccountMode, TradingMarketSource, TradingScenario, Web3TradingState } from "@/src/db/web3-trading";
 
 type BrowserSolanaProvider = {
@@ -14,6 +15,7 @@ type BrowserSolanaProvider = {
   isConnected?: boolean;
   publicKey?: { toString: () => string };
   connect?: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: { toString: () => string } } | void>;
+  signMessage?: (message: Uint8Array, display?: "utf8" | "hex") => Promise<Uint8Array | { signature: Uint8Array }>;
   signTransaction?: (transaction: unknown) => Promise<unknown>;
 };
 
@@ -53,6 +55,7 @@ export function Web3LiveCanaryConsole({
   const [canaryReceipt, setCanaryReceipt] = useState(receipt);
   const [message, setMessage] = useState(receipt.next_action);
   const [busy, setBusy] = useState(false);
+  const [ownershipBusy, setOwnershipBusy] = useState(false);
   const [preflightBusy, setPreflightBusy] = useState(false);
   const [proofBusy, setProofBusy] = useState<"refresh" | "watchdog" | null>(null);
   const [autoProofMonitorEnabled, setAutoProofMonitorEnabled] = useState(false);
@@ -61,6 +64,7 @@ export function Web3LiveCanaryConsole({
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveUnsignedOrderPreflightReceipt | null>(null);
   const [unsignedReceipt, setUnsignedReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
   const [actionReceipt, setActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
+  const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
   const [walletPreview, setWalletPreview] = useState(previewValue(defaultWalletPublicKey));
 
   const params = new URLSearchParams({
@@ -248,6 +252,53 @@ export function Web3LiveCanaryConsole({
     }
   }
 
+  async function proveWalletOwnership() {
+    setOwnershipBusy(true);
+    setMessage("Requesting a text-only wallet ownership signature. This is not a transaction and cannot move funds...");
+    try {
+      const provider = getBrowserSolanaProvider();
+      if (!provider || typeof provider.signMessage !== "function") {
+        throw new Error("No browser wallet with message signing is available on this browser.");
+      }
+      let publicKey = provider.publicKey?.toString() ?? null;
+      if ((!publicKey || !isLikelySolanaPublicKey(publicKey)) && typeof provider.connect === "function") {
+        const result = await provider.connect();
+        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? null;
+      }
+      if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
+        throw new Error("Connect a valid public Solana wallet before proving ownership.");
+      }
+      setWalletPreview(previewValue(publicKey));
+      const challenge = buildWalletOwnershipChallenge(publicKey);
+      const signed = await provider.signMessage(new TextEncoder().encode(challenge), "utf8");
+      const signatureBytes = signed instanceof Uint8Array ? signed : signed.signature;
+      if (!(signatureBytes instanceof Uint8Array)) {
+        throw new Error("Wallet did not return a valid message signature.");
+      }
+      const response = await fetch("/api/web3-wallet-ownership", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          wallet_public_key: publicKey,
+          message: challenge,
+          signature_base64: bytesToBase64(signatureBytes),
+          provider: browserWalletProviderName(provider),
+        }),
+      });
+      const payload = await response.json().catch(() => null) as Web3WalletOwnershipReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Wallet ownership proof failed.");
+      }
+      setOwnershipReceipt(payload);
+      setMessage(payload.summary);
+      await refreshCanaryReceipt("auto");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Wallet ownership proof failed.");
+    } finally {
+      setOwnershipBusy(false);
+    }
+  }
+
   async function signTinyCanary() {
     setBusy(true);
     setMessage("Preparing the tiny SOL-to-USDC canary handoff for browser-wallet signing...");
@@ -364,7 +415,7 @@ export function Web3LiveCanaryConsole({
                 <button
                   type="button"
                   onClick={() => void runCanaryPreflight()}
-                  disabled={busy || preflightBusy}
+                  disabled={busy || ownershipBusy || preflightBusy}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/40 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
                 >
                   <ShieldCheck aria-hidden="true" className={preflightBusy ? "size-4 animate-pulse" : "size-4"} />
@@ -372,8 +423,17 @@ export function Web3LiveCanaryConsole({
                 </button>
                 <button
                   type="button"
+                  onClick={() => void proveWalletOwnership()}
+                  disabled={busy || ownershipBusy || preflightBusy}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
+                >
+                  <ShieldCheck aria-hidden="true" className={ownershipBusy ? "size-4 animate-pulse" : "size-4"} />
+                  {ownershipBusy ? "Proving wallet" : "Prove wallet"}
+                </button>
+                <button
+                  type="button"
                   onClick={() => void signTinyCanary()}
-                  disabled={busy || preflightBusy}
+                  disabled={busy || ownershipBusy || preflightBusy}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 text-sm font-semibold text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
                 >
                   <Wallet aria-hidden="true" className={busy ? "size-4 animate-pulse" : "size-4"} />
@@ -521,6 +581,27 @@ export function Web3LiveCanaryConsole({
               ))}
             </ul>
           </div>
+
+          {ownershipReceipt ? (
+            <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Trading wallet ownership receipt">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Wallet ownership</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{ownershipReceipt.status}</p>
+                </div>
+                <span className={evidenceStatusClassName(ownershipReceipt.signature_verified ? "pass" : "fail")}>
+                  {ownershipReceipt.signature_verified ? "verified" : "not verified"}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <CanaryMetric label="Wallet" value={ownershipReceipt.wallet_public_key_preview} tone={ownershipReceipt.signature_verified ? "engine" : "caution"} />
+                <CanaryMetric label="Message" value={ownershipReceipt.message_storage} tone="neutral" />
+                <CanaryMetric label="Tx signing" value={ownershipReceipt.transaction_signing_permission} tone="neutral" />
+                <CanaryMetric label="Submit" value={ownershipReceipt.transaction_submission_permission} tone="neutral" />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-outline">{ownershipReceipt.next_action}</p>
+            </div>
+          ) : null}
 
           {preflightReceipt ? (
             <div className="rounded-md border border-caution/25 bg-caution/[0.04] p-3" aria-label="Trading live canary preflight receipt">
@@ -714,6 +795,14 @@ function getBrowserSolanaProvider(): BrowserSolanaProvider | null {
   return maybeWindow.solana ?? maybeWindow.phantom?.solana ?? maybeWindow.solflare ?? maybeWindow.backpack ?? null;
 }
 
+function browserWalletProviderName(provider: BrowserSolanaProvider | null) {
+  if (!provider) return "none";
+  if (provider.isPhantom) return "Phantom";
+  if (provider.isSolflare) return "Solflare";
+  if (provider.isBackpack) return "Backpack";
+  return "Solana wallet";
+}
+
 async function getTrustedBrowserWalletPublicKey() {
   const provider = getBrowserSolanaProvider();
   if (!provider) return null;
@@ -743,6 +832,16 @@ function bytesToBase64(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return window.btoa(binary);
+}
+
+function buildWalletOwnershipChallenge(walletPublicKey: string) {
+  return [
+    "Mastermind Web3 wallet ownership challenge",
+    `Wallet: ${walletPublicKey}`,
+    "Purpose: prove public wallet control only",
+    "No transaction signing or wallet mutation is authorized.",
+    `Issued: ${new Date().toISOString()}`,
+  ].join("\n");
 }
 
 function serializeSignedWalletTransaction(value: unknown): Uint8Array | null {
