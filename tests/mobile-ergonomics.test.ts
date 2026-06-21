@@ -813,8 +813,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Live trading command center");
     expect(tradingPage).toContain("No real trade tested yet");
     expect(tradingPage).toContain("Open live cockpit");
-    expect(tradingPage).toContain("Proof gate command");
-    expect(tradingPage).toContain("proof watcher fails until a signed canary lands");
+    expect(tradingPage).toContain("Canary drill commands");
+    expect(tradingPage).toContain("drill first, then prove a signed canary");
     expect(tradingPage).toContain("Trading live command next blocker");
     expect(tradingPage).toContain("Trading live proof command");
     expect(tradingPage).toContain("cannot sign, submit, store wallet authority, or move funds");
@@ -1657,6 +1657,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading unsigned canary receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading signed canary relay receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("VersionedTransaction.deserialize");
+    expect(source("package.json")).toContain("\"drill-canary:web3\": \"node scripts/web3-first-canary-drill.mjs\"");
+    expect(source("README.md")).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json");
+    expect(source("app/trading/page.tsx")).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json");
+    expect(source("scripts/web3-first-canary-drill.mjs")).toContain("mode: \"web3-first-canary-drill\"");
+    expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run drill-canary:web3 command");
     expect(source("package.json")).toContain("\"prove-canary:web3\": \"node scripts/web3-live-canary-proof.mjs\"");
     expect(source("README.md")).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");

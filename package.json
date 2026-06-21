@@ -23,6 +23,7 @@
     "research:web3": "node scripts/web3-research-handoff.mjs",
     "requirements:web3": "node scripts/web3-credential-requirements.mjs",
     "activate:web3": "node scripts/web3-live-activation-plan.mjs",
+    "drill-canary:web3": "node scripts/web3-first-canary-drill.mjs",
     "prove-canary:web3": "node scripts/web3-live-canary-proof.mjs",
     "repair-accountability:web3": "node scripts/web3-local-accountability-repair.mjs",
     "preflight-live:web3": "node scripts/web3-live-capital-preflight.mjs",

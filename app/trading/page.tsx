@@ -498,6 +498,7 @@ function LiveCanaryCommandCenter({
   const nextCredential = blockers.next_credential_request;
   const nextBlocker = blockers.next_blocker;
   const nextCanaryLane = readiness.lanes.find((lane) => lane.id === readiness.next_lane_id);
+  const drillCommand = "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json";
   const proofCommand = "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json";
   const liveHref = "/trading?source=live-dex&account=persistent";
   const proofHref = `/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=${canary.scenario}&cycles=0`;
@@ -593,9 +594,9 @@ function LiveCanaryCommandCenter({
           <details className="rounded-md border border-outline/15 bg-surface-dim/40 p-3" aria-label="Trading live proof command">
             <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Proof gate command</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Canary drill commands</p>
                 <p className="mt-1 text-sm font-semibold text-on-surface">
-                  {canaryProven ? "strict canary proof can be reviewed" : "proof watcher fails until a signed canary lands"}
+                  {canaryProven ? "strict canary proof can be reviewed" : "drill first, then prove a signed canary"}
                 </p>
               </div>
               <span className={supervisedCanaryStatusClassName(readiness.status)}>
@@ -603,10 +604,13 @@ function LiveCanaryCommandCenter({
               </span>
             </summary>
             <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+              {drillCommand}
+            </code>
+            <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
               {proofCommand}
             </code>
             <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-outline">
-              The command cannot sign, submit, store wallet authority, or move funds; it only watches signed-relay, confirmation, settlement, and portfolio mirror proof.
+              The drill cannot sign, submit, store wallet authority, or move funds; the proof watcher fails until signed-relay, confirmation, settlement, and portfolio mirror proof are real.
             </p>
           </details>
 
