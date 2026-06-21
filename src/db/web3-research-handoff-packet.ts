@@ -102,6 +102,7 @@ export type Web3ResearchHandoffHealth = {
   strategy_review_question_count: number;
   open_operator_input_count: number;
   live_capital_blocker_count: number;
+  current_input: Web3OperatorRequestPacket["current_input"];
   next_question: string;
   next_operator_input: string;
   next_unlock_step_label: string | null;
@@ -260,6 +261,7 @@ export function buildWeb3ResearchHandoffHealth(packet: Web3ResearchHandoffPacket
     strategy_review_question_count: strategyReviewQuestions.length,
     open_operator_input_count: packet.open_operator_inputs.length,
     live_capital_blocker_count: packet.live_capital_blockers.length,
+    current_input: packet.current_input,
     next_question: firstQuestion?.question ?? "No research questions are open.",
     next_operator_input: packet.open_operator_inputs[0]?.next_action ?? "No required operator input is open.",
     next_unlock_step_label: packet.next_unlock_step?.label ?? null,

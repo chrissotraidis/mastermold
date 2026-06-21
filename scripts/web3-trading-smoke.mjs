@@ -108,6 +108,8 @@ async function main() {
   assert(typeof health.web3_research_handoff.next_question === "string" && health.web3_research_handoff.next_question.length > 0, "Research handoff health should expose the next research question.", health.web3_research_handoff);
   assert(typeof health.web3_research_handoff.next_unlock_step_label === "string" && health.web3_research_handoff.next_unlock_step_label.length > 0, "Research handoff health should expose the next unlock step.", health.web3_research_handoff);
   assert(typeof health.web3_research_handoff.next_unlock_step_action === "string" && health.web3_research_handoff.next_unlock_step_action.length > 0, "Research handoff health should expose the next unlock action.", health.web3_research_handoff);
+  assert(health.web3_research_handoff.current_input?.live_execution_permission === "blocked", "Research handoff health should expose a locked current input contract.", health.web3_research_handoff);
+  assert(Array.isArray(health.web3_research_handoff.current_input.target_names), "Research handoff health current input should expose safe target names.", health.web3_research_handoff.current_input);
   assert(health.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", health.web3_research_handoff);
   assert(health.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", health.web3_research_handoff);
   assert(health.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", health.web3_research_handoff);
@@ -121,6 +123,8 @@ async function main() {
   assert(health.web3_live_usability.total_live_usability_row_count >= health.web3_live_usability.listed_live_usability_row_count, "Live-usability health listed rows should not exceed total rows.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.next_unlock_step_label === "string" && health.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next unlock step.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.next_unlock_step_action === "string" && health.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", health.web3_live_usability);
+  assert(health.web3_live_usability.current_input?.live_execution_permission === "blocked", "Live-usability health should expose a locked current input contract.", health.web3_live_usability);
+  assert(Array.isArray(health.web3_live_usability.current_input.target_names), "Live-usability health current input should expose safe target names.", health.web3_live_usability.current_input);
   assert(health.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", health.web3_live_usability);
   assert(health.web3_live_usability.transaction_submission_permission === "blocked", "Live-usability health should keep transaction submission blocked.", health.web3_live_usability);
   assert(health.web3_live_usability.wallet_mutation_permission === "blocked", "Live-usability health should keep wallet mutation blocked.", health.web3_live_usability);

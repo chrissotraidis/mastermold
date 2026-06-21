@@ -1605,6 +1605,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/health/route.ts")).toContain("web3_live_usability");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_review_source_endpoint");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("current_input: Web3OperatorRequestPacket[\"current_input\"]");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("current_input: packet.current_input");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("source=${packet.source}");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("account=${packet.account}");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("scenario=${packet.scenario}");
@@ -1613,6 +1615,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_profit_proof.threshold_matrix");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("Proof thresholds");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_live_usability?.mode === \"web3-live-usability-health\"");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("current_input?.live_execution_permission === \"blocked\"");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("current_input.target_names");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("live_review_source_endpoint");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("total_live_usability_row_count");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("listed_live_usability_row_count");
@@ -1620,8 +1624,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_research_handoff");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("live_review_source_endpoint");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_live_usability?.mode === \"web3-live-usability-health\"");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("current_input?.live_execution_permission === \"blocked\"");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("current_input.target_names");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("total_live_usability_row_count");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("listed_live_usability_row_count");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("current_input: Web3OperatorCurrentInput | null");
+    expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input)");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");
@@ -1664,9 +1672,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("/api/web3-live-usability-blockers?source=live-dex");
     expect(source("README.md")).toContain("web3_live_usability");
     expect(source("README.md")).toContain("total-versus-listed live-usability row counts");
+    expect(source("README.md")).toContain("current safe input contract");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-usability-blockers");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_live_usability");
     expect(source("docs/web3-credentials-runbook.md")).toContain("total and listed live-usability row counts");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("current safe input contract");
     expect(source("docs/web3-credentials-runbook.md")).toContain("next ordered unlock step");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Setup runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Action checklist");

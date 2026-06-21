@@ -187,6 +187,8 @@ async function verifyHealth() {
   );
   assert(typeof json.web3_research_handoff.next_unlock_step_label === "string" && json.web3_research_handoff.next_unlock_step_label.length > 0, "Research handoff health should expose the next unlock step.", json.web3_research_handoff);
   assert(typeof json.web3_research_handoff.next_unlock_step_action === "string" && json.web3_research_handoff.next_unlock_step_action.length > 0, "Research handoff health should expose the next unlock action.", json.web3_research_handoff);
+  assert(json.web3_research_handoff.current_input?.live_execution_permission === "blocked", "Research handoff health should expose a locked current input contract.", json.web3_research_handoff);
+  assert(Array.isArray(json.web3_research_handoff.current_input.target_names), "Research handoff health current input should expose safe target names.", json.web3_research_handoff.current_input);
   assert(json.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", json.web3_research_handoff);
   assert(json.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", json.web3_research_handoff);
   assert(json.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", json.web3_research_handoff);
@@ -211,6 +213,8 @@ async function verifyHealth() {
   assert(typeof json.web3_live_usability.credential_doctor_next_action === "string" && json.web3_live_usability.credential_doctor_next_action.length > 0, "Live-usability health should expose credential doctor next action.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_label === "string" && json.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next operator unlock step.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_action === "string" && json.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", json.web3_live_usability);
+  assert(json.web3_live_usability.current_input?.live_execution_permission === "blocked", "Live-usability health should expose a locked current input contract.", json.web3_live_usability);
+  assert(Array.isArray(json.web3_live_usability.current_input.target_names), "Live-usability health current input should expose safe target names.", json.web3_live_usability.current_input);
   assert(json.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.wallet_mutation_permission === "blocked", "Live-usability health should keep wallet mutation blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.transaction_submission_permission === "blocked", "Live-usability health should keep transaction submission blocked.", json.web3_live_usability);

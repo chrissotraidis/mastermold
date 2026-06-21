@@ -1462,6 +1462,19 @@ describe("Web3 autonomous trading subsystem", () => {
         source: string;
         account: string;
         scenario: string;
+        current_input: {
+          id: string;
+          label: string;
+          safe_collection_surface: string;
+          storage: string;
+          target_names: string[];
+          live_execution_permission: string;
+          wallet_mutation_permission: string;
+          transaction_submission_permission: string;
+          private_key_storage: string;
+          seed_phrase_storage: string;
+          secret_echo_permission: string;
+        } | null;
         source_endpoint: string;
         live_review_source_endpoint: string;
         live_execution_permission: string;
@@ -1473,6 +1486,19 @@ describe("Web3 autonomous trading subsystem", () => {
       };
       web3_live_usability: {
         mode: string;
+        current_input: {
+          id: string;
+          label: string;
+          safe_collection_surface: string;
+          storage: string;
+          target_names: string[];
+          live_execution_permission: string;
+          wallet_mutation_permission: string;
+          transaction_submission_permission: string;
+          private_key_storage: string;
+          seed_phrase_storage: string;
+          secret_echo_permission: string;
+        } | null;
         live_execution_permission: string;
         wallet_mutation_permission: string;
         transaction_submission_permission: string;
@@ -1491,6 +1517,21 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_research_handoff.source_endpoint).toContain(`account=${receipt.web3_research_handoff.account}`);
     expect(receipt.web3_research_handoff.source_endpoint).toContain(`scenario=${receipt.web3_research_handoff.scenario}`);
     expect(receipt.web3_research_handoff.live_review_source_endpoint).toBe("/api/web3-research-handoff-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_research_handoff.current_input).not.toBeNull();
+    expect(receipt.web3_research_handoff.current_input?.id).toBe(receipt.web3_live_usability.current_input?.id);
+    expect(receipt.web3_research_handoff.current_input?.label).toBe(receipt.web3_live_usability.current_input?.label);
+    expect(receipt.web3_research_handoff.current_input).toMatchObject({
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(receipt.web3_research_handoff.current_input?.target_names.length).toBeGreaterThan(0);
+    expect(receipt.web3_research_handoff.current_input?.target_names.join(" ")).not.toContain("test-");
+    expect(receipt.web3_research_handoff.current_input?.safe_collection_surface.length).toBeGreaterThan(0);
+    expect(receipt.web3_research_handoff.current_input?.storage.length).toBeGreaterThan(0);
     expect(receipt.web3_research_handoff.live_execution_permission).toBe("blocked");
     expect(receipt.web3_research_handoff.wallet_mutation_permission).toBe("blocked");
     expect(receipt.web3_research_handoff.transaction_submission_permission).toBe("blocked");
@@ -1498,6 +1539,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_research_handoff.seed_phrase_storage).toBe("blocked");
     expect(receipt.web3_research_handoff.secret_echo_permission).toBe("blocked");
     expect(receipt.web3_live_usability.mode).toBe("web3-live-usability-health");
+    expect(receipt.web3_live_usability.current_input).not.toBeNull();
+    expect(receipt.web3_live_usability.current_input).toMatchObject({
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(receipt.web3_live_usability.current_input?.target_names.length).toBeGreaterThan(0);
+    expect(receipt.web3_live_usability.current_input?.target_names.join(" ")).not.toContain("test-");
+    expect(receipt.web3_live_usability.current_input?.safe_collection_surface.length).toBeGreaterThan(0);
+    expect(receipt.web3_live_usability.current_input?.storage.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.live_execution_permission).toBe("blocked");
     expect(receipt.web3_live_usability.wallet_mutation_permission).toBe("blocked");
     expect(receipt.web3_live_usability.transaction_submission_permission).toBe("blocked");

@@ -3,6 +3,7 @@ import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "
 import type { Web3CutoverBlockerBoard } from "./web3-cutover-blocker-board";
 import type { Web3LiveCapitalPreflightReceipt } from "./web3-live-capital-preflight";
 import type { Web3ManualLiveReviewPacket } from "./web3-manual-live-review-packet";
+import type { Web3OperatorCurrentInput } from "./web3-operator-request-packet";
 import type { Web3OperatorRunbookReceipt } from "./web3-operator-runbook";
 import type { Web3SupervisedLiveRunway } from "./web3-supervised-live-runway";
 import type { Web3TradingState } from "./web3-trading";
@@ -135,6 +136,7 @@ export type Web3LiveUsabilityBlockersHealth = {
   ready_live_lane_count: number;
   total_live_lane_count: number;
   safe_action_count: number;
+  current_input: Web3OperatorCurrentInput | null;
   next_operator_input_label: string | null;
   next_unlock_step_label: string | null;
   next_unlock_step_status: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number]["status"] | null;
@@ -283,6 +285,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
 
 export function buildWeb3LiveUsabilityBlockersHealth(
   receipt: Web3LiveUsabilityBlockersReceipt,
+  currentInput: Web3OperatorCurrentInput | null = null,
 ): Web3LiveUsabilityBlockersHealth {
   return {
     mode: "web3-live-usability-health",
@@ -300,6 +303,7 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     ready_live_lane_count: receipt.ready_live_lane_count,
     total_live_lane_count: receipt.total_live_lane_count,
     safe_action_count: receipt.safe_action_count,
+    current_input: currentInput,
     next_operator_input_label: receipt.next_operator_input?.label ?? null,
     next_unlock_step_label: receipt.next_unlock_step?.label ?? null,
     next_unlock_step_status: receipt.next_unlock_step?.status ?? null,

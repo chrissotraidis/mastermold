@@ -119,7 +119,7 @@ export async function GET() {
     web3_production_supervisor: web3ProductionSupervisor,
     web3_promoted_paper_autopilot: web3PromotedPaperAutopilot,
     web3_profit_proof: buildWeb3ProfitProofReadiness({ promotedHealth: web3PromotedPaperAutopilot }),
-    web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability),
+    web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
   });
 }
