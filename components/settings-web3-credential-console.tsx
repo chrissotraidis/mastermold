@@ -11,7 +11,10 @@ import type { Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-dri
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import type { Web3LiveTradeCanaryActionReceipt } from "@/src/db/web3-live-trade-canary";
-import type { Web3LiveUnsignedOrderHandoffReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
+import type {
+  Web3LiveUnsignedOrderHandoffReceipt,
+  Web3LiveUnsignedOrderPreflightReceipt,
+} from "@/src/db/web3-live-unsigned-order-handoff";
 import type { Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import type { Web3LocalCredentialInstallReceipt } from "@/src/db/web3-local-credential-install";
 import type { Web3TradingState } from "@/src/db/web3-trading";
@@ -156,7 +159,7 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"blockers" | "canary-drill" | "credentials" | "dex" | "doctor" | "install" | "jupiter" | "live-canary" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
+  const [busy, setBusy] = useState<"blockers" | "canary-drill" | "canary-preflight" | "credentials" | "dex" | "doctor" | "install" | "jupiter" | "live-canary" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [browserWallet, setBrowserWallet] = useState<BrowserWalletReceipt | null>(null);
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
@@ -165,6 +168,7 @@ export function SettingsWeb3CredentialConsole({
   const [doctorRefreshReceipt, setDoctorRefreshReceipt] = useState<Web3CredentialDoctorRefreshReceipt | null>(null);
   const [localInstallReceipt, setLocalInstallReceipt] = useState<Web3LocalCredentialInstallReceipt | null>(null);
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveCapitalPreflightReceipt | null>(null);
+  const [unsignedCanaryPreflightReceipt, setUnsignedCanaryPreflightReceipt] = useState<Web3LiveUnsignedOrderPreflightReceipt | null>(null);
   const [unsignedCanaryReceipt, setUnsignedCanaryReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
   const [liveCanaryActionReceipt, setLiveCanaryActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
   const [liveUsabilityReceipt, setLiveUsabilityReceipt] = useState<Web3LiveUsabilityBlockersReceipt>(initialLiveUsability);
@@ -393,6 +397,50 @@ export function SettingsWeb3CredentialConsole({
       void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live-capital preflight failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runUnsignedCanaryPreflight() {
+    setBusy("canary-preflight");
+    setMessage("Checking the exact tiny canary wallet, caps, Jupiter env, and live flags before any transaction prompt...");
+    try {
+      const provider = getBrowserSolanaProvider();
+      let publicKey = provider?.publicKey?.toString() ?? draft.wallet_public_key.trim();
+      if ((!publicKey || !isLikelySolanaPublicKey(publicKey)) && provider && typeof provider.connect === "function") {
+        const result = await provider.connect({ onlyIfTrusted: true }).catch(() => null);
+        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? draft.wallet_public_key.trim();
+      }
+      if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
+        throw new Error("Save or connect a valid public Solana wallet before the canary preflight.");
+      }
+      setDraft((current) => ({
+        ...current,
+        wallet_public_key: publicKey,
+        signer_mode: "external-wallet",
+      }));
+      const params = new URLSearchParams({
+        scenario,
+        source: "live-dex",
+        account: "persistent",
+        cycles: String(cycles),
+        operator_ack: "true",
+        canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+        wallet_public_key: publicKey,
+        amount_lamports: "100000",
+        max_slippage_bps: String(Math.max(1, Math.min(100, Math.trunc(Number(draft.max_slippage_bps) || 50)))),
+      });
+      const response = await fetch(`/api/web3-live-unsigned-order-handoff?${params.toString()}`);
+      const payload = (await response.json().catch(() => null)) as Web3LiveUnsignedOrderPreflightReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Canary preflight failed.");
+      }
+      setUnsignedCanaryPreflightReceipt(payload);
+      setMessage(payload.next_action);
+      void refreshCredentialAndCanaryState({ announce: false });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Canary preflight failed.");
     } finally {
       setBusy(null);
     }
@@ -1441,6 +1489,15 @@ export function SettingsWeb3CredentialConsole({
           </button>
           <button
             type="button"
+            onClick={() => void runUnsignedCanaryPreflight()}
+            disabled={disabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-caution/45 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <ShieldCheck className={cn("size-3.5 shrink-0", busy === "canary-preflight" && "animate-pulse")} aria-hidden="true" />
+            {busy === "canary-preflight" ? "Checking canary" : "Canary preflight"}
+          </button>
+          <button
+            type="button"
             onClick={() => void signAndRelayLiveCanary()}
             disabled={disabled}
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
@@ -1692,8 +1749,8 @@ export function SettingsWeb3CredentialConsole({
         />
         <ConsoleMetric
           label="Live canary"
-          value={liveCanaryActionReceipt ? liveCanaryActionReceipt.status.replaceAll("-", " ") : unsignedCanaryReceipt ? unsignedCanaryReceipt.status.replaceAll("-", " ") : "not signed"}
-          tone={liveCanaryActionReceipt?.actual_live_trade_tested ? "engine" : liveCanaryActionReceipt || unsignedCanaryReceipt ? "caution" : "neutral"}
+          value={liveCanaryActionReceipt ? liveCanaryActionReceipt.status.replaceAll("-", " ") : unsignedCanaryReceipt ? unsignedCanaryReceipt.status.replaceAll("-", " ") : unsignedCanaryPreflightReceipt ? unsignedCanaryPreflightReceipt.status : "not signed"}
+          tone={liveCanaryActionReceipt?.actual_live_trade_tested ? "engine" : liveCanaryActionReceipt || unsignedCanaryReceipt || unsignedCanaryPreflightReceipt ? "caution" : "neutral"}
         />
       </div>
 
@@ -1778,6 +1835,40 @@ export function SettingsWeb3CredentialConsole({
           <p className="mt-2 text-xs leading-5 text-on-surface-variant">{jupiterReceipt.next_action}</p>
           <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
             receipt {jupiterReceipt.receipt_hash.slice(0, 10)} · tx bytes {jupiterReceipt.unsigned_transaction_return}
+          </p>
+        </div>
+      ) : null}
+
+      {unsignedCanaryPreflightReceipt ? (
+        <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Settings live unsigned canary preflight receipt">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Canary preflight receipt</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{unsignedCanaryPreflightReceipt.status.replaceAll("-", " ")}</p>
+            </div>
+            <Badge variant="outline" className={cn(
+              "border-outline-variant/35 bg-void/25 text-outline",
+              unsignedCanaryPreflightReceipt.can_request_one_shot_unsigned_order && "border-engine/35 bg-engine/10 text-engine",
+              unsignedCanaryPreflightReceipt.status === "blocked" && "border-caution/35 bg-caution/10 text-caution",
+              unsignedCanaryPreflightReceipt.status === "unsafe-rejected" && "border-critical/35 bg-critical/10 text-critical",
+            )}>
+              {unsignedCanaryPreflightReceipt.can_request_one_shot_unsigned_order ? "ready to request" : "no transaction"}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <ConsoleMetric label="Wallet" value={unsignedCanaryPreflightReceipt.wallet_public_key_preview ?? "missing"} tone={unsignedCanaryPreflightReceipt.wallet_ready ? "engine" : "critical"} />
+            <ConsoleMetric label="Jupiter" value={unsignedCanaryPreflightReceipt.jupiter_key_configured ? "ready" : "missing"} tone={unsignedCanaryPreflightReceipt.jupiter_key_configured ? "engine" : "caution"} />
+            <ConsoleMetric label="Live flags" value={unsignedCanaryPreflightReceipt.live_flags_ready ? "ready" : "missing"} tone={unsignedCanaryPreflightReceipt.live_flags_ready ? "engine" : "critical"} />
+            <ConsoleMetric label="Tx return" value={unsignedCanaryPreflightReceipt.unsigned_transaction_return.replaceAll("-", " ")} tone="neutral" />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">{unsignedCanaryPreflightReceipt.next_action}</p>
+          {unsignedCanaryPreflightReceipt.blockers.length > 0 ? (
+            <p className="mt-1 rounded-md border border-caution/20 bg-caution/[0.035] p-2 text-xs leading-5 text-caution">
+              Blocker: {unsignedCanaryPreflightReceipt.blockers[0]}
+            </p>
+          ) : null}
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+            receipt {unsignedCanaryPreflightReceipt.receipt_hash.slice(0, 10)} · pair {unsignedCanaryPreflightReceipt.canary_pair} · amount {unsignedCanaryPreflightReceipt.amount_lamports} lamports · transaction bytes not returned
           </p>
         </div>
       ) : null}

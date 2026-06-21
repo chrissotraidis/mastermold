@@ -1615,6 +1615,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("/api/web3-dex-discovery?");
     expect(settingsConsole).toContain("Run live preflight");
     expect(settingsConsole).toContain("/api/web3-live-capital-preflight?");
+    expect(settingsConsole).toContain("Canary preflight");
+    expect(settingsConsole).toContain("runUnsignedCanaryPreflight");
+    expect(settingsConsole).toContain("Settings live unsigned canary preflight receipt");
+    expect(settingsConsole).toContain("Canary preflight receipt");
+    expect(settingsConsole).toContain("Web3LiveUnsignedOrderPreflightReceipt");
+    expect(settingsConsole).toContain("can_request_one_shot_unsigned_order");
+    expect(settingsConsole).toContain("transaction bytes not returned");
     expect(settingsConsole).toContain("Sign tiny canary");
     expect(settingsConsole).toContain("signAndRelayLiveCanary");
     expect(settingsConsole).toContain("VersionedTransaction.deserialize");
@@ -2041,6 +2048,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings mirrors that same next dependency blocker");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings mirrors that same first-canary operator unblock plan");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings credential console refreshes both the live-usability blocker receipt and the first-canary drill");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Settings also has the same `Canary preflight` button as Trading");
     expect(source("components/review-readiness.tsx")).toContain("web3_operator_runbook summary");
     expect(source("components/review-readiness.tsx")).toContain("live-review runbook endpoint");
     expect(source("components/review-readiness.tsx")).toContain("next dependency blocker");
@@ -2053,6 +2061,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors the same next dependency blocker");
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors that same first-canary drill receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now refreshes that first-canary drill");
+    expect(source("components/review-readiness.tsx")).toContain("Settings credential console now includes the same no-transaction Canary preflight as Trading");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");

@@ -296,7 +296,7 @@ bodies, execute, custody funds, or mutate wallets.
 `GET /api/web3-live-unsigned-order-handoff` is the no-transaction preflight for that same exact
 canary: it checks the public wallet, tiny amount, slippage cap, live flags, source/account scope,
 and Jupiter env before any browser-wallet prompt or Jupiter order creation, and still returns no
-transaction bytes. Trading exposes this as `Canary preflight`.
+transaction bytes. Trading and Settings expose this as `Canary preflight` before `Sign tiny canary`.
 The Trading canary console now shows a compact `Canary launch checklist` that separates preflight,
 browser-wallet signature, signed relay, and confirmation/accounting, and it labels the result as
 `Funded canary still not proven` until all four live-money proof stages are complete.
