@@ -444,6 +444,7 @@ export function Web3LiveCanaryConsole({
 
   return (
     <section
+      id="web3-live-canary-console"
       aria-labelledby="web3-live-canary-console-title"
       className="rounded-md border border-critical/30 bg-critical/[0.035] p-4 sm:p-5"
     >

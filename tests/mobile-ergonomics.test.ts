@@ -1703,6 +1703,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/trading/page.tsx")).toContain("getLatestWeb3WalletOwnershipReceipt");
     expect(source("app/trading/page.tsx")).toContain("initialWalletOwnershipReceipt={latestWalletOwnership}");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Live money canary");
+    expect(source("components/web3-live-canary-console.tsx")).toContain('id="web3-live-canary-console"');
     expect(source("components/web3-live-canary-console.tsx")).toContain("No real trade tested yet");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary launch checklist");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary launch checklist");
@@ -2253,6 +2254,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("defaults plain /trading to Live DEX read");
     expect(source("components/review-readiness.tsx")).toContain("compact linked evidence index");
     expect(source("components/review-readiness.tsx")).toContain("defers its bulky trading-state and launch-checklist payloads");
+    expect(source("components/review-readiness.tsx")).toContain("live canary console anchor");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3-live-canary-console");
     expect(settingsPage).toContain("Open Web3 wiring");
     expect(settingsPage).toContain('href="/trading?source=sample"');
     expect(settingsPage).toContain('href="/trading?source=live-dex"');

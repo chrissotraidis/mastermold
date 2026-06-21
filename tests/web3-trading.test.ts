@@ -4029,7 +4029,7 @@ describe("Web3 autonomous trading subsystem", () => {
       expect(receipt.next_blocker).toMatchObject({
         id: "wallet-ownership-proof",
         label: "Wallet ownership proof",
-        href: "/trading?source=live-dex&account=persistent",
+        href: "/trading?source=live-dex&account=persistent#web3-live-canary-console",
       });
       expect(receipt.next_blocker?.next_action).toBe(receipt.current_input.next_action);
     } else {
@@ -4056,7 +4056,7 @@ describe("Web3 autonomous trading subsystem", () => {
     if (receipt.current_input?.id === "wallet-ownership-proof") {
       expect(receipt.next_credential_request).toMatchObject({
         id: "wallet-ownership-proof",
-        fix_href: "/trading?source=live-dex&account=persistent",
+        fix_href: "/trading?source=live-dex&account=persistent#web3-live-canary-console",
         safe_collection_surface: "browser-wallet",
         storage: "hash-only-local-receipt",
         target_names: ["hash-only wallet ownership receipt"],
@@ -4075,7 +4075,7 @@ describe("Web3 autonomous trading subsystem", () => {
         "strict-wallet-verifier",
         "refresh-live-usability",
       ]);
-      expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/trading?source=live-dex&account=persistent");
+      expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
     } else {
       expect(receipt.next_credential_request).toMatchObject({
         fix_href: "/settings/integrations#settings-web3-wallet-public-key",

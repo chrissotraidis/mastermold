@@ -516,7 +516,7 @@ function credentialRequestFixHref(
   useCurrentInput: boolean,
 ) {
   if (useCurrentInput && currentInput?.id === "wallet-ownership-proof") {
-    return "/trading?source=live-dex&account=persistent";
+    return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
   }
   return nextBlocker?.href ?? "/settings/integrations#settings-web3-credentials-runway";
 }
@@ -792,7 +792,7 @@ function summarizeNextBlocker(
       source: item.source,
       status: item.status,
       next_action: currentInput.next_action,
-      href: "/trading?source=live-dex&account=persistent",
+      href: "/trading?source=live-dex&account=persistent#web3-live-canary-console",
       safe_command: currentInput.verifier_command,
       blocks_live_capital: item.blocks_live_capital,
     };

@@ -403,6 +403,7 @@ async function verifyHealth() {
   const liveUsabilityCurrentInputId = json.web3_live_usability.current_input?.id;
   const liveUsabilityNextBlockerId = json.web3_live_usability.next_blocker?.id;
   const liveUsabilityProofIsNext = liveUsabilityCurrentInputId === "wallet-ownership-proof";
+  const liveUsabilityProofSurface = "/trading?source=live-dex&account=persistent#web3-live-canary-console";
   assert(
     ["cutover:dedicated-trading-wallet", "cutover:wallet-ownership-proof", "runway:wallet", "wallet-ownership-proof"].includes(liveUsabilityNextBlockerId),
     "Live-usability health should expose the next dependency-ranked blocker.",
@@ -415,14 +416,14 @@ async function verifyHealth() {
     json.web3_live_usability.next_blocker,
   );
   assert(
-    json.web3_live_usability.next_blocker?.href === (liveUsabilityProofIsNext ? "/trading?source=live-dex&account=persistent" : "/settings/integrations#settings-web3-wallet-public-key"),
+    json.web3_live_usability.next_blocker?.href === (liveUsabilityProofIsNext ? liveUsabilityProofSurface : "/settings/integrations#settings-web3-wallet-public-key"),
     "Live-usability health next blocker should expose the safe fix surface.",
     json.web3_live_usability.next_blocker,
   );
   assert(String(json.web3_live_usability.next_blocker?.safe_command ?? "").includes("--require-operator-wallet"), "Live-usability health next blocker should expose the strict safe verifier command.", json.web3_live_usability.next_blocker);
   assert(json.web3_live_usability.next_blocker?.blocks_live_capital === true, "Live-usability health next blocker should preserve live-capital blocking status.", json.web3_live_usability.next_blocker);
   assert(
-    json.web3_live_usability.next_credential_request?.fix_href === (liveUsabilityProofIsNext ? "/trading?source=live-dex&account=persistent" : "/settings/integrations#settings-web3-wallet-public-key"),
+    json.web3_live_usability.next_credential_request?.fix_href === (liveUsabilityProofIsNext ? liveUsabilityProofSurface : "/settings/integrations#settings-web3-wallet-public-key"),
     "Live-usability health should expose the next credential request fix surface.",
     json.web3_live_usability.next_credential_request,
   );
