@@ -9558,6 +9558,7 @@ function QuickLaunchChecklistPanel({
   const openRepairActions = repairActions.filter((item) => item.status !== "ready").length;
   const nextStep = checklist.next_cutover_step;
   const proofPlan = checklist.profit_proof_readiness.proof_plan;
+  const proofThresholds = checklist.profit_proof_readiness.threshold_matrix;
   const repairHealth = checklist.local_accountability_repair_health;
 
   return (
@@ -9630,6 +9631,26 @@ function QuickLaunchChecklistPanel({
           <ProfitMetric label="Hit target" value={`${proofPlan.observed_target_hit_rate_pct.toFixed(0)}%`} detail={`${proofPlan.required_target_hit_rate_pct}% required`} tone={proofPlan.observed_target_hit_rate_pct >= proofPlan.required_target_hit_rate_pct ? "engine" : "caution"} />
           <ProfitMetric label="Next batch" value={`${proofPlan.suggested_next_runs}`} detail={proofPlan.safe_command} tone={proofPlan.suggested_next_runs > 0 ? "engine" : "neutral"} />
           <ProfitMetric label="Proof PnL" value={formatCompactSignedCurrency(proofPlan.observed_total_net_pnl_usd)} detail={proofPlan.status.replaceAll("-", " ")} tone={proofPlan.observed_total_net_pnl_usd > 0 ? "engine" : proofPlan.observed_total_net_pnl_usd < 0 ? "critical" : "neutral"} />
+        </div>
+        <div className="mt-2 rounded-md border border-outline-variant/20 bg-void/20 p-2" aria-label="Promoted paper proof threshold matrix">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Proof thresholds</p>
+            <Chip tone={checklist.profit_proof_readiness.can_satisfy_profit_gate ? "engine" : "caution"}>
+              {proofThresholds.filter((threshold) => threshold.status === "pass").length}/{proofThresholds.length} pass
+            </Chip>
+          </div>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
+            {proofThresholds.map((threshold) => (
+              <div key={threshold.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-black/10 p-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="min-w-0 text-[11px] font-semibold leading-4 text-on-surface">{threshold.label}</p>
+                  <Chip tone={profitProofThresholdTone(threshold.status)}>{threshold.status}</Chip>
+                </div>
+                <p className="mt-1 text-[10px] leading-4 text-on-surface-variant">{threshold.observed}</p>
+                <p className="mt-0.5 text-[10px] leading-4 text-outline">Needs: {threshold.required}</p>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-1 sm:grid-cols-4" aria-label="Local paper accountability repair health">
           <ProfitMetric label="Repair health" value={repairHealth.status.replaceAll("-", " ")} detail={repairHealth.receipt_fresh ? "fresh receipt" : "no fresh receipt"} tone={repairHealth.repair_plateaued ? "critical" : repairHealth.status === "complete" ? "engine" : repairHealth.status === "improved" ? "caution" : "neutral"} />
@@ -9801,7 +9822,7 @@ function QuickLaunchChecklistPanel({
         Dry-run signer and order rehearsal only scope public-key rehearsal, simulated signer metadata, live DEX route/order evidence, caps, slippage, and kill-switch review; they cannot store keys, sign, submit, custody funds, or enable real-capital trades.
       </p>
       <span className="sr-only" aria-label="Web3 launch checklist receipt">
-        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; next operator action {nextOperatorAction ? `${nextOperatorAction.label}: ${nextOperatorAction.status}, ${nextOperatorAction.next_action}` : "none"}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; local accountability repair health {repairHealth.status}, fresh {repairHealth.receipt_fresh ? "yes" : "no"}, plateaued {repairHealth.repair_plateaued ? "yes" : "no"}, score {repairHealth.final_accountability_score}/100, next {repairHealth.next_action}; operator input packet {operatorInputs.map((item) => `${item.label}: ${item.status}, storage ${item.storage}, ${item.next_action}`).join("; ")}; launch repair queue {repairActions.map((item) => `${item.label}: ${item.status}, ${item.command ?? item.next_action}`).join("; ")}; researched stack decisions {researchDecisions.map((item) => `${item.label}: ${item.status}, ${item.needs_user_input.join(", ") || item.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
+        Web3 autonomy launch checklist status {checklist.status}; readiness score {checklist.readiness_score}; completed proofs {checklist.completed_proof_count}; remaining work {checklist.remaining_work_count}; next cutover step {nextStep.label}: {nextStep.next_action}; next operator action {nextOperatorAction ? `${nextOperatorAction.label}: ${nextOperatorAction.status}, ${nextOperatorAction.next_action}` : "none"}; cutover runway {runway.map((step) => `${step.label}: ${step.status}, ${step.next_action}`).join("; ")}; local accountability repair health {repairHealth.status}, fresh {repairHealth.receipt_fresh ? "yes" : "no"}, plateaued {repairHealth.repair_plateaued ? "yes" : "no"}, score {repairHealth.final_accountability_score}/100, next {repairHealth.next_action}; operator input packet {operatorInputs.map((item) => `${item.label}: ${item.status}, storage ${item.storage}, ${item.next_action}`).join("; ")}; launch repair queue {repairActions.map((item) => `${item.label}: ${item.status}, ${item.command ?? item.next_action}`).join("; ")}; researched stack decisions {researchDecisions.map((item) => `${item.label}: ${item.status}, ${item.needs_user_input.join(", ") || item.next_action}`).join("; ")}; promoted paper proof plan {proofPlan.status}; threshold matrix {proofThresholds.map((threshold) => `${threshold.label}: ${threshold.status}, observed ${threshold.observed}, required ${threshold.required}`).join("; ")}; remaining promoted runs {proofPlan.remaining_promoted_runs}; suggested next runs {proofPlan.suggested_next_runs}; safe command {proofPlan.safe_command}; dry-run signer setup available yes; dry-run order rehearsal available yes; paper scale permitted {checklist.paper_scale_permitted ? "yes" : "no"}; live review permitted {checklist.live_review_permitted ? "yes" : "no"}; real capital blocked {checklist.real_capital_blocked ? "yes" : "no"}; hard blockers {checklist.hard_blockers.join("; ") || "none"}; remaining gates {checklist.remaining_work.map((item) => `${item.label}: ${item.next_action}`).join("; ") || "none"}; controls {checklist.controls.join(" ")}
       </span>
     </section>
   );
@@ -10563,6 +10584,12 @@ function launchChecklistItemTextClass(status: Web3AutonomyLaunchChecklist["items
   if (status === "pass") return "text-engine";
   if (status === "watch") return "text-caution";
   return "text-critical";
+}
+
+function profitProofThresholdTone(status: Web3AutonomyLaunchChecklist["profit_proof_readiness"]["threshold_matrix"][number]["status"]): QuickChipTone {
+  if (status === "pass") return "engine";
+  if (status === "watch") return "caution";
+  return "critical";
 }
 
 function cutoverRunwayTone(status: Web3AutonomyLaunchChecklist["cutover_runway"][number]["status"]): QuickChipTone {

@@ -82,6 +82,8 @@ async function main() {
   assert(health.web3_profit_proof.live_execution_permission === "blocked", "Profit-proof readiness should keep live execution blocked.", health.web3_profit_proof);
   assert(health.web3_profit_proof.wallet_mutation_permission === "blocked", "Profit-proof readiness should keep wallet mutation blocked.", health.web3_profit_proof);
   assert(Array.isArray(health.web3_profit_proof.checks) && health.web3_profit_proof.checks.some((check) => check.id === "target-hit-rate"), "Profit-proof readiness should expose target-hit evidence.", health.web3_profit_proof);
+  assert(Array.isArray(health.web3_profit_proof.threshold_matrix) && health.web3_profit_proof.threshold_matrix.some((threshold) => threshold.id === "promoted-run-count"), "Profit-proof readiness should expose promoted-run threshold evidence.", health.web3_profit_proof);
+  assert(health.web3_profit_proof.threshold_matrix.some((threshold) => threshold.id === "live-boundary" && threshold.status === "pass"), "Profit-proof threshold matrix should keep the live boundary passing but blocked.", health.web3_profit_proof.threshold_matrix);
   assert(health.web3_profit_proof.proof_plan?.mode === "promoted-paper-proof-plan", "Profit-proof readiness should expose a promoted paper proof plan.", health.web3_profit_proof);
   assert(health.web3_profit_proof.proof_plan.local_accountability_repair_command === "npm run repair-accountability:web3", "Profit-proof plan should expose the safe local accountability repair command.", health.web3_profit_proof.proof_plan);
   assert(health.web3_profit_proof.proof_plan.live_execution_permission === "blocked", "Profit-proof plan should keep live execution blocked.", health.web3_profit_proof.proof_plan);
@@ -122,6 +124,7 @@ async function main() {
   assert(launchChecklist.profit_proof_readiness?.mode === "web3-profit-proof-readiness", "Web3 launch checklist should expose profit-proof readiness.", launchChecklist);
   assert(launchChecklist.profit_proof_readiness.live_execution_permission === "blocked", "Checklist profit-proof readiness should keep live execution blocked.", launchChecklist.profit_proof_readiness);
   assert(launchChecklist.profit_proof_readiness.wallet_mutation_permission === "blocked", "Checklist profit-proof readiness should keep wallet mutation blocked.", launchChecklist.profit_proof_readiness);
+  assert(Array.isArray(launchChecklist.profit_proof_readiness.threshold_matrix) && launchChecklist.profit_proof_readiness.threshold_matrix.some((threshold) => threshold.id === "target-hit-rate"), "Checklist profit-proof readiness should expose threshold matrix evidence.", launchChecklist.profit_proof_readiness);
   assert(launchChecklist.profit_proof_readiness.proof_plan?.safe_command === "npm run autopilot-paper:web3", "Checklist profit-proof readiness should expose the safe promoted proof command.", launchChecklist.profit_proof_readiness.proof_plan);
   assert(launchChecklist.profit_proof_readiness.proof_plan.local_accountability_repair_command === "npm run repair-accountability:web3", "Checklist profit-proof readiness should expose the safe local accountability repair command.", launchChecklist.profit_proof_readiness.proof_plan);
   assert(typeof launchChecklist.profit_proof_readiness.proof_plan.remaining_promoted_runs === "number", "Checklist profit-proof readiness should expose remaining promoted proof runs.", launchChecklist.profit_proof_readiness.proof_plan);
@@ -248,6 +251,7 @@ async function main() {
   assert(html.includes("Autonomous session ticket chart"), "Trading page should chart session plan, wake plan, order ticket, route proof, and paper-apply readiness before the long workbench.");
   assert(html.includes("Autonomous session ticket receipt"), "Trading page should expose a review receipt for session caps, budgets, order boundary, and live-gate status.");
   assert(html.includes("Profit proof"), "Trading page should expose whether the autonomous paper loop is making money before the long workbench.");
+  assert(html.includes("Proof thresholds"), "Trading page should expose the promoted paper proof threshold matrix.");
   assert(html.includes("Autonomous profit accountability chart"), "Trading page should chart paper PnL, win rate, fills, loop feedback, and outcome memory before the long workbench.");
   assert(html.includes("Profit accountability loop receipt"), "Trading page should expose a review receipt for paper profit accountability, loop feedback, outcome memory, and live-gate status.");
   assert(html.includes("Accountability repair plan"), "Trading page should expose the local paper accountability repair plan in the compact cockpit.");

@@ -16,6 +16,23 @@ export type Web3ProfitProofReadinessCheck = {
   detail: string;
 };
 
+export type Web3ProfitProofThreshold = {
+  id:
+    | "local-accountability"
+    | "promoted-run-count"
+    | "promoted-total-pnl"
+    | "target-hit-rate"
+    | "recent-positive-runs"
+    | "loss-brake"
+    | "memory-posture"
+    | "live-boundary";
+  label: string;
+  required: string;
+  observed: string;
+  status: "pass" | "watch" | "fail";
+  next_action: string;
+};
+
 export type Web3ProfitProofRunPlan = {
   mode: "promoted-paper-proof-plan";
   status: "complete" | "needs-runs" | "needs-hit-rate" | "needs-local-accountability" | "drawdown-gated" | "blocked";
@@ -54,6 +71,7 @@ export type Web3ProfitProofReadiness = {
   recommended_supervisor_round_cap: number;
   can_support_paper_scale: boolean;
   can_satisfy_profit_gate: boolean;
+  threshold_matrix: Web3ProfitProofThreshold[];
   proof_plan: Web3ProfitProofRunPlan;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -95,6 +113,19 @@ export function buildWeb3ProfitProofReadiness({
     recentPositiveCount >= requiredRecentPositiveRuns &&
     !lossBrakeTripped &&
     !memoryProtecting;
+  const thresholdMatrix = buildProfitProofThresholdMatrix({
+    localMakingMoney,
+    localScore,
+    localNet,
+    runCount,
+    totalPnl,
+    hitRate,
+    recentPositiveCount,
+    requiredRecentPositiveRuns,
+    lossBrakeTripped,
+    memoryStatus,
+    memoryProtecting,
+  });
   const canSupportPaperScale = localMakingMoney && !lossBrakeTripped && memoryStatus !== "stand-down";
   const checks = profitProofChecks({
     localMakingMoney,
@@ -155,6 +186,7 @@ export function buildWeb3ProfitProofReadiness({
     recommended_supervisor_round_cap: promotedHealth?.recommended_supervisor_round_cap ?? 0,
     can_support_paper_scale: canSupportPaperScale,
     can_satisfy_profit_gate: repeatable,
+    threshold_matrix: thresholdMatrix,
     proof_plan: proofPlan,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -287,6 +319,101 @@ function profitProofChecks(evidence: {
       label: "Live boundary",
       status: "pass",
       detail: "Profit proof remains paper evidence and cannot unlock live-capital execution.",
+    },
+  ];
+}
+
+function buildProfitProofThresholdMatrix(evidence: {
+  localMakingMoney: boolean;
+  localScore: number;
+  localNet: number;
+  runCount: number;
+  totalPnl: number;
+  hitRate: number;
+  recentPositiveCount: number;
+  requiredRecentPositiveRuns: number;
+  lossBrakeTripped: boolean;
+  memoryStatus: Web3PromotedPaperAutopilotHealth["run_memory_status"];
+  memoryProtecting: boolean;
+}): Web3ProfitProofThreshold[] {
+  return [
+    {
+      id: "local-accountability",
+      label: "Local accountability",
+      required: "Making money with accountability at 70/100 or better",
+      observed: `${formatSignedCompactValue(evidence.localNet)} local net, ${evidence.localScore}/100 accountability`,
+      status: evidence.localMakingMoney ? "pass" : evidence.localScore > 0 || evidence.localNet >= 0 ? "watch" : "fail",
+      next_action: evidence.localMakingMoney
+        ? "Keep local paper accountability above 70/100 while collecting promoted proof."
+        : "Run or repair local paper accountability before claiming the profit gate.",
+    },
+    {
+      id: "promoted-run-count",
+      label: "Promoted run count",
+      required: "At least 3 promoted paper runs",
+      observed: `${evidence.runCount} promoted run${evidence.runCount === 1 ? "" : "s"}`,
+      status: evidence.runCount >= 3 ? "pass" : evidence.runCount > 0 ? "watch" : "fail",
+      next_action: evidence.runCount >= 3
+        ? "Sample size is high enough for the current paper gate; keep collecting more runs for confidence."
+        : `Run ${Math.max(1, 3 - evidence.runCount)} more promoted paper proof ${3 - evidence.runCount === 1 ? "window" : "windows"}.`,
+    },
+    {
+      id: "promoted-total-pnl",
+      label: "Promoted total PnL",
+      required: "Positive promoted paper total PnL",
+      observed: `${formatSignedCompactValue(evidence.totalPnl)} promoted total PnL`,
+      status: evidence.totalPnl > 0 ? "pass" : evidence.runCount > 0 && evidence.totalPnl === 0 ? "watch" : "fail",
+      next_action: evidence.totalPnl > 0
+        ? "Promoted total PnL is positive; keep it positive through the remaining proof windows."
+        : "Do not advance live review until promoted paper total PnL is positive.",
+    },
+    {
+      id: "target-hit-rate",
+      label: "Target hit rate",
+      required: "70% or better target-hit rate",
+      observed: `${evidence.hitRate.toFixed(0)}% target-hit rate`,
+      status: evidence.hitRate >= 70 ? "pass" : evidence.hitRate > 0 ? "watch" : "fail",
+      next_action: evidence.hitRate >= 70
+        ? "Target-hit rate clears the current paper gate; keep it above 70%."
+        : "Run smaller promoted proof windows until target-hit rate recovers above 70%.",
+    },
+    {
+      id: "recent-positive-runs",
+      label: "Recent positives",
+      required: `${evidence.requiredRecentPositiveRuns} recent positive target-hit run${evidence.requiredRecentPositiveRuns === 1 ? "" : "s"}`,
+      observed: `${evidence.recentPositiveCount} recent positive target-hit run${evidence.recentPositiveCount === 1 ? "" : "s"}`,
+      status: evidence.recentPositiveCount >= evidence.requiredRecentPositiveRuns ? "pass" : evidence.recentPositiveCount > 0 ? "watch" : "fail",
+      next_action: evidence.recentPositiveCount >= evidence.requiredRecentPositiveRuns
+        ? "Recent promoted runs are positive enough for the current proof gate."
+        : "Collect more recent positive target-hit runs before live review.",
+    },
+    {
+      id: "loss-brake",
+      label: "Loss brake",
+      required: "No promoted paper loss brake tripped",
+      observed: evidence.lossBrakeTripped ? "Loss brake tripped" : "No loss brake tripped",
+      status: evidence.lossBrakeTripped ? "fail" : "pass",
+      next_action: evidence.lossBrakeTripped
+        ? "Stop expansion and repair drawdown before more proof runs."
+        : "Loss brake is clear; keep the brake active during proof collection.",
+    },
+    {
+      id: "memory-posture",
+      label: "Memory posture",
+      required: "Promoted memory is not protect-paper or stand-down",
+      observed: evidence.memoryStatus.replaceAll("-", " "),
+      status: evidence.memoryProtecting ? "fail" : evidence.memoryStatus === "extend-paper" || evidence.memoryStatus === "continue-paper" ? "pass" : "watch",
+      next_action: evidence.memoryProtecting
+        ? "Stay in protect/review mode until promoted memory stops protecting the desk."
+        : "Use promoted memory posture to cap the next proof window.",
+    },
+    {
+      id: "live-boundary",
+      label: "Live boundary",
+      required: "Profit proof cannot unlock live trading by itself",
+      observed: "Live execution and wallet mutation blocked",
+      status: "pass",
+      next_action: "Treat profit proof as paper evidence only; manual live review and all other live gates remain required.",
     },
   ];
 }

@@ -1359,15 +1359,20 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-launch-checklist.ts")).toContain("operator_inputs_needed");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("repair_actions");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("local_accountability_repair_health");
+    expect(source("src/db/web3-profit-proof.ts")).toContain("threshold_matrix");
+    expect(source("src/db/web3-profit-proof.ts")).toContain("At least 3 promoted paper runs");
     expect(source("src/db/web3-local-accountability-repair.ts")).toContain("web3-local-accountability-repair");
     expect(source("src/db/web3-local-accountability-repair.ts")).toContain("web3LocalAccountabilityRepairReceiptCandidatePaths");
     expect(source("components/web3-trading-workspace-loader.tsx")).toContain("Local paper accountability repair health");
+    expect(source("components/web3-trading-workspace-loader.tsx")).toContain("Promoted paper proof threshold matrix");
+    expect(source("components/web3-trading-workspace-loader.tsx")).toContain("Proof thresholds");
     expect(source("app/settings/integrations/page.tsx")).toContain("Local paper repair health");
     expect(source("scripts/web3-local-accountability-repair.mjs")).toContain("writeLocalAccountabilityRepairReceipt");
     expect(source("scripts/web3-local-accountability-repair.mjs")).toContain("WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH");
     expect(source("scripts/web3-local-accountability-repair.mjs")).toContain("Refusing live-dex accountability repair unless");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("--source=live-dex");
     expect(source("docs/web3-credentials-runbook.md")).toContain("local paper accountability repair receipt");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("promoted paper proof threshold matrix");
     expect(source("docs/web3-credentials-runbook.md")).toContain("freshest sanitized repair receipt");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("buildRepairActions");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("repair-execution-quality");
@@ -1434,6 +1439,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/health/route.ts")).toContain("web3_live_usability");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_research_handoff");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_profit_proof.threshold_matrix");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("Proof thresholds");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_live_usability?.mode === \"web3-live-usability-health\"");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("Live-usability health should keep signing blocked");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_research_handoff");
@@ -1477,6 +1484,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("Setup runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Action checklist");
     expect(source("docs/web3-credentials-runbook.md")).toContain("checklist over existing safe actions");
+    expect(source("components/review-readiness.tsx")).toContain("promoted paper proof threshold matrix");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also surfaces the Web3 launch-blocker queue");
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");

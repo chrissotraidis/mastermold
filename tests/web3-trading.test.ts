@@ -8205,6 +8205,25 @@ describe("Web3 autonomous trading subsystem", () => {
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
     });
+    expect(launchChecklist.profit_proof_readiness.threshold_matrix.map((threshold) => threshold.id)).toEqual([
+      "local-accountability",
+      "promoted-run-count",
+      "promoted-total-pnl",
+      "target-hit-rate",
+      "recent-positive-runs",
+      "loss-brake",
+      "memory-posture",
+      "live-boundary",
+    ]);
+    expect(launchChecklist.profit_proof_readiness.threshold_matrix.find((threshold) => threshold.id === "promoted-run-count")).toMatchObject({
+      required: "At least 3 promoted paper runs",
+      observed: "0 promoted runs",
+      status: "fail",
+    });
+    expect(launchChecklist.profit_proof_readiness.threshold_matrix.find((threshold) => threshold.id === "live-boundary")).toMatchObject({
+      observed: "Live execution and wallet mutation blocked",
+      status: "pass",
+    });
     expect(launchChecklist.provider_credentials_readiness).toMatchObject({
       mode: "web3-provider-credentials-readiness",
       status: "missing-wallet",
@@ -8542,6 +8561,17 @@ describe("Web3 autonomous trading subsystem", () => {
       local_accountability_repair_command: "npm run repair-accountability:web3",
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
+    });
+    expect(promotedReadyProfitProof.threshold_matrix.find((threshold) => threshold.id === "promoted-run-count")).toMatchObject({
+      observed: "4 promoted runs",
+      status: "pass",
+    });
+    expect(promotedReadyProfitProof.threshold_matrix.find((threshold) => threshold.id === "target-hit-rate")).toMatchObject({
+      observed: "75% target-hit rate",
+      status: "pass",
+    });
+    expect(promotedReadyProfitProof.threshold_matrix.find((threshold) => threshold.id === "local-accountability")).toMatchObject({
+      status: "watch",
     });
     expect(promotedReadyProfitProof.proof_plan.next_action).toContain("local paper accountability");
     expect(promotedReadyProfitProof.next_action).toContain("local paper accountability");
