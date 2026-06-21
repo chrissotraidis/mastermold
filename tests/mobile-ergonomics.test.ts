@@ -1495,6 +1495,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("/api/web3-dex-discovery?");
     expect(settingsConsole).toContain("Run live preflight");
     expect(settingsConsole).toContain("/api/web3-live-capital-preflight?");
+    expect(settingsConsole).toContain("Sign tiny canary");
+    expect(settingsConsole).toContain("signAndRelayLiveCanary");
+    expect(settingsConsole).toContain("VersionedTransaction.deserialize");
+    expect(settingsConsole).toContain("/api/web3-live-unsigned-order-handoff?");
+    expect(settingsConsole).toContain("/api/web3-live-trade-canary?");
+    expect(settingsConsole).toContain("Settings live unsigned canary handoff receipt");
+    expect(settingsConsole).toContain("Settings live canary signed relay receipt");
     expect(settingsConsole).toContain("Settings live capital preflight receipt");
     expect(settingsConsole).toContain("Live-capital preflight receipt");
     expect(settingsConsole).toContain("live-capital preflight receipt is review evidence only");
@@ -1503,7 +1510,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("scanner evidence only");
     expect(settingsConsole).toContain("Rehearse Jupiter");
     expect(settingsConsole).toContain("no browser storage for Helius, Jupiter, Privy, Turnkey, signer-provider, or production alert keys");
-    expect(settingsConsole).toContain("unsigned transaction return withheld");
+    expect(settingsConsole).toContain("Jupiter rehearsal withholds unsigned transaction bodies");
+    expect(settingsConsole).toContain("tiny live canary signing uses a gated one-shot unsigned handoff");
     expect(settingsConsole).toContain("DEX scanner receipt is read-only paper evidence");
     expect(settingsConsole).toContain("Strict verifier runway");
     expect(settingsConsole).toContain("Operator wallet, Jupiter order, and live DEX gates");
@@ -1697,6 +1705,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-live-activation-intake/route.ts")).toContain("buildWeb3LiveActivationIntakeReceipt");
     expect(source("app/api/web3-live-trade-canary/route.ts")).toContain("buildWeb3LiveTradeCanaryReceipt");
     expect(source("app/api/web3-live-trade-canary/route.ts")).toContain("buildWeb3LiveTradeCanaryActionReceipt");
+    expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("buildWeb3LiveUnsignedOrderHandoffReceipt");
+    expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("web3-live-unsigned-order-handoff");
+    expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
+    expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("returned-one-shot");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("actual_live_trade_tested");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("web3-live-trade-canary-action");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("signed_payload_echoed");

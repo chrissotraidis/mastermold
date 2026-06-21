@@ -238,6 +238,9 @@ a dedicated public wallet, explicit canary acknowledgement, `return_unsigned_tra
 `MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true`. It never accepts private keys, seed phrases,
 API keys, raw transactions, or signed payloads, and it still cannot sign, submit, store transaction
 bodies, execute, custody funds, or mutate wallets.
+Settings exposes this as `Sign tiny canary`: the browser deserializes the one-shot transaction with
+`@solana/web3.js`, asks the connected wallet to sign, then posts the serialized signed payload to
+the live canary relay without storing transaction bodies or wallet authority.
 `POST /api/web3-live-trade-canary` is the guarded action wrapper for the existing external
 signed-payload relay: it requires operator acknowledgement, canary acknowledgement, live-dex
 persistent scope, request id, route, and a base64 signed transaction, hashes but never echoes the

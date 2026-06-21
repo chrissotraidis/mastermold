@@ -9,6 +9,8 @@ import type { Web3DexDiscoveryReceipt } from "@/src/db/web3-dex-discovery";
 import type { Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
+import type { Web3LiveTradeCanaryActionReceipt } from "@/src/db/web3-live-trade-canary";
+import type { Web3LiveUnsignedOrderHandoffReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
 import type { Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import type { Web3LocalCredentialInstallReceipt } from "@/src/db/web3-local-credential-install";
 import type { Web3TradingState } from "@/src/db/web3-trading";
@@ -81,6 +83,7 @@ type BrowserSolanaProvider = {
   publicKey?: { toString: () => string };
   connect?: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: { toString: () => string } } | void>;
   signMessage?: (message: Uint8Array, display?: "utf8" | "hex") => Promise<Uint8Array | { signature: Uint8Array }>;
+  signTransaction?: (transaction: unknown) => Promise<unknown>;
 };
 
 type Web3CredentialDoctorRefreshReceipt = {
@@ -144,7 +147,7 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"blockers" | "credentials" | "dex" | "doctor" | "install" | "jupiter" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
+  const [busy, setBusy] = useState<"blockers" | "credentials" | "dex" | "doctor" | "install" | "jupiter" | "live-canary" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [browserWallet, setBrowserWallet] = useState<BrowserWalletReceipt | null>(null);
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
@@ -153,6 +156,8 @@ export function SettingsWeb3CredentialConsole({
   const [doctorRefreshReceipt, setDoctorRefreshReceipt] = useState<Web3CredentialDoctorRefreshReceipt | null>(null);
   const [localInstallReceipt, setLocalInstallReceipt] = useState<Web3LocalCredentialInstallReceipt | null>(null);
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveCapitalPreflightReceipt | null>(null);
+  const [unsignedCanaryReceipt, setUnsignedCanaryReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
+  const [liveCanaryActionReceipt, setLiveCanaryActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
   const [liveUsabilityReceipt, setLiveUsabilityReceipt] = useState<Web3LiveUsabilityBlockersReceipt>(initialLiveUsability);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
@@ -369,6 +374,88 @@ export function SettingsWeb3CredentialConsole({
       void refreshLiveUsabilityBlockers({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live-capital preflight failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function signAndRelayLiveCanary() {
+    setBusy("live-canary");
+    setMessage("Building a tiny gated canary order for browser-wallet transaction signing...");
+    try {
+      const provider = getBrowserSolanaProvider();
+      if (!provider || typeof provider.signTransaction !== "function") {
+        throw new Error("No browser wallet with transaction signing is available.");
+      }
+      let publicKey = provider.publicKey?.toString() ?? null;
+      if ((!publicKey || !isLikelySolanaPublicKey(publicKey)) && typeof provider.connect === "function") {
+        const result = await provider.connect();
+        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? null;
+      }
+      if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
+        throw new Error("Connect a valid public Solana wallet before requesting the live canary signature.");
+      }
+      setDraft((current) => ({
+        ...current,
+        wallet_public_key: publicKey,
+        signer_mode: "external-wallet",
+      }));
+      const params = new URLSearchParams({
+        scenario,
+        source: "live-dex",
+        account: "persistent",
+        cycles: String(cycles),
+      });
+      const unsignedResponse = await fetch(`/api/web3-live-unsigned-order-handoff?${params.toString()}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operator_ack: true,
+          canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+          return_unsigned_transaction_ack: true,
+          wallet_public_key: publicKey,
+          amount_lamports: 100_000,
+          max_slippage_bps: Math.max(1, Math.min(100, Math.trunc(Number(draft.max_slippage_bps) || 50))),
+        }),
+      });
+      const unsignedPayload = (await unsignedResponse.json().catch(() => null)) as Web3LiveUnsignedOrderHandoffReceipt | { error: string } | null;
+      if (!unsignedResponse.ok || !unsignedPayload || "error" in unsignedPayload) {
+        throw new Error(unsignedPayload && "error" in unsignedPayload ? unsignedPayload.error : "Live unsigned order handoff failed.");
+      }
+      setUnsignedCanaryReceipt(unsignedPayload);
+      if (unsignedPayload.status !== "order-ready" || !unsignedPayload.unsigned_transaction || !unsignedPayload.request_id) {
+        throw new Error(unsignedPayload.next_action);
+      }
+
+      setMessage("Wallet prompt opening for the tiny canary transaction. Review it carefully before signing.");
+      const { VersionedTransaction } = await import("@solana/web3.js");
+      const transaction = VersionedTransaction.deserialize(base64ToBytes(unsignedPayload.unsigned_transaction));
+      const signedTransaction = await provider.signTransaction(transaction);
+      const serialized = serializeSignedWalletTransaction(signedTransaction);
+      if (!serialized) {
+        throw new Error("Wallet did not return a serializable signed transaction.");
+      }
+      const signedBase64 = bytesToBase64(serialized);
+      const relayResponse = await fetch(`/api/web3-live-trade-canary?${params.toString()}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operator_ack: true,
+          canary_ack: "I_UNDERSTAND_THIS_CAN_MOVE_REAL_FUNDS",
+          signed_transaction: signedBase64,
+          request_id: unsignedPayload.request_id,
+          route: "jupiter-swap-v2",
+        }),
+      });
+      const relayPayload = (await relayResponse.json().catch(() => null)) as Web3LiveTradeCanaryActionReceipt | { error: string } | null;
+      if (!relayResponse.ok || !relayPayload || "error" in relayPayload) {
+        throw new Error(relayPayload && "error" in relayPayload ? relayPayload.error : "Live canary relay failed.");
+      }
+      setLiveCanaryActionReceipt(relayPayload);
+      setMessage(relayPayload.next_action);
+      void refreshLiveUsabilityBlockers({ announce: false });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Live canary signing flow failed.");
     } finally {
       setBusy(null);
     }
@@ -1251,6 +1338,15 @@ export function SettingsWeb3CredentialConsole({
             <ShieldCheck className={cn("size-3.5 shrink-0", busy === "preflight" && "animate-pulse")} aria-hidden="true" />
             {busy === "preflight" ? "Checking" : "Run live preflight"}
           </button>
+          <button
+            type="button"
+            onClick={() => void signAndRelayLiveCanary()}
+            disabled={disabled}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Zap className={cn("size-3.5 shrink-0", busy === "live-canary" && "animate-pulse")} aria-hidden="true" />
+            {busy === "live-canary" ? "Signing canary" : "Sign tiny canary"}
+          </button>
         </div>
       </div>
 
@@ -1433,6 +1529,11 @@ export function SettingsWeb3CredentialConsole({
           value={preflightReceipt ? `${preflightReceipt.failed_gate_count} fail / ${preflightReceipt.watch_gate_count} watch` : "blocked"}
           tone={preflightReceipt?.status === "manual-live-review" ? "engine" : preflightReceipt ? "caution" : "neutral"}
         />
+        <ConsoleMetric
+          label="Live canary"
+          value={liveCanaryActionReceipt ? liveCanaryActionReceipt.status.replaceAll("-", " ") : unsignedCanaryReceipt ? unsignedCanaryReceipt.status.replaceAll("-", " ") : "not signed"}
+          tone={liveCanaryActionReceipt?.actual_live_trade_tested ? "engine" : liveCanaryActionReceipt || unsignedCanaryReceipt ? "caution" : "neutral"}
+        />
       </div>
 
       {savedScope ? (
@@ -1520,6 +1621,72 @@ export function SettingsWeb3CredentialConsole({
         </div>
       ) : null}
 
+      {unsignedCanaryReceipt ? (
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.035] p-2" aria-label="Settings live unsigned canary handoff receipt">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Tiny canary handoff</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{unsignedCanaryReceipt.status.replaceAll("-", " ")}</p>
+            </div>
+            <Badge variant="outline" className={cn(
+              "border-outline-variant/35 bg-void/25 text-outline",
+              unsignedCanaryReceipt.status === "order-ready" && "border-caution/35 bg-caution/10 text-caution",
+              unsignedCanaryReceipt.status === "unsafe-rejected" && "border-critical/35 bg-critical/10 text-critical",
+            )}>
+              {unsignedCanaryReceipt.unsigned_transaction_return.replaceAll("-", " ")}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <ConsoleMetric label="Wallet" value={unsignedCanaryReceipt.wallet_public_key_preview ?? "missing"} tone={unsignedCanaryReceipt.wallet_public_key_preview ? "caution" : "critical"} />
+            <ConsoleMetric label="Request" value={unsignedCanaryReceipt.request_id ?? "none"} tone={unsignedCanaryReceipt.request_id ? "caution" : "neutral"} />
+            <ConsoleMetric label="Bytes" value={String(unsignedCanaryReceipt.unsigned_payload_byte_count)} tone={unsignedCanaryReceipt.unsigned_payload_byte_count > 0 ? "caution" : "neutral"} />
+            <ConsoleMetric label="Store body" value={unsignedCanaryReceipt.transaction_body_storage} tone="neutral" />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">{unsignedCanaryReceipt.next_action}</p>
+          {unsignedCanaryReceipt.blockers.length > 0 ? (
+            <p className="mt-1 text-[11px] leading-4 text-outline">
+              Blocker: {unsignedCanaryReceipt.blockers[0]}
+            </p>
+          ) : null}
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+            receipt {unsignedCanaryReceipt.receipt_hash.slice(0, 10)} · pair {unsignedCanaryReceipt.canary_pair} · amount {unsignedCanaryReceipt.amount_lamports} lamports
+          </p>
+        </div>
+      ) : null}
+
+      {liveCanaryActionReceipt ? (
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.035] p-2" aria-label="Settings live canary signed relay receipt">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Signed canary relay</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{liveCanaryActionReceipt.status.replaceAll("-", " ")}</p>
+            </div>
+            <Badge variant="outline" className={cn(
+              "border-outline-variant/35 bg-void/25 text-outline",
+              liveCanaryActionReceipt.actual_live_trade_tested && "border-engine/35 bg-engine/10 text-engine",
+              liveCanaryActionReceipt.status === "unsafe-rejected" && "border-critical/35 bg-critical/10 text-critical",
+            )}>
+              {liveCanaryActionReceipt.actual_live_trade_tested ? "live evidence" : "not confirmed"}
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <ConsoleMetric label="Request" value={liveCanaryActionReceipt.request_id ?? "none"} tone={liveCanaryActionReceipt.request_id ? "caution" : "neutral"} />
+            <ConsoleMetric label="Route" value={liveCanaryActionReceipt.route ?? "none"} tone={liveCanaryActionReceipt.route ? "caution" : "neutral"} />
+            <ConsoleMetric label="Signed bytes" value={String(liveCanaryActionReceipt.signed_payload_byte_count)} tone={liveCanaryActionReceipt.signed_payload_byte_count > 0 ? "caution" : "neutral"} />
+            <ConsoleMetric label="Echoed" value={String(liveCanaryActionReceipt.signed_payload_echoed)} tone="neutral" />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">{liveCanaryActionReceipt.next_action}</p>
+          {liveCanaryActionReceipt.blockers.length > 0 ? (
+            <p className="mt-1 text-[11px] leading-4 text-outline">
+              Blocker: {liveCanaryActionReceipt.blockers[0]}
+            </p>
+          ) : null}
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+            receipt {liveCanaryActionReceipt.receipt_hash.slice(0, 10)} · funds moved {String(liveCanaryActionReceipt.real_funds_moved_by_this_app)}
+          </p>
+        </div>
+      ) : null}
+
       {dexReceipt ? (
         <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings DEX discovery receipt">
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1599,7 +1766,7 @@ export function SettingsWeb3CredentialConsole({
       ) : null}
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
-        Settings Web3 credential console keeps API keys session only; no browser storage for Helius, Jupiter, Privy, Turnkey, signer-provider, or production alert keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; unsigned transaction return withheld; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; live execution blocked; wallet mutation blocked.
+        Settings Web3 credential console keeps API keys session only; no browser storage for Helius, Jupiter, Privy, Turnkey, signer-provider, or production alert keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; Jupiter rehearsal withholds unsigned transaction bodies; tiny live canary signing uses a gated one-shot unsigned handoff and browser wallet prompt only after live flags; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; wallet mutation blocked.
         Local credential installer can write known provider, signer-provider, emergency-stop, production-worker, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
       </p>
     </section>
@@ -2003,6 +2170,21 @@ function bytesToBase64(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return window.btoa(binary);
+}
+
+function base64ToBytes(value: string) {
+  const binary = window.atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function serializeSignedWalletTransaction(value: unknown): Uint8Array | null {
+  if (!value || typeof value !== "object") return null;
+  const maybeSerializable = value as { serialize?: () => Uint8Array };
+  if (typeof maybeSerializable.serialize !== "function") return null;
+  const serialized = maybeSerializable.serialize();
+  return serialized instanceof Uint8Array ? serialized : null;
 }
 
 const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";

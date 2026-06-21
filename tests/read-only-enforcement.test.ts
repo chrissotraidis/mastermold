@@ -28,6 +28,10 @@ const localOrchestrationRouteAllowlist = new Set([
   "app/api/web3-credentials/test/route.ts",
   // Web3 Jupiter packet route is a redacted setup receipt, not an execution endpoint.
   "app/api/web3-jupiter-order-packet/route.ts",
+  // Web3 live canary route is explicitly gated and accepts externally signed payloads only after live approval; it never stores keys.
+  "app/api/web3-live-trade-canary/route.ts",
+  // Web3 live unsigned canary route is explicitly gated and returns a one-shot tiny unsigned payload only; it cannot sign, submit, or mutate wallets.
+  "app/api/web3-live-unsigned-order-handoff/route.ts",
 ]);
 
 function collectRouteFiles(directory: string): RouteFile[] {
