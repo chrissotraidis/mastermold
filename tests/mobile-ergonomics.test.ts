@@ -1202,6 +1202,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("web3-operator-request-packet");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("next_unlock_step");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("operator_unlock_sequence");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("live_usability");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("Live Usability Summary");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("Rows listed:");
+    expect(source("app/api/web3-operator-request-packet/route.ts")).toContain("buildWeb3LiveUsabilityBlockersReceipt");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("# Mastermind Web3 Operator Request Packet");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("Next Ordered Unlock Step");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("Operator Unlock Sequence");

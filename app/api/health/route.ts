@@ -62,9 +62,9 @@ export async function GET() {
     acquisition: buildWeb3AccountAcquisitionReceipt(web3State),
     launchChecklist: web3LaunchChecklist,
   });
-  const web3RequestPacket = buildWeb3OperatorRequestPacket(web3Handoff, { usability: web3Usability });
+  const web3BaseRequestPacket = buildWeb3OperatorRequestPacket(web3Handoff, { usability: web3Usability });
   const web3Cutover = buildWeb3CutoverBlockerBoard({
-    requestPacket: web3RequestPacket,
+    requestPacket: web3BaseRequestPacket,
     runway: web3SupervisedRunway,
     usability: web3Usability,
   });
@@ -95,10 +95,17 @@ export async function GET() {
     manualLiveReview: web3ManualLiveReview,
     runway: web3SupervisedRunway,
   });
+  const web3EnrichedHandoff = buildWeb3OperatorCredentialHandoffReceipt({
+    accountSetup: web3AccountSetup,
+    acquisition: buildWeb3AccountAcquisitionReceipt(web3State),
+    launchChecklist: web3LaunchChecklist,
+    liveUsability: web3LiveUsability,
+  });
+  const web3RequestPacket = buildWeb3OperatorRequestPacket(web3EnrichedHandoff, { usability: web3Usability });
   const web3ResearchHandoff = buildWeb3ResearchHandoffPacket({
     state: web3State,
     usability: web3Usability,
-    handoff: web3Handoff,
+    handoff: web3EnrichedHandoff,
     requestPacket: web3RequestPacket,
     cutover: web3Cutover,
     runbook: web3Runbook,

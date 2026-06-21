@@ -7,12 +7,17 @@ import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-p
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import { buildWeb3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
+import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3OperatorCredentialHandoffReceipt } from "@/src/db/web3-operator-credential-handoff";
 import {
   buildWeb3OperatorRequestPacket,
   type Web3OperatorRequestPacket,
 } from "@/src/db/web3-operator-request-packet";
+import { buildWeb3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
+import { buildWeb3OperatorRunbook } from "@/src/db/web3-operator-runbook";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
@@ -86,10 +91,50 @@ export async function GET(request: Request): Promise<NextResponse<Web3OperatorRe
     launchChecklist,
     supervisedRunway: runway,
   });
+  const acquisition = buildWeb3AccountAcquisitionReceipt(state);
+  const baseHandoff = buildWeb3OperatorCredentialHandoffReceipt({
+    accountSetup,
+    acquisition,
+    launchChecklist,
+  });
+  const baseRequestPacket = buildWeb3OperatorRequestPacket(baseHandoff, { usability });
+  const cutover = buildWeb3CutoverBlockerBoard({
+    requestPacket: baseRequestPacket,
+    runway,
+    usability,
+  });
+  const preflight = buildWeb3LiveCapitalPreflightReceipt({
+    state,
+    checklist: launchChecklist,
+  });
+  const runbook = buildWeb3OperatorRunbook({
+    state,
+    usability,
+    cutover,
+    preflight,
+    runway,
+  });
+  const manualLiveReview = buildWeb3ManualLiveReviewPacket({
+    state,
+    checklist: launchChecklist,
+    preflight,
+    liveOps,
+    runway,
+  });
+  const liveUsability = buildWeb3LiveUsabilityBlockersReceipt({
+    state,
+    usability,
+    cutover,
+    runbook,
+    preflight,
+    manualLiveReview,
+    runway,
+  });
   const handoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup,
-    acquisition: buildWeb3AccountAcquisitionReceipt(state),
+    acquisition,
     launchChecklist,
+    liveUsability,
   });
 
   return NextResponse.json(buildWeb3OperatorRequestPacket(handoff, { usability }));

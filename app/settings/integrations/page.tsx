@@ -120,11 +120,11 @@ export default async function IntegrationsSettingsPage() {
     launchChecklist: web3LaunchChecklist,
     supervisedRunway: web3SupervisedLiveRunway,
   });
-  const web3OperatorRequestPacket = buildWeb3OperatorRequestPacket(web3BaseOperatorCredentialHandoff, {
+  const web3BaseOperatorRequestPacket = buildWeb3OperatorRequestPacket(web3BaseOperatorCredentialHandoff, {
     usability: web3UsabilityStatus,
   });
   const web3CutoverBlockerBoard = buildWeb3CutoverBlockerBoard({
-    requestPacket: web3OperatorRequestPacket,
+    requestPacket: web3BaseOperatorRequestPacket,
     runway: web3SupervisedLiveRunway,
     usability: web3UsabilityStatus,
   });
@@ -149,6 +149,9 @@ export default async function IntegrationsSettingsPage() {
     acquisition: web3AcquisitionReceipt,
     launchChecklist: web3LaunchChecklist,
     liveUsability: web3LiveUsabilityBlockers,
+  });
+  const web3OperatorRequestPacket = buildWeb3OperatorRequestPacket(web3OperatorCredentialHandoff, {
+    usability: web3UsabilityStatus,
   });
   const web3ResearchHandoffPacket = buildWeb3ResearchHandoffPacket({
     state: web3State,

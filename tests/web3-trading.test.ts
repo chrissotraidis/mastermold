@@ -924,6 +924,19 @@ describe("Web3 autonomous trading subsystem", () => {
       handoff_receipt_hash: string;
       next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string; evidence: string } | null;
       operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
+      live_usability: {
+        mode: string;
+        status: string;
+        receipt_hash: string;
+        real_capital_blocker_count: number;
+        total_live_usability_row_count: number;
+        listed_live_usability_row_count: number;
+        ready_live_lane_count: number;
+        total_live_lane_count: number;
+        next_unlock_step_label: string | null;
+        next_unlock_step_action: string | null;
+        evidence_endpoint: string;
+      } | null;
       next_input: { id: string; label: string; next_action: string } | null;
       required_inputs: Array<{ id: string; env_targets: string[]; storage: string; safe_collection_surface: string; verifier_command: string | null }>;
       review_inputs: Array<{ id: string }>;
@@ -958,6 +971,19 @@ describe("Web3 autonomous trading subsystem", () => {
       "ops-accounting",
       "external-review",
     ]);
+    expect(packet.live_usability).not.toBeNull();
+    const requestLiveUsability = packet.live_usability!;
+    expect(requestLiveUsability).toMatchObject({
+      mode: "web3-operator-credential-live-usability-summary",
+      status: "operator-input-needed",
+      evidence_endpoint: "GET /api/web3-live-usability-blockers",
+    });
+    expect(requestLiveUsability.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(requestLiveUsability.total_live_usability_row_count).toBeGreaterThanOrEqual(requestLiveUsability.listed_live_usability_row_count);
+    expect(requestLiveUsability.real_capital_blocker_count).toBeGreaterThan(0);
+    expect(requestLiveUsability.ready_live_lane_count).toBeLessThanOrEqual(requestLiveUsability.total_live_lane_count);
+    expect(requestLiveUsability.next_unlock_step_label).toBe("Scope dedicated wallet");
+    expect(requestLiveUsability.next_unlock_step_action).toContain("public Solana trading wallet");
     expect(packet.next_input?.id).toBe("dedicated-trading-wallet");
     expect(packet.required_inputs.map((item) => item.id)).toEqual(expect.arrayContaining([
       "jupiter-route-order-key",
@@ -981,6 +1007,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.text_packet).toContain("# Mastermind Web3 Operator Request Packet");
     expect(packet.text_packet).toContain("Next Ordered Unlock Step");
     expect(packet.text_packet).toContain("Operator Unlock Sequence");
+    expect(packet.text_packet).toContain("Live Usability Summary");
+    expect(packet.text_packet).toContain("Rows listed:");
+    expect(packet.text_packet).toContain("GET /api/web3-live-usability-blockers");
     expect(packet.text_packet).toContain("JUPITER_API_KEY");
     expect(packet.text_packet).toContain("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL");
     expect(packet.text_packet).toContain("Never Provide");

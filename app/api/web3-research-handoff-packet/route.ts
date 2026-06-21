@@ -132,12 +132,13 @@ export async function GET(request: Request): Promise<NextResponse<Web3ResearchHa
     launchChecklist,
     liveUsability,
   });
+  const enrichedRequestPacket = buildWeb3OperatorRequestPacket(handoff, { usability });
 
   return NextResponse.json(buildWeb3ResearchHandoffPacket({
     state,
     usability,
     handoff,
-    requestPacket,
+    requestPacket: enrichedRequestPacket,
     cutover,
     runbook,
     preflight,

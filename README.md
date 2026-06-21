@@ -186,6 +186,10 @@ safe collection surfaces, env target names, next input, verifier commands, and a
 live-usability summary with real-capital blocker count, total-versus-listed row counts,
 live-lane counts, the next ordered unlock step, and the same live-execution/wallet-mutation/
 transaction-submission/private-key/seed-phrase/secret-echo blocks without returning raw secrets.
+`/api/web3-operator-request-packet` turns that same handoff into a shareable redacted
+setup packet with the live-usability summary embedded in JSON and text form, so another
+helper sees blocker counts, listed rows, the next unlock step, safe inputs, and never-provide
+boundaries in one pasteable artifact.
 `/api/web3-research-handoff-packet?source=live-dex` is the paste-ready research brief for
 another helper. It includes the next ordered unlock step, the six-step operator unlock
 sequence, open operator inputs, live-capital blockers, source endpoints, and research

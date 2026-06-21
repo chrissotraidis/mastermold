@@ -667,8 +667,14 @@ async function verifyOperatorSetupPackets() {
   assert(typeof requestPacket.json.text_packet === "string" && requestPacket.json.text_packet.includes("# Mastermind Web3 Operator Request Packet"), "Operator request packet should include pasteable text.", requestPacket.json.text_packet);
   assert(Array.isArray(requestPacket.json.operator_unlock_sequence) && requestPacket.json.operator_unlock_sequence.map((item) => item.id).join(",") === "scope-wallet,prove-wallet,rehearse-jupiter,choose-signer,ops-accounting,external-review", "Operator request packet should carry the ordered unlock sequence.", requestPacket.json.operator_unlock_sequence);
   assert(requestPacket.json.operator_unlock_sequence.some((item) => item.id === requestPacket.json.next_unlock_step?.id), "Operator request packet should expose the next ordered unlock step.", requestPacket.json.next_unlock_step);
+  assert(requestPacket.json.live_usability?.mode === "web3-operator-credential-live-usability-summary", "Operator request packet should carry a compact live-usability summary.", requestPacket.json.live_usability);
+  assert(typeof requestPacket.json.live_usability.real_capital_blocker_count === "number", "Operator request packet live-usability summary should expose real-money blocker count.", requestPacket.json.live_usability);
+  assert(requestPacket.json.live_usability.total_live_usability_row_count >= requestPacket.json.live_usability.listed_live_usability_row_count, "Operator request packet live-usability summary listed rows should not exceed total rows.", requestPacket.json.live_usability);
+  assert(requestPacket.json.live_usability.evidence_endpoint === "GET /api/web3-live-usability-blockers", "Operator request packet live-usability summary should point to the full blocker endpoint.", requestPacket.json.live_usability);
   assert(requestPacket.json.text_packet.includes("Next Ordered Unlock Step"), "Operator request text should name the next ordered unlock step.", requestPacket.json.text_packet);
   assert(requestPacket.json.text_packet.includes("Operator Unlock Sequence"), "Operator request text should include the ordered unlock sequence.", requestPacket.json.text_packet);
+  assert(requestPacket.json.text_packet.includes("Live Usability Summary"), "Operator request text should include the live-usability summary.", requestPacket.json.text_packet);
+  assert(requestPacket.json.text_packet.includes("Rows listed:"), "Operator request text should include listed-versus-total live-usability rows.", requestPacket.json.text_packet);
   assert(requestPacket.json.text_packet.includes("Never Provide"), "Operator request text should include the never-provide boundary.", requestPacket.json.text_packet);
   assertBlockedAuthority("Operator request packet", requestPacket.json);
 

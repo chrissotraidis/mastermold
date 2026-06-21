@@ -29,6 +29,7 @@ export type Web3OperatorRequestPacket = {
   handoff_receipt_hash: string;
   next_unlock_step: Web3OperatorUnlockStep | null;
   operator_unlock_sequence: Web3OperatorUnlockStep[];
+  live_usability: Web3OperatorCredentialHandoffReceipt["live_usability"];
   next_input: Web3OperatorRequestPacketInput | null;
   required_inputs: Web3OperatorRequestPacketInput[];
   review_inputs: Web3OperatorRequestPacketInput[];
@@ -76,6 +77,7 @@ export function buildWeb3OperatorRequestPacket(
     handoff_receipt_hash: handoff.receipt_hash,
     next_unlock_step: nextUnlockStep,
     operator_unlock_sequence: operatorUnlockSequence,
+    live_usability: handoff.live_usability,
     next_input: nextInput,
     required_inputs: openRequired,
     review_inputs: reviewInputs,
@@ -91,6 +93,7 @@ export function buildWeb3OperatorRequestPacket(
     controls: [
       "This packet is safe to share with a research/helper agent because it contains target names and status only.",
       "When a usability receipt is supplied, the packet carries the ordered unlock sequence so setup helpers can resolve wallet scope before downstream proof and review work.",
+      "When a live-usability summary is supplied, the packet includes blocker counts, listed-versus-total rows, live-lane counts, and the next unlock step without embedding secrets or full diagnostic rows.",
       "It asks for public wallet, server-env API keys, ops contacts, accounting target, signer/custody decision, and manual review decisions; it never asks for wallet private keys or seed phrases.",
       "Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.",
     ],
@@ -149,6 +152,18 @@ function renderOperatorRequestText(packet: Omit<Web3OperatorRequestPacket, "rece
       `  Evidence: ${step.evidence}`,
     ].join("\n")).join("\n")
     : "- No ordered unlock sequence was attached.";
+  const liveUsabilityLines = packet.live_usability
+    ? [
+      `- Status: ${packet.live_usability.status}`,
+      `- Real-money blockers: ${packet.live_usability.real_capital_blocker_count}`,
+      `- Rows listed: ${packet.live_usability.listed_live_usability_row_count}/${packet.live_usability.total_live_usability_row_count}`,
+      `- Live lanes ready: ${packet.live_usability.ready_live_lane_count}/${packet.live_usability.total_live_lane_count}`,
+      packet.live_usability.next_unlock_step_label
+        ? `- Next unlock: ${packet.live_usability.next_unlock_step_label}; ${packet.live_usability.next_unlock_step_action}`
+        : `- Next action: ${packet.live_usability.next_action}`,
+      `- Evidence: ${packet.live_usability.evidence_endpoint}; receipt ${packet.live_usability.receipt_hash}`,
+    ].join("\n")
+    : "- No live-usability summary was attached; load GET /api/web3-live-usability-blockers for the full blocker packet.";
   return [
     "# Mastermind Web3 Operator Request Packet",
     "",
@@ -164,6 +179,9 @@ function renderOperatorRequestText(packet: Omit<Web3OperatorRequestPacket, "rece
     "",
     "## Operator Unlock Sequence",
     unlockLines,
+    "",
+    "## Live Usability Summary",
+    liveUsabilityLines,
     "",
     "## Required Inputs",
     requiredLines,

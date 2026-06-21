@@ -180,12 +180,13 @@ async function buildResearchHandoffForSearch(input: {
     launchChecklist,
     liveUsability,
   });
+  const enrichedRequestPacket = buildWeb3OperatorRequestPacket(handoff, { usability });
 
   return buildWeb3ResearchHandoffPacket({
     state,
     usability,
     handoff,
-    requestPacket,
+    requestPacket: enrichedRequestPacket,
     cutover,
     runbook,
     preflight,
