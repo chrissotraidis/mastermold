@@ -2182,13 +2182,16 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_credential_requirements.before_live_count).toBeGreaterThan(0);
     expect(receipt.web3_credential_requirements.external_review_count).toBe(1);
     expect(receipt.web3_credential_requirements.blocker_count).toBe(receipt.web3_credential_requirements.requirement_count);
+    const healthWalletGateIsOwnershipProof = receipt.web3_live_usability.current_input?.id === "wallet-ownership-proof";
     expect(receipt.web3_credential_requirements.next_requirement).toMatchObject({
-      id: "dedicated-public-wallet",
-      target_names: ["wallet_public_key"],
+      id: healthWalletGateIsOwnershipProof ? "wallet-ownership-proof" : "dedicated-public-wallet",
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
       secret_echo_permission: "blocked",
     });
+    expect(receipt.web3_credential_requirements.next_requirement?.target_names).toContain(
+      healthWalletGateIsOwnershipProof ? "hash-only wallet ownership receipt" : "wallet_public_key",
+    );
     expect(receipt.web3_credential_requirements.source_endpoint).toContain("/api/web3-credential-requirements");
     expect(receipt.web3_credential_requirements.live_review_source_endpoint).toBe("/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(receipt.web3_credential_requirements.live_execution_permission).toBe("blocked");
@@ -2208,9 +2211,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_activation.live_execution_permitted).toBe(false);
     expect(receipt.web3_live_activation.milestone_count).toBeGreaterThanOrEqual(10);
     expect(receipt.web3_live_activation.next_milestone).toMatchObject({
-      id: "dedicated-public-wallet",
-      target_names: ["wallet_public_key"],
+      id: healthWalletGateIsOwnershipProof ? "wallet-ownership-proof" : "dedicated-public-wallet",
     });
+    expect(receipt.web3_live_activation.next_milestone?.target_names).toContain(
+      healthWalletGateIsOwnershipProof ? "hash-only wallet ownership receipt" : "wallet_public_key",
+    );
     expect(receipt.web3_live_activation.source_endpoint).toContain("/api/web3-live-activation-plan");
     expect(receipt.web3_live_activation.live_review_source_endpoint).toBe("/api/web3-live-activation-plan?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(receipt.web3_live_activation.live_execution_permission).toBe("blocked");
@@ -2980,13 +2985,17 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.activation_permitted).toBe(false);
     expect(receipt.can_trade_real_capital).toBe(false);
     expect(receipt.live_execution_permitted).toBe(false);
+    expect(receipt.next_milestone).not.toBeNull();
+    if (!receipt.next_milestone) throw new Error("Expected a next live activation milestone.");
+    expect(["dedicated-public-wallet", "wallet-ownership-proof"]).toContain(receipt.next_milestone.id);
     expect(receipt.next_milestone).toMatchObject({
-      id: "dedicated-public-wallet",
-      label: "Dedicated public wallet",
       owner: "operator",
       status: "next",
-      target_names: ["wallet_public_key"],
     });
+    expect(receipt.next_milestone?.target_names.some((target) =>
+      ["wallet_public_key", "wallet_ownership_signature_hash"].includes(target)
+      || target === "hash-only wallet ownership receipt"
+    )).toBe(true);
     expect(receipt.next_milestone?.verifier_command).toContain("--require-operator-wallet");
     expect(receipt.milestones.map((item) => item.id)).toContain("live-autonomy-final-gate");
     expect(receipt.milestones.length).toBeGreaterThanOrEqual(10);

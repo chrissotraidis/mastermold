@@ -199,15 +199,20 @@ function buildActivationMilestones(input: {
   liveAutonomy: Web3TradingState["autonomous_live_autonomy_readiness"];
 }): Web3LiveActivationMilestone[] {
   const nextRequirementId = input.requirements.next_requirement?.id ?? null;
+  const dedicatedWalletReady = input.liveUsability.operator_unlock_sequence.some((step) =>
+    step.id === "scope-wallet" && step.status === "ready"
+  );
   const requirementMilestones = input.requirements.requirements.map((requirement) => ({
     id: requirement.id,
     label: requirement.label,
     owner: requirement.owner,
-    status: requirement.id === nextRequirementId
-      ? "next" as const
-      : requirement.priority === "external-review"
-        ? "external-review" as const
-        : "blocked" as const,
+    status: requirement.id === "dedicated-public-wallet" && dedicatedWalletReady
+      ? "ready" as const
+      : requirement.id === nextRequirementId
+        ? "next" as const
+        : requirement.priority === "external-review"
+          ? "external-review" as const
+          : "blocked" as const,
     safe_value_type: requirement.safe_value_type,
     safe_collection_surface: requirement.safe_collection_surface,
     storage_rule: requirement.storage_rule,

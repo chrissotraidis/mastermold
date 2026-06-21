@@ -98,7 +98,7 @@ function verifyPacket(packet) {
   assert(packet.live_execution_permitted === false, "Live activation plan should keep live execution disabled.", packet);
   assert(Array.isArray(packet.milestones) && packet.milestones.length >= 9, "Live activation plan should include activation milestones.", packet);
   assert(packet.milestones.some((item) => item.id === "live-autonomy-final-gate"), "Live activation plan should include the final autonomy gate.", packet.milestones);
-  assert(packet.next_milestone?.id === "dedicated-public-wallet", "Live activation plan should start with the dedicated public wallet gate.", packet.next_milestone);
+  assert(["dedicated-public-wallet", "wallet-ownership-proof"].includes(packet.next_milestone?.id), "Live activation plan should expose the current wallet gate.", packet.next_milestone);
   assert(Array.isArray(packet.activation_commands) && packet.activation_commands.some((command) => command.includes("activate:web3")), "Live activation plan should include its local export command.", packet.activation_commands);
   assert(typeof packet.text_packet === "string" && packet.text_packet.includes("# Mastermind Web3 Live Activation Plan"), "Live activation plan should include paste-ready markdown text.", packet);
   assert(packet.text_packet.includes("## Next Milestone"), "Live activation text should include the next milestone.", packet.text_packet);

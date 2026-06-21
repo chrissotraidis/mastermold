@@ -327,9 +327,21 @@ function buildCredentialRequirements(
     const targets = openInputById.get(id)?.env_targets ?? [];
     return targets.length > 0 ? targets : fallback;
   };
+  const walletOwnershipIsCurrent = currentInput?.id === "wallet-ownership-proof";
   const currentAction = currentInput?.id === "dedicated-trading-wallet"
     ? currentInput.next_action
-    : "Save a dedicated public Solana trading wallet address in Settings; do not paste private keys or seed phrases.";
+    : walletOwnershipIsCurrent
+      ? "A dedicated public wallet is scoped; keep it isolated and prove control with the browser wallet text-only challenge."
+      : "Save a dedicated public Solana trading wallet address in Settings; do not paste private keys or seed phrases.";
+  const walletOwnershipTargetNames = walletOwnershipIsCurrent && currentInput.target_names.length > 0
+    ? currentInput.target_names
+    : ["wallet_public_key", "wallet_ownership_signature_hash"];
+  const walletOwnershipSurface = walletOwnershipIsCurrent
+    ? "/trading?source=live-dex&account=persistent"
+    : "/settings/integrations#settings-web3-wallet-public-key";
+  const walletOwnershipAction = walletOwnershipIsCurrent
+    ? currentInput.next_action
+    : "Connect the browser wallet only for a public-address prompt, then sign the app's text-only ownership message.";
   const linkedQuestions = (...ids: Web3ResearchQuestion["id"][]) => ids.filter((id) => questionIds.has(id));
 
   return [
@@ -337,7 +349,7 @@ function buildCredentialRequirements(
       id: "dedicated-public-wallet",
       label: "Dedicated public wallet",
       owner: "operator",
-      priority: "needed-now",
+      priority: walletOwnershipIsCurrent ? "before-live" : "needed-now",
       safe_value_type: "Public Solana wallet address only",
       safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
       storage_rule: "browser-public-scope",
@@ -356,12 +368,12 @@ function buildCredentialRequirements(
       owner: "operator",
       priority: "needed-now",
       safe_value_type: "Text-message signature receipt with hashes only",
-      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+      safe_collection_surface: walletOwnershipSurface,
       storage_rule: "hash-only-local-receipt",
-      target_names: ["wallet_public_key", "wallet_ownership_signature_hash"],
+      target_names: walletOwnershipTargetNames,
       research_question_ids: linkedQuestions("custody-architecture", "credential-storage"),
       completion_signal: "Wallet proof receipt stores challenge/signature hashes only and transaction signing stays blocked.",
-      next_action: "Connect the browser wallet only for a public-address prompt, then sign the app's text-only ownership message.",
+      next_action: walletOwnershipAction,
       blocks_live_capital: true,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",

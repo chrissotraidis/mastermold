@@ -94,8 +94,14 @@ function verifyPacket(packet) {
   assert(typeof packet.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(packet.receipt_hash), "Credential requirements packet should include a receipt hash.", packet);
   assert(typeof packet.research_handoff_hash === "string" && /^[0-9a-f]{64}$/.test(packet.research_handoff_hash), "Credential requirements packet should include the source research handoff hash.", packet);
   assert(Array.isArray(packet.requirements) && packet.requirements.length >= 8, "Credential requirements packet should include the safe ask list.", packet);
-  assert(packet.next_requirement?.id === "dedicated-public-wallet", "Credential requirements packet should expose the dedicated wallet as the next ask.", packet);
-  assert(packet.next_requirement?.target_names?.includes("wallet_public_key"), "Credential requirements packet should point to the public wallet target.", packet.next_requirement);
+  assert(["dedicated-public-wallet", "wallet-ownership-proof"].includes(packet.next_requirement?.id), "Credential requirements packet should expose the current wallet ask.", packet);
+  assert(
+    packet.next_requirement?.target_names?.includes("wallet_public_key") ||
+      packet.next_requirement?.target_names?.includes("wallet_ownership_signature_hash") ||
+      packet.next_requirement?.target_names?.includes("hash-only wallet ownership receipt"),
+    "Credential requirements packet should point to the current wallet target.",
+    packet.next_requirement,
+  );
   assert(Array.isArray(packet.safe_export_commands) && packet.safe_export_commands.some((command) => command.includes("requirements:web3")), "Credential requirements packet should include the local export command.", packet);
   assert(typeof packet.text_packet === "string" && packet.text_packet.includes("# Mastermind Web3 Credential Requirements Packet"), "Credential requirements packet should include paste-ready markdown text.", packet);
   assert(packet.text_packet.includes("## Next Requirement"), "Credential requirements text should include the next requirement.", packet.text_packet);

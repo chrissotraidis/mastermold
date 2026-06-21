@@ -213,14 +213,17 @@ async function verifyHealth() {
   assert(json.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", json.web3_research_handoff);
   assert(json.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", json.web3_research_handoff);
   assert(json.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", json.web3_research_handoff);
+  const healthProofIsNext = json.web3_live_usability?.current_input?.id === "wallet-ownership-proof";
+  const healthExpectedWalletGateId = healthProofIsNext ? "wallet-ownership-proof" : "dedicated-public-wallet";
+  const healthExpectedWalletTarget = healthProofIsNext ? "hash-only wallet ownership receipt" : "wallet_public_key";
   assert(json.web3_credential_requirements?.mode === "web3-credential-requirements-health", "Health endpoint should expose Web3 credential requirements health.", json.web3_credential_requirements);
   assertReceiptHash("Health credential requirements", json.web3_credential_requirements.receipt_hash);
   assertReceiptHash("Health credential requirements source", json.web3_credential_requirements.research_handoff_hash);
   assert(json.web3_credential_requirements.requirement_count >= 8, "Credential requirements health should expose safe requirement count.", json.web3_credential_requirements);
   assert(json.web3_credential_requirements.needed_now_count >= 1, "Credential requirements health should expose needed-now asks.", json.web3_credential_requirements);
   assert(json.web3_credential_requirements.blocker_count === json.web3_credential_requirements.requirement_count, "Credential requirements health should keep each requirement blocking live capital.", json.web3_credential_requirements);
-  assert(json.web3_credential_requirements.next_requirement?.id === "dedicated-public-wallet", "Credential requirements health should expose the next wallet requirement.", json.web3_credential_requirements);
-  assert(json.web3_credential_requirements.next_requirement?.target_names?.includes("wallet_public_key"), "Credential requirements health should point to the public wallet target.", json.web3_credential_requirements.next_requirement);
+  assert(json.web3_credential_requirements.next_requirement?.id === healthExpectedWalletGateId, "Credential requirements health should expose the current wallet gate.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.next_requirement?.target_names?.includes(healthExpectedWalletTarget), "Credential requirements health should point to the current wallet target.", json.web3_credential_requirements.next_requirement);
   assert(json.web3_credential_requirements.source_endpoint.includes("/api/web3-credential-requirements"), "Credential requirements health should link its standalone endpoint.", json.web3_credential_requirements);
   assert(
     json.web3_credential_requirements.live_review_source_endpoint === "/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0",
@@ -242,7 +245,7 @@ async function verifyHealth() {
   assert(json.web3_live_activation.can_trade_real_capital === false, "Live activation health should keep real-capital trading blocked.", json.web3_live_activation);
   assert(json.web3_live_activation.live_execution_permitted === false, "Live activation health should keep live execution disabled.", json.web3_live_activation);
   assert(json.web3_live_activation.milestone_count >= 10, "Live activation health should expose activation milestone count.", json.web3_live_activation);
-  assert(json.web3_live_activation.next_milestone?.id === "dedicated-public-wallet", "Live activation health should expose the dedicated wallet as the next milestone.", json.web3_live_activation);
+  assert(json.web3_live_activation.next_milestone?.id === healthExpectedWalletGateId, "Live activation health should expose the current wallet gate as the next milestone.", json.web3_live_activation);
   assert(json.web3_live_activation.source_endpoint.includes("/api/web3-live-activation-plan"), "Live activation health should link its standalone endpoint.", json.web3_live_activation);
   assert(
     json.web3_live_activation.live_review_source_endpoint === "/api/web3-live-activation-plan?source=live-dex&account=persistent&scenario=breakout&cycles=0",
@@ -1245,8 +1248,14 @@ async function verifyCredentialRequirementsPacket() {
   assert(json.before_live_count >= 1, "Credential requirements packet should expose before-live asks.", json);
   assert(json.external_review_count === 1, "Credential requirements packet should expose the external review gate.", json);
   assert(json.blocker_count === json.requirement_count, "Credential requirements packet should keep every ask blocking live capital.", json);
-  assert(json.next_requirement?.id === "dedicated-public-wallet", "Credential requirements packet should show the public wallet as the next ask.", json.next_requirement);
-  assert(json.next_requirement?.target_names?.includes("wallet_public_key"), "Credential requirements packet should point to the public wallet target.", json.next_requirement);
+  assert(["dedicated-public-wallet", "wallet-ownership-proof"].includes(json.next_requirement?.id), "Credential requirements packet should show the current wallet ask.", json.next_requirement);
+  assert(
+    json.next_requirement?.target_names?.includes("wallet_public_key") ||
+      json.next_requirement?.target_names?.includes("wallet_ownership_signature_hash") ||
+      json.next_requirement?.target_names?.includes("hash-only wallet ownership receipt"),
+    "Credential requirements packet should point to the current wallet target.",
+    json.next_requirement,
+  );
   assert(
     ["dedicated-public-wallet", "wallet-ownership-proof", "read-provider-rail", "jupiter-order-rail", "signer-policy", "ops-emergency-stop", "accounting-ledger", "risk-policy", "manual-live-review"].every((id) =>
       json.requirements.some((item) =>
@@ -1297,7 +1306,7 @@ async function verifyLiveActivationPlanPacket() {
   assert(json.activation_permitted === false, "Live activation plan must not permit activation.", json);
   assert(json.can_trade_real_capital === false, "Live activation plan must keep real-capital trading blocked.", json);
   assert(json.live_execution_permitted === false, "Live activation plan must keep live execution disabled.", json);
-  assert(json.next_milestone?.id === "dedicated-public-wallet", "Live activation plan should expose the dedicated wallet as the next milestone.", json.next_milestone);
+  assert(["dedicated-public-wallet", "wallet-ownership-proof"].includes(json.next_milestone?.id), "Live activation plan should expose the current wallet gate as the next milestone.", json.next_milestone);
   assert(String(json.next_milestone?.verifier_command ?? "").includes("--require-operator-wallet"), "Live activation plan next milestone should expose the strict wallet verifier.", json.next_milestone);
   assert(Array.isArray(json.milestones) && json.milestones.length >= 10, "Live activation plan should include ordered milestones.", json.milestones);
   assert(json.milestones.some((item) => item.id === "live-autonomy-final-gate"), "Live activation plan should include the final live-autonomy gate.", json.milestones);

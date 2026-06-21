@@ -265,8 +265,8 @@ It keeps `can_autonomously_trade_real_money_now=false` until the supervised cana
 relayed, confirmed, reconciled settlement, and mirrored the local portfolio; it cannot sign, submit,
 return transaction bytes from the ignition action, store wallet authority, echo secrets, or mutate wallets.
 `/api/web3-live-activation-plan` now consolidates the credential requirements, live-usability blockers,
-and final autonomy gate into one operator go/no-go packet with ordered milestones, the next safe
-milestone, strict verifier commands, paste-ready Markdown, and compact `/api/health`
+and final autonomy gate into one operator go/no-go packet with ordered milestones, the current safe
+wallet milestone, strict verifier commands, paste-ready Markdown, and compact `/api/health`
 `web3_live_activation` status. Run `npm run --silent activate:web3 -- --base-url=http://localhost:4010`
 to export the same redacted plan as Markdown, or add `--json` for the full receipt. It is an activation
 plan only: activation, live execution, signing, transaction submission, wallet mutation, private-key

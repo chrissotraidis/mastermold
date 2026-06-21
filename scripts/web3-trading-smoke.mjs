@@ -134,7 +134,13 @@ async function main() {
   assert(health.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", health.web3_research_handoff);
   assert(health.web3_credential_requirements?.mode === "web3-credential-requirements-health", "Health endpoint should expose Web3 credential requirements health.", health.web3_credential_requirements);
   assert(health.web3_credential_requirements.requirement_count >= 8, "Credential requirements health should expose safe ask count.", health.web3_credential_requirements);
-  assert(health.web3_credential_requirements.next_requirement?.target_names?.includes("wallet_public_key"), "Credential requirements health should point to the public wallet target.", health.web3_credential_requirements);
+  assert(
+    health.web3_credential_requirements.next_requirement?.target_names?.includes("wallet_public_key") ||
+      health.web3_credential_requirements.next_requirement?.target_names?.includes("wallet_ownership_signature_hash") ||
+      health.web3_credential_requirements.next_requirement?.target_names?.includes("hash-only wallet ownership receipt"),
+    "Credential requirements health should point to the current wallet target.",
+    health.web3_credential_requirements,
+  );
   assert(health.web3_credential_requirements.source_endpoint.includes("/api/web3-credential-requirements"), "Credential requirements health should link the standalone endpoint.", health.web3_credential_requirements);
   assert(health.web3_credential_requirements.live_execution_permission === "blocked", "Credential requirements health should keep live execution blocked.", health.web3_credential_requirements);
   assert(health.web3_credential_requirements.wallet_mutation_permission === "blocked", "Credential requirements health should keep wallet mutation blocked.", health.web3_credential_requirements);
