@@ -692,6 +692,30 @@ export function SettingsWeb3CredentialConsole({
     preflightReady: Boolean(preflightReceipt),
   });
   const nextConsoleAction = actionChecklist.find((item) => item.status !== "ready") ?? actionChecklist[actionChecklist.length - 1];
+  const safeCredentialProfile = buildSafeCredentialProfile({
+    operatorWalletReady,
+    ownershipProved: ownershipReceipt?.signature_verified === true,
+    browserWalletConnected: browserWallet?.status === "connected",
+    providerTested: Boolean(credentialResult),
+    rpcHealthy: credentialResult?.rpc_healthy === true,
+    hasReadProviderInput: [
+      draft.helius_api_key,
+      draft.rpc_url,
+      draft.ws_url,
+    ].some((value) => value.trim().length > 0),
+    localInstallReceipt,
+    jupiterConfigured: jupiterKeyReady,
+    jupiterOrderReady: jupiterReceipt?.summary.jupiter_order_ready === true,
+    signerTargetCount,
+    signerMode: draft.signer_mode,
+    productionOpsTargetCount,
+    hasEmergencyTarget: draft.emergency_stop_webhook_url.trim().length > 0 || draft.emergency_stop_contact.trim().length > 0,
+    hasAccountingTarget: draft.tax_ledger_export_path.trim().length > 0 || localInstallReceipt?.configured_keys.includes("MASTERMOLD_TAX_LEDGER_EXPORT_PATH") === true,
+    maxTradeUsd: Number(draft.max_trade_usd) || maxTradeUsd,
+    dailySpendCapUsd: Number(draft.daily_spend_cap_usd) || dailySpendCapUsd,
+    maxSlippageBps: Number(draft.max_slippage_bps) || maxSlippageBps,
+  });
+  const safeCredentialProfileReadyCount = safeCredentialProfile.filter((item) => item.status === "ready").length;
 
   return (
     <section className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Settings Web3 credential action console">
@@ -741,6 +765,41 @@ export function SettingsWeb3CredentialConsole({
         </div>
         <p className="mt-2 text-xs leading-5 text-outline">
           Checklist actions use the controls below. They can save public scope, install allowed local env targets, or build redacted receipts; they cannot sign, submit, mutate wallets, store seed phrases, or unlock live trading.
+        </p>
+      </div>
+
+      <div className="mt-3 rounded-md border border-engine/25 bg-surface-dim/25 p-3" aria-label="Settings safe Web3 credential profile">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Safe credential profile</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">
+              {safeCredentialProfileReadyCount}/{safeCredentialProfile.length} non-secret lanes ready
+            </p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              Operator-facing setup map for wallet scope, read rail, Jupiter rehearsal, signer policy, ops, accounting, and risk caps. It never displays raw keys, wallet secrets, transaction bytes, or signed payloads.
+            </p>
+          </div>
+          <Badge variant="outline" className="border-engine/35 bg-engine/10 text-engine">
+            profile only
+          </Badge>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {safeCredentialProfile.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{item.source}</p>
+                </div>
+                <ConsoleActionBadge status={item.status === "ready" ? "ready" : item.status === "active" ? "active" : "gated"} />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.detail}</p>
+              <p className="mt-1 text-[10px] leading-4 text-outline">{item.boundary}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-xs leading-5 text-outline">
+          The profile is status-only. It can guide the next credential action, but live execution, signing, submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.
         </p>
       </div>
 
@@ -1556,6 +1615,15 @@ type ConsoleActionChecklistItem = {
   boundary: string;
 };
 
+type SafeCredentialProfileItem = {
+  id: string;
+  label: string;
+  status: "ready" | "active" | "gated";
+  source: string;
+  detail: string;
+  boundary: string;
+};
+
 function buildConsoleActionChecklist(input: {
   hasProviderInput: boolean;
   providerTested: boolean;
@@ -1624,6 +1692,116 @@ function buildConsoleActionChecklist(input: {
         ? "Live-capital preflight is recorded. Remaining blockers still require external review."
         : "Run live preflight after wallet, provider, DEX, Jupiter, risk, signer, settlement, and proof receipts are refreshed.",
       boundary: "Review receipt only; real capital, signing, submission, and wallet mutation remain blocked.",
+    },
+  ];
+}
+
+function buildSafeCredentialProfile(input: {
+  operatorWalletReady: boolean;
+  ownershipProved: boolean;
+  browserWalletConnected: boolean;
+  providerTested: boolean;
+  rpcHealthy: boolean;
+  hasReadProviderInput: boolean;
+  localInstallReceipt: Web3LocalCredentialInstallReceipt | null;
+  jupiterConfigured: boolean;
+  jupiterOrderReady: boolean;
+  signerTargetCount: number;
+  signerMode: Web3SignerSetupMode;
+  productionOpsTargetCount: number;
+  hasEmergencyTarget: boolean;
+  hasAccountingTarget: boolean;
+  maxTradeUsd: number;
+  dailySpendCapUsd: number;
+  maxSlippageBps: number;
+}): SafeCredentialProfileItem[] {
+  const locallyConfigured = (key: string) => input.localInstallReceipt?.configured_keys.includes(key) === true;
+  const readProviderReady = input.rpcHealthy || locallyConfigured("HELIUS_API_KEY") || locallyConfigured("SOLANA_RPC_URL");
+  const readProviderActive = input.providerTested || input.hasReadProviderInput;
+  const riskCapsReady = input.maxTradeUsd > 0 && input.dailySpendCapUsd >= input.maxTradeUsd && input.maxSlippageBps > 0 && input.maxSlippageBps <= 250;
+  const signerPolicyReady = input.signerMode === "external-wallet"
+    ? input.operatorWalletReady && input.ownershipProved
+    : input.signerTargetCount >= 2;
+  const opsReady = input.productionOpsTargetCount >= 2 || input.hasEmergencyTarget || locallyConfigured("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL") || locallyConfigured("MASTERMOLD_EMERGENCY_STOP_CONTACT");
+
+  return [
+    {
+      id: "public-wallet-scope",
+      label: "Public wallet scope",
+      status: input.ownershipProved ? "ready" : input.operatorWalletReady || input.browserWalletConnected ? "active" : "gated",
+      source: input.ownershipProved ? "hash-only ownership receipt" : input.operatorWalletReady ? "browser public scope" : "operator input needed",
+      detail: input.ownershipProved
+        ? "Dedicated wallet control is represented by a text-message proof receipt."
+        : input.operatorWalletReady
+          ? "A valid public wallet address is present; proof and strict verification are next."
+          : "A dedicated public Solana address is still needed before live review.",
+      boundary: "Public address and text-message proof only; no private keys, seed phrases, or transaction signing.",
+    },
+    {
+      id: "read-provider-rail",
+      label: "Read provider rail",
+      status: readProviderReady ? "ready" : readProviderActive ? "active" : "gated",
+      source: readProviderReady ? "server env or validated session" : readProviderActive ? "session/local env pending test" : "provider input needed",
+      detail: readProviderReady
+        ? "RPC/provider evidence is available for read-only wallet and market checks."
+        : readProviderActive
+          ? "Provider values are present or tested, but the rail still needs a clean health receipt."
+          : "Add Helius or Solana RPC targets before relying on live read evidence.",
+      boundary: "Read-only RPC and DAS evidence only; no wallet authority or order submission.",
+    },
+    {
+      id: "jupiter-order-rail",
+      label: "Jupiter order rail",
+      status: input.jupiterOrderReady ? "ready" : input.jupiterConfigured ? "active" : "gated",
+      source: input.jupiterOrderReady ? "redacted order rehearsal" : input.jupiterConfigured ? "Jupiter target configured" : "Jupiter key needed",
+      detail: input.jupiterOrderReady
+        ? "Quote/order readiness has a redacted proof receipt with transaction bytes withheld."
+        : input.jupiterConfigured
+          ? "A Jupiter target is available; run the rehearsal after wallet scope is clean."
+          : "Jupiter Swap V2 order proof still needs a key and public wallet scope.",
+      boundary: "Unsigned order rehearsal only; execute, signing, submission, and transaction bytes stay blocked.",
+    },
+    {
+      id: "signer-policy",
+      label: "Signer policy",
+      status: signerPolicyReady ? "ready" : input.signerMode === "external-wallet" || input.signerTargetCount > 0 ? "active" : "gated",
+      source: input.signerMode.replaceAll("-", " "),
+      detail: signerPolicyReady
+        ? "Signer path has enough non-secret evidence for external review."
+        : input.signerMode === "external-wallet"
+          ? "Manual wallet signing is selected; wallet proof must clear before review."
+          : "Provider credentials or policy identifiers are incomplete for the selected signer path.",
+      boundary: "External signer or provider vault review only; wallet private keys and seed phrases are never accepted.",
+    },
+    {
+      id: "ops-emergency-stop",
+      label: "Ops and emergency stop",
+      status: opsReady ? "ready" : input.productionOpsTargetCount > 0 || input.hasEmergencyTarget ? "active" : "gated",
+      source: opsReady ? "local ops targets" : "ops target needed",
+      detail: opsReady
+        ? "Ops or emergency-stop targets are named for review without dispatch authority."
+        : "Emergency-stop contact/webhook and production-worker review targets are still incomplete.",
+      boundary: "Target names/status only; this app does not dispatch webhooks or start production workers.",
+    },
+    {
+      id: "accounting-ledger",
+      label: "Accounting ledger",
+      status: input.hasAccountingTarget ? "ready" : "gated",
+      source: input.hasAccountingTarget ? "local accounting target" : "settlement review needed",
+      detail: input.hasAccountingTarget
+        ? "Accounting/export target evidence is present for review."
+        : "Settlement and tax-ledger targets are still needed before real capital review.",
+      boundary: "Ledger/export target only; no settlement movement or wallet mutation.",
+    },
+    {
+      id: "risk-caps",
+      label: "Risk caps",
+      status: riskCapsReady ? "ready" : "active",
+      source: "dry-run policy",
+      detail: riskCapsReady
+        ? "Trade size, daily cap, and slippage are bounded for dry-run and review."
+        : "Risk caps need a daily cap at least as large as max trade and slippage at or below 250 bps.",
+      boundary: "Policy numbers only; they do not authorize live execution.",
     },
   ];
 }

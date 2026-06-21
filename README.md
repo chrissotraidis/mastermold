@@ -201,7 +201,9 @@ live-lane counts, next ordered unlock step, next dependency blocker with its saf
 safe input contract, and blocked live-execution/signing/wallet/secret permissions without
 returning secrets or transaction bytes. Settings mirrors that next dependency blocker in
 the Web3 setup priority card and credential action console, and it also shows the compact
-credential request, verification runway, and completion criteria so the safe wallet/provider/review value, follow-up proof path, and done condition are visible where the operator fixes credentials.
+credential request, verification runway, completion criteria, and safe credential profile
+so the safe wallet/provider/review value, non-secret lane status, follow-up proof path, and
+done condition are visible where the operator fixes credentials.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and a compact

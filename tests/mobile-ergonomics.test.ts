@@ -1346,6 +1346,18 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Settings Web3 credential action checklist");
     expect(settingsConsole).toContain("Action checklist");
     expect(settingsConsole).toContain("Next safe control:");
+    expect(settingsConsole).toContain("Settings safe Web3 credential profile");
+    expect(settingsConsole).toContain("Safe credential profile");
+    expect(settingsConsole).toContain("buildSafeCredentialProfile");
+    expect(settingsConsole).toContain("non-secret lanes ready");
+    expect(settingsConsole).toContain("public-wallet-scope");
+    expect(settingsConsole).toContain("read-provider-rail");
+    expect(settingsConsole).toContain("jupiter-order-rail");
+    expect(settingsConsole).toContain("signer-policy");
+    expect(settingsConsole).toContain("ops-emergency-stop");
+    expect(settingsConsole).toContain("accounting-ledger");
+    expect(settingsConsole).toContain("risk-caps");
+    expect(settingsConsole).toContain("It never displays raw keys");
     expect(settingsConsole).toContain("Settings Web3 next operator unlock");
     expect(settingsConsole).toContain("Next operator unlock");
     expect(settingsConsole).toContain("Settings Web3 console next dependency blocker");
@@ -1706,6 +1718,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("next credential request");
     expect(source("README.md")).toContain("verification runway");
     expect(source("README.md")).toContain("completion criteria");
+    expect(source("README.md")).toContain("safe credential profile");
     expect(source("README.md")).toContain("safe fix link");
     expect(source("README.md")).toContain("verifier command");
     expect(source("README.md")).toContain("Settings mirrors that next dependency blocker");
@@ -1715,6 +1728,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("next credential request");
     expect(source("docs/web3-credentials-runbook.md")).toContain("verification runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("completion criteria");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Safe credential profile");
     expect(source("docs/web3-credentials-runbook.md")).toContain("safe fix link");
     expect(source("docs/web3-credentials-runbook.md")).toContain("verifier command");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings mirrors that same next dependency blocker");
@@ -1724,6 +1738,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("next credential request");
     expect(source("components/review-readiness.tsx")).toContain("verification runway");
     expect(source("components/review-readiness.tsx")).toContain("completion criteria");
+    expect(source("components/review-readiness.tsx")).toContain("safe credential profile");
     expect(source("components/review-readiness.tsx")).toContain("safe fix link");
     expect(source("components/review-readiness.tsx")).toContain("verifier command");
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors the same next dependency blocker");
