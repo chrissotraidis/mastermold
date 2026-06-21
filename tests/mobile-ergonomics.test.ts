@@ -1375,6 +1375,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-account-setup.ts")).toContain("sample all-ones wallet is allowed for demos");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("web3-dedicated-wallet-packet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("sample all-ones wallet");
+    expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--require-operator-wallet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("private_key_storage: \"blocked\"");
     expect(source("app/api/web3-dedicated-wallet-packet/route.ts")).toContain("buildWeb3DedicatedWalletPacket");

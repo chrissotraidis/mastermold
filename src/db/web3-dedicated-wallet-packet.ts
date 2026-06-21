@@ -68,8 +68,9 @@ export function buildWeb3DedicatedWalletPacket(state: Web3TradingState): Web3Ded
     state.execution_readiness.config.wallet_public_key ??
     null;
   const walletScoped = Boolean(walletPublicKey);
+  const walletLooksLikePublicKey = typeof walletPublicKey === "string" && isLikelySolanaPublicKey(walletPublicKey);
   const walletIsSample = walletPublicKey === SAMPLE_SYSTEM_WALLET;
-  const dedicatedWalletScoped = walletScoped && !walletIsSample;
+  const dedicatedWalletScoped = walletScoped && walletLooksLikePublicKey && !walletIsSample;
   const walletOwnership = getLatestWeb3WalletOwnershipReceipt(walletPublicKey);
   const walletOwnershipProved = dedicatedWalletScoped && Boolean(walletOwnership);
   const readProviderConfigured = hasEnv("HELIUS_API_KEY") || hasEnv("SOLANA_RPC_URL") || hasEnv("NEXT_PUBLIC_SOLANA_RPC_URL");
@@ -81,12 +82,13 @@ export function buildWeb3DedicatedWalletPacket(state: Web3TradingState): Web3Ded
     walletOwnershipProved,
   });
   const missingRequired = [
-    !dedicatedWalletScoped ? "Dedicated public Solana trading wallet" : null,
+    !walletScoped ? "Dedicated public Solana trading wallet" : null,
+    walletScoped && !walletLooksLikePublicKey ? "Valid public Solana trading wallet" : null,
     walletIsSample ? "Replace sample all-ones wallet" : null,
     dedicatedWalletScoped && !walletOwnershipProved ? "Hash-only wallet ownership proof" : null,
     !readProviderConfigured ? "Helius or Solana read provider" : null,
   ].filter((item): item is string => Boolean(item));
-  const strictVerifierCommand = "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet";
+  const strictVerifierCommand = buildStrictVerifierCommand(walletPublicKey, dedicatedWalletScoped);
   const steps = buildDedicatedWalletSteps({
     walletScoped,
     walletIsSample,
@@ -241,6 +243,16 @@ function dedicatedWalletNextAction(status: Web3DedicatedWalletPacketStatus, read
 function hasEnv(name: string) {
   const value = process.env[name];
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function buildStrictVerifierCommand(walletPublicKey: string | null, dedicatedWalletScoped: boolean) {
+  const placeholderCommand = "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
+  if (!dedicatedWalletScoped || !walletPublicKey || !isLikelySolanaPublicKey(walletPublicKey)) return placeholderCommand;
+  return placeholderCommand.replace("<public-solana-address>", walletPublicKey);
+}
+
+function isLikelySolanaPublicKey(value: string) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
 function previewValue(value: string | null | undefined) {

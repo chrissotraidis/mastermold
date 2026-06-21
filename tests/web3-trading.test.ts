@@ -2654,6 +2654,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.wallet_ownership_proved).toBe(false);
     expect(packet.read_provider_configured).toBe(true);
     expect(packet.jupiter_configured).toBe(true);
+    expect(packet.strict_verifier_command).toBe("npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet");
+    expect(packet.strict_verifier_command).not.toContain("test-helius-secret");
+    expect(packet.strict_verifier_command).not.toContain("test-jupiter-secret");
     expect(packet.strict_verifier_command).toContain("--require-operator-wallet");
     expect(packet.missing_required).toContain("Dedicated public Solana trading wallet");
     expect(packet.steps.map((step) => step.id)).toEqual([
