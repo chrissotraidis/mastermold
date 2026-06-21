@@ -93,9 +93,13 @@ function verifyPacket(packet) {
   assert(packet?.mode === "web3-research-handoff-packet", "Research handoff packet should expose the expected mode.", packet);
   assert(typeof packet.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(packet.receipt_hash), "Research handoff packet should include a receipt hash.", packet);
   assert(Array.isArray(packet.research_questions) && packet.research_questions.length >= 10, "Research handoff packet should include research questions.", packet);
+  assert(Array.isArray(packet.operator_unlock_sequence) && packet.operator_unlock_sequence.length === 6, "Research handoff packet should include the ordered unlock sequence.", packet);
+  assert(packet.operator_unlock_sequence.some((item) => item.id === packet.next_unlock_step?.id), "Research handoff packet should expose the next ordered unlock step.", packet);
   assert(Array.isArray(packet.open_operator_inputs), "Research handoff packet should include operator input rows.", packet);
   assert(Array.isArray(packet.live_capital_blockers), "Research handoff packet should include live-capital blockers.", packet);
   assert(typeof packet.text_packet === "string" && packet.text_packet.includes("# Mastermind Web3 Research Handoff Packet"), "Research handoff packet should include paste-ready markdown text.", packet);
+  assert(packet.text_packet.includes("## Next Ordered Unlock Step"), "Research handoff text should include the next ordered unlock step.", packet.text_packet);
+  assert(packet.text_packet.includes("## Operator Unlock Sequence"), "Research handoff text should include the operator unlock sequence.", packet.text_packet);
   assert(packet.text_packet.includes("## Never Provide"), "Research handoff text should include the never-provide boundary.", packet.text_packet);
   assert(packet.live_execution_permission === "blocked", "Research handoff packet must keep live execution blocked.", packet);
   assert(packet.wallet_mutation_permission === "blocked", "Research handoff packet must keep wallet mutation blocked.", packet);

@@ -91,6 +91,8 @@ async function main() {
   assert(health.web3_research_handoff?.mode === "web3-research-handoff-health", "Health endpoint should expose Web3 research handoff health.", health.web3_research_handoff);
   assert(health.web3_research_handoff.question_count >= 10, "Research handoff health should expose the research question count.", health.web3_research_handoff);
   assert(typeof health.web3_research_handoff.next_question === "string" && health.web3_research_handoff.next_question.length > 0, "Research handoff health should expose the next research question.", health.web3_research_handoff);
+  assert(typeof health.web3_research_handoff.next_unlock_step_label === "string" && health.web3_research_handoff.next_unlock_step_label.length > 0, "Research handoff health should expose the next unlock step.", health.web3_research_handoff);
+  assert(typeof health.web3_research_handoff.next_unlock_step_action === "string" && health.web3_research_handoff.next_unlock_step_action.length > 0, "Research handoff health should expose the next unlock action.", health.web3_research_handoff);
   assert(health.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", health.web3_research_handoff);
   assert(health.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", health.web3_research_handoff);
   assert(health.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", health.web3_research_handoff);

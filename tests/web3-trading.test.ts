@@ -974,6 +974,8 @@ describe("Web3 autonomous trading subsystem", () => {
         total_credential_lanes: number;
       };
       current_capabilities: string[];
+      next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string; evidence: string } | null;
+      operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       open_operator_inputs: Array<{ id: string; env_targets: string[]; storage: string; safe_collection_surface: string }>;
       live_capital_blockers: Array<{ id: string; label: string; status: string; next_action: string }>;
       research_questions: Array<{ id: string; priority: string; category: string; question: string; expected_answer_format: string }>;
@@ -1000,6 +1002,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.summary).toContain("Research packet is ready to share");
     expect(packet.app_state.ready_credential_lanes).toBeLessThan(packet.app_state.total_credential_lanes);
     expect(packet.current_capabilities.some((item) => item.includes("Paper wallet telemetry"))).toBe(true);
+    expect(packet.next_unlock_step).toMatchObject({
+      id: "scope-wallet",
+      label: "Scope dedicated wallet",
+      storage: "browser-public-scope",
+    });
+    expect(packet.operator_unlock_sequence.map((step) => step.id)).toEqual([
+      "scope-wallet",
+      "prove-wallet",
+      "rehearse-jupiter",
+      "choose-signer",
+      "ops-accounting",
+      "external-review",
+    ]);
     expect(packet.open_operator_inputs.map((item) => item.id)).toEqual(expect.arrayContaining([
       "dedicated-trading-wallet",
       "emergency-stop-target",
@@ -1030,6 +1045,9 @@ describe("Web3 autonomous trading subsystem", () => {
     ]));
     expect(packet.text_packet).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(packet.text_packet).toContain("## Local Export Commands");
+    expect(packet.text_packet).toContain("## Next Ordered Unlock Step");
+    expect(packet.text_packet).toContain("## Operator Unlock Sequence");
+    expect(packet.text_packet).toContain("Scope dedicated wallet");
     expect(packet.text_packet).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
     expect(packet.text_packet).toContain("What is the safest Solana custody architecture");
     expect(packet.text_packet).toContain("Live Capital Blockers");

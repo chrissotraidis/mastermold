@@ -185,6 +185,11 @@ operators and external research agents. It lists allowed inputs, never-requested
 safe collection surfaces, env target names, next input, verifier commands, and the same
 live-execution/wallet-mutation/transaction-submission/private-key/seed-phrase/secret-echo
 blocks without returning raw secrets.
+`/api/web3-research-handoff-packet?source=live-dex` is the paste-ready research brief for
+another helper. It includes the next ordered unlock step, the six-step operator unlock
+sequence, open operator inputs, live-capital blockers, source endpoints, and research
+questions while keeping secrets, transaction bytes, signing, wallet mutation, and live
+execution blocked.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.

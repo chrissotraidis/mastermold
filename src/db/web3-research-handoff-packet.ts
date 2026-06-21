@@ -53,6 +53,8 @@ export type Web3ResearchHandoffPacket = {
     total_credential_lanes: number;
   };
   current_capabilities: string[];
+  next_unlock_step: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number] | null;
+  operator_unlock_sequence: Web3UsabilityStatusReceipt["operator_unlock_sequence"];
   open_operator_inputs: Array<{
     id: Web3OperatorRequestPacket["required_inputs"][number]["id"];
     label: string;
@@ -99,6 +101,8 @@ export type Web3ResearchHandoffHealth = {
   live_capital_blocker_count: number;
   next_question: string;
   next_operator_input: string;
+  next_unlock_step_label: string | null;
+  next_unlock_step_action: string | null;
   source_endpoint: string;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -139,6 +143,9 @@ export function buildWeb3ResearchHandoffPacket(input: {
       next_action: gate.next_action,
     }));
   const researchQuestions = buildResearchQuestions();
+  const nextUnlockStep = input.usability.operator_unlock_sequence.find((step) => step.status !== "ready") ??
+    input.usability.operator_unlock_sequence[input.usability.operator_unlock_sequence.length - 1] ??
+    null;
   const status: Web3ResearchHandoffPacket["status"] = input.manualLiveReview.can_request_external_review
     ? "ready-for-external-review"
     : openOperatorInputs.length > 0
@@ -179,6 +186,8 @@ export function buildWeb3ResearchHandoffPacket(input: {
       total_credential_lanes: input.handoff.inputs.length,
     },
     current_capabilities: currentCapabilities,
+    next_unlock_step: nextUnlockStep,
+    operator_unlock_sequence: input.usability.operator_unlock_sequence,
     open_operator_inputs: openOperatorInputs,
     live_capital_blockers: liveCapitalBlockers,
     research_questions: researchQuestions,
@@ -243,6 +252,8 @@ export function buildWeb3ResearchHandoffHealth(packet: Web3ResearchHandoffPacket
     live_capital_blocker_count: packet.live_capital_blockers.length,
     next_question: firstQuestion?.question ?? "No research questions are open.",
     next_operator_input: packet.open_operator_inputs[0]?.next_action ?? "No required operator input is open.",
+    next_unlock_step_label: packet.next_unlock_step?.label ?? null,
+    next_unlock_step_action: packet.next_unlock_step?.next_action ?? null,
     source_endpoint: "/api/web3-research-handoff-packet?source=live-dex&account=persistent",
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -390,6 +401,14 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
     `  Why: ${question.why_it_matters}`,
     `  Answer format: ${question.expected_answer_format}`,
   ].join("\n")).join("\n");
+  const unlockSequence = packet.operator_unlock_sequence.length > 0
+    ? packet.operator_unlock_sequence.map((step, index) => [
+      `- ${index + 1}. ${step.label}: ${step.status}`,
+      `  Storage: ${step.storage}`,
+      `  Next action: ${step.next_action}`,
+      `  Evidence: ${step.evidence}`,
+    ].join("\n")).join("\n")
+    : "- No operator unlock sequence is available in this packet.";
 
   return [
     "# Mastermind Web3 Research Handoff Packet",
@@ -410,6 +429,14 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
     "",
     "## Current Capabilities",
     ...packet.current_capabilities.map((item) => `- ${item}`),
+    "",
+    "## Next Ordered Unlock Step",
+    packet.next_unlock_step
+      ? `- ${packet.next_unlock_step.label}: ${packet.next_unlock_step.status}; ${packet.next_unlock_step.next_action}`
+      : "- No ordered unlock step is open.",
+    "",
+    "## Operator Unlock Sequence",
+    unlockSequence,
     "",
     "## Open Operator Inputs",
     openInputs,
