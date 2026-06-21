@@ -870,6 +870,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("runnable_now");
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("can_request_unsigned_order_now");
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("can_relay_signed_payload_now");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("Wait for wallet proof, Jupiter order proof, live flags, unsigned preflight, and a current request id before opening the external wallet transaction prompt.");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("Complete manual live review for the tiny cap, emergency stop, settlement/accounting owner, and operator signoff");
     expect(source("app/api/web3-supervised-canary-readiness/route.ts")).toContain("buildWeb3SupervisedCanaryReadinessReceipt");
     expect(source("app/api/health/route.ts")).toContain("web3_live_canary_attempt");
     expect(source("src/db/web3-live-ignition.ts")).toContain("web3-live-ignition");

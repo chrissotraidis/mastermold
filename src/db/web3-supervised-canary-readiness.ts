@@ -440,7 +440,9 @@ function buildSupervisedCanaryReadinessLanes(input: {
       label: "Signed payload relay",
       status: signerRelayReady ? "pass" : input.signer.status === "review-ready" ? "watch" : "fail",
       detail: signerRelayReady ? "The canary relay can accept an external signed payload for the current request id." : input.canary.next_action,
-      next_action: signerRelayReady ? "Relay only the matching externally signed canary payload, then stop for confirmation/accounting." : input.signer.next_action,
+      next_action: signerRelayReady
+        ? "Relay only the matching externally signed canary payload, then stop for confirmation/accounting."
+        : "Wait for wallet proof, Jupiter order proof, live flags, unsigned preflight, and a current request id before opening the external wallet transaction prompt.",
       evidence_endpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
       blocks_first_canary: true,
     },
@@ -449,7 +451,9 @@ function buildSupervisedCanaryReadinessLanes(input: {
       label: "Manual live review",
       status: input.livePreflight.live_review_permitted ? "pass" : "fail",
       detail: input.livePreflight.live_review_permitted ? "Manual live executor review can begin." : input.livePreflight.summary,
-      next_action: input.livePreflight.live_review_permitted ? "Keep review attached through the canary and settlement proof." : input.livePreflight.next_action,
+      next_action: input.livePreflight.live_review_permitted
+        ? "Keep review attached through the canary and settlement proof."
+        : "Complete manual live review for the tiny cap, emergency stop, settlement/accounting owner, and operator signoff before treating the canary as reviewed.",
       evidence_endpoint: "/api/web3-live-capital-preflight?source=live-dex&account=persistent&scenario=breakout&cycles=0",
       blocks_first_canary: true,
     },

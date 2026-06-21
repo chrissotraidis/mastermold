@@ -336,9 +336,10 @@ It now also includes a compact first-canary execution rail under the gate snapsh
 at the current drill step, labels the next few canary gates as now/next/queued/done, shows whether
 the action lives in Trading, Settings, a read-only receipt, or a verifier, and keeps live execution,
 submission, signing authority, and wallet mutation blocked until the actual proof chain clears.
-The same drill operator plan uses explicit downstream actions for signer relay, manual live review,
-and proof watch, so blocked later rows still tell the operator what will happen after wallet,
-Jupiter, and live-flag prerequisites are cleared instead of showing raw evidence fragments.
+The same drill operator plan and supervised-canary readiness lanes use explicit downstream actions
+for signer relay, manual live review, and proof watch, so blocked later rows still tell the operator
+what will happen after wallet, Jupiter, and live-flag prerequisites are cleared instead of showing
+raw evidence fragments.
 The Trading live canary console refreshes the first-canary drill after wallet proof, canary
 preflight, tiny-canary signing, proof checks, and manual receipt refresh, so the next unblock step,
 hard-fail count, proof count, and ordered gates stay current without treating paper trades, DEX

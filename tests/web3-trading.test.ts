@@ -2870,6 +2870,12 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.lanes.map((lane) => lane.id).join(",")).toBe("live-scope,dedicated-wallet,wallet-ownership,jupiter-order,live-flags,unsigned-order-preflight,signer-relay,manual-live-review,funded-canary-proof");
     expect(receipt.lanes.every((lane) => ["pass", "watch", "fail"].includes(lane.status) && lane.detail && lane.next_action && lane.evidence_endpoint)).toBe(true);
     expect(receipt.lanes.some((lane) => lane.id === "funded-canary-proof" && lane.status === "fail" && lane.blocks_first_canary === false)).toBe(true);
+    expect(receipt.lanes.find((lane) => lane.id === "signer-relay")?.next_action).toContain("external wallet transaction prompt");
+    expect(receipt.lanes.find((lane) => lane.id === "manual-live-review")?.next_action).toContain("Complete manual live review");
+    expect(receipt.blockers.join(" ")).not.toContain("Hash-only wallet ownership proof");
+    expect(receipt.blockers.join(" ")).not.toContain("Spend: $0 remains");
+    expect(receipt.canary_attempt_contract.missing_inputs.join(" ")).not.toContain("Hash-only wallet ownership proof");
+    expect(receipt.canary_attempt_contract.missing_inputs.join(" ")).not.toContain("Spend: $0 remains");
     expect(receipt.blockers.join(" ")).toContain("Jupiter");
     expect(receipt.transaction_submission_permission).toBe("blocked");
     expect(receipt.live_execution_permission).toBe("blocked");
