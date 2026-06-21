@@ -864,6 +864,10 @@ function LiveUsabilityBlockersPanel({
   const missing = receipt.missing_for_live_usability.slice(0, 6);
   const ownerSummary = receipt.missing_owner_summary.slice(0, 4);
   const sourceSummary = receipt.missing_source_summary.slice(0, 4);
+  const currentInput = receipt.current_input;
+  const currentInputHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet"
+    ? "/settings/integrations#settings-web3-wallet-public-key"
+    : "/settings/integrations#settings-web3-credentials-runway";
 
   return (
     <section
@@ -902,6 +906,39 @@ function LiveUsabilityBlockersPanel({
               Showing {receipt.listed_live_usability_row_count}/{receipt.total_live_usability_row_count} rows here; open the JSON for every dependency-ranked blocker.
             </p>
           </div>
+
+          {currentInput ? (
+            <div className="mt-2 rounded-md border border-caution/25 bg-caution/[0.04] p-3" aria-label="Live usability current input contract">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Current input contract</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{currentInput.label}</p>
+                </div>
+                <span className="rounded-md border border-critical/25 bg-critical/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-critical">
+                  live blocked
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-on-surface-variant">{currentInput.next_action}</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <LiveUsabilityContractStat label="Surface" value={currentInput.safe_collection_surface.replaceAll("-", " ")} />
+                <LiveUsabilityContractStat label="Storage" value={currentInput.storage.replaceAll("-", " ")} />
+                <LiveUsabilityContractStat label="Targets" value={currentInput.target_names.length > 0 ? currentInput.target_names.join(", ") : "none"} />
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Link
+                  href={currentInputHref}
+                  className="inline-flex min-h-10 items-center justify-center rounded-md border border-engine/30 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+                >
+                  Open current input
+                </Link>
+                {currentInput.verifier_command ? (
+                  <code className="min-w-0 flex-1 break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                    {currentInput.verifier_command}
+                  </code>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-2 rounded-md border border-outline/15 bg-surface/50 p-3" aria-label="Live usability credential doctor summary">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -996,6 +1033,15 @@ function LiveUsabilityStat({ label, value, tone }: { label: string; value: strin
     <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5">
       <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
       <p className={`mt-1 truncate text-sm font-semibold ${valueClassName}`}>{value}</p>
+    </div>
+  );
+}
+
+function LiveUsabilityContractStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/35 p-2">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+      <p className="mt-1 truncate text-[11px] font-semibold text-on-surface">{value}</p>
     </div>
   );
 }

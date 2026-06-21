@@ -178,7 +178,9 @@ the latest sanitized credential-doctor status, the next ordered unlock step, the
 safe input contract, and live-lane readiness while keeping autonomous live trading, signing, submission,
 wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
 It also groups missing rows by owner and evidence source so operators can see whether
-the next work belongs to wallet setup, security, ops, accounting, strategy, or review.
+the next work belongs to wallet setup, security, ops, accounting, strategy, or review,
+and `/trading` shows the current input contract in both the first-screen command board
+and expanded readiness receipt.
 Use `rows=all` on that same endpoint to return every dependency-ranked missing row for
 external review; the default response stays compact for dashboard panels.
 `/api/web3-credential-doctor` is the localhost-only in-app refresh endpoint for the

@@ -729,6 +729,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Lead owner:");
     expect(tradingPage).toContain("Trading credential doctor status");
     expect(tradingPage).toContain("Trading current input contract");
+    expect(tradingPage).toContain("Live usability current input contract");
+    expect(tradingPage).toContain("LiveUsabilityContractStat");
+    expect(tradingPage).toContain("Open current input");
+    expect(tradingPage).toContain("currentInputHref");
     expect(tradingPage).toContain("liveUsabilityBlockers.current_input");
     expect(tradingPage).toContain("currentInput.target_names");
     expect(tradingPage).toContain("currentInput.verifier_command");
@@ -1678,11 +1682,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("next ordered unlock step");
     expect(source("components/review-readiness.tsx")).toContain("Settings now adds a Web3 setup runway");
     expect(source("components/review-readiness.tsx")).toContain("Settings now places that same live-usability blocker receipt");
-    expect(source("components/review-readiness.tsx")).toContain("trading command board now shows that current input contract");
+    expect(source("components/review-readiness.tsx")).toContain("trading command board and expanded live-usability receipt now show that current input contract");
     expect(source("README.md")).toContain("/api/web3-live-usability-blockers?source=live-dex");
     expect(source("README.md")).toContain("web3_live_usability");
     expect(source("README.md")).toContain("total-versus-listed live-usability row counts");
     expect(source("README.md")).toContain("current safe input contract");
+    expect(source("README.md")).toContain("current input contract in both the first-screen command board");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-usability-blockers");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_live_usability");
     expect(source("docs/web3-credentials-runbook.md")).toContain("total and listed live-usability row counts");
