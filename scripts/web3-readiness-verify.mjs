@@ -1256,8 +1256,8 @@ async function verifyLiveTradeCanary() {
   assert(json.live_execution_gate_enabled === false, "Live trade canary should keep the current live execution gate locked.", json);
   assert(json.signed_relay_accepts_payload === false, "Live trade canary should not accept signed payloads in the sample check.", json);
   assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("No confirmed live transaction signature")), "Live trade canary should name missing live-trade evidence.", json.blockers);
-  assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("withholds unsigned transaction bytes")), "Live trade canary should name the missing browser-signing path.", json.blockers);
-  assert(Array.isArray(json.required_for_real_canary) && json.required_for_real_canary.some((item) => item.includes("reviewed signer path")), "Live trade canary should list signer requirements.", json.required_for_real_canary);
+  assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("does not return unsigned transaction bytes")), "Live trade canary should name the gated browser-signing handoff path.", json.blockers);
+  assert(Array.isArray(json.required_for_real_canary) && json.required_for_real_canary.some((item) => item.includes("web3-live-unsigned-order-handoff")), "Live trade canary should list signer or unsigned-handoff requirements.", json.required_for_real_canary);
   assert(json.transaction_submission_permission === "blocked", "Live trade canary must keep transaction submission blocked in sample verification.", json);
   assert(json.live_execution_permission === "blocked", "Live trade canary must keep live execution blocked in sample verification.", json);
   assert(json.wallet_mutation_permission === "blocked", "Live trade canary must keep wallet mutation blocked.", json);
@@ -1299,7 +1299,42 @@ async function verifyLiveTradeCanary() {
   assert(unsafe.json.status === "unsafe-rejected", "Live trade canary unsafe action should expose unsafe rejection.", unsafe.json);
   assert(Array.isArray(unsafe.json.unsafe_fields) && unsafe.json.unsafe_fields.includes("private_key"), "Live trade canary unsafe action should name unsafe field paths only.", unsafe.json);
   assertNoLeak("live trade canary unsafe action", unsafe.json);
-  record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}; signed payload action blocked safely`);
+
+  const unsignedHandoff = await postJson("/api/web3-live-unsigned-order-handoff?source=sample&account=persistent&scenario=breakout&cycles=0", {
+    operator_ack: true,
+    canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+    return_unsigned_transaction_ack: true,
+    wallet_public_key: walletPublicKey,
+    amount_lamports: 100_000,
+  });
+  assert(unsignedHandoff.response.status === 200, "Live unsigned order handoff should return a blocked receipt in sample verification.", { status: unsignedHandoff.response.status, json: unsignedHandoff.json });
+  assert(unsignedHandoff.json.mode === "web3-live-unsigned-order-handoff", "Live unsigned order handoff should expose the expected mode.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.status === "blocked", "Live unsigned order handoff should block sample-source requests.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.unsigned_transaction === null, "Live unsigned order handoff must not return unsigned bytes while blocked.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.unsigned_transaction_return === "blocked", "Live unsigned order handoff should mark unsigned return blocked.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.transaction_body_storage === "blocked", "Live unsigned order handoff must not store transaction bodies.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.execute_permission === "blocked", "Live unsigned order handoff must not execute orders.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.private_key_storage === "blocked", "Live unsigned order handoff must block private-key storage.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.secret_echo_permission === "blocked", "Live unsigned order handoff must block secret echo.", unsignedHandoff.json);
+  assert(Array.isArray(unsignedHandoff.json.blockers) && unsignedHandoff.json.blockers.some((blocker) => blocker.includes("source=live-dex")), "Live unsigned order handoff should require live-dex source.", unsignedHandoff.json.blockers);
+  assertNoLeak("live unsigned order handoff", unsignedHandoff.json);
+
+  const unsafeUnsigned = await postJson("/api/web3-live-unsigned-order-handoff?source=sample&account=persistent&scenario=breakout&cycles=0", {
+    operator_ack: true,
+    canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+    return_unsigned_transaction_ack: true,
+    wallet_public_key: walletPublicKey,
+    private_key: CANARY_SECRET,
+    raw_transaction: "raw-transaction-canary-never-echo",
+  });
+  assert(unsafeUnsigned.response.status === 422, "Live unsigned order handoff should reject unsafe fields.", { status: unsafeUnsigned.response.status, json: unsafeUnsigned.json });
+  assert(unsafeUnsigned.json.status === "unsafe-rejected", "Live unsigned order unsafe handoff should expose unsafe rejection.", unsafeUnsigned.json);
+  assert(Array.isArray(unsafeUnsigned.json.unsafe_fields) && unsafeUnsigned.json.unsafe_fields.includes("private_key"), "Live unsigned order unsafe handoff should name private_key.", unsafeUnsigned.json);
+  assert(Array.isArray(unsafeUnsigned.json.unsafe_fields) && unsafeUnsigned.json.unsafe_fields.includes("raw_transaction"), "Live unsigned order unsafe handoff should name raw_transaction.", unsafeUnsigned.json);
+  assert(unsafeUnsigned.text.includes(CANARY_SECRET) === false, "Live unsigned order unsafe handoff must not echo private canary text.", unsafeUnsigned.text);
+  assert(unsafeUnsigned.text.includes("raw-transaction-canary-never-echo") === false, "Live unsigned order unsafe handoff must not echo raw transaction canary text.", unsafeUnsigned.text);
+  assertNoLeak("live unsigned order unsafe handoff", unsafeUnsigned.json);
+  record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}; signed payload and unsigned handoff actions blocked safely`);
 }
 
 async function verifyResearchAnswerIntake() {

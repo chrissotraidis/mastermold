@@ -228,8 +228,16 @@ wallet mutation, private-key storage, seed-phrase storage, and secret echo block
 `/api/web3-live-trade-canary` is the truthful live-money test receipt. It says whether a real
 live trade has actually been tested through Mastermind, whether any real funds moved through the
 app, whether the signed relay can accept an external signed payload, and why browser-wallet live
-signing is not currently possible from the UI because unsigned transaction bytes are withheld.
+signing now needs the separate gated unsigned-order handoff before a browser wallet can sign.
 Paper loops, read-only DEX checks, and Jupiter rehearsals do not count as actual live trades.
+`POST /api/web3-live-unsigned-order-handoff` is the tiny live canary bridge: it can return a
+one-shot SOL-to-USDC Jupiter unsigned transaction only after `source=live-dex`, `account=persistent`,
+a dedicated public wallet, explicit canary acknowledgement, `return_unsigned_transaction_ack`, server
+`JUPITER_API_KEY`, `MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true`,
+`MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS`, and
+`MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true`. It never accepts private keys, seed phrases,
+API keys, raw transactions, or signed payloads, and it still cannot sign, submit, store transaction
+bodies, execute, custody funds, or mutate wallets.
 `POST /api/web3-live-trade-canary` is the guarded action wrapper for the existing external
 signed-payload relay: it requires operator acknowledgement, canary acknowledgement, live-dex
 persistent scope, request id, route, and a base64 signed transaction, hashes but never echoes the

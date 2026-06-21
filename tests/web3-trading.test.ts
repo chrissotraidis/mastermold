@@ -32,6 +32,7 @@ import { GET as CREDENTIAL_REQUIREMENTS_GET } from "@/app/api/web3-credential-re
 import { GET as LIVE_ACTIVATION_INTAKE_GET, POST as LIVE_ACTIVATION_INTAKE_POST } from "@/app/api/web3-live-activation-intake/route";
 import { GET as LIVE_ACTIVATION_PLAN_GET } from "@/app/api/web3-live-activation-plan/route";
 import { GET as LIVE_TRADE_CANARY_GET, POST as LIVE_TRADE_CANARY_POST } from "@/app/api/web3-live-trade-canary/route";
+import { POST as LIVE_UNSIGNED_ORDER_HANDOFF_POST } from "@/app/api/web3-live-unsigned-order-handoff/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -78,6 +79,7 @@ let prevLocalAccountabilityRepairPath: string | undefined;
 let prevCredentialDoctorPath: string | undefined;
 let prevLiveExecution: string | undefined;
 let prevLiveApproval: string | undefined;
+let prevLiveUnsignedCanaryHandoff: string | undefined;
 let prevSignerProvider: string | undefined;
 let prevPrivyAppId: string | undefined;
 let prevPrivyAppSecret: string | undefined;
@@ -116,6 +118,7 @@ beforeEach(() => {
   prevCredentialDoctorPath = process.env.WEB3_CREDENTIAL_DOCTOR_STATUS_PATH;
   prevLiveExecution = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   prevLiveApproval = process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
+  prevLiveUnsignedCanaryHandoff = process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF;
   prevSignerProvider = process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER;
   prevPrivyAppId = process.env.PRIVY_APP_ID;
   prevPrivyAppSecret = process.env.PRIVY_APP_SECRET;
@@ -153,6 +156,7 @@ beforeEach(() => {
   delete process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
   delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   delete process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
+  delete process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF;
   delete process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER;
   delete process.env.PRIVY_APP_ID;
   delete process.env.PRIVY_APP_SECRET;
@@ -207,6 +211,8 @@ afterEach(() => {
   else process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION = prevLiveExecution;
   if (prevLiveApproval === undefined) delete process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
   else process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL = prevLiveApproval;
+  if (prevLiveUnsignedCanaryHandoff === undefined) delete process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF;
+  else process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF = prevLiveUnsignedCanaryHandoff;
   if (prevSignerProvider === undefined) delete process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER;
   else process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = prevSignerProvider;
   if (prevPrivyAppId === undefined) delete process.env.PRIVY_APP_ID;
@@ -2385,9 +2391,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.current_request_id).toBeNull();
     expect(receipt.latest_signature_preview).toBeNull();
     expect(receipt.blockers.join(" ")).toContain("No confirmed live transaction signature");
-    expect(receipt.blockers.join(" ")).toContain("withholds unsigned transaction bytes");
+    expect(receipt.blockers.join(" ")).toContain("does not return unsigned transaction bytes");
     expect(receipt.required_for_real_canary.join(" ")).toContain("Dedicated non-sample public wallet");
-    expect(receipt.required_for_real_canary.join(" ")).toContain("reviewed signer path");
+    expect(receipt.required_for_real_canary.join(" ")).toContain("web3-live-unsigned-order-handoff");
     expect(receipt.transaction_submission_permission).toBe("blocked");
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");
@@ -2460,6 +2466,83 @@ describe("Web3 autonomous trading subsystem", () => {
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");
+  });
+
+  test("GIVEN the operator asks for a live unsigned canary order WHEN gates are missing THEN the handoff blocks safely", async () => {
+    const safeWallet = "9xQeWvG816bUx9EPfYQ4mKZ8sPXc6zQnK9j8vY9J3F3";
+    const response = await LIVE_UNSIGNED_ORDER_HANDOFF_POST(new Request("http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=sample&account=persistent&cycles=0", {
+      method: "POST",
+      body: JSON.stringify({
+        operator_ack: true,
+        canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+        return_unsigned_transaction_ack: true,
+        wallet_public_key: safeWallet,
+        amount_lamports: 100_000,
+      }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      unsigned_transaction: string | null;
+      unsigned_transaction_return: string;
+      transaction_body_storage: string;
+      execute_permission: string;
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      blockers: string[];
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-live-unsigned-order-handoff");
+    expect(receipt.status).toBe("blocked");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.unsigned_transaction).toBeNull();
+    expect(receipt.unsigned_transaction_return).toBe("blocked");
+    expect(receipt.transaction_body_storage).toBe("blocked");
+    expect(receipt.execute_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.blockers.join(" ")).toContain("source=live-dex");
+    expect(receipt.blockers.join(" ")).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true");
+    expect(receipt.controls.join(" ")).toContain("tiny SOL-to-USDC Jupiter canary order");
+
+    const unsafeCanary = "codex-unsafe-private-key-never-echo";
+    const unsafeResponse = await LIVE_UNSIGNED_ORDER_HANDOFF_POST(new Request("http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=sample&account=persistent&cycles=0", {
+      method: "POST",
+      body: JSON.stringify({
+        operator_ack: true,
+        canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+        return_unsigned_transaction_ack: true,
+        wallet_public_key: safeWallet,
+        private_key: unsafeCanary,
+        raw_transaction: "raw-canary-never-echo",
+      }),
+    }));
+    const unsafeText = await unsafeResponse.text();
+    expect(unsafeResponse.status).toBe(422);
+    expect(unsafeText).not.toContain(unsafeCanary);
+    expect(unsafeText).not.toContain("raw-canary-never-echo");
+    const unsafeReceipt = JSON.parse(unsafeText) as {
+      status: string;
+      unsafe_fields: string[];
+      unsigned_transaction: string | null;
+      secret_echo_permission: string;
+    };
+    expect(unsafeReceipt.status).toBe("unsafe-rejected");
+    expect(unsafeReceipt.unsafe_fields).toContain("private_key");
+    expect(unsafeReceipt.unsafe_fields).toContain("raw_transaction");
+    expect(unsafeReceipt.unsigned_transaction).toBeNull();
+    expect(unsafeReceipt.secret_echo_permission).toBe("blocked");
   });
 
   test("GIVEN real-money blockers remain WHEN live usability blockers are requested THEN the next unlock step comes before proof work", async () => {

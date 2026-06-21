@@ -823,6 +823,7 @@ function SettingsWeb3SetupPriorityCard({
 
 function SettingsWeb3LiveTradeCanaryPanel({ receipt }: { receipt: Web3LiveTradeCanaryReceipt }) {
   const canaryEndpoint = `/api/web3-live-trade-canary?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`;
+  const unsignedHandoffEndpoint = `/api/web3-live-unsigned-order-handoff?source=live-dex&account=persistent&scenario=${receipt.scenario}&cycles=0`;
 
   return (
     <section
@@ -840,7 +841,7 @@ function SettingsWeb3LiveTradeCanaryPanel({ receipt }: { receipt: Web3LiveTradeC
         <div className="flex flex-wrap justify-end gap-1.5">
           <LaunchQueueBadge status={receipt.actual_live_trade_tested ? "pass" : "fail"} label={receipt.status.replaceAll("-", " ")} />
           <LaunchQueueBadge status={receipt.can_submit_from_app_now ? "watch" : "fail"} label={receipt.can_submit_from_app_now ? "external payload ready" : "submit blocked"} />
-          <LaunchQueueBadge status="fail" label="browser signer absent" />
+          <LaunchQueueBadge status="watch" label="unsigned handoff gated" />
         </div>
       </div>
 
@@ -857,6 +858,16 @@ function SettingsWeb3LiveTradeCanaryPanel({ receipt }: { receipt: Web3LiveTradeC
         <p className="mt-2 text-[11px] leading-4 text-outline">
           Paper, DEX-read, and Jupiter rehearsal checks do not count as live trades. This panel only turns green after live relay evidence records a real signature.
         </p>
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Tiny unsigned order handoff</p>
+        <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+          POST can build a one-shot SOL-to-USDC Jupiter canary transaction for browser-wallet signing only after live env flags, source=live-dex, account=persistent, a dedicated public wallet, and explicit unsigned-return acknowledgement are present.
+        </p>
+        <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+          {`POST ${unsignedHandoffEndpoint} {"operator_ack":true,"canary_ack":"I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED","return_unsigned_transaction_ack":true,"wallet_public_key":"<public-solana-address>","amount_lamports":100000}`}
+        </code>
       </div>
 
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2">

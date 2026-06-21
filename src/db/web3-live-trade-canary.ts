@@ -190,7 +190,7 @@ export function buildWeb3LiveTradeCanaryReceipt(
       "Dedicated non-sample public wallet with explicit spend caps and kill switch cleared.",
       "Jupiter Swap V2 key and Solana RPC or Helius read/status rail configured in ignored server env.",
       "Explicit live env flags: MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true and MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS.",
-      "A reviewed signer path that can produce or manage a signed payload without storing private keys, seed phrases, raw keypairs, or signed payloads in Mastermind.",
+      "A reviewed signer path or gated /api/web3-live-unsigned-order-handoff browser-wallet path that can produce a signed payload without storing private keys, seed phrases, raw keypairs, or signed payloads in Mastermind.",
       "A current request id and payload hash that match the signed transaction or provider-managed submit status.",
       "Manual live review, accounting/export target, stop drill, and loss-limit signoff.",
     ],
@@ -203,7 +203,7 @@ export function buildWeb3LiveTradeCanaryReceipt(
     secret_echo_permission: "blocked" as const,
     controls: [
       "This canary receipt answers whether a real live trade has actually been tested through Mastermind.",
-      "Mastermind currently does not expose unsigned transaction bytes to the browser wallet flow.",
+      "This canary receipt does not expose unsigned transaction bytes; the separate /api/web3-live-unsigned-order-handoff route is the gated one-shot browser-wallet bridge.",
       "The only live-submit shape represented here is an external signed payload or provider-managed submit status for a matching request id.",
       "Private keys, seed phrases, keypair JSON, raw transaction bytes, signed payload storage, browser key storage, and secret echo remain blocked.",
       "Paper and read-only DEX tests do not count as actual live trades.",
@@ -226,7 +226,7 @@ function liveTradeCanaryBlockers(
     .map((check) => `${check.label}: ${check.detail}`);
   const blockers = [
     !actualLiveTradeTested ? "No confirmed live transaction signature has been recorded by this app." : null,
-    "Mastermind currently withholds unsigned transaction bytes, so a browser-wallet live trade cannot be signed from the UI yet.",
+    "This canary receipt does not return unsigned transaction bytes; use the gated /api/web3-live-unsigned-order-handoff route before browser-wallet signing.",
     !state.signed_transaction_relay.request_id ? "No active signed-relay request id is ready for a canary trade." : null,
     !readyForExternalSignedPayload ? "Signed relay is not currently ready to accept an external signed payload." : null,
     ...state.execution_gate.live_blockers,
