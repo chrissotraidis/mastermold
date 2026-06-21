@@ -64,6 +64,39 @@ export type Web3OperatorRunbookReceipt = {
   controls: string[];
 };
 
+export type Web3OperatorRunbookHealth = {
+  mode: "web3-operator-runbook-health";
+  status: Web3OperatorRunbookReceipt["status"];
+  receipt_hash: string;
+  source: Web3OperatorRunbookReceipt["source"];
+  account: Web3OperatorRunbookReceipt["account"];
+  scenario: Web3OperatorRunbookReceipt["scenario"];
+  primary_safe_action_id: Web3OperatorRunbookAction["id"] | null;
+  primary_safe_action_label: string | null;
+  primary_safe_action_status: Web3OperatorRunbookActionStatus | null;
+  primary_safe_action_surface: Web3OperatorRunbookAction["surface"] | null;
+  primary_safe_action_href: string | null;
+  primary_safe_action_command: string | null;
+  primary_safe_action_next_action: string | null;
+  current_input: Web3OperatorCurrentInput | null;
+  allowed_now_count: number;
+  gated_count: number;
+  blocked_count: number;
+  real_capital_blocker_count: number;
+  next_safe_input_label: string | null;
+  next_safe_input_action: string | null;
+  next_live_lane_action: string;
+  safe_command: string | null;
+  source_endpoint: string;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  signing_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export function buildWeb3OperatorRunbook(input: {
   state: Web3TradingState;
   usability: Web3UsabilityStatusReceipt;
@@ -138,6 +171,43 @@ export function buildWeb3OperatorRunbook(input: {
   return {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
+  };
+}
+
+export function buildWeb3OperatorRunbookHealth(receipt: Web3OperatorRunbookReceipt): Web3OperatorRunbookHealth {
+  const primary = receipt.primary_safe_action;
+
+  return {
+    mode: "web3-operator-runbook-health",
+    status: receipt.status,
+    receipt_hash: receipt.receipt_hash,
+    source: receipt.source,
+    account: receipt.account,
+    scenario: receipt.scenario,
+    primary_safe_action_id: primary?.id ?? null,
+    primary_safe_action_label: primary?.label ?? null,
+    primary_safe_action_status: primary?.status ?? null,
+    primary_safe_action_surface: primary?.surface ?? null,
+    primary_safe_action_href: primary?.href ?? null,
+    primary_safe_action_command: primary?.command ?? null,
+    primary_safe_action_next_action: primary?.next_action ?? null,
+    current_input: receipt.current_input,
+    allowed_now_count: receipt.allowed_now_count,
+    gated_count: receipt.gated_count,
+    blocked_count: receipt.blocked_count,
+    real_capital_blocker_count: receipt.real_capital_blockers.length,
+    next_safe_input_label: receipt.next_safe_input?.label ?? null,
+    next_safe_input_action: receipt.next_safe_input?.next_action ?? null,
+    next_live_lane_action: receipt.next_live_lane_action,
+    safe_command: primary?.command ?? receipt.verifier_commands[0] ?? null,
+    source_endpoint: `/api/web3-operator-runbook?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    transaction_submission_permission: "blocked",
+    signing_permission: "blocked",
+    private_key_storage: "blocked",
+    seed_phrase_storage: "blocked",
+    secret_echo_permission: "blocked",
   };
 }
 

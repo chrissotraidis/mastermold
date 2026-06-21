@@ -17,7 +17,7 @@ import {
 import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3OperatorCredentialHandoffReceipt } from "@/src/db/web3-operator-credential-handoff";
 import { buildWeb3OperatorRequestPacket } from "@/src/db/web3-operator-request-packet";
-import { buildWeb3OperatorRunbook } from "@/src/db/web3-operator-runbook";
+import { buildWeb3OperatorRunbook, buildWeb3OperatorRunbookHealth } from "@/src/db/web3-operator-runbook";
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
@@ -121,6 +121,7 @@ export async function GET() {
     web3_production_supervisor: web3ProductionSupervisor,
     web3_promoted_paper_autopilot: web3PromotedPaperAutopilot,
     web3_profit_proof: buildWeb3ProfitProofReadiness({ promotedHealth: web3PromotedPaperAutopilot }),
+    web3_operator_runbook: buildWeb3OperatorRunbookHealth(web3Runbook),
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
   });

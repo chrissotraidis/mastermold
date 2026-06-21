@@ -168,6 +168,24 @@ async function verifyHealth() {
   assert(json.web3_daemon_supervisor?.wallet_mutation_permission === "blocked", "Daemon health should keep wallet mutation blocked.", json.web3_daemon_supervisor);
   assert(json.web3_production_supervisor?.live_execution_permission === "blocked", "Production supervisor should keep live execution blocked.", json.web3_production_supervisor);
   assert(json.web3_production_supervisor?.wallet_mutation_permission === "blocked", "Production supervisor should keep wallet mutation blocked.", json.web3_production_supervisor);
+  assert(json.web3_operator_runbook?.mode === "web3-operator-runbook-health", "Health endpoint should expose Web3 operator runbook health.", json.web3_operator_runbook);
+  assert(["setup-needed", "paper-operable", "supervised-review-ready"].includes(json.web3_operator_runbook.status), "Operator runbook health should expose a known status.", json.web3_operator_runbook);
+  assertReceiptHash("Health operator runbook", json.web3_operator_runbook.receipt_hash);
+  assert(["sample", "live-dex"].includes(json.web3_operator_runbook.source), "Operator runbook health should expose the summarized source.", json.web3_operator_runbook);
+  assert(["ephemeral", "persistent"].includes(json.web3_operator_runbook.account), "Operator runbook health should expose the summarized account.", json.web3_operator_runbook);
+  assert(["base", "breakout", "rug-risk"].includes(json.web3_operator_runbook.scenario), "Operator runbook health should expose the summarized scenario.", json.web3_operator_runbook);
+  assert(typeof json.web3_operator_runbook.allowed_now_count === "number", "Operator runbook health should expose allowed action count.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.allowed_now_count + json.web3_operator_runbook.gated_count + json.web3_operator_runbook.blocked_count >= 1, "Operator runbook health action counts should be present.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.primary_safe_action_status === null || ["allowed", "gated", "blocked"].includes(json.web3_operator_runbook.primary_safe_action_status), "Operator runbook health should expose a valid primary safe action status.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.current_input?.live_execution_permission === "blocked", "Operator runbook health should expose a locked current input contract.", json.web3_operator_runbook);
+  assert(Array.isArray(json.web3_operator_runbook.current_input.target_names), "Operator runbook health current input should expose safe target names.", json.web3_operator_runbook.current_input);
+  assert(json.web3_operator_runbook.live_execution_permission === "blocked", "Operator runbook health should keep live execution blocked.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.transaction_submission_permission === "blocked", "Operator runbook health should keep transaction submission blocked.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.wallet_mutation_permission === "blocked", "Operator runbook health should keep wallet mutation blocked.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.signing_permission === "blocked", "Operator runbook health should keep signing blocked.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.private_key_storage === "blocked", "Operator runbook health should keep private-key storage blocked.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.seed_phrase_storage === "blocked", "Operator runbook health should keep seed-phrase storage blocked.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.secret_echo_permission === "blocked", "Operator runbook health should keep secret echo blocked.", json.web3_operator_runbook);
   assert(json.web3_research_handoff?.mode === "web3-research-handoff-health", "Health endpoint should expose Web3 research handoff health.", json.web3_research_handoff);
   assert(json.web3_research_handoff.question_count >= 10, "Research handoff health should expose unresolved question count.", json.web3_research_handoff);
   assert(["sample", "live-dex"].includes(json.web3_research_handoff.source), "Research handoff health should expose the summarized source.", json.web3_research_handoff);
@@ -222,7 +240,7 @@ async function verifyHealth() {
   assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
-  record("health", "pass", "live, wallet mutation, research handoff, and live-usability locks are blocked");
+  record("health", "pass", "live, wallet mutation, runbook, research handoff, and live-usability locks are blocked");
 }
 
 async function verifyOperatorWalletScope() {

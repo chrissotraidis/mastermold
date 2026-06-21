@@ -1457,6 +1457,42 @@ describe("Web3 autonomous trading subsystem", () => {
     const response = await APP_HEALTH_GET();
     const receipt = await json<{
       status: string;
+      web3_operator_runbook: {
+        mode: string;
+        source: string;
+        account: string;
+        scenario: string;
+        receipt_hash: string;
+        primary_safe_action_id: string | null;
+        primary_safe_action_status: string | null;
+        primary_safe_action_surface: string | null;
+        primary_safe_action_next_action: string | null;
+        current_input: {
+          id: string;
+          label: string;
+          safe_collection_surface: string;
+          storage: string;
+          target_names: string[];
+          live_execution_permission: string;
+          wallet_mutation_permission: string;
+          transaction_submission_permission: string;
+          private_key_storage: string;
+          seed_phrase_storage: string;
+          secret_echo_permission: string;
+        } | null;
+        allowed_now_count: number;
+        gated_count: number;
+        blocked_count: number;
+        real_capital_blocker_count: number;
+        source_endpoint: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        signing_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      };
       web3_research_handoff: {
         mode: string;
         source: string;
@@ -1509,6 +1545,17 @@ describe("Web3 autonomous trading subsystem", () => {
 
     expect(response.status).toBe(200);
     expect(receipt.status).toBe("ok");
+    expect(receipt.web3_operator_runbook.mode).toBe("web3-operator-runbook-health");
+    expect(["sample", "live-dex"]).toContain(receipt.web3_operator_runbook.source);
+    expect(["ephemeral", "persistent"]).toContain(receipt.web3_operator_runbook.account);
+    expect(["base", "breakout", "rug-risk"]).toContain(receipt.web3_operator_runbook.scenario);
+    expect(receipt.web3_operator_runbook.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.web3_operator_runbook.source_endpoint).toContain(`source=${receipt.web3_operator_runbook.source}`);
+    expect(receipt.web3_operator_runbook.source_endpoint).toContain(`account=${receipt.web3_operator_runbook.account}`);
+    expect(receipt.web3_operator_runbook.source_endpoint).toContain(`scenario=${receipt.web3_operator_runbook.scenario}`);
+    expect(receipt.web3_operator_runbook.allowed_now_count).toBeGreaterThanOrEqual(0);
+    expect(receipt.web3_operator_runbook.allowed_now_count + receipt.web3_operator_runbook.gated_count + receipt.web3_operator_runbook.blocked_count).toBeGreaterThanOrEqual(1);
+    expect(receipt.web3_operator_runbook.primary_safe_action_status === null || ["allowed", "gated", "blocked"].includes(receipt.web3_operator_runbook.primary_safe_action_status)).toBe(true);
     expect(receipt.web3_research_handoff.mode).toBe("web3-research-handoff-health");
     expect(["sample", "live-dex"]).toContain(receipt.web3_research_handoff.source);
     expect(["ephemeral", "persistent"]).toContain(receipt.web3_research_handoff.account);
@@ -1517,6 +1564,28 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_research_handoff.source_endpoint).toContain(`account=${receipt.web3_research_handoff.account}`);
     expect(receipt.web3_research_handoff.source_endpoint).toContain(`scenario=${receipt.web3_research_handoff.scenario}`);
     expect(receipt.web3_research_handoff.live_review_source_endpoint).toBe("/api/web3-research-handoff-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_operator_runbook.current_input).not.toBeNull();
+    expect(receipt.web3_operator_runbook.current_input?.id).toBe(receipt.web3_live_usability.current_input?.id);
+    expect(receipt.web3_operator_runbook.current_input?.label).toBe(receipt.web3_live_usability.current_input?.label);
+    expect(receipt.web3_operator_runbook.current_input).toMatchObject({
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(receipt.web3_operator_runbook.current_input?.target_names.length).toBeGreaterThan(0);
+    expect(receipt.web3_operator_runbook.current_input?.target_names.join(" ")).not.toContain("test-");
+    expect(receipt.web3_operator_runbook.current_input?.safe_collection_surface.length).toBeGreaterThan(0);
+    expect(receipt.web3_operator_runbook.current_input?.storage.length).toBeGreaterThan(0);
+    expect(receipt.web3_operator_runbook.live_execution_permission).toBe("blocked");
+    expect(receipt.web3_operator_runbook.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.web3_operator_runbook.transaction_submission_permission).toBe("blocked");
+    expect(receipt.web3_operator_runbook.signing_permission).toBe("blocked");
+    expect(receipt.web3_operator_runbook.private_key_storage).toBe("blocked");
+    expect(receipt.web3_operator_runbook.seed_phrase_storage).toBe("blocked");
+    expect(receipt.web3_operator_runbook.secret_echo_permission).toBe("blocked");
     expect(receipt.web3_research_handoff.current_input).not.toBeNull();
     expect(receipt.web3_research_handoff.current_input?.id).toBe(receipt.web3_live_usability.current_input?.id);
     expect(receipt.web3_research_handoff.current_input?.label).toBe(receipt.web3_live_usability.current_input?.label);
