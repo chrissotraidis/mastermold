@@ -80,6 +80,7 @@ export type Web3LiveUsabilityCredentialRequest = {
   blocks_live_capital: boolean;
   safe_to_provide: string[];
   never_provide: string[];
+  completion_criteria: string[];
   verification_runway: Array<{
     id: string;
     label: string;
@@ -432,6 +433,7 @@ function summarizeNextCredentialRequest(
     blocks_live_capital: nextBlocker?.blocks_live_capital ?? true,
     safe_to_provide: safeToProvide.slice(0, 6),
     never_provide: neverProvide.slice(0, 6),
+    completion_criteria: credentialRequestCompletionCriteria(id),
     verification_runway: credentialRequestVerificationRunway(id, verifierCommand, fixHref),
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -441,6 +443,53 @@ function summarizeNextCredentialRequest(
     seed_phrase_storage: "blocked",
     secret_echo_permission: "blocked",
   };
+}
+
+function credentialRequestCompletionCriteria(id: string) {
+  const normalized = id.toLowerCase();
+  if (normalized.includes("wallet")) {
+    return [
+      "A dedicated public Solana wallet address is saved; the sample all-ones wallet is rejected.",
+      "The strict operator-wallet verifier passes with --require-operator-wallet.",
+      "Wallet ownership proof is recorded as a hash-only text-message signature receipt.",
+      "The refreshed live-usability receipt no longer ranks dedicated wallet scope as the next blocker, while live execution, signing, submission, wallet mutation, and secret echo stay blocked.",
+    ];
+  }
+  if (normalized.includes("jupiter")) {
+    return [
+      "JUPITER_API_KEY is available through ignored server env or a session-only Settings test.",
+      "The strict Jupiter verifier passes with --require-jupiter-order.",
+      "Quote and unsigned order readiness are recorded without returning transaction bytes.",
+      "The refreshed live-usability receipt advances to the next non-Jupiter blocker while live execution, signing, submission, wallet mutation, and secret echo stay blocked.",
+    ];
+  }
+  if (normalized.includes("signer") || normalized.includes("custody")) {
+    return [
+      "Signer provider mode and policy targets are documented without wallet private keys or seed phrases.",
+      "Provider custody review records hash-only request or policy evidence.",
+      "External signer approval remains separate from in-app live execution authority.",
+      "The refreshed live-usability receipt keeps signing and wallet mutation blocked until manual live review.",
+    ];
+  }
+  if (normalized.includes("accounting") || normalized.includes("settlement")) {
+    return [
+      "Accounting or settlement target names are configured without raw secrets.",
+      "A redacted ledger/accounting receipt proves the review path.",
+      "The refreshed live-usability receipt keeps live settlement and wallet mutation blocked.",
+    ];
+  }
+  if (normalized.includes("production") || normalized.includes("emergency") || normalized.includes("ops")) {
+    return [
+      "Ops target names, process owner, restart policy, or emergency-stop contact route are configured without secret echo.",
+      "The Web3 credential doctor reports the local ops receipt as fresh or ready for review.",
+      "The refreshed live-usability receipt keeps external dispatch, live execution, and wallet mutation blocked.",
+    ];
+  }
+  return [
+    "The safe setup value or review decision is recorded in the linked surface.",
+    "The safe verifier passes after the value changes.",
+    "The refreshed live-usability receipt advances to the next blocker while live execution, signing, submission, wallet mutation, and secret echo stay blocked.",
+  ];
 }
 
 function credentialRequestVerificationRunway(

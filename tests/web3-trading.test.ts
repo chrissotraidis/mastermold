@@ -1555,6 +1555,7 @@ describe("Web3 autonomous trading subsystem", () => {
           verifier_command: string | null;
           safe_to_provide: string[];
           never_provide: string[];
+          completion_criteria: string[];
           verification_runway: Array<{
             id: string;
             label: string;
@@ -1684,6 +1685,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_usability.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.next_credential_request?.never_provide.join(" ")).toContain("private key");
+    expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("strict operator-wallet verifier");
+    expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("live execution");
     expect(receipt.web3_live_usability.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
       "save-public-wallet",
       "strict-wallet-verifier",
@@ -1752,6 +1755,7 @@ describe("Web3 autonomous trading subsystem", () => {
         verifier_command: string | null;
         safe_to_provide: string[];
         never_provide: string[];
+        completion_criteria: string[];
         verification_runway: Array<{
           id: string;
           label: string;
@@ -1860,6 +1864,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     expect(receipt.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.next_credential_request?.never_provide.join(" ")).toContain("private key");
+    expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("sample all-ones wallet is rejected");
+    expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("live execution");
     expect(receipt.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
       "save-public-wallet",
       "strict-wallet-verifier",
@@ -1903,7 +1909,7 @@ describe("Web3 autonomous trading subsystem", () => {
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
       next_blocker: { id: string; label: string; owner: string; source: string; status: string; next_action: string; href: string; safe_command: string | null; blocks_live_capital: boolean } | null;
-      next_credential_request: { id: string; label: string; fix_href: string; verifier_command: string | null; safe_value_description: string; verification_runway: Array<{ id: string; command: string | null }>; secret_echo_permission: string } | null;
+      next_credential_request: { id: string; label: string; fix_href: string; verifier_command: string | null; safe_value_description: string; completion_criteria: string[]; verification_runway: Array<{ id: string; command: string | null }>; secret_echo_permission: string } | null;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; first_label: string; next_action: string }>;
       missing_source_summary: Array<{ source: string; missing_count: number; first_label: string; next_action: string }>;
@@ -1926,6 +1932,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.next_credential_request?.fix_href).toBe("/settings/integrations#settings-web3-wallet-public-key");
     expect(allRowsReceipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     expect(allRowsReceipt.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+    expect(allRowsReceipt.next_credential_request?.completion_criteria.join(" ")).toContain("strict operator-wallet verifier");
     expect(allRowsReceipt.next_credential_request?.verification_runway[1]?.command).toContain("--require-operator-wallet");
     expect(allRowsReceipt.next_credential_request?.secret_echo_permission).toBe("blocked");
     expect(allRowsReceipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);

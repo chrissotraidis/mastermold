@@ -460,6 +460,14 @@ function TradingCommandBoard({
                     {nextCredentialRequest.verifier_command}
                   </code>
                 ) : null}
+                <div className="mt-2 rounded-md border border-outline/15 bg-surface-dim/30 p-2" aria-label="Trading next credential completion criteria">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Done when</p>
+                  <ul className="mt-1 grid gap-1 text-[10px] leading-4 text-outline">
+                    {nextCredentialRequest.completion_criteria.slice(0, 3).map((criterion) => (
+                      <li key={criterion}>{criterion}</li>
+                    ))}
+                  </ul>
+                </div>
                 <div className="mt-2 grid gap-1.5" aria-label="Trading next credential verification runway">
                   {nextCredentialRequest.verification_runway.slice(0, 3).map((step, index) => (
                     <div key={step.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-2 rounded-md border border-outline/15 bg-surface-dim/30 p-2">
