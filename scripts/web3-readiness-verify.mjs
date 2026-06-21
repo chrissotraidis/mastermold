@@ -1492,6 +1492,17 @@ async function verifyLiveTradeCanary() {
   assert(preflight.json.mode === "web3-live-unsigned-order-preflight", "Live unsigned order preflight should expose the expected mode.", preflight.json);
   assert(preflight.json.status === "blocked", "Live unsigned order preflight should block sample-source requests.", preflight.json);
   assert(preflight.json.can_request_one_shot_unsigned_order === false, "Live unsigned order preflight should not permit one-shot unsigned order requests while blocked.", preflight.json);
+  assert(preflight.json.scoped_wallet_ownership_proved === true, "Live unsigned order preflight should see the scoped hash-only wallet ownership proof.", preflight.json);
+  assert(
+    walletPublicKey === DEFAULT_WALLET ? preflight.json.wallet_matches_scoped_wallet === false : preflight.json.wallet_matches_scoped_wallet === true,
+    "Live unsigned order preflight should report whether the request wallet matches the scoped wallet.",
+    preflight.json,
+  );
+  assert(
+    walletPublicKey === DEFAULT_WALLET ? preflight.json.wallet_ownership_proved === false : preflight.json.wallet_ownership_proved === true,
+    "Live unsigned order preflight should prove ownership only for the exact request wallet.",
+    preflight.json,
+  );
   assert(preflight.json.unsigned_transaction_return === "blocked", "Live unsigned order preflight must not return unsigned transaction bytes.", preflight.json);
   assert(preflight.json.transaction_body_storage === "blocked", "Live unsigned order preflight must not store transaction bodies.", preflight.json);
   assert(preflight.json.execute_permission === "blocked", "Live unsigned order preflight must not execute orders.", preflight.json);
@@ -1527,6 +1538,17 @@ async function verifyLiveTradeCanary() {
   assert(unsignedHandoff.json.mode === "web3-live-unsigned-order-handoff", "Live unsigned order handoff should expose the expected mode.", unsignedHandoff.json);
   assert(unsignedHandoff.json.status === "blocked", "Live unsigned order handoff should block sample-source requests.", unsignedHandoff.json);
   assert(unsignedHandoff.json.unsigned_transaction === null, "Live unsigned order handoff must not return unsigned bytes while blocked.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.scoped_wallet_ownership_proved === true, "Live unsigned order handoff should see scoped hash-only wallet proof before order creation.", unsignedHandoff.json);
+  assert(
+    walletPublicKey === DEFAULT_WALLET ? unsignedHandoff.json.wallet_matches_scoped_wallet === false : unsignedHandoff.json.wallet_matches_scoped_wallet === true,
+    "Live unsigned order handoff should report request wallet continuity with scoped wallet.",
+    unsignedHandoff.json,
+  );
+  assert(
+    walletPublicKey === DEFAULT_WALLET ? unsignedHandoff.json.wallet_ownership_proved === false : unsignedHandoff.json.wallet_ownership_proved === true,
+    "Live unsigned order handoff should prove ownership only for the exact request wallet.",
+    unsignedHandoff.json,
+  );
   assert(unsignedHandoff.json.unsigned_transaction_return === "blocked", "Live unsigned order handoff should mark unsigned return blocked.", unsignedHandoff.json);
   assert(unsignedHandoff.json.transaction_body_storage === "blocked", "Live unsigned order handoff must not store transaction bodies.", unsignedHandoff.json);
   assert(unsignedHandoff.json.execute_permission === "blocked", "Live unsigned order handoff must not execute orders.", unsignedHandoff.json);

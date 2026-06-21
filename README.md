@@ -293,16 +293,17 @@ ownership proof, Jupiter setup, live canary flags, or request-id readiness befor
 missing-signature proof.
 `POST /api/web3-live-unsigned-order-handoff` is the tiny live canary bridge: it can return a
 one-shot SOL-to-USDC Jupiter unsigned transaction only after `source=live-dex`, `account=persistent`,
-a dedicated public wallet, explicit canary acknowledgement, `return_unsigned_transaction_ack`, server
-`JUPITER_API_KEY`, `MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true`,
+a matching dedicated public wallet, hash-only browser-wallet ownership proof, explicit canary acknowledgement,
+`return_unsigned_transaction_ack`, server `JUPITER_API_KEY`, `MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true`,
 `MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS`, and
 `MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true`. It never accepts private keys, seed phrases,
 API keys, raw transactions, or signed payloads, and it still cannot sign, submit, store transaction
 bodies, execute, custody funds, or mutate wallets.
 `GET /api/web3-live-unsigned-order-handoff` is the no-transaction preflight for that same exact
-canary: it checks the public wallet, tiny amount, slippage cap, live flags, source/account scope,
-and Jupiter env before any browser-wallet prompt or Jupiter order creation, and still returns no
-transaction bytes. Trading and Settings expose this as `Canary preflight` before `Sign tiny canary`.
+canary: it checks the request wallet against the scoped wallet, hash-only ownership proof, tiny amount,
+slippage cap, live flags, source/account scope, and Jupiter env before any browser-wallet prompt or
+Jupiter order creation, and still returns no transaction bytes. Trading and Settings expose this as
+`Canary preflight` before `Sign tiny canary`.
 The Trading canary console now shows a compact `Canary launch checklist` that separates preflight,
 browser-wallet signature, signed relay, and confirmation/accounting, and it labels the result as
 `Funded canary still not proven` until all four live-money proof stages are complete.

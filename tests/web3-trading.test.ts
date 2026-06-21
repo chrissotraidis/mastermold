@@ -294,6 +294,56 @@ function bytesToBase64ForTest(bytes: ArrayBuffer) {
 
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
+async function createScopedOwnedWalletForTest(provider = "test-browser-wallet") {
+  const keyPair = await globalThis.crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]) as CryptoKeyPair;
+  const rawPublicKey = await globalThis.crypto.subtle.exportKey("raw", keyPair.publicKey);
+  const walletPublicKey = base58Encode(new Uint8Array(rawPublicKey));
+  const challengeResponse = await WALLET_OWNERSHIP_GET(new Request(`http://localhost/api/web3-wallet-ownership?wallet_public_key=${walletPublicKey}`));
+  const challengeReceipt = await json<{ message: string | null }>(challengeResponse);
+  expect(challengeResponse.status).toBe(200);
+  if (!challengeReceipt.message) throw new Error("Expected wallet ownership challenge message.");
+  const signature = await globalThis.crypto.subtle.sign({ name: "Ed25519" }, keyPair.privateKey, new TextEncoder().encode(challengeReceipt.message));
+  const proofResponse = await WALLET_OWNERSHIP_POST(new Request("http://localhost/api/web3-wallet-ownership", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      wallet_public_key: walletPublicKey,
+      message: challengeReceipt.message,
+      signature_base64: bytesToBase64ForTest(signature),
+      provider,
+    }),
+  }));
+  const proofReceipt = await json<{ status: string; receipt_hash: string; signature_verified: boolean }>(proofResponse);
+  expect(proofResponse.status).toBe(200);
+  expect(proofReceipt.status).toBe("verified");
+  expect(proofReceipt.signature_verified).toBe(true);
+
+  const saveScope = await POST(new Request("http://localhost/api/web3-trading", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scenario: "breakout",
+      source: "sample",
+      account: "persistent",
+      cycles: 0,
+      advance: false,
+      execution: {
+        mode: "dry-run",
+        wallet_public_key: walletPublicKey,
+        signer_simulation_enabled: true,
+        signer_session_label: "ownership-proof",
+        signer_network: "devnet",
+        max_trade_usd: 250,
+        daily_spend_cap_usd: 1000,
+        max_slippage_bps: 150,
+      },
+    }),
+  }));
+  expect(saveScope.status).toBe(200);
+
+  return { walletPublicKey, receiptHash: proofReceipt.receipt_hash };
+}
+
 function withClearExecutionLane(state: Web3TradingState): Web3TradingState {
   return {
     ...state,
@@ -3446,6 +3496,9 @@ describe("Web3 autonomous trading subsystem", () => {
       jupiter_key_configured: boolean;
       live_flags_ready: boolean;
       wallet_ready: boolean;
+      scoped_wallet_ownership_proved: boolean;
+      wallet_matches_scoped_wallet: boolean;
+      wallet_ownership_proved: boolean;
       blockers: string[];
       controls: string[];
     }>(preflightResponse);
@@ -3467,7 +3520,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(preflightReceipt.jupiter_key_configured).toBe(false);
     expect(preflightReceipt.live_flags_ready).toBe(false);
     expect(preflightReceipt.wallet_ready).toBe(true);
+    expect(preflightReceipt.scoped_wallet_ownership_proved).toBe(false);
+    expect(preflightReceipt.wallet_matches_scoped_wallet).toBe(false);
+    expect(preflightReceipt.wallet_ownership_proved).toBe(false);
     expect(preflightReceipt.blockers.join(" ")).toContain("source=live-dex");
+    expect(preflightReceipt.blockers.join(" ")).toContain("Save a dedicated public Solana wallet");
     expect(preflightReceipt.blockers.join(" ")).toContain("JUPITER_API_KEY");
     expect(preflightReceipt.controls.join(" ")).toContain("before any wallet prompt");
     expect(preflightReceipt.controls.join(" ")).toContain("never calls Jupiter order creation");
@@ -3492,7 +3549,25 @@ describe("Web3 autonomous trading subsystem", () => {
     process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION = "true";
     process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL = "I_UNDERSTAND_REAL_FUNDS";
     process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF = "true";
-    const readyPreflight = await LIVE_UNSIGNED_ORDER_HANDOFF_GET(new Request(`http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=live-dex&account=persistent&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${safeWallet}&amount_lamports=100000&max_slippage_bps=50`));
+    const unprovenPreflight = await LIVE_UNSIGNED_ORDER_HANDOFF_GET(new Request(`http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=live-dex&account=persistent&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${safeWallet}&amount_lamports=100000&max_slippage_bps=50`));
+    const unprovenReceipt = await json<{
+      status: string;
+      can_request_one_shot_unsigned_order: boolean;
+      scoped_wallet_ownership_proved: boolean;
+      wallet_matches_scoped_wallet: boolean;
+      wallet_ownership_proved: boolean;
+      blockers: string[];
+    }>(unprovenPreflight);
+    expect(unprovenPreflight.status).toBe(200);
+    expect(unprovenReceipt.status).toBe("blocked");
+    expect(unprovenReceipt.can_request_one_shot_unsigned_order).toBe(false);
+    expect(unprovenReceipt.scoped_wallet_ownership_proved).toBe(false);
+    expect(unprovenReceipt.wallet_matches_scoped_wallet).toBe(false);
+    expect(unprovenReceipt.wallet_ownership_proved).toBe(false);
+    expect(unprovenReceipt.blockers.join(" ")).toContain("Save a dedicated public Solana wallet");
+
+    const { walletPublicKey } = await createScopedOwnedWalletForTest("test-canary-preflight-wallet");
+    const readyPreflight = await LIVE_UNSIGNED_ORDER_HANDOFF_GET(new Request(`http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=live-dex&account=persistent&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${walletPublicKey}&amount_lamports=100000&max_slippage_bps=50`));
     const readyPreflightText = await readyPreflight.text();
     expect(readyPreflight.status).toBe(200);
     expect(readyPreflightText).not.toContain("jup-test-canary-key");
@@ -3514,6 +3589,9 @@ describe("Web3 autonomous trading subsystem", () => {
       source_ready: boolean;
       account_ready: boolean;
       wallet_ready: boolean;
+      scoped_wallet_ownership_proved: boolean;
+      wallet_matches_scoped_wallet: boolean;
+      wallet_ownership_proved: boolean;
       blockers: string[];
     };
     expect(readyPreflightReceipt.mode).toBe("web3-live-unsigned-order-preflight");
@@ -3533,6 +3611,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(readyPreflightReceipt.source_ready).toBe(true);
     expect(readyPreflightReceipt.account_ready).toBe(true);
     expect(readyPreflightReceipt.wallet_ready).toBe(true);
+    expect(readyPreflightReceipt.scoped_wallet_ownership_proved).toBe(true);
+    expect(readyPreflightReceipt.wallet_matches_scoped_wallet).toBe(true);
+    expect(readyPreflightReceipt.wallet_ownership_proved).toBe(true);
     expect(readyPreflightReceipt.blockers).toEqual([]);
     delete process.env.JUPITER_API_KEY;
     delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
@@ -3615,7 +3696,7 @@ describe("Web3 autonomous trading subsystem", () => {
   });
 
   test("GIVEN a one-shot unsigned canary order is returned WHEN the canary receipt refreshes THEN request continuity is available without storing transaction bytes", async () => {
-    const safeWallet = "9xQeWvG816bUx9EPfYQ4mKZ8sPXc6zQnK9j8vY9J3F3";
+    const { walletPublicKey } = await createScopedOwnedWalletForTest("test-canary-handoff-wallet");
     const unsignedTransaction = Buffer.from("unsigned-live-canary-transaction-never-store").toString("base64");
     process.env.JUPITER_API_KEY = "jup-test-canary-key";
     process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION = "true";
@@ -3641,7 +3722,7 @@ describe("Web3 autonomous trading subsystem", () => {
         operator_ack: true,
         canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
         return_unsigned_transaction_ack: true,
-        wallet_public_key: safeWallet,
+        wallet_public_key: walletPublicKey,
         amount_lamports: 100_000,
         max_slippage_bps: 50,
       }),
@@ -3655,6 +3736,9 @@ describe("Web3 autonomous trading subsystem", () => {
       unsigned_payload_byte_count: number;
       unsigned_transaction_return: string;
       continuity_audit_recorded: boolean;
+      scoped_wallet_ownership_proved: boolean;
+      wallet_matches_scoped_wallet: boolean;
+      wallet_ownership_proved: boolean;
       transaction_body_storage: string;
       signed_transaction_return: string;
       secret_echo_permission: string;
@@ -3665,6 +3749,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(handoffReceipt.request_id).toBe("canary-order-001");
     expect(handoffReceipt.unsigned_transaction).toBe(unsignedTransaction);
     expect(handoffReceipt.unsigned_transaction_return).toBe("returned-one-shot");
+    expect(handoffReceipt.scoped_wallet_ownership_proved).toBe(true);
+    expect(handoffReceipt.wallet_matches_scoped_wallet).toBe(true);
+    expect(handoffReceipt.wallet_ownership_proved).toBe(true);
     expect(handoffReceipt.unsigned_payload_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(handoffReceipt.unsigned_payload_byte_count).toBeGreaterThan(0);
     expect(handoffReceipt.continuity_audit_recorded).toBe(true);

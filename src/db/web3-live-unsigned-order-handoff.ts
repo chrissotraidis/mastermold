@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { isLikelySolanaPublicKey } from "./web3-credentials";
 import { store, type Web3ExecutionAuditRow } from "./store";
 import type { ExecutionAuditEntry, Web3TradingState } from "./web3-trading";
+import { getLatestWeb3WalletOwnershipReceipt } from "./web3-wallet-ownership";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -42,6 +43,10 @@ export type Web3LiveUnsignedOrderPreflightReceipt = {
   source_ready: boolean;
   account_ready: boolean;
   wallet_ready: boolean;
+  scoped_wallet_public_key_preview: string | null;
+  scoped_wallet_ownership_proved: boolean;
+  wallet_matches_scoped_wallet: boolean;
+  wallet_ownership_proved: boolean;
   can_request_one_shot_unsigned_order: boolean;
   unsigned_transaction_return: "blocked";
   transaction_body_storage: "blocked";
@@ -71,6 +76,10 @@ export type Web3LiveUnsignedOrderHandoffReceipt = {
   canary_acknowledged: boolean;
   return_acknowledged: boolean;
   wallet_public_key_preview: string | null;
+  scoped_wallet_public_key_preview: string | null;
+  scoped_wallet_ownership_proved: boolean;
+  wallet_matches_scoped_wallet: boolean;
+  wallet_ownership_proved: boolean;
   canary_pair: "SOL-USDC";
   amount_lamports: number;
   max_lamports: number;
@@ -116,17 +125,28 @@ export function buildWeb3LiveUnsignedOrderPreflightReceipt(
   const sourceReady = state.market_source.mode === "live-dex";
   const accountReady = state.paper_account.mode === "persistent";
   const walletReady = Boolean(wallet) && isLikelySolanaPublicKey(wallet) && wallet !== SAMPLE_SYSTEM_WALLET;
+  const scopedWallet = scopedWalletPublicKey(state);
+  const scopedWalletReady = isDedicatedPublicWallet(scopedWallet);
+  const scopedWalletOwnershipProved = scopedWalletReady && Boolean(getLatestWeb3WalletOwnershipReceipt(scopedWallet));
+  const walletMatchesScopedWallet = walletReady && scopedWalletReady && wallet === scopedWallet;
+  const walletOwnershipProved = walletMatchesScopedWallet && scopedWalletOwnershipProved;
   const blockers = [
-    !operatorAcknowledged ? "operator_ack must be true before live canary preflight can pass." : null,
-    !canaryAcknowledged ? "canary_ack must equal I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED." : null,
     !sourceReady ? "Live canary preflight requires source=live-dex." : null,
     !accountReady ? "Live canary preflight requires account=persistent." : null,
+    !scopedWallet ? "Save a dedicated public Solana wallet before live canary preflight." : null,
+    scopedWallet && !isLikelySolanaPublicKey(scopedWallet) ? "Replace the scoped wallet with a valid public Solana address before live canary preflight." : null,
+    scopedWallet === SAMPLE_SYSTEM_WALLET ? "The scoped sample all-ones wallet cannot pass live canary preflight." : null,
+    scopedWalletReady && !scopedWalletOwnershipProved ? "Run Prove ownership with the scoped browser wallet before live canary preflight; this signs text only and cannot move funds." : null,
     !wallet ? "wallet_public_key is required." : null,
     wallet && !isLikelySolanaPublicKey(wallet) ? "wallet_public_key must be a valid public Solana address." : null,
     wallet === SAMPLE_SYSTEM_WALLET ? "The sample all-ones wallet cannot pass live canary preflight." : null,
+    walletReady && scopedWalletReady && !walletMatchesScopedWallet ? "wallet_public_key must match the scoped dedicated wallet before live canary preflight." : null,
+    walletMatchesScopedWallet && !walletOwnershipProved ? "Run Prove ownership with the scoped browser wallet before live canary preflight; this signs text only and cannot move funds." : null,
     amountLamports > MAX_CANARY_LAMPORTS ? `amount_lamports must be ${MAX_CANARY_LAMPORTS} or less for the first canary.` : null,
     !process.env.JUPITER_API_KEY ? "JUPITER_API_KEY must be configured in ignored server env." : null,
     !liveFlagsReady ? "Live canary preflight requires MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, and MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true." : null,
+    !operatorAcknowledged ? "operator_ack must be true before live canary preflight can pass." : null,
+    !canaryAcknowledged ? "canary_ack must equal I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED." : null,
   ].filter((item): item is string => Boolean(item));
   const status: Web3LiveUnsignedOrderPreflightReceipt["status"] = unsafeFields.length > 0
     ? "unsafe-rejected"
@@ -147,6 +167,7 @@ export function buildWeb3LiveUnsignedOrderPreflightReceipt(
     operator_acknowledged: operatorAcknowledged,
     canary_acknowledged: canaryAcknowledged,
     wallet_public_key_preview: previewValue(wallet),
+    scoped_wallet_public_key_preview: previewValue(scopedWallet),
     canary_pair: "SOL-USDC" as const,
     amount_lamports: amountLamports,
     max_lamports: MAX_CANARY_LAMPORTS,
@@ -156,6 +177,9 @@ export function buildWeb3LiveUnsignedOrderPreflightReceipt(
     source_ready: sourceReady,
     account_ready: accountReady,
     wallet_ready: walletReady,
+    scoped_wallet_ownership_proved: scopedWalletOwnershipProved,
+    wallet_matches_scoped_wallet: walletMatchesScopedWallet,
+    wallet_ownership_proved: walletOwnershipProved,
     can_request_one_shot_unsigned_order: status === "ready",
     unsigned_transaction_return: "blocked" as const,
     transaction_body_storage: "blocked" as const,
@@ -171,7 +195,7 @@ export function buildWeb3LiveUnsignedOrderPreflightReceipt(
     blockers: [...new Set(allBlockers)].slice(0, 10),
     next_action: unsignedPreflightNextAction(status, allBlockers),
     controls: [
-      "This preflight checks the exact live canary wallet, caps, Jupiter env, source, account, and live flags before any wallet prompt.",
+      "This preflight checks the exact scoped wallet, hash-only ownership proof, tiny cap, Jupiter env, source, account, and live flags before any wallet prompt.",
       "It never calls Jupiter order creation, returns transaction bytes, signs, submits, stores payloads, or mutates a wallet.",
       "If ready, the next step is the explicit one-shot unsigned handoff and browser-wallet signature prompt.",
       "Private keys, seed phrases, keypair JSON, provider API key values, raw transactions, signed payloads, secret echo, and wallet authority remain blocked.",
@@ -198,18 +222,30 @@ export async function buildWeb3LiveUnsignedOrderHandoffReceipt(
   const amountLamports = canaryLamports(rawInput.amount_lamports);
   const maxSlippageBps = canarySlippage(rawInput.max_slippage_bps);
   const liveFlagsReady = liveUnsignedCanaryFlagsReady();
+  const scopedWallet = scopedWalletPublicKey(state);
+  const scopedWalletReady = isDedicatedPublicWallet(scopedWallet);
+  const walletReady = Boolean(wallet) && isLikelySolanaPublicKey(wallet) && wallet !== SAMPLE_SYSTEM_WALLET;
+  const scopedWalletOwnershipProved = scopedWalletReady && Boolean(getLatestWeb3WalletOwnershipReceipt(scopedWallet));
+  const walletMatchesScopedWallet = walletReady && scopedWalletReady && wallet === scopedWallet;
+  const walletOwnershipProved = walletMatchesScopedWallet && scopedWalletOwnershipProved;
   const blockers = [
-    !operatorAcknowledged ? "operator_ack must be true before building a live canary order." : null,
-    !canaryAcknowledged ? "canary_ack must equal I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED." : null,
-    !returnAcknowledged ? "return_unsigned_transaction_ack must be true before unsigned transaction bytes can be returned." : null,
     state.market_source.mode !== "live-dex" ? "Unsigned live canary handoff requires source=live-dex." : null,
     state.paper_account.mode !== "persistent" ? "Unsigned live canary handoff requires account=persistent." : null,
+    !scopedWallet ? "Save a dedicated public Solana wallet before requesting a live unsigned canary order." : null,
+    scopedWallet && !isLikelySolanaPublicKey(scopedWallet) ? "Replace the scoped wallet with a valid public Solana address before requesting a live unsigned canary order." : null,
+    scopedWallet === SAMPLE_SYSTEM_WALLET ? "The scoped sample all-ones wallet cannot receive a live unsigned canary order." : null,
+    scopedWalletReady && !scopedWalletOwnershipProved ? "Run Prove ownership with the scoped browser wallet before requesting a live unsigned canary order; this signs text only and cannot move funds." : null,
     !wallet ? "wallet_public_key is required." : null,
     wallet && !isLikelySolanaPublicKey(wallet) ? "wallet_public_key must be a valid public Solana address." : null,
     wallet === SAMPLE_SYSTEM_WALLET ? "The sample all-ones wallet cannot receive a live unsigned canary order." : null,
+    walletReady && scopedWalletReady && !walletMatchesScopedWallet ? "wallet_public_key must match the scoped dedicated wallet before requesting a live unsigned canary order." : null,
+    walletMatchesScopedWallet && !walletOwnershipProved ? "Run Prove ownership with the scoped browser wallet before requesting a live unsigned canary order; this signs text only and cannot move funds." : null,
     amountLamports > MAX_CANARY_LAMPORTS ? `amount_lamports must be ${MAX_CANARY_LAMPORTS} or less for the first canary.` : null,
     !process.env.JUPITER_API_KEY ? "JUPITER_API_KEY must be configured in ignored server env." : null,
     !liveFlagsReady ? "Live unsigned canary handoff requires MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, and MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true." : null,
+    !operatorAcknowledged ? "operator_ack must be true before building a live canary order." : null,
+    !canaryAcknowledged ? "canary_ack must equal I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED." : null,
+    !returnAcknowledged ? "return_unsigned_transaction_ack must be true before unsigned transaction bytes can be returned." : null,
   ].filter((item): item is string => Boolean(item));
 
   if (unsafeFields.length > 0 || blockers.length > 0) {
@@ -221,6 +257,10 @@ export async function buildWeb3LiveUnsignedOrderHandoffReceipt(
       canaryAcknowledged,
       returnAcknowledged,
       wallet,
+      scopedWallet,
+      scopedWalletOwnershipProved,
+      walletMatchesScopedWallet,
+      walletOwnershipProved,
       amountLamports,
       maxSlippageBps,
       unsafeFields,
@@ -261,6 +301,10 @@ export async function buildWeb3LiveUnsignedOrderHandoffReceipt(
         canaryAcknowledged,
         returnAcknowledged,
         wallet,
+        scopedWallet,
+        scopedWalletOwnershipProved,
+        walletMatchesScopedWallet,
+        walletOwnershipProved,
         amountLamports,
         maxSlippageBps,
         requestId: typeof json?.requestId === "string" ? json.requestId : null,
@@ -279,6 +323,10 @@ export async function buildWeb3LiveUnsignedOrderHandoffReceipt(
       canaryAcknowledged,
       returnAcknowledged,
       wallet,
+      scopedWallet,
+      scopedWalletOwnershipProved,
+      walletMatchesScopedWallet,
+      walletOwnershipProved,
       amountLamports,
       maxSlippageBps,
       requestId: typeof json?.requestId === "string" ? json.requestId : null,
@@ -300,6 +348,10 @@ export async function buildWeb3LiveUnsignedOrderHandoffReceipt(
       canaryAcknowledged,
       returnAcknowledged,
       wallet,
+      scopedWallet,
+      scopedWalletOwnershipProved,
+      walletMatchesScopedWallet,
+      walletOwnershipProved,
       amountLamports,
       maxSlippageBps,
       unsafeFields,
@@ -316,6 +368,10 @@ function receipt(input: {
   canaryAcknowledged: boolean;
   returnAcknowledged: boolean;
   wallet: string;
+  scopedWallet: string | null;
+  scopedWalletOwnershipProved: boolean;
+  walletMatchesScopedWallet: boolean;
+  walletOwnershipProved: boolean;
   amountLamports: number;
   maxSlippageBps: number;
   requestId?: string | null;
@@ -344,6 +400,10 @@ function receipt(input: {
     canary_acknowledged: input.canaryAcknowledged,
     return_acknowledged: input.returnAcknowledged,
     wallet_public_key_preview: previewValue(input.wallet),
+    scoped_wallet_public_key_preview: previewValue(input.scopedWallet),
+    scoped_wallet_ownership_proved: input.scopedWalletOwnershipProved,
+    wallet_matches_scoped_wallet: input.walletMatchesScopedWallet,
+    wallet_ownership_proved: input.walletOwnershipProved,
     canary_pair: "SOL-USDC" as const,
     amount_lamports: input.amountLamports,
     max_lamports: MAX_CANARY_LAMPORTS,
@@ -373,7 +433,7 @@ function receipt(input: {
     next_action: unsignedHandoffNextAction(input.status, blockers),
     controls: [
       "This route builds only a tiny SOL-to-USDC Jupiter canary order and never signs, submits, stores, or repeats the transaction body.",
-      "Unsigned bytes are returned only after explicit live flags, source=live-dex, account=persistent, public wallet scope, and canary acknowledgements.",
+      "Unsigned bytes are returned only after explicit live flags, source=live-dex, account=persistent, matching public wallet scope, hash-only ownership proof, and canary acknowledgements.",
       "The browser wallet or external signer must sign the one-shot transaction, then the signed payload must go through the live trade canary relay.",
       "Private keys, seed phrases, keypair JSON, provider API keys, raw transaction inputs, signed payload inputs, secret echo, and wallet mutation remain blocked.",
     ],
@@ -457,6 +517,17 @@ function unsignedPreflightNextAction(status: Web3LiveUnsignedOrderPreflightRecei
   return blockers[0] ?? "Clear live canary preflight blockers before requesting an unsigned order.";
 }
 
+function scopedWalletPublicKey(state: Web3TradingState) {
+  return state.autonomous_custody_mandate.wallet_public_key ??
+    state.live_wallet_accounting_readiness.wallet_public_key ??
+    state.execution_readiness.config.wallet_public_key ??
+    null;
+}
+
+function isDedicatedPublicWallet(value: string | null) {
+  return Boolean(value) && isLikelySolanaPublicKey(value!) && value !== SAMPLE_SYSTEM_WALLET;
+}
+
 function liveUnsignedCanaryFlagsReady() {
   return process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true" &&
     process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL === "I_UNDERSTAND_REAL_FUNDS" &&
@@ -530,7 +601,7 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function previewValue(value: string) {
+function previewValue(value: string | null | undefined) {
   return value ? `${value.slice(0, 4)}...${value.slice(-4)}` : null;
 }
 
