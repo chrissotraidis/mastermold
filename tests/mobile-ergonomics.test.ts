@@ -1975,6 +1975,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/settings/integrations/page.tsx")).toContain("receipt.post_signing_next_action");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Post-signing proof chain");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading post-signing proof chain");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading canary gate snapshot");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Canary gate snapshot");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Current blocker count");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("gateSnapshotStatus");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("primaryCanaryBlockers");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Check proof chain");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Auto watch proof");
     expect(source("components/web3-live-canary-console.tsx")).toContain("AUTO_PROOF_MAX_ATTEMPTS");

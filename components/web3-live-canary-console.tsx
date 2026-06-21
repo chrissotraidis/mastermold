@@ -117,6 +117,43 @@ export function Web3LiveCanaryConsole({
     .slice(firstCanaryVisibleStart + 1)
     .filter((step) => step.status === "blocked")
     .slice(0, 5);
+  const firstCanaryStepById = new Map(firstCanaryDrillReceipt.operator_unblock_plan.map((step) => [step.id, step]));
+  const liveFlagsStep = firstCanaryStepById.get("live-flags");
+  const unsignedPreflightStep = firstCanaryStepById.get("unsigned-order-preflight");
+  const signerRelayStep = firstCanaryStepById.get("signer-relay");
+  const primaryCanaryBlockers = actionReceipt?.blockers ?? unsignedReceipt?.blockers ?? preflightReceipt?.blockers ?? canaryReceipt.blockers;
+  const canaryGateSnapshot = [
+    {
+      id: "wallet-proof",
+      label: "Wallet proof",
+      value: canaryReceipt.wallet_ownership_current_for_canary ? "current" : canaryReceipt.wallet_ownership_proved ? "stale" : "needed",
+      status: canaryReceipt.wallet_ownership_current_for_canary ? "pass" as const : "fail" as const,
+    },
+    {
+      id: "live-flags",
+      label: "Live flags",
+      value: liveFlagsStep?.status === "done" ? "armed" : "missing",
+      status: gateSnapshotStatus(liveFlagsStep?.status),
+    },
+    {
+      id: "unsigned",
+      label: "Unsigned",
+      value: canaryReceipt.current_request_id ? "request ready" : unsignedPreflightStep?.status === "done" ? "preflight ready" : "blocked",
+      status: canaryReceipt.current_request_id ? "pass" as const : gateSnapshotStatus(unsignedPreflightStep?.status),
+    },
+    {
+      id: "relay",
+      label: "Relay",
+      value: canaryReceipt.can_submit_from_app_now ? "accepting" : canaryReceipt.signed_relay_status.replaceAll("-", " "),
+      status: canaryReceipt.can_submit_from_app_now ? "pass" as const : gateSnapshotStatus(signerRelayStep?.status),
+    },
+    {
+      id: "proof",
+      label: "Proof",
+      value: `${canaryReceipt.post_signing_evidence.filter((item) => item.status === "pass").length}/4`,
+      status: canaryReceipt.post_signing_evidence_status === "settlement-accounted" ? "pass" as const : canaryReceipt.latest_signature_preview ? "watch" as const : "fail" as const,
+    },
+  ];
 
   useEffect(() => {
     if (!autoProofMonitorEnabled || !sourceReady) return;
@@ -484,6 +521,34 @@ export function Web3LiveCanaryConsole({
             <CanaryMetric label="Wallet" value={walletPreview ?? "not connected"} tone={walletPreview ? "caution" : "neutral"} />
           </div>
 
+          <div className="mt-3 rounded-md border border-critical/20 bg-surface/55 p-3" aria-label="Trading canary gate snapshot">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Canary gate snapshot</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {firstCanaryDrillReceipt.next_unblock_step?.label ?? canaryReceipt.next_action}
+                </p>
+              </div>
+              <span className={evidenceStatusClassName(actualTradeTested ? "pass" : "fail")}>
+                {actualTradeTested ? "live proven" : "not live"}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-5">
+              {canaryGateSnapshot.map((item) => (
+                <div key={item.id} className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{item.label}</p>
+                    <span className={evidenceStatusClassName(item.status)}>{item.status}</span>
+                  </div>
+                  <p className="mt-1 truncate text-xs font-semibold text-on-surface">{item.value}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              Current blocker count {primaryCanaryBlockers.length}; the app stays unable to move funds until wallet proof, live flags, unsigned handoff, signed relay, and proof accounting all clear.
+            </p>
+          </div>
+
           <div className="mt-3 flex flex-wrap gap-2">
             {sourceReady ? (
               <>
@@ -741,7 +806,7 @@ export function Web3LiveCanaryConsole({
               <ShieldCheck aria-hidden="true" className="size-4 text-outline" />
             </div>
             <ul className="mt-2 grid gap-1.5 text-[11px] leading-4 text-on-surface-variant">
-              {(actionReceipt?.blockers ?? unsignedReceipt?.blockers ?? preflightReceipt?.blockers ?? canaryReceipt.blockers).slice(0, 4).map((blocker, blockerIndex) => (
+              {primaryCanaryBlockers.slice(0, 4).map((blocker, blockerIndex) => (
                 <li key={`${blockerIndex}-${blocker}`}>{blocker}</li>
               ))}
             </ul>
@@ -897,6 +962,12 @@ function postSigningStatusClassName(status: Web3LiveTradeCanaryReceipt["post_sig
   if (status === "settlement-accounted") return `${base} border-engine/30 bg-engine/10 text-engine`;
   if (status === "review-required") return `${base} border-critical/30 bg-critical/10 text-critical`;
   return `${base} border-caution/30 bg-caution/10 text-caution`;
+}
+
+function gateSnapshotStatus(status: Web3FirstCanaryDrillReceipt["operator_unblock_plan"][number]["status"] | undefined) {
+  if (status === "done") return "pass" as const;
+  if (status === "watch" || status === "next") return "watch" as const;
+  return "fail" as const;
 }
 
 function firstCanaryDrillStatusClassName(status: Web3FirstCanaryDrillReceipt["status"]) {

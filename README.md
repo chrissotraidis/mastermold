@@ -315,6 +315,9 @@ bytes. Trading and Settings expose this as `Canary preflight` before `Sign tiny 
 The Trading canary console now shows a compact `Canary launch checklist` that separates preflight,
 browser-wallet signature, signed relay, and confirmation/accounting, and it labels the result as
 `Funded canary still not proven` until all four live-money proof stages are complete.
+It also shows an always-visible `Canary gate snapshot` for wallet proof, live flags, unsigned
+handoff/request id, relay readiness, proof count, and current blocker count, so the operator can see
+why the app has not moved funds without opening JSON or running preflight first.
 The Trading live canary console refreshes the first-canary drill after wallet proof, canary
 preflight, tiny-canary signing, proof checks, and manual receipt refresh, so the next unblock step,
 hard-fail count, proof count, and ordered gates stay current without treating paper trades, DEX
