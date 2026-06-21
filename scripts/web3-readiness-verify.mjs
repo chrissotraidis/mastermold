@@ -459,6 +459,9 @@ async function verifyLiveUsabilityBlockersReceipt() {
   assert(json.autonomous_live_locked === true, "Live usability blockers should explicitly lock autonomous live trading.", json);
   assert(typeof json.open_operator_input_count === "number", "Live usability blockers should count open operator inputs.", json);
   assert(typeof json.real_capital_blocker_count === "number", "Live usability blockers should count real-capital blockers.", json);
+  assert(typeof json.total_live_usability_row_count === "number", "Live usability blockers should count total live-usability rows.", json);
+  assert(typeof json.listed_live_usability_row_count === "number", "Live usability blockers should count listed live-usability rows.", json);
+  assert(json.total_live_usability_row_count >= json.listed_live_usability_row_count, "Live usability blockers listed rows should not exceed total rows.", json);
   assert(json.ready_live_lane_count <= json.total_live_lane_count, "Live usability blockers live-lane counts should reconcile.", json);
   assert(
     json.passed_signoff_count + json.failed_or_watch_signoff_count === json.required_signoff_count,
@@ -466,6 +469,11 @@ async function verifyLiveUsabilityBlockersReceipt() {
     json,
   );
   assert(Array.isArray(json.missing_for_live_usability), "Live usability blockers should include missing-for-usability rows.", json);
+  assert(
+    typeof json.summary === "string" && json.summary.includes("cutover setup blocker") && json.summary.includes("total live-usability row") && json.summary.includes("dependency-ranked row"),
+    "Live usability blockers summary should distinguish cutover blockers from dependency-ranked usability rows.",
+    json.summary,
+  );
   assert(Array.isArray(json.operator_unlock_sequence) && json.operator_unlock_sequence.map((item) => item.id).join(",") === "scope-wallet,prove-wallet,rehearse-jupiter,choose-signer,ops-accounting,external-review", "Live usability blockers should carry the ordered unlock sequence.", json.operator_unlock_sequence);
   assert(json.operator_unlock_sequence.some((item) => item.id === json.next_unlock_step?.id), "Live usability blockers should expose the next ordered unlock step before downstream proof work.", json.next_unlock_step);
   if (json.next_unlock_step?.id === "scope-wallet") {

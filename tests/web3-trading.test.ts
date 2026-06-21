@@ -1297,7 +1297,10 @@ describe("Web3 autonomous trading subsystem", () => {
     const receipt = await json<{
       mode: string;
       status: string;
+      summary: string;
       receipt_hash: string;
+      total_live_usability_row_count: number;
+      listed_live_usability_row_count: number;
       next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string } | null;
       operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
@@ -1311,6 +1314,11 @@ describe("Web3 autonomous trading subsystem", () => {
 
     expect(response.status).toBe(200);
     expect(receipt.mode).toBe("web3-live-usability-blockers");
+    expect(receipt.summary).toContain("cutover setup blocker");
+    expect(receipt.summary).toContain("total live-usability row");
+    expect(receipt.summary).toContain("dependency-ranked row");
+    expect(receipt.total_live_usability_row_count).toBeGreaterThanOrEqual(receipt.listed_live_usability_row_count);
+    expect(receipt.listed_live_usability_row_count).toBe(receipt.missing_for_live_usability.length);
     expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.next_unlock_step).toMatchObject({
       id: "scope-wallet",

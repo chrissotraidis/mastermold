@@ -788,6 +788,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("cannot sign, submit, store wallet authority, or mutate balances");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("web3-live-usability-blockers");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("what is left before real-money Web3 usability");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("cutover setup blocker");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("total_live_usability_row_count");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("listed_live_usability_row_count");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("total live-usability row");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("dependency-ranked row");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("Autonomous live trading remains locked in-app");
     expect(source("app/api/web3-live-usability-blockers/route.ts")).toContain("buildWeb3LiveUsabilityBlockersReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-usability-blockers?source=live-dex&account=persistent");
@@ -1571,6 +1576,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-live-usability-blockers");
     expect(source("components/review-readiness.tsx")).toContain("live-usability blocker summaries");
+    expect(source("components/review-readiness.tsx")).toContain("separates cutover setup blockers from total versus listed dependency-ranked live-usability rows");
     expect(source("components/review-readiness.tsx")).toContain("next ordered unlock step");
     expect(source("components/review-readiness.tsx")).toContain("Settings now adds a Web3 setup runway");
     expect(source("components/review-readiness.tsx")).toContain("Settings now places that same live-usability blocker receipt");

@@ -43,6 +43,8 @@ export type Web3LiveUsabilityBlockersReceipt = {
   open_operator_input_count: number;
   open_cutover_blocker_count: number;
   real_capital_blocker_count: number;
+  total_live_usability_row_count: number;
+  listed_live_usability_row_count: number;
   required_signoff_count: number;
   passed_signoff_count: number;
   failed_or_watch_signoff_count: number;
@@ -148,6 +150,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
       next_action: action.next_action,
     }))
     .slice(0, 6);
+  const listedMissing = missing.slice(0, 14);
   const verifierCommands = Array.from(new Set([
     ...input.runbook.verifier_commands,
     ...input.manualLiveReview.safe_commands,
@@ -172,6 +175,8 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     open_operator_input_count: openOperatorInputCount,
     open_cutover_blocker_count: input.cutover.open_blocker_count,
     real_capital_blocker_count: realCapitalBlockerCount,
+    total_live_usability_row_count: missing.length,
+    listed_live_usability_row_count: listedMissing.length,
     required_signoff_count: input.manualLiveReview.required_signoff_count,
     passed_signoff_count: input.manualLiveReview.passed_signoff_count,
     failed_or_watch_signoff_count: failedOrWatchSignoffCount,
@@ -191,7 +196,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     next_action: liveUsabilityNextAction(status, input, missing),
     summary: liveUsabilitySummary(status, input, missing, autonomousLive?.detail),
     operator_unlock_sequence: input.usability.operator_unlock_sequence,
-    missing_for_live_usability: missing.slice(0, 14),
+    missing_for_live_usability: listedMissing,
     safe_next_actions: safeNextActions,
     verifier_commands: verifierCommands,
     evidence_endpoints: [
@@ -417,7 +422,8 @@ function liveUsabilitySummary(
     return "Supervised live review can be requested externally; Mastermind still blocks signing, submission, wallet mutation, and autonomous live trading.";
   }
   if (status === "operator-input-needed") {
-    return `${input.cutover.open_blocker_count} setup blocker${input.cutover.open_blocker_count === 1 ? "" : "s"} remain before real-money usability can be reviewed.`;
+    const listedCount = Math.min(missing.length, 14);
+    return `${input.cutover.open_blocker_count} cutover setup blocker${input.cutover.open_blocker_count === 1 ? "" : "s"} and ${missing.length} total live-usability row${missing.length === 1 ? "" : "s"} remain before real-money usability can be reviewed; the first ${listedCount} dependency-ranked row${listedCount === 1 ? "" : "s"} are listed.`;
   }
   if (status === "external-review-needed") {
     return `${input.manualLiveReview.failed_signoff_count + input.manualLiveReview.watch_signoff_count} live-review signoff${input.manualLiveReview.failed_signoff_count + input.manualLiveReview.watch_signoff_count === 1 ? "" : "s"} still need review; ${input.runway.ready_lane_count}/${input.runway.total_lane_count} supervised lanes are ready.`;
