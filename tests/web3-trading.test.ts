@@ -2260,7 +2260,7 @@ describe("Web3 autonomous trading subsystem", () => {
       healthWalletGateIsOwnershipProof ? "hash-only wallet ownership receipt" : "wallet_public_key",
     );
     if (healthWalletGateIsOwnershipProof) {
-      expect(receipt.web3_credential_requirements.next_requirement?.safe_collection_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
+      expect(receipt.web3_credential_requirements.next_requirement?.safe_collection_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     }
     expect(receipt.web3_credential_requirements.source_endpoint).toContain("/api/web3-credential-requirements");
     expect(receipt.web3_credential_requirements.live_review_source_endpoint).toBe("/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0");
@@ -2984,9 +2984,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("wallet-ownership");
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("jupiter-order");
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("unsigned-order-preflight");
-    expect(receipt.operator_unblock_plan.find((step) => step.id === "wallet-ownership")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
-    expect(receipt.operator_unblock_plan.find((step) => step.id === "unsigned-order-preflight")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
-    expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "wallet-ownership")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "unsigned-order-preflight")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "signer-relay")?.action).toContain("external wallet transaction prompt");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "manual-live-review")?.action).toContain("external live review");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.action).toContain("signed tiny-canary relay");
@@ -3006,6 +3006,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.safe_commands).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready");
     expect(receipt.safe_commands).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");
     expect(receipt.safe_surfaces).toContain("/trading?source=live-dex&account=persistent");
+    expect(receipt.safe_surfaces).toContain("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(receipt.source_endpoint).toContain("/api/web3-first-canary-drill");
     expect(receipt.live_review_source_endpoint).toBe("/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(receipt.strict_ready_command).toContain("drill-canary:web3");
@@ -4061,7 +4062,7 @@ describe("Web3 autonomous trading subsystem", () => {
       expect(receipt.next_blocker).toMatchObject({
         id: "wallet-ownership-proof",
         label: "Wallet ownership proof",
-        href: "/trading?source=live-dex&account=persistent#web3-live-canary-console",
+        href: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
       });
       expect(receipt.next_blocker?.next_action).toBe(receipt.current_input.next_action);
     } else {
@@ -4088,7 +4089,7 @@ describe("Web3 autonomous trading subsystem", () => {
     if (receipt.current_input?.id === "wallet-ownership-proof") {
       expect(receipt.next_credential_request).toMatchObject({
         id: "wallet-ownership-proof",
-        fix_href: "/trading?source=live-dex&account=persistent#web3-live-canary-console",
+        fix_href: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
         safe_collection_surface: "browser-wallet",
         storage: "hash-only-local-receipt",
         target_names: ["hash-only wallet ownership receipt"],
@@ -4107,7 +4108,7 @@ describe("Web3 autonomous trading subsystem", () => {
         "strict-wallet-verifier",
         "refresh-live-usability",
       ]);
-      expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
+      expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     } else {
       expect(receipt.next_credential_request).toMatchObject({
         fix_href: "/settings/integrations#settings-web3-wallet-public-key",

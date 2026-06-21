@@ -9,6 +9,8 @@ import type { Web3SupervisedLiveRunway } from "./web3-supervised-live-runway";
 import type { Web3TradingState } from "./web3-trading";
 import type { Web3UsabilityStatusReceipt } from "./web3-usability-status";
 
+const CANONICAL_LIVE_CANARY_SURFACE = "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console";
+
 export type Web3LiveUsabilityBlockerOwner = "operator" | "security" | "ops" | "accounting" | "strategy" | "manual-review";
 
 export type Web3LiveUsabilityMissingItem = {
@@ -516,7 +518,7 @@ function credentialRequestFixHref(
   useCurrentInput: boolean,
 ) {
   if (useCurrentInput && currentInput?.id === "wallet-ownership-proof") {
-    return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
+    return CANONICAL_LIVE_CANARY_SURFACE;
   }
   return nextBlocker?.href ?? "/settings/integrations#settings-web3-credentials-runway";
 }
@@ -792,7 +794,7 @@ function summarizeNextBlocker(
       source: item.source,
       status: item.status,
       next_action: currentInput.next_action,
-      href: "/trading?source=live-dex&account=persistent#web3-live-canary-console",
+      href: CANONICAL_LIVE_CANARY_SURFACE,
       safe_command: currentInput.verifier_command,
       blocks_live_capital: item.blocks_live_capital,
     };

@@ -32,7 +32,7 @@ import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
 import { buildWeb3SupervisedCanaryReadinessReceipt, type Web3SupervisedCanaryReadinessLane, type Web3SupervisedCanaryReadinessReceipt } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3UsabilityStatus, type Web3UsabilityStatusReceipt } from "@/src/db/web3-usability-status";
-import { getWeb3TradingStateAsync, isTradingAccountMode, isTradingMarketSource } from "@/src/db/web3-trading";
+import { getWeb3TradingStateAsync, isTradingAccountMode, isTradingMarketSource, isTradingScenario } from "@/src/db/web3-trading";
 import { getLatestWeb3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
 
 export const dynamic = "force-dynamic";
@@ -49,11 +49,14 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
   const params = await searchParams;
   const accountParam = firstParam(params?.account);
   const sourceParam = firstParam(params?.source);
+  const scenarioParam = firstParam(params?.scenario);
   const account = accountParam && isTradingAccountMode(accountParam) ? accountParam : "persistent";
   const source = sourceParam && isTradingMarketSource(sourceParam) ? sourceParam : "live-dex";
+  const scenario = scenarioParam && isTradingScenario(scenarioParam) ? scenarioParam : "breakout";
   const initialState = await getWeb3TradingStateAsync({
     account,
     source,
+    scenario,
   });
   const latestWalletOwnership = getLatestWeb3WalletOwnershipReceipt(initialState.execution_readiness.config.wallet_public_key);
   const supervisorHealth = getWeb3DaemonSupervisorHealth();
@@ -174,7 +177,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
         />
 
         <div className="w-full min-w-0 space-y-4">
-          <TradingSourceSwitch source={source} account={account} />
+          <TradingSourceSwitch source={source} account={account} scenario={initialState.scenario} />
           <LiveCanaryCommandCenter
             ignition={liveIgnition}
             readiness={supervisedCanaryReadiness}
@@ -231,9 +234,11 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
 function TradingSourceSwitch({
   source,
   account,
+  scenario,
 }: {
   source: "sample" | "live-dex";
   account: "persistent" | "ephemeral";
+  scenario: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>["scenario"];
 }) {
   const sourceLabel = source === "live-dex" ? "Live DEX read" : "Sample tape";
   const sourceDetail = source === "live-dex"
@@ -253,13 +258,13 @@ function TradingSourceSwitch({
         </div>
         <div className="grid min-w-0 grid-cols-2 gap-2 sm:w-auto" aria-label="Choose Web3 market source">
           <TradingSourceLink
-            href={tradingSourceHref("sample", account)}
+            href={tradingSourceHref("sample", account, scenario)}
             active={source === "sample"}
             icon={<Database aria-hidden="true" className="size-4" />}
             label="Sample tape"
           />
           <TradingSourceLink
-            href={tradingSourceHref("live-dex", account)}
+            href={tradingSourceHref("live-dex", account, scenario)}
             active={source === "live-dex"}
             icon={<Activity aria-hidden="true" className="size-4" />}
             label="Live DEX read"
@@ -267,7 +272,7 @@ function TradingSourceSwitch({
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-4 text-outline">
-        Plain /trading opens live DEX read by default. Source switching changes read-only market evidence only; signing, submission, wallet mutation, private-key storage, and seed phrase storage stay blocked.
+        Plain /trading opens the live DEX breakout canary view by default. Source switching changes read-only market evidence only; signing, submission, wallet mutation, private-key storage, and seed phrase storage stay blocked.
       </p>
     </section>
   );
@@ -554,8 +559,8 @@ function TradingSourceLink({
   );
 }
 
-function tradingSourceHref(source: "sample" | "live-dex", account: "persistent" | "ephemeral") {
-  const params = new URLSearchParams({ source });
+function tradingSourceHref(source: "sample" | "live-dex", account: "persistent" | "ephemeral", scenario: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>["scenario"]) {
+  const params = new URLSearchParams({ source, scenario });
   if (account !== "persistent") params.set("account", account);
   return `/trading?${params.toString()}`;
 }
@@ -579,7 +584,7 @@ function LiveCanaryCommandCenter({
   const nextCanaryLane = drill.lanes.find((lane) => lane.status === "fail") ?? drill.lanes.find((lane) => lane.status === "watch") ?? readiness.lanes.find((lane) => lane.id === readiness.next_lane_id);
   const drillCommand = drill.strict_ready_command.replace(" --require-ready", "");
   const proofCommand = drill.strict_proof_command;
-  const liveHref = "/trading?source=live-dex&account=persistent";
+  const liveHref = `/trading?source=live-dex&account=persistent&scenario=${drill.scenario}#web3-live-canary-console`;
   const drillHref = drill.live_review_source_endpoint;
   const nextProof = canary.post_signing_evidence.find((item) => item.status !== "pass") ?? null;
   const proofPassCount = canary.post_signing_evidence.filter((item) => item.status === "pass").length;

@@ -9,6 +9,8 @@ import type { Web3SupervisedLiveRunway } from "./web3-supervised-live-runway";
 import type { Web3TradingState } from "./web3-trading";
 import type { Web3UsabilityStatusReceipt } from "./web3-usability-status";
 
+const CANONICAL_LIVE_CANARY_SURFACE = "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console";
+
 export type Web3ResearchQuestion = {
   id:
     | "custody-architecture"
@@ -337,7 +339,7 @@ function buildCredentialRequirements(
     ? currentInput.target_names
     : ["wallet_public_key", "wallet_ownership_signature_hash"];
   const walletOwnershipSurface = walletOwnershipIsCurrent
-    ? "/trading?source=live-dex&account=persistent#web3-live-canary-console"
+    ? CANONICAL_LIVE_CANARY_SURFACE
     : "/settings/integrations#settings-web3-wallet-public-key";
   const walletOwnershipAction = walletOwnershipIsCurrent
     ? currentInput.next_action

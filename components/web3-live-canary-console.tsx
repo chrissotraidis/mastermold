@@ -113,7 +113,7 @@ export function Web3LiveCanaryConsole({
   const canaryHref = `/api/web3-live-trade-canary?${currentParams.toString()}`;
   const drillHref = `/api/web3-first-canary-drill?${currentParams.toString()}`;
   const unsignedHref = `/api/web3-live-unsigned-order-handoff?${params.toString()}`;
-  const liveTradingHref = `/trading?source=live-dex${account !== "persistent" ? "&account=persistent" : ""}`;
+  const liveTradingHref = `/trading?source=live-dex&account=persistent&scenario=${scenario}#web3-live-canary-console`;
   const latestStatus = actionReceipt?.status ?? unsignedReceipt?.status ?? preflightReceipt?.status ?? canaryReceipt.status;
   const actualTradeTested = actionReceipt?.actual_live_trade_tested ?? canaryReceipt.actual_live_trade_tested;
   const sourceReady = source === "live-dex" && account === "persistent";
@@ -187,6 +187,7 @@ export function Web3LiveCanaryConsole({
     signTinyCanary,
     runPostSigningProofCheck,
     liveCanaryConsentArmed,
+    scenario,
   });
 
   useEffect(() => {
@@ -1122,6 +1123,7 @@ function buildPrimaryCanaryGateControl(input: {
   signTinyCanary: () => void;
   runPostSigningProofCheck: () => void;
   liveCanaryConsentArmed: boolean;
+  scenario: TradingScenario;
 }): PrimaryCanaryGateControl {
   const step = input.step;
   if (!input.sourceReady) {
@@ -1129,7 +1131,7 @@ function buildPrimaryCanaryGateControl(input: {
       label: "Open live canary",
       detail: "The supervised canary actions run only from the live DEX persistent trading view.",
       tone: "critical",
-      href: "/trading?source=live-dex&account=persistent#web3-live-canary-console",
+      href: `/trading?source=live-dex&account=persistent&scenario=${input.scenario}#web3-live-canary-console`,
       disabled: false,
     };
   }

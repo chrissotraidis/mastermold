@@ -403,7 +403,7 @@ async function verifyHealth() {
   const liveUsabilityCurrentInputId = json.web3_live_usability.current_input?.id;
   const liveUsabilityNextBlockerId = json.web3_live_usability.next_blocker?.id;
   const liveUsabilityProofIsNext = liveUsabilityCurrentInputId === "wallet-ownership-proof";
-  const liveUsabilityProofSurface = "/trading?source=live-dex&account=persistent#web3-live-canary-console";
+  const liveUsabilityProofSurface = "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console";
   assert(
     ["cutover:dedicated-trading-wallet", "cutover:wallet-ownership-proof", "runway:wallet", "wallet-ownership-proof"].includes(liveUsabilityNextBlockerId),
     "Live-usability health should expose the next dependency-ranked blocker.",

@@ -305,7 +305,7 @@ function canaryAttemptEndpoint(stage: Web3SupervisedCanaryAttemptContract["stage
   if (stage === "signed-payload-relay" || stage === "proof-watch" || stage === "canary-proven") return input.canaryEndpoint;
   const lane = firstBlockingCanaryLane(input.lanes);
   if (lane?.id === "live-scope" || lane?.id === "wallet-ownership") {
-    return "/trading?source=live-dex&account=persistent";
+    return `/trading?${input.endpointParams}#web3-live-canary-console`;
   }
   if (lane?.id === "dedicated-wallet" || lane?.id === "jupiter-order" || lane?.id === "live-flags" || lane?.id === "signer-relay" || lane?.id === "manual-live-review") {
     return "/settings/integrations#settings-web3-credentials-runway";

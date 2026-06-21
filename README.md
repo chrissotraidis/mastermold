@@ -344,6 +344,9 @@ The Trading live canary console refreshes the first-canary drill after wallet pr
 preflight, tiny-canary signing, proof checks, and manual receipt refresh, so the next unblock step,
 hard-fail count, proof count, and ordered gates stay current without treating paper trades, DEX
 reads, or Jupiter rehearsals as live-trade proof.
+Plain `/trading` now defaults to the canonical live DEX breakout canary view, and Trading source
+switching plus wallet-proof/blocker/credential/canary links preserve `scenario=breakout` so the
+operator does not drift between base and breakout receipts while preparing the first funded test.
 It also shows the actual trade, funds moved, signed-relay, unsigned-order, hard-fail, and proof
 counts in one truth strip, plus an after-current-gate forecast so the operator can see the still
 blocked Jupiter, live-flag, unsigned-preflight, signer-relay, and post-signing proof runway without

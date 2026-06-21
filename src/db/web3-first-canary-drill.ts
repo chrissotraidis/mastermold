@@ -174,6 +174,7 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
     .slice(0, 6)
     .map((item) => item.next_action);
   const endpointParams = `source=${input.state.market_source.mode}&account=${input.state.paper_account.mode}&scenario=${input.state.scenario}&cycles=0`;
+  const tradingCanarySurface = `/trading?source=live-dex&account=persistent&scenario=${input.state.scenario}#web3-live-canary-console`;
   const base = {
     mode: "web3-first-canary-drill" as const,
     status,
@@ -226,6 +227,7 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
       input.liveUsability.next_blocker?.href,
       `/api/web3-first-canary-drill?${endpointParams}`,
       "/trading?source=live-dex&account=persistent",
+      tradingCanarySurface,
       "/settings/integrations#settings-web3-credentials-runway",
     ]),
     source_endpoint: `/api/web3-first-canary-drill?${endpointParams}`,
@@ -426,15 +428,16 @@ function firstCanarySafeSurface(
     canary: Web3LiveTradeCanaryReceipt;
   },
 ) {
+  const tradingCanarySurface = `/trading?source=live-dex&account=persistent&scenario=${input.readiness.scenario}#web3-live-canary-console`;
   if (lane.id === "dedicated-wallet") return "/settings/integrations#settings-web3-wallet-public-key";
-  if (lane.id === "wallet-ownership") return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
+  if (lane.id === "wallet-ownership") return tradingCanarySurface;
   if (lane.id === "jupiter-order") return "/settings/integrations#web3-credential-action-console";
   if (lane.id === "live-flags") return "/settings/integrations#web3-credential-action-console";
-  if (lane.id === "unsigned-order-preflight") return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
+  if (lane.id === "unsigned-order-preflight") return tradingCanarySurface;
   if (lane.id === "signer-relay") return input.readiness.canary_endpoint;
   if (lane.id === "manual-live-review") return "/api/web3-manual-live-review-packet?source=live-dex&account=persistent";
-  if (lane.id === "funded-canary-proof" || lane.id === "post-signing-proof") return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
-  if (lane.id === "live-scope") return "/trading?source=live-dex&account=persistent#web3-live-canary-console";
+  if (lane.id === "funded-canary-proof" || lane.id === "post-signing-proof") return tradingCanarySurface;
+  if (lane.id === "live-scope") return tradingCanarySurface;
   return input.liveUsability.next_blocker?.href ?? lane.evidence_endpoint;
 }
 

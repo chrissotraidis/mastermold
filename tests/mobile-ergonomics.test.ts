@@ -773,11 +773,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Sample tape");
     expect(tradingPage).toContain("Live DEX read");
     expect(tradingPage).toContain('const source = sourceParam && isTradingMarketSource(sourceParam) ? sourceParam : "live-dex"');
-    expect(tradingPage).toContain("Plain /trading opens live DEX read by default.");
+    expect(tradingPage).toContain('const scenario = scenarioParam && isTradingScenario(scenarioParam) ? scenarioParam : "breakout"');
+    expect(tradingPage).toContain("Plain /trading opens the live DEX breakout canary view by default.");
     expect(tradingPage).toContain('const provenanceLabel = source === "live-dex" ? "Live DEX read" : "Sample data"');
     expect(tradingPage).toContain("dataMode={provenanceLabel}");
     expect(tradingPage).toContain("provenance={provenanceLabel}");
-    expect(tradingPage).toContain('tradingSourceHref("live-dex", account)');
+    expect(tradingPage).toContain('tradingSourceHref("live-dex", account, scenario)');
     expect(tradingPage).toContain("Source switching changes read-only market evidence only");
     expect(tradingPage).toContain("Live readiness dossier");
     expect(tradingPage).toContain("Open JSON");
@@ -1781,7 +1782,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("current_input_label");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("next_lane_id");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("operator_unblock_plan");
-    expect(source("src/db/web3-first-canary-drill.ts")).toContain("/trading?source=live-dex&account=persistent#web3-live-canary-console");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("/trading?source=live-dex&account=persistent&scenario=${input.readiness.scenario}#web3-live-canary-console");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("next_unblock_step");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("completion_signal");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("buildFirstCanaryUnblockPlan");
