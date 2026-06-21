@@ -110,7 +110,7 @@ export default async function IntegrationsSettingsPage() {
     liveOps: web3LiveOpsPacket,
     runway: web3SupervisedLiveRunway,
   });
-  const web3OperatorCredentialHandoff = buildWeb3OperatorCredentialHandoffReceipt({
+  const web3BaseOperatorCredentialHandoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup: web3AccountReceipt,
     acquisition: web3AcquisitionReceipt,
     launchChecklist: web3LaunchChecklist,
@@ -120,7 +120,7 @@ export default async function IntegrationsSettingsPage() {
     launchChecklist: web3LaunchChecklist,
     supervisedRunway: web3SupervisedLiveRunway,
   });
-  const web3OperatorRequestPacket = buildWeb3OperatorRequestPacket(web3OperatorCredentialHandoff, {
+  const web3OperatorRequestPacket = buildWeb3OperatorRequestPacket(web3BaseOperatorCredentialHandoff, {
     usability: web3UsabilityStatus,
   });
   const web3CutoverBlockerBoard = buildWeb3CutoverBlockerBoard({
@@ -143,6 +143,12 @@ export default async function IntegrationsSettingsPage() {
     preflight: web3LiveCapitalPreflight,
     manualLiveReview: web3ManualLiveReviewPacket,
     runway: web3SupervisedLiveRunway,
+  });
+  const web3OperatorCredentialHandoff = buildWeb3OperatorCredentialHandoffReceipt({
+    accountSetup: web3AccountReceipt,
+    acquisition: web3AcquisitionReceipt,
+    launchChecklist: web3LaunchChecklist,
+    liveUsability: web3LiveUsabilityBlockers,
   });
   const web3ResearchHandoffPacket = buildWeb3ResearchHandoffPacket({
     state: web3State,
@@ -1229,6 +1235,8 @@ function SettingsWeb3OperatorIntakeBoard({ receipt }: { receipt: Web3OperatorCre
   const facts = [
     ["Ready lanes", `${receipt.ready_count}/${receipt.inputs.length}`],
     ["Required open", String(receipt.open_required_count)],
+    ["Real blockers", receipt.live_usability ? String(receipt.live_usability.real_capital_blocker_count) : "pending"],
+    ["Rows listed", receipt.live_usability ? `${receipt.live_usability.listed_live_usability_row_count}/${receipt.live_usability.total_live_usability_row_count}` : "pending"],
     ["Surface", nextInput?.safe_collection_surface.replaceAll("-", " ") ?? "verifier"],
     ["Storage", nextInput?.storage.replaceAll("-", " ") ?? "status only"],
   ];
@@ -2091,6 +2099,7 @@ function SettingsLaunchBlockerQueue({ checklist }: { checklist: Web3AutonomyLaun
 function SettingsOperatorCredentialHandoffReceiptPanel({ receipt }: { receipt: Web3OperatorCredentialHandoffReceipt }) {
   const nextInput = receipt.next_input;
   const visibleInputs = receipt.inputs.slice(0, 12);
+  const liveUsability = receipt.live_usability;
   return (
     <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Operator credential handoff receipt">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -2113,6 +2122,27 @@ function SettingsOperatorCredentialHandoffReceiptPanel({ receipt }: { receipt: W
           <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{nextInput.next_action}</p>
           <p className="mt-1 text-[10px] leading-4 text-outline">
             Surface: {nextInput.safe_collection_surface.replaceAll("-", " ")} · storage: {nextInput.storage.replaceAll("-", " ")}
+          </p>
+        </div>
+      ) : null}
+      {liveUsability ? (
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Credential handoff live-usability summary">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Live-usability summary</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">
+                {liveUsability.real_capital_blocker_count} real-money blockers · {liveUsability.listed_live_usability_row_count}/{liveUsability.total_live_usability_row_count} rows listed
+              </p>
+            </div>
+            <LaunchQueueBadge status="fail" label={liveUsability.status.replaceAll("-", " ")} />
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+            {liveUsability.next_unlock_step_label
+              ? `Next unlock: ${liveUsability.next_unlock_step_label}. ${liveUsability.next_unlock_step_action}`
+              : liveUsability.next_action}
+          </p>
+          <p className="mt-1 text-[10px] leading-4 text-outline">
+            Evidence: {liveUsability.evidence_endpoint}; receipt {liveUsability.receipt_hash.slice(0, 12)}.
           </p>
         </div>
       ) : null}

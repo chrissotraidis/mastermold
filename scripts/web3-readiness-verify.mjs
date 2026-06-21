@@ -633,6 +633,24 @@ async function verifyLiveReadinessPackets() {
 }
 
 async function verifyOperatorSetupPackets() {
+  const handoff = await requestJson("/api/web3-operator-credential-handoff?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(handoff.response.status === 200, "Operator credential handoff should return 200.", {
+    status: handoff.response.status,
+    json: handoff.json,
+  });
+  assert(handoff.json.mode === "web3-operator-credential-handoff", "Operator credential handoff should expose the expected mode.", handoff.json);
+  assert(["needs-operator-input", "ready-for-dry-run-rehearsal", "ready-for-manual-live-review"].includes(handoff.json.status), "Operator credential handoff should use a known status.", handoff.json);
+  assert(typeof handoff.json.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(handoff.json.receipt_hash), "Operator credential handoff should include a receipt hash.", handoff.json);
+  assert(handoff.json.live_usability?.mode === "web3-operator-credential-live-usability-summary", "Operator credential handoff should expose a compact live-usability summary.", handoff.json.live_usability);
+  assert(typeof handoff.json.live_usability.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(handoff.json.live_usability.receipt_hash), "Handoff live-usability summary should include the blocker receipt hash.", handoff.json.live_usability);
+  assert(typeof handoff.json.live_usability.real_capital_blocker_count === "number", "Handoff live-usability summary should expose real-capital blockers.", handoff.json.live_usability);
+  assert(typeof handoff.json.live_usability.total_live_usability_row_count === "number", "Handoff live-usability summary should expose total live-usability rows.", handoff.json.live_usability);
+  assert(typeof handoff.json.live_usability.listed_live_usability_row_count === "number", "Handoff live-usability summary should expose listed live-usability rows.", handoff.json.live_usability);
+  assert(handoff.json.live_usability.total_live_usability_row_count >= handoff.json.live_usability.listed_live_usability_row_count, "Handoff live-usability listed rows should not exceed total rows.", handoff.json.live_usability);
+  assert(typeof handoff.json.live_usability.next_unlock_step_label === "string" && handoff.json.live_usability.next_unlock_step_label.length > 0, "Handoff live-usability summary should expose the next unlock step.", handoff.json.live_usability);
+  assert(handoff.json.live_usability.evidence_endpoint === "GET /api/web3-live-usability-blockers", "Handoff live-usability summary should point at the full blocker packet.", handoff.json.live_usability);
+  assertBlockedAuthority("Operator credential handoff", handoff.json);
+
   const requestPacket = await requestJson("/api/web3-operator-request-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0");
   assert(requestPacket.response.status === 200, "Operator request packet should return 200.", {
     status: requestPacket.response.status,

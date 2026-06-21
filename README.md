@@ -182,9 +182,10 @@ live-lane counts, next ordered unlock step, next action, and blocked live-execut
 permissions without returning secrets or transaction bytes.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
-safe collection surfaces, env target names, next input, verifier commands, and the same
-live-execution/wallet-mutation/transaction-submission/private-key/seed-phrase/secret-echo
-blocks without returning raw secrets.
+safe collection surfaces, env target names, next input, verifier commands, and a compact
+live-usability summary with real-capital blocker count, total-versus-listed row counts,
+live-lane counts, the next ordered unlock step, and the same live-execution/wallet-mutation/
+transaction-submission/private-key/seed-phrase/secret-echo blocks without returning raw secrets.
 `/api/web3-research-handoff-packet?source=live-dex` is the paste-ready research brief for
 another helper. It includes the next ordered unlock step, the six-step operator unlock
 sequence, open operator inputs, live-capital blockers, source endpoints, and research

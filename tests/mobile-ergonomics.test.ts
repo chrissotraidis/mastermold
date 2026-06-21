@@ -1193,6 +1193,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("MASTERMOLD_WEB3_PROCESS_MANAGER");
     expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("MASTERMOLD_TAX_LEDGER_EXPORT_PATH");
     expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("this app cannot start workers or dispatch alerts");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("web3-operator-credential-live-usability-summary");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("total_live_usability_row_count");
+    expect(source("src/db/web3-operator-credential-handoff.ts")).toContain("listed_live_usability_row_count");
+    expect(source("app/api/web3-operator-credential-handoff/route.ts")).toContain("buildWeb3LiveUsabilityBlockersReceipt");
+    expect(settingsPage).toContain("Credential handoff live-usability summary");
+    expect(settingsPage).toContain("receipt.live_usability");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("web3-operator-request-packet");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("next_unlock_step");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("operator_unlock_sequence");

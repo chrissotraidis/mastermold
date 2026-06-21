@@ -10,6 +10,7 @@ import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet"
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import { buildWeb3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3OperatorCredentialHandoffReceipt } from "@/src/db/web3-operator-credential-handoff";
 import { buildWeb3OperatorRequestPacket } from "@/src/db/web3-operator-request-packet";
@@ -135,12 +136,12 @@ async function buildResearchHandoffForSearch(input: {
     supervisedRunway: runway,
   });
   const accountSetup = buildWeb3AccountSetupReceipt(state);
-  const handoff = buildWeb3OperatorCredentialHandoffReceipt({
+  const baseHandoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup,
     acquisition: buildWeb3AccountAcquisitionReceipt(state),
     launchChecklist,
   });
-  const requestPacket = buildWeb3OperatorRequestPacket(handoff, { usability });
+  const requestPacket = buildWeb3OperatorRequestPacket(baseHandoff, { usability });
   const cutover = buildWeb3CutoverBlockerBoard({
     requestPacket,
     runway,
@@ -163,6 +164,21 @@ async function buildResearchHandoffForSearch(input: {
     preflight,
     liveOps,
     runway,
+  });
+  const liveUsability = buildWeb3LiveUsabilityBlockersReceipt({
+    state,
+    usability,
+    cutover,
+    runbook,
+    preflight,
+    manualLiveReview,
+    runway,
+  });
+  const handoff = buildWeb3OperatorCredentialHandoffReceipt({
+    accountSetup,
+    acquisition: buildWeb3AccountAcquisitionReceipt(state),
+    launchChecklist,
+    liveUsability,
   });
 
   return buildWeb3ResearchHandoffPacket({

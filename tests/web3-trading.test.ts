@@ -786,6 +786,20 @@ describe("Web3 autonomous trading subsystem", () => {
       status: string;
       receipt_hash: string;
       next_input: { id: string; label: string; can_enter_in_app: boolean; verifier_command: string | null } | null;
+      live_usability: {
+        mode: string;
+        status: string;
+        receipt_hash: string;
+        real_capital_blocker_count: number;
+        total_live_usability_row_count: number;
+        listed_live_usability_row_count: number;
+        open_operator_input_count: number;
+        ready_live_lane_count: number;
+        total_live_lane_count: number;
+        next_unlock_step_label: string | null;
+        next_unlock_step_action: string | null;
+        evidence_endpoint: string;
+      } | null;
       inputs: Array<{ id: string; input_kind: string; safe_collection_surface: string; env_targets: string[]; storage: string; secret_handling: string }>;
       allowed_inputs: string[];
       never_request: string[];
@@ -814,6 +828,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.private_key_storage).toBe("blocked");
     expect(receipt.seed_phrase_storage).toBe("blocked");
     expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.live_usability).not.toBeNull();
+    const handoffLiveUsability = receipt.live_usability!;
+    expect(handoffLiveUsability).toMatchObject({
+      mode: "web3-operator-credential-live-usability-summary",
+      status: "operator-input-needed",
+      evidence_endpoint: "GET /api/web3-live-usability-blockers",
+    });
+    expect(handoffLiveUsability.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(handoffLiveUsability.total_live_usability_row_count).toBeGreaterThanOrEqual(handoffLiveUsability.listed_live_usability_row_count);
+    expect(handoffLiveUsability.real_capital_blocker_count).toBeGreaterThan(0);
+    expect(handoffLiveUsability.ready_live_lane_count).toBeLessThanOrEqual(handoffLiveUsability.total_live_lane_count);
+    expect(handoffLiveUsability.next_unlock_step_label).toBe("Scope dedicated wallet");
+    expect(handoffLiveUsability.next_unlock_step_action).toContain("public Solana trading wallet");
     expect(receipt.next_input?.id).toBe("dedicated-trading-wallet");
     expect(receipt.inputs.find((item) => item.id === "helius-solana-read-rail")).toMatchObject({
       input_kind: "api-key",

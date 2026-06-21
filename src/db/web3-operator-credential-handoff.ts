@@ -5,6 +5,7 @@ import type {
   Web3AutonomyLaunchChecklist,
   Web3AutonomyLaunchOperatorInput,
 } from "./web3-launch-checklist";
+import type { Web3LiveUsabilityBlockersReceipt } from "./web3-live-usability-blockers";
 
 export type Web3OperatorCredentialHandoffInputId =
   | Web3AutonomyLaunchOperatorInput["id"]
@@ -33,6 +34,27 @@ export type Web3OperatorCredentialHandoffInput = {
   secret_handling: string;
 };
 
+export type Web3OperatorCredentialHandoffLiveUsability = {
+  mode: "web3-operator-credential-live-usability-summary";
+  status: Web3LiveUsabilityBlockersReceipt["status"];
+  summary: string;
+  receipt_hash: string;
+  real_capital_blocker_count: number;
+  total_live_usability_row_count: number;
+  listed_live_usability_row_count: number;
+  open_operator_input_count: number;
+  failed_or_watch_signoff_count: number;
+  ready_live_lane_count: number;
+  total_live_lane_count: number;
+  safe_action_count: number;
+  next_unlock_step_label: string | null;
+  next_unlock_step_status: NonNullable<Web3LiveUsabilityBlockersReceipt["next_unlock_step"]>["status"] | null;
+  next_unlock_step_action: string | null;
+  next_unlock_step_storage: string | null;
+  next_action: string;
+  evidence_endpoint: "GET /api/web3-live-usability-blockers";
+};
+
 export type Web3OperatorCredentialHandoffReceipt = {
   mode: "web3-operator-credential-handoff";
   status: Web3OperatorCredentialHandoffStatus;
@@ -43,6 +65,7 @@ export type Web3OperatorCredentialHandoffReceipt = {
   ready_count: number;
   required_count: number;
   open_required_count: number;
+  live_usability: Web3OperatorCredentialHandoffLiveUsability | null;
   next_input: Web3OperatorCredentialHandoffInput | null;
   inputs: Web3OperatorCredentialHandoffInput[];
   allowed_inputs: string[];
@@ -63,6 +86,7 @@ export function buildWeb3OperatorCredentialHandoffReceipt(input: {
   accountSetup: Web3AccountSetupReceipt;
   acquisition: Web3AccountAcquisitionReceipt;
   launchChecklist: Web3AutonomyLaunchChecklist;
+  liveUsability?: Web3LiveUsabilityBlockersReceipt | null;
 }): Web3OperatorCredentialHandoffReceipt {
   const generatedAt = new Date().toISOString();
   const inputs = [
@@ -95,6 +119,7 @@ export function buildWeb3OperatorCredentialHandoffReceipt(input: {
     ready_count: readyCount,
     required_count: requiredInputs.length,
     open_required_count: openRequiredCount,
+    live_usability: input.liveUsability ? buildLiveUsabilitySummary(input.liveUsability) : null,
     next_input: nextInput,
     inputs,
     allowed_inputs: [
@@ -137,6 +162,7 @@ export function buildWeb3OperatorCredentialHandoffReceipt(input: {
       "This receipt is a credential handoff contract, not a live executor.",
       "It can guide setup and verifier commands, but it cannot create provider accounts, sign, submit, custody funds, or mutate wallets.",
       "Configured secrets are reported only as configured/missing booleans and env target names.",
+      "Live-usability summary counts are status evidence only; the full blocker rows stay in /api/web3-live-usability-blockers.",
       "Private keys, seed phrases, raw keypairs, raw transaction bodies, signed payloads, live execution, wallet mutation, and secret echo stay blocked.",
     ],
   };
@@ -144,6 +170,31 @@ export function buildWeb3OperatorCredentialHandoffReceipt(input: {
   return {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
+  };
+}
+
+function buildLiveUsabilitySummary(
+  receipt: Web3LiveUsabilityBlockersReceipt,
+): Web3OperatorCredentialHandoffLiveUsability {
+  return {
+    mode: "web3-operator-credential-live-usability-summary",
+    status: receipt.status,
+    summary: receipt.summary,
+    receipt_hash: receipt.receipt_hash,
+    real_capital_blocker_count: receipt.real_capital_blocker_count,
+    total_live_usability_row_count: receipt.total_live_usability_row_count,
+    listed_live_usability_row_count: receipt.listed_live_usability_row_count,
+    open_operator_input_count: receipt.open_operator_input_count,
+    failed_or_watch_signoff_count: receipt.failed_or_watch_signoff_count,
+    ready_live_lane_count: receipt.ready_live_lane_count,
+    total_live_lane_count: receipt.total_live_lane_count,
+    safe_action_count: receipt.safe_action_count,
+    next_unlock_step_label: receipt.next_unlock_step?.label ?? null,
+    next_unlock_step_status: receipt.next_unlock_step?.status ?? null,
+    next_unlock_step_action: receipt.next_unlock_step?.next_action ?? null,
+    next_unlock_step_storage: receipt.next_unlock_step?.storage ?? null,
+    next_action: receipt.next_action,
+    evidence_endpoint: "GET /api/web3-live-usability-blockers",
   };
 }
 
