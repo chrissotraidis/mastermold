@@ -164,8 +164,12 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
 
         <div className="w-full min-w-0 space-y-4">
           <TradingSourceSwitch source={source} account={account} />
-          <LiveIgnitionPanel receipt={liveIgnition} />
-          <SupervisedCanaryReadinessPanel receipt={supervisedCanaryReadiness} />
+          <LiveCanaryCommandCenter
+            ignition={liveIgnition}
+            readiness={supervisedCanaryReadiness}
+            blockers={liveUsabilityBlockers}
+            canary={liveTradeCanary}
+          />
           <Web3LiveCanaryConsole
             receipt={liveTradeCanary}
             source={source}
@@ -186,6 +190,8 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
             liveUsabilityBlockers={liveUsabilityBlockers}
           />
           <ReadinessReceiptsDrawer>
+            <LiveIgnitionPanel receipt={liveIgnition} />
+            <SupervisedCanaryReadinessPanel receipt={supervisedCanaryReadiness} />
             <LiveAutonomyReadinessPanel readiness={initialState.autonomous_live_autonomy_readiness} source={source} account={account} scenario={initialState.scenario} />
             <LiveUsabilityBlockersPanel receipt={liveUsabilityBlockers} source={source} account={account} />
             <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
@@ -475,6 +481,143 @@ function tradingSourceHref(source: "sample" | "live-dex", account: "persistent" 
   const params = new URLSearchParams({ source });
   if (account !== "persistent") params.set("account", account);
   return `/trading?${params.toString()}`;
+}
+
+function LiveCanaryCommandCenter({
+  ignition,
+  readiness,
+  blockers,
+  canary,
+}: {
+  ignition: Web3LiveIgnitionReceipt;
+  readiness: Web3SupervisedCanaryReadinessReceipt;
+  blockers: Web3LiveUsabilityBlockersReceipt;
+  canary: ReturnType<typeof buildWeb3LiveTradeCanaryReceipt>;
+}) {
+  const canaryProven = canary.actual_live_trade_tested && canary.real_funds_moved_by_this_app;
+  const nextCredential = blockers.next_credential_request;
+  const nextBlocker = blockers.next_blocker;
+  const nextCanaryLane = readiness.lanes.find((lane) => lane.id === readiness.next_lane_id);
+  const proofCommand = "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json";
+  const liveHref = "/trading?source=live-dex&account=persistent";
+  const proofHref = `/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=${canary.scenario}&cycles=0`;
+
+  return (
+    <section
+      aria-labelledby="web3-live-command-center-title"
+      className="rounded-md border border-critical/25 bg-surface/80 p-4 sm:p-5"
+    >
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-critical/30 bg-critical/10 text-critical">
+                <ShieldCheck aria-hidden="true" className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Live trading command center</p>
+                <h2 id="web3-live-command-center-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
+                  {canaryProven
+                    ? "Funded canary proof is accounted"
+                    : readiness.can_request_unsigned_order_now
+                      ? "Tiny canary can be prepared for review"
+                      : "No real trade tested yet"}
+                </h2>
+                <p className="mt-1 line-clamp-3 max-w-3xl text-sm leading-6 text-on-surface-variant">
+                  {canaryProven ? canary.post_signing_next_action : blockers.next_action}
+                </p>
+              </div>
+            </div>
+            <span className={liveIgnitionStatusClassName(ignition.status)}>
+              {ignition.status.replaceAll("-", " ")}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <LiveUsabilityStat label="Live trade" value={canaryProven ? "proven" : "not tested"} tone={canaryProven ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Unsigned order" value={readiness.can_request_unsigned_order_now ? "ready" : "blocked"} tone={readiness.can_request_unsigned_order_now ? "caution" : "critical"} />
+            <LiveUsabilityStat label="Signed relay" value={readiness.can_relay_signed_payload_now ? "ready" : "blocked"} tone={readiness.can_relay_signed_payload_now ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Proof" value={`${canary.post_signing_evidence.filter((item) => item.status === "pass").length}/4`} tone={canaryProven ? "engine" : "critical"} />
+          </div>
+
+          <div className="hidden gap-2 sm:mt-3 sm:grid sm:grid-cols-3">
+            <LiveUsabilityContractStat label="Source" value={canary.source === "live-dex" ? "Live DEX" : "sample"} />
+            <LiveUsabilityContractStat label="Account" value={canary.account} />
+            <LiveUsabilityContractStat label="Canary status" value={canary.post_signing_evidence_status.replaceAll("-", " ")} />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={liveHref}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15"
+            >
+              Open live cockpit
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+            <Link
+              href={nextCredential?.fix_href ?? nextBlocker?.href ?? "/settings/integrations#settings-web3-credentials-runway"}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15"
+            >
+              {nextCredential?.label ?? nextBlocker?.label ?? "Fix next gate"}
+            </Link>
+            <Link
+              href={proofHref}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open proof receipt
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-3">
+          <div className="rounded-md border border-critical/20 bg-critical/[0.025] p-3" aria-label="Trading live command next blocker">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Next blocking dependency</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{nextBlocker?.label ?? nextCredential?.label ?? nextCanaryLane?.label ?? "First funded canary"}</p>
+              </div>
+              <span className="rounded-md border border-critical/30 bg-critical/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-critical">
+                live blocked
+              </span>
+            </div>
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
+              {nextBlocker?.next_action ?? nextCredential?.next_action ?? readiness.next_action}
+            </p>
+            {nextCredential?.safe_value_description ? (
+              <p className="mt-2 line-clamp-2 rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-5 text-outline">
+                {nextCredential.safe_value_description}
+              </p>
+            ) : null}
+          </div>
+
+          <details className="rounded-md border border-outline/15 bg-surface-dim/40 p-3" aria-label="Trading live proof command">
+            <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Proof gate command</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {canaryProven ? "strict canary proof can be reviewed" : "proof watcher fails until a signed canary lands"}
+                </p>
+              </div>
+              <span className={supervisedCanaryStatusClassName(readiness.status)}>
+                {readiness.status.replaceAll("-", " ")}
+              </span>
+            </summary>
+            <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+              {proofCommand}
+            </code>
+            <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-outline">
+              The command cannot sign, submit, store wallet authority, or move funds; it only watches signed-relay, confirmation, settlement, and portfolio mirror proof.
+            </p>
+          </details>
+
+          <div className="grid grid-cols-2 gap-2">
+            <CommandBoardMetric label="Capital blockers" value={`${blockers.real_capital_blocker_count}`} detail={`${blockers.open_operator_input_count} inputs`} tone={blockers.real_capital_blocker_count > 0 ? "critical" : "engine"} />
+            <CommandBoardMetric label="Ignition blockers" value={`${ignition.blocker_count}`} detail={ignition.first_trade_path.replaceAll("-", " ")} tone={ignition.blocker_count > 0 ? "critical" : "engine"} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function TradingCommandBoard({

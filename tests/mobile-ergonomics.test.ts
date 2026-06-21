@@ -693,12 +693,24 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<MarketMonitorHistoryPanel"),
     );
     expect(tradingPage.indexOf("<TradingSourceSwitch")).toBeLessThan(
+      tradingPage.indexOf("<LiveCanaryCommandCenter"),
+    );
+    expect(tradingPage.indexOf("<LiveCanaryCommandCenter")).toBeLessThan(
+      tradingPage.indexOf("<Web3LiveCanaryConsole"),
+    );
+    expect(tradingPage.indexOf("<Web3LiveCanaryConsole")).toBeLessThan(
       tradingPage.indexOf("<TradingCommandBoard"),
     );
     expect(tradingPage.indexOf("<TradingCommandBoard")).toBeLessThan(
       tradingPage.indexOf("<ReadinessReceiptsDrawer"),
     );
     expect(tradingPage.indexOf("<ReadinessReceiptsDrawer")).toBeLessThan(
+      tradingPage.indexOf("<LiveIgnitionPanel"),
+    );
+    expect(tradingPage.indexOf("<LiveIgnitionPanel")).toBeLessThan(
+      tradingPage.indexOf("<SupervisedCanaryReadinessPanel"),
+    );
+    expect(tradingPage.indexOf("<SupervisedCanaryReadinessPanel")).toBeLessThan(
       tradingPage.indexOf("<LiveUsabilityBlockersPanel"),
     );
     expect(tradingPage.indexOf("<LiveUsabilityBlockersPanel")).toBeLessThan(
@@ -797,6 +809,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-operator-runbook/route.ts")).toContain("currentInput: requestPacket.current_input");
     expect(source("app/api/web3-operator-runbook/route.ts")).toContain("buildWeb3OperatorRunbook");
     expect(tradingPage).toContain("TradingCommandBoard");
+    expect(tradingPage).toContain("LiveCanaryCommandCenter");
+    expect(tradingPage).toContain("Live trading command center");
+    expect(tradingPage).toContain("No real trade tested yet");
+    expect(tradingPage).toContain("Open live cockpit");
+    expect(tradingPage).toContain("Proof gate command");
+    expect(tradingPage).toContain("proof watcher fails until a signed canary lands");
+    expect(tradingPage).toContain("Trading live command next blocker");
+    expect(tradingPage).toContain("Trading live proof command");
+    expect(tradingPage).toContain("cannot sign, submit, store wallet authority, or move funds");
     expect(tradingPage).toContain("Command board");
     expect(tradingPage).toContain("WalletNetWorthCurve");
     expect(tradingPage).toContain("First-screen Web3 wallet net worth curve");
