@@ -13,6 +13,7 @@ import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
+import { buildWeb3LiveAutonomyReadinessHealth } from "@/src/db/web3-live-autonomy-readiness";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import {
   buildWeb3LiveUsabilityBlockersHealth,
@@ -127,6 +128,7 @@ export async function GET() {
     web3_promoted_paper_autopilot: web3PromotedPaperAutopilot,
     web3_profit_proof: buildWeb3ProfitProofReadiness({ promotedHealth: web3PromotedPaperAutopilot }),
     web3_operator_runbook: buildWeb3OperatorRunbookHealth(web3Runbook),
+    web3_live_autonomy_readiness: buildWeb3LiveAutonomyReadinessHealth(web3State),
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
     web3_credential_requirements: buildWeb3CredentialRequirementsHealth(web3CredentialRequirements),

@@ -18,6 +18,7 @@ import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wallet-packet/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
+import { GET as LIVE_AUTONOMY_READINESS_GET } from "@/app/api/web3-live-autonomy-readiness/route";
 import { GET as LIVE_USABILITY_BLOCKERS_GET } from "@/app/api/web3-live-usability-blockers/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
@@ -1732,6 +1733,35 @@ describe("Web3 autonomous trading subsystem", () => {
         seed_phrase_storage: string;
         secret_echo_permission: string;
       };
+      web3_live_autonomy_readiness: {
+        mode: string;
+        status: string;
+        source: string;
+        account: string;
+        scenario: string;
+        readiness_score: number;
+        can_run_unattended: boolean;
+        can_trade_real_capital: boolean;
+        live_execution_permitted: boolean;
+        max_live_trade_usd: number;
+        daily_cap_remaining_usd: number;
+        fastest_ttl_seconds: number;
+        next_wake_seconds: number;
+        failed_item_count: number;
+        watch_item_count: number;
+        passed_item_count: number;
+        blocker_count: number;
+        next_action: string;
+        source_endpoint: string;
+        live_review_source_endpoint: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        signing_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      };
       web3_live_usability: {
         mode: string;
         current_input: {
@@ -1881,6 +1911,26 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_credential_requirements.private_key_storage).toBe("blocked");
     expect(receipt.web3_credential_requirements.seed_phrase_storage).toBe("blocked");
     expect(receipt.web3_credential_requirements.secret_echo_permission).toBe("blocked");
+    expect(receipt.web3_live_autonomy_readiness.mode).toBe("web3-live-autonomy-readiness-health");
+    expect(["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"]).toContain(receipt.web3_live_autonomy_readiness.status);
+    expect(["sample", "live-dex"]).toContain(receipt.web3_live_autonomy_readiness.source);
+    expect(["ephemeral", "persistent"]).toContain(receipt.web3_live_autonomy_readiness.account);
+    expect(["base", "breakout", "rug-risk"]).toContain(receipt.web3_live_autonomy_readiness.scenario);
+    expect(receipt.web3_live_autonomy_readiness.readiness_score).toBeGreaterThanOrEqual(0);
+    expect(receipt.web3_live_autonomy_readiness.readiness_score).toBeLessThanOrEqual(100);
+    expect(receipt.web3_live_autonomy_readiness.can_trade_real_capital).toBe(false);
+    expect(receipt.web3_live_autonomy_readiness.live_execution_permitted).toBe(false);
+    expect(receipt.web3_live_autonomy_readiness.max_live_trade_usd).toBe(0);
+    expect(receipt.web3_live_autonomy_readiness.failed_item_count + receipt.web3_live_autonomy_readiness.watch_item_count + receipt.web3_live_autonomy_readiness.passed_item_count).toBe(8);
+    expect(receipt.web3_live_autonomy_readiness.source_endpoint).toContain("/api/web3-live-autonomy-readiness");
+    expect(receipt.web3_live_autonomy_readiness.live_review_source_endpoint).toBe("/api/web3-live-autonomy-readiness?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_live_autonomy_readiness.live_execution_permission).toBe("blocked");
+    expect(receipt.web3_live_autonomy_readiness.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.web3_live_autonomy_readiness.transaction_submission_permission).toBe("blocked");
+    expect(receipt.web3_live_autonomy_readiness.signing_permission).toBe("blocked");
+    expect(receipt.web3_live_autonomy_readiness.private_key_storage).toBe("blocked");
+    expect(receipt.web3_live_autonomy_readiness.seed_phrase_storage).toBe("blocked");
+    expect(receipt.web3_live_autonomy_readiness.secret_echo_permission).toBe("blocked");
     expect(receipt.web3_live_usability.mode).toBe("web3-live-usability-health");
     expect(receipt.web3_live_usability.current_input).not.toBeNull();
     expect(receipt.web3_live_usability.current_input).toMatchObject({
@@ -1940,6 +1990,70 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_usability.transaction_submission_permission).toBe("blocked");
     expect(receipt.web3_live_usability.signing_permission).toBe("blocked");
     expect(receipt.web3_live_usability.secret_echo_permission).toBe("blocked");
+  });
+
+  test("GIVEN wallet autonomy is audited WHEN live autonomy readiness route runs THEN it exposes the final transition gate only", async () => {
+    const response = await LIVE_AUTONOMY_READINESS_GET(new Request("http://localhost/api/web3-live-autonomy-readiness?scenario=breakout&source=sample&account=ephemeral&cycles=1"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      summary: string;
+      readiness_score: number;
+      can_run_unattended: boolean;
+      can_trade_real_capital: boolean;
+      live_execution_permitted: boolean;
+      max_live_trade_usd: number;
+      daily_cap_remaining_usd: number;
+      fastest_ttl_seconds: number;
+      next_wake_seconds: number;
+      next_action: string;
+      blockers: string[];
+      controls: string[];
+      items: Array<{
+        id: string;
+        label: string;
+        status: string;
+        score: number;
+        detail: string;
+      }>;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("autonomous-live-autonomy-readiness");
+    expect(["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"]).toContain(receipt.status);
+    expect(receipt.summary).toMatch(/blocked|locked|real funds/i);
+    expect(receipt.readiness_score).toBeGreaterThanOrEqual(0);
+    expect(receipt.readiness_score).toBeLessThanOrEqual(100);
+    expect(receipt.can_trade_real_capital).toBe(false);
+    expect(receipt.live_execution_permitted).toBe(false);
+    expect(receipt.max_live_trade_usd).toBe(0);
+    expect(receipt.daily_cap_remaining_usd).toBeGreaterThanOrEqual(0);
+    expect(receipt.fastest_ttl_seconds).toBeGreaterThanOrEqual(0);
+    expect(receipt.next_wake_seconds).toBeGreaterThanOrEqual(0);
+    expect(receipt.next_action.length).toBeGreaterThan(0);
+    expect(receipt.items.map((item) => item.id)).toEqual([
+      "daemon",
+      "market",
+      "route",
+      "fees",
+      "policy",
+      "signer",
+      "relay",
+      "kill-switch",
+    ]);
+    expect(receipt.items.every((item) =>
+      ["pass", "watch", "fail"].includes(item.status) &&
+      item.score >= 0 &&
+      item.score <= 100 &&
+      item.detail.length > 0
+    )).toBe(true);
+    expect(receipt.controls.some((control) => control.includes("final transition gate"))).toBe(true);
+    expect(receipt.controls.some((control) => control.includes("cannot move funds"))).toBe(true);
+
+    const invalid = await LIVE_AUTONOMY_READINESS_GET(new Request("http://localhost/api/web3-live-autonomy-readiness?source=moonshot&cycles=99"));
+    const invalidReceipt = await json<{ error: string }>(invalid);
+    expect(invalid.status).toBe(422);
+    expect(invalidReceipt.error).toContain("source must be sample or live-dex");
   });
 
   test("GIVEN real-money blockers remain WHEN live usability blockers are requested THEN the next unlock step comes before proof work", async () => {

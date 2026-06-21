@@ -232,6 +232,30 @@ async function verifyHealth() {
   assert(json.web3_credential_requirements.private_key_storage === "blocked", "Credential requirements health should keep private-key storage blocked.", json.web3_credential_requirements);
   assert(json.web3_credential_requirements.seed_phrase_storage === "blocked", "Credential requirements health should keep seed-phrase storage blocked.", json.web3_credential_requirements);
   assert(json.web3_credential_requirements.secret_echo_permission === "blocked", "Credential requirements health should keep secret echo blocked.", json.web3_credential_requirements);
+  assert(json.web3_live_autonomy_readiness?.mode === "web3-live-autonomy-readiness-health", "Health endpoint should expose compact Web3 live-autonomy readiness.", json.web3_live_autonomy_readiness);
+  assert(
+    ["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"].includes(json.web3_live_autonomy_readiness.status),
+    "Live-autonomy readiness health should expose a known status.",
+    json.web3_live_autonomy_readiness,
+  );
+  assert(json.web3_live_autonomy_readiness.readiness_score >= 0 && json.web3_live_autonomy_readiness.readiness_score <= 100, "Live-autonomy readiness score should be bounded.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.can_trade_real_capital === false, "Live-autonomy readiness health should keep real-capital trading blocked.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.live_execution_permitted === false, "Live-autonomy readiness health should keep live execution disabled.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.max_live_trade_usd === 0, "Live-autonomy readiness health should expose zero live trade cap.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.failed_item_count + json.web3_live_autonomy_readiness.watch_item_count + json.web3_live_autonomy_readiness.passed_item_count === 8, "Live-autonomy readiness health should summarize the eight final gates.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.source_endpoint.includes("/api/web3-live-autonomy-readiness"), "Live-autonomy readiness health should link its standalone endpoint.", json.web3_live_autonomy_readiness);
+  assert(
+    json.web3_live_autonomy_readiness.live_review_source_endpoint === "/api/web3-live-autonomy-readiness?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Live-autonomy readiness health should expose the live-review readiness endpoint separately.",
+    json.web3_live_autonomy_readiness,
+  );
+  assert(json.web3_live_autonomy_readiness.live_execution_permission === "blocked", "Live-autonomy readiness health should keep live execution blocked.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.wallet_mutation_permission === "blocked", "Live-autonomy readiness health should keep wallet mutation blocked.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.transaction_submission_permission === "blocked", "Live-autonomy readiness health should keep transaction submission blocked.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.signing_permission === "blocked", "Live-autonomy readiness health should keep signing blocked.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.private_key_storage === "blocked", "Live-autonomy readiness health should keep private-key storage blocked.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.seed_phrase_storage === "blocked", "Live-autonomy readiness health should keep seed-phrase storage blocked.", json.web3_live_autonomy_readiness);
+  assert(json.web3_live_autonomy_readiness.secret_echo_permission === "blocked", "Live-autonomy readiness health should keep secret echo blocked.", json.web3_live_autonomy_readiness);
   assert(json.web3_live_usability?.mode === "web3-live-usability-health", "Health endpoint should expose compact Web3 live-usability health.", json.web3_live_usability);
   assert(
     ["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(json.web3_live_usability.status),
@@ -277,7 +301,7 @@ async function verifyHealth() {
   assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
-  record("health", "pass", "live, wallet mutation, runbook, research handoff, and live-usability locks are blocked");
+  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-autonomy, and live-usability locks are blocked");
 }
 
 async function verifyOperatorWalletScope() {
@@ -664,6 +688,28 @@ function assertBlockedWhenPresent(label, json, fields) {
       assert(json[field] === "blocked", `${label} must keep ${field.replaceAll("_", " ")} blocked.`, json);
     }
   }
+}
+
+async function verifyLiveAutonomyReadinessPacket() {
+  const { response, json } = await requestJson("/api/web3-live-autonomy-readiness?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Live autonomy readiness packet should return 200.", { status: response.status, json });
+  assert(json.mode === "autonomous-live-autonomy-readiness", "Live autonomy readiness packet should expose the expected mode.", json);
+  assert(["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"].includes(json.status), "Live autonomy readiness packet should expose a known status.", json);
+  assert(typeof json.summary === "string" && /blocked|locked|real funds/i.test(json.summary), "Live autonomy readiness summary should preserve the live lock.", json.summary);
+  assert(json.readiness_score >= 0 && json.readiness_score <= 100, "Live autonomy readiness score should be bounded.", json);
+  assert(json.can_trade_real_capital === false, "Live autonomy readiness must not permit real-capital trading.", json);
+  assert(json.live_execution_permitted === false, "Live autonomy readiness must not permit live execution.", json);
+  assert(json.max_live_trade_usd === 0, "Live autonomy readiness should expose a zero live trade cap.", json);
+  assert(json.daily_cap_remaining_usd >= 0, "Live autonomy readiness should expose nonnegative daily cap remaining.", json);
+  assert(json.fastest_ttl_seconds >= 0, "Live autonomy readiness should expose nonnegative route TTL.", json);
+  assert(json.next_wake_seconds >= 0, "Live autonomy readiness should expose nonnegative next wake.", json);
+  assert(Array.isArray(json.items) && json.items.map((item) => item.id).join(",") === "daemon,market,route,fees,policy,signer,relay,kill-switch", "Live autonomy readiness should expose the eight final gates in order.", json.items);
+  assert(json.items.every((item) => ["pass", "watch", "fail"].includes(item.status) && item.score >= 0 && item.score <= 100 && typeof item.detail === "string" && item.detail.length > 0), "Live autonomy readiness items should be bounded and descriptive.", json.items);
+  assert(Array.isArray(json.controls) && json.controls.some((control) => control.includes("final transition gate")), "Live autonomy readiness controls should name the final transition gate.", json.controls);
+  assert(Array.isArray(json.controls) && json.controls.some((control) => control.includes("cannot move funds")), "Live autonomy readiness controls should preserve the no-funds-movement boundary.", json.controls);
+  const invalid = await requestJson("/api/web3-live-autonomy-readiness?source=unknown");
+  assert(invalid.response.status === 422, "Live autonomy readiness should reject unknown market sources.", invalid);
+  record("live-autonomy-readiness-packet", "pass", `${json.status}; ${json.readiness_score}/100 final gate score`);
 }
 
 async function verifyLiveReadinessPackets() {
@@ -1320,6 +1366,7 @@ async function main() {
   await verifyProviderHealthReceipt();
   await verifyUsabilityStatusReceipt();
   await verifyLiveUsabilityBlockersReceipt();
+  await verifyLiveAutonomyReadinessPacket();
   await verifyCredentialDoctorRefreshPreview();
   await verifyLiveReadinessPackets();
   await verifyOperatorSetupPackets();

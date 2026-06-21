@@ -144,6 +144,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
             liveUsabilityBlockers={liveUsabilityBlockers}
           />
           <ReadinessReceiptsDrawer>
+            <LiveAutonomyReadinessPanel readiness={initialState.autonomous_live_autonomy_readiness} source={source} account={account} scenario={initialState.scenario} />
             <LiveUsabilityBlockersPanel receipt={liveUsabilityBlockers} source={source} account={account} />
             <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
             <CutoverBlockerBoardPanel board={cutoverBlockerBoard} source={source} account={account} />
@@ -933,6 +934,122 @@ function credentialDoctorBadgeClassName(doctor: Web3LiveUsabilityBlockersReceipt
   if (doctor.status === "absent" || doctor.blocked_count > 0) return `${base} border-critical/30 bg-critical/10 text-critical`;
   if (!doctor.receipt_fresh || doctor.watch_count > 0) return `${base} border-caution/30 bg-caution/10 text-caution`;
   return `${base} border-engine/30 bg-engine/10 text-engine`;
+}
+
+function LiveAutonomyReadinessPanel({
+  readiness,
+  source,
+  account,
+  scenario,
+}: {
+  readiness: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>["autonomous_live_autonomy_readiness"];
+  source: "sample" | "live-dex";
+  account: "persistent" | "ephemeral";
+  scenario: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>["scenario"];
+}) {
+  const params = new URLSearchParams({ source, account, scenario, cycles: "0" });
+  const href = `/api/web3-live-autonomy-readiness?${params.toString()}`;
+  const failing = readiness.items.filter((item) => item.status === "fail");
+  const watching = readiness.items.filter((item) => item.status === "watch");
+  const topItems = [...failing, ...watching, ...readiness.items.filter((item) => item.status === "pass")].slice(0, 8);
+
+  return (
+    <section
+      aria-labelledby="web3-live-autonomy-readiness-title"
+      className="rounded-md border border-engine/25 bg-engine/[0.035] p-3 sm:p-4"
+    >
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Live autonomy gate</p>
+              <h2 id="web3-live-autonomy-readiness-title" className="mt-1 font-display text-lg font-semibold text-on-surface">
+                {readiness.status.replaceAll("-", " ")}
+              </h2>
+              <p className="mt-1 line-clamp-3 text-sm leading-6 text-on-surface-variant">{readiness.summary}</p>
+            </div>
+            <Link
+              href={href}
+              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open readiness JSON
+            </Link>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <LiveUsabilityStat label="Score" value={`${readiness.readiness_score}/100`} tone={readiness.readiness_score >= 80 ? "engine" : readiness.readiness_score >= 55 ? "caution" : "critical"} />
+            <LiveUsabilityStat label="Unattended" value={readiness.can_run_unattended ? "yes" : "no"} tone={readiness.can_run_unattended ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Real capital" value={readiness.can_trade_real_capital ? "yes" : "blocked"} tone={readiness.can_trade_real_capital ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Live max" value={formatTradingCompactCurrency(readiness.max_live_trade_usd)} tone={readiness.max_live_trade_usd > 0 ? "caution" : "critical"} />
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <LiveUsabilityContractStat label="Cap left" value={formatTradingCurrency(readiness.daily_cap_remaining_usd)} />
+            <LiveUsabilityContractStat label="Fastest TTL" value={`${readiness.fastest_ttl_seconds}s`} />
+            <LiveUsabilityContractStat label="Next wake" value={`${readiness.next_wake_seconds}s`} />
+          </div>
+
+          <div className="mt-3 rounded-md border border-outline/15 bg-surface/50 p-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Next action</p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{readiness.next_action}</p>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Autonomy checklist</p>
+            <span className={liveAutonomyReadinessStatusClassName(readiness.status)}>
+              {failing.length} fail · {watching.length} watch
+            </span>
+          </div>
+          <div className="mt-2 grid gap-2">
+            {topItems.map((item) => (
+              <div key={item.id} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md border border-outline/15 bg-surface-dim/35 p-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-on-surface">{item.label}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-outline">{item.detail}</p>
+                </div>
+                <span className={liveAutonomyItemStatusClassName(item.status)}>{item.status}</span>
+              </div>
+            ))}
+          </div>
+          {readiness.blockers.length > 0 ? (
+            <div className="mt-3 rounded-md border border-critical/20 bg-critical/[0.025] p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Blocking real-capital autonomy</p>
+              <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-on-surface-variant">
+                {readiness.blockers.slice(0, 4).map((blocker) => (
+                  <li key={blocker}>{blocker}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <p className="mt-3 line-clamp-2 text-xs leading-5 text-outline">
+            This is the final transition gate for wallet-backed autonomy; it reports readiness only and cannot sign, submit, custody funds, or move wallet assets.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function liveAutonomyReadinessStatusClassName(
+  status: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>["autonomous_live_autonomy_readiness"]["status"],
+) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "live-ready") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "paper-only" || status === "daemon-gated" || status === "signature-gated" || status === "submit-gated") {
+    return `${base} border-caution/30 bg-caution/10 text-caution`;
+  }
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
+function liveAutonomyItemStatusClassName(
+  status: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>["autonomous_live_autonomy_readiness"]["items"][number]["status"],
+) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
 function LiveUsabilityBlockersPanel({

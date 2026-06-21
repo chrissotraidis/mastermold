@@ -190,8 +190,11 @@ It requires `operator_ack: true`, supports preview mode for `npm run verify:web3
 only status fields, forces live-execution approval flags off while running the doctor, and
 keeps signing, submission, wallet mutation, private-key storage, seed-phrase storage, and
 secret echo blocked.
-`/api/health` also exposes compact `web3_operator_runbook`, `web3_research_handoff`, and
-`web3_live_usability` summaries for monitors. The runbook health summary carries the
+`/api/health` also exposes compact `web3_operator_runbook`, `web3_research_handoff`,
+`web3_live_autonomy_readiness`, and `web3_live_usability` summaries for monitors. The live-autonomy
+summary carries the final daemon, market, route, fee, policy, signer, relay, and kill-switch gate
+score, source endpoint, live-review endpoint, unattended/real-capital booleans, live cap fields, and
+blocked live-execution/signing/wallet/secret permissions. The runbook health summary carries the
 primary safe action, current safe input contract, action counts, source endpoint,
 live-review source endpoint, verifier command, and blocked live-execution/signing/wallet/secret permissions.
 The research health summary names the exact source/account/scenario packet being summarized and separately
@@ -204,6 +207,11 @@ the Web3 setup priority card and credential action console, and it also shows th
 credential request, verification runway, completion criteria, and safe credential profile
 so the safe wallet/provider/review value, non-secret lane status, follow-up proof path, and
 done condition are visible where the operator fixes credentials.
+`/api/web3-live-autonomy-readiness` exposes that same final transition gate directly for the trading
+cockpit and external monitors. It reports whether the system can run unattended, whether real-capital
+wallet trading is allowed, the live trade cap, route TTL pressure, next wake cadence, blockers, and
+the ordered final gate list only; it cannot sign, submit, custody funds, mutate wallets, store private
+keys or seed phrases, or enable live execution.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and a compact
