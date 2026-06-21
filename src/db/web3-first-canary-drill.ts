@@ -169,6 +169,10 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
   const nextUnblockStep = operatorUnblockPlan.find((step) => step.status === "next") ??
     operatorUnblockPlan.find((step) => step.status === "watch") ??
     null;
+  const scopedLiveUsabilityBlockers = input.liveUsability.missing_for_live_usability
+    .filter(isFirstCanaryScopedLiveUsabilityBlocker)
+    .slice(0, 6)
+    .map((item) => item.next_action);
   const endpointParams = `source=${input.state.market_source.mode}&account=${input.state.paper_account.mode}&scenario=${input.state.scenario}&cycles=0`;
   const base = {
     mode: "web3-first-canary-drill" as const,
@@ -206,7 +210,7 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
     blockers: uniqueText([
       permissionDrift ? "Unexpected live execution, transaction submission, wallet mutation, or secret-storage permission appeared in a canary receipt." : null,
       nextLane?.next_action,
-      ...input.liveUsability.missing_for_live_usability.slice(0, 6).map((item) => item.next_action),
+      ...scopedLiveUsabilityBlockers,
       ...input.readiness.blockers.slice(0, 6),
       ...input.canary.blockers.slice(0, 6),
     ]),
@@ -456,6 +460,13 @@ function firstCanaryDrillNextAction(
 
 function hasUnexpectedPermission(value: string | undefined) {
   return typeof value === "string" && value !== "blocked";
+}
+
+function isFirstCanaryScopedLiveUsabilityBlocker(
+  item: Web3LiveUsabilityBlockersReceipt["missing_for_live_usability"][number],
+) {
+  if (item.source === "preflight") return false;
+  return !/(paper sizing|dry-run|backfill|profit gate|paper wallet)/i.test(item.next_action);
 }
 
 function previewValue(value: string | null | undefined) {

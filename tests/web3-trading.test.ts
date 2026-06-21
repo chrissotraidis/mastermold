@@ -2956,6 +2956,9 @@ describe("Web3 autonomous trading subsystem", () => {
       step.completion_signal.length > 0
     )).toBe(true);
     expect(receipt.blockers.join(" ")).toContain("JUPITER");
+    expect(receipt.blockers.join(" ")).not.toContain("FARTCOIN");
+    expect(receipt.blockers.join(" ")).not.toContain("paper sizing");
+    expect(receipt.blockers.join(" ")).not.toContain("dry-run");
     expect(receipt.safe_commands).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready");
     expect(receipt.safe_commands).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");
     expect(receipt.safe_surfaces).toContain("/trading?source=live-dex&account=persistent");

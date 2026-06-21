@@ -1737,6 +1737,9 @@ async function verifyFirstCanaryDrill() {
   assert(String(json.strict_proof_command ?? "").includes("prove-canary:web3"), "First canary drill should expose the canary proof command.", json);
   assert(Array.isArray(json.safe_commands) && json.safe_commands.some((command) => command.includes("drill-canary:web3")), "First canary drill should expose safe command-line verification.", json.safe_commands);
   assert(Array.isArray(json.safe_surfaces) && json.safe_surfaces.some((surface) => surface.includes("/trading?source=live-dex")), "First canary drill should expose safe operator surfaces.", json.safe_surfaces);
+  assert(!String(json.blockers?.join(" ") ?? "").includes("FARTCOIN"), "First canary drill should not mix paper market backfill into first funded canary blockers.", json.blockers);
+  assert(!String(json.blockers?.join(" ") ?? "").includes("paper sizing"), "First canary drill should keep paper sizing repair outside first funded canary blockers.", json.blockers);
+  assert(!String(json.blockers?.join(" ") ?? "").includes("dry-run"), "First canary drill should keep dry-run repair outside first funded canary blockers.", json.blockers);
   assert(Array.isArray(json.lanes) && json.lanes.some((lane) => lane.id === "unsigned-order-preflight") && json.lanes.some((lane) => lane.id === "post-signing-proof") && json.lanes.some((lane) => lane.id === "live-boundary"), "First canary drill should include unsigned, post-signing, and boundary lanes.", json.lanes);
   assert(json.lanes.every((lane) => ["pass", "watch", "fail"].includes(lane.status) && lane.evidence_endpoint), "First canary drill lanes should be actionable.", json.lanes);
   assert(json.live_execution_permission === "blocked", "First canary drill must keep live execution blocked.", json);
