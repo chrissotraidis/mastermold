@@ -198,10 +198,8 @@ export function buildWeb3LiveTradeCanaryReceipt(
 ): Web3LiveTradeCanaryReceipt {
   const latest = state.execution_audit.latest;
   const signature = state.signed_transaction_relay.latest_signature ?? latest?.relay_signature ?? null;
-  const actualLiveTradeTested = Boolean(
-    signature &&
-    (state.signed_transaction_relay.status === "confirmed" || state.signed_transaction_relay.status === "relayed"),
-  );
+  const relayConfirmed = isConfirmedLiveRelay(state, latest);
+  const actualLiveTradeTested = Boolean(signature && relayConfirmed);
   const readyForExternalSignedPayload = state.live_execution_arming.submit_ready &&
     state.signed_transaction_relay.can_accept_signed_payload &&
     Boolean(state.signed_transaction_relay.request_id);
@@ -211,7 +209,7 @@ export function buildWeb3LiveTradeCanaryReceipt(
       ? "ready-for-external-signed-payload"
       : "blocked";
   const blockers = liveTradeCanaryBlockers(state, readyForExternalSignedPayload, actualLiveTradeTested);
-  const postSigningEvidence = buildPostSigningEvidence(state, actualLiveTradeTested);
+  const postSigningEvidence = buildPostSigningEvidence(state, signature);
   const postSigningEvidenceStatus = postSigningEvidenceStatusFrom(postSigningEvidence, signature);
   const postSigningNextAction = postSigningEvidence.find((item) => item.status !== "pass")?.next_action ??
     "Settlement is accounted for in the local mirror; review caps, PnL, and stop conditions before another canary.";
@@ -298,14 +296,18 @@ function liveTradeCanaryBlockers(
 
 function buildPostSigningEvidence(
   state: Web3TradingState,
-  actualLiveTradeTested: boolean,
+  signature: string | null,
 ): Web3LiveTradeCanaryEvidenceItem[] {
   const relay = state.signed_transaction_relay;
   const confirmation = state.signature_confirmation_poll;
   const settlement = state.settlement_fill_reconciliation;
   const watchdog = state.autonomous_settlement_watchdog;
   const mirror = state.portfolio_mirror_apply;
-  const relayConfirmed = relay.status === "confirmed" || confirmation?.status === "confirmed";
+  const relaySubmitted = Boolean(signature);
+  const relayConfirmed = relay.status === "confirmed" ||
+    confirmation?.status === "confirmed" ||
+    isConfirmedStatus(relay.confirmation_status) ||
+    isConfirmedStatus(confirmation?.confirmation_status);
   const settlementReconciled = settlement?.status === "reconciled" || watchdog?.status === "reconciled" || watchdog?.status === "mirrored";
   const mirrorAccounted = mirror?.status === "applied" || mirror?.status === "duplicate" || watchdog?.status === "mirrored" || watchdog?.status === "duplicate";
 
@@ -313,26 +315,28 @@ function buildPostSigningEvidence(
     {
       id: "signed-relay",
       label: "Signed relay",
-      status: actualLiveTradeTested ? "pass" : relay.can_accept_signed_payload ? "watch" : "fail",
-      detail: actualLiveTradeTested
-        ? `Signature ${previewSignature(relay.latest_signature) ?? "recorded"} was relayed by the guarded canary path.`
+      status: relaySubmitted ? "pass" : relay.can_accept_signed_payload ? "watch" : "fail",
+      detail: relaySubmitted
+        ? `Signature ${previewSignature(signature) ?? "recorded"} was relayed by the guarded canary path.`
         : relay.can_accept_signed_payload
           ? "The relay can accept one external signed payload for the current request."
           : "No live signed transaction has been relayed by this app.",
-      next_action: relay.can_accept_signed_payload
-        ? "Use the browser wallet canary button with tiny caps, then inspect the relay receipt."
+      next_action: relaySubmitted
+        ? "Poll chain confirmation for the relayed signature before claiming a live trade test."
+        : relay.can_accept_signed_payload
+          ? "Use the browser wallet canary button with tiny caps, then inspect the relay receipt."
         : "Clear live DEX, wallet, signer, cap, and request-id gates before attempting a canary.",
     },
     {
       id: "chain-confirmation",
       label: "Chain confirmation",
-      status: relayConfirmed ? "pass" : confirmation?.status === "pending" ? "watch" : actualLiveTradeTested ? "watch" : "fail",
+      status: relayConfirmed ? "pass" : relaySubmitted || confirmation?.status === "pending" ? "watch" : "fail",
       detail: relayConfirmed
         ? `Confirmation status is ${relay.confirmation_status ?? confirmation?.confirmation_status ?? "recorded"}.`
-        : confirmation?.status === "pending"
+        : relaySubmitted || confirmation?.status === "pending"
           ? "Confirmation polling is waiting on the signature."
           : "No confirmed chain status has been recorded for the signed payload.",
-      next_action: actualLiveTradeTested
+      next_action: relaySubmitted
         ? "Run the signature confirmation poll until the signature is confirmed or failed."
         : "Relay a signed canary transaction before polling confirmation.",
     },
@@ -367,9 +371,9 @@ function postSigningEvidenceStatusFrom(
   evidence: Web3LiveTradeCanaryEvidenceItem[],
   signature: string | null,
 ): Web3LiveTradeCanaryReceipt["post_signing_evidence_status"] {
-  if (evidence.some((item) => item.status === "fail" && item.id !== "signed-relay" && signature)) return "review-required";
   if (evidence.every((item) => item.status === "pass")) return "settlement-accounted";
   const firstOpen = evidence.find((item) => item.status !== "pass");
+  if (firstOpen?.status === "fail" && firstOpen.id !== "signed-relay" && signature) return "review-required";
   if (!firstOpen || firstOpen.id === "signed-relay") return "needs-signed-relay";
   if (firstOpen.id === "chain-confirmation") return "needs-confirmation";
   if (firstOpen.id === "settlement-reconciliation") return "needs-settlement";
@@ -401,6 +405,21 @@ function previewSignature(signature: string | null) {
   if (!signature) return null;
   if (signature.length <= 14) return signature;
   return `${signature.slice(0, 6)}...${signature.slice(-6)}`;
+}
+
+function isConfirmedLiveRelay(
+  state: Web3TradingState,
+  latest: Web3TradingState["execution_audit"]["latest"],
+) {
+  return state.signed_transaction_relay.status === "confirmed" ||
+    state.signature_confirmation_poll?.status === "confirmed" ||
+    isConfirmedStatus(state.signed_transaction_relay.confirmation_status) ||
+    isConfirmedStatus(state.signature_confirmation_poll?.confirmation_status) ||
+    isConfirmedStatus(latest?.confirmation_status);
+}
+
+function isConfirmedStatus(status: "processed" | "confirmed" | "finalized" | null | undefined) {
+  return status === "confirmed" || status === "finalized";
 }
 
 function hashJson(value: unknown) {

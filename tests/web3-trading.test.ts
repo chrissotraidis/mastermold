@@ -47,7 +47,7 @@ import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3CredentialsSetupReadiness } from "@/src/db/web3-credentials";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
-import { liveCanaryRequestContinuityBlockers, type Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
+import { buildWeb3LiveTradeCanaryReceipt, liveCanaryRequestContinuityBlockers, type Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
 import {
   getWeb3PromotedPaperAutopilotHealth,
@@ -2860,6 +2860,81 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(missing.join(" ")).toContain("No active canary request id");
     expect(mismatch).toEqual(["request_id must match the current canary request order-current-001."]);
     expect(matched).toEqual([]);
+  });
+
+  test("GIVEN a signed payload was relayed but not confirmed WHEN the live canary receipt is built THEN it does not claim a real live trade test", async () => {
+    const base = await getWeb3TradingStateAsync({
+      source: "sample",
+      account: "persistent",
+      scenario: "breakout",
+      cycles: 0,
+    });
+    const createdAt = new Date("2026-06-21T12:00:00.000Z").toISOString();
+    const signature = "5NfPendingRelaySignature1111111111111111111111111111111111";
+    const pendingEntry: NonNullable<Web3TradingState["execution_audit"]["latest"]> = {
+      id: "web3-relay-pending-001",
+      created_at: createdAt,
+      nonce: "web3-relay-pending",
+      plan_id: null,
+      symbol: "SOL-USDC",
+      side: "buy",
+      status: "relayed",
+      attempt: 0,
+      max_attempts: 3,
+      retry_window_seconds: 90,
+      next_retry_at: null,
+      request_id: "order-pending-001",
+      router: "metis",
+      relay_path: "solana-rpc",
+      transaction_ready: true,
+      payload_hash: "0".repeat(64),
+      payload_bytes: 184,
+      simulated_signature: null,
+      relay_signature: signature,
+      relay_slot: null,
+      confirmation_status: null,
+      signer_session_label: null,
+      signer_network: null,
+      kill_switch: false,
+      reason: "Solana RPC accepted the signed transaction; confirmation status is still pending.",
+    };
+
+    const receipt = buildWeb3LiveTradeCanaryReceipt({
+      ...base,
+      execution_audit: {
+        entries: [pendingEntry],
+        latest: pendingEntry,
+      },
+      signed_transaction_relay: {
+        ...base.signed_transaction_relay,
+        status: "relayed",
+        can_accept_signed_payload: false,
+        request_id: "order-pending-001",
+        latest_signature: signature,
+        latest_slot: null,
+        confirmation_status: null,
+        blockers: [],
+      },
+    }, new Date("2026-06-21T12:00:30.000Z"));
+
+    expect(receipt.status).toBe("blocked");
+    expect(receipt.actual_live_trade_tested).toBe(false);
+    expect(receipt.real_funds_moved_by_this_app).toBe(false);
+    expect(receipt.signed_relay_status).toBe("relayed");
+    expect(receipt.latest_signature_preview).toBe("5NfPen...111111");
+    expect(receipt.latest_confirmation_status).toBeNull();
+    expect(receipt.post_signing_evidence_status).toBe("needs-confirmation");
+    expect(receipt.post_signing_evidence.find((item) => item.id === "signed-relay")).toMatchObject({
+      status: "pass",
+      detail: expect.stringContaining("was relayed"),
+      next_action: expect.stringContaining("Poll chain confirmation"),
+    });
+    expect(receipt.post_signing_evidence.find((item) => item.id === "chain-confirmation")).toMatchObject({
+      status: "watch",
+      detail: expect.stringContaining("waiting on the signature"),
+    });
+    expect(receipt.post_signing_next_action).toContain("signature confirmation poll");
+    expect(receipt.blockers.join(" ")).toContain("No confirmed live transaction signature");
   });
 
   test("GIVEN the operator asks for a live unsigned canary order WHEN gates are missing THEN the handoff blocks safely", async () => {
