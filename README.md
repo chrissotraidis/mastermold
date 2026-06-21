@@ -316,6 +316,10 @@ before any wallet prompt.
 Trading server-renders the latest hash-only wallet ownership receipt for the scoped public wallet,
 so proof created from Settings or an earlier Trading session is visible in the live canary console
 after reload before another canary attempt.
+When wallet ownership proof is the active operator input, the live-usability blocker receipt now
+promotes that proof step into `next_blocker` and `next_credential_request`, points the safe fix link
+at Trading, and lists `Check wallet`, `Prove wallet`, strict verification, and receipt refresh as
+the proof runway instead of re-asking for the public wallet address.
 Trading and Settings expose the actual supervised handoff as `Sign tiny canary`: the browser
 deserializes the one-shot transaction with `@solana/web3.js`, asks the connected wallet to sign,
 then posts the serialized signed payload to the live canary relay without storing transaction

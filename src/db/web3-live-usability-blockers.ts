@@ -408,12 +408,11 @@ function summarizeNextCredentialRequest(
   neverProvide: string[],
 ): Web3LiveUsabilityCredentialRequest | null {
   if (!currentInput && !nextBlocker) return null;
-  const currentInputMatchesBlocker = Boolean(currentInput && nextBlocker && nextBlocker.id.includes(currentInput.id));
-  const useCurrentInput = Boolean(currentInput && (!nextBlocker || currentInputMatchesBlocker));
+  const useCurrentInput = shouldUseCurrentInputForCredentialRequest(currentInput, nextBlocker);
   const id = useCurrentInput ? currentInput!.id : nextBlocker?.id ?? currentInput?.id ?? "next-web3-credential";
   const label = useCurrentInput ? currentInput!.label : nextBlocker?.label ?? currentInput?.label ?? "Next Web3 setup input";
   const verifierCommand = nextBlocker?.safe_command ?? currentInput?.verifier_command ?? null;
-  const fixHref = nextBlocker?.href ?? "/settings/integrations#settings-web3-credentials-runway";
+  const fixHref = credentialRequestFixHref(currentInput, nextBlocker, useCurrentInput);
   return {
     id,
     label,
@@ -445,8 +444,39 @@ function summarizeNextCredentialRequest(
   };
 }
 
+function shouldUseCurrentInputForCredentialRequest(
+  currentInput: Web3OperatorCurrentInput | null,
+  nextBlocker: Web3LiveUsabilityNextBlocker | null,
+) {
+  if (!currentInput) return false;
+  if (!nextBlocker) return true;
+  if (nextBlocker.id.includes(currentInput.id)) return true;
+  return currentInput.id === "wallet-ownership-proof" &&
+    nextBlocker.id === "runway:wallet" &&
+    currentInput.storage === "hash-only-local-receipt";
+}
+
+function credentialRequestFixHref(
+  currentInput: Web3OperatorCurrentInput | null,
+  nextBlocker: Web3LiveUsabilityNextBlocker | null,
+  useCurrentInput: boolean,
+) {
+  if (useCurrentInput && currentInput?.id === "wallet-ownership-proof") {
+    return "/trading?source=live-dex&account=persistent";
+  }
+  return nextBlocker?.href ?? "/settings/integrations#settings-web3-credentials-runway";
+}
+
 function credentialRequestCompletionCriteria(id: string) {
   const normalized = id.toLowerCase();
+  if (normalized.includes("wallet-ownership")) {
+    return [
+      "The connected browser wallet matches the saved dedicated public wallet.",
+      "The browser wallet signs the Mastermind text-only ownership challenge.",
+      "The app stores only hash evidence for the challenge and signature.",
+      "The refreshed live-usability receipt advances past wallet ownership while live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo stay blocked.",
+    ];
+  }
   if (normalized.includes("wallet")) {
     return [
       "A dedicated public Solana wallet address is saved; the sample all-ones wallet is rejected.",
@@ -498,6 +528,46 @@ function credentialRequestVerificationRunway(
   fixHref: string,
 ): Web3LiveUsabilityCredentialRequest["verification_runway"] {
   const normalized = id.toLowerCase();
+  if (normalized.includes("wallet-ownership")) {
+    return [
+      verificationRunwayStep({
+        id: "check-wallet-challenge",
+        label: "Check wallet challenge",
+        surface: "browser-wallet",
+        href: fixHref,
+        command: null,
+        status: "next",
+        next_action: "Use Check wallet in Trading to fetch the text-only challenge without a signature prompt.",
+      }),
+      verificationRunwayStep({
+        id: "prove-wallet-ownership",
+        label: "Prove wallet ownership",
+        surface: "browser-wallet",
+        href: fixHref,
+        command: null,
+        status: "after-input",
+        next_action: "Use Prove wallet with the matching browser wallet; this signs text only and cannot move funds.",
+      }),
+      verificationRunwayStep({
+        id: "strict-wallet-verifier",
+        label: "Run wallet verifier",
+        surface: "local-command",
+        href: null,
+        command: verifierCommand,
+        status: "after-input",
+        next_action: "Run the strict operator-wallet verifier and keep live authority blocked.",
+      }),
+      verificationRunwayStep({
+        id: "refresh-live-usability",
+        label: "Refresh what is left",
+        surface: "read-only-api",
+        href: "/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all",
+        command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+        status: "after-input",
+        next_action: "Refresh the live-usability receipt so the next blocker advances only after the proof is recorded.",
+      }),
+    ];
+  }
   if (normalized.includes("wallet")) {
     return [
       verificationRunwayStep({
@@ -644,6 +714,9 @@ function credentialRequestSafeValueDescription(
   nextBlocker: Web3LiveUsabilityNextBlocker | null,
 ) {
   const normalized = `${id} ${currentInput?.target_names.join(" ") ?? ""} ${nextBlocker?.id ?? ""}`.toLowerCase();
+  if (normalized.includes("wallet-ownership") || normalized.includes("hash-only wallet ownership")) {
+    return "Browser-wallet text-message ownership proof only; never a private key, seed phrase, keypair JSON, transaction signature, signed payload, or transaction body.";
+  }
   if (normalized.includes("wallet")) return "Dedicated public Solana trading wallet address only; never a private key, seed phrase, keypair JSON, signed payload, or transaction body.";
   if (normalized.includes("jupiter")) return "Jupiter provider key in ignored server env or a session-only Settings test; never wallet authority or signed transaction data.";
   if (normalized.includes("signer") || normalized.includes("custody")) return "Signer provider choice, policy identifier, and provider target names only; custody credentials stay in the external provider surface.";
@@ -657,6 +730,19 @@ function summarizeNextBlocker(
   currentInput: Web3OperatorCurrentInput | null,
 ): Web3LiveUsabilityNextBlocker | null {
   if (!item) return null;
+  if (currentInput?.id === "wallet-ownership-proof" && item.id === "runway:wallet") {
+    return {
+      id: currentInput.id,
+      label: currentInput.label,
+      owner: item.owner,
+      source: item.source,
+      status: item.status,
+      next_action: currentInput.next_action,
+      href: "/trading?source=live-dex&account=persistent",
+      safe_command: currentInput.verifier_command,
+      blocks_live_capital: item.blocks_live_capital,
+    };
+  }
   return {
     id: item.id,
     label: item.label,

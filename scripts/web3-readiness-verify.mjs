@@ -397,8 +397,11 @@ async function verifyHealth() {
   assert(typeof json.web3_live_usability.credential_doctor_next_action === "string" && json.web3_live_usability.credential_doctor_next_action.length > 0, "Live-usability health should expose credential doctor next action.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_label === "string" && json.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next operator unlock step.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_action === "string" && json.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", json.web3_live_usability);
+  const liveUsabilityCurrentInputId = json.web3_live_usability.current_input?.id;
+  const liveUsabilityNextBlockerId = json.web3_live_usability.next_blocker?.id;
+  const liveUsabilityProofIsNext = liveUsabilityCurrentInputId === "wallet-ownership-proof";
   assert(
-    ["cutover:dedicated-trading-wallet", "cutover:wallet-ownership-proof", "runway:wallet"].includes(json.web3_live_usability.next_blocker?.id),
+    ["cutover:dedicated-trading-wallet", "cutover:wallet-ownership-proof", "runway:wallet", "wallet-ownership-proof"].includes(liveUsabilityNextBlockerId),
     "Live-usability health should expose the next dependency-ranked blocker.",
     json.web3_live_usability,
   );
@@ -408,13 +411,32 @@ async function verifyHealth() {
     "Live-usability health next blocker should expose owner/source routing.",
     json.web3_live_usability.next_blocker,
   );
-  assert(json.web3_live_usability.next_blocker?.href === "/settings/integrations#settings-web3-wallet-public-key", "Live-usability health next blocker should expose the safe fix surface.", json.web3_live_usability.next_blocker);
+  assert(
+    json.web3_live_usability.next_blocker?.href === (liveUsabilityProofIsNext ? "/trading?source=live-dex&account=persistent" : "/settings/integrations#settings-web3-wallet-public-key"),
+    "Live-usability health next blocker should expose the safe fix surface.",
+    json.web3_live_usability.next_blocker,
+  );
   assert(String(json.web3_live_usability.next_blocker?.safe_command ?? "").includes("--require-operator-wallet"), "Live-usability health next blocker should expose the strict safe verifier command.", json.web3_live_usability.next_blocker);
   assert(json.web3_live_usability.next_blocker?.blocks_live_capital === true, "Live-usability health next blocker should preserve live-capital blocking status.", json.web3_live_usability.next_blocker);
-  assert(json.web3_live_usability.next_credential_request?.fix_href === "/settings/integrations#settings-web3-wallet-public-key", "Live-usability health should expose the next credential request fix surface.", json.web3_live_usability.next_credential_request);
-  assert(String(json.web3_live_usability.next_credential_request?.safe_value_description ?? "").includes("public Solana trading wallet address"), "Live-usability health should describe the safe next credential value.", json.web3_live_usability.next_credential_request);
+  assert(
+    json.web3_live_usability.next_credential_request?.fix_href === (liveUsabilityProofIsNext ? "/trading?source=live-dex&account=persistent" : "/settings/integrations#settings-web3-wallet-public-key"),
+    "Live-usability health should expose the next credential request fix surface.",
+    json.web3_live_usability.next_credential_request,
+  );
+  assert(
+    String(json.web3_live_usability.next_credential_request?.safe_value_description ?? "").includes(
+      liveUsabilityProofIsNext ? "Browser-wallet text-message ownership proof only" : "public Solana trading wallet address",
+    ),
+    "Live-usability health should describe the safe next credential value.",
+    json.web3_live_usability.next_credential_request,
+  );
   assert(String(json.web3_live_usability.next_credential_request?.verifier_command ?? "").includes("--require-operator-wallet"), "Live-usability health should expose the next credential verifier command.", json.web3_live_usability.next_credential_request);
-  assert(Array.isArray(json.web3_live_usability.next_credential_request?.completion_criteria) && json.web3_live_usability.next_credential_request.completion_criteria.join(" ").includes("strict operator-wallet verifier"), "Live-usability health should expose the next credential completion criteria.", json.web3_live_usability.next_credential_request);
+  assert(
+    Array.isArray(json.web3_live_usability.next_credential_request?.completion_criteria) &&
+      json.web3_live_usability.next_credential_request.completion_criteria.join(" ").includes(liveUsabilityProofIsNext ? "hash evidence" : "strict operator-wallet verifier"),
+    "Live-usability health should expose the next credential completion criteria.",
+    json.web3_live_usability.next_credential_request,
+  );
   assert(json.web3_live_usability.next_credential_request.completion_criteria.join(" ").includes("live execution"), "Live-usability health completion criteria should preserve the live-execution lock.", json.web3_live_usability.next_credential_request);
   assert(Array.isArray(json.web3_live_usability.next_credential_request?.verification_runway) && json.web3_live_usability.next_credential_request.verification_runway.length >= 3, "Live-usability health should expose the next credential verification runway.", json.web3_live_usability.next_credential_request);
   assert(json.web3_live_usability.next_credential_request.verification_runway.some((step) => String(step.command ?? "").includes("--require-operator-wallet")), "Live-usability health verification runway should carry the strict wallet verifier.", json.web3_live_usability.next_credential_request);

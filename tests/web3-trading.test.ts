@@ -2077,6 +2077,8 @@ describe("Web3 autonomous trading subsystem", () => {
           id: string;
           label: string;
           fix_href: string;
+          storage: string;
+          target_names: string[];
           safe_value_description: string;
           verifier_command: string | null;
           safe_to_provide: string[];
@@ -2372,18 +2374,26 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_usability.current_input?.safe_collection_surface.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.current_input?.storage.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.next_blocker).toMatchObject({
-      id: "cutover:dedicated-trading-wallet",
-      label: "Dedicated trading wallet",
       owner: "operator",
-      source: "cutover",
-      href: "/settings/integrations#settings-web3-wallet-public-key",
       blocks_live_capital: true,
     });
+    if (receipt.web3_live_usability.current_input?.id === "wallet-ownership-proof") {
+      expect(receipt.web3_live_usability.next_blocker).toMatchObject({
+        id: "wallet-ownership-proof",
+        label: "Wallet ownership proof",
+        href: "/trading?source=live-dex&account=persistent",
+      });
+    } else {
+      expect(receipt.web3_live_usability.next_blocker).toMatchObject({
+        id: "cutover:dedicated-trading-wallet",
+        label: "Dedicated trading wallet",
+        source: "cutover",
+        href: "/settings/integrations#settings-web3-wallet-public-key",
+      });
+    }
     expect(receipt.web3_live_usability.next_blocker?.safe_command).toContain("--require-operator-wallet");
     expect(receipt.web3_live_usability.next_blocker?.next_action.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.next_credential_request).toMatchObject({
-      label: "Dedicated trading wallet",
-      fix_href: "/settings/integrations#settings-web3-wallet-public-key",
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
       transaction_submission_permission: "blocked",
@@ -2392,20 +2402,42 @@ describe("Web3 autonomous trading subsystem", () => {
       seed_phrase_storage: "blocked",
       secret_echo_permission: "blocked",
     });
-    expect(receipt.web3_live_usability.next_credential_request?.id).toContain("dedicated-trading-wallet");
-    expect(receipt.web3_live_usability.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+    if (receipt.web3_live_usability.current_input?.id === "wallet-ownership-proof") {
+      expect(receipt.web3_live_usability.next_credential_request).toMatchObject({
+        id: "wallet-ownership-proof",
+        label: "Wallet ownership proof",
+        fix_href: "/trading?source=live-dex&account=persistent",
+        storage: "hash-only-local-receipt",
+        target_names: ["hash-only wallet ownership receipt"],
+      });
+      expect(receipt.web3_live_usability.next_credential_request?.safe_value_description).toContain("text-message ownership proof");
+      expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("hash evidence");
+      expect(receipt.web3_live_usability.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
+        "check-wallet-challenge",
+        "prove-wallet-ownership",
+        "strict-wallet-verifier",
+        "refresh-live-usability",
+      ]);
+    } else {
+      expect(receipt.web3_live_usability.next_credential_request).toMatchObject({
+        label: "Dedicated trading wallet",
+        fix_href: "/settings/integrations#settings-web3-wallet-public-key",
+      });
+      expect(receipt.web3_live_usability.next_credential_request?.id).toContain("dedicated-trading-wallet");
+      expect(receipt.web3_live_usability.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+      expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("strict operator-wallet verifier");
+      expect(receipt.web3_live_usability.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
+        "save-public-wallet",
+        "strict-wallet-verifier",
+        "prove-wallet-ownership",
+        "refresh-live-usability",
+      ]);
+    }
     expect(receipt.web3_live_usability.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.next_credential_request?.never_provide.join(" ")).toContain("private key");
-    expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("strict operator-wallet verifier");
     expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("live execution");
-    expect(receipt.web3_live_usability.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
-      "save-public-wallet",
-      "strict-wallet-verifier",
-      "prove-wallet-ownership",
-      "refresh-live-usability",
-    ]);
-    expect(receipt.web3_live_usability.next_credential_request?.verification_runway[1]?.command).toContain("--require-operator-wallet");
+    expect(receipt.web3_live_usability.next_credential_request?.verification_runway.some((step) => step.command?.includes("--require-operator-wallet"))).toBe(true);
     expect(receipt.web3_live_usability.next_credential_request?.verification_runway.every((step) =>
       step.live_execution_permission === "blocked" &&
       step.wallet_mutation_permission === "blocked" &&
@@ -3753,22 +3785,29 @@ describe("Web3 autonomous trading subsystem", () => {
       label: "Dedicated trading wallet",
     });
     expect(receipt.next_blocker).toMatchObject({
-      id: receipt.missing_for_live_usability[0].id,
-      label: receipt.missing_for_live_usability[0].label,
       owner: "operator",
-      source: "cutover",
-      href: "/settings/integrations#settings-web3-wallet-public-key",
       blocks_live_capital: true,
     });
-    expect(receipt.next_blocker?.next_action).toBe(receipt.missing_for_live_usability[0].next_action);
+    if (receipt.current_input?.id === "wallet-ownership-proof") {
+      expect(receipt.next_blocker).toMatchObject({
+        id: "wallet-ownership-proof",
+        label: "Wallet ownership proof",
+        href: "/trading?source=live-dex&account=persistent",
+      });
+      expect(receipt.next_blocker?.next_action).toBe(receipt.current_input.next_action);
+    } else {
+      expect(receipt.next_blocker).toMatchObject({
+        id: receipt.missing_for_live_usability[0].id,
+        label: receipt.missing_for_live_usability[0].label,
+        source: "cutover",
+        href: "/settings/integrations#settings-web3-wallet-public-key",
+      });
+      expect(receipt.next_blocker?.next_action).toBe(receipt.missing_for_live_usability[0].next_action);
+    }
     expect(receipt.next_blocker?.safe_command).toContain("--require-operator-wallet");
     expect(receipt.next_credential_request).toMatchObject({
       label: receipt.next_blocker?.label,
-      fix_href: "/settings/integrations#settings-web3-wallet-public-key",
-      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
-      storage: "browser-public-scope",
       can_enter_in_app: true,
-      target_names: ["wallet_public_key"],
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",
       transaction_submission_permission: "blocked",
@@ -3777,20 +3816,45 @@ describe("Web3 autonomous trading subsystem", () => {
       seed_phrase_storage: "blocked",
       secret_echo_permission: "blocked",
     });
-    expect(receipt.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+    if (receipt.current_input?.id === "wallet-ownership-proof") {
+      expect(receipt.next_credential_request).toMatchObject({
+        id: "wallet-ownership-proof",
+        fix_href: "/trading?source=live-dex&account=persistent",
+        safe_collection_surface: "browser-wallet",
+        storage: "hash-only-local-receipt",
+        target_names: ["hash-only wallet ownership receipt"],
+      });
+      expect(receipt.next_credential_request?.safe_value_description).toContain("text-message ownership proof");
+      expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("hash evidence");
+      expect(receipt.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
+        "check-wallet-challenge",
+        "prove-wallet-ownership",
+        "strict-wallet-verifier",
+        "refresh-live-usability",
+      ]);
+      expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/trading?source=live-dex&account=persistent");
+    } else {
+      expect(receipt.next_credential_request).toMatchObject({
+        fix_href: "/settings/integrations#settings-web3-wallet-public-key",
+        safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+        storage: "browser-public-scope",
+        target_names: ["wallet_public_key"],
+      });
+      expect(receipt.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+      expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("sample all-ones wallet is rejected");
+      expect(receipt.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
+        "save-public-wallet",
+        "strict-wallet-verifier",
+        "prove-wallet-ownership",
+        "refresh-live-usability",
+      ]);
+      expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/settings/integrations#settings-web3-wallet-public-key");
+    }
     expect(receipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     expect(receipt.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.next_credential_request?.never_provide.join(" ")).toContain("private key");
-    expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("sample all-ones wallet is rejected");
     expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("live execution");
-    expect(receipt.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
-      "save-public-wallet",
-      "strict-wallet-verifier",
-      "prove-wallet-ownership",
-      "refresh-live-usability",
-    ]);
-    expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/settings/integrations#settings-web3-wallet-public-key");
-    expect(receipt.next_credential_request?.verification_runway[1]?.command).toContain("--require-operator-wallet");
+    expect(receipt.next_credential_request?.verification_runway.some((step) => step.command?.includes("--require-operator-wallet"))).toBe(true);
     expect(receipt.next_credential_request?.verification_runway.every((step) =>
       step.live_execution_permission === "blocked" &&
       step.wallet_mutation_permission === "blocked" &&
@@ -3842,15 +3906,15 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.listed_live_usability_row_count).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_for_live_usability.length).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_for_live_usability.length).toBeGreaterThanOrEqual(receipt.missing_for_live_usability.length);
-    expect(allRowsReceipt.next_blocker?.id).toBe(allRowsReceipt.missing_for_live_usability[0].id);
-    expect(allRowsReceipt.next_blocker?.label).toBe(allRowsReceipt.missing_for_live_usability[0].label);
-    expect(allRowsReceipt.next_blocker?.href).toBe("/settings/integrations#settings-web3-wallet-public-key");
+    expect(allRowsReceipt.next_blocker?.id).toBe(receipt.next_blocker?.id);
+    expect(allRowsReceipt.next_blocker?.label).toBe(receipt.next_blocker?.label);
+    expect(allRowsReceipt.next_blocker?.href).toBe(receipt.next_blocker?.href);
     expect(allRowsReceipt.next_blocker?.safe_command).toContain("--require-operator-wallet");
-    expect(allRowsReceipt.next_credential_request?.fix_href).toBe("/settings/integrations#settings-web3-wallet-public-key");
+    expect(allRowsReceipt.next_credential_request?.fix_href).toBe(receipt.next_credential_request?.fix_href);
     expect(allRowsReceipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
-    expect(allRowsReceipt.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
-    expect(allRowsReceipt.next_credential_request?.completion_criteria.join(" ")).toContain("strict operator-wallet verifier");
-    expect(allRowsReceipt.next_credential_request?.verification_runway[1]?.command).toContain("--require-operator-wallet");
+    expect(allRowsReceipt.next_credential_request?.safe_value_description.length).toBeGreaterThan(20);
+    expect(allRowsReceipt.next_credential_request?.completion_criteria.join(" ")).toContain("live execution");
+    expect(allRowsReceipt.next_credential_request?.verification_runway.some((step) => step.command?.includes("--require-operator-wallet"))).toBe(true);
     expect(allRowsReceipt.next_credential_request?.secret_echo_permission).toBe("blocked");
     expect(allRowsReceipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);

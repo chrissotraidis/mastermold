@@ -1997,6 +1997,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("next_blocker: Web3LiveUsabilityNextBlocker | null");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("next_credential_request: Web3LiveUsabilityCredentialRequest | null");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("summarizeNextCredentialRequest");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("shouldUseCurrentInputForCredentialRequest");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("check-wallet-challenge");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("Browser-wallet text-message ownership proof only");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("credentialRequestCompletionCriteria");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("completion_criteria: credentialRequestCompletionCriteria(id)");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("credentialRequestVerificationRunway");
@@ -2065,6 +2068,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("Trading live canary console refreshes the first-canary drill");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Trading also exposes `Check wallet`");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Trading server-renders the latest hash-only wallet ownership receipt");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("live-usability blocker receipt now promotes that active current input");
     expect(source("components/review-readiness.tsx")).toContain("web3_operator_runbook summary");
     expect(source("components/review-readiness.tsx")).toContain("live-review runbook endpoint");
     expect(source("components/review-readiness.tsx")).toContain("next dependency blocker");
@@ -2081,6 +2085,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now refreshes the first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now includes a no-signature Check wallet action");
     expect(source("components/review-readiness.tsx")).toContain("Trading now server-renders the latest hash-only wallet ownership receipt");
+    expect(source("components/review-readiness.tsx")).toContain("live-usability blocker receipt now promotes the active current input");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");
