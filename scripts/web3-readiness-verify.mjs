@@ -174,6 +174,7 @@ async function verifyHealth() {
   assert(["sample", "live-dex"].includes(json.web3_operator_runbook.source), "Operator runbook health should expose the summarized source.", json.web3_operator_runbook);
   assert(["ephemeral", "persistent"].includes(json.web3_operator_runbook.account), "Operator runbook health should expose the summarized account.", json.web3_operator_runbook);
   assert(["base", "breakout", "rug-risk"].includes(json.web3_operator_runbook.scenario), "Operator runbook health should expose the summarized scenario.", json.web3_operator_runbook);
+  assert(json.web3_operator_runbook.live_review_source_endpoint === "/api/web3-operator-runbook?source=live-dex&account=persistent&scenario=breakout&cycles=0", "Operator runbook health should expose the live-review runbook packet separately.", json.web3_operator_runbook);
   assert(typeof json.web3_operator_runbook.allowed_now_count === "number", "Operator runbook health should expose allowed action count.", json.web3_operator_runbook);
   assert(json.web3_operator_runbook.allowed_now_count + json.web3_operator_runbook.gated_count + json.web3_operator_runbook.blocked_count >= 1, "Operator runbook health action counts should be present.", json.web3_operator_runbook);
   assert(json.web3_operator_runbook.primary_safe_action_status === null || ["allowed", "gated", "blocked"].includes(json.web3_operator_runbook.primary_safe_action_status), "Operator runbook health should expose a valid primary safe action status.", json.web3_operator_runbook);

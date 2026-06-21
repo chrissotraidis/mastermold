@@ -191,9 +191,9 @@ keeps signing, submission, wallet mutation, private-key storage, seed-phrase sto
 secret echo blocked.
 `/api/health` also exposes compact `web3_operator_runbook`, `web3_research_handoff`, and
 `web3_live_usability` summaries for monitors. The runbook health summary carries the
-primary safe action, current safe input contract, action counts, source endpoint, verifier
-command, and blocked live-execution/signing/wallet/secret permissions. The research health
-summary names the exact source/account/scenario packet being summarized and separately
+primary safe action, current safe input contract, action counts, source endpoint,
+live-review source endpoint, verifier command, and blocked live-execution/signing/wallet/secret permissions.
+The research health summary names the exact source/account/scenario packet being summarized and separately
 points at the live-dex persistent export packet for helper research. The live-usability
 summary carries the same receipt hash, missing-input counts, total-versus-listed live-usability row counts,
 live-lane counts, next ordered unlock step, next action, current

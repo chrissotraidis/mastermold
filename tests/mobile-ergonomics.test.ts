@@ -1628,6 +1628,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_research_handoff");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_operator_runbook?.mode === \"web3-operator-runbook-health\"");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_operator_runbook.live_review_source_endpoint");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_profit_proof.threshold_matrix");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("Proof thresholds");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_live_usability?.mode === \"web3-live-usability-health\"");
@@ -1639,6 +1640,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("Live-usability health should keep signing blocked");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_research_handoff");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_operator_runbook?.mode === \"web3-operator-runbook-health\"");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_operator_runbook.live_review_source_endpoint");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("live_review_source_endpoint");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_live_usability?.mode === \"web3-live-usability-health\"");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("current_input?.live_execution_permission === \"blocked\"");
@@ -1652,9 +1654,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/trading/page.tsx")).toContain("currentInput: operatorRequestPacket.current_input");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input)");
     expect(source("src/db/web3-operator-runbook.ts")).toContain("mode: \"web3-operator-runbook-health\"");
+    expect(source("src/db/web3-operator-runbook.ts")).toContain("live_review_source_endpoint");
     expect(source("README.md")).toContain("web3_operator_runbook");
+    expect(source("README.md")).toContain("live-review source endpoint");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_operator_runbook");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("live_review_source_endpoint");
     expect(source("components/review-readiness.tsx")).toContain("web3_operator_runbook summary");
+    expect(source("components/review-readiness.tsx")).toContain("live-review runbook endpoint");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");

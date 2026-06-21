@@ -88,6 +88,7 @@ export type Web3OperatorRunbookHealth = {
   next_live_lane_action: string;
   safe_command: string | null;
   source_endpoint: string;
+  live_review_source_endpoint: string;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
   transaction_submission_permission: "blocked";
@@ -201,6 +202,7 @@ export function buildWeb3OperatorRunbookHealth(receipt: Web3OperatorRunbookRecei
     next_live_lane_action: receipt.next_live_lane_action,
     safe_command: primary?.command ?? receipt.verifier_commands[0] ?? null,
     source_endpoint: `/api/web3-operator-runbook?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`,
+    live_review_source_endpoint: "/api/web3-operator-runbook?source=live-dex&account=persistent&scenario=breakout&cycles=0",
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     transaction_submission_permission: "blocked",

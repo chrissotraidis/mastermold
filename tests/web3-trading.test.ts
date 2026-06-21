@@ -1485,6 +1485,7 @@ describe("Web3 autonomous trading subsystem", () => {
         blocked_count: number;
         real_capital_blocker_count: number;
         source_endpoint: string;
+        live_review_source_endpoint: string;
         live_execution_permission: string;
         wallet_mutation_permission: string;
         transaction_submission_permission: string;
@@ -1553,6 +1554,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_operator_runbook.source_endpoint).toContain(`source=${receipt.web3_operator_runbook.source}`);
     expect(receipt.web3_operator_runbook.source_endpoint).toContain(`account=${receipt.web3_operator_runbook.account}`);
     expect(receipt.web3_operator_runbook.source_endpoint).toContain(`scenario=${receipt.web3_operator_runbook.scenario}`);
+    expect(receipt.web3_operator_runbook.live_review_source_endpoint).toBe("/api/web3-operator-runbook?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(receipt.web3_operator_runbook.allowed_now_count).toBeGreaterThanOrEqual(0);
     expect(receipt.web3_operator_runbook.allowed_now_count + receipt.web3_operator_runbook.gated_count + receipt.web3_operator_runbook.blocked_count).toBeGreaterThanOrEqual(1);
     expect(receipt.web3_operator_runbook.primary_safe_action_status === null || ["allowed", "gated", "blocked"].includes(receipt.web3_operator_runbook.primary_safe_action_status)).toBe(true);
