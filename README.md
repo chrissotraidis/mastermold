@@ -98,6 +98,7 @@ npm run verify:web3 -- --base-url=http://localhost:4010
 npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet
 npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
 npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live
+npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary
 ```
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
@@ -157,6 +158,10 @@ submission, wallet mutation, private-key storage, and secret echo remain blocked
 discovery is temporarily throttled, the strict gate can fall back to auto-resolved
 GeckoTerminal OHLCV proof or a recent recorded live-dex candle proof for a Solana pool while
 preserving the same live locks.
+Add `--require-live-canary` only after the tiny funded canary has been signed externally,
+relayed, confirmed or finalized on-chain, reconciled for settlement, and accounted in the
+local portfolio mirror. This strict gate fails closed while `actual_live_trade_tested` is
+false, while the signature is only relayed, or while settlement/mirror proof is incomplete.
 `/api/web3-dex-discovery?source=live-dex` is the compact read-only scanner receipt for
 current public DEX Screener discovery evidence: profiles, boosts, ads, paid orders, pair
 mapping, top symbols, and scanner intake status. It is paper-only evidence and still blocks

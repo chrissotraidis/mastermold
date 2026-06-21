@@ -201,7 +201,7 @@ export function buildWeb3ResearchHandoffPacket(input: {
     ...input.requestPacket.verifier_commands,
     ...input.runbook.verifier_commands,
     ...input.runway.safe_commands,
-    "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live",
+    "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
   ])).slice(0, 10);
   const packetBase = {
     mode: "web3-research-handoff-packet" as const,
@@ -494,7 +494,7 @@ function buildCredentialRequirements(
       target_names: ["MASTERMOLD_LIVE_OPERATOR_APPROVAL"],
       research_question_ids: linkedQuestions("first-live-mode", "compliance-boundaries", "profit-proof", "go-live-checklist"),
       completion_signal: "Manual live-review packet reports all required signoffs passing; in-app autonomous live authority remains blocked until a separate executor exists.",
-      next_action: "Request external review only after the strict wallet, Jupiter, live DEX, signer, ops, accounting, and proof gates pass.",
+      next_action: "Request external review only after the strict wallet, Jupiter, live DEX, funded canary, signer, ops, accounting, and proof gates pass.",
       blocks_live_capital: true,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",

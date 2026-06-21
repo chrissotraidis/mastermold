@@ -112,7 +112,7 @@ export function buildWeb3ManualLiveReviewPacket(input: {
     ],
     safe_commands: [
       "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live",
-      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live",
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
       "npm run landing-drill:web3",
       "npm run doctor:web3 -- --json",
     ],

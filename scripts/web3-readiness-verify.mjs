@@ -13,6 +13,7 @@ const walletPublicKey = config.wallet || process.env.WEB3_VERIFY_WALLET_PUBLIC_K
 const requireJupiterOrder = config.requireJupiterOrder || process.env.WEB3_VERIFY_REQUIRE_JUPITER_ORDER === "1";
 const requireOperatorWallet = config.requireOperatorWallet || process.env.WEB3_VERIFY_REQUIRE_OPERATOR_WALLET === "1";
 const requireDexLive = config.requireDexLive || process.env.WEB3_VERIFY_REQUIRE_DEX_LIVE === "1";
+const requireLiveCanary = config.requireLiveCanary || process.env.WEB3_VERIFY_REQUIRE_LIVE_CANARY === "1";
 const strictJupiterKey = process.env.WEB3_VERIFY_JUPITER_API_KEY || process.env.JUPITER_API_KEY || "";
 const secretValues = [
   { label: "jupiter canary", value: CANARY_JUPITER_KEY },
@@ -34,6 +35,7 @@ function parseArgs(args) {
     if (arg === "--require-jupiter-order") parsed.requireJupiterOrder = true;
     if (arg === "--require-operator-wallet") parsed.requireOperatorWallet = true;
     if (arg === "--require-dex-live") parsed.requireDexLive = true;
+    if (arg === "--require-live-canary") parsed.requireLiveCanary = true;
     if (arg === "--json") parsed.json = true;
   }
   return parsed;
@@ -1394,6 +1396,35 @@ async function verifyLiveTradeCanary() {
   record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}; preflight, signed payload, and unsigned handoff actions blocked safely`);
 }
 
+async function verifyStrictLiveCanaryProof() {
+  if (!requireLiveCanary) {
+    record("live-canary-strict", "skipped", "run with --require-live-canary after the tiny funded canary confirms, reconciles, and mirrors");
+    return;
+  }
+
+  const { response, json } = await requestJson("/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Strict live canary proof should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-live-trade-canary", "Strict live canary proof should read the canary receipt.", json);
+  assert(json.status === "live-relay-evidence-recorded", "Strict live canary proof requires recorded live relay evidence.", json);
+  assert(json.actual_live_trade_tested === true, "Strict live canary proof requires a confirmed funded live canary.", json);
+  assert(json.real_funds_moved_by_this_app === true, "Strict live canary proof requires real-money movement evidence.", json);
+  assert(typeof json.latest_signature_preview === "string" && json.latest_signature_preview.length > 0, "Strict live canary proof requires a transaction signature preview.", json);
+  assert(["confirmed", "finalized"].includes(json.latest_confirmation_status), "Strict live canary proof requires confirmed or finalized chain status.", json);
+  assert(json.post_signing_evidence_status === "settlement-accounted", "Strict live canary proof requires settlement and local mirror accounting.", json);
+  assert(Array.isArray(json.post_signing_evidence) && json.post_signing_evidence.length === 4, "Strict live canary proof requires the full four-stage proof chain.", json);
+  assert(json.post_signing_evidence.every((item) => item.status === "pass"), "Strict live canary proof requires signed relay, confirmation, settlement, and portfolio mirror to pass.", json.post_signing_evidence);
+  assert(["confirmed", "not-run"].includes(json.confirmation_poll_status) || json.latest_confirmation_status === "finalized", "Strict live canary proof requires confirmation poll evidence or finalized status.", json);
+  assert(["reconciled", "not-run"].includes(json.settlement_reconciliation_status) || ["reconciled", "mirrored", "duplicate"].includes(json.settlement_watchdog_status), "Strict live canary proof requires settlement reconciliation evidence.", json);
+  assert(["applied", "duplicate", "not-run"].includes(json.portfolio_mirror_status) || ["mirrored", "duplicate"].includes(json.settlement_watchdog_status), "Strict live canary proof requires local portfolio mirror evidence.", json);
+  assert(json.live_execution_permission === "external-signed-payload-only", "Strict live canary proof should still limit live permission to the external signed-payload path.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Strict live canary proof must keep wallet mutation blocked.", json);
+  assert(json.private_key_storage === "blocked", "Strict live canary proof must keep private-key storage blocked.", json);
+  assert(json.seed_phrase_storage === "blocked", "Strict live canary proof must keep seed-phrase storage blocked.", json);
+  assert(json.secret_echo_permission === "blocked", "Strict live canary proof must keep secret echo blocked.", json);
+  assertNoLeak("strict live canary proof", json);
+  record("live-canary-strict", "pass", "confirmed funded canary, settlement reconciliation, and local portfolio mirror proof are accounted");
+}
+
 async function verifyLiveIgnition() {
   const endpoint = "/api/web3-live-ignition?source=live-dex&account=persistent&scenario=breakout&cycles=0";
   const { response, json } = await requestJson(endpoint);
@@ -1764,6 +1795,7 @@ async function main() {
   await verifyLiveActivationPlanPacket();
   await verifyLiveActivationIntake();
   await verifyLiveTradeCanary();
+  await verifyStrictLiveCanaryProof();
   await verifyLiveIgnition();
   await verifySupervisedCanaryReadiness();
   await verifyResearchAnswerIntake();
@@ -1781,6 +1813,7 @@ async function main() {
     strict_operator_wallet_required: requireOperatorWallet,
     strict_jupiter_order_required: requireJupiterOrder,
     strict_dex_live_required: requireDexLive,
+    strict_live_canary_required: requireLiveCanary,
     checked_at: new Date().toISOString(),
     result: "pass",
     checks: results,

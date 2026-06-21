@@ -160,7 +160,7 @@ export function buildWeb3LiveIgnitionReceipt(input: {
     blocker_count: dedupedBlockers.length,
     blockers: dedupedBlockers,
     checks,
-    verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live",
+    verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
     canary_endpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
     unsigned_handoff_endpoint: "/api/web3-live-unsigned-order-handoff?source=live-dex&account=persistent&scenario=breakout&cycles=0",
     live_usability_endpoint: "/api/web3-live-usability-blockers?source=live-dex&account=persistent&scenario=breakout&cycles=0&rows=all",

@@ -235,7 +235,7 @@ function buildActivationMilestones(input: {
       storage_rule: "status-only",
       target_names: ["web3_live_autonomy_readiness"],
       completion_signal: "Daemon, market, route, fees, policy, signer, relay, and kill-switch items pass with external live-executor approval.",
-      verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live",
+      verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
       next_action: input.liveAutonomy.next_action,
       blocks_live_capital: true,
     },
@@ -289,7 +289,7 @@ function buildActivationCommands(input: {
     ...input.liveUsability.verifier_commands,
     "npm run --silent activate:web3 -- --base-url=http://localhost:4010",
     "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
-    "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live",
+    "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
     "npm run preflight-live:web3 -- --base-url=http://localhost:4010 --source=live-dex --account=persistent --scenario=breakout --json",
   ].filter((command): command is string => typeof command === "string" && command.length > 0)));
 }

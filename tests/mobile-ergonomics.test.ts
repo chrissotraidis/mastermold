@@ -1646,6 +1646,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run supervise:web3 -- --base-url=http://localhost:4010 --rounds=1 --ticks-per-round=1 --target-net-pnl=1 --max-drawdown=250 --json");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("--target-net-pnl=1 --max-drawdown=250 --json");
     expect(source("docs/web3-credentials-runbook.md")).toContain("strict verifier runway");
@@ -1965,6 +1966,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyDexDiscoveryReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyStrictDexLiveReadiness");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-dex-live");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyStrictLiveCanaryProof");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("strict_live_canary_required");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-live-canary");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run verify:web3 gate");
     expect(source("components/review-readiness.tsx")).toContain("snapshots and restores the saved public wallet/risk scope");
     expect(source("components/review-readiness.tsx")).toContain("full credential checklist");
@@ -2080,6 +2084,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-operator-wallet gate");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-jupiter-order gate");
     expect(source("components/review-readiness.tsx")).toContain("opt-in --require-dex-live gate");
+    expect(source("components/review-readiness.tsx")).toContain("opt-in --require-live-canary gate");
     expect(source("components/review-readiness.tsx")).toContain("fresh recorded live-dex candle proof");
     expect(source("components/review-readiness.tsx")).toContain("production-worker target setup");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-credential-handoff");

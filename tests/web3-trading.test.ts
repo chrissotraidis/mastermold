@@ -1340,7 +1340,7 @@ describe("Web3 autonomous trading subsystem", () => {
       "npm run --silent requirements:web3 -- --base-url=http://localhost:4010 --json",
     ]));
     expect(packet.verifier_commands).toEqual(expect.arrayContaining([
-      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live",
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
     ]));
     expect(packet.text_packet).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(packet.text_packet).toContain("## Local Export Commands");
@@ -2285,6 +2285,7 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(receipt.verifier_command).toContain("verify:web3");
     expect(receipt.verifier_command).toContain("--require-operator-wallet");
+    expect(receipt.verifier_command).toContain("--require-live-canary");
     expect(receipt.canary_endpoint).toContain("/api/web3-live-trade-canary");
     expect(receipt.unsigned_handoff_endpoint).toContain("/api/web3-live-unsigned-order-handoff");
     expect(receipt.live_usability_endpoint).toContain("rows=all");
@@ -2546,6 +2547,7 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(receipt.activation_commands.some((command) => command.includes("activate:web3"))).toBe(true);
     expect(receipt.activation_commands.some((command) => command.includes("--require-jupiter-order"))).toBe(true);
+    expect(receipt.activation_commands.some((command) => command.includes("--require-live-canary"))).toBe(true);
     expect(receipt.text_packet).toContain("# Mastermind Web3 Live Activation Plan");
     expect(receipt.text_packet).toContain("## Next Milestone");
     expect(receipt.text_packet).toContain("## Never Provide");
