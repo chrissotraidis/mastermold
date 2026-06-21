@@ -1265,7 +1265,41 @@ async function verifyLiveTradeCanary() {
   assert(json.seed_phrase_storage === "blocked", "Live trade canary must block seed-phrase storage.", json);
   assert(json.secret_echo_permission === "blocked", "Live trade canary must block secret echo.", json);
   assertNoLeak("live trade canary", json);
-  record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}`);
+
+  const signedPayload = Buffer.from("signed-payload-canary-never-echo").toString("base64");
+  const action = await postJson("/api/web3-live-trade-canary?source=sample&account=persistent&scenario=breakout&cycles=0", {
+    operator_ack: true,
+    canary_ack: "I_UNDERSTAND_THIS_CAN_MOVE_REAL_FUNDS",
+    signed_transaction: signedPayload,
+    request_id: "order-123",
+    route: "jupiter-swap-v2",
+  });
+  assert(action.response.status === 200, "Live trade canary action should return a blocked receipt for sample source.", { status: action.response.status, json: action.json });
+  assert(action.json.mode === "web3-live-trade-canary-action", "Live trade canary action should expose the expected mode.", action.json);
+  assert(action.json.status === "blocked", "Live trade canary action should block sample-source relay.", action.json);
+  assert(action.json.relay_attempted === false, "Live trade canary action should not relay from sample source.", action.json);
+  assert(action.json.signed_payload_received === true, "Live trade canary action should acknowledge signed payload receipt.", action.json);
+  assert(action.json.signed_payload_echoed === false, "Live trade canary action must not echo signed payloads.", action.json);
+  assertReceiptHash("Live trade canary action payload hash", action.json.signed_payload_hash);
+  assert(action.text.includes(signedPayload) === false, "Live trade canary action must not echo signed payload text.", action.text);
+  assert(action.json.blockers.some((blocker) => blocker.includes("source=live-dex")), "Live trade canary action should require live-dex source.", action.json.blockers);
+  assert(action.json.transaction_submission_permission === "blocked", "Live trade canary action must keep transaction submission blocked while blocked.", action.json);
+  assert(action.json.private_key_storage === "blocked", "Live trade canary action must block private-key storage.", action.json);
+  assert(action.json.secret_echo_permission === "blocked", "Live trade canary action must block secret echo.", action.json);
+
+  const unsafe = await postJson("/api/web3-live-trade-canary?source=sample&account=persistent&scenario=breakout&cycles=0", {
+    operator_ack: true,
+    canary_ack: "I_UNDERSTAND_THIS_CAN_MOVE_REAL_FUNDS",
+    signed_transaction: signedPayload,
+    request_id: "order-123",
+    route: "jupiter-swap-v2",
+    private_key: CANARY_SECRET,
+  });
+  assert(unsafe.response.status === 422, "Live trade canary action should reject unsafe fields.", { status: unsafe.response.status, json: unsafe.json });
+  assert(unsafe.json.status === "unsafe-rejected", "Live trade canary unsafe action should expose unsafe rejection.", unsafe.json);
+  assert(Array.isArray(unsafe.json.unsafe_fields) && unsafe.json.unsafe_fields.includes("private_key"), "Live trade canary unsafe action should name unsafe field paths only.", unsafe.json);
+  assertNoLeak("live trade canary unsafe action", unsafe.json);
+  record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}; signed payload action blocked safely`);
 }
 
 async function verifyResearchAnswerIntake() {

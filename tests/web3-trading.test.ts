@@ -31,7 +31,7 @@ import { GET as CREDENTIAL_DOCTOR_GET, POST as CREDENTIAL_DOCTOR_POST } from "@/
 import { GET as CREDENTIAL_REQUIREMENTS_GET } from "@/app/api/web3-credential-requirements/route";
 import { GET as LIVE_ACTIVATION_INTAKE_GET, POST as LIVE_ACTIVATION_INTAKE_POST } from "@/app/api/web3-live-activation-intake/route";
 import { GET as LIVE_ACTIVATION_PLAN_GET } from "@/app/api/web3-live-activation-plan/route";
-import { GET as LIVE_TRADE_CANARY_GET } from "@/app/api/web3-live-trade-canary/route";
+import { GET as LIVE_TRADE_CANARY_GET, POST as LIVE_TRADE_CANARY_POST } from "@/app/api/web3-live-trade-canary/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -2395,6 +2395,66 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.seed_phrase_storage).toBe("blocked");
     expect(receipt.secret_echo_permission).toBe("blocked");
     expect(receipt.controls.join(" ")).toContain("Paper and read-only DEX tests do not count as actual live trades");
+
+    const signedPayload = Buffer.from("signed-payload-canary-never-echo").toString("base64");
+    const actionResponse = await LIVE_TRADE_CANARY_POST(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=sample&account=persistent&cycles=0", {
+      method: "POST",
+      body: JSON.stringify({
+        operator_ack: true,
+        canary_ack: "I_UNDERSTAND_THIS_CAN_MOVE_REAL_FUNDS",
+        signed_transaction: signedPayload,
+        request_id: "order-123",
+        route: "jupiter-swap-v2",
+      }),
+    }));
+    const actionText = await actionResponse.text();
+    expect(actionResponse.status).toBe(200);
+    expect(actionText).not.toContain(signedPayload);
+    expect(actionText).not.toContain("signed-payload-canary-never-echo");
+    const actionReceipt = JSON.parse(actionText) as {
+      mode: string;
+      status: string;
+      relay_attempted: boolean;
+      signed_payload_received: boolean;
+      signed_payload_echoed: boolean;
+      signed_payload_hash: string | null;
+      signed_payload_byte_count: number;
+      blockers: string[];
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      secret_echo_permission: string;
+    };
+    expect(actionReceipt.mode).toBe("web3-live-trade-canary-action");
+    expect(actionReceipt.status).toBe("blocked");
+    expect(actionReceipt.relay_attempted).toBe(false);
+    expect(actionReceipt.signed_payload_received).toBe(true);
+    expect(actionReceipt.signed_payload_echoed).toBe(false);
+    expect(actionReceipt.signed_payload_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(actionReceipt.signed_payload_byte_count).toBeGreaterThan(0);
+    expect(actionReceipt.blockers.join(" ")).toContain("source=live-dex");
+    expect(actionReceipt.transaction_submission_permission).toBe("blocked");
+    expect(actionReceipt.private_key_storage).toBe("blocked");
+    expect(actionReceipt.secret_echo_permission).toBe("blocked");
+
+    const unsafeCanary = "codex-canary-private-key-never-echo";
+    const unsafeActionResponse = await LIVE_TRADE_CANARY_POST(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=sample&account=persistent&cycles=0", {
+      method: "POST",
+      body: JSON.stringify({
+        operator_ack: true,
+        canary_ack: "I_UNDERSTAND_THIS_CAN_MOVE_REAL_FUNDS",
+        signed_transaction: signedPayload,
+        request_id: "order-123",
+        route: "jupiter-swap-v2",
+        private_key: unsafeCanary,
+      }),
+    }));
+    const unsafeActionText = await unsafeActionResponse.text();
+    expect(unsafeActionResponse.status).toBe(422);
+    expect(unsafeActionText).not.toContain(unsafeCanary);
+    expect(unsafeActionText).not.toContain(signedPayload);
+    const unsafeAction = JSON.parse(unsafeActionText) as { status: string; unsafe_fields: string[] };
+    expect(unsafeAction.status).toBe("unsafe-rejected");
+    expect(unsafeAction.unsafe_fields).toContain("private_key");
 
     const invalid = await LIVE_TRADE_CANARY_GET(new Request("http://localhost/api/web3-live-trade-canary?account=hot-wallet"));
     const invalidReceipt = await json<{ error: string }>(invalid);

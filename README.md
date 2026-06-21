@@ -230,6 +230,11 @@ live trade has actually been tested through Mastermind, whether any real funds m
 app, whether the signed relay can accept an external signed payload, and why browser-wallet live
 signing is not currently possible from the UI because unsigned transaction bytes are withheld.
 Paper loops, read-only DEX checks, and Jupiter rehearsals do not count as actual live trades.
+`POST /api/web3-live-trade-canary` is the guarded action wrapper for the existing external
+signed-payload relay: it requires operator acknowledgement, canary acknowledgement, live-dex
+persistent scope, request id, route, and a base64 signed transaction, hashes but never echoes the
+payload, rejects private keys/API keys/seed phrases/raw transaction fields, and remains blocked
+unless the runtime live gates are armed.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and a compact

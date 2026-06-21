@@ -1696,7 +1696,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-live-activation-plan/route.ts")).toContain("buildWeb3LiveActivationPlan");
     expect(source("app/api/web3-live-activation-intake/route.ts")).toContain("buildWeb3LiveActivationIntakeReceipt");
     expect(source("app/api/web3-live-trade-canary/route.ts")).toContain("buildWeb3LiveTradeCanaryReceipt");
+    expect(source("app/api/web3-live-trade-canary/route.ts")).toContain("buildWeb3LiveTradeCanaryActionReceipt");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("actual_live_trade_tested");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("web3-live-trade-canary-action");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("signed_payload_echoed");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("Paper and read-only DEX tests do not count as actual live trades");
     expect(source("src/db/web3-live-activation-intake.ts")).toContain("unsafeKeyPatterns");
     expect(source("src/db/web3-live-activation-intake.ts")).toContain("Provider API keys or bearer tokens");

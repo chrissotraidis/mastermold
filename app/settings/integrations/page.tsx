@@ -859,6 +859,16 @@ function SettingsWeb3LiveTradeCanaryPanel({ receipt }: { receipt: Web3LiveTradeC
         </p>
       </div>
 
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">External signed-payload action</p>
+        <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+          POST can attempt only a matching external signed payload after live-dex, persistent account, operator acknowledgement, canary acknowledgement, request id, and live env gates are ready.
+        </p>
+        <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+          {`POST ${canaryEndpoint} {"operator_ack":true,"canary_ack":"I_UNDERSTAND_THIS_CAN_MOVE_REAL_FUNDS","request_id":"<current-request-id>","route":"jupiter-swap-v2","signed_transaction":"<external-signed-base64>"}`}
+        </code>
+      </div>
+
       <div className="mt-3 flex flex-wrap gap-2">
         <Link
           href={canaryEndpoint}

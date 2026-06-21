@@ -36,6 +36,114 @@ export type Web3LiveTradeCanaryReceipt = {
   controls: string[];
 };
 
+export type Web3LiveTradeCanaryActionReceipt = {
+  mode: "web3-live-trade-canary-action";
+  status: "blocked" | "unsafe-rejected" | "relay-attempted" | "live-relay-evidence-recorded";
+  generated_at: string;
+  receipt_hash: string;
+  action: "external-signed-payload-canary";
+  operator_acknowledged: boolean;
+  canary_acknowledged: boolean;
+  relay_attempted: boolean;
+  actual_live_trade_tested: boolean;
+  real_funds_moved_by_this_app: boolean;
+  request_id: string | null;
+  route: "jupiter-swap-v2" | "solana-rpc" | null;
+  signed_payload_received: boolean;
+  signed_payload_echoed: false;
+  signed_payload_hash: string | null;
+  signed_payload_byte_count: number;
+  unsafe_field_count: number;
+  unsafe_fields: string[];
+  before_canary_status: Web3LiveTradeCanaryReceipt["status"];
+  after_canary_status: Web3LiveTradeCanaryReceipt["status"];
+  after_signature_preview: string | null;
+  blockers: string[];
+  next_action: string;
+  transaction_submission_permission: "blocked" | "external-signed-payload-only";
+  live_execution_permission: "blocked" | "external-signed-payload-only";
+  wallet_mutation_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+  controls: string[];
+};
+
+export function buildWeb3LiveTradeCanaryActionReceipt(input: {
+  before: Web3LiveTradeCanaryReceipt;
+  after?: Web3LiveTradeCanaryReceipt;
+  operatorAcknowledged: boolean;
+  canaryAcknowledged: boolean;
+  relayAttempted: boolean;
+  requestId: string | null;
+  route: "jupiter-swap-v2" | "solana-rpc" | null;
+  signedPayloadHash: string | null;
+  signedPayloadByteCount: number;
+  unsafeFields?: string[];
+  blockers?: string[];
+  now?: Date;
+}): Web3LiveTradeCanaryActionReceipt {
+  const after = input.after ?? input.before;
+  const unsafeFields = input.unsafeFields ?? [];
+  const blockers = [
+    ...unsafeFields.map((field) => `Unsafe field rejected: ${field}.`),
+    ...(input.blockers ?? []),
+    ...after.blockers,
+  ];
+  const dedupedBlockers = [...new Set(blockers)].slice(0, 12);
+  const actualLiveTradeTested = after.actual_live_trade_tested;
+  const status: Web3LiveTradeCanaryActionReceipt["status"] = unsafeFields.length > 0
+    ? "unsafe-rejected"
+    : actualLiveTradeTested
+      ? "live-relay-evidence-recorded"
+      : input.relayAttempted
+        ? "relay-attempted"
+        : "blocked";
+  const generatedAt = (input.now ?? new Date()).toISOString();
+  const receiptBase = {
+    mode: "web3-live-trade-canary-action" as const,
+    status,
+    generated_at: generatedAt,
+    action: "external-signed-payload-canary" as const,
+    operator_acknowledged: input.operatorAcknowledged,
+    canary_acknowledged: input.canaryAcknowledged,
+    relay_attempted: input.relayAttempted,
+    actual_live_trade_tested: actualLiveTradeTested,
+    real_funds_moved_by_this_app: after.real_funds_moved_by_this_app,
+    request_id: input.requestId,
+    route: input.route,
+    signed_payload_received: Boolean(input.signedPayloadHash),
+    signed_payload_echoed: false as const,
+    signed_payload_hash: input.signedPayloadHash,
+    signed_payload_byte_count: input.signedPayloadByteCount,
+    unsafe_field_count: unsafeFields.length,
+    unsafe_fields: unsafeFields,
+    before_canary_status: input.before.status,
+    after_canary_status: after.status,
+    after_signature_preview: after.latest_signature_preview,
+    blockers: dedupedBlockers,
+    next_action: liveTradeCanaryActionNextAction(status, dedupedBlockers),
+    transaction_submission_permission: input.relayAttempted || actualLiveTradeTested ? "external-signed-payload-only" as const : "blocked" as const,
+    live_execution_permission: input.relayAttempted || actualLiveTradeTested ? "external-signed-payload-only" as const : "blocked" as const,
+    wallet_mutation_permission: "blocked" as const,
+    private_key_storage: "blocked" as const,
+    seed_phrase_storage: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
+    controls: [
+      "This action receipt can attempt only the external-signed-payload relay path; it cannot create, sign, or store a transaction.",
+      "A signed payload must already match the current request id and live routing context.",
+      "Signed payload bytes are hashed for this receipt and never echoed in the response.",
+      "Private keys, seed phrases, keypair JSON, provider API keys, raw transactions, and browser wallet authority are rejected.",
+      "If live env flags, Jupiter/RPC credentials, wallet scope, caps, signer review, or request continuity are missing, the action remains blocked.",
+    ],
+  };
+
+  return {
+    ...receiptBase,
+    receipt_hash: hashJson(receiptBase),
+  };
+}
+
 export function buildWeb3LiveTradeCanaryReceipt(
   state: Web3TradingState,
   now = new Date(),
@@ -137,6 +245,17 @@ function liveTradeCanaryNextAction(status: Web3LiveTradeCanaryReceipt["status"],
     return "Run one operator-approved external signed-payload canary with tiny caps, then record confirmation and settlement evidence.";
   }
   return blockers[0] ?? "Clear live canary blockers before claiming a real live trade has been tested.";
+}
+
+function liveTradeCanaryActionNextAction(status: Web3LiveTradeCanaryActionReceipt["status"], blockers: string[]) {
+  if (status === "live-relay-evidence-recorded") {
+    return "Review confirmation, settlement, accounting, and position mirror evidence before allowing another canary.";
+  }
+  if (status === "relay-attempted") {
+    return "Relay was attempted but no confirmed live trade is proven yet; poll confirmation and reconcile settlement before continuing.";
+  }
+  if (status === "unsafe-rejected") return "Remove unsafe fields and submit only the signed-payload canary contract.";
+  return blockers[0] ?? "Submit operator acknowledgement, canary acknowledgement, request id, and external signed payload only after all live gates are ready.";
 }
 
 function previewSignature(signature: string | null) {
