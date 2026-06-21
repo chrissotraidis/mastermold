@@ -631,6 +631,71 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receiptText).not.toContain("restart-canary");
   });
 
+  test("GIVEN first-canary live flags WHEN the local installer runs THEN it accepts only exact values without granting wallet authority", async () => {
+    const envPath = join(mkdtempSync(join(tmpdir(), "mm-web3-canary-env-")), ".env.local");
+    process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH = envPath;
+
+    const rejected = await LOCAL_CREDENTIALS_POST(new Request("http://localhost/api/web3-local-credentials", {
+      method: "POST",
+      headers: { "content-type": "application/json", host: "localhost" },
+      body: JSON.stringify({
+        enable_live_web3_execution: "yes",
+        live_operator_approval: "I_ACCEPT",
+        allow_live_unsigned_canary_handoff: "1",
+      }),
+    }));
+    const rejectedReceipt = await json<{ status: string; rejected_fields: string[]; secret_echo_permission: string }>(rejected);
+    expect(rejected.status).toBe(422);
+    expect(rejectedReceipt.status).toBe("invalid");
+    expect(rejectedReceipt.rejected_fields).toEqual(expect.arrayContaining([
+      "enable_live_web3_execution",
+      "live_operator_approval",
+      "allow_live_unsigned_canary_handoff",
+    ]));
+    expect(rejectedReceipt.secret_echo_permission).toBe("blocked");
+
+    const response = await LOCAL_CREDENTIALS_POST(new Request("http://localhost/api/web3-local-credentials", {
+      method: "POST",
+      headers: { "content-type": "application/json", host: "localhost" },
+      body: JSON.stringify({
+        enable_live_web3_execution: "true",
+        live_operator_approval: "I_UNDERSTAND_REAL_FUNDS",
+        allow_live_unsigned_canary_handoff: "true",
+      }),
+    }));
+    const receipt = await json<{
+      status: string;
+      installed_keys: string[];
+      configured_keys: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      secret_echo_permission: string;
+      next_action: string;
+    }>(response);
+    const envText = readFileSync(envPath, "utf8");
+
+    expect(response.status).toBe(200);
+    expect(receipt.status).toBe("installed");
+    expect(receipt.installed_keys).toEqual(expect.arrayContaining([
+      "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+      "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+      "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+    ]));
+    expect(receipt.configured_keys).toEqual(expect.arrayContaining([
+      "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+      "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+      "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+    ]));
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.next_action).toContain("JUPITER_API_KEY");
+    expect(envText).toContain("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true");
+    expect(envText).toContain("MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS");
+    expect(envText).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true");
+    expect(JSON.stringify(receipt)).not.toContain("I_UNDERSTAND_REAL_FUNDS");
+  });
+
   test("GIVEN signer provider targets WHEN the local installer runs THEN it allowlists provider credentials but rejects wallet secrets", async () => {
     const envPath = join(mkdtempSync(join(tmpdir(), "mm-web3-signer-env-")), ".env.local");
     process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH = envPath;

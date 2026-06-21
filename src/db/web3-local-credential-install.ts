@@ -35,6 +35,9 @@ type CredentialInput = {
   rpc_url?: unknown;
   ws_url?: unknown;
   jupiter_api_key?: unknown;
+  enable_live_web3_execution?: unknown;
+  live_operator_approval?: unknown;
+  allow_live_unsigned_canary_handoff?: unknown;
   autonomous_signer_provider?: unknown;
   privy_app_id?: unknown;
   privy_app_secret?: unknown;
@@ -61,6 +64,9 @@ type CredentialTarget = {
     | "SOLANA_RPC_URL"
     | "SOLANA_WS_URL"
     | "JUPITER_API_KEY"
+    | "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION"
+    | "MASTERMOLD_LIVE_OPERATOR_APPROVAL"
+    | "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF"
     | "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER"
     | "PRIVY_APP_ID"
     | "PRIVY_APP_SECRET"
@@ -78,7 +84,7 @@ type CredentialTarget = {
     | "MASTERMOLD_WEB3_WORKER_OWNER"
     | "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL"
     | "MASTERMOLD_WEB3_RESTART_POLICY_URL";
-  kind: "key" | "http-url" | "ws-url" | "contact" | "path" | "signer-provider";
+  kind: "key" | "http-url" | "ws-url" | "contact" | "path" | "signer-provider" | "true-flag" | "live-operator-approval";
 };
 
 const CREDENTIAL_TARGETS: CredentialTarget[] = [
@@ -86,6 +92,9 @@ const CREDENTIAL_TARGETS: CredentialTarget[] = [
   { field: "rpc_url", env: "SOLANA_RPC_URL", kind: "http-url" },
   { field: "ws_url", env: "SOLANA_WS_URL", kind: "ws-url" },
   { field: "jupiter_api_key", env: "JUPITER_API_KEY", kind: "key" },
+  { field: "enable_live_web3_execution", env: "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION", kind: "true-flag" },
+  { field: "live_operator_approval", env: "MASTERMOLD_LIVE_OPERATOR_APPROVAL", kind: "live-operator-approval" },
+  { field: "allow_live_unsigned_canary_handoff", env: "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF", kind: "true-flag" },
   { field: "autonomous_signer_provider", env: "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER", kind: "signer-provider" },
   { field: "privy_app_id", env: "PRIVY_APP_ID", kind: "key" },
   { field: "privy_app_secret", env: "PRIVY_APP_SECRET", kind: "key" },
@@ -260,6 +269,8 @@ function isValidCredentialValue(value: string, kind: CredentialTarget["kind"]) {
   if (kind === "contact") return /^[^<>{}\[\]\r\n\0]{3,}$/.test(value);
   if (kind === "path") return /^[~/A-Za-z0-9._:\-\/ ]{3,}$/.test(value);
   if (kind === "signer-provider") return /^(external-wallet|privy|turnkey|session-key)$/i.test(value);
+  if (kind === "true-flag") return value === "true";
+  if (kind === "live-operator-approval") return value === "I_UNDERSTAND_REAL_FUNDS";
   return /^[A-Za-z0-9._:\-/+=@]{8,}$/.test(value);
 }
 
@@ -291,6 +302,13 @@ function writeIgnoredLocalEnv(updates: Map<CredentialTarget["env"], string>) {
 
 function nextInstallAction(missing: string[], installed: string[]) {
   if (missing.includes("JUPITER_API_KEY")) return "Add JUPITER_API_KEY, then run Jupiter rehearsal and strict order verification.";
+  if ([
+    "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+    "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+    "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+  ].some((key) => missing.includes(key))) {
+    return "Arm the exact first-canary live flags only after wallet, ownership, and Jupiter order proof are reviewed.";
+  }
   if (missing.includes("HELIUS_API_KEY") && missing.includes("SOLANA_RPC_URL")) return "Add HELIUS_API_KEY or SOLANA_RPC_URL, then test provider health.";
   const signerProvider = (process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER ?? "").trim().toLowerCase();
   if (!signerProvider && missing.includes("MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER")) {

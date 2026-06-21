@@ -1473,6 +1473,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Public wallet scope");
     expect(settingsConsole).toContain("Live DEX proof");
     expect(settingsConsole).toContain("Jupiter order proof");
+    expect(settingsConsole).toContain("Enable live Web3 flag");
+    expect(settingsConsole).toContain("Live operator approval");
+    expect(settingsConsole).toContain("Unsigned canary handoff");
+    expect(settingsConsole).toContain("Canary flags");
+    expect(settingsConsole).toContain("exact first-canary flags");
     expect(settingsConsole).toContain("Live preflight");
     expect(settingsConsole).toContain("Checklist actions use the controls below.");
     expect(settingsConsole).toContain("buildConsoleActionChecklist");
@@ -1502,6 +1507,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("tax_ledger_export_path");
     expect(settingsConsole).toContain("production_process_manager");
     expect(settingsConsole).toContain("production_alert_webhook_url");
+    expect(settingsConsole).toContain("enable_live_web3_execution");
+    expect(settingsConsole).toContain("live_operator_approval");
+    expect(settingsConsole).toContain("allow_live_unsigned_canary_handoff");
     expect(source("app/api/web3-local-credentials/route.ts")).toContain("installWeb3LocalCredentials");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("web3-local-credential-install");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_ALLOW_LOCAL_CREDENTIAL_INSTALL");
@@ -1511,6 +1519,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-local-credential-install.ts")).toContain("ALLOWED_SENSITIVE_FIELDS");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_TAX_LEDGER_EXPORT_PATH");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_LIVE_OPERATOR_APPROVAL");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("live-operator-approval");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("private-key, seed-phrase");
     expect(settingsConsole).toContain("DEX scanner evidence");

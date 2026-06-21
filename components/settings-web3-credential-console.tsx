@@ -39,6 +39,9 @@ type Draft = {
   rpc_url: string;
   ws_url: string;
   jupiter_api_key: string;
+  enable_live_web3_execution: string;
+  live_operator_approval: string;
+  allow_live_unsigned_canary_handoff: string;
   autonomous_signer_provider: "external-wallet" | "privy" | "turnkey" | "session-key";
   privy_app_id: string;
   privy_app_secret: string;
@@ -124,6 +127,9 @@ export function SettingsWeb3CredentialConsole({
     rpc_url: "",
     ws_url: "",
     jupiter_api_key: "",
+    enable_live_web3_execution: "",
+    live_operator_approval: "",
+    allow_live_unsigned_canary_handoff: "",
     autonomous_signer_provider: "external-wallet",
     privy_app_id: "",
     privy_app_secret: "",
@@ -208,6 +214,9 @@ export function SettingsWeb3CredentialConsole({
       draft.rpc_url,
       draft.ws_url,
       draft.jupiter_api_key,
+      draft.enable_live_web3_execution,
+      draft.live_operator_approval,
+      draft.allow_live_unsigned_canary_handoff,
       draft.autonomous_signer_provider,
       draft.privy_app_id,
       draft.privy_app_secret,
@@ -226,7 +235,7 @@ export function SettingsWeb3CredentialConsole({
       draft.production_alert_webhook_url,
       draft.production_restart_policy_url,
     ].some((value) => value.trim().length > 0)) {
-      setMessage("Enter a provider, emergency-stop, production-worker, or accounting value before installing local env targets.");
+      setMessage("Enter a provider, first-canary flag, emergency-stop, production-worker, or accounting value before installing local env targets.");
       return;
     }
     setBusy("install");
@@ -240,6 +249,9 @@ export function SettingsWeb3CredentialConsole({
           rpc_url: draft.rpc_url,
           ws_url: draft.ws_url,
           jupiter_api_key: draft.jupiter_api_key,
+          enable_live_web3_execution: draft.enable_live_web3_execution,
+          live_operator_approval: draft.live_operator_approval,
+          allow_live_unsigned_canary_handoff: draft.allow_live_unsigned_canary_handoff,
           autonomous_signer_provider: draft.autonomous_signer_provider,
           privy_app_id: draft.privy_app_id,
           privy_app_secret: draft.privy_app_secret,
@@ -270,6 +282,9 @@ export function SettingsWeb3CredentialConsole({
         rpc_url: "",
         ws_url: "",
         jupiter_api_key: "",
+        enable_live_web3_execution: "",
+        live_operator_approval: "",
+        allow_live_unsigned_canary_handoff: "",
         privy_app_id: "",
         privy_app_secret: "",
         privy_solana_wallet_id: "",
@@ -724,6 +739,11 @@ export function SettingsWeb3CredentialConsole({
         : "Use Detect wallet, Connect wallet, or paste a public address into Wallet public address.";
   const localJupiterConfigured = localInstallReceipt?.configured_keys.includes("JUPITER_API_KEY") === true;
   const jupiterKeyReady = jupiterConfigured || localJupiterConfigured || draft.jupiter_api_key.trim().length > 0;
+  const liveCanaryFlagCount = [
+    "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+    "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+    "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+  ].filter((key) => localInstallReceipt?.configured_keys.includes(key) === true).length;
   const signerTargetCount = [
     "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
     "PRIVY_APP_ID",
@@ -767,6 +787,9 @@ export function SettingsWeb3CredentialConsole({
       draft.rpc_url,
       draft.ws_url,
       draft.jupiter_api_key,
+      draft.enable_live_web3_execution,
+      draft.live_operator_approval,
+      draft.allow_live_unsigned_canary_handoff,
     ].some((value) => value.trim().length > 0),
     providerTested: Boolean(credentialResult),
     localInstallReceipt,
@@ -1101,6 +1124,39 @@ export function SettingsWeb3CredentialConsole({
           placeholder="Leave blank to use server env"
           onChange={(value) => updateDraft("jupiter_api_key", value)}
         />
+        <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
+          Enable live Web3 flag
+          <select
+            value={draft.enable_live_web3_execution}
+            onChange={(event) => updateDraft("enable_live_web3_execution", event.target.value)}
+            className="h-10 w-full rounded-md border border-outline-variant/45 bg-void/40 px-3 text-sm normal-case tracking-normal text-on-surface outline-none transition focus:border-engine/60"
+          >
+            <option value="">Not armed</option>
+            <option value="true">true</option>
+          </select>
+        </label>
+        <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
+          Live operator approval
+          <select
+            value={draft.live_operator_approval}
+            onChange={(event) => updateDraft("live_operator_approval", event.target.value)}
+            className="h-10 w-full rounded-md border border-outline-variant/45 bg-void/40 px-3 text-sm normal-case tracking-normal text-on-surface outline-none transition focus:border-engine/60"
+          >
+            <option value="">Not acknowledged</option>
+            <option value="I_UNDERSTAND_REAL_FUNDS">I_UNDERSTAND_REAL_FUNDS</option>
+          </select>
+        </label>
+        <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
+          Unsigned canary handoff
+          <select
+            value={draft.allow_live_unsigned_canary_handoff}
+            onChange={(event) => updateDraft("allow_live_unsigned_canary_handoff", event.target.value)}
+            className="h-10 w-full rounded-md border border-outline-variant/45 bg-void/40 px-3 text-sm normal-case tracking-normal text-on-surface outline-none transition focus:border-engine/60"
+          >
+            <option value="">Not allowed</option>
+            <option value="true">true</option>
+          </select>
+        </label>
         <ConsoleInput
           label="Emergency stop webhook"
           type="password"
@@ -1248,12 +1304,13 @@ export function SettingsWeb3CredentialConsole({
           </button>
         </div>
         <p className="mt-2 text-[11px] leading-4 text-outline">
-          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, signer-provider, emergency-stop, production-worker, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps live execution blocked.
+          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, exact first-canary flags, signer-provider, emergency-stop, production-worker, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps wallet mutation blocked.
         </p>
         {localInstallReceipt ? (
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-5" aria-label="Local Web3 credential install receipt">
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-6" aria-label="Local Web3 credential install receipt">
             <ConsoleMetric label="Install" value={localInstallReceipt.status} tone={localInstallReceipt.status === "installed" ? "engine" : localInstallReceipt.status === "invalid" || localInstallReceipt.status === "blocked" ? "critical" : "neutral"} />
             <ConsoleMetric label="Configured" value={String(localInstallReceipt.configured_keys.length)} tone={localInstallReceipt.configured_keys.length >= 4 ? "engine" : "caution"} />
+            <ConsoleMetric label="Canary flags" value={`${liveCanaryFlagCount}/3`} tone={liveCanaryFlagCount === 3 ? "engine" : liveCanaryFlagCount > 0 ? "caution" : "neutral"} />
             <ConsoleMetric label="Signer targets" value={`${signerTargetCount}/10`} tone={signerTargetCount > 0 ? "engine" : "neutral"} />
             <ConsoleMetric label="Worker targets" value={`${productionOpsTargetCount}/4`} tone={productionOpsTargetCount === 4 ? "engine" : productionOpsTargetCount > 0 ? "caution" : "neutral"} />
             <ConsoleMetric label="Missing" value={formatMissingTargets(localInstallReceipt.missing_keys)} tone={localInstallReceipt.missing_keys.length === 0 ? "engine" : "caution"} />
