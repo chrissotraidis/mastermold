@@ -1463,6 +1463,37 @@ async function verifyLiveIgnition() {
   record("live-ignition", "pass", `${json.status}; launch envelope ${action.json.status}; autonomous real-money trading: ${json.can_autonomously_trade_real_money_now}; actual live trade tested: ${json.actual_live_trade_tested}`);
 }
 
+async function verifySupervisedCanaryReadiness() {
+  const { response, json } = await requestJson("/api/web3-supervised-canary-readiness?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Supervised canary readiness should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-supervised-canary-readiness", "Supervised canary readiness should expose the expected mode.", json);
+  assert(["blocked", "unsigned-order-ready", "signed-relay-ready", "canary-tested"].includes(json.status), "Supervised canary readiness should expose a known status.", json);
+  assertReceiptHash("Supervised canary readiness", json.receipt_hash);
+  assert(json.can_request_unsigned_order_now === false, "Default supervised canary readiness should not say unsigned order is ready.", json);
+  assert(json.can_relay_signed_payload_now === false, "Default supervised canary readiness should not say signed relay is ready.", json);
+  assert(json.actual_live_trade_tested === false, "Default supervised canary readiness should not claim a funded canary.", json);
+  assert(json.real_funds_moved_by_this_app === false, "Default supervised canary readiness should not claim real funds moved.", json);
+  assert(json.first_unsigned_order_path === "blocked", "Default supervised canary readiness should block the first unsigned order path.", json);
+  assert(json.first_signed_payload_path === "blocked", "Default supervised canary readiness should block the first signed payload path.", json);
+  assert(Array.isArray(json.lanes) && json.lanes.map((lane) => lane.id).join(",") === "live-scope,dedicated-wallet,wallet-ownership,jupiter-order,live-flags,unsigned-order-preflight,signer-relay,manual-live-review,funded-canary-proof", "Supervised canary readiness should expose the ordered first-trade ladder.", json.lanes);
+  assert(json.lanes.every((lane) => ["pass", "watch", "fail"].includes(lane.status) && lane.detail && lane.next_action && lane.evidence_endpoint), "Supervised canary readiness lanes should be actionable.", json.lanes);
+  assert(json.lanes.some((lane) => lane.id === "funded-canary-proof" && lane.status === "fail" && lane.blocks_first_canary === false), "Supervised canary readiness should keep funded proof separate from pre-canary blockers.", json.lanes);
+  assert(Array.isArray(json.blockers) && json.blockers.length > 0, "Supervised canary readiness should name first-canary blockers.", json.blockers);
+  assert(String(json.ignition_endpoint ?? "").includes("/api/web3-live-ignition"), "Supervised canary readiness should link ignition evidence.", json);
+  assert(String(json.unsigned_handoff_endpoint ?? "").includes("/api/web3-live-unsigned-order-handoff"), "Supervised canary readiness should link unsigned handoff evidence.", json);
+  assert(String(json.canary_endpoint ?? "").includes("/api/web3-live-trade-canary"), "Supervised canary readiness should link canary evidence.", json);
+  assert(json.transaction_submission_permission === "blocked", "Supervised canary readiness must keep transaction submission blocked by default.", json);
+  assert(json.live_execution_permission === "blocked", "Supervised canary readiness must keep live execution blocked by default.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Supervised canary readiness must keep wallet mutation blocked.", json);
+  assert(json.private_key_storage === "blocked", "Supervised canary readiness must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "Supervised canary readiness must block seed-phrase storage.", json);
+  assert(json.signed_payload_storage === "blocked", "Supervised canary readiness must block signed-payload storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Supervised canary readiness must block secret echo.", json);
+  assert(String(json.controls?.join(" ") ?? "").includes("first funded canary readiness ladder"), "Supervised canary readiness should describe its proof ladder boundary.", json.controls);
+  assertNoLeak("supervised canary readiness", json);
+  record("supervised-canary-readiness", "pass", `${json.status}; unsigned order ready: ${json.can_request_unsigned_order_now}; signed relay ready: ${json.can_relay_signed_payload_now}; actual live trade tested: ${json.actual_live_trade_tested}`);
+}
+
 async function verifyResearchAnswerIntake() {
   const answer = [
     "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
@@ -1734,6 +1765,7 @@ async function main() {
   await verifyLiveActivationIntake();
   await verifyLiveTradeCanary();
   await verifyLiveIgnition();
+  await verifySupervisedCanaryReadiness();
   await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();

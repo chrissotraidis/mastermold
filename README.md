@@ -220,6 +220,10 @@ and the safety boundary into one status for the trading cockpit, `/api/health`, 
 `POST /api/web3-live-ignition` can prepare a machine-readable launch envelope for either the next
 supervised canary or a future bounded autonomous launch, but only after explicit acknowledgements and
 only when the existing ignition gates say the step is allowed.
+`/api/web3-supervised-canary-readiness` is the first-funded-trade ladder: it combines the dedicated
+wallet, ownership proof, Jupiter order rail, live flags, unsigned-order preflight, signed relay,
+manual review, and funded-canary proof into one ordered answer for whether the app can request the
+tiny unsigned order, relay a signed payload, or prove a real canary yet.
 It keeps `can_autonomously_trade_real_money_now=false` until the supervised canary has actually
 relayed, confirmed, reconciled settlement, and mirrored the local portfolio; it cannot sign, submit,
 return transaction bytes from the ignition action, store wallet authority, echo secrets, or mutate wallets.

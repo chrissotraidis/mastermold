@@ -819,9 +819,18 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("LiveIgnitionPanel");
     expect(tradingPage).toContain("Live ignition gate");
     expect(tradingPage).toContain("Autonomous live trading is blocked");
+    expect(tradingPage).toContain("SupervisedCanaryReadinessPanel");
+    expect(tradingPage).toContain("First funded canary readiness");
+    expect(tradingPage).toContain("Trading supervised canary readiness lanes");
+    expect(tradingPage).toContain("tiny unsigned order, external browser-wallet signature, guarded signed-payload relay");
     expect(tradingPage).toContain("Open ignition JSON");
     expect(tradingPage).toContain("Trading live ignition checks");
     expect(tradingPage).toContain("This is a read-only go/no-go contract for the bot.");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("web3-supervised-canary-readiness");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("first funded canary readiness ladder");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("can_request_unsigned_order_now");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("can_relay_signed_payload_now");
+    expect(source("app/api/web3-supervised-canary-readiness/route.ts")).toContain("buildWeb3SupervisedCanaryReadinessReceipt");
     expect(source("src/db/web3-live-ignition.ts")).toContain("web3-live-ignition");
     expect(source("src/db/web3-live-ignition.ts")).toContain("can_autonomously_trade_real_money_now");
     expect(source("src/db/web3-live-ignition.ts")).toContain("No funded live trade has been tested by this app yet.");
@@ -1754,6 +1763,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("prepare-supervised-canary");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("launch envelope");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("unsafe-rejected");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifySupervisedCanaryReadiness");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-supervised-canary-readiness?source=live-dex&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("supervised-canary-readiness");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3-live-unsigned-order-preflight");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("unsafe preflight");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchAnswerIntake");

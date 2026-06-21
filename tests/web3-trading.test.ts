@@ -20,6 +20,7 @@ import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wal
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LIVE_AUTONOMY_READINESS_GET } from "@/app/api/web3-live-autonomy-readiness/route";
 import { GET as LIVE_IGNITION_GET, POST as LIVE_IGNITION_POST } from "@/app/api/web3-live-ignition/route";
+import { GET as SUPERVISED_CANARY_READINESS_GET } from "@/app/api/web3-supervised-canary-readiness/route";
 import { GET as LIVE_USABILITY_BLOCKERS_GET } from "@/app/api/web3-live-usability-blockers/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
@@ -2328,6 +2329,79 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(unsafeReceipt.unsafe_fields).toContain("private_key");
     expect(unsafeReceipt.launch_envelope.kind).toBe("none");
     expect(unsafeReceipt.secret_echo_permission).toBe("blocked");
+  });
+
+  test("GIVEN the operator asks what remains before the first funded canary WHEN supervised canary readiness runs THEN it orders the real-money proof ladder", async () => {
+    const response = await SUPERVISED_CANARY_READINESS_GET(new Request("http://localhost/api/web3-supervised-canary-readiness?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      can_request_unsigned_order_now: boolean;
+      can_relay_signed_payload_now: boolean;
+      actual_live_trade_tested: boolean;
+      real_funds_moved_by_this_app: boolean;
+      first_unsigned_order_path: string;
+      first_signed_payload_path: string;
+      blocker_count: number;
+      lanes: Array<{
+        id: string;
+        label: string;
+        status: string;
+        detail: string;
+        next_action: string;
+        evidence_endpoint: string;
+        blocks_first_canary: boolean;
+      }>;
+      blockers: string[];
+      next_lane_id: string | null;
+      next_action: string;
+      ignition_endpoint: string;
+      unsigned_handoff_endpoint: string;
+      canary_endpoint: string;
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      signed_payload_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-supervised-canary-readiness");
+    expect(receipt.status).toBe("blocked");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.can_request_unsigned_order_now).toBe(false);
+    expect(receipt.can_relay_signed_payload_now).toBe(false);
+    expect(receipt.actual_live_trade_tested).toBe(false);
+    expect(receipt.real_funds_moved_by_this_app).toBe(false);
+    expect(receipt.first_unsigned_order_path).toBe("blocked");
+    expect(receipt.first_signed_payload_path).toBe("blocked");
+    expect(receipt.blocker_count).toBeGreaterThan(0);
+    expect(receipt.next_lane_id).toBeTruthy();
+    expect(receipt.next_action.length).toBeGreaterThan(10);
+    expect(receipt.ignition_endpoint).toContain("/api/web3-live-ignition");
+    expect(receipt.unsigned_handoff_endpoint).toContain("/api/web3-live-unsigned-order-handoff");
+    expect(receipt.canary_endpoint).toContain("/api/web3-live-trade-canary");
+    expect(receipt.lanes.map((lane) => lane.id).join(",")).toBe("live-scope,dedicated-wallet,wallet-ownership,jupiter-order,live-flags,unsigned-order-preflight,signer-relay,manual-live-review,funded-canary-proof");
+    expect(receipt.lanes.every((lane) => ["pass", "watch", "fail"].includes(lane.status) && lane.detail && lane.next_action && lane.evidence_endpoint)).toBe(true);
+    expect(receipt.lanes.some((lane) => lane.id === "funded-canary-proof" && lane.status === "fail" && lane.blocks_first_canary === false)).toBe(true);
+    expect(receipt.blockers.join(" ")).toContain("Jupiter");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.signed_payload_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.join(" ")).toContain("first funded canary readiness ladder");
+
+    const invalid = await SUPERVISED_CANARY_READINESS_GET(new Request("http://localhost/api/web3-supervised-canary-readiness?source=rogue"));
+    const invalidReceipt = await json<{ error: string }>(invalid);
+    expect(invalid.status).toBe(422);
+    expect(invalidReceipt.error).toContain("source must be sample or live-dex");
   });
 
   test("GIVEN an operator needs one go-live packet WHEN the live activation plan route runs THEN it orders safe milestones without activation authority", async () => {

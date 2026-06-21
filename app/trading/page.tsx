@@ -23,11 +23,13 @@ import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital
 import { buildWeb3LiveIgnitionReceipt, type Web3LiveIgnitionCheck, type Web3LiveIgnitionReceipt } from "@/src/db/web3-live-ignition";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
+import { buildWeb3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
 import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
+import { buildWeb3SupervisedCanaryReadinessReceipt, type Web3SupervisedCanaryReadinessLane, type Web3SupervisedCanaryReadinessReceipt } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3UsabilityStatus, type Web3UsabilityStatusReceipt } from "@/src/db/web3-usability-status";
 import { getWeb3TradingStateAsync, isTradingAccountMode, isTradingMarketSource } from "@/src/db/web3-trading";
 
@@ -67,11 +69,14 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     }),
     accounting,
   });
+  const dedicatedWallet = buildWeb3DedicatedWalletPacket(initialState);
+  const jupiterOrder = buildWeb3JupiterOrderPacket(initialState);
+  const signerPacket = buildWeb3SignerCredentialPacket(initialState);
   const supervisedLiveRunway = buildWeb3SupervisedLiveRunway({
     state: initialState,
-    wallet: buildWeb3DedicatedWalletPacket(initialState),
-    jupiter: buildWeb3JupiterOrderPacket(initialState),
-    signer: buildWeb3SignerCredentialPacket(initialState),
+    wallet: dedicatedWallet,
+    jupiter: jupiterOrder,
+    signer: signerPacket,
     liveOps,
   });
   const usabilityStatus = buildWeb3UsabilityStatus({
@@ -125,6 +130,23 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     liveUsability: liveUsabilityBlockers,
     canary: liveTradeCanary,
   });
+  const unsignedCanaryPreflight = buildWeb3LiveUnsignedOrderPreflightReceipt(initialState, {
+    operator_ack: true,
+    canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+    wallet_public_key: initialState.execution_readiness.config.wallet_public_key,
+    amount_lamports: 100_000,
+    max_slippage_bps: initialState.execution_readiness.config.max_slippage_bps,
+  });
+  const supervisedCanaryReadiness = buildWeb3SupervisedCanaryReadinessReceipt({
+    state: initialState,
+    wallet: dedicatedWallet,
+    jupiter: jupiterOrder,
+    signer: signerPacket,
+    livePreflight: liveCapitalPreflight,
+    ignition: liveIgnition,
+    unsignedPreflight: unsignedCanaryPreflight,
+    canary: liveTradeCanary,
+  });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -143,6 +165,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
         <div className="w-full min-w-0 space-y-4">
           <TradingSourceSwitch source={source} account={account} />
           <LiveIgnitionPanel receipt={liveIgnition} />
+          <SupervisedCanaryReadinessPanel receipt={supervisedCanaryReadiness} />
           <Web3LiveCanaryConsole
             receipt={liveTradeCanary}
             source={source}
@@ -319,6 +342,104 @@ function liveIgnitionStatusClassName(status: Web3LiveIgnitionReceipt["status"]) 
 }
 
 function liveIgnitionCheckClassName(status: Web3LiveIgnitionCheck["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
+function SupervisedCanaryReadinessPanel({ receipt }: { receipt: Web3SupervisedCanaryReadinessReceipt }) {
+  const visibleLanes = [
+    ...receipt.lanes.filter((lane) => lane.blocks_first_canary && lane.status !== "pass"),
+    ...receipt.lanes.filter((lane) => lane.blocks_first_canary && lane.status === "pass"),
+    ...receipt.lanes.filter((lane) => !lane.blocks_first_canary),
+  ].slice(0, 6);
+
+  return (
+    <section
+      aria-labelledby="web3-supervised-canary-readiness-title"
+      className="rounded-md border border-caution/25 bg-caution/[0.025] p-4 sm:p-5"
+    >
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.78fr)_minmax(22rem,1fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">First funded canary readiness</p>
+              <h2 id="web3-supervised-canary-readiness-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
+                {receipt.actual_live_trade_tested
+                  ? "Funded canary proof exists"
+                  : receipt.can_relay_signed_payload_now
+                    ? "Signed canary relay is ready"
+                    : receipt.can_request_unsigned_order_now
+                      ? "Tiny unsigned canary is ready"
+                      : "First live canary is blocked"}
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">{receipt.next_action}</p>
+            </div>
+            <span className={supervisedCanaryStatusClassName(receipt.status)}>
+              {receipt.status.replaceAll("-", " ")}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <LiveUsabilityStat label="Unsigned order" value={receipt.can_request_unsigned_order_now ? "ready" : "blocked"} tone={receipt.can_request_unsigned_order_now ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Signed relay" value={receipt.can_relay_signed_payload_now ? "ready" : "blocked"} tone={receipt.can_relay_signed_payload_now ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Live trade" value={receipt.actual_live_trade_tested ? "tested" : "not tested"} tone={receipt.actual_live_trade_tested ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Blockers" value={`${receipt.blocker_count}`} tone={receipt.blocker_count > 0 ? "critical" : "engine"} />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={receipt.unsigned_handoff_endpoint}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open preflight JSON
+            </Link>
+            <Link
+              href={receipt.settings_fix_href}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+            >
+              Fix canary gates
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-outline">
+            This ladder is the first real-money proof path: tiny unsigned order, external browser-wallet signature, guarded signed-payload relay, then settlement and portfolio mirror proof. It still cannot store private keys, seed phrases, signed payloads, or wallet authority.
+          </p>
+        </div>
+
+        <div className="grid min-w-0 gap-2" aria-label="Trading supervised canary readiness lanes">
+          {visibleLanes.map((lane) => (
+            <div key={lane.id} className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface/55 p-2.5 sm:grid-cols-[minmax(0,0.4fr)_minmax(0,1fr)]">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={supervisedCanaryLaneClassName(lane.status)}>{lane.status}</span>
+                  <p className="text-xs font-semibold text-on-surface">{lane.label}</p>
+                </div>
+                <Link href={lane.evidence_endpoint} className="mt-1 block truncate text-[11px] leading-4 text-outline transition hover:text-engine">
+                  {lane.evidence_endpoint}
+                </Link>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] leading-4 text-on-surface-variant">{lane.detail}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{lane.next_action}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function supervisedCanaryStatusClassName(status: Web3SupervisedCanaryReadinessReceipt["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "canary-tested" || status === "signed-relay-ready") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "unsigned-order-ready") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
+function supervisedCanaryLaneClassName(status: Web3SupervisedCanaryReadinessLane["status"]) {
   const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
   if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
   if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
