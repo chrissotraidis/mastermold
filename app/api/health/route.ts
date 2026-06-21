@@ -3,6 +3,10 @@ import { buildWeb3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquis
 import { buildWeb3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { buildWeb3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
 import { buildWeb3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
+import {
+  buildWeb3CredentialRequirementsHealth,
+  buildWeb3CredentialRequirementsReceipt,
+} from "@/src/db/web3-credential-requirements";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
@@ -115,6 +119,7 @@ export async function GET() {
     runway: web3SupervisedRunway,
     manualLiveReview: web3ManualLiveReview,
   });
+  const web3CredentialRequirements = buildWeb3CredentialRequirementsReceipt(web3ResearchHandoff);
   return NextResponse.json({
     status: "ok",
     web3_daemon_supervisor: web3DaemonSupervisor,
@@ -124,5 +129,6 @@ export async function GET() {
     web3_operator_runbook: buildWeb3OperatorRunbookHealth(web3Runbook),
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
+    web3_credential_requirements: buildWeb3CredentialRequirementsHealth(web3CredentialRequirements),
   });
 }

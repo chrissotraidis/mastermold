@@ -1333,7 +1333,15 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
               Give this structured list to a helper or operator when collecting credentials. It names safe value types, storage rules, target names, and done signals without requesting wallet secrets.
             </p>
           </div>
-          <LaunchQueueBadge status="watch" label="safe asks only" />
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <LaunchQueueBadge status="watch" label="safe asks only" />
+            <Link
+              href={`/api/web3-credential-requirements?source=${packet.source}&account=${packet.account}&scenario=${packet.scenario}&cycles=0`}
+              className="inline-flex min-h-8 items-center rounded-md px-2 text-[11px] font-semibold text-engine hover:text-engine/80"
+            >
+              Open requirements JSON
+            </Link>
+          </div>
         </div>
         <div className="mt-2 grid gap-2 md:grid-cols-2">
           {credentialRequirements.map((requirement) => (

@@ -27,6 +27,7 @@ import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-
 import { GET as OPERATOR_REQUEST_PACKET_GET } from "@/app/api/web3-operator-request-packet/route";
 import { GET as OPERATOR_RUNBOOK_GET } from "@/app/api/web3-operator-runbook/route";
 import { GET as CREDENTIAL_DOCTOR_GET, POST as CREDENTIAL_DOCTOR_POST } from "@/app/api/web3-credential-doctor/route";
+import { GET as CREDENTIAL_REQUIREMENTS_GET } from "@/app/api/web3-credential-requirements/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -1252,6 +1253,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.safe_to_share).toContain("Dedicated Solana public wallet address");
     expect(packet.never_provide).toContain("Seed phrase or mnemonic");
     expect(packet.source_endpoints).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
+    expect(packet.source_endpoints).toContain("/api/web3-credential-requirements?source=live-dex&account=persistent");
     expect(packet.source_endpoints).toContain("/api/web3-operator-runbook?source=live-dex&account=persistent");
     expect(packet.safe_export_commands).toEqual(expect.arrayContaining([
       "npm run --silent research:web3 -- --base-url=http://localhost:4010",
@@ -1285,6 +1287,123 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.controls.some((control) => control.includes("safe to share"))).toBe(true);
     expect(text).not.toContain("test-helius-research-secret");
     expect(text).not.toContain("test-jupiter-research-secret");
+  });
+
+  test("GIVEN helper or operator needs safe credential asks WHEN credential requirements route runs THEN it returns a blocked checklist", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-requirements-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-requirements-secret";
+
+    const rejected = await CREDENTIAL_REQUIREMENTS_GET(new Request("http://localhost/api/web3-credential-requirements?cycles=99"));
+    expect(rejected.status).toBe(422);
+
+    const response = await CREDENTIAL_REQUIREMENTS_GET(new Request("http://localhost/api/web3-credential-requirements?scenario=breakout&source=sample&account=ephemeral&cycles=1"));
+    const packet = await json<{
+      mode: string;
+      status: string;
+      generated_at: string;
+      receipt_hash: string;
+      research_handoff_hash: string;
+      source: string;
+      account: string;
+      scenario: string;
+      requirement_count: number;
+      needed_now_count: number;
+      before_live_count: number;
+      external_review_count: number;
+      blocker_count: number;
+      next_requirement: {
+        id: string;
+        next_action: string;
+        target_names: string[];
+        safe_collection_surface: string;
+        completion_signal: string;
+      } | null;
+      requirements: Array<{
+        id: string;
+        label: string;
+        owner: string;
+        priority: string;
+        safe_value_type: string;
+        safe_collection_surface: string;
+        storage_rule: string;
+        target_names: string[];
+        research_question_ids: string[];
+        completion_signal: string;
+        next_action: string;
+        blocks_live_capital: boolean;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        secret_echo_permission: string;
+      }>;
+      safe_to_share: string[];
+      never_provide: string[];
+      source_endpoint: string;
+      live_review_source_endpoint: string;
+      summary: string;
+      next_action: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+    const text = JSON.stringify(packet);
+
+    expect(response.status).toBe(200);
+    expect(packet.mode).toBe("web3-credential-requirements");
+    expect(packet.status).toBe("operator-input-needed");
+    expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.research_handoff_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.requirement_count).toBe(9);
+    expect(packet.needed_now_count).toBeGreaterThanOrEqual(4);
+    expect(packet.before_live_count).toBeGreaterThanOrEqual(4);
+    expect(packet.external_review_count).toBe(1);
+    expect(packet.blocker_count).toBe(9);
+    expect(packet.next_requirement).toMatchObject({
+      id: "dedicated-public-wallet",
+      target_names: ["wallet_public_key"],
+      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+    });
+    expect(packet.next_requirement?.completion_signal).toContain("--require-operator-wallet");
+    expect(packet.next_action).toContain("public Solana trading wallet");
+    expect(packet.requirements.map((item) => item.id)).toEqual([
+      "dedicated-public-wallet",
+      "wallet-ownership-proof",
+      "read-provider-rail",
+      "jupiter-order-rail",
+      "signer-policy",
+      "ops-emergency-stop",
+      "accounting-ledger",
+      "risk-policy",
+      "manual-live-review",
+    ]);
+    expect(packet.requirements.find((item) => item.id === "jupiter-order-rail")?.target_names).toContain("JUPITER_API_KEY");
+    expect(packet.requirements.find((item) => item.id === "signer-policy")?.research_question_ids).toEqual(expect.arrayContaining(["custody-architecture", "risk-gates"]));
+    expect(packet.requirements.every((item) =>
+      item.blocks_live_capital === true &&
+      item.live_execution_permission === "blocked" &&
+      item.wallet_mutation_permission === "blocked" &&
+      item.secret_echo_permission === "blocked"
+    )).toBe(true);
+    expect(packet.safe_to_share).toContain("Dedicated Solana public wallet address");
+    expect(packet.never_provide).toContain("Seed phrase or mnemonic");
+    expect(packet.source_endpoint).toContain("/api/web3-credential-requirements");
+    expect(packet.source_endpoint).toContain("source=sample");
+    expect(packet.live_review_source_endpoint).toBe("/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(packet.summary).toContain("safe Web3 credential");
+    expect(packet.controls.some((control) => control.includes("credential collection checklist"))).toBe(true);
+    expect(packet.live_execution_permission).toBe("blocked");
+    expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.transaction_submission_permission).toBe("blocked");
+    expect(packet.signing_permission).toBe("blocked");
+    expect(packet.private_key_storage).toBe("blocked");
+    expect(packet.seed_phrase_storage).toBe("blocked");
+    expect(packet.secret_echo_permission).toBe("blocked");
+    expect(text).not.toContain("test-helius-requirements-secret");
+    expect(text).not.toContain("test-jupiter-requirements-secret");
   });
 
   test("GIVEN helper research answers are pasted WHEN answer intake runs THEN it scores decision coverage without live authority", async () => {
@@ -1544,6 +1663,7 @@ describe("Web3 autonomous trading subsystem", () => {
       };
       web3_research_handoff: {
         mode: string;
+        receipt_hash: string;
         source: string;
         account: string;
         scenario: string;
@@ -1565,6 +1685,33 @@ describe("Web3 autonomous trading subsystem", () => {
         live_execution_permission: string;
         wallet_mutation_permission: string;
         transaction_submission_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      };
+      web3_credential_requirements: {
+        mode: string;
+        status: string;
+        receipt_hash: string;
+        research_handoff_hash: string;
+        requirement_count: number;
+        needed_now_count: number;
+        before_live_count: number;
+        external_review_count: number;
+        blocker_count: number;
+        next_requirement: {
+          id: string;
+          target_names: string[];
+          live_execution_permission: string;
+          wallet_mutation_permission: string;
+          secret_echo_permission: string;
+        } | null;
+        source_endpoint: string;
+        live_review_source_endpoint: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        signing_permission: string;
         private_key_storage: string;
         seed_phrase_storage: string;
         secret_echo_permission: string;
@@ -1693,6 +1840,31 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_research_handoff.private_key_storage).toBe("blocked");
     expect(receipt.web3_research_handoff.seed_phrase_storage).toBe("blocked");
     expect(receipt.web3_research_handoff.secret_echo_permission).toBe("blocked");
+    expect(receipt.web3_credential_requirements.mode).toBe("web3-credential-requirements-health");
+    expect(receipt.web3_credential_requirements.status).toBe("operator-input-needed");
+    expect(receipt.web3_credential_requirements.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.web3_credential_requirements.research_handoff_hash).toBe(receipt.web3_research_handoff.receipt_hash);
+    expect(receipt.web3_credential_requirements.requirement_count).toBeGreaterThanOrEqual(8);
+    expect(receipt.web3_credential_requirements.needed_now_count).toBeGreaterThan(0);
+    expect(receipt.web3_credential_requirements.before_live_count).toBeGreaterThan(0);
+    expect(receipt.web3_credential_requirements.external_review_count).toBe(1);
+    expect(receipt.web3_credential_requirements.blocker_count).toBe(receipt.web3_credential_requirements.requirement_count);
+    expect(receipt.web3_credential_requirements.next_requirement).toMatchObject({
+      id: "dedicated-public-wallet",
+      target_names: ["wallet_public_key"],
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(receipt.web3_credential_requirements.source_endpoint).toContain("/api/web3-credential-requirements");
+    expect(receipt.web3_credential_requirements.live_review_source_endpoint).toBe("/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_credential_requirements.live_execution_permission).toBe("blocked");
+    expect(receipt.web3_credential_requirements.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.web3_credential_requirements.transaction_submission_permission).toBe("blocked");
+    expect(receipt.web3_credential_requirements.signing_permission).toBe("blocked");
+    expect(receipt.web3_credential_requirements.private_key_storage).toBe("blocked");
+    expect(receipt.web3_credential_requirements.seed_phrase_storage).toBe("blocked");
+    expect(receipt.web3_credential_requirements.secret_echo_permission).toBe("blocked");
     expect(receipt.web3_live_usability.mode).toBe("web3-live-usability-health");
     expect(receipt.web3_live_usability.current_input).not.toBeNull();
     expect(receipt.web3_live_usability.current_input).toMatchObject({

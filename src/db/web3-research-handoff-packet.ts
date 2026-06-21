@@ -237,6 +237,7 @@ export function buildWeb3ResearchHandoffPacket(input: {
     never_provide: input.requestPacket.never_provide,
     source_endpoints: [
       "/api/web3-research-handoff-packet?source=live-dex&account=persistent",
+      "/api/web3-credential-requirements?source=live-dex&account=persistent",
       "/api/web3-operator-request-packet?source=live-dex&account=persistent",
       "/api/web3-operator-runbook?source=live-dex&account=persistent",
       "/api/web3-cutover-blocker-board?source=live-dex&account=persistent",

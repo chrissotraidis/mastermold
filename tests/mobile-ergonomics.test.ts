@@ -1089,6 +1089,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings Web3 research live-usability summary");
     expect(settingsPage).toContain("Settings Web3 credential requirements packet");
     expect(settingsPage).toContain("Credential requirements packet");
+    expect(settingsPage).toContain("Open requirements JSON");
+    expect(settingsPage).toContain("/api/web3-credential-requirements?source=");
     expect(settingsPage).toContain("packet.credential_requirements");
     expect(settingsPage).toContain("safe_value_type");
     expect(settingsPage).toContain("completion_signal");
@@ -1108,6 +1110,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("manual-live-review");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Rows listed:");
     expect(settingsPage).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
+    expect(source("src/db/web3-credential-requirements.ts")).toContain("web3-credential-requirements");
+    expect(source("app/api/web3-credential-requirements/route.ts")).toContain("buildWeb3CredentialRequirementsReceipt");
     expect(settingsPage).toContain("validated export commands only");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Settings Web3 research answer intake");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("/api/web3-research-answer-intake");
@@ -1655,6 +1659,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchHandoffPacket");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-research-handoff-packet?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("research-handoff-packet");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyCredentialRequirementsPacket");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-credential-requirements?source=sample&account=persistent");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("credential-requirements-packet");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchAnswerIntake");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-research-answer-intake?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("implementation_decisions");
@@ -1663,6 +1670,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/health/route.ts")).toContain("buildWeb3OperatorRunbookHealth");
     expect(source("app/api/health/route.ts")).toContain("web3_research_handoff");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3ResearchHandoffHealth");
+    expect(source("app/api/health/route.ts")).toContain("web3_credential_requirements");
+    expect(source("app/api/health/route.ts")).toContain("buildWeb3CredentialRequirementsHealth");
     expect(source("app/api/health/route.ts")).toContain("web3_live_usability");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_review_source_endpoint");
@@ -1827,6 +1836,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
     expect(source("docs/web3-credentials-runbook.md")).toContain("paste-ready Markdown");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-research-handoff-packet");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-credential-requirements");
+    expect(source("README.md")).toContain("/api/web3-credential-requirements");
+    expect(source("components/review-readiness.tsx")).toContain("web3_credential_requirements");
     expect(source("docs/web3-credentials-runbook.md")).toContain("owner/phase implementation plan");
     expect(source("docs/web3-credentials-runbook.md")).toContain("plan is sequencing evidence only");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("# Mastermind Web3 Research Handoff Packet");

@@ -132,6 +132,16 @@ async function main() {
   assert(health.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", health.web3_research_handoff);
   assert(health.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", health.web3_research_handoff);
   assert(health.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", health.web3_research_handoff);
+  assert(health.web3_credential_requirements?.mode === "web3-credential-requirements-health", "Health endpoint should expose Web3 credential requirements health.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.requirement_count >= 8, "Credential requirements health should expose safe ask count.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.next_requirement?.target_names?.includes("wallet_public_key"), "Credential requirements health should point to the public wallet target.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.source_endpoint.includes("/api/web3-credential-requirements"), "Credential requirements health should link the standalone endpoint.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.live_execution_permission === "blocked", "Credential requirements health should keep live execution blocked.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.wallet_mutation_permission === "blocked", "Credential requirements health should keep wallet mutation blocked.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.signing_permission === "blocked", "Credential requirements health should keep signing blocked.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.private_key_storage === "blocked", "Credential requirements health should keep private-key storage blocked.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.seed_phrase_storage === "blocked", "Credential requirements health should keep seed-phrase storage blocked.", health.web3_credential_requirements);
+  assert(health.web3_credential_requirements.secret_echo_permission === "blocked", "Credential requirements health should keep secret echo blocked.", health.web3_credential_requirements);
   assert(health.web3_live_usability?.mode === "web3-live-usability-health", "Health endpoint should expose Web3 live-usability health.", health.web3_live_usability);
   assert(["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(health.web3_live_usability.status), "Live-usability health should return a known status.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.receipt_hash === "string" && health.web3_live_usability.receipt_hash.length === 64, "Live-usability health should expose a receipt hash.", health.web3_live_usability);

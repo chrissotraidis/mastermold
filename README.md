@@ -226,6 +226,11 @@ sequence, compact live-usability summary, open operator inputs, a structured cre
 requirements packet, live-capital blockers, source endpoints, current safe input contract,
 and research questions while keeping secrets,
 transaction bytes, signing, wallet mutation, and live execution blocked.
+`/api/web3-credential-requirements?source=live-dex` exposes that credential checklist as
+standalone JSON for monitors, operators, or helper agents. It carries safe value types,
+target names, collection surfaces, storage rules, completion signals, the next requirement,
+and blocked live/signing/wallet/secret permissions only; it never returns provider secrets,
+private keys, seed phrases, raw transactions, signed payloads, or trading authority.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.

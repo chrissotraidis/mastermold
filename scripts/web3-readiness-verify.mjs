@@ -211,6 +211,27 @@ async function verifyHealth() {
   assert(json.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", json.web3_research_handoff);
   assert(json.web3_research_handoff.wallet_mutation_permission === "blocked", "Research handoff health should keep wallet mutation blocked.", json.web3_research_handoff);
   assert(json.web3_research_handoff.secret_echo_permission === "blocked", "Research handoff health should keep secret echo blocked.", json.web3_research_handoff);
+  assert(json.web3_credential_requirements?.mode === "web3-credential-requirements-health", "Health endpoint should expose Web3 credential requirements health.", json.web3_credential_requirements);
+  assertReceiptHash("Health credential requirements", json.web3_credential_requirements.receipt_hash);
+  assertReceiptHash("Health credential requirements source", json.web3_credential_requirements.research_handoff_hash);
+  assert(json.web3_credential_requirements.requirement_count >= 8, "Credential requirements health should expose safe requirement count.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.needed_now_count >= 1, "Credential requirements health should expose needed-now asks.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.blocker_count === json.web3_credential_requirements.requirement_count, "Credential requirements health should keep each requirement blocking live capital.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.next_requirement?.id === "dedicated-public-wallet", "Credential requirements health should expose the next wallet requirement.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.next_requirement?.target_names?.includes("wallet_public_key"), "Credential requirements health should point to the public wallet target.", json.web3_credential_requirements.next_requirement);
+  assert(json.web3_credential_requirements.source_endpoint.includes("/api/web3-credential-requirements"), "Credential requirements health should link its standalone endpoint.", json.web3_credential_requirements);
+  assert(
+    json.web3_credential_requirements.live_review_source_endpoint === "/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Credential requirements health should expose the live-review requirements packet separately.",
+    json.web3_credential_requirements,
+  );
+  assert(json.web3_credential_requirements.live_execution_permission === "blocked", "Credential requirements health should keep live execution blocked.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.wallet_mutation_permission === "blocked", "Credential requirements health should keep wallet mutation blocked.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.transaction_submission_permission === "blocked", "Credential requirements health should keep transaction submission blocked.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.signing_permission === "blocked", "Credential requirements health should keep signing blocked.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.private_key_storage === "blocked", "Credential requirements health should keep private-key storage blocked.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.seed_phrase_storage === "blocked", "Credential requirements health should keep seed-phrase storage blocked.", json.web3_credential_requirements);
+  assert(json.web3_credential_requirements.secret_echo_permission === "blocked", "Credential requirements health should keep secret echo blocked.", json.web3_credential_requirements);
   assert(json.web3_live_usability?.mode === "web3-live-usability-health", "Health endpoint should expose compact Web3 live-usability health.", json.web3_live_usability);
   assert(
     ["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(json.web3_live_usability.status),
@@ -966,6 +987,7 @@ async function verifyResearchHandoffPacket() {
   assert(Array.isArray(json.safe_to_share) && json.safe_to_share.includes("Dedicated Solana public wallet address"), "Research handoff packet should list safe-to-share operator inputs.", json.safe_to_share);
   assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Research handoff packet should keep seed phrases in never-provide list.", json.never_provide);
   assert(Array.isArray(json.source_endpoints) && json.source_endpoints.includes("/api/web3-operator-runbook?source=live-dex&account=persistent"), "Research handoff packet should link source endpoints.", json.source_endpoints);
+  assert(json.source_endpoints.includes("/api/web3-credential-requirements?source=live-dex&account=persistent"), "Research handoff packet should link the standalone credential requirements endpoint.", json.source_endpoints);
   assert(Array.isArray(json.verifier_commands) && json.verifier_commands.some((command) => command.includes("--require-operator-wallet")), "Research handoff packet should include strict verifier commands.", json.verifier_commands);
   assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind Web3 Research Handoff Packet"), "Research handoff packet should include pasteable text.", json.text_packet);
   assert(json.text_packet.includes("Next Ordered Unlock Step") && json.text_packet.includes("Operator Unlock Sequence"), "Research handoff text should include the ordered unlock sequence.", json.text_packet);
@@ -980,6 +1002,55 @@ async function verifyResearchHandoffPacket() {
   assert(json.secret_echo_permission === "blocked", "Research handoff packet must block secret echo.", json);
   assert(Array.isArray(json.controls) && json.controls.some((control) => control.includes("safe to share")), "Research handoff packet should describe safe sharing controls.", json.controls);
   record("research-handoff-packet", "pass", `${json.status}; ${json.research_questions.length} questions; ${json.live_capital_blockers.length} live blockers`);
+}
+
+async function verifyCredentialRequirementsPacket() {
+  const { response, json } = await requestJson("/api/web3-credential-requirements?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Credential requirements packet should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-credential-requirements", "Credential requirements packet should expose the expected mode.", json);
+  assert(json.status === "operator-input-needed", "Credential requirements packet should show operator input is still needed.", json);
+  assertReceiptHash("Credential requirements packet", json.receipt_hash);
+  assertReceiptHash("Credential requirements source handoff", json.research_handoff_hash);
+  assert(json.requirement_count >= 8, "Credential requirements packet should expose the full safe ask count.", json);
+  assert(json.needed_now_count >= 1, "Credential requirements packet should expose needed-now asks.", json);
+  assert(json.before_live_count >= 1, "Credential requirements packet should expose before-live asks.", json);
+  assert(json.external_review_count === 1, "Credential requirements packet should expose the external review gate.", json);
+  assert(json.blocker_count === json.requirement_count, "Credential requirements packet should keep every ask blocking live capital.", json);
+  assert(json.next_requirement?.id === "dedicated-public-wallet", "Credential requirements packet should show the public wallet as the next ask.", json.next_requirement);
+  assert(json.next_requirement?.target_names?.includes("wallet_public_key"), "Credential requirements packet should point to the public wallet target.", json.next_requirement);
+  assert(
+    ["dedicated-public-wallet", "wallet-ownership-proof", "read-provider-rail", "jupiter-order-rail", "signer-policy", "ops-emergency-stop", "accounting-ledger", "risk-policy", "manual-live-review"].every((id) =>
+      json.requirements.some((item) =>
+        item.id === id &&
+        item.blocks_live_capital === true &&
+        item.live_execution_permission === "blocked" &&
+        item.wallet_mutation_permission === "blocked" &&
+        item.secret_echo_permission === "blocked"
+      ),
+    ),
+    "Credential requirements packet should cover all safe asks while keeping live locks blocked.",
+    json.requirements,
+  );
+  assert(json.requirements.some((item) => item.id === "jupiter-order-rail" && item.target_names?.includes("JUPITER_API_KEY")), "Credential requirements packet should name the Jupiter target.", json.requirements);
+  assert(json.requirements.some((item) => item.id === "signer-policy" && item.research_question_ids?.includes("custody-architecture") && item.research_question_ids?.includes("risk-gates")), "Credential requirements packet should link signer asks to custody and risk research.", json.requirements);
+  assert(Array.isArray(json.safe_to_share) && json.safe_to_share.includes("Dedicated Solana public wallet address"), "Credential requirements packet should list safe-to-share values.", json.safe_to_share);
+  assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Credential requirements packet should keep seed phrase in never-provide list.", json.never_provide);
+  assert(json.source_endpoint.includes("/api/web3-credential-requirements"), "Credential requirements packet should link itself.", json);
+  assert(
+    json.live_review_source_endpoint === "/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Credential requirements packet should expose the live-review source endpoint.",
+    json,
+  );
+  assert(Array.isArray(json.controls) && json.controls.some((control) => control.includes("credential collection checklist")), "Credential requirements packet should describe itself as a collection checklist.", json.controls);
+  assert(json.live_execution_permission === "blocked", "Credential requirements packet must keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Credential requirements packet must keep wallet mutation blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "Credential requirements packet must keep transaction submission blocked.", json);
+  assert(json.signing_permission === "blocked", "Credential requirements packet must keep signing blocked.", json);
+  assert(json.private_key_storage === "blocked", "Credential requirements packet must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "Credential requirements packet must block seed-phrase storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Credential requirements packet must block secret echo.", json);
+  assertNoLeak("credential requirements packet", json);
+  record("credential-requirements-packet", "pass", `${json.status}; ${json.requirement_count} safe asks`);
 }
 
 async function verifyResearchAnswerIntake() {
@@ -1247,6 +1318,7 @@ async function main() {
   await verifyOperatorSetupPackets();
   await verifyManualLiveReviewPacket();
   await verifyResearchHandoffPacket();
+  await verifyCredentialRequirementsPacket();
   await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();
