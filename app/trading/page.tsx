@@ -50,7 +50,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
   const accountParam = firstParam(params?.account);
   const sourceParam = firstParam(params?.source);
   const account = accountParam && isTradingAccountMode(accountParam) ? accountParam : "persistent";
-  const source = sourceParam && isTradingMarketSource(sourceParam) ? sourceParam : "sample";
+  const source = sourceParam && isTradingMarketSource(sourceParam) ? sourceParam : "live-dex";
   const initialState = await getWeb3TradingStateAsync({
     account,
     source,
@@ -168,7 +168,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
       <div className="mx-auto w-full min-w-0 max-w-6xl">
         <PageHeader
           title="Web3 Autopilot"
-          subtitle="Autonomous Web3 trading desk and copilot for high-signal memecoin monitoring, wallet growth, route checks, and local paper fills."
+          subtitle="Autonomous Web3 trading desk and copilot for live memecoin monitoring, wallet growth, route checks, and gated canary execution."
           provenance={provenanceLabel}
           right={<Chip tone={initialState.autonomous_edge_stack_execution.status === "blocked" ? "critical" : "caution"}>{shellStatus}</Chip>}
         />
@@ -265,7 +265,7 @@ function TradingSourceSwitch({
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-4 text-outline">
-        Source switching changes read-only market evidence only; signing, submission, wallet mutation, private-key storage, and seed phrase storage stay blocked.
+        Plain /trading opens live DEX read by default. Source switching changes read-only market evidence only; signing, submission, wallet mutation, private-key storage, and seed phrase storage stay blocked.
       </p>
     </section>
   );

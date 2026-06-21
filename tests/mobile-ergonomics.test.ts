@@ -769,6 +769,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Choose Web3 market source");
     expect(tradingPage).toContain("Sample tape");
     expect(tradingPage).toContain("Live DEX read");
+    expect(tradingPage).toContain('const source = sourceParam && isTradingMarketSource(sourceParam) ? sourceParam : "live-dex"');
+    expect(tradingPage).toContain("Plain /trading opens live DEX read by default.");
     expect(tradingPage).toContain('const provenanceLabel = source === "live-dex" ? "Live DEX read" : "Sample data"');
     expect(tradingPage).toContain("dataMode={provenanceLabel}");
     expect(tradingPage).toContain("provenance={provenanceLabel}");
@@ -2245,7 +2247,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-credential-handoff");
     expect(source("components/review-readiness.tsx")).toContain("compact safe-to-provide request packet");
     expect(source("components/review-readiness.tsx")).toContain("read-only live DEX cockpit");
-    expect(source("components/review-readiness.tsx")).toContain("provenance chip now switch from Sample to Live DEX read");
+    expect(source("components/review-readiness.tsx")).toContain("defaults plain /trading to Live DEX read");
     expect(settingsPage).toContain("Open Web3 wiring");
     expect(settingsPage).toContain('href="/trading?source=sample"');
     expect(settingsPage).toContain('href="/trading?source=live-dex"');
