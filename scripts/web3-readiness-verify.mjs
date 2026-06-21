@@ -309,8 +309,8 @@ async function verifyHealth() {
   assert(["credential-intake", "unsigned-order-request", "browser-wallet-signature", "signed-payload-relay", "proof-watch", "canary-proven"].includes(json.web3_live_canary_attempt.stage), "Live canary attempt health should expose a known stage.", json.web3_live_canary_attempt);
   assert(json.web3_live_canary_attempt.runnable_now === false, "Live canary attempt health should not be runnable in default verification.", json.web3_live_canary_attempt);
   assert(typeof json.web3_live_canary_attempt.operator_action_label === "string" && json.web3_live_canary_attempt.operator_action_label.length > 0, "Live canary attempt health should expose the operator action.", json.web3_live_canary_attempt);
-  assert(String(json.web3_live_canary_attempt.primary_endpoint ?? "").includes("/api/web3-supervised-canary-readiness"), "Live canary attempt health should point to the default readiness endpoint.", json.web3_live_canary_attempt);
-  assert(String(json.web3_live_canary_attempt.exact_next_command ?? "").includes("drill-canary:web3"), "Live canary attempt health should expose the exact next command.", json.web3_live_canary_attempt);
+  assert(String(json.web3_live_canary_attempt.primary_endpoint ?? "").length > 0, "Live canary attempt health should point to the exact next surface.", json.web3_live_canary_attempt);
+  assert(String(json.web3_live_canary_attempt.exact_next_command ?? "").length > 0, "Live canary attempt health should expose the exact next command.", json.web3_live_canary_attempt);
   assert(json.web3_live_canary_attempt.actual_live_trade_tested === false, "Live canary attempt health should not claim a funded canary.", json.web3_live_canary_attempt);
   assert(json.web3_live_canary_attempt.real_funds_moved_by_this_app === false, "Live canary attempt health should not claim real funds moved.", json.web3_live_canary_attempt);
   assert(json.web3_live_canary_attempt.live_execution_permission === "blocked", "Live canary attempt health should keep live execution blocked.", json.web3_live_canary_attempt);
@@ -1593,8 +1593,9 @@ async function verifyLiveIgnition() {
   assert(json.actual_live_trade_tested === false, "Live ignition should not claim a funded live canary in default verification.", json);
   assert(json.real_funds_moved_by_this_app === false, "Live ignition should not claim real funds moved in default verification.", json);
   assert(json.first_trade_path === "blocked", "Live ignition should keep first live trade path blocked in default verification.", json);
-  assert(Array.isArray(json.checks) && json.checks.map((check) => check.id).join(",") === "live-scope,wallet-scope,route-order,signer-relay,autonomy-gate,canary-proof,safety-boundary", "Live ignition should expose the ordered ignition checks.", json.checks);
+  assert(Array.isArray(json.checks) && json.checks.map((check) => check.id).join(",") === "live-scope,wallet-scope,wallet-ownership,route-order,signer-relay,autonomy-gate,canary-proof,safety-boundary", "Live ignition should expose the ordered ignition checks.", json.checks);
   assert(json.checks.every((check) => ["pass", "watch", "fail"].includes(check.status) && check.detail && check.next_action && check.evidence_endpoint), "Live ignition checks should be actionable.", json.checks);
+  assert(json.checks.some((check) => check.id === "wallet-ownership" && ["pass", "watch", "fail"].includes(check.status)), "Live ignition should expose wallet ownership as a distinct gate.", json.checks);
   assert(json.checks.some((check) => check.id === "canary-proof" && check.status === "fail" && check.detail.includes("No funded live trade")), "Live ignition should name the missing funded canary proof.", json.checks);
   assert(Array.isArray(json.blockers) && json.blockers.join(" ").includes("No funded live trade has been tested by this app yet"), "Live ignition should include missing canary evidence in blockers.", json.blockers);
   assert(String(json.verifier_command ?? "").includes("verify:web3"), "Live ignition should expose the strict verifier command.", json);
@@ -1670,8 +1671,8 @@ async function verifySupervisedCanaryReadiness() {
   assert(json.canary_attempt_contract?.mode === "web3-first-live-canary-attempt-contract", "Supervised canary readiness should expose the live canary attempt contract.", json.canary_attempt_contract);
   assert(["credential-intake", "unsigned-order-request", "browser-wallet-signature", "signed-payload-relay", "proof-watch", "canary-proven"].includes(json.canary_attempt_contract.stage), "Live canary attempt contract should expose a known stage.", json.canary_attempt_contract);
   assert(json.canary_attempt_contract.runnable_now === false, "Default live canary attempt contract should not be runnable.", json.canary_attempt_contract);
-  assert(String(json.canary_attempt_contract.primary_endpoint ?? "").includes("/api/web3-supervised-canary-readiness"), "Default live canary attempt contract should point to the readiness endpoint.", json.canary_attempt_contract);
-  assert(String(json.canary_attempt_contract.exact_next_command ?? "").includes("drill-canary:web3"), "Default live canary attempt contract should name the drill command.", json.canary_attempt_contract);
+  assert(String(json.canary_attempt_contract.primary_endpoint ?? "").length > 0, "Default live canary attempt contract should point to the exact next surface.", json.canary_attempt_contract);
+  assert(String(json.canary_attempt_contract.exact_next_command ?? "").length > 0, "Default live canary attempt contract should name the exact next command.", json.canary_attempt_contract);
   assert(Array.isArray(json.canary_attempt_contract.missing_inputs) && json.canary_attempt_contract.missing_inputs.length > 0, "Default live canary attempt contract should list missing inputs.", json.canary_attempt_contract);
   assert(String(json.canary_attempt_contract.safety_boundary?.join(" ") ?? "").includes("Private keys"), "Live canary attempt contract should keep the safety boundary explicit.", json.canary_attempt_contract);
   assert(String(json.ignition_endpoint ?? "").includes("/api/web3-live-ignition"), "Supervised canary readiness should link ignition evidence.", json);

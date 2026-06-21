@@ -246,8 +246,11 @@ wallet trading is allowed, the live trade cap, route TTL pressure, next wake cad
 the ordered final gate list only; it cannot sign, submit, custody funds, mutate wallets, store private
 keys or seed phrases, or enable live execution.
 `/api/web3-live-ignition` is the bot-facing real-money ignition go/no-go receipt. It reconciles
-live scope, wallet scope, Jupiter route/order proof, signer relay, autonomy readiness, canary proof,
-and the safety boundary into one status for the trading cockpit, `/api/health`, and `npm run verify:web3`.
+live scope, wallet scope, wallet ownership proof, Jupiter route/order proof, signer relay, autonomy readiness,
+canary proof, and the safety boundary into one status for the trading cockpit, `/api/health`, and `npm run verify:web3`.
+When a public wallet is scoped but not proven, ignition ranks the hash-only browser-wallet ownership proof
+ahead of Jupiter/order rehearsal so every live-trade surface points at the same next safe action before
+any unsigned canary order can be requested.
 `POST /api/web3-live-ignition` can prepare a machine-readable launch envelope for either the next
 supervised canary or a future bounded autonomous launch, but only after explicit acknowledgements and
 only when the existing ignition gates say the step is allowed.

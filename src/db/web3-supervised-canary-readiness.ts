@@ -260,7 +260,7 @@ function buildCanaryAttemptContract(input: {
     mode: "web3-first-live-canary-attempt-contract",
     stage,
     runnable_now: runnableNow,
-    operator_action_label: canaryAttemptOperatorAction(stage),
+    operator_action_label: canaryAttemptOperatorAction(stage, input.lanes),
     primary_endpoint: canaryAttemptEndpoint(stage, input),
     exact_next_command: canaryAttemptCommand(stage, input),
     missing_inputs: [...new Set(missingInputs.length > 0 ? missingInputs : input.blockers)].slice(0, 8),
@@ -274,12 +274,24 @@ function buildCanaryAttemptContract(input: {
   };
 }
 
-function canaryAttemptOperatorAction(stage: Web3SupervisedCanaryAttemptContract["stage"]) {
+function canaryAttemptOperatorAction(
+  stage: Web3SupervisedCanaryAttemptContract["stage"],
+  lanes: Web3SupervisedCanaryReadinessLane[],
+) {
   if (stage === "canary-proven") return "Run strict live-canary verification";
   if (stage === "proof-watch") return "Watch confirmation, settlement, and mirror proof";
   if (stage === "signed-payload-relay") return "Relay the matching externally signed payload";
   if (stage === "browser-wallet-signature") return "Open browser wallet signing for the one-shot canary";
   if (stage === "unsigned-order-request") return "Request one tiny unsigned canary order";
+  const lane = firstBlockingCanaryLane(lanes);
+  if (lane?.id === "live-scope") return "Open live DEX trading scope";
+  if (lane?.id === "dedicated-wallet") return "Save the dedicated public wallet";
+  if (lane?.id === "wallet-ownership") return "Prove wallet ownership";
+  if (lane?.id === "jupiter-order") return "Configure Jupiter and rehearse the order";
+  if (lane?.id === "live-flags") return "Arm exact live canary flags";
+  if (lane?.id === "unsigned-order-preflight") return "Clear unsigned order preflight";
+  if (lane?.id === "signer-relay") return "Prepare the signed-payload relay";
+  if (lane?.id === "manual-live-review") return "Complete manual live review";
   return "Clear credential and wallet gates";
 }
 
@@ -287,9 +299,18 @@ function canaryAttemptEndpoint(stage: Web3SupervisedCanaryAttemptContract["stage
   endpointParams: string;
   unsignedHandoffEndpoint: string;
   canaryEndpoint: string;
+  lanes: Web3SupervisedCanaryReadinessLane[];
 }) {
   if (stage === "unsigned-order-request" || stage === "browser-wallet-signature") return input.unsignedHandoffEndpoint;
   if (stage === "signed-payload-relay" || stage === "proof-watch" || stage === "canary-proven") return input.canaryEndpoint;
+  const lane = firstBlockingCanaryLane(input.lanes);
+  if (lane?.id === "live-scope" || lane?.id === "wallet-ownership") {
+    return "/trading?source=live-dex&account=persistent";
+  }
+  if (lane?.id === "dedicated-wallet" || lane?.id === "jupiter-order" || lane?.id === "live-flags" || lane?.id === "signer-relay" || lane?.id === "manual-live-review") {
+    return "/settings/integrations#settings-web3-credentials-runway";
+  }
+  if (lane?.id === "unsigned-order-preflight") return input.unsignedHandoffEndpoint;
   return `/api/web3-supervised-canary-readiness?${input.endpointParams}`;
 }
 
@@ -297,13 +318,27 @@ function canaryAttemptCommand(stage: Web3SupervisedCanaryAttemptContract["stage"
   proofCommand: string;
   unsignedHandoffEndpoint: string;
   canaryEndpoint: string;
+  lanes: Web3SupervisedCanaryReadinessLane[];
 }) {
   if (stage === "canary-proven") return "npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary";
   if (stage === "proof-watch") return input.proofCommand;
   if (stage === "signed-payload-relay") return `POST ${input.canaryEndpoint} with operator_ack=true, canary_ack, request_id, route, and signed_transaction.`;
   if (stage === "browser-wallet-signature") return "Use the Trading or Settings Sign tiny canary button; review the wallet prompt before signing.";
   if (stage === "unsigned-order-request") return `POST ${input.unsignedHandoffEndpoint} with operator_ack=true, canary_ack, return_unsigned_transaction_ack=true, wallet_public_key, amount_lamports<=1000000.`;
+  const lane = firstBlockingCanaryLane(input.lanes);
+  if (lane?.id === "live-scope") return "Open /trading?source=live-dex&account=persistent and refresh the first-canary readiness receipt.";
+  if (lane?.id === "dedicated-wallet") return "Save only the dedicated public Solana wallet address in Settings, then run npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet.";
+  if (lane?.id === "wallet-ownership") return "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
+  if (lane?.id === "jupiter-order") return "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order";
+  if (lane?.id === "live-flags") return "Set the exact live canary env flags, then rerun npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready.";
+  if (lane?.id === "unsigned-order-preflight") return `GET ${input.unsignedHandoffEndpoint} to confirm the one-shot unsigned order preflight is ready before any wallet prompt.`;
+  if (lane?.id === "signer-relay") return "Choose the browser-wallet signed-payload relay path and keep private keys, seed phrases, and signed payload storage blocked.";
+  if (lane?.id === "manual-live-review") return "Complete manual live review with tiny canary caps, emergency stop, and accounting mirror evidence.";
   return "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready";
+}
+
+function firstBlockingCanaryLane(lanes: Web3SupervisedCanaryReadinessLane[]) {
+  return lanes.find((lane) => lane.blocks_first_canary && lane.status !== "pass") ?? null;
 }
 
 function canaryAttemptAcknowledgements(stage: Web3SupervisedCanaryAttemptContract["stage"]) {
