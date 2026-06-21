@@ -398,6 +398,22 @@ function TradingCommandBoard({
               <CommandBoardMetric label="Signoffs" value={`${liveUsabilityBlockers.passed_signoff_count}/${liveUsabilityBlockers.required_signoff_count}`} detail={`${liveUsabilityBlockers.failed_or_watch_signoff_count} open`} tone={liveUsabilityBlockers.failed_or_watch_signoff_count > 0 ? "caution" : "engine"} />
               <CommandBoardMetric label="Actions" value={`${liveUsabilityBlockers.safe_action_count}`} detail={`${liveUsabilityBlockers.gated_action_count} gated`} tone="engine" />
             </div>
+            <div className="mt-2 rounded-md border border-outline/15 bg-surface-dim/35 p-2" aria-label="Trading credential doctor status">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Credential doctor</p>
+                  <p className="mt-1 truncate text-xs font-semibold text-on-surface">
+                    {liveUsabilityBlockers.credential_doctor.status.replaceAll("-", " ")}
+                  </p>
+                </div>
+                <span className={credentialDoctorBadgeClassName(liveUsabilityBlockers.credential_doctor)}>
+                  {liveUsabilityBlockers.credential_doctor.receipt_fresh ? "fresh" : "stale"}
+                </span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">
+                {liveUsabilityBlockers.credential_doctor.next_action}
+              </p>
+            </div>
             {leadMissingOwner ? (
               <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-outline">
                 Lead owner: {leadMissingOwner.owner.replaceAll("-", " ")} has {leadMissingOwner.missing_count} row{leadMissingOwner.missing_count === 1 ? "" : "s"} open; next is {leadMissingOwner.first_label}.
@@ -794,6 +810,13 @@ function operatorUnlockStepClassName(status: Web3UsabilityStatusReceipt["operato
   return "rounded-md border border-critical/30 bg-critical/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-critical";
 }
 
+function credentialDoctorBadgeClassName(doctor: Web3LiveUsabilityBlockersReceipt["credential_doctor"]) {
+  const base = "rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (doctor.status === "absent" || doctor.blocked_count > 0) return `${base} border-critical/30 bg-critical/10 text-critical`;
+  if (!doctor.receipt_fresh || doctor.watch_count > 0) return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-engine/30 bg-engine/10 text-engine`;
+}
+
 function LiveUsabilityBlockersPanel({
   receipt,
   source,
@@ -846,6 +869,24 @@ function LiveUsabilityBlockersPanel({
             <p className="mt-2 text-[11px] leading-4 text-outline">
               Showing {receipt.listed_live_usability_row_count}/{receipt.total_live_usability_row_count} rows here; open the JSON for every dependency-ranked blocker.
             </p>
+          </div>
+
+          <div className="mt-2 rounded-md border border-outline/15 bg-surface/50 p-3" aria-label="Live usability credential doctor summary">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Credential doctor</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {receipt.credential_doctor.ready_count} ready · {receipt.credential_doctor.blocked_count} blocked
+                </p>
+              </div>
+              <span className={credentialDoctorBadgeClassName(receipt.credential_doctor)}>
+                {receipt.credential_doctor.status.replaceAll("-", " ")}
+              </span>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{receipt.credential_doctor.next_action}</p>
+            <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+              {receipt.credential_doctor.safe_command}
+            </code>
           </div>
 
           {receipt.next_unlock_step ? (

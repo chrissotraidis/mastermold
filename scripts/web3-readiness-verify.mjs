@@ -187,6 +187,13 @@ async function verifyHealth() {
   assert(typeof json.web3_live_usability.total_live_usability_row_count === "number", "Live-usability health should expose total live-usability row count.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.listed_live_usability_row_count === "number", "Live-usability health should expose listed live-usability row count.", json.web3_live_usability);
   assert(json.web3_live_usability.total_live_usability_row_count >= json.web3_live_usability.listed_live_usability_row_count, "Live-usability health listed rows should not exceed total rows.", json.web3_live_usability);
+  assert(
+    ["absent", "needs-jupiter", "needs-wallet", "blocked", "ready-for-strict-verification", "ready-for-live-review-packet"].includes(json.web3_live_usability.credential_doctor_status),
+    "Live-usability health should expose credential doctor status.",
+    json.web3_live_usability,
+  );
+  assert(typeof json.web3_live_usability.credential_doctor_receipt_fresh === "boolean", "Live-usability health should expose credential doctor freshness.", json.web3_live_usability);
+  assert(typeof json.web3_live_usability.credential_doctor_next_action === "string" && json.web3_live_usability.credential_doctor_next_action.length > 0, "Live-usability health should expose credential doctor next action.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_label === "string" && json.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next operator unlock step.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_action === "string" && json.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", json.web3_live_usability);
   assert(json.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", json.web3_live_usability);
@@ -475,6 +482,15 @@ async function verifyLiveUsabilityBlockersReceipt() {
   assert(Array.isArray(json.missing_for_live_usability), "Live usability blockers should include missing-for-usability rows.", json);
   assert(Array.isArray(json.missing_owner_summary) && json.missing_owner_summary.length > 0, "Live usability blockers should include owner summary rows.", json.missing_owner_summary);
   assert(Array.isArray(json.missing_source_summary) && json.missing_source_summary.length > 0, "Live usability blockers should include source summary rows.", json.missing_source_summary);
+  assert(json.credential_doctor && typeof json.credential_doctor === "object", "Live usability blockers should include the credential doctor summary.", json.credential_doctor);
+  assert(
+    ["absent", "needs-jupiter", "needs-wallet", "blocked", "ready-for-strict-verification", "ready-for-live-review-packet"].includes(json.credential_doctor.status),
+    "Live usability credential doctor summary should use a known status.",
+    json.credential_doctor,
+  );
+  assert(typeof json.credential_doctor.receipt_fresh === "boolean", "Live usability credential doctor summary should state freshness.", json.credential_doctor);
+  assert(typeof json.credential_doctor.next_action === "string" && json.credential_doctor.next_action.length > 0, "Live usability credential doctor summary should include a next action.", json.credential_doctor);
+  assert(String(json.credential_doctor.safe_command ?? "").includes("doctor:web3"), "Live usability credential doctor summary should include the safe doctor command.", json.credential_doctor);
   assert(
     json.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0) === json.total_live_usability_row_count,
     "Live usability blocker owner summary should reconcile to total rows.",
@@ -520,6 +536,7 @@ async function verifyLiveUsabilityBlockersReceipt() {
     "Live usability blockers rows=all source summary should reconcile to total rows.",
     allRows.json.missing_source_summary,
   );
+  assert(allRows.json.credential_doctor?.status === json.credential_doctor.status, "Live usability blockers rows=all should keep the same credential doctor status.", allRows.json.credential_doctor);
   assert(
     typeof allRows.json.summary === "string" && allRows.json.summary.includes("all dependency-ranked rows are listed"),
     "Live usability blockers rows=all summary should say all rows are listed.",

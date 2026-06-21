@@ -727,6 +727,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain('params.set("rows", "all")');
     expect(tradingPage).toContain("open the JSON for every dependency-ranked blocker");
     expect(tradingPage).toContain("Lead owner:");
+    expect(tradingPage).toContain("Trading credential doctor status");
+    expect(tradingPage).toContain("Live usability credential doctor summary");
+    expect(tradingPage).toContain("credentialDoctorBadgeClassName");
+    expect(tradingPage).toContain("credential_doctor");
     expect(tradingPage).toContain("Live usability blocker owner and source summary");
     expect(tradingPage).toContain("Owner split");
     expect(tradingPage).toContain("Evidence split");
@@ -804,6 +808,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("live_usability_row_scope");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("missing_owner_summary");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("missing_source_summary");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("credential_doctor");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("credential_doctor_status");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("summarizeCredentialDoctor");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("summarizeMissingByOwner");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("summarizeMissingBySource");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("rows=all");
@@ -1024,6 +1031,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings live usability next unlock step");
     expect(settingsPage).toContain("Settings live usability next action");
     expect(settingsPage).toContain("Settings live usability safe actions");
+    expect(settingsPage).toContain("Settings live usability credential doctor summary");
+    expect(settingsPage).toContain("credentialDoctor: web3CredentialDoctor");
     expect(settingsPage).toContain("Settings Web3 blocker owner and evidence summary");
     expect(settingsPage).toContain("Owner split");
     expect(settingsPage).toContain("Evidence split");

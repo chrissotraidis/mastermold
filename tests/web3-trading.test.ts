@@ -1392,6 +1392,16 @@ describe("Web3 autonomous trading subsystem", () => {
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; real_capital_blocker_count: number; first_label: string; next_action: string; sources: string[] }>;
       missing_source_summary: Array<{ source: string; missing_count: number; real_capital_blocker_count: number; first_label: string; next_action: string }>;
+      credential_doctor: {
+        status: string;
+        receipt_fresh: boolean;
+        ready_count: number;
+        watch_count: number;
+        blocked_count: number;
+        next_action: string;
+        safe_command: string;
+        receipt_hash: string | null;
+      };
       live_execution_permission: string;
       wallet_mutation_permission: string;
       transaction_submission_permission: string;
@@ -1437,6 +1447,11 @@ describe("Web3 autonomous trading subsystem", () => {
       first_label: "Dedicated trading wallet",
     });
     expect(receipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(receipt.total_live_usability_row_count);
+    expect(receipt.credential_doctor.status).toMatch(/^(absent|needs-jupiter|needs-wallet|blocked|ready-for-strict-verification|ready-for-live-review-packet)$/);
+    expect(typeof receipt.credential_doctor.receipt_fresh).toBe("boolean");
+    expect(receipt.credential_doctor.ready_count + receipt.credential_doctor.watch_count + receipt.credential_doctor.blocked_count).toBeGreaterThanOrEqual(0);
+    expect(receipt.credential_doctor.next_action.length).toBeGreaterThan(0);
+    expect(receipt.credential_doctor.safe_command).toContain("doctor:web3");
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");
     expect(receipt.transaction_submission_permission).toBe("blocked");
@@ -1453,6 +1468,7 @@ describe("Web3 autonomous trading subsystem", () => {
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; first_label: string; next_action: string }>;
       missing_source_summary: Array<{ source: string; missing_count: number; first_label: string; next_action: string }>;
+      credential_doctor: { status: string; safe_command: string; next_action: string };
       live_execution_permission: string;
       wallet_mutation_permission: string;
       secret_echo_permission: string;
@@ -1466,6 +1482,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.missing_for_live_usability.length).toBeGreaterThanOrEqual(receipt.missing_for_live_usability.length);
     expect(allRowsReceipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
+    expect(allRowsReceipt.credential_doctor.status).toBe(receipt.credential_doctor.status);
+    expect(allRowsReceipt.credential_doctor.safe_command).toContain("doctor:web3");
     expect(allRowsReceipt.controls.some((control) => control.includes("rows=all"))).toBe(true);
     expect(allRowsReceipt.live_execution_permission).toBe("blocked");
     expect(allRowsReceipt.wallet_mutation_permission).toBe("blocked");

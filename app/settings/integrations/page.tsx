@@ -143,6 +143,7 @@ export default async function IntegrationsSettingsPage() {
     preflight: web3LiveCapitalPreflight,
     manualLiveReview: web3ManualLiveReviewPacket,
     runway: web3SupervisedLiveRunway,
+    credentialDoctor: web3CredentialDoctor,
   });
   const web3OperatorCredentialHandoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup: web3AccountReceipt,
@@ -996,12 +997,32 @@ function SettingsWeb3LiveUsabilityBlockersPanel({ receipt }: { receipt: Web3Live
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-5">
+      <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <SettingsMetric label="Capital blockers" value={`${receipt.real_capital_blocker_count}`} />
         <SettingsMetric label="Rows listed" value={`${receipt.listed_live_usability_row_count}/${receipt.total_live_usability_row_count}`} />
         <SettingsMetric label="Live lanes" value={`${receipt.ready_live_lane_count}/${receipt.total_live_lane_count}`} />
         <SettingsMetric label="Signoffs" value={`${receipt.passed_signoff_count}/${receipt.required_signoff_count}`} />
         <SettingsMetric label="Safe actions" value={`${receipt.safe_action_count}`} />
+        <SettingsMetric label="Doctor" value={receipt.credential_doctor.receipt_fresh ? "fresh" : "stale"} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/30 p-2" aria-label="Settings live usability credential doctor summary">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Credential doctor</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              {receipt.credential_doctor.status.replaceAll("-", " ")} · {receipt.credential_doctor.ready_count} ready · {receipt.credential_doctor.blocked_count} blocked
+            </p>
+          </div>
+          <LaunchQueueBadge
+            status={receipt.credential_doctor.status === "absent" || receipt.credential_doctor.blocked_count > 0 ? "fail" : receipt.credential_doctor.receipt_fresh ? "pass" : "watch"}
+            label={receipt.credential_doctor.receipt_fresh ? "fresh" : "refresh"}
+          />
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{receipt.credential_doctor.next_action}</p>
+        <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+          {receipt.credential_doctor.safe_command}
+        </code>
       </div>
 
       <div className="mt-3 grid gap-2 md:grid-cols-2" aria-label="Settings Web3 blocker owner and evidence summary">

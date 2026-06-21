@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "./web3-credential-doctor";
 import type { Web3CutoverBlockerBoard } from "./web3-cutover-blocker-board";
 import type { Web3LiveCapitalPreflightReceipt } from "./web3-live-capital-preflight";
 import type { Web3ManualLiveReviewPacket } from "./web3-manual-live-review-packet";
@@ -34,6 +35,17 @@ export type Web3LiveUsabilitySourceSummary = {
   real_capital_blocker_count: number;
   first_label: string;
   next_action: string;
+};
+
+export type Web3LiveUsabilityCredentialDoctorSummary = {
+  status: Web3CredentialDoctorHealth["status"];
+  receipt_fresh: boolean;
+  ready_count: number;
+  watch_count: number;
+  blocked_count: number;
+  next_action: string;
+  safe_command: string;
+  receipt_hash: string | null;
 };
 
 export type Web3LiveUsabilityBlockersReceipt = {
@@ -83,6 +95,7 @@ export type Web3LiveUsabilityBlockersReceipt = {
   missing_for_live_usability: Web3LiveUsabilityMissingItem[];
   missing_owner_summary: Web3LiveUsabilityOwnerSummary[];
   missing_source_summary: Web3LiveUsabilitySourceSummary[];
+  credential_doctor: Web3LiveUsabilityCredentialDoctorSummary;
   safe_next_actions: Array<{
     id: Web3OperatorRunbookReceipt["run_now"][number]["id"];
     label: string;
@@ -126,6 +139,10 @@ export type Web3LiveUsabilityBlockersHealth = {
   next_unlock_step_label: string | null;
   next_unlock_step_status: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number]["status"] | null;
   next_unlock_step_action: string | null;
+  credential_doctor_status: Web3LiveUsabilityCredentialDoctorSummary["status"];
+  credential_doctor_receipt_fresh: boolean;
+  credential_doctor_blocked_count: number;
+  credential_doctor_next_action: string;
   next_action: string;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -144,6 +161,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   preflight: Web3LiveCapitalPreflightReceipt;
   manualLiveReview: Web3ManualLiveReviewPacket;
   runway: Web3SupervisedLiveRunway;
+  credentialDoctor?: Web3CredentialDoctorHealth;
   now?: Date;
   rowScope?: "compact" | "all";
 }): Web3LiveUsabilityBlockersReceipt {
@@ -177,6 +195,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   const listedMissing = rowScope === "all" ? missing : missing.slice(0, 14);
   const ownerSummary = summarizeMissingByOwner(missing);
   const sourceSummary = summarizeMissingBySource(missing);
+  const credentialDoctor = summarizeCredentialDoctor(input.credentialDoctor ?? getWeb3CredentialDoctorHealth());
   const verifierCommands = Array.from(new Set([
     ...input.runbook.verifier_commands,
     ...input.manualLiveReview.safe_commands,
@@ -226,6 +245,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     missing_for_live_usability: listedMissing,
     missing_owner_summary: ownerSummary,
     missing_source_summary: sourceSummary,
+    credential_doctor: credentialDoctor,
     safe_next_actions: safeNextActions,
     verifier_commands: verifierCommands,
     evidence_endpoints: [
@@ -235,6 +255,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
       "GET /api/web3-supervised-live-runway",
       "GET /api/web3-manual-live-review-packet",
       "GET /api/web3-operator-runbook",
+      "LOCAL data/web3-credential-doctor.json",
     ],
     safe_to_provide: input.cutover.safe_to_provide,
     never_provide: input.cutover.never_provide,
@@ -248,7 +269,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     controls: [
       "This receipt answers what is left before real-money Web3 usability; it is not an execution endpoint.",
       "Safe actions are limited to cockpit review, paper autonomy, read-only market refresh, credential setup, verifier commands, and external review packets.",
-      "It summarizes target names, owner/source groups, labels, next actions, and blocker counts only; provider secrets, wallet secrets, transaction bodies, signatures, and webhook values are never returned.",
+      "It summarizes target names, owner/source groups, credential-doctor status, labels, next actions, and blocker counts only; provider secrets, wallet secrets, transaction bodies, signatures, and webhook values are never returned.",
       "Pass rows=all to inspect every dependency-ranked missing row; the default receipt stays compact for dashboards.",
       "Autonomous live trading remains locked in-app even when supervised live review becomes externally requestable.",
     ],
@@ -283,6 +304,10 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     next_unlock_step_label: receipt.next_unlock_step?.label ?? null,
     next_unlock_step_status: receipt.next_unlock_step?.status ?? null,
     next_unlock_step_action: receipt.next_unlock_step?.next_action ?? null,
+    credential_doctor_status: receipt.credential_doctor.status,
+    credential_doctor_receipt_fresh: receipt.credential_doctor.receipt_fresh,
+    credential_doctor_blocked_count: receipt.credential_doctor.blocked_count,
+    credential_doctor_next_action: receipt.credential_doctor.next_action,
     next_action: receipt.next_action,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -291,6 +316,19 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     private_key_storage: "blocked",
     seed_phrase_storage: "blocked",
     secret_echo_permission: "blocked",
+  };
+}
+
+function summarizeCredentialDoctor(health: Web3CredentialDoctorHealth): Web3LiveUsabilityCredentialDoctorSummary {
+  return {
+    status: health.status,
+    receipt_fresh: health.receipt_fresh,
+    ready_count: health.ready_count,
+    watch_count: health.watch_count,
+    blocked_count: health.blocked_count,
+    next_action: health.next_action,
+    safe_command: "npm run doctor:web3 -- --json",
+    receipt_hash: health.receipt_hash || null,
   };
 }
 
