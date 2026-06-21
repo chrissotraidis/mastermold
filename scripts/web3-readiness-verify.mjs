@@ -291,6 +291,16 @@ async function verifyHealth() {
   assert(json.web3_live_ignition.can_autonomously_trade_real_money_now === false, "Live ignition health should keep autonomous real-money trading false in default verification.", json.web3_live_ignition);
   assert(json.web3_live_ignition.actual_live_trade_tested === false, "Live ignition health should not claim a funded live canary in default verification.", json.web3_live_ignition);
   assert(typeof json.web3_live_ignition.blocker_count === "number", "Live ignition health should expose blocker count.", json.web3_live_ignition);
+  verifyCanaryProofHealth(json.web3_canary_proof, {
+    name: "Default canary proof health",
+    endpoint: "/api/web3-live-trade-canary",
+    liveEndpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+  });
+  verifyCanaryProofHealth(json.web3_live_canary_proof, {
+    name: "Canonical live canary proof health",
+    endpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    liveEndpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+  });
   assert(json.web3_first_canary_drill?.mode === "web3-first-canary-drill-health", "Health endpoint should expose compact first-canary drill health.", json.web3_first_canary_drill);
   assert(
     ["blocked", "ready-to-request-unsigned-order", "ready-to-relay-signed-payload", "canary-proven", "unsafe-permission-drift"].includes(json.web3_first_canary_drill.status),
@@ -399,7 +409,31 @@ async function verifyHealth() {
   assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
-  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, first-canary drill, canonical live canary drill, and live-usability locks are blocked");
+  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, canary proof, first-canary drill, canonical live canary drill, and live-usability locks are blocked");
+}
+
+function verifyCanaryProofHealth(health, { name, endpoint, liveEndpoint }) {
+  assert(health?.mode === "web3-live-canary-proof-health", `${name} should expose compact live canary proof health.`, health);
+  assert(["blocked", "ready-for-external-signed-payload", "live-relay-evidence-recorded"].includes(health.status), `${name} should expose a known status.`, health);
+  assertReceiptHash(name, health.receipt_hash);
+  assert(health.source_endpoint.includes(endpoint), `${name} should link the canary receipt endpoint.`, health);
+  assert(health.live_review_source_endpoint === liveEndpoint, `${name} should expose the canonical live canary endpoint.`, health);
+  assert(health.actual_live_trade_tested === false, `${name} should not claim a funded live canary in default verification.`, health);
+  assert(health.real_funds_moved_by_this_app === false, `${name} should not claim real funds moved in default verification.`, health);
+  assert(health.proof_required_count === 4, `${name} should require four post-signing proof stages.`, health);
+  assert(typeof health.proof_pass_count === "number", `${name} should expose passed proof count.`, health);
+  assert(["needs-signed-relay", "needs-confirmation", "needs-settlement", "needs-mirror-review", "settlement-accounted", "review-required"].includes(health.post_signing_evidence_status), `${name} should expose a known proof status.`, health);
+  assert(health.next_proof_id === null || ["signed-relay", "chain-confirmation", "settlement-reconciliation", "portfolio-mirror"].includes(health.next_proof_id), `${name} should expose a known next proof id.`, health);
+  assert(health.next_proof_label === null || typeof health.next_proof_label === "string", `${name} should expose a next proof label or null.`, health);
+  assert(health.next_proof_status === null || ["pass", "watch", "fail"].includes(health.next_proof_status), `${name} should expose a known next proof status.`, health);
+  assert(typeof health.next_proof_action === "string" && health.next_proof_action.length > 0, `${name} should expose the next proof action.`, health);
+  assert(typeof health.next_action === "string" && health.next_action.length > 0, `${name} should expose next action.`, health);
+  assert(["blocked", "external-signed-payload-only"].includes(health.live_execution_permission), `${name} should keep live execution bounded.`, health);
+  assert(["blocked", "external-signed-payload-only"].includes(health.transaction_submission_permission), `${name} should keep transaction submission bounded.`, health);
+  assert(health.wallet_mutation_permission === "blocked", `${name} should keep wallet mutation blocked.`, health);
+  assert(health.private_key_storage === "blocked", `${name} should keep private-key storage blocked.`, health);
+  assert(health.seed_phrase_storage === "blocked", `${name} should keep seed-phrase storage blocked.`, health);
+  assert(health.secret_echo_permission === "blocked", `${name} should keep secret echo blocked.`, health);
 }
 
 async function verifyOperatorWalletScope() {

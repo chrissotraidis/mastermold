@@ -51,6 +51,38 @@ export type Web3LiveTradeCanaryReceipt = {
   controls: string[];
 };
 
+export type Web3LiveTradeCanaryHealth = {
+  mode: "web3-live-canary-proof-health";
+  status: Web3LiveTradeCanaryReceipt["status"];
+  receipt_hash: string;
+  source_endpoint: string;
+  live_review_source_endpoint: string;
+  actual_live_trade_tested: boolean;
+  real_funds_moved_by_this_app: boolean;
+  can_submit_from_app_now: boolean;
+  signed_relay_status: Web3LiveTradeCanaryReceipt["signed_relay_status"];
+  latest_signature_preview: string | null;
+  latest_confirmation_status: string | null;
+  confirmation_poll_status: Web3LiveTradeCanaryReceipt["confirmation_poll_status"];
+  settlement_reconciliation_status: Web3LiveTradeCanaryReceipt["settlement_reconciliation_status"];
+  settlement_watchdog_status: Web3LiveTradeCanaryReceipt["settlement_watchdog_status"];
+  portfolio_mirror_status: Web3LiveTradeCanaryReceipt["portfolio_mirror_status"];
+  post_signing_evidence_status: Web3LiveTradeCanaryReceipt["post_signing_evidence_status"];
+  proof_pass_count: number;
+  proof_required_count: 4;
+  next_proof_id: Web3LiveTradeCanaryEvidenceItem["id"] | null;
+  next_proof_label: string | null;
+  next_proof_status: Web3LiveTradeCanaryEvidenceItem["status"] | null;
+  next_proof_action: string;
+  next_action: string;
+  live_execution_permission: Web3LiveTradeCanaryReceipt["live_execution_permission"];
+  transaction_submission_permission: Web3LiveTradeCanaryReceipt["transaction_submission_permission"];
+  wallet_mutation_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export type Web3LiveTradeCanaryActionReceipt = {
   mode: "web3-live-trade-canary-action";
   status: "blocked" | "unsafe-rejected" | "relay-attempted" | "live-relay-evidence-recorded";
@@ -270,6 +302,41 @@ export function buildWeb3LiveTradeCanaryReceipt(
   return {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
+  };
+}
+
+export function buildWeb3LiveTradeCanaryHealth(receipt: Web3LiveTradeCanaryReceipt): Web3LiveTradeCanaryHealth {
+  const nextProof = receipt.post_signing_evidence.find((item) => item.status !== "pass") ?? null;
+  return {
+    mode: "web3-live-canary-proof-health",
+    status: receipt.status,
+    receipt_hash: receipt.receipt_hash,
+    source_endpoint: `/api/web3-live-trade-canary?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`,
+    live_review_source_endpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    actual_live_trade_tested: receipt.actual_live_trade_tested,
+    real_funds_moved_by_this_app: receipt.real_funds_moved_by_this_app,
+    can_submit_from_app_now: receipt.can_submit_from_app_now,
+    signed_relay_status: receipt.signed_relay_status,
+    latest_signature_preview: receipt.latest_signature_preview,
+    latest_confirmation_status: receipt.latest_confirmation_status,
+    confirmation_poll_status: receipt.confirmation_poll_status,
+    settlement_reconciliation_status: receipt.settlement_reconciliation_status,
+    settlement_watchdog_status: receipt.settlement_watchdog_status,
+    portfolio_mirror_status: receipt.portfolio_mirror_status,
+    post_signing_evidence_status: receipt.post_signing_evidence_status,
+    proof_pass_count: receipt.post_signing_evidence.filter((item) => item.status === "pass").length,
+    proof_required_count: 4,
+    next_proof_id: nextProof?.id ?? null,
+    next_proof_label: nextProof?.label ?? null,
+    next_proof_status: nextProof?.status ?? null,
+    next_proof_action: nextProof?.next_action ?? receipt.post_signing_next_action,
+    next_action: receipt.post_signing_next_action,
+    live_execution_permission: receipt.live_execution_permission,
+    transaction_submission_permission: receipt.transaction_submission_permission,
+    wallet_mutation_permission: "blocked",
+    private_key_storage: "blocked",
+    seed_phrase_storage: "blocked",
+    secret_echo_permission: "blocked",
   };
 }
 

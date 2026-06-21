@@ -18,7 +18,7 @@ import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital
 import { buildWeb3LiveAutonomyReadinessHealth } from "@/src/db/web3-live-autonomy-readiness";
 import { buildWeb3LiveIgnitionHealth, buildWeb3LiveIgnitionReceipt } from "@/src/db/web3-live-ignition";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
-import { buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
+import { buildWeb3LiveTradeCanaryHealth, buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
 import {
   buildWeb3LiveUsabilityBlockersHealth,
@@ -167,6 +167,7 @@ export async function GET() {
     canary: web3Canary,
   });
   const web3LiveFirstCanaryDrillHealth = await buildCanonicalLiveFirstCanaryDrillHealth();
+  const web3LiveCanaryProofHealth = await buildCanonicalLiveCanaryProofHealth();
   return NextResponse.json({
     status: "ok",
     web3_daemon_supervisor: web3DaemonSupervisor,
@@ -177,12 +178,25 @@ export async function GET() {
     web3_live_activation: buildWeb3LiveActivationPlanHealth(web3LiveActivationPlan),
     web3_live_autonomy_readiness: buildWeb3LiveAutonomyReadinessHealth(web3State),
     web3_live_ignition: buildWeb3LiveIgnitionHealth(web3LiveIgnition),
+    web3_canary_proof: buildWeb3LiveTradeCanaryHealth(web3Canary),
+    web3_live_canary_proof: web3LiveCanaryProofHealth,
     web3_first_canary_drill: buildWeb3FirstCanaryDrillHealth(web3FirstCanaryDrill),
     web3_live_first_canary_drill: web3LiveFirstCanaryDrillHealth,
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
     web3_credential_requirements: buildWeb3CredentialRequirementsHealth(web3CredentialRequirements),
   });
+}
+
+async function buildCanonicalLiveCanaryProofHealth() {
+  const state = await getWeb3TradingStateAsync({
+    advance: false,
+    source: "live-dex",
+    account: "persistent",
+    scenario: "breakout",
+    cycles: 0,
+  });
+  return buildWeb3LiveTradeCanaryHealth(buildWeb3LiveTradeCanaryReceipt(state));
 }
 
 async function buildCanonicalLiveFirstCanaryDrillHealth() {
