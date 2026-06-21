@@ -2359,7 +2359,7 @@ describe("Web3 autonomous trading subsystem", () => {
       actual_live_trade_tested: boolean;
       real_funds_moved_by_this_app: boolean;
       can_submit_from_app_now: boolean;
-      browser_wallet_signature_flow: boolean;
+      browser_wallet_signature_flow: string;
       unsigned_transaction_return: string;
       live_execution_gate_enabled: boolean;
       signed_relay_status: string;
@@ -2384,7 +2384,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.actual_live_trade_tested).toBe(false);
     expect(receipt.real_funds_moved_by_this_app).toBe(false);
     expect(receipt.can_submit_from_app_now).toBe(false);
-    expect(receipt.browser_wallet_signature_flow).toBe(false);
+    expect(receipt.browser_wallet_signature_flow).toBe("gated-unsigned-handoff");
     expect(receipt.unsigned_transaction_return).toBe("withheld");
     expect(receipt.live_execution_gate_enabled).toBe(false);
     expect(receipt.signed_relay_accepts_payload).toBe(false);
@@ -2400,6 +2400,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.private_key_storage).toBe("blocked");
     expect(receipt.seed_phrase_storage).toBe("blocked");
     expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.join(" ")).toContain("Browser-wallet signing is wired only through the gated one-shot");
     expect(receipt.controls.join(" ")).toContain("Paper and read-only DEX tests do not count as actual live trades");
 
     const signedPayload = Buffer.from("signed-payload-canary-never-echo").toString("base64");

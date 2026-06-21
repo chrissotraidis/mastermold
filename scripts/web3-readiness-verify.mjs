@@ -1251,7 +1251,7 @@ async function verifyLiveTradeCanary() {
   assert(json.actual_live_trade_tested === false, "Live trade canary should truthfully say no real live trade has been tested in this local sample check.", json);
   assert(json.real_funds_moved_by_this_app === false, "Live trade canary should not claim funds moved in sample verification.", json);
   assert(json.can_submit_from_app_now === false, "Live trade canary should not be ready to submit from sample verification.", json);
-  assert(json.browser_wallet_signature_flow === false, "Live trade canary should disclose that browser-wallet signing is not wired.", json);
+  assert(json.browser_wallet_signature_flow === "gated-unsigned-handoff", "Live trade canary should disclose the gated browser-wallet signing bridge.", json);
   assert(json.unsigned_transaction_return === "withheld", "Live trade canary should disclose unsigned transaction withholding.", json);
   assert(json.live_execution_gate_enabled === false, "Live trade canary should keep the current live execution gate locked.", json);
   assert(json.signed_relay_accepts_payload === false, "Live trade canary should not accept signed payloads in the sample check.", json);

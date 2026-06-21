@@ -1,0 +1,338 @@
+"use client";
+
+import { useState } from "react";
+import { ArrowRight, ShieldCheck, Wallet, Zap } from "lucide-react";
+import Link from "next/link";
+import type { Web3LiveTradeCanaryActionReceipt, Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
+import type { Web3LiveUnsignedOrderHandoffReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
+import type { TradingAccountMode, TradingMarketSource, TradingScenario } from "@/src/db/web3-trading";
+
+type BrowserSolanaProvider = {
+  isPhantom?: boolean;
+  isSolflare?: boolean;
+  isBackpack?: boolean;
+  isConnected?: boolean;
+  publicKey?: { toString: () => string };
+  connect?: (options?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey?: { toString: () => string } } | void>;
+  signTransaction?: (transaction: unknown) => Promise<unknown>;
+};
+
+type Web3LiveCanaryConsoleProps = {
+  receipt: Web3LiveTradeCanaryReceipt;
+  source: TradingMarketSource;
+  account: TradingAccountMode;
+  scenario: TradingScenario;
+  cycles: number;
+  maxSlippageBps: number;
+  defaultWalletPublicKey: string | null;
+};
+
+export function Web3LiveCanaryConsole({
+  receipt,
+  source,
+  account,
+  scenario,
+  cycles,
+  maxSlippageBps,
+  defaultWalletPublicKey,
+}: Web3LiveCanaryConsoleProps) {
+  const [message, setMessage] = useState(receipt.next_action);
+  const [busy, setBusy] = useState(false);
+  const [unsignedReceipt, setUnsignedReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
+  const [actionReceipt, setActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
+  const [walletPreview, setWalletPreview] = useState(previewValue(defaultWalletPublicKey));
+
+  const params = new URLSearchParams({
+    scenario,
+    source: "live-dex",
+    account: "persistent",
+    cycles: String(cycles),
+  });
+  const currentParams = new URLSearchParams({
+    scenario,
+    source,
+    account,
+    cycles: String(cycles),
+  });
+  const canaryHref = `/api/web3-live-trade-canary?${currentParams.toString()}`;
+  const unsignedHref = `/api/web3-live-unsigned-order-handoff?${params.toString()}`;
+  const liveTradingHref = `/trading?source=live-dex${account !== "persistent" ? "&account=persistent" : ""}`;
+  const latestStatus = actionReceipt?.status ?? unsignedReceipt?.status ?? receipt.status;
+  const actualTradeTested = actionReceipt?.actual_live_trade_tested ?? receipt.actual_live_trade_tested;
+  const sourceReady = source === "live-dex" && account === "persistent";
+
+  async function signTinyCanary() {
+    setBusy(true);
+    setMessage("Preparing the tiny SOL-to-USDC canary handoff for browser-wallet signing...");
+    try {
+      const provider = getBrowserSolanaProvider();
+      if (!provider || typeof provider.signTransaction !== "function") {
+        throw new Error("No browser wallet with transaction signing is available on this browser.");
+      }
+      let publicKey = provider.publicKey?.toString() ?? null;
+      if ((!publicKey || !isLikelySolanaPublicKey(publicKey)) && typeof provider.connect === "function") {
+        const result = await provider.connect();
+        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? null;
+      }
+      if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
+        throw new Error("Connect a valid public Solana wallet before requesting the tiny live canary.");
+      }
+      setWalletPreview(previewValue(publicKey));
+
+      const unsignedResponse = await fetch(unsignedHref, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operator_ack: true,
+          canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+          return_unsigned_transaction_ack: true,
+          wallet_public_key: publicKey,
+          amount_lamports: 100_000,
+          max_slippage_bps: Math.max(1, Math.min(100, Math.trunc(maxSlippageBps || 50))),
+        }),
+      });
+      const unsignedPayload = await unsignedResponse.json().catch(() => null) as Web3LiveUnsignedOrderHandoffReceipt | { error: string } | null;
+      if (!unsignedResponse.ok || !unsignedPayload || "error" in unsignedPayload) {
+        throw new Error(unsignedPayload && "error" in unsignedPayload ? unsignedPayload.error : "Live unsigned order handoff failed.");
+      }
+      setUnsignedReceipt(unsignedPayload);
+      if (unsignedPayload.status !== "order-ready" || !unsignedPayload.unsigned_transaction || !unsignedPayload.request_id) {
+        throw new Error(unsignedPayload.next_action);
+      }
+
+      setMessage("Wallet prompt opening. Confirm the tiny canary only if the wallet preview and amount look correct.");
+      const { VersionedTransaction } = await import("@solana/web3.js");
+      const transaction = VersionedTransaction.deserialize(base64ToBytes(unsignedPayload.unsigned_transaction));
+      const signedTransaction = await provider.signTransaction(transaction);
+      const serialized = serializeSignedWalletTransaction(signedTransaction);
+      if (!serialized) throw new Error("Wallet did not return a serializable signed transaction.");
+
+      const relayResponse = await fetch(`/api/web3-live-trade-canary?${params.toString()}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operator_ack: true,
+          canary_ack: "I_UNDERSTAND_THIS_CAN_MOVE_REAL_FUNDS",
+          signed_transaction: bytesToBase64(serialized),
+          request_id: unsignedPayload.request_id,
+          route: "jupiter-swap-v2",
+        }),
+      });
+      const relayPayload = await relayResponse.json().catch(() => null) as Web3LiveTradeCanaryActionReceipt | { error: string } | null;
+      if (!relayResponse.ok || !relayPayload || "error" in relayPayload) {
+        throw new Error(relayPayload && "error" in relayPayload ? relayPayload.error : "Live canary relay failed.");
+      }
+      setActionReceipt(relayPayload);
+      setMessage(relayPayload.next_action);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Tiny canary signing failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section
+      aria-labelledby="web3-live-canary-console-title"
+      className="rounded-md border border-critical/30 bg-critical/[0.035] p-4 sm:p-5"
+    >
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.95fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-critical/30 bg-critical/10 text-critical">
+                <Zap aria-hidden="true" className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Live money canary</p>
+                <h2 id="web3-live-canary-console-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
+                  {actualTradeTested ? "Tiny live trade evidence recorded" : "No real trade tested yet"}
+                </h2>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">{message}</p>
+              </div>
+            </div>
+            <span className={canaryStatusClassName(latestStatus)}>
+              {latestStatus.replaceAll("-", " ")}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <CanaryMetric label="Actual trade" value={actualTradeTested ? "yes" : "no"} tone={actualTradeTested ? "engine" : "critical"} />
+            <CanaryMetric label="Browser sign" value={receipt.browser_wallet_signature_flow.replaceAll("-", " ")} tone="caution" />
+            <CanaryMetric label="Submit path" value={receipt.transaction_submission_permission.replaceAll("-", " ")} tone={receipt.can_submit_from_app_now ? "caution" : "neutral"} />
+            <CanaryMetric label="Wallet" value={walletPreview ?? "not connected"} tone={walletPreview ? "caution" : "neutral"} />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {sourceReady ? (
+              <button
+                type="button"
+                onClick={() => void signTinyCanary()}
+                disabled={busy}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 text-sm font-semibold text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
+              >
+                <Wallet aria-hidden="true" className={busy ? "size-4 animate-pulse" : "size-4"} />
+                {busy ? "Signing canary" : "Sign tiny canary"}
+              </button>
+            ) : (
+              <Link
+                href={liveTradingHref}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 text-sm font-semibold text-critical transition hover:bg-critical/15"
+              >
+                Open live DEX canary
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            )}
+            <Link
+              href="/settings/integrations#settings-web3-credentials-runway"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15"
+            >
+              Fix credential gates
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+            <Link
+              href={canaryHref}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open canary JSON
+            </Link>
+          </div>
+
+          <p className="mt-3 text-xs leading-5 text-outline">
+            This control can request only a tiny one-shot unsigned Jupiter canary, ask the external browser wallet to sign it, and relay the signed payload through the guarded canary endpoint. It cannot store wallet authority, private keys, seed phrases, or transaction bodies.
+          </p>
+        </div>
+
+        <div className="grid min-w-0 gap-2">
+          <div className="rounded-md border border-critical/20 bg-surface/55 p-3" aria-label="Trading live canary blockers">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Blocking real trade proof</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {receipt.blockers.length > 0 ? `${receipt.blockers.length} blocker${receipt.blockers.length === 1 ? "" : "s"}` : "No listed blocker"}
+                </p>
+              </div>
+              <ShieldCheck aria-hidden="true" className="size-4 text-outline" />
+            </div>
+            <ul className="mt-2 grid gap-1.5 text-[11px] leading-4 text-on-surface-variant">
+              {(actionReceipt?.blockers ?? unsignedReceipt?.blockers ?? receipt.blockers).slice(0, 4).map((blocker) => (
+                <li key={blocker}>{blocker}</li>
+              ))}
+            </ul>
+          </div>
+
+          {unsignedReceipt ? (
+            <div className="rounded-md border border-caution/25 bg-caution/[0.04] p-3" aria-label="Trading unsigned canary receipt">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Unsigned handoff</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{unsignedReceipt.status.replaceAll("-", " ")}</p>
+                </div>
+                <span className="rounded-md border border-caution/30 bg-caution/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-caution">
+                  {unsignedReceipt.unsigned_transaction_return.replaceAll("-", " ")}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <CanaryMetric label="Request" value={unsignedReceipt.request_id ?? "none"} tone={unsignedReceipt.request_id ? "caution" : "neutral"} />
+                <CanaryMetric label="Bytes" value={String(unsignedReceipt.unsigned_payload_byte_count)} tone={unsignedReceipt.unsigned_payload_byte_count > 0 ? "caution" : "neutral"} />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-outline">{unsignedReceipt.next_action}</p>
+            </div>
+          ) : null}
+
+          {actionReceipt ? (
+            <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Trading signed canary relay receipt">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Signed relay</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{actionReceipt.status.replaceAll("-", " ")}</p>
+                </div>
+                <span className={actionReceipt.actual_live_trade_tested ? canaryStatusClassName("live-relay-evidence-recorded") : canaryStatusClassName(actionReceipt.status)}>
+                  {actionReceipt.actual_live_trade_tested ? "evidence" : "pending"}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <CanaryMetric label="Signed bytes" value={String(actionReceipt.signed_payload_byte_count)} tone={actionReceipt.signed_payload_byte_count > 0 ? "caution" : "neutral"} />
+                <CanaryMetric label="Echoed" value={String(actionReceipt.signed_payload_echoed)} tone="neutral" />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-outline">{actionReceipt.next_action}</p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CanaryMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "engine" | "caution" | "critical" | "neutral";
+}) {
+  const toneClassName = tone === "engine"
+    ? "text-engine"
+    : tone === "caution"
+      ? "text-caution"
+      : tone === "critical"
+        ? "text-critical"
+        : "text-on-surface";
+  return (
+    <div className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5">
+      <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{label}</p>
+      <p className={`mt-1 truncate text-sm font-semibold ${toneClassName}`}>{value}</p>
+    </div>
+  );
+}
+
+function canaryStatusClassName(status: Web3LiveTradeCanaryReceipt["status"] | Web3LiveTradeCanaryActionReceipt["status"] | Web3LiveUnsignedOrderHandoffReceipt["status"]) {
+  const base = "shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold capitalize";
+  if (status === "live-relay-evidence-recorded" || status === "order-ready") return `${base} border-engine/35 bg-engine/10 text-engine`;
+  if (status === "relay-attempted" || status === "ready-for-external-signed-payload" || status === "order-failed") return `${base} border-caution/35 bg-caution/10 text-caution`;
+  return `${base} border-critical/35 bg-critical/10 text-critical`;
+}
+
+function getBrowserSolanaProvider(): BrowserSolanaProvider | null {
+  if (typeof window === "undefined") return null;
+  const maybeWindow = window as typeof window & {
+    solana?: BrowserSolanaProvider;
+    phantom?: { solana?: BrowserSolanaProvider };
+    solflare?: BrowserSolanaProvider;
+    backpack?: BrowserSolanaProvider;
+  };
+  return maybeWindow.solana ?? maybeWindow.phantom?.solana ?? maybeWindow.solflare ?? maybeWindow.backpack ?? null;
+}
+
+function isLikelySolanaPublicKey(value: string) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+function base64ToBytes(value: string) {
+  const binary = window.atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return window.btoa(binary);
+}
+
+function serializeSignedWalletTransaction(value: unknown): Uint8Array | null {
+  if (!value || typeof value !== "object") return null;
+  const maybeSerializable = value as { serialize?: () => Uint8Array };
+  if (typeof maybeSerializable.serialize !== "function") return null;
+  const serialized = maybeSerializable.serialize();
+  return serialized instanceof Uint8Array ? serialized : null;
+}
+
+function previewValue(value: string | null | undefined) {
+  if (!value) return null;
+  if (value.length <= 12) return value;
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
+}

@@ -1559,6 +1559,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-market-monitor-history/route.ts")).toContain("getWeb3MarketMonitorHistory");
     expect(source("app/trading/page.tsx")).toContain("MarketMonitorHistoryPanel");
     expect(source("app/trading/page.tsx")).toContain("Read-only market monitor");
+    expect(source("app/trading/page.tsx")).toContain("Web3LiveCanaryConsole");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Live money canary");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("No real trade tested yet");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Sign tiny canary");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-unsigned-order-handoff?");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-trade-canary?");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading unsigned canary receipt");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading signed canary relay receipt");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("VersionedTransaction.deserialize");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("browser_wallet_signature_flow: \"gated-unsigned-handoff\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("transaction_submission_permission: \"blocked\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("secret_echo_permission: \"blocked\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("provider_degraded");

@@ -12,7 +12,7 @@ export type Web3LiveTradeCanaryReceipt = {
   actual_live_trade_tested: boolean;
   real_funds_moved_by_this_app: boolean;
   can_submit_from_app_now: boolean;
-  browser_wallet_signature_flow: false;
+  browser_wallet_signature_flow: "gated-unsigned-handoff";
   unsigned_transaction_return: "withheld";
   live_execution_gate_enabled: boolean;
   live_execution_arming_status: Web3TradingState["live_execution_arming"]["status"];
@@ -173,7 +173,7 @@ export function buildWeb3LiveTradeCanaryReceipt(
     actual_live_trade_tested: actualLiveTradeTested,
     real_funds_moved_by_this_app: actualLiveTradeTested,
     can_submit_from_app_now: readyForExternalSignedPayload,
-    browser_wallet_signature_flow: false as const,
+    browser_wallet_signature_flow: "gated-unsigned-handoff" as const,
     unsigned_transaction_return: "withheld" as const,
     live_execution_gate_enabled: state.execution_gate.live_execution_enabled,
     live_execution_arming_status: state.live_execution_arming.status,
@@ -203,7 +203,7 @@ export function buildWeb3LiveTradeCanaryReceipt(
     secret_echo_permission: "blocked" as const,
     controls: [
       "This canary receipt answers whether a real live trade has actually been tested through Mastermind.",
-      "This canary receipt does not expose unsigned transaction bytes; the separate /api/web3-live-unsigned-order-handoff route is the gated one-shot browser-wallet bridge.",
+      "Browser-wallet signing is wired only through the gated one-shot /api/web3-live-unsigned-order-handoff bridge and the guarded signed-payload canary relay.",
       "The only live-submit shape represented here is an external signed payload or provider-managed submit status for a matching request id.",
       "Private keys, seed phrases, keypair JSON, raw transaction bytes, signed payload storage, browser key storage, and secret echo remain blocked.",
       "Paper and read-only DEX tests do not count as actual live trades.",

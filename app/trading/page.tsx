@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Chip } from "@/components/sentinel";
+import { Web3LiveCanaryConsole } from "@/components/web3-live-canary-console";
 import { Web3TradingWorkspaceLoader } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
 import { buildWeb3AccountSetupReceipt } from "@/src/db/web3-account-setup";
@@ -20,6 +21,7 @@ import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-pape
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import { buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
@@ -116,6 +118,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     runway: supervisedLiveRunway,
     currentInput: operatorRequestPacket.current_input,
   });
+  const liveTradeCanary = buildWeb3LiveTradeCanaryReceipt(initialState);
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -133,6 +136,15 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
 
         <div className="w-full min-w-0 space-y-4">
           <TradingSourceSwitch source={source} account={account} />
+          <Web3LiveCanaryConsole
+            receipt={liveTradeCanary}
+            source={source}
+            account={account}
+            scenario={initialState.scenario}
+            cycles={0}
+            maxSlippageBps={initialState.execution_readiness.config.max_slippage_bps}
+            defaultWalletPublicKey={initialState.execution_readiness.config.wallet_public_key}
+          />
           <TradingCommandBoard
             state={initialState}
             status={usabilityStatus}
