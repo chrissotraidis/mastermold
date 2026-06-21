@@ -1260,6 +1260,7 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
   const liveBlockers = packet.live_capital_blockers.slice(0, 4);
   const openInputs = packet.open_operator_inputs.slice(0, 4);
   const credentialRequirements = packet.credential_requirements.slice(0, 6);
+  const credentialRequirementExportCommands = packet.safe_export_commands.filter((command) => command.includes("requirements:web3"));
   const liveUsability = packet.live_usability;
   const currentInput = packet.current_input;
   return (
@@ -1367,6 +1368,15 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
         <p className="mt-2 text-[11px] leading-4 text-outline">
           Every requirement keeps live execution, wallet mutation, and secret echo blocked; private keys, seed phrases, raw transactions, and signed payloads are never requested.
         </p>
+        {credentialRequirementExportCommands.length > 0 ? (
+          <div className="mt-2 grid gap-2" aria-label="Settings Web3 credential requirements export commands">
+            {credentialRequirementExportCommands.map((command) => (
+              <code key={command} className="block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+                {command}
+              </code>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {packet.next_unlock_step ? (

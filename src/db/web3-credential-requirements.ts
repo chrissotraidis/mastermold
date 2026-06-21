@@ -21,6 +21,8 @@ export type Web3CredentialRequirementsReceipt = {
   never_provide: string[];
   source_endpoint: string;
   live_review_source_endpoint: string;
+  safe_export_commands: string[];
+  text_packet: string;
   summary: string;
   next_action: string;
   live_execution_permission: "blocked";
@@ -88,6 +90,10 @@ export function buildWeb3CredentialRequirementsReceipt(
     never_provide: packet.never_provide,
     source_endpoint: `/api/web3-credential-requirements?source=${packet.source}&account=${packet.account}&scenario=${packet.scenario}&cycles=0`,
     live_review_source_endpoint: "/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    safe_export_commands: [
+      "npm run --silent requirements:web3 -- --base-url=http://localhost:4010",
+      "npm run --silent requirements:web3 -- --base-url=http://localhost:4010 --json",
+    ],
     summary: credentialRequirementsSummary(requirements.length, neededNowCount, beforeLiveCount, externalReviewCount),
     next_action: nextRequirement?.next_action ?? "No credential requirement is open; run strict verification and external review before any live authority.",
     live_execution_permission: "blocked" as const,
@@ -104,10 +110,14 @@ export function buildWeb3CredentialRequirementsReceipt(
       "Every requirement keeps live execution, signing, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.",
     ],
   };
+  const receiptWithText = {
+    ...receiptBase,
+    text_packet: renderCredentialRequirementsText(receiptBase),
+  };
 
   return {
-    ...receiptBase,
-    receipt_hash: hashJson(receiptBase),
+    ...receiptWithText,
+    receipt_hash: hashJson(receiptWithText),
   };
 }
 
@@ -155,6 +165,71 @@ function credentialRequirementsSummary(
   externalReviewCount: number,
 ) {
   return `${total} safe Web3 credential requirement${total === 1 ? "" : "s"} are tracked: ${neededNowCount} needed now, ${beforeLiveCount} before live review, and ${externalReviewCount} external review gate${externalReviewCount === 1 ? "" : "s"}.`;
+}
+
+function renderCredentialRequirementsText(
+  receipt: Omit<Web3CredentialRequirementsReceipt, "receipt_hash" | "text_packet">,
+) {
+  const sourceEndpoints = Array.from(new Set([receipt.source_endpoint, receipt.live_review_source_endpoint]));
+  const nextRequirement = receipt.next_requirement
+    ? [
+        `- ${receipt.next_requirement.label}: ${receipt.next_requirement.next_action}`,
+        `- Owner: ${receipt.next_requirement.owner}`,
+        `- Priority: ${receipt.next_requirement.priority.replaceAll("-", " ")}`,
+        `- Safe value: ${receipt.next_requirement.safe_value_type}`,
+        `- Surface: ${receipt.next_requirement.safe_collection_surface}`,
+        `- Storage: ${receipt.next_requirement.storage_rule}`,
+        `- Target names: ${receipt.next_requirement.target_names.join(", ")}`,
+        `- Done when: ${receipt.next_requirement.completion_signal}`,
+      ].join("\n")
+    : "- No credential requirement is currently open.";
+  const requirements = receipt.requirements.map((requirement, index) => [
+    `${index + 1}. ${requirement.label}`,
+    `   - Owner: ${requirement.owner}`,
+    `   - Priority: ${requirement.priority.replaceAll("-", " ")}`,
+    `   - Safe value: ${requirement.safe_value_type}`,
+    `   - Surface: ${requirement.safe_collection_surface}`,
+    `   - Storage: ${requirement.storage_rule}`,
+    `   - Target names: ${requirement.target_names.join(", ")}`,
+    requirement.research_question_ids.length > 0 ? `   - Related research: ${requirement.research_question_ids.join(", ")}` : null,
+    `   - Done when: ${requirement.completion_signal}`,
+    `   - Permissions: live execution blocked; signing blocked; transaction submission blocked; wallet mutation blocked; secret echo blocked.`,
+  ].filter(Boolean).join("\n"));
+
+  return [
+    "# Mastermind Web3 Credential Requirements Packet",
+    "",
+    `Generated: ${receipt.generated_at}`,
+    `Status: ${receipt.status}`,
+    `Source: ${receipt.source}`,
+    `Account: ${receipt.account}`,
+    `Scenario: ${receipt.scenario}`,
+    `Research handoff hash: ${receipt.research_handoff_hash}`,
+    "",
+    "## Summary",
+    receipt.summary,
+    "",
+    "## Next Requirement",
+    nextRequirement,
+    "",
+    "## Requirements",
+    ...requirements,
+    "",
+    "## Safe To Share",
+    ...receipt.safe_to_share.map((item) => `- ${item}`),
+    "",
+    "## Never Provide",
+    ...receipt.never_provide.map((item) => `- ${item}`),
+    "",
+    "## Source Endpoints",
+    ...sourceEndpoints.map((endpoint) => `- ${endpoint}`),
+    "",
+    "## Local Export Commands",
+    ...receipt.safe_export_commands.map((command) => `- ${command}`),
+    "",
+    "## Controls",
+    ...receipt.controls.map((control) => `- ${control}`),
+  ].join("\n");
 }
 
 function hashJson(value: unknown) {

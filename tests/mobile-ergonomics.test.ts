@@ -1091,6 +1091,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Credential requirements packet");
     expect(settingsPage).toContain("Open requirements JSON");
     expect(settingsPage).toContain("/api/web3-credential-requirements?source=");
+    expect(settingsPage).toContain("Settings Web3 credential requirements export commands");
+    expect(settingsPage).toContain("requirements:web3");
     expect(settingsPage).toContain("packet.credential_requirements");
     expect(settingsPage).toContain("safe_value_type");
     expect(settingsPage).toContain("completion_signal");
@@ -1111,6 +1113,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Rows listed:");
     expect(settingsPage).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
     expect(source("src/db/web3-credential-requirements.ts")).toContain("web3-credential-requirements");
+    expect(source("src/db/web3-credential-requirements.ts")).toContain("# Mastermind Web3 Credential Requirements Packet");
+    expect(source("src/db/web3-credential-requirements.ts")).toContain("safe_export_commands");
     expect(source("app/api/web3-credential-requirements/route.ts")).toContain("buildWeb3CredentialRequirementsReceipt");
     expect(settingsPage).toContain("validated export commands only");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Settings Web3 research answer intake");
@@ -1662,6 +1666,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyCredentialRequirementsPacket");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-credential-requirements?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("credential-requirements-packet");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("# Mastermind Web3 Credential Requirements Packet");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchAnswerIntake");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-research-answer-intake?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("implementation_decisions");
@@ -1823,7 +1828,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now includes a Web3 research handoff packet");
     expect(source("components/review-readiness.tsx")).toContain("owner/phase implementation plan and queue");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run research:web3 command");
+    expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run requirements:web3 command");
     expect(source("package.json")).toContain("\"research:web3\": \"node scripts/web3-research-handoff.mjs\"");
+    expect(source("package.json")).toContain("\"requirements:web3\": \"node scripts/web3-credential-requirements.mjs\"");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("/api/web3-research-handoff-packet");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("packet.live_execution_permission === \"blocked\"");
@@ -1833,7 +1840,18 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-research-handoff.mjs")).toContain("packet.seed_phrase_storage === \"blocked\"");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("packet.secret_echo_permission === \"blocked\"");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("api-key=");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("/api/web3-credential-requirements");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("# Mastermind Web3 Credential Requirements Packet");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.live_execution_permission === \"blocked\"");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.transaction_submission_permission === \"blocked\"");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.wallet_mutation_permission === \"blocked\"");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.signing_permission === \"blocked\"");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.private_key_storage === \"blocked\"");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.seed_phrase_storage === \"blocked\"");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.secret_echo_permission === \"blocked\"");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("api-key=");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run --silent requirements:web3 -- --base-url=http://localhost:4010");
     expect(source("docs/web3-credentials-runbook.md")).toContain("paste-ready Markdown");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-research-handoff-packet");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-credential-requirements");

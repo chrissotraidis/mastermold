@@ -21,6 +21,7 @@
     "doctor:web3": "node scripts/web3-credential-doctor.mjs",
     "doctor-repair:web3": "node scripts/web3-credential-doctor.mjs --refresh-supervisor",
     "research:web3": "node scripts/web3-research-handoff.mjs",
+    "requirements:web3": "node scripts/web3-credential-requirements.mjs",
     "repair-accountability:web3": "node scripts/web3-local-accountability-repair.mjs",
     "preflight-live:web3": "node scripts/web3-live-capital-preflight.mjs",
     "landing-drill:web3": "node scripts/web3-live-landing-drill.mjs",

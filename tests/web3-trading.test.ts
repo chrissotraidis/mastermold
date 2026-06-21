@@ -1258,6 +1258,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.safe_export_commands).toEqual(expect.arrayContaining([
       "npm run --silent research:web3 -- --base-url=http://localhost:4010",
       "npm run --silent research:web3 -- --base-url=http://localhost:4010 --json",
+      "npm run --silent requirements:web3 -- --base-url=http://localhost:4010",
+      "npm run --silent requirements:web3 -- --base-url=http://localhost:4010 --json",
     ]));
     expect(packet.verifier_commands).toEqual(expect.arrayContaining([
       "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live",
@@ -1339,6 +1341,8 @@ describe("Web3 autonomous trading subsystem", () => {
       never_provide: string[];
       source_endpoint: string;
       live_review_source_endpoint: string;
+      safe_export_commands: string[];
+      text_packet: string;
       summary: string;
       next_action: string;
       live_execution_permission: string;
@@ -1390,6 +1394,18 @@ describe("Web3 autonomous trading subsystem", () => {
     )).toBe(true);
     expect(packet.safe_to_share).toContain("Dedicated Solana public wallet address");
     expect(packet.never_provide).toContain("Seed phrase or mnemonic");
+    expect(packet.safe_export_commands).toEqual(expect.arrayContaining([
+      "npm run --silent requirements:web3 -- --base-url=http://localhost:4010",
+      "npm run --silent requirements:web3 -- --base-url=http://localhost:4010 --json",
+    ]));
+    expect(packet.text_packet).toContain("# Mastermind Web3 Credential Requirements Packet");
+    expect(packet.text_packet).toContain("## Next Requirement");
+    expect(packet.text_packet).toContain("wallet_public_key");
+    expect(packet.text_packet).toContain("## Requirements");
+    expect(packet.text_packet).toContain("Jupiter order rail");
+    expect(packet.text_packet).toContain("## Never Provide");
+    expect(packet.text_packet).toContain("Seed phrase or mnemonic");
+    expect(packet.text_packet).toContain("requirements:web3");
     expect(packet.source_endpoint).toContain("/api/web3-credential-requirements");
     expect(packet.source_endpoint).toContain("source=sample");
     expect(packet.live_review_source_endpoint).toBe("/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0");

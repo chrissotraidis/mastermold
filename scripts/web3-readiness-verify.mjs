@@ -988,6 +988,7 @@ async function verifyResearchHandoffPacket() {
   assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Research handoff packet should keep seed phrases in never-provide list.", json.never_provide);
   assert(Array.isArray(json.source_endpoints) && json.source_endpoints.includes("/api/web3-operator-runbook?source=live-dex&account=persistent"), "Research handoff packet should link source endpoints.", json.source_endpoints);
   assert(json.source_endpoints.includes("/api/web3-credential-requirements?source=live-dex&account=persistent"), "Research handoff packet should link the standalone credential requirements endpoint.", json.source_endpoints);
+  assert(Array.isArray(json.safe_export_commands) && json.safe_export_commands.some((command) => command.includes("requirements:web3")), "Research handoff packet should link the credential-only export command.", json.safe_export_commands);
   assert(Array.isArray(json.verifier_commands) && json.verifier_commands.some((command) => command.includes("--require-operator-wallet")), "Research handoff packet should include strict verifier commands.", json.verifier_commands);
   assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind Web3 Research Handoff Packet"), "Research handoff packet should include pasteable text.", json.text_packet);
   assert(json.text_packet.includes("Next Ordered Unlock Step") && json.text_packet.includes("Operator Unlock Sequence"), "Research handoff text should include the ordered unlock sequence.", json.text_packet);
@@ -1035,6 +1036,12 @@ async function verifyCredentialRequirementsPacket() {
   assert(json.requirements.some((item) => item.id === "signer-policy" && item.research_question_ids?.includes("custody-architecture") && item.research_question_ids?.includes("risk-gates")), "Credential requirements packet should link signer asks to custody and risk research.", json.requirements);
   assert(Array.isArray(json.safe_to_share) && json.safe_to_share.includes("Dedicated Solana public wallet address"), "Credential requirements packet should list safe-to-share values.", json.safe_to_share);
   assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Credential requirements packet should keep seed phrase in never-provide list.", json.never_provide);
+  assert(Array.isArray(json.safe_export_commands) && json.safe_export_commands.some((command) => command.includes("requirements:web3")), "Credential requirements packet should expose its safe export command.", json.safe_export_commands);
+  assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind Web3 Credential Requirements Packet"), "Credential requirements packet should include paste-ready markdown.", json.text_packet);
+  assert(json.text_packet.includes("## Next Requirement") && json.text_packet.includes("wallet_public_key"), "Credential requirements text should include the next public wallet ask.", json.text_packet);
+  assert(json.text_packet.includes("## Requirements") && json.text_packet.includes("Jupiter order rail"), "Credential requirements text should include the full requirements list.", json.text_packet);
+  assert(json.text_packet.includes("## Never Provide") && json.text_packet.includes("Seed phrase or mnemonic"), "Credential requirements text should include never-provide boundaries.", json.text_packet);
+  assert(json.text_packet.includes("requirements:web3"), "Credential requirements text should include the local export command.", json.text_packet);
   assert(json.source_endpoint.includes("/api/web3-credential-requirements"), "Credential requirements packet should link itself.", json);
   assert(
     json.live_review_source_endpoint === "/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0",

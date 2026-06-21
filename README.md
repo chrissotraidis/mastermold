@@ -231,6 +231,8 @@ standalone JSON for monitors, operators, or helper agents. It carries safe value
 target names, collection surfaces, storage rules, completion signals, the next requirement,
 and blocked live/signing/wallet/secret permissions only; it never returns provider secrets,
 private keys, seed phrases, raw transactions, signed payloads, or trading authority.
+`npm run --silent requirements:web3 -- --base-url=http://localhost:4010` prints the same
+credential-only packet as paste-ready Markdown, or add `--json` for the full redacted receipt.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.

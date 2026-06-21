@@ -248,6 +248,8 @@ export function buildWeb3ResearchHandoffPacket(input: {
     safe_export_commands: [
       "npm run --silent research:web3 -- --base-url=http://localhost:4010",
       "npm run --silent research:web3 -- --base-url=http://localhost:4010 --json",
+      "npm run --silent requirements:web3 -- --base-url=http://localhost:4010",
+      "npm run --silent requirements:web3 -- --base-url=http://localhost:4010 --json",
     ],
     verifier_commands: verifierCommands,
     live_execution_permission: "blocked" as const,
