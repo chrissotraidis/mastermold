@@ -476,6 +476,13 @@ function firstCanaryDrillLaneClassName(status: Web3FirstCanaryDrillLane["status"
   return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
+function canaryProofStageClassName(status: "pass" | "watch" | "fail") {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
 function TradingSourceLink({
   href,
   active,
@@ -528,6 +535,8 @@ function LiveCanaryCommandCenter({
   const proofCommand = drill.strict_proof_command;
   const liveHref = "/trading?source=live-dex&account=persistent";
   const drillHref = drill.live_review_source_endpoint;
+  const nextProof = canary.post_signing_evidence.find((item) => item.status !== "pass") ?? null;
+  const proofPassCount = canary.post_signing_evidence.filter((item) => item.status === "pass").length;
   const leadingDrillLanes = [
     ...drill.lanes.filter((lane) => lane.status === "fail"),
     ...drill.lanes.filter((lane) => lane.status === "watch"),
@@ -632,6 +641,31 @@ function LiveCanaryCommandCenter({
                 {nextCredential.safe_value_description}
               </p>
             ) : null}
+          </div>
+
+          <div className="rounded-md border border-engine/20 bg-engine/[0.035] p-3" aria-label="Trading canary proof monitor">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Canary proof monitor</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {nextProof?.label ?? "Settlement accounted"}
+                </p>
+              </div>
+              <span className={canaryProofStageClassName(nextProof?.status ?? (canary.actual_live_trade_tested ? "pass" : "fail"))}>
+                {canary.post_signing_evidence_status.replaceAll("-", " ")}
+              </span>
+            </div>
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
+              {nextProof?.next_action ?? canary.post_signing_next_action}
+            </p>
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+              <p className="truncate rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-5 text-outline">
+                Signature: <span className="font-semibold text-on-surface">{canary.latest_signature_preview ?? "none"}</span>
+              </p>
+              <p className="truncate rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-5 text-outline">
+                Proof stages: <span className="font-semibold text-on-surface">{proofPassCount}/{canary.post_signing_evidence.length}</span>
+              </p>
+            </div>
           </div>
 
           <div className="grid min-w-0 gap-2" aria-label="Trading first canary drill lanes">
