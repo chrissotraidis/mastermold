@@ -31,8 +31,10 @@ import { getWeb3JupiterRehearsalHistory, type Web3JupiterRehearsalHistory } from
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveActivationPlan, type Web3LiveActivationPlan } from "@/src/db/web3-live-activation-plan";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
+import { buildWeb3LiveIgnitionReceipt } from "@/src/db/web3-live-ignition";
 import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3LiveTradeCanaryReceipt, type Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
+import { buildWeb3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
 import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import {
   buildWeb3ManualLiveReviewPacket,
@@ -48,6 +50,7 @@ import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production
 import { getWeb3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-paper-autopilot";
 import { buildWeb3ResearchHandoffPacket, type Web3ResearchHandoffPacket } from "@/src/db/web3-research-handoff-packet";
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
+import { buildWeb3SupervisedCanaryReadinessReceipt, type Web3SupervisedCanaryReadinessReceipt } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
 import { buildWeb3UsabilityStatus, type Web3UsabilityStatusReceipt } from "@/src/db/web3-usability-status";
@@ -177,6 +180,28 @@ export default async function IntegrationsSettingsPage() {
     liveAutonomy: web3State.autonomous_live_autonomy_readiness,
   });
   const web3LiveTradeCanary = buildWeb3LiveTradeCanaryReceipt(web3State);
+  const web3LiveIgnition = buildWeb3LiveIgnitionReceipt({
+    state: web3State,
+    liveUsability: web3LiveUsabilityBlockers,
+    canary: web3LiveTradeCanary,
+  });
+  const web3UnsignedCanaryPreflight = buildWeb3LiveUnsignedOrderPreflightReceipt(web3State, {
+    operator_ack: true,
+    canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+    wallet_public_key: web3State.execution_readiness.config.wallet_public_key,
+    amount_lamports: 100_000,
+    max_slippage_bps: web3State.execution_readiness.config.max_slippage_bps,
+  });
+  const web3SupervisedCanaryReadiness = buildWeb3SupervisedCanaryReadinessReceipt({
+    state: web3State,
+    wallet: web3DedicatedWalletPacket,
+    jupiter: web3JupiterOrderPacket,
+    signer: web3SignerPacket,
+    livePreflight: web3LiveCapitalPreflight,
+    ignition: web3LiveIgnition,
+    unsignedPreflight: web3UnsignedCanaryPreflight,
+    canary: web3LiveTradeCanary,
+  });
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -228,6 +253,7 @@ export default async function IntegrationsSettingsPage() {
             usabilityStatus={web3UsabilityStatus}
             liveUsabilityBlockers={web3LiveUsabilityBlockers}
             liveTradeCanary={web3LiveTradeCanary}
+            supervisedCanaryReadiness={web3SupervisedCanaryReadiness}
             researchHandoffPacket={web3ResearchHandoffPacket}
             state={web3State}
           />
@@ -285,6 +311,7 @@ function Web3CredentialsRunwayCard({
   usabilityStatus,
   liveUsabilityBlockers,
   liveTradeCanary,
+  supervisedCanaryReadiness,
   researchHandoffPacket,
   state,
 }: {
@@ -306,6 +333,7 @@ function Web3CredentialsRunwayCard({
   usabilityStatus: Web3UsabilityStatusReceipt;
   liveUsabilityBlockers: Web3LiveUsabilityBlockersReceipt;
   liveTradeCanary: Web3LiveTradeCanaryReceipt;
+  supervisedCanaryReadiness: Web3SupervisedCanaryReadinessReceipt;
   researchHandoffPacket: Web3ResearchHandoffPacket;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
@@ -361,6 +389,7 @@ function Web3CredentialsRunwayCard({
             handoff={operatorCredentialHandoff}
             liveUsability={liveUsabilityBlockers}
             liveTradeCanary={liveTradeCanary}
+            supervisedCanaryReadiness={supervisedCanaryReadiness}
           />
           <SettingsWeb3CredentialCommandCenter
             handoff={operatorCredentialHandoff}
@@ -672,14 +701,17 @@ function SettingsWeb3LiveCredentialLaunchpad({
   handoff,
   liveUsability,
   liveTradeCanary,
+  supervisedCanaryReadiness,
 }: {
   rows: SettingsWeb3LaunchpadRow[];
   handoff: Web3OperatorCredentialHandoffReceipt;
   liveUsability: Web3LiveUsabilityBlockersReceipt;
   liveTradeCanary: Web3LiveTradeCanaryReceipt;
+  supervisedCanaryReadiness: Web3SupervisedCanaryReadinessReceipt;
 }) {
   const readyRows = rows.filter((row) => row.status === "ready").length;
   const nextRow = rows.find((row) => row.status === "active" || row.status === "blocked" || row.status === "review") ?? rows[0];
+  const attempt = supervisedCanaryReadiness.canary_attempt_contract;
   const strictVerifier = nextRow?.command ??
     handoff.next_input?.verifier_command ??
     liveUsability.current_input?.verifier_command ??
@@ -701,6 +733,7 @@ function SettingsWeb3LiveCredentialLaunchpad({
         <div className="flex flex-wrap justify-end gap-1.5">
           <LaunchQueueBadge status={readyRows === rows.length ? "pass" : "watch"} label={`${readyRows}/${rows.length} ready`} />
           <LaunchQueueBadge status={liveTradeCanary.actual_live_trade_tested ? "pass" : "fail"} label={liveTradeCanary.actual_live_trade_tested ? "trade tested" : "trade untested"} />
+          <LaunchQueueBadge status={attempt.runnable_now ? "watch" : "fail"} label={attempt.runnable_now ? "canary runnable" : "canary blocked"} />
           <LaunchQueueBadge status="fail" label="wallet authority blocked" />
         </div>
       </div>
@@ -710,6 +743,40 @@ function SettingsWeb3LiveCredentialLaunchpad({
         <SettingsMetric label="Live blockers" value={`${liveUsability.real_capital_blocker_count}`} />
         <SettingsMetric label="Canary" value={liveTradeCanary.actual_live_trade_tested ? "tested" : "not tested"} />
         <SettingsMetric label="Next surface" value={nextSurface} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-engine/25 bg-surface-dim/35 p-2" aria-label="Settings first live canary attempt contract">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">First live canary attempt</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">{attempt.operator_action_label}</p>
+            <p className="mt-1 text-[11px] leading-4 text-outline">
+              This is the exact live-trade attempt contract. It is blocked until the wallet, Jupiter, signer, live flags, and proof gates are ready.
+            </p>
+          </div>
+          <LaunchQueueBadge status={attempt.runnable_now ? "watch" : "fail"} label={attempt.stage.replaceAll("-", " ")} />
+        </div>
+        <div className="mt-2 grid gap-1.5">
+          <Link
+            href={attempt.primary_endpoint}
+            className="truncate rounded-md border border-outline-variant/25 bg-void/20 px-2 py-1.5 text-[11px] font-semibold text-engine transition hover:border-engine/35"
+          >
+            {attempt.primary_endpoint}
+          </Link>
+          <code className="block overflow-x-auto whitespace-nowrap rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1.5 text-[11px] leading-5 text-on-surface-variant">
+            {attempt.exact_next_command}
+          </code>
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          <SettingsMetric label="Runnable now" value={attempt.runnable_now ? "yes" : "no"} />
+          <SettingsMetric label="Missing inputs" value={`${attempt.missing_inputs.length}`} />
+          <SettingsMetric label="Acknowledgements" value={`${attempt.required_acknowledgements.length}`} />
+        </div>
+        {attempt.missing_inputs.length > 0 ? (
+          <p className="mt-2 text-[11px] leading-4 text-outline">
+            Next missing input: {attempt.missing_inputs[0]}
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.55fr)]">

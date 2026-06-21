@@ -1073,6 +1073,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Live trading setup launchpad");
     expect(settingsPage).toContain("Settings Web3 live credential launchpad proof lanes");
     expect(settingsPage).toContain("Settings Web3 live credential launchpad boundary");
+    expect(settingsPage).toContain("buildWeb3LiveIgnitionReceipt");
+    expect(settingsPage).toContain("buildWeb3LiveUnsignedOrderPreflightReceipt");
+    expect(settingsPage).toContain("buildWeb3SupervisedCanaryReadinessReceipt");
+    expect(settingsPage).toContain("supervisedCanaryReadiness.canary_attempt_contract");
+    expect(settingsPage).toContain("Settings first live canary attempt contract");
+    expect(settingsPage).toContain("First live canary attempt");
+    expect(settingsPage).toContain("This is the exact live-trade attempt contract.");
+    expect(settingsPage).toContain("attempt.exact_next_command");
+    expect(settingsPage).toContain("Next missing input");
     expect(settingsPage).toContain("No funded live trade has been tested by this app yet.");
     expect(settingsPage).toContain("public wallet scope, text-only wallet proof, ignored server-env provider keys, and external review status");
     expect(settingsPage).toContain("Private keys and seed phrases are rejected.");
