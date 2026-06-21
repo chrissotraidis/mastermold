@@ -1047,6 +1047,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsWeb3SetupPriorityCard");
     expect(settingsPage).toContain("Settings Web3 setup priority");
     expect(settingsPage).toContain("Web3 setup priority");
+    expect(settingsPage).toContain("Settings first funded canary handoff");
+    expect(settingsPage).toContain("First funded canary handoff");
+    expect(settingsPage).toContain("Safe to provide next");
+    expect(settingsPage).toContain("Never paste");
+    expect(settingsPage).toContain("Open canary step");
+    expect(settingsPage).toContain("credentialRequirements.needed_now_count");
+    expect(settingsPage).toContain("firstCanaryDrill.actual_live_trade_tested");
+    expect(settingsPage).toContain("This handoff is the operator checklist for the first real canary only");
     expect(settingsPage).toContain("Go to wallet field");
     expect(settingsPage).toContain('href="#settings-web3-wallet-public-key"');
     expect(settingsPage).toContain('href="#settings-web3-credentials-runway"');

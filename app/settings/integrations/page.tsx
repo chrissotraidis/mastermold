@@ -21,7 +21,7 @@ import { buildWeb3AccountAcquisitionReceipt, type Web3AccountAcquisitionReceipt 
 import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { buildWeb3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
 import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
-import { buildWeb3CredentialRequirementsReceipt } from "@/src/db/web3-credential-requirements";
+import { buildWeb3CredentialRequirementsReceipt, type Web3CredentialRequirementsReceipt } from "@/src/db/web3-credential-requirements";
 import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
@@ -227,6 +227,8 @@ export default async function IntegrationsSettingsPage() {
             liveUsability={web3LiveUsabilityBlockers}
             requestPacket={web3OperatorRequestPacket}
             researchPacket={web3ResearchHandoffPacket}
+            credentialRequirements={web3CredentialRequirements}
+            firstCanaryDrill={web3FirstCanaryDrill}
           />
         </div>
 
@@ -1052,15 +1054,26 @@ function SettingsWeb3SetupPriorityCard({
   liveUsability,
   requestPacket,
   researchPacket,
+  credentialRequirements,
+  firstCanaryDrill,
 }: {
   liveUsability: Web3LiveUsabilityBlockersReceipt;
   requestPacket: Web3OperatorRequestPacket;
   researchPacket: Web3ResearchHandoffPacket;
+  credentialRequirements: Web3CredentialRequirementsReceipt;
+  firstCanaryDrill: Web3FirstCanaryDrillReceipt;
 }) {
   const nextInput = requestPacket.next_input;
   const nextUnlock = liveUsability.next_unlock_step ?? requestPacket.next_unlock_step;
   const nextBlocker = liveUsability.next_blocker;
   const nextCredentialRequest = liveUsability.next_credential_request;
+  const nextCanaryStep = firstCanaryDrill.next_unblock_step;
+  const canarySurface = nextCanaryStep?.safe_surface ?? nextCredentialRequest?.fix_href ?? "/trading?source=live-dex&account=persistent";
+  const canarySurfaceHref = canarySurface.startsWith("/") ? canarySurface : "/settings/integrations#settings-web3-credentials-runway";
+  const canaryCommand = nextCanaryStep?.command ?? nextCredentialRequest?.verifier_command ?? firstCanaryDrill.strict_ready_command;
+  const neededRequirements = credentialRequirements.requirements
+    .filter((item) => item.priority === "needed-now")
+    .slice(0, 4);
   const verifier = nextInput?.verifier_command ??
     requestPacket.verifier_commands.find((command) => command.includes("verify:web3")) ??
     "npm run verify:web3 -- --base-url=http://localhost:4010";
@@ -1092,6 +1105,67 @@ function SettingsWeb3SetupPriorityCard({
         <SettingsMetric label="Rows listed" value={`${liveUsability.listed_live_usability_row_count}/${liveUsability.total_live_usability_row_count}`} />
         <SettingsMetric label="Research questions" value={`${researchPacket.research_questions.length}`} />
         <SettingsMetric label="Verifier" value={verifier.includes("--require-operator-wallet") ? "wallet gate" : "base gate"} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.035] p-3" aria-label="Settings first funded canary handoff">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">First funded canary handoff</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">
+              {nextCanaryStep ? nextCanaryStep.label : firstCanaryDrill.status.replaceAll("-", " ")}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              {nextCanaryStep?.action ?? firstCanaryDrill.next_action}
+            </p>
+          </div>
+          <LaunchQueueBadge status={firstCanaryDrill.actual_live_trade_tested ? "pass" : "fail"} label={firstCanaryDrill.actual_live_trade_tested ? "live proven" : "not proven"} />
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-4">
+          <SettingsMetric label="Stage" value={firstCanaryDrill.status.replaceAll("-", " ")} />
+          <SettingsMetric label="Proof" value={`${firstCanaryDrill.proof_pass_count}/${firstCanaryDrill.proof_required_count}`} />
+          <SettingsMetric label="Hard fails" value={`${firstCanaryDrill.hard_fail_count}`} />
+          <SettingsMetric label="Needed now" value={`${credentialRequirements.needed_now_count}`} />
+        </div>
+        <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.58fr)]">
+          <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe to provide next</p>
+            <div className="mt-2 grid gap-1.5">
+              {neededRequirements.map((requirement) => (
+                <div key={requirement.id} className="rounded-md border border-outline-variant/20 bg-black/10 p-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-on-surface">{requirement.label}</p>
+                    <LaunchQueueBadge status={requirement.blocks_live_capital ? "fail" : "watch"} label={requirement.owner} />
+                  </div>
+                  <p className="mt-1 text-[10px] leading-4 text-outline">{requirement.safe_value_type}</p>
+                  <p className="mt-1 text-[10px] leading-4 text-on-surface-variant">{requirement.next_action}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Never paste</p>
+            <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-outline">
+              {credentialRequirements.never_provide.slice(0, 4).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,0.6fr)_minmax(0,1fr)]">
+          <Link
+            href={canarySurfaceHref}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15"
+          >
+            Open canary step
+            <ExternalLink aria-hidden="true" className="size-4" />
+          </Link>
+          <code className="block overflow-x-auto whitespace-nowrap rounded-md border border-outline-variant/20 bg-black/20 px-2 py-2 text-[11px] leading-5 text-on-surface-variant">
+            {canaryCommand}
+          </code>
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-outline">
+          This handoff is the operator checklist for the first real canary only; it cannot sign, submit, save signed payloads, custody funds, or enable autonomous live trading.
+        </p>
       </div>
 
       {nextBlocker ? (
