@@ -42,6 +42,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveUsabil
   const source = search.get("source") ?? "live-dex";
   const account = search.get("account") ?? "persistent";
   const cycles = Number(search.get("cycles") ?? "0");
+  const rows = search.get("rows") ?? "compact";
 
   if (!isTradingScenario(scenario)) {
     return NextResponse.json({ error: "scenario must be base, breakout, or rug-risk." }, { status: 422 });
@@ -54,6 +55,9 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveUsabil
   }
   if (!Number.isInteger(cycles) || cycles < 0 || cycles > 24) {
     return NextResponse.json({ error: "cycles must be an integer from 0 to 24." }, { status: 422 });
+  }
+  if (rows !== "compact" && rows !== "all") {
+    return NextResponse.json({ error: "rows must be compact or all." }, { status: 422 });
   }
 
   const state = await getWeb3TradingStateAsync({
@@ -125,5 +129,6 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveUsabil
     preflight,
     manualLiveReview,
     runway,
+    rowScope: rows,
   }));
 }

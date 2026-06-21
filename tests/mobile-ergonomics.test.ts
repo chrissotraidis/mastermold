@@ -794,10 +794,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("cutover setup blocker");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("total_live_usability_row_count");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("listed_live_usability_row_count");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("live_usability_row_scope");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("rows=all");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("total live-usability row");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("dependency-ranked row");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("all dependency-ranked rows are listed");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("Autonomous live trading remains locked in-app");
     expect(source("app/api/web3-live-usability-blockers/route.ts")).toContain("buildWeb3LiveUsabilityBlockersReceipt");
+    expect(source("app/api/web3-live-usability-blockers/route.ts")).toContain("rows must be compact or all");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-usability-blockers?source=live-dex&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-usability-blockers");
     expect(tradingPage).toContain("buildWeb3UsabilityStatus");
@@ -1009,8 +1013,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings live usability next unlock step");
     expect(settingsPage).toContain("Settings live usability next action");
     expect(settingsPage).toContain("Settings live usability safe actions");
-    expect(settingsPage).toContain("Open what-is-left JSON");
-    expect(settingsPage).toContain("/api/web3-live-usability-blockers?source=live-dex&account=persistent");
+    expect(settingsPage).toContain("Open all blockers JSON");
+    expect(settingsPage).toContain("/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all");
     expect(settingsPage).toContain("This is a readiness receipt only.");
     expect(settingsPage.indexOf("<SettingsWeb3CredentialSafetyMatrix")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3ResearchHandoffPanel"),
@@ -1302,7 +1306,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("What is left after latest action");
     expect(settingsConsole).toContain("Refresh blockers");
     expect(settingsConsole).toContain("Open current gate");
-    expect(settingsConsole).toContain("Open blocker JSON");
+    expect(settingsConsole).toContain("Open all blockers JSON");
+    expect(settingsConsole).toContain('rows: "all"');
     expect(settingsConsole).toContain("visibleLiveUsabilityBlockers");
     expect(settingsConsole).toContain("missing_for_live_usability.slice(0, 4)");
     expect(settingsConsole).toContain("Settings top refreshed Web3 blockers");

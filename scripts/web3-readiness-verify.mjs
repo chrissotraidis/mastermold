@@ -465,6 +465,7 @@ async function verifyLiveUsabilityBlockersReceipt() {
   assert(typeof json.total_live_usability_row_count === "number", "Live usability blockers should count total live-usability rows.", json);
   assert(typeof json.listed_live_usability_row_count === "number", "Live usability blockers should count listed live-usability rows.", json);
   assert(json.total_live_usability_row_count >= json.listed_live_usability_row_count, "Live usability blockers listed rows should not exceed total rows.", json);
+  assert(json.live_usability_row_scope === "compact", "Live usability blockers should default to compact row scope.", json);
   assert(json.ready_live_lane_count <= json.total_live_lane_count, "Live usability blockers live-lane counts should reconcile.", json);
   assert(
     json.passed_signoff_count + json.failed_or_watch_signoff_count === json.required_signoff_count,
@@ -492,10 +493,21 @@ async function verifyLiveUsabilityBlockersReceipt() {
   assert(Array.isArray(json.safe_to_provide) && json.safe_to_provide.includes("Dedicated Solana public wallet address"), "Live usability blockers should list safe operator inputs.", json.safe_to_provide);
   assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Live usability blockers should keep seed phrases in never-provide list.", json.never_provide);
   assertBlockedAuthority("Live usability blockers", json);
+  const allRows = await requestJson("/api/web3-live-usability-blockers?source=live-dex&account=persistent&scenario=breakout&cycles=0&rows=all");
+  assert(allRows.response.status === 200, "Live usability blockers all-row receipt should return 200.", { status: allRows.response.status, json: allRows.json });
+  assert(allRows.json.live_usability_row_scope === "all", "Live usability blockers all-row receipt should expose all row scope.", allRows.json);
+  assert(allRows.json.listed_live_usability_row_count === allRows.json.total_live_usability_row_count, "Live usability blockers rows=all should list every safe missing row.", allRows.json);
+  assert(allRows.json.missing_for_live_usability.length === allRows.json.total_live_usability_row_count, "Live usability blockers rows=all rows should match total count.", allRows.json.missing_for_live_usability);
+  assert(
+    typeof allRows.json.summary === "string" && allRows.json.summary.includes("all dependency-ranked rows are listed"),
+    "Live usability blockers rows=all summary should say all rows are listed.",
+    allRows.json.summary,
+  );
+  assertBlockedAuthority("Live usability blockers all-row receipt", allRows.json);
   record(
     "live-usability-blockers",
     "pass",
-    `${json.status}; ${json.missing_for_live_usability.length} missing rows; ${json.safe_action_count} safe actions`,
+    `${json.status}; ${json.missing_for_live_usability.length}/${allRows.json.missing_for_live_usability.length} missing rows; ${json.safe_action_count} safe actions`,
   );
 }
 

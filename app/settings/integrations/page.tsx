@@ -1055,10 +1055,10 @@ function SettingsWeb3LiveUsabilityBlockersPanel({ receipt }: { receipt: Web3Live
             </ul>
           </div>
           <Link
-            href="/api/web3-live-usability-blockers?source=live-dex&account=persistent"
+            href="/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all"
             className="inline-flex min-h-10 items-center rounded-md px-2 text-xs font-semibold text-critical hover:text-critical/80"
           >
-            Open what-is-left JSON
+            Open all blockers JSON
           </Link>
         </div>
       </div>

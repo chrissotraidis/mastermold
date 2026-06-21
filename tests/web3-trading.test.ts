@@ -1386,6 +1386,7 @@ describe("Web3 autonomous trading subsystem", () => {
       receipt_hash: string;
       total_live_usability_row_count: number;
       listed_live_usability_row_count: number;
+      live_usability_row_scope: string;
       next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string } | null;
       operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
@@ -1404,6 +1405,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.summary).toContain("dependency-ranked row");
     expect(receipt.total_live_usability_row_count).toBeGreaterThanOrEqual(receipt.listed_live_usability_row_count);
     expect(receipt.listed_live_usability_row_count).toBe(receipt.missing_for_live_usability.length);
+    expect(receipt.live_usability_row_scope).toBe("compact");
     expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.next_unlock_step).toMatchObject({
       id: "scope-wallet",
@@ -1428,6 +1430,32 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.private_key_storage).toBe("blocked");
     expect(receipt.seed_phrase_storage).toBe("blocked");
     expect(receipt.secret_echo_permission).toBe("blocked");
+
+    const allRowsResponse = await LIVE_USABILITY_BLOCKERS_GET(new Request("http://localhost/api/web3-live-usability-blockers?scenario=breakout&source=live-dex&account=persistent&rows=all"));
+    const allRowsReceipt = await json<{
+      summary: string;
+      total_live_usability_row_count: number;
+      listed_live_usability_row_count: number;
+      live_usability_row_scope: string;
+      missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(allRowsResponse);
+    expect(allRowsResponse.status).toBe(200);
+    expect(allRowsReceipt.live_usability_row_scope).toBe("all");
+    expect(allRowsReceipt.summary).toContain("all dependency-ranked rows are listed");
+    expect(allRowsReceipt.listed_live_usability_row_count).toBe(allRowsReceipt.total_live_usability_row_count);
+    expect(allRowsReceipt.missing_for_live_usability.length).toBe(allRowsReceipt.total_live_usability_row_count);
+    expect(allRowsReceipt.missing_for_live_usability.length).toBeGreaterThanOrEqual(receipt.missing_for_live_usability.length);
+    expect(allRowsReceipt.controls.some((control) => control.includes("rows=all"))).toBe(true);
+    expect(allRowsReceipt.live_execution_permission).toBe("blocked");
+    expect(allRowsReceipt.wallet_mutation_permission).toBe("blocked");
+    expect(allRowsReceipt.secret_echo_permission).toBe("blocked");
+
+    const badRowsResponse = await LIVE_USABILITY_BLOCKERS_GET(new Request("http://localhost/api/web3-live-usability-blockers?scenario=breakout&source=live-dex&account=persistent&rows=private"));
+    expect(badRowsResponse.status).toBe(422);
   });
 
   test("GIVEN live cutover blockers remain WHEN the blocker board route runs THEN it groups safe next steps without live authority", async () => {

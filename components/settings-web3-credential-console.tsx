@@ -529,6 +529,7 @@ export function SettingsWeb3CredentialConsole({
       source: "live-dex",
       account,
       cycles: String(cycles),
+      rows: "all",
     });
     const response = await fetch(`/api/web3-live-usability-blockers?${params.toString()}`);
     const payload = (await response.json().catch(() => null)) as Web3LiveUsabilityBlockersReceipt | { error: string } | null;
@@ -616,6 +617,7 @@ export function SettingsWeb3CredentialConsole({
     source: "live-dex",
     account,
     cycles: String(cycles),
+    rows: "all",
   });
   const liveUsabilityHref = `/api/web3-live-usability-blockers?${liveUsabilityParams.toString()}`;
   const visibleLiveUsabilityBlockers = liveUsabilityReceipt.missing_for_live_usability.slice(0, 4);
@@ -1078,7 +1080,7 @@ export function SettingsWeb3CredentialConsole({
               rel="noreferrer"
               className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline-variant/35 bg-void/20 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
             >
-              Open blocker JSON
+              Open all blockers JSON
             </a>
             <button
               type="button"

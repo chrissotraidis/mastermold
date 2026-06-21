@@ -45,6 +45,7 @@ export type Web3LiveUsabilityBlockersReceipt = {
   real_capital_blocker_count: number;
   total_live_usability_row_count: number;
   listed_live_usability_row_count: number;
+  live_usability_row_scope: "compact" | "all";
   required_signoff_count: number;
   passed_signoff_count: number;
   failed_or_watch_signoff_count: number;
@@ -125,6 +126,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   manualLiveReview: Web3ManualLiveReviewPacket;
   runway: Web3SupervisedLiveRunway;
   now?: Date;
+  rowScope?: "compact" | "all";
 }): Web3LiveUsabilityBlockersReceipt {
   const generatedAt = (input.now ?? new Date()).toISOString();
   const missing = buildMissingItems(input);
@@ -152,7 +154,8 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
       next_action: action.next_action,
     }))
     .slice(0, 6);
-  const listedMissing = missing.slice(0, 14);
+  const rowScope = input.rowScope ?? "compact";
+  const listedMissing = rowScope === "all" ? missing : missing.slice(0, 14);
   const verifierCommands = Array.from(new Set([
     ...input.runbook.verifier_commands,
     ...input.manualLiveReview.safe_commands,
@@ -179,6 +182,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     real_capital_blocker_count: realCapitalBlockerCount,
     total_live_usability_row_count: missing.length,
     listed_live_usability_row_count: listedMissing.length,
+    live_usability_row_scope: rowScope,
     required_signoff_count: input.manualLiveReview.required_signoff_count,
     passed_signoff_count: input.manualLiveReview.passed_signoff_count,
     failed_or_watch_signoff_count: failedOrWatchSignoffCount,
@@ -222,6 +226,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
       "This receipt answers what is left before real-money Web3 usability; it is not an execution endpoint.",
       "Safe actions are limited to cockpit review, paper autonomy, read-only market refresh, credential setup, verifier commands, and external review packets.",
       "It summarizes target names, labels, next actions, and blocker counts only; provider secrets, wallet secrets, transaction bodies, signatures, and webhook values are never returned.",
+      "Pass rows=all to inspect every dependency-ranked missing row; the default receipt stays compact for dashboards.",
       "Autonomous live trading remains locked in-app even when supervised live review becomes externally requestable.",
     ],
   };
@@ -418,6 +423,7 @@ function liveUsabilitySummary(
     cutover: Web3CutoverBlockerBoard;
     manualLiveReview: Web3ManualLiveReviewPacket;
     runway: Web3SupervisedLiveRunway;
+    rowScope?: "compact" | "all";
   },
   missing: Web3LiveUsabilityMissingItem[],
   autonomousLiveDetail?: string,
@@ -426,7 +432,10 @@ function liveUsabilitySummary(
     return "Supervised live review can be requested externally; Mastermind still blocks signing, submission, wallet mutation, and autonomous live trading.";
   }
   if (status === "operator-input-needed") {
-    const listedCount = Math.min(missing.length, 14);
+    const listedCount = input.rowScope === "all" ? missing.length : Math.min(missing.length, 14);
+    if (input.rowScope === "all") {
+      return `${input.cutover.open_blocker_count} cutover setup blocker${input.cutover.open_blocker_count === 1 ? "" : "s"} and ${missing.length} total live-usability row${missing.length === 1 ? "" : "s"} remain before real-money usability can be reviewed; all dependency-ranked rows are listed.`;
+    }
     return `${input.cutover.open_blocker_count} cutover setup blocker${input.cutover.open_blocker_count === 1 ? "" : "s"} and ${missing.length} total live-usability row${missing.length === 1 ? "" : "s"} remain before real-money usability can be reviewed; the first ${listedCount} dependency-ranked row${listedCount === 1 ? "" : "s"} are listed.`;
   }
   if (status === "external-review-needed") {
