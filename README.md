@@ -160,6 +160,10 @@ unblock step, safe action surface, verifier command, and ordered first-canary un
 next to the credential console that clears wallet and provider gates. The Settings credential
 console also refreshes the first-canary drill after safe wallet, provider, Jupiter, preflight,
 and canary actions so the app-visible next live-trade blocker changes without a page reload.
+That same Settings credential console now has a `First canary live flags` arming panel that
+shows the exact accepted flag values, whether each one is selected or installed locally, and
+the safe localhost installer action; it still cannot sign, submit, custody funds, mutate a
+wallet, or prove that a live trade happened.
 `/api/health` also exposes `web3_live_first_canary_drill`, a canonical
 live-dex persistent first-canary health summary for monitors that need the real live-trade
 blocker without inferring it from the default app state, plus `web3_live_canary_proof`

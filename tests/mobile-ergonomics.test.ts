@@ -1479,6 +1479,17 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Safe credential profile");
     expect(settingsConsole).toContain("buildSafeCredentialProfile");
     expect(settingsConsole).toContain("non-secret lanes ready");
+    expect(settingsConsole).toContain("Settings first canary live flag arming");
+    expect(settingsConsole).toContain("First canary live flags");
+    expect(settingsConsole).toContain("Settings first canary live flag checklist");
+    expect(settingsConsole).toContain("buildFirstCanaryFlagItems");
+    expect(settingsConsole).toContain("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION");
+    expect(settingsConsole).toContain("MASTERMOLD_LIVE_OPERATOR_APPROVAL");
+    expect(settingsConsole).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
+    expect(settingsConsole).toContain("I_UNDERSTAND_REAL_FUNDS");
+    expect(settingsConsole).toContain("Install selected flags");
+    expect(settingsConsole).toContain("settings-web3-live-flag-fields");
+    expect(settingsConsole).toContain("Installing them prepares the review path, but it still cannot sign, submit, custody funds, or mutate wallets.");
     expect(settingsConsole).toContain("public-wallet-scope");
     expect(settingsConsole).toContain("read-provider-rail");
     expect(settingsConsole).toContain("jupiter-order-rail");

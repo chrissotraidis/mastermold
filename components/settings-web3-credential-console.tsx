@@ -915,6 +915,9 @@ export function SettingsWeb3CredentialConsole({
     maxSlippageBps: Number(draft.max_slippage_bps) || maxSlippageBps,
   });
   const safeCredentialProfileReadyCount = safeCredentialProfile.filter((item) => item.status === "ready").length;
+  const firstCanaryFlagItems = buildFirstCanaryFlagItems({ draft, localInstallReceipt });
+  const firstCanaryFlagReadyCount = firstCanaryFlagItems.filter((item) => item.status === "ready").length;
+  const firstCanaryFlagSelectedCount = firstCanaryFlagItems.filter((item) => item.status === "ready" || item.status === "selected").length;
 
   return (
     <section className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Settings Web3 credential action console">
@@ -999,6 +1002,64 @@ export function SettingsWeb3CredentialConsole({
         </div>
         <p className="mt-2 text-xs leading-5 text-outline">
           The profile is status-only. It can guide the next credential action, but live execution, signing, submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.
+        </p>
+      </div>
+
+      <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.035] p-3" aria-label="Settings first canary live flag arming">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">First canary live flags</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">
+              {firstCanaryFlagReadyCount === firstCanaryFlagItems.length
+                ? "Exact canary flags are installed locally"
+                : firstCanaryFlagSelectedCount === firstCanaryFlagItems.length
+                  ? "Exact canary flags are selected"
+                  : "Exact canary flags still need review"}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              These are the only live-env values accepted for the tiny unsigned canary handoff. Installing them prepares the review path, but it still cannot sign, submit, custody funds, or mutate wallets.
+            </p>
+          </div>
+          <Badge variant="outline" className={firstCanaryFlagReadyCount === firstCanaryFlagItems.length ? "border-engine/35 bg-engine/10 text-engine" : "border-caution/35 bg-caution/10 text-caution"}>
+            {firstCanaryFlagReadyCount}/{firstCanaryFlagItems.length} installed
+          </Badge>
+        </div>
+        <div className="mt-3 grid gap-2 lg:grid-cols-3" aria-label="Settings first canary live flag checklist">
+          {firstCanaryFlagItems.map((item) => (
+            <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                  <p className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{item.envKey}</p>
+                </div>
+                <ConsoleActionBadge status={item.status === "ready" ? "ready" : item.status === "selected" ? "active" : "gated"} />
+              </div>
+              <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[10px] leading-4 text-on-surface-variant">
+                {item.requiredValue}
+              </code>
+              <p className="mt-2 text-[11px] leading-4 text-outline">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <a
+            href="#settings-web3-live-flag-fields"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-xs font-semibold text-caution transition hover:bg-caution/15"
+          >
+            Review flag fields
+          </a>
+          <button
+            type="button"
+            onClick={installLocalCredentials}
+            disabled={disabled || firstCanaryFlagSelectedCount < firstCanaryFlagItems.length}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-violet/45 bg-violet/10 px-3 py-2 text-xs font-semibold text-violet transition hover:bg-violet/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <Terminal className={cn("size-3.5 shrink-0", busy === "install" && "animate-pulse")} aria-hidden="true" />
+            Install selected flags
+          </button>
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-outline">
+          The installer writes only allowlisted env target names to the receipt and clears sensitive page fields after success; wallet keys, seed phrases, transaction bytes, signed payloads, and unrestricted signer policy are rejected.
         </p>
       </div>
 
@@ -1213,7 +1274,7 @@ export function SettingsWeb3CredentialConsole({
           placeholder="Leave blank to use server env"
           onChange={(value) => updateDraft("jupiter_api_key", value)}
         />
-        <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
+        <label id="settings-web3-live-flag-fields" className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
           Enable live Web3 flag
           <select
             value={draft.enable_live_web3_execution}
@@ -2066,6 +2127,15 @@ type SafeCredentialProfileItem = {
   boundary: string;
 };
 
+type FirstCanaryFlagItem = {
+  id: string;
+  label: string;
+  envKey: string;
+  requiredValue: string;
+  status: "ready" | "selected" | "missing";
+  detail: string;
+};
+
 function buildConsoleActionChecklist(input: {
   hasProviderInput: boolean;
   providerTested: boolean;
@@ -2246,6 +2316,60 @@ function buildSafeCredentialProfile(input: {
       boundary: "Policy numbers only; they do not authorize live execution.",
     },
   ];
+}
+
+function buildFirstCanaryFlagItems(input: {
+  draft: Draft;
+  localInstallReceipt: Web3LocalCredentialInstallReceipt | null;
+}): FirstCanaryFlagItem[] {
+  return [
+    firstCanaryFlagItem({
+      id: "enable-live-web3-execution",
+      label: "Live execution flag",
+      envKey: "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+      requiredValue: "true",
+      draftValue: input.draft.enable_live_web3_execution,
+      installed: input.localInstallReceipt?.configured_keys.includes("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION") === true,
+      detail: "Required before the guarded unsigned handoff can even ask for a tiny canary transaction.",
+    }),
+    firstCanaryFlagItem({
+      id: "operator-real-funds-approval",
+      label: "Operator approval",
+      envKey: "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+      requiredValue: "I_UNDERSTAND_REAL_FUNDS",
+      draftValue: input.draft.live_operator_approval,
+      installed: input.localInstallReceipt?.configured_keys.includes("MASTERMOLD_LIVE_OPERATOR_APPROVAL") === true,
+      detail: "Records that this path can involve real funds while still requiring wallet proof, Jupiter, signing, and proof gates.",
+    }),
+    firstCanaryFlagItem({
+      id: "unsigned-canary-handoff",
+      label: "Unsigned handoff",
+      envKey: "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+      requiredValue: "true",
+      draftValue: input.draft.allow_live_unsigned_canary_handoff,
+      installed: input.localInstallReceipt?.configured_keys.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF") === true,
+      detail: "Allows only the explicitly acknowledged, one-shot unsigned tiny canary handoff; it does not submit anything.",
+    }),
+  ];
+}
+
+function firstCanaryFlagItem(input: {
+  id: string;
+  label: string;
+  envKey: string;
+  requiredValue: string;
+  draftValue: string;
+  installed: boolean;
+  detail: string;
+}): FirstCanaryFlagItem {
+  return {
+    id: input.id,
+    label: input.label,
+    envKey: input.envKey,
+    requiredValue: input.requiredValue,
+    status: input.installed ? "ready" : input.draftValue === input.requiredValue ? "selected" : "missing",
+    detail: input.detail,
+  };
 }
 
 function ConsoleActionBadge({ status }: { status: ConsoleActionChecklistItem["status"] }) {
