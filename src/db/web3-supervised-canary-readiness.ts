@@ -27,6 +27,45 @@ export type Web3SupervisedCanaryReadinessLane = {
   blocks_first_canary: boolean;
 };
 
+export type Web3SupervisedCanaryAttemptContract = {
+  mode: "web3-first-live-canary-attempt-contract";
+  stage:
+    | "credential-intake"
+    | "unsigned-order-request"
+    | "browser-wallet-signature"
+    | "signed-payload-relay"
+    | "proof-watch"
+    | "canary-proven";
+  runnable_now: boolean;
+  operator_action_label: string;
+  primary_endpoint: string;
+  exact_next_command: string;
+  missing_inputs: string[];
+  required_acknowledgements: string[];
+  safety_boundary: string[];
+};
+
+export type Web3SupervisedCanaryAttemptHealth = {
+  mode: "web3-first-live-canary-attempt-health";
+  readiness_status: Web3SupervisedCanaryReadinessReceipt["status"];
+  stage: Web3SupervisedCanaryAttemptContract["stage"];
+  runnable_now: boolean;
+  operator_action_label: string;
+  primary_endpoint: string;
+  exact_next_command: string;
+  missing_input_count: number;
+  required_acknowledgement_count: number;
+  actual_live_trade_tested: boolean;
+  real_funds_moved_by_this_app: boolean;
+  live_execution_permission: Web3SupervisedCanaryReadinessReceipt["live_execution_permission"];
+  transaction_submission_permission: Web3SupervisedCanaryReadinessReceipt["transaction_submission_permission"];
+  wallet_mutation_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  signed_payload_storage: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export type Web3SupervisedCanaryReadinessReceipt = {
   mode: "web3-supervised-canary-readiness";
   status: "blocked" | "unsigned-order-ready" | "signed-relay-ready" | "canary-tested";
@@ -50,6 +89,7 @@ export type Web3SupervisedCanaryReadinessReceipt = {
   blockers: string[];
   next_lane_id: Web3SupervisedCanaryReadinessLane["id"] | null;
   next_action: string;
+  canary_attempt_contract: Web3SupervisedCanaryAttemptContract;
   ignition_endpoint: string;
   unsigned_handoff_endpoint: string;
   canary_endpoint: string;
@@ -94,6 +134,20 @@ export function buildWeb3SupervisedCanaryReadinessReceipt(input: {
         ? "unsigned-order-ready"
         : "blocked";
   const endpointParams = `source=${input.state.market_source.mode}&account=${input.state.paper_account.mode}&scenario=${input.state.scenario}&cycles=0`;
+  const unsignedHandoffEndpoint = `/api/web3-live-unsigned-order-handoff?${endpointParams}`;
+  const canaryEndpoint = `/api/web3-live-trade-canary?${endpointParams}`;
+  const proofCommand = "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json";
+  const canaryAttemptContract = buildCanaryAttemptContract({
+    status,
+    lanes,
+    blockers,
+    endpointParams,
+    unsignedHandoffEndpoint,
+    canaryEndpoint,
+    proofCommand,
+    unsignedPreflight: input.unsignedPreflight,
+    canary: input.canary,
+  });
   const base = {
     mode: "web3-supervised-canary-readiness" as const,
     status,
@@ -116,9 +170,10 @@ export function buildWeb3SupervisedCanaryReadinessReceipt(input: {
     blockers: [...new Set(blockers)].slice(0, 12),
     next_lane_id: nextLane?.id ?? null,
     next_action: supervisedCanaryNextAction(status, nextLane, input),
+    canary_attempt_contract: canaryAttemptContract,
     ignition_endpoint: `/api/web3-live-ignition?${endpointParams}`,
-    unsigned_handoff_endpoint: `/api/web3-live-unsigned-order-handoff?${endpointParams}`,
-    canary_endpoint: `/api/web3-live-trade-canary?${endpointParams}`,
+    unsigned_handoff_endpoint: unsignedHandoffEndpoint,
+    canary_endpoint: canaryEndpoint,
     settings_fix_href: "/settings/integrations#settings-web3-credentials-runway",
     strict_verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order",
     transaction_submission_permission: canRelaySignedPayload || actualLiveTradeTested ? "external-signed-payload-only" as const : "blocked" as const,
@@ -140,6 +195,133 @@ export function buildWeb3SupervisedCanaryReadinessReceipt(input: {
     ...base,
     receipt_hash: hashJson(base),
   };
+}
+
+export function buildWeb3SupervisedCanaryAttemptHealth(
+  receipt: Web3SupervisedCanaryReadinessReceipt,
+): Web3SupervisedCanaryAttemptHealth {
+  const contract = receipt.canary_attempt_contract;
+  return {
+    mode: "web3-first-live-canary-attempt-health",
+    readiness_status: receipt.status,
+    stage: contract.stage,
+    runnable_now: contract.runnable_now,
+    operator_action_label: contract.operator_action_label,
+    primary_endpoint: contract.primary_endpoint,
+    exact_next_command: contract.exact_next_command,
+    missing_input_count: contract.missing_inputs.length,
+    required_acknowledgement_count: contract.required_acknowledgements.length,
+    actual_live_trade_tested: receipt.actual_live_trade_tested,
+    real_funds_moved_by_this_app: receipt.real_funds_moved_by_this_app,
+    live_execution_permission: receipt.live_execution_permission,
+    transaction_submission_permission: receipt.transaction_submission_permission,
+    wallet_mutation_permission: "blocked",
+    private_key_storage: "blocked",
+    seed_phrase_storage: "blocked",
+    signed_payload_storage: "blocked",
+    secret_echo_permission: "blocked",
+  };
+}
+
+function buildCanaryAttemptContract(input: {
+  status: Web3SupervisedCanaryReadinessReceipt["status"];
+  lanes: Web3SupervisedCanaryReadinessLane[];
+  blockers: string[];
+  endpointParams: string;
+  unsignedHandoffEndpoint: string;
+  canaryEndpoint: string;
+  proofCommand: string;
+  unsignedPreflight: Web3LiveUnsignedOrderPreflightReceipt;
+  canary: Web3LiveTradeCanaryReceipt;
+}): Web3SupervisedCanaryAttemptContract {
+  const missingInputs = input.lanes
+    .filter((lane) => lane.blocks_first_canary && lane.status !== "pass")
+    .map((lane) => `${lane.label}: ${lane.next_action}`);
+  const hasSignature = Boolean(input.canary.latest_signature_preview);
+  const proofComplete = input.canary.post_signing_evidence_status === "settlement-accounted" &&
+    input.canary.post_signing_evidence.every((item) => item.status === "pass");
+  const stage: Web3SupervisedCanaryAttemptContract["stage"] = input.status === "canary-tested" && proofComplete
+    ? "canary-proven"
+    : hasSignature
+      ? "proof-watch"
+      : input.canary.can_submit_from_app_now
+        ? "signed-payload-relay"
+        : input.status === "unsigned-order-ready"
+          ? "unsigned-order-request"
+          : input.unsignedPreflight.status === "ready"
+            ? "browser-wallet-signature"
+            : "credential-intake";
+  const runnableNow = stage === "canary-proven" ||
+    stage === "proof-watch" ||
+    stage === "signed-payload-relay" ||
+    stage === "unsigned-order-request";
+
+  return {
+    mode: "web3-first-live-canary-attempt-contract",
+    stage,
+    runnable_now: runnableNow,
+    operator_action_label: canaryAttemptOperatorAction(stage),
+    primary_endpoint: canaryAttemptEndpoint(stage, input),
+    exact_next_command: canaryAttemptCommand(stage, input),
+    missing_inputs: [...new Set(missingInputs.length > 0 ? missingInputs : input.blockers)].slice(0, 8),
+    required_acknowledgements: canaryAttemptAcknowledgements(stage),
+    safety_boundary: [
+      "Only the dedicated public wallet and tiny first-canary caps are in scope.",
+      "Private keys, seed phrases, keypair JSON, raw transaction storage, signed payload storage, and wallet authority are blocked.",
+      "The app cannot call autonomous real-money trading complete until signed relay, chain confirmation, settlement reconciliation, and portfolio mirror proof pass.",
+      "Any failed, stale, mismatched, or oversized request stops at the current canary stage.",
+    ],
+  };
+}
+
+function canaryAttemptOperatorAction(stage: Web3SupervisedCanaryAttemptContract["stage"]) {
+  if (stage === "canary-proven") return "Run strict live-canary verification";
+  if (stage === "proof-watch") return "Watch confirmation, settlement, and mirror proof";
+  if (stage === "signed-payload-relay") return "Relay the matching externally signed payload";
+  if (stage === "browser-wallet-signature") return "Open browser wallet signing for the one-shot canary";
+  if (stage === "unsigned-order-request") return "Request one tiny unsigned canary order";
+  return "Clear credential and wallet gates";
+}
+
+function canaryAttemptEndpoint(stage: Web3SupervisedCanaryAttemptContract["stage"], input: {
+  endpointParams: string;
+  unsignedHandoffEndpoint: string;
+  canaryEndpoint: string;
+}) {
+  if (stage === "unsigned-order-request" || stage === "browser-wallet-signature") return input.unsignedHandoffEndpoint;
+  if (stage === "signed-payload-relay" || stage === "proof-watch" || stage === "canary-proven") return input.canaryEndpoint;
+  return `/api/web3-supervised-canary-readiness?${input.endpointParams}`;
+}
+
+function canaryAttemptCommand(stage: Web3SupervisedCanaryAttemptContract["stage"], input: {
+  proofCommand: string;
+  unsignedHandoffEndpoint: string;
+  canaryEndpoint: string;
+}) {
+  if (stage === "canary-proven") return "npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary";
+  if (stage === "proof-watch") return input.proofCommand;
+  if (stage === "signed-payload-relay") return `POST ${input.canaryEndpoint} with operator_ack=true, canary_ack, request_id, route, and signed_transaction.`;
+  if (stage === "browser-wallet-signature") return "Use the Trading or Settings Sign tiny canary button; review the wallet prompt before signing.";
+  if (stage === "unsigned-order-request") return `POST ${input.unsignedHandoffEndpoint} with operator_ack=true, canary_ack, return_unsigned_transaction_ack=true, wallet_public_key, amount_lamports<=1000000.`;
+  return "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready";
+}
+
+function canaryAttemptAcknowledgements(stage: Web3SupervisedCanaryAttemptContract["stage"]) {
+  if (stage === "unsigned-order-request" || stage === "browser-wallet-signature") {
+    return [
+      "operator_ack=true",
+      "canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+      "return_unsigned_transaction_ack=true",
+    ];
+  }
+  if (stage === "signed-payload-relay") {
+    return [
+      "operator_ack=true",
+      "canary_ack=I_UNDERSTAND_THIS_CAN_MOVE_REAL_FUNDS",
+      "request_id must match the current audited canary request",
+    ];
+  }
+  return [];
 }
 
 function buildSupervisedCanaryReadinessLanes(input: {

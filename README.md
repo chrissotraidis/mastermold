@@ -247,6 +247,10 @@ only when the existing ignition gates say the step is allowed.
 wallet, ownership proof, Jupiter order rail, live flags, unsigned-order preflight, signed relay,
 manual review, and funded-canary proof into one ordered answer for whether the app can request the
 tiny unsigned order, relay a signed payload, or prove a real canary yet.
+It also exposes a `web3-first-live-canary-attempt-contract` object naming the current attempt stage,
+whether anything is runnable now, the exact endpoint/command to use, missing inputs, required
+acknowledgements, and the safety boundary before a funded canary is attempted; `/api/health`
+mirrors the canonical live-dex/persistent version as `web3_live_canary_attempt`.
 It keeps `can_autonomously_trade_real_money_now=false` until the supervised canary has actually
 relayed, confirmed, reconciled settlement, and mirrored the local portfolio; it cannot sign, submit,
 return transaction bytes from the ignition action, store wallet authority, echo secrets, or mutate wallets.

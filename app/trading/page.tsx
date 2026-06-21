@@ -370,6 +370,7 @@ function SupervisedCanaryReadinessPanel({ receipt }: { receipt: Web3SupervisedCa
     ...receipt.lanes.filter((lane) => lane.blocks_first_canary && lane.status === "pass"),
     ...receipt.lanes.filter((lane) => !lane.blocks_first_canary),
   ].slice(0, 6);
+  const attempt = receipt.canary_attempt_contract;
 
   return (
     <section
@@ -402,6 +403,31 @@ function SupervisedCanaryReadinessPanel({ receipt }: { receipt: Web3SupervisedCa
             <LiveUsabilityStat label="Signed relay" value={receipt.can_relay_signed_payload_now ? "ready" : "blocked"} tone={receipt.can_relay_signed_payload_now ? "engine" : "critical"} />
             <LiveUsabilityStat label="Live trade" value={receipt.actual_live_trade_tested ? "tested" : "not tested"} tone={receipt.actual_live_trade_tested ? "engine" : "critical"} />
             <LiveUsabilityStat label="Blockers" value={`${receipt.blocker_count}`} tone={receipt.blocker_count > 0 ? "critical" : "engine"} />
+          </div>
+
+          <div className="mt-3 rounded-md border border-engine/20 bg-engine/[0.035] p-3" aria-label="Trading first live canary attempt contract">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Live canary attempt contract</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{attempt.operator_action_label}</p>
+              </div>
+              <span className={canaryAttemptStageClassName(attempt.stage, attempt.runnable_now)}>
+                {attempt.stage.replaceAll("-", " ")}
+              </span>
+            </div>
+            <div className="mt-2 grid gap-1.5">
+              <Link href={attempt.primary_endpoint} className="truncate rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-5 text-outline transition hover:text-engine">
+                {attempt.primary_endpoint}
+              </Link>
+              <code className="block overflow-x-auto whitespace-nowrap rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                {attempt.exact_next_command}
+              </code>
+            </div>
+            {attempt.missing_inputs.length > 0 ? (
+              <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">
+                Missing: {attempt.missing_inputs[0]}
+              </p>
+            ) : null}
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -446,6 +472,13 @@ function SupervisedCanaryReadinessPanel({ receipt }: { receipt: Web3SupervisedCa
       </div>
     </section>
   );
+}
+
+function canaryAttemptStageClassName(stage: Web3SupervisedCanaryReadinessReceipt["canary_attempt_contract"]["stage"], runnableNow: boolean) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (stage === "canary-proven" || (runnableNow && stage === "proof-watch")) return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (runnableNow) return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
 function supervisedCanaryStatusClassName(status: Web3SupervisedCanaryReadinessReceipt["status"]) {

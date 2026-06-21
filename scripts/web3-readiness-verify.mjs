@@ -301,6 +301,22 @@ async function verifyHealth() {
     endpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
     liveEndpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
   });
+  assert(json.web3_live_canary_attempt?.mode === "web3-first-live-canary-attempt-health", "Health endpoint should expose compact live canary attempt health.", json.web3_live_canary_attempt);
+  assert(["blocked", "unsigned-order-ready", "signed-relay-ready", "canary-tested"].includes(json.web3_live_canary_attempt.readiness_status), "Live canary attempt health should expose a known readiness status.", json.web3_live_canary_attempt);
+  assert(["credential-intake", "unsigned-order-request", "browser-wallet-signature", "signed-payload-relay", "proof-watch", "canary-proven"].includes(json.web3_live_canary_attempt.stage), "Live canary attempt health should expose a known stage.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.runnable_now === false, "Live canary attempt health should not be runnable in default verification.", json.web3_live_canary_attempt);
+  assert(typeof json.web3_live_canary_attempt.operator_action_label === "string" && json.web3_live_canary_attempt.operator_action_label.length > 0, "Live canary attempt health should expose the operator action.", json.web3_live_canary_attempt);
+  assert(String(json.web3_live_canary_attempt.primary_endpoint ?? "").includes("/api/web3-supervised-canary-readiness"), "Live canary attempt health should point to the default readiness endpoint.", json.web3_live_canary_attempt);
+  assert(String(json.web3_live_canary_attempt.exact_next_command ?? "").includes("drill-canary:web3"), "Live canary attempt health should expose the exact next command.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.actual_live_trade_tested === false, "Live canary attempt health should not claim a funded canary.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.real_funds_moved_by_this_app === false, "Live canary attempt health should not claim real funds moved.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.live_execution_permission === "blocked", "Live canary attempt health should keep live execution blocked.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.transaction_submission_permission === "blocked", "Live canary attempt health should keep transaction submission blocked.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.wallet_mutation_permission === "blocked", "Live canary attempt health should keep wallet mutation blocked.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.private_key_storage === "blocked", "Live canary attempt health should keep private-key storage blocked.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.seed_phrase_storage === "blocked", "Live canary attempt health should keep seed-phrase storage blocked.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.signed_payload_storage === "blocked", "Live canary attempt health should keep signed-payload storage blocked.", json.web3_live_canary_attempt);
+  assert(json.web3_live_canary_attempt.secret_echo_permission === "blocked", "Live canary attempt health should keep secret echo blocked.", json.web3_live_canary_attempt);
   assert(json.web3_first_canary_drill?.mode === "web3-first-canary-drill-health", "Health endpoint should expose compact first-canary drill health.", json.web3_first_canary_drill);
   assert(
     ["blocked", "ready-to-request-unsigned-order", "ready-to-relay-signed-payload", "canary-proven", "unsafe-permission-drift"].includes(json.web3_first_canary_drill.status),
@@ -409,7 +425,7 @@ async function verifyHealth() {
   assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
-  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, canary proof, first-canary drill, canonical live canary drill, and live-usability locks are blocked");
+  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, canary proof, live canary attempt, first-canary drill, canonical live canary drill, and live-usability locks are blocked");
 }
 
 function verifyCanaryProofHealth(health, { name, endpoint, liveEndpoint }) {
@@ -1603,6 +1619,13 @@ async function verifySupervisedCanaryReadiness() {
   assert(json.lanes.every((lane) => ["pass", "watch", "fail"].includes(lane.status) && lane.detail && lane.next_action && lane.evidence_endpoint), "Supervised canary readiness lanes should be actionable.", json.lanes);
   assert(json.lanes.some((lane) => lane.id === "funded-canary-proof" && lane.status === "fail" && lane.blocks_first_canary === false), "Supervised canary readiness should keep funded proof separate from pre-canary blockers.", json.lanes);
   assert(Array.isArray(json.blockers) && json.blockers.length > 0, "Supervised canary readiness should name first-canary blockers.", json.blockers);
+  assert(json.canary_attempt_contract?.mode === "web3-first-live-canary-attempt-contract", "Supervised canary readiness should expose the live canary attempt contract.", json.canary_attempt_contract);
+  assert(["credential-intake", "unsigned-order-request", "browser-wallet-signature", "signed-payload-relay", "proof-watch", "canary-proven"].includes(json.canary_attempt_contract.stage), "Live canary attempt contract should expose a known stage.", json.canary_attempt_contract);
+  assert(json.canary_attempt_contract.runnable_now === false, "Default live canary attempt contract should not be runnable.", json.canary_attempt_contract);
+  assert(String(json.canary_attempt_contract.primary_endpoint ?? "").includes("/api/web3-supervised-canary-readiness"), "Default live canary attempt contract should point to the readiness endpoint.", json.canary_attempt_contract);
+  assert(String(json.canary_attempt_contract.exact_next_command ?? "").includes("drill-canary:web3"), "Default live canary attempt contract should name the drill command.", json.canary_attempt_contract);
+  assert(Array.isArray(json.canary_attempt_contract.missing_inputs) && json.canary_attempt_contract.missing_inputs.length > 0, "Default live canary attempt contract should list missing inputs.", json.canary_attempt_contract);
+  assert(String(json.canary_attempt_contract.safety_boundary?.join(" ") ?? "").includes("Private keys"), "Live canary attempt contract should keep the safety boundary explicit.", json.canary_attempt_contract);
   assert(String(json.ignition_endpoint ?? "").includes("/api/web3-live-ignition"), "Supervised canary readiness should link ignition evidence.", json);
   assert(String(json.unsigned_handoff_endpoint ?? "").includes("/api/web3-live-unsigned-order-handoff"), "Supervised canary readiness should link unsigned handoff evidence.", json);
   assert(String(json.canary_endpoint ?? "").includes("/api/web3-live-trade-canary"), "Supervised canary readiness should link canary evidence.", json);
@@ -1615,7 +1638,7 @@ async function verifySupervisedCanaryReadiness() {
   assert(json.secret_echo_permission === "blocked", "Supervised canary readiness must block secret echo.", json);
   assert(String(json.controls?.join(" ") ?? "").includes("first funded canary readiness ladder"), "Supervised canary readiness should describe its proof ladder boundary.", json.controls);
   assertNoLeak("supervised canary readiness", json);
-  record("supervised-canary-readiness", "pass", `${json.status}; unsigned order ready: ${json.can_request_unsigned_order_now}; signed relay ready: ${json.can_relay_signed_payload_now}; actual live trade tested: ${json.actual_live_trade_tested}`);
+  record("supervised-canary-readiness", "pass", `${json.status}; attempt ${json.canary_attempt_contract.stage}; runnable: ${json.canary_attempt_contract.runnable_now}; actual live trade tested: ${json.actual_live_trade_tested}`);
 }
 
 async function verifyFirstCanaryDrill() {
