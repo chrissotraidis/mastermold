@@ -1543,6 +1543,7 @@ describe("Web3 autonomous trading subsystem", () => {
           source: string;
           status: string;
           next_action: string;
+          href: string;
           blocks_live_capital: boolean;
         } | null;
         live_execution_permission: string;
@@ -1637,6 +1638,7 @@ describe("Web3 autonomous trading subsystem", () => {
       label: "Dedicated trading wallet",
       owner: "operator",
       source: "cutover",
+      href: "/settings/integrations#settings-web3-wallet-public-key",
       blocks_live_capital: true,
     });
     expect(receipt.web3_live_usability.next_blocker?.next_action.length).toBeGreaterThan(0);
@@ -1680,6 +1682,7 @@ describe("Web3 autonomous trading subsystem", () => {
         source: string;
         status: string;
         next_action: string;
+        href: string;
         blocks_live_capital: boolean;
       } | null;
       operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
@@ -1749,6 +1752,7 @@ describe("Web3 autonomous trading subsystem", () => {
       label: receipt.missing_for_live_usability[0].label,
       owner: "operator",
       source: "cutover",
+      href: "/settings/integrations#settings-web3-wallet-public-key",
       blocks_live_capital: true,
     });
     expect(receipt.next_blocker?.next_action).toBe(receipt.missing_for_live_usability[0].next_action);
@@ -1781,7 +1785,7 @@ describe("Web3 autonomous trading subsystem", () => {
       total_live_usability_row_count: number;
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
-      next_blocker: { id: string; label: string; owner: string; source: string; status: string; next_action: string; blocks_live_capital: boolean } | null;
+      next_blocker: { id: string; label: string; owner: string; source: string; status: string; next_action: string; href: string; blocks_live_capital: boolean } | null;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; first_label: string; next_action: string }>;
       missing_source_summary: Array<{ source: string; missing_count: number; first_label: string; next_action: string }>;
@@ -1799,6 +1803,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.missing_for_live_usability.length).toBeGreaterThanOrEqual(receipt.missing_for_live_usability.length);
     expect(allRowsReceipt.next_blocker?.id).toBe(allRowsReceipt.missing_for_live_usability[0].id);
     expect(allRowsReceipt.next_blocker?.label).toBe(allRowsReceipt.missing_for_live_usability[0].label);
+    expect(allRowsReceipt.next_blocker?.href).toBe("/settings/integrations#settings-web3-wallet-public-key");
     expect(allRowsReceipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.credential_doctor.status).toBe(receipt.credential_doctor.status);

@@ -677,6 +677,12 @@ function SettingsWeb3SetupPriorityCard({
           <p className="mt-1 truncate text-[11px] leading-4 text-outline">
             {nextBlocker.owner.replaceAll("-", " ")} · {nextBlocker.source.replaceAll("-", " ")} · {nextBlocker.blocks_live_capital ? "blocks live capital" : "review item"}
           </p>
+          <Link
+            href={nextBlocker.href}
+            className="mt-2 inline-flex min-h-10 items-center justify-center rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-xs font-semibold text-critical transition hover:bg-critical/15"
+          >
+            Open blocker control
+          </Link>
         </div>
       ) : null}
 

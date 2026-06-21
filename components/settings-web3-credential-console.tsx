@@ -670,9 +670,9 @@ export function SettingsWeb3CredentialConsole({
   const liveUsabilityHref = `/api/web3-live-usability-blockers?${liveUsabilityParams.toString()}`;
   const visibleLiveUsabilityBlockers = liveUsabilityReceipt.missing_for_live_usability.slice(0, 4);
   const nextLiveUsabilityBlocker = liveUsabilityReceipt.next_blocker;
-  const liveUsabilitySetupHref = liveUsabilityReceipt.next_unlock_step?.id === "scope-wallet"
+  const liveUsabilitySetupHref = nextLiveUsabilityBlocker?.href ?? (liveUsabilityReceipt.next_unlock_step?.id === "scope-wallet"
     ? "#settings-web3-wallet-public-key"
-    : "#settings-web3-credentials-runway";
+    : "#settings-web3-credentials-runway");
   const actionChecklist = buildConsoleActionChecklist({
     hasProviderInput: [
       draft.helius_api_key,

@@ -56,6 +56,7 @@ export type Web3LiveUsabilityNextBlocker = {
   source: Web3LiveUsabilityMissingItem["source"];
   status: Web3LiveUsabilityMissingItem["status"];
   next_action: string;
+  href: string;
   blocks_live_capital: boolean;
 };
 
@@ -351,8 +352,36 @@ function summarizeNextBlocker(item: Web3LiveUsabilityMissingItem | undefined): W
     source: item.source,
     status: item.status,
     next_action: item.next_action,
+    href: nextBlockerHref(item),
     blocks_live_capital: item.blocks_live_capital,
   };
+}
+
+function nextBlockerHref(item: Web3LiveUsabilityMissingItem) {
+  if (
+    item.id.includes("dedicated-trading-wallet") ||
+    item.id.includes("operator-wallet") ||
+    item.id.includes("wallet-ownership") ||
+    item.id === "runway:wallet"
+  ) {
+    return "/settings/integrations#settings-web3-wallet-public-key";
+  }
+  if (
+    item.id.includes("jupiter") ||
+    item.id.includes("signer") ||
+    item.id.includes("emergency-stop") ||
+    item.id.includes("production-worker") ||
+    item.id.includes("accounting") ||
+    item.id.includes("settlement") ||
+    item.id === "runway:ops" ||
+    item.id === "runway:accounting"
+  ) {
+    return "/settings/integrations#web3-credential-action-console";
+  }
+  if (item.source === "manual-review" || item.id.includes("manual-live")) {
+    return "/settings/integrations#settings-web3-research-handoff";
+  }
+  return "/settings/integrations#settings-web3-credentials-runway";
 }
 
 function summarizeCredentialDoctor(health: Web3CredentialDoctorHealth): Web3LiveUsabilityCredentialDoctorSummary {
