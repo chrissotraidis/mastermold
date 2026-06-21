@@ -94,6 +94,7 @@ export type Web3ResearchHandoffHealth = {
   receipt_hash: string;
   source: Web3ResearchHandoffPacket["source"];
   account: Web3ResearchHandoffPacket["account"];
+  scenario: Web3ResearchHandoffPacket["scenario"];
   question_count: number;
   now_question_count: number;
   before_live_question_count: number;
@@ -105,6 +106,7 @@ export type Web3ResearchHandoffHealth = {
   next_unlock_step_label: string | null;
   next_unlock_step_action: string | null;
   source_endpoint: string;
+  live_review_source_endpoint: string;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
   transaction_submission_permission: "blocked";
@@ -249,6 +251,7 @@ export function buildWeb3ResearchHandoffHealth(packet: Web3ResearchHandoffPacket
     receipt_hash: packet.receipt_hash,
     source: packet.source,
     account: packet.account,
+    scenario: packet.scenario,
     question_count: packet.research_questions.length,
     now_question_count: nowQuestions.length,
     before_live_question_count: beforeLiveQuestions.length,
@@ -259,7 +262,8 @@ export function buildWeb3ResearchHandoffHealth(packet: Web3ResearchHandoffPacket
     next_operator_input: packet.open_operator_inputs[0]?.next_action ?? "No required operator input is open.",
     next_unlock_step_label: packet.next_unlock_step?.label ?? null,
     next_unlock_step_action: packet.next_unlock_step?.next_action ?? null,
-    source_endpoint: "/api/web3-research-handoff-packet?source=live-dex&account=persistent",
+    source_endpoint: `/api/web3-research-handoff-packet?source=${packet.source}&account=${packet.account}&scenario=${packet.scenario}&cycles=0`,
+    live_review_source_endpoint: "/api/web3-research-handoff-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0",
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     transaction_submission_permission: "blocked",

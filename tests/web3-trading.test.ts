@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { GET as APP_HEALTH_GET } from "@/app/api/health/route";
 import { GET, POST } from "@/app/api/web3-trading/route";
 import { GET as ACCOUNT_ACQUISITION_GET } from "@/app/api/web3-account-acquisition/route";
 import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
@@ -1382,6 +1383,58 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("cannot sign, submit"))).toBe(true);
     expect(text).not.toContain("test-helius-usability-secret");
     expect(text).not.toContain("test-jupiter-usability-secret");
+  });
+
+  test("GIVEN monitors read app health WHEN Web3 summaries are returned THEN research handoff endpoints match their packet scope", async () => {
+    const response = await APP_HEALTH_GET();
+    const receipt = await json<{
+      status: string;
+      web3_research_handoff: {
+        mode: string;
+        source: string;
+        account: string;
+        scenario: string;
+        source_endpoint: string;
+        live_review_source_endpoint: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      };
+      web3_live_usability: {
+        mode: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        signing_permission: string;
+        secret_echo_permission: string;
+      };
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.status).toBe("ok");
+    expect(receipt.web3_research_handoff.mode).toBe("web3-research-handoff-health");
+    expect(["sample", "live-dex"]).toContain(receipt.web3_research_handoff.source);
+    expect(["ephemeral", "persistent"]).toContain(receipt.web3_research_handoff.account);
+    expect(["base", "breakout", "rug-risk"]).toContain(receipt.web3_research_handoff.scenario);
+    expect(receipt.web3_research_handoff.source_endpoint).toContain(`source=${receipt.web3_research_handoff.source}`);
+    expect(receipt.web3_research_handoff.source_endpoint).toContain(`account=${receipt.web3_research_handoff.account}`);
+    expect(receipt.web3_research_handoff.source_endpoint).toContain(`scenario=${receipt.web3_research_handoff.scenario}`);
+    expect(receipt.web3_research_handoff.live_review_source_endpoint).toBe("/api/web3-research-handoff-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_research_handoff.live_execution_permission).toBe("blocked");
+    expect(receipt.web3_research_handoff.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.web3_research_handoff.transaction_submission_permission).toBe("blocked");
+    expect(receipt.web3_research_handoff.private_key_storage).toBe("blocked");
+    expect(receipt.web3_research_handoff.seed_phrase_storage).toBe("blocked");
+    expect(receipt.web3_research_handoff.secret_echo_permission).toBe("blocked");
+    expect(receipt.web3_live_usability.mode).toBe("web3-live-usability-health");
+    expect(receipt.web3_live_usability.live_execution_permission).toBe("blocked");
+    expect(receipt.web3_live_usability.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.web3_live_usability.transaction_submission_permission).toBe("blocked");
+    expect(receipt.web3_live_usability.signing_permission).toBe("blocked");
+    expect(receipt.web3_live_usability.secret_echo_permission).toBe("blocked");
   });
 
   test("GIVEN real-money blockers remain WHEN live usability blockers are requested THEN the next unlock step comes before proof work", async () => {

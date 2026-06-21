@@ -170,6 +170,21 @@ async function verifyHealth() {
   assert(json.web3_production_supervisor?.wallet_mutation_permission === "blocked", "Production supervisor should keep wallet mutation blocked.", json.web3_production_supervisor);
   assert(json.web3_research_handoff?.mode === "web3-research-handoff-health", "Health endpoint should expose Web3 research handoff health.", json.web3_research_handoff);
   assert(json.web3_research_handoff.question_count >= 10, "Research handoff health should expose unresolved question count.", json.web3_research_handoff);
+  assert(["sample", "live-dex"].includes(json.web3_research_handoff.source), "Research handoff health should expose the summarized source.", json.web3_research_handoff);
+  assert(["ephemeral", "persistent"].includes(json.web3_research_handoff.account), "Research handoff health should expose the summarized account.", json.web3_research_handoff);
+  assert(["base", "breakout", "rug-risk"].includes(json.web3_research_handoff.scenario), "Research handoff health should expose the summarized scenario.", json.web3_research_handoff);
+  assert(
+    json.web3_research_handoff.source_endpoint.includes(`source=${json.web3_research_handoff.source}`) &&
+      json.web3_research_handoff.source_endpoint.includes(`account=${json.web3_research_handoff.account}`) &&
+      json.web3_research_handoff.source_endpoint.includes(`scenario=${json.web3_research_handoff.scenario}`),
+    "Research handoff health source endpoint should match the summarized packet.",
+    json.web3_research_handoff,
+  );
+  assert(
+    json.web3_research_handoff.live_review_source_endpoint === "/api/web3-research-handoff-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Research handoff health should expose the live-review handoff packet separately.",
+    json.web3_research_handoff,
+  );
   assert(typeof json.web3_research_handoff.next_unlock_step_label === "string" && json.web3_research_handoff.next_unlock_step_label.length > 0, "Research handoff health should expose the next unlock step.", json.web3_research_handoff);
   assert(typeof json.web3_research_handoff.next_unlock_step_action === "string" && json.web3_research_handoff.next_unlock_step_action.length > 0, "Research handoff health should expose the next unlock action.", json.web3_research_handoff);
   assert(json.web3_research_handoff.live_execution_permission === "blocked", "Research handoff health should keep live execution blocked.", json.web3_research_handoff);

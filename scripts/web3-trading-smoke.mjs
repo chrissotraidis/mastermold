@@ -90,6 +90,21 @@ async function main() {
   assert(health.web3_profit_proof.proof_plan.wallet_mutation_permission === "blocked", "Profit-proof plan should keep wallet mutation blocked.", health.web3_profit_proof.proof_plan);
   assert(health.web3_research_handoff?.mode === "web3-research-handoff-health", "Health endpoint should expose Web3 research handoff health.", health.web3_research_handoff);
   assert(health.web3_research_handoff.question_count >= 10, "Research handoff health should expose the research question count.", health.web3_research_handoff);
+  assert(["sample", "live-dex"].includes(health.web3_research_handoff.source), "Research handoff health should expose the summarized source.", health.web3_research_handoff);
+  assert(["ephemeral", "persistent"].includes(health.web3_research_handoff.account), "Research handoff health should expose the summarized account.", health.web3_research_handoff);
+  assert(["base", "breakout", "rug-risk"].includes(health.web3_research_handoff.scenario), "Research handoff health should expose the summarized scenario.", health.web3_research_handoff);
+  assert(
+    health.web3_research_handoff.source_endpoint.includes(`source=${health.web3_research_handoff.source}`) &&
+      health.web3_research_handoff.source_endpoint.includes(`account=${health.web3_research_handoff.account}`) &&
+      health.web3_research_handoff.source_endpoint.includes(`scenario=${health.web3_research_handoff.scenario}`),
+    "Research handoff health source endpoint should match the summarized packet.",
+    health.web3_research_handoff,
+  );
+  assert(
+    health.web3_research_handoff.live_review_source_endpoint === "/api/web3-research-handoff-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Research handoff health should expose the live-review packet separately.",
+    health.web3_research_handoff,
+  );
   assert(typeof health.web3_research_handoff.next_question === "string" && health.web3_research_handoff.next_question.length > 0, "Research handoff health should expose the next research question.", health.web3_research_handoff);
   assert(typeof health.web3_research_handoff.next_unlock_step_label === "string" && health.web3_research_handoff.next_unlock_step_label.length > 0, "Research handoff health should expose the next unlock step.", health.web3_research_handoff);
   assert(typeof health.web3_research_handoff.next_unlock_step_action === "string" && health.web3_research_handoff.next_unlock_step_action.length > 0, "Research handoff health should expose the next unlock action.", health.web3_research_handoff);
