@@ -1485,6 +1485,8 @@ async function verifyLiveTradeCanary() {
     live.json.blockers,
   );
   assert(!String(live.json.blockers?.[0] ?? "").includes("No confirmed live transaction signature"), "Live-scoped canary should not lead with the final proof blocker before prerequisite gates.", live.json.blockers);
+  assert(!String(live.json.blockers?.join(" ") ?? "").includes("Dry-run spend"), "Live-scoped canary proof should not mix paper dry-run cap repair into first funded canary blockers.", live.json.blockers);
+  assert(!String(live.json.blockers?.join(" ") ?? "").includes("dry-run daily cap"), "Live-scoped canary proof should keep dry-run cap repair in paper/runway receipts.", live.json.blockers);
 
   const preflightPath = `/api/web3-live-unsigned-order-handoff?source=sample&account=persistent&scenario=breakout&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${encodeURIComponent(walletPublicKey)}&amount_lamports=100000`;
   const preflight = await requestJson(preflightPath);

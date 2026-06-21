@@ -3307,6 +3307,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(liveReceipt.actual_live_trade_tested).toBe(false);
     expect(liveReceipt.blockers[0]).toMatch(/Add a dedicated|Replace the scoped wallet|Replace the sample|Run Prove ownership|Add JUPITER_API_KEY|Set the exact live canary flags/);
     expect(liveReceipt.blockers[0]).not.toContain("No confirmed live transaction signature");
+    expect(liveReceipt.blockers.join(" ")).not.toContain("Dry-run spend");
+    expect(liveReceipt.blockers.join(" ")).not.toContain("dry-run daily cap");
     expect(liveReceipt.next_action).toBe(liveReceipt.blockers[0]);
     expect(liveReceipt.live_execution_permission).toBe("blocked");
     expect(liveReceipt.wallet_mutation_permission).toBe("blocked");

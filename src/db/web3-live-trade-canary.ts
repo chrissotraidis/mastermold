@@ -360,11 +360,8 @@ function liveTradeCanaryBlockers(
   const liveFlagsReady = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true" &&
     process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL === "I_UNDERSTAND_REAL_FUNDS" &&
     process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF === "true";
-  const failChecks = state.live_execution_arming.checks
-    .filter((check) => check.status === "fail")
-    .map((check) => `${check.label}: ${check.detail}`);
   const blockers = [
-    !liveScopeReady ? "Open the live DEX trading cockpit with account=persistent before requesting canary evidence." : null,
+    !liveScopeReady ? "Open the live DEX trading cockpit with source=live-dex and account=persistent before requesting canary evidence." : null,
     !walletScoped ? "Add a dedicated public Solana trading wallet address in Settings; never paste a private key or seed phrase." : null,
     walletScoped && !walletLooksLikePublicKey ? "Replace the scoped wallet with a valid public Solana address." : null,
     walletIsSample ? "Replace the sample all-ones wallet with a dedicated public Solana address before canary review." : null,
@@ -375,9 +372,6 @@ function liveTradeCanaryBlockers(
     !readyForExternalSignedPayload ? "Signed relay is not currently ready to accept an external signed payload." : null,
     "This canary receipt does not return unsigned transaction bytes; use the gated /api/web3-live-unsigned-order-handoff route before browser-wallet signing.",
     !actualLiveTradeTested ? "No confirmed live transaction signature has been recorded by this app." : null,
-    ...state.execution_gate.live_blockers,
-    ...failChecks,
-    ...state.signed_transaction_relay.blockers,
   ].filter((item): item is string => Boolean(item));
 
   return [...new Set(blockers)].slice(0, 12);
