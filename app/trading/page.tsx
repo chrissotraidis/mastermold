@@ -393,7 +393,7 @@ function TradingCommandBoard({
             </div>
             <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">{liveUsabilityBlockers.summary}</p>
             <div className="mt-2 grid grid-cols-3 gap-2">
-              <CommandBoardMetric label="Missing" value={`${liveUsabilityBlockers.missing_for_live_usability.length}`} detail="top rows" tone={liveUsabilityBlockers.missing_for_live_usability.length > 0 ? "critical" : "engine"} />
+              <CommandBoardMetric label="Missing" value={`${liveUsabilityBlockers.total_live_usability_row_count}`} detail={`${liveUsabilityBlockers.listed_live_usability_row_count} listed`} tone={liveUsabilityBlockers.total_live_usability_row_count > 0 ? "critical" : "engine"} />
               <CommandBoardMetric label="Signoffs" value={`${liveUsabilityBlockers.passed_signoff_count}/${liveUsabilityBlockers.required_signoff_count}`} detail={`${liveUsabilityBlockers.failed_or_watch_signoff_count} open`} tone={liveUsabilityBlockers.failed_or_watch_signoff_count > 0 ? "caution" : "engine"} />
               <CommandBoardMetric label="Actions" value={`${liveUsabilityBlockers.safe_action_count}`} detail={`${liveUsabilityBlockers.gated_action_count} gated`} tone="engine" />
             </div>
@@ -798,6 +798,7 @@ function LiveUsabilityBlockersPanel({
   account: "persistent" | "ephemeral";
 }) {
   const params = new URLSearchParams({ source, account, scenario: receipt.scenario, cycles: "0" });
+  params.set("rows", "all");
   const href = `/api/web3-live-usability-blockers?${params.toString()}`;
   const missing = receipt.missing_for_live_usability.slice(0, 6);
 
@@ -820,7 +821,7 @@ function LiveUsabilityBlockersPanel({
               href={href}
               className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
             >
-              Open blockers JSON
+              Open all blockers JSON
             </Link>
           </div>
 
@@ -834,6 +835,9 @@ function LiveUsabilityBlockersPanel({
           <div className="mt-3 rounded-md border border-outline/15 bg-surface/50 p-3">
             <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Next action</p>
             <p className="mt-1 text-xs leading-5 text-on-surface-variant">{receipt.next_action}</p>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              Showing {receipt.listed_live_usability_row_count}/{receipt.total_live_usability_row_count} rows here; open the JSON for every dependency-ranked blocker.
+            </p>
           </div>
 
           {receipt.next_unlock_step ? (

@@ -723,8 +723,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("total_live_usability_row_count");
     expect(tradingPage).toContain("Next unlock step");
     expect(tradingPage).toContain("Live usability next unlock step");
-    expect(tradingPage).toContain("Open blockers JSON");
-    expect(tradingPage).toContain("/api/web3-live-usability-blockers?${params.toString()}");
+    expect(tradingPage).toContain("Open all blockers JSON");
+    expect(tradingPage).toContain('params.set("rows", "all")');
+    expect(tradingPage).toContain("open the JSON for every dependency-ranked blocker");
     expect(tradingPage).toContain("next_unlock_step");
     expect(tradingPage).toContain("missing_for_live_usability");
     expect(tradingPage).toContain("safe_next_actions");
