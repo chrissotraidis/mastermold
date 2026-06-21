@@ -1091,9 +1091,10 @@ export function SettingsWeb3CredentialConsole({
             </button>
           </div>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <div className="mt-3 grid gap-2 sm:grid-cols-5">
           <ConsoleMetric label="Inputs open" value={`${liveUsabilityReceipt.open_operator_input_count}`} tone={liveUsabilityReceipt.open_operator_input_count > 0 ? "caution" : "engine"} />
           <ConsoleMetric label="Real blockers" value={`${liveUsabilityReceipt.real_capital_blocker_count}`} tone={liveUsabilityReceipt.real_capital_blocker_count > 0 ? "critical" : "engine"} />
+          <ConsoleMetric label="Rows listed" value={`${liveUsabilityReceipt.listed_live_usability_row_count}/${liveUsabilityReceipt.total_live_usability_row_count}`} tone={liveUsabilityReceipt.listed_live_usability_row_count < liveUsabilityReceipt.total_live_usability_row_count ? "caution" : "engine"} />
           <ConsoleMetric label="Live lanes" value={`${liveUsabilityReceipt.ready_live_lane_count}/${liveUsabilityReceipt.total_live_lane_count}`} tone={liveUsabilityReceipt.ready_live_lane_count === liveUsabilityReceipt.total_live_lane_count ? "engine" : "caution"} />
           <ConsoleMetric label="Safe actions" value={`${liveUsabilityReceipt.safe_action_count}`} tone={liveUsabilityReceipt.safe_action_count > 0 ? "engine" : "neutral"} />
         </div>

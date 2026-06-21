@@ -718,6 +718,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("LiveUsabilityBlockersPanel");
     expect(tradingPage).toContain("Real-money usability");
     expect(tradingPage).toContain("What is left");
+    expect(tradingPage).toContain("Rows listed");
+    expect(tradingPage).toContain("listed_live_usability_row_count");
+    expect(tradingPage).toContain("total_live_usability_row_count");
     expect(tradingPage).toContain("Next unlock step");
     expect(tradingPage).toContain("Live usability next unlock step");
     expect(tradingPage).toContain("Open blockers JSON");
@@ -999,6 +1002,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsWeb3LiveUsabilityBlockersPanel");
     expect(settingsPage).toContain("Settings Web3 live usability blockers");
     expect(settingsPage).toContain("What is left for real money");
+    expect(settingsPage).toContain("Rows listed");
+    expect(settingsPage).toContain("listed_live_usability_row_count");
+    expect(settingsPage).toContain("total_live_usability_row_count");
     expect(settingsPage).toContain("Settings real-money missing rows");
     expect(settingsPage).toContain("Settings live usability next unlock step");
     expect(settingsPage).toContain("Settings live usability next action");
@@ -1288,6 +1294,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Settings top refreshed Web3 blockers");
     expect(settingsConsole).toContain("Inputs open");
     expect(settingsConsole).toContain("Real blockers");
+    expect(settingsConsole).toContain("Rows listed");
+    expect(settingsConsole).toContain("listed_live_usability_row_count");
+    expect(settingsConsole).toContain("total_live_usability_row_count");
     expect(settingsConsole).toContain("No missing live-usability rows are listed");
     expect(settingsConsole).toContain("This receipt refreshes after wallet scope");
     expect(settingsPage).toContain("nextOperatorInputLabel={operatorRequestPacket.next_input?.label");
@@ -1577,6 +1586,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-live-usability-blockers");
     expect(source("components/review-readiness.tsx")).toContain("live-usability blocker summaries");
     expect(source("components/review-readiness.tsx")).toContain("separates cutover setup blockers from total versus listed dependency-ranked live-usability rows");
+    expect(source("components/review-readiness.tsx")).toContain("Trading and Settings now surface that listed-versus-total live-usability row count");
     expect(source("components/review-readiness.tsx")).toContain("next ordered unlock step");
     expect(source("components/review-readiness.tsx")).toContain("Settings now adds a Web3 setup runway");
     expect(source("components/review-readiness.tsx")).toContain("Settings now places that same live-usability blocker receipt");

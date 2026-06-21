@@ -644,8 +644,9 @@ function SettingsWeb3SetupPriorityCard({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
         <SettingsMetric label="Live lanes" value={`${liveUsability.ready_live_lane_count}/${liveUsability.total_live_lane_count}`} />
+        <SettingsMetric label="Rows listed" value={`${liveUsability.listed_live_usability_row_count}/${liveUsability.total_live_usability_row_count}`} />
         <SettingsMetric label="Research questions" value={`${researchPacket.research_questions.length}`} />
         <SettingsMetric label="Verifier" value={verifier.includes("--require-operator-wallet") ? "wallet gate" : "base gate"} />
       </div>
@@ -909,9 +910,10 @@ function SettingsWeb3OperatorSetupRunway({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3" aria-label="Settings Web3 setup runway metrics">
+      <div className="mt-3 grid gap-2 sm:grid-cols-4" aria-label="Settings Web3 setup runway metrics">
         <SettingsMetric label="Open inputs" value={`${handoff.open_required_count}`} />
         <SettingsMetric label="Real blockers" value={`${liveUsability.real_capital_blocker_count}`} />
+        <SettingsMetric label="Rows listed" value={`${liveUsability.listed_live_usability_row_count}/${liveUsability.total_live_usability_row_count}`} />
         <SettingsMetric label="Live lanes" value={`${liveUsability.ready_live_lane_count}/${liveUsability.total_live_lane_count}`} />
       </div>
 
@@ -983,8 +985,9 @@ function SettingsWeb3LiveUsabilityBlockersPanel({ receipt }: { receipt: Web3Live
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+      <div className="mt-3 grid gap-2 sm:grid-cols-5">
         <SettingsMetric label="Capital blockers" value={`${receipt.real_capital_blocker_count}`} />
+        <SettingsMetric label="Rows listed" value={`${receipt.listed_live_usability_row_count}/${receipt.total_live_usability_row_count}`} />
         <SettingsMetric label="Live lanes" value={`${receipt.ready_live_lane_count}/${receipt.total_live_lane_count}`} />
         <SettingsMetric label="Signoffs" value={`${receipt.passed_signoff_count}/${receipt.required_signoff_count}`} />
         <SettingsMetric label="Safe actions" value={`${receipt.safe_action_count}`} />

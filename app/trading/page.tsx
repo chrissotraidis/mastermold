@@ -824,9 +824,10 @@ function LiveUsabilityBlockersPanel({
             </Link>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <LiveUsabilityStat label="Inputs" value={`${receipt.open_operator_input_count}`} tone={receipt.open_operator_input_count > 0 ? "caution" : "engine"} />
             <LiveUsabilityStat label="Capital blockers" value={`${receipt.real_capital_blocker_count}`} tone={receipt.real_capital_blocker_count > 0 ? "critical" : "engine"} />
+            <LiveUsabilityStat label="Rows listed" value={`${receipt.listed_live_usability_row_count}/${receipt.total_live_usability_row_count}`} tone={receipt.listed_live_usability_row_count < receipt.total_live_usability_row_count ? "caution" : "engine"} />
             <LiveUsabilityStat label="Live lanes" value={`${receipt.ready_live_lane_count}/${receipt.total_live_lane_count}`} tone={receipt.ready_live_lane_count === receipt.total_live_lane_count ? "engine" : "caution"} />
           </div>
 
