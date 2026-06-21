@@ -1105,6 +1105,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("firstCanaryDrill.next_unblock_step");
     expect(settingsPage).toContain("Settings first canary operator unblock plan");
     expect(settingsPage).toContain("Settings ordered first canary unblock steps");
+    expect(settingsConsole).toContain("Settings first canary after current gate forecast");
+    expect(settingsConsole).toContain("firstCanaryForecastSteps");
+    expect(settingsConsole).toContain("signed_relay_status");
+    expect(settingsConsole).toContain("These forecast steps stay blocked until the active proof is recorded");
     expect(settingsPage).toContain("Operator unblock plan");
     expect(settingsPage).toContain("firstCanaryUnblockBadgeStatus");
     expect(settingsPage).toContain("No funded live trade has been tested by this app yet.");

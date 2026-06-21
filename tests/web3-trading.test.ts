@@ -1863,6 +1863,7 @@ describe("Web3 autonomous trading subsystem", () => {
         next_requirement: {
           id: string;
           target_names: string[];
+          safe_collection_surface: string;
           live_execution_permission: string;
           wallet_mutation_permission: string;
           secret_echo_permission: string;
@@ -2258,6 +2259,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_credential_requirements.next_requirement?.target_names).toContain(
       healthWalletGateIsOwnershipProof ? "hash-only wallet ownership receipt" : "wallet_public_key",
     );
+    if (healthWalletGateIsOwnershipProof) {
+      expect(receipt.web3_credential_requirements.next_requirement?.safe_collection_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
+    }
     expect(receipt.web3_credential_requirements.source_endpoint).toContain("/api/web3-credential-requirements");
     expect(receipt.web3_credential_requirements.live_review_source_endpoint).toBe("/api/web3-credential-requirements?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(receipt.web3_credential_requirements.live_execution_permission).toBe("blocked");

@@ -337,7 +337,7 @@ function buildCredentialRequirements(
     ? currentInput.target_names
     : ["wallet_public_key", "wallet_ownership_signature_hash"];
   const walletOwnershipSurface = walletOwnershipIsCurrent
-    ? "/trading?source=live-dex&account=persistent"
+    ? "/trading?source=live-dex&account=persistent#web3-live-canary-console"
     : "/settings/integrations#settings-web3-wallet-public-key";
   const walletOwnershipAction = walletOwnershipIsCurrent
     ? currentInput.next_action

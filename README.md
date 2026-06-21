@@ -323,6 +323,9 @@ It also shows the actual trade, funds moved, signed-relay, unsigned-order, hard-
 counts in one truth strip, plus an after-current-gate forecast so the operator can see the still
 blocked Jupiter, live-flag, unsigned-preflight, signer-relay, and post-signing proof runway without
 opening JSON.
+Settings mirrors that same first-canary truth strip and forecast, and the credential requirements
+packet now points wallet-ownership proof directly to the Trading live canary console anchor when
+that proof is the active gate.
 It also exposes `Prove wallet` in the same live canary console, using the existing text-only
 `/api/web3-wallet-ownership` flow so the operator can clear the next wallet-control gate without a
 transaction signature, private key, seed phrase, wallet mutation, or fund movement. That flow now
