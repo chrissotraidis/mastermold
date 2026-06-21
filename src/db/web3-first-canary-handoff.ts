@@ -53,11 +53,7 @@ export function buildWeb3FirstCanaryHandoffReceipt(input: {
   const nextOperatorStep = input.drill.next_unblock_step;
   const doneSteps = input.drill.operator_unblock_plan.filter((step) => step.status === "done");
   const openSteps = input.drill.operator_unblock_plan.filter((step) => step.status !== "done");
-  const safeToProvideNow = uniqueText([
-    input.requirements.next_requirement?.safe_value_type,
-    ...(input.requirements.next_requirement?.target_names ?? []),
-    ...input.requirements.safe_to_share,
-  ]);
+  const safeToProvideNow = buildSafeToProvideNow(nextOperatorStep, input.requirements);
   const safeCommands = uniqueText([
     input.drill.strict_ready_command,
     input.drill.strict_proof_command,
@@ -150,6 +146,86 @@ function firstCanaryHandoffSummary(
     return "The first funded canary has live-trade evidence; strict proof review is still required before any broader autonomy.";
   }
   return `${openSteps.length} first-canary step${openSteps.length === 1 ? "" : "s"} remain; actual live trade tested is false and real funds moved by this app is false.`;
+}
+
+function buildSafeToProvideNow(
+  nextOperatorStep: Web3FirstCanaryUnblockStep | null,
+  requirements: Web3CredentialRequirementsReceipt,
+) {
+  const requirement = requirements.next_requirement;
+  const requirementValues = requirement && firstCanaryStepMatchesRequirement(nextOperatorStep?.id ?? null, requirement.id)
+    ? [
+        requirement.safe_value_type,
+        ...requirement.target_names,
+      ]
+    : [];
+
+  if (requirementValues.length > 0) return uniqueText(requirementValues);
+
+  if (nextOperatorStep?.id === "wallet-ownership") {
+    return [
+      "Browser-wallet text-message ownership proof only",
+      "hash-only wallet ownership receipt",
+    ];
+  }
+  if (nextOperatorStep?.id === "dedicated-wallet") {
+    return [
+      "Dedicated Solana public wallet address",
+      "wallet_public_key",
+    ];
+  }
+  if (nextOperatorStep?.id === "jupiter-order") {
+    return [
+      "JUPITER_API_KEY target in ignored server env or one-shot Settings rehearsal",
+      "Jupiter Swap V2 quote/order proof without transaction bytes",
+    ];
+  }
+  if (nextOperatorStep?.id === "live-flags") {
+    return [
+      "Exact first-canary live flags in ignored server env",
+      "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true",
+      "MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS",
+      "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true",
+    ];
+  }
+  if (nextOperatorStep?.id === "unsigned-order-preflight") {
+    return [
+      "operator_ack=true",
+      "tiny canary amount and slippage cap",
+      "matching scoped public wallet",
+    ];
+  }
+  if (nextOperatorStep?.id === "signer-relay") {
+    return [
+      "externally signed tiny canary payload through the guarded relay only",
+      "matching one-shot request id",
+    ];
+  }
+  if (nextOperatorStep?.id === "manual-live-review") {
+    return [
+      "external manual live review decision",
+      "approved first-canary spend and risk caps",
+    ];
+  }
+  if (nextOperatorStep?.id === "funded-canary-proof" || nextOperatorStep?.id === "post-signing-proof") {
+    return [
+      "confirmed canary signature",
+      "settlement reconciliation evidence",
+      "local portfolio mirror proof",
+    ];
+  }
+
+  return requirement
+    ? uniqueText([requirement.safe_value_type, ...requirement.target_names])
+    : ["Rerun the first-canary drill to identify the next safe input."];
+}
+
+function firstCanaryStepMatchesRequirement(stepId: Web3FirstCanaryUnblockStep["id"] | null, requirementId: string) {
+  if (stepId === "dedicated-wallet") return requirementId === "dedicated-public-wallet";
+  if (stepId === "wallet-ownership") return requirementId === "wallet-ownership-proof";
+  if (stepId === "jupiter-order") return requirementId === "jupiter-order-rail";
+  if (stepId === "manual-live-review") return requirementId === "manual-live-review";
+  return false;
 }
 
 function renderFirstCanaryHandoffText(

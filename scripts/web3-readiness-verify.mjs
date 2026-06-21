@@ -1777,6 +1777,12 @@ async function verifyFirstCanaryHandoff() {
   assert(Array.isArray(json.done_steps), "First canary handoff should expose completed first-canary steps.", json.done_steps);
   assert(Array.isArray(json.open_steps) && json.open_steps.length > 0, "First canary handoff should expose open first-canary steps.", json.open_steps);
   assert(Array.isArray(json.safe_to_provide_now) && json.safe_to_provide_now.length > 0, "First canary handoff should expose safe-to-provide values.", json.safe_to_provide_now);
+  if (json.next_operator_step?.id === "wallet-ownership") {
+    const safeNow = json.safe_to_provide_now.join(" ");
+    assert(/wallet ownership|ownership proof|hash-only/i.test(safeNow), "Wallet-ownership handoff should ask only for ownership proof now.", json.safe_to_provide_now);
+    assert(!safeNow.includes("JUPITER_API_KEY"), "Wallet-ownership handoff should not ask for Jupiter key as the immediate input.", json.safe_to_provide_now);
+    assert(!/Emergency-stop|signer provider|accounting/i.test(safeNow), "Wallet-ownership handoff should not mix later ops or signer asks into safe_to_provide_now.", json.safe_to_provide_now);
+  }
   assert(Array.isArray(json.never_provide) && json.never_provide.length > 0, "First canary handoff should expose never-provide values.", json.never_provide);
   assert(Array.isArray(json.proof_completion_criteria) && json.proof_completion_criteria.length === 4, "First canary handoff should expose proof completion criteria.", json.proof_completion_criteria);
   assert(Array.isArray(json.source_endpoints) && json.source_endpoints.some((endpoint) => endpoint.includes("/api/web3-first-canary-drill")) && json.source_endpoints.some((endpoint) => endpoint.includes("/api/web3-credential-requirements")), "First canary handoff should link its source packets.", json.source_endpoints);

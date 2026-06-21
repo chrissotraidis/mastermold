@@ -218,7 +218,7 @@ external review; the default response stays compact for dashboard panels.
 `/api/web3-first-canary-handoff?source=live-dex&account=persistent&scenario=breakout&cycles=0`
 is the compact first funded canary handoff for another operator or helper. It combines the
 first-canary drill and credential requirements into a redacted packet with completed gates,
-open canary steps, the next operator action, safe-to-provide values, never-provide values,
+open canary steps, the next operator action, current-step safe-to-provide values, never-provide values,
 proof criteria, source endpoints, and strict commands while live execution, signing,
 submission, wallet mutation, private-key storage, seed-phrase storage, signed-payload storage,
 and secret echo remain blocked. `npm run --silent handoff-canary:web3 -- --base-url=http://localhost:4010`

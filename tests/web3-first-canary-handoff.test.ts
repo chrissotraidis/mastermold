@@ -159,6 +159,8 @@ describe("Web3 first canary handoff", () => {
     expect(receipt.real_funds_moved_by_this_app).toBe(false);
     expect(receipt.next_operator_step?.id).toBe("wallet-ownership");
     expect(receipt.safe_to_provide_now).toContain("hash-only wallet ownership receipt");
+    expect(receipt.safe_to_provide_now).not.toContain("public Solana wallet address");
+    expect(receipt.safe_to_provide_now.join(" ")).not.toContain("JUPITER_API_KEY");
     expect(receipt.never_provide).toContain("private keys");
     expect(receipt.proof_completion_criteria).toHaveLength(4);
     expect(receipt.text_packet).toContain("# Mastermind First Funded Canary Handoff");
@@ -183,6 +185,11 @@ describe("Web3 first canary handoff", () => {
     expect(receipt.actual_live_trade_tested).toBe(false);
     expect(receipt.real_funds_moved_by_this_app).toBe(false);
     expect(receipt.next_operator_step).toBeTruthy();
+    if (receipt.next_operator_step?.id === "wallet-ownership") {
+      expect(receipt.safe_to_provide_now.join(" ")).toContain("wallet ownership");
+      expect(receipt.safe_to_provide_now.join(" ")).not.toContain("JUPITER_API_KEY");
+      expect(receipt.safe_to_provide_now.join(" ")).not.toContain("Emergency-stop");
+    }
     expect(receipt.safe_commands.join(" ")).toContain("drill-canary:web3");
     expect(receipt.safe_commands.join(" ")).toContain("prove-canary:web3");
     expect(receipt.source_endpoints.join(" ")).toContain("/api/web3-first-canary-drill");
