@@ -3050,6 +3050,81 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(unsafeReceipt.secret_echo_permission).toBe("blocked");
   });
 
+  test("GIVEN a one-shot unsigned canary order is returned WHEN the canary receipt refreshes THEN request continuity is available without storing transaction bytes", async () => {
+    const safeWallet = "9xQeWvG816bUx9EPfYQ4mKZ8sPXc6zQnK9j8vY9J3F3";
+    const unsignedTransaction = Buffer.from("unsigned-live-canary-transaction-never-store").toString("base64");
+    process.env.JUPITER_API_KEY = "jup-test-canary-key";
+    process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION = "true";
+    process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL = "I_UNDERSTAND_REAL_FUNDS";
+    process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF = "true";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.jup.ag/swap/v2/order")) {
+        return Response.json({
+          transaction: unsignedTransaction,
+          requestId: "canary-order-001",
+          router: "metis",
+          mode: "manual",
+          feeBps: 0,
+        });
+      }
+      return Response.json([]);
+    }) as typeof fetch;
+
+    const handoff = await LIVE_UNSIGNED_ORDER_HANDOFF_POST(new Request("http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=live-dex&account=persistent&cycles=0", {
+      method: "POST",
+      body: JSON.stringify({
+        operator_ack: true,
+        canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+        return_unsigned_transaction_ack: true,
+        wallet_public_key: safeWallet,
+        amount_lamports: 100_000,
+        max_slippage_bps: 50,
+      }),
+    }));
+    const handoffText = await handoff.text();
+    const handoffReceipt = JSON.parse(handoffText) as {
+      status: string;
+      request_id: string | null;
+      unsigned_transaction: string | null;
+      unsigned_payload_hash: string | null;
+      unsigned_payload_byte_count: number;
+      unsigned_transaction_return: string;
+      continuity_audit_recorded: boolean;
+      transaction_body_storage: string;
+      signed_transaction_return: string;
+      secret_echo_permission: string;
+    };
+
+    expect(handoff.status).toBe(200);
+    expect(handoffReceipt.status).toBe("order-ready");
+    expect(handoffReceipt.request_id).toBe("canary-order-001");
+    expect(handoffReceipt.unsigned_transaction).toBe(unsignedTransaction);
+    expect(handoffReceipt.unsigned_transaction_return).toBe("returned-one-shot");
+    expect(handoffReceipt.unsigned_payload_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(handoffReceipt.unsigned_payload_byte_count).toBeGreaterThan(0);
+    expect(handoffReceipt.continuity_audit_recorded).toBe(true);
+    expect(handoffReceipt.transaction_body_storage).toBe("blocked");
+    expect(handoffReceipt.signed_transaction_return).toBe("blocked");
+    expect(handoffReceipt.secret_echo_permission).toBe("blocked");
+    expect(handoffText).not.toContain("jup-test-canary-key");
+    expect(handoffText).not.toContain("unsigned-live-canary-transaction-never-store");
+
+    const canary = await LIVE_TRADE_CANARY_GET(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=sample&account=persistent&cycles=0"));
+    const canaryReceipt = await json<{
+      current_request_id: string | null;
+      signed_relay_status: string;
+      latest_signature_preview: string | null;
+      blockers: string[];
+    }>(canary);
+
+    expect(canary.status).toBe(200);
+    expect(canaryReceipt.current_request_id).toBe("canary-order-001");
+    expect(["locked", "awaiting-signature", "ready"]).toContain(canaryReceipt.signed_relay_status);
+    expect(canaryReceipt.latest_signature_preview).toBeNull();
+    expect(JSON.stringify(canaryReceipt)).not.toContain(unsignedTransaction);
+  });
+
   test("GIVEN real-money blockers remain WHEN live usability blockers are requested THEN the next unlock step comes before proof work", async () => {
     const response = await LIVE_USABILITY_BLOCKERS_GET(new Request("http://localhost/api/web3-live-usability-blockers?scenario=breakout&source=live-dex&account=persistent"));
     const receipt = await json<{

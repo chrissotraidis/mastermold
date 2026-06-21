@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { isLikelySolanaPublicKey } from "./web3-credentials";
-import type { Web3TradingState } from "./web3-trading";
+import { store, type Web3ExecutionAuditRow } from "./store";
+import type { ExecutionAuditEntry, Web3TradingState } from "./web3-trading";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -84,6 +85,7 @@ export type Web3LiveUnsignedOrderHandoffReceipt = {
   unsigned_transaction_return: "blocked" | "returned-one-shot";
   unsigned_payload_hash: string | null;
   unsigned_payload_byte_count: number;
+  continuity_audit_recorded: boolean;
   transaction_body_storage: "blocked";
   signed_transaction_return: "blocked";
   execute_permission: "blocked";
@@ -330,6 +332,7 @@ function receipt(input: {
     ...input.unsafeFields.map((field) => `Unsafe field rejected: ${field}.`),
     ...input.blockers,
   ];
+  const continuityAuditRecorded = recordCanaryContinuityAudit(input);
   const receiptBase = {
     mode: "web3-live-unsigned-order-handoff" as const,
     status: input.status,
@@ -355,6 +358,7 @@ function receipt(input: {
     unsigned_transaction_return: input.status === "order-ready" ? "returned-one-shot" as const : "blocked" as const,
     unsigned_payload_hash: input.unsignedPayloadHash ?? null,
     unsigned_payload_byte_count: input.unsignedPayloadByteCount ?? 0,
+    continuity_audit_recorded: continuityAuditRecorded,
     transaction_body_storage: "blocked" as const,
     signed_transaction_return: "blocked" as const,
     execute_permission: "blocked" as const,
@@ -382,6 +386,62 @@ function receipt(input: {
       unsigned_transaction: receiptBase.unsigned_transaction ? "[one-shot-unsigned-transaction-redacted-from-hash]" : null,
     }),
   };
+}
+
+function recordCanaryContinuityAudit(input: {
+  state: Web3TradingState;
+  generatedAt: string;
+  status: Web3LiveUnsignedOrderHandoffReceipt["status"];
+  requestId?: string | null;
+  router?: string | null;
+  unsignedPayloadHash?: string | null;
+  unsignedPayloadByteCount?: number;
+}): boolean {
+  if (
+    input.status !== "order-ready" ||
+    !input.requestId ||
+    !input.unsignedPayloadHash ||
+    !input.unsignedPayloadByteCount
+  ) {
+    return false;
+  }
+
+  const digest = createHash("sha256")
+    .update(`${input.requestId}:${input.unsignedPayloadHash}:${input.generatedAt}`)
+    .digest("hex");
+  const entry: ExecutionAuditEntry = {
+    id: `web3-canary-handoff-${digest.slice(0, 24)}`,
+    created_at: input.generatedAt,
+    nonce: `web3-canary-handoff-${digest.slice(0, 12)}`,
+    plan_id: null,
+    symbol: "SOL-USDC",
+    side: "buy",
+    status: "ready-to-sign",
+    attempt: 0,
+    max_attempts: 1,
+    retry_window_seconds: 90,
+    next_retry_at: null,
+    request_id: input.requestId,
+    router: input.router ?? "jupiter-swap-v2",
+    relay_path: "jupiter-swap-v2",
+    transaction_ready: true,
+    payload_hash: input.unsignedPayloadHash,
+    payload_bytes: input.unsignedPayloadByteCount,
+    simulated_signature: null,
+    relay_signature: null,
+    relay_slot: null,
+    confirmation_status: null,
+    signer_session_label: "browser-wallet:live-canary-handoff",
+    signer_network: null,
+    kill_switch: input.state.execution_readiness.config.kill_switch,
+    reason: "One-shot live canary unsigned order was returned for external browser-wallet signing; transaction bytes were not stored.",
+  };
+  store().appendWeb3ExecutionAudit({
+    id: entry.id,
+    created_at: entry.created_at,
+    data: entry,
+  } satisfies Web3ExecutionAuditRow);
+  return true;
 }
 
 function unsignedHandoffNextAction(status: Web3LiveUnsignedOrderHandoffReceipt["status"], blockers: string[]) {

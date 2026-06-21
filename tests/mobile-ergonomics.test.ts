@@ -1812,8 +1812,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("can_request_one_shot_unsigned_order");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("returned-one-shot");
+    expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("continuity_audit_recorded");
+    expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("web3-canary-handoff");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("actual_live_trade_tested");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("web3-live-trade-canary-action");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("request_continuity_status");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("expected_request_id");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("signed_payload_echoed");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("post_signing_evidence_status");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("settlement-accounted");
