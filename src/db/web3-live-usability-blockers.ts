@@ -61,6 +61,34 @@ export type Web3LiveUsabilityNextBlocker = {
   blocks_live_capital: boolean;
 };
 
+export type Web3LiveUsabilityCredentialRequest = {
+  id: string;
+  label: string;
+  status: string;
+  source: Web3OperatorCurrentInput["source"] | "dependency-blocker";
+  priority: string;
+  safe_collection_surface: string;
+  storage: string;
+  can_enter_in_app: boolean;
+  target_names: string[];
+  fix_href: string;
+  safe_value_description: string;
+  verifier_command: string | null;
+  next_action: string;
+  blocker_id: string | null;
+  blocker_owner: Web3LiveUsabilityBlockerOwner | null;
+  blocks_live_capital: boolean;
+  safe_to_provide: string[];
+  never_provide: string[];
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  signing_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export type Web3LiveUsabilityBlockersReceipt = {
   mode: "web3-live-usability-blockers";
   status:
@@ -103,6 +131,7 @@ export type Web3LiveUsabilityBlockersReceipt = {
     storage: string;
   } | null;
   next_blocker: Web3LiveUsabilityNextBlocker | null;
+  next_credential_request: Web3LiveUsabilityCredentialRequest | null;
   next_unlock_step: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number] | null;
   next_action: string;
   summary: string;
@@ -160,6 +189,7 @@ export type Web3LiveUsabilityBlockersHealth = {
   credential_doctor_blocked_count: number;
   credential_doctor_next_action: string;
   next_blocker: Web3LiveUsabilityNextBlocker | null;
+  next_credential_request: Web3LiveUsabilityCredentialRequest | null;
   next_action: string;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -215,6 +245,12 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   const sourceSummary = summarizeMissingBySource(missing);
   const credentialDoctor = summarizeCredentialDoctor(input.credentialDoctor ?? getWeb3CredentialDoctorHealth());
   const nextBlocker = summarizeNextBlocker(missing[0], input.currentInput ?? null);
+  const nextCredentialRequest = summarizeNextCredentialRequest(
+    input.currentInput ?? null,
+    nextBlocker,
+    input.cutover.safe_to_provide,
+    input.cutover.never_provide,
+  );
   const verifierCommands = Array.from(new Set([
     ...input.runbook.verifier_commands,
     ...input.manualLiveReview.safe_commands,
@@ -259,6 +295,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
       }
       : null,
     next_blocker: nextBlocker,
+    next_credential_request: nextCredentialRequest,
     next_unlock_step: nextUnlockStep,
     next_action: liveUsabilityNextAction(status, input, missing),
     summary: liveUsabilitySummary(status, input, missing, autonomousLive?.detail),
@@ -307,6 +344,12 @@ export function buildWeb3LiveUsabilityBlockersHealth(
   currentInput: Web3OperatorCurrentInput | null = null,
 ): Web3LiveUsabilityBlockersHealth {
   const healthCurrentInput = currentInput ?? receipt.current_input;
+  const healthCredentialRequest = summarizeNextCredentialRequest(
+    healthCurrentInput,
+    receipt.next_blocker,
+    receipt.safe_to_provide,
+    receipt.never_provide,
+  );
   return {
     mode: "web3-live-usability-health",
     status: receipt.status,
@@ -333,6 +376,7 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     credential_doctor_blocked_count: receipt.credential_doctor.blocked_count,
     credential_doctor_next_action: receipt.credential_doctor.next_action,
     next_blocker: receipt.next_blocker,
+    next_credential_request: healthCredentialRequest,
     next_action: receipt.next_action,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -342,6 +386,83 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     seed_phrase_storage: "blocked",
     secret_echo_permission: "blocked",
   };
+}
+
+function summarizeNextCredentialRequest(
+  currentInput: Web3OperatorCurrentInput | null,
+  nextBlocker: Web3LiveUsabilityNextBlocker | null,
+  safeToProvide: string[],
+  neverProvide: string[],
+): Web3LiveUsabilityCredentialRequest | null {
+  if (!currentInput && !nextBlocker) return null;
+  const currentInputMatchesBlocker = Boolean(currentInput && nextBlocker && nextBlocker.id.includes(currentInput.id));
+  const useCurrentInput = Boolean(currentInput && (!nextBlocker || currentInputMatchesBlocker));
+  const id = useCurrentInput ? currentInput!.id : nextBlocker?.id ?? currentInput?.id ?? "next-web3-credential";
+  const label = useCurrentInput ? currentInput!.label : nextBlocker?.label ?? currentInput?.label ?? "Next Web3 setup input";
+  const verifierCommand = nextBlocker?.safe_command ?? currentInput?.verifier_command ?? null;
+  const fixHref = nextBlocker?.href ?? "/settings/integrations#settings-web3-credentials-runway";
+  return {
+    id,
+    label,
+    status: useCurrentInput ? currentInput!.status : nextBlocker?.status ?? currentInput?.status ?? "needed",
+    source: useCurrentInput ? currentInput!.source : "dependency-blocker",
+    priority: useCurrentInput ? currentInput!.priority : "required-now",
+    safe_collection_surface: useCurrentInput ? currentInput!.safe_collection_surface : fixHref,
+    storage: useCurrentInput ? currentInput!.storage : credentialRequestStorageRule(id),
+    can_enter_in_app: useCurrentInput ? currentInput!.can_enter_in_app : Boolean(fixHref.includes("#settings-web3-wallet-public-key") || fixHref.includes("#web3-credential-action-console")),
+    target_names: useCurrentInput ? currentInput!.target_names : credentialRequestTargetNames(id),
+    fix_href: fixHref,
+    safe_value_description: credentialRequestSafeValueDescription(id, currentInput, nextBlocker),
+    verifier_command: verifierCommand,
+    next_action: useCurrentInput ? currentInput!.next_action : nextBlocker?.next_action ?? currentInput?.next_action ?? "Open Settings and resolve the next Web3 setup gate.",
+    blocker_id: nextBlocker?.id ?? null,
+    blocker_owner: nextBlocker?.owner ?? null,
+    blocks_live_capital: nextBlocker?.blocks_live_capital ?? true,
+    safe_to_provide: safeToProvide.slice(0, 6),
+    never_provide: neverProvide.slice(0, 6),
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    transaction_submission_permission: "blocked",
+    signing_permission: "blocked",
+    private_key_storage: "blocked",
+    seed_phrase_storage: "blocked",
+    secret_echo_permission: "blocked",
+  };
+}
+
+function credentialRequestStorageRule(id: string) {
+  const normalized = id.toLowerCase();
+  if (normalized.includes("wallet")) return "browser-public-scope";
+  if (normalized.includes("jupiter") || normalized.includes("provider") || normalized.includes("helius") || normalized.includes("rpc")) return "ignored-server-env";
+  if (normalized.includes("signer") || normalized.includes("custody")) return "external-provider-policy";
+  if (normalized.includes("accounting") || normalized.includes("settlement")) return "external-accounting-review";
+  if (normalized.includes("production") || normalized.includes("emergency") || normalized.includes("ops")) return "ops-target-review";
+  return "safe-setup-surface";
+}
+
+function credentialRequestTargetNames(id: string) {
+  const normalized = id.toLowerCase();
+  if (normalized.includes("wallet")) return ["wallet_public_key"];
+  if (normalized.includes("jupiter")) return ["JUPITER_API_KEY"];
+  if (normalized.includes("helius") || normalized.includes("rpc")) return ["HELIUS_API_KEY", "SOLANA_RPC_URL", "SOLANA_WS_URL"];
+  if (normalized.includes("accounting") || normalized.includes("settlement")) return ["MASTERMOLD_TAX_LEDGER_EXPORT_PATH"];
+  if (normalized.includes("production")) return ["MASTERMOLD_WEB3_PROCESS_MANAGER", "MASTERMOLD_WEB3_WORKER_OWNER", "MASTERMOLD_WEB3_RESTART_POLICY_URL"];
+  if (normalized.includes("emergency")) return ["MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL", "MASTERMOLD_EMERGENCY_STOP_CONTACT"];
+  return [];
+}
+
+function credentialRequestSafeValueDescription(
+  id: string,
+  currentInput: Web3OperatorCurrentInput | null,
+  nextBlocker: Web3LiveUsabilityNextBlocker | null,
+) {
+  const normalized = `${id} ${currentInput?.target_names.join(" ") ?? ""} ${nextBlocker?.id ?? ""}`.toLowerCase();
+  if (normalized.includes("wallet")) return "Dedicated public Solana trading wallet address only; never a private key, seed phrase, keypair JSON, signed payload, or transaction body.";
+  if (normalized.includes("jupiter")) return "Jupiter provider key in ignored server env or a session-only Settings test; never wallet authority or signed transaction data.";
+  if (normalized.includes("signer") || normalized.includes("custody")) return "Signer provider choice, policy identifier, and provider target names only; custody credentials stay in the external provider surface.";
+  if (normalized.includes("accounting") || normalized.includes("settlement")) return "Accounting/export target name and review decision only; no wallet secrets or raw private ledger credentials.";
+  if (normalized.includes("production") || normalized.includes("emergency") || normalized.includes("ops")) return "Ops target names, process owner, restart policy, or emergency-stop contact route only; no webhook secret echo or live execution authority.";
+  return "Redacted setup status, target names, or review decision only; secrets and wallet authority stay out of the app.";
 }
 
 function summarizeNextBlocker(

@@ -728,6 +728,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("open the JSON for every dependency-ranked blocker");
     expect(tradingPage).toContain("Lead owner:");
     expect(tradingPage).toContain("Trading credential doctor status");
+    expect(tradingPage).toContain("Trading next credential request");
+    expect(tradingPage).toContain("next_credential_request");
     expect(tradingPage).toContain("Trading current input contract");
     expect(tradingPage).toContain("Live usability current input contract");
     expect(tradingPage).toContain("Operator runbook current input contract");
@@ -986,9 +988,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings Web3 priority next verifier");
     expect(settingsPage).toContain("Settings Web3 priority boundary");
     expect(settingsPage).toContain("Settings Web3 priority next dependency blocker");
+    expect(settingsPage).toContain("Settings Web3 priority next credential request");
     expect(settingsPage).toContain("const nextBlocker = liveUsability.next_blocker");
+    expect(settingsPage).toContain("const nextCredentialRequest = liveUsability.next_credential_request");
     expect(settingsPage).toContain("href={nextBlocker.href}");
     expect(settingsPage).toContain("nextBlocker.safe_command");
+    expect(settingsPage).toContain("nextCredentialRequest.safe_value_description");
     expect(settingsPage).toContain("blocks live capital");
     expect(settingsPage).toContain("This first-screen card is navigation and status only");
     expect(settingsPage.indexOf("<SettingsWeb3SetupPriorityCard")).toBeLessThan(
@@ -1340,9 +1345,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Settings Web3 next operator unlock");
     expect(settingsConsole).toContain("Next operator unlock");
     expect(settingsConsole).toContain("Settings Web3 console next dependency blocker");
+    expect(settingsConsole).toContain("Settings Web3 console next credential request");
     expect(settingsConsole).toContain("nextLiveUsabilityBlocker");
+    expect(settingsConsole).toContain("nextCredentialRequest");
     expect(settingsConsole).toContain("nextLiveUsabilityBlocker?.href");
     expect(settingsConsole).toContain("nextLiveUsabilityBlocker.safe_command");
+    expect(settingsConsole).toContain("nextCredentialRequest.safe_value_description");
     expect(settingsConsole).toContain("Open blocker control");
     expect(settingsConsole).toContain("Go to wallet field");
     expect(settingsConsole).toContain("settings-web3-wallet-public-key");
@@ -1661,6 +1669,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3_live_usability.next_blocker");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("current_input: Web3OperatorCurrentInput | null");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("next_blocker: Web3LiveUsabilityNextBlocker | null");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("next_credential_request: Web3LiveUsabilityCredentialRequest | null");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("summarizeNextCredentialRequest");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("safe_value_description");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("next_blocker: receipt.next_blocker");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("href: nextBlockerHref(item)");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("safe_command: nextBlockerSafeCommand(item, currentInput)");
@@ -1672,6 +1683,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/trading/page.tsx")).toContain("currentInput: operatorRequestPacket.current_input");
     expect(source("app/trading/page.tsx")).toContain("Trading next dependency blocker");
     expect(source("app/trading/page.tsx")).toContain("Live usability next dependency blocker");
+    expect(source("app/trading/page.tsx")).toContain("Trading next credential request");
     expect(source("app/trading/page.tsx")).toContain("href={nextBlocker.href}");
     expect(source("app/trading/page.tsx")).toContain("nextBlocker.safe_command");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input)");
@@ -1680,18 +1692,21 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("web3_operator_runbook");
     expect(source("README.md")).toContain("live-review source endpoint");
     expect(source("README.md")).toContain("next dependency blocker");
+    expect(source("README.md")).toContain("next credential request");
     expect(source("README.md")).toContain("safe fix link");
     expect(source("README.md")).toContain("verifier command");
     expect(source("README.md")).toContain("Settings mirrors that next dependency blocker");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_operator_runbook");
     expect(source("docs/web3-credentials-runbook.md")).toContain("live_review_source_endpoint");
     expect(source("docs/web3-credentials-runbook.md")).toContain("next dependency blocker");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("next credential request");
     expect(source("docs/web3-credentials-runbook.md")).toContain("safe fix link");
     expect(source("docs/web3-credentials-runbook.md")).toContain("verifier command");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings mirrors that same next dependency blocker");
     expect(source("components/review-readiness.tsx")).toContain("web3_operator_runbook summary");
     expect(source("components/review-readiness.tsx")).toContain("live-review runbook endpoint");
     expect(source("components/review-readiness.tsx")).toContain("next dependency blocker");
+    expect(source("components/review-readiness.tsx")).toContain("next credential request");
     expect(source("components/review-readiness.tsx")).toContain("safe fix link");
     expect(source("components/review-readiness.tsx")).toContain("verifier command");
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors the same next dependency blocker");

@@ -1547,6 +1547,22 @@ describe("Web3 autonomous trading subsystem", () => {
           safe_command: string | null;
           blocks_live_capital: boolean;
         } | null;
+        next_credential_request: {
+          id: string;
+          label: string;
+          fix_href: string;
+          safe_value_description: string;
+          verifier_command: string | null;
+          safe_to_provide: string[];
+          never_provide: string[];
+          live_execution_permission: string;
+          wallet_mutation_permission: string;
+          transaction_submission_permission: string;
+          signing_permission: string;
+          private_key_storage: string;
+          seed_phrase_storage: string;
+          secret_echo_permission: string;
+        } | null;
         live_execution_permission: string;
         wallet_mutation_permission: string;
         transaction_submission_permission: string;
@@ -1644,6 +1660,22 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(receipt.web3_live_usability.next_blocker?.safe_command).toContain("--require-operator-wallet");
     expect(receipt.web3_live_usability.next_blocker?.next_action.length).toBeGreaterThan(0);
+    expect(receipt.web3_live_usability.next_credential_request).toMatchObject({
+      label: "Dedicated trading wallet",
+      fix_href: "/settings/integrations#settings-web3-wallet-public-key",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      signing_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(receipt.web3_live_usability.next_credential_request?.id).toContain("dedicated-trading-wallet");
+    expect(receipt.web3_live_usability.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+    expect(receipt.web3_live_usability.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
+    expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
+    expect(receipt.web3_live_usability.next_credential_request?.never_provide.join(" ")).toContain("private key");
     expect(receipt.web3_live_usability.live_execution_permission).toBe("blocked");
     expect(receipt.web3_live_usability.wallet_mutation_permission).toBe("blocked");
     expect(receipt.web3_live_usability.transaction_submission_permission).toBe("blocked");
@@ -1687,6 +1719,26 @@ describe("Web3 autonomous trading subsystem", () => {
         href: string;
         safe_command: string | null;
         blocks_live_capital: boolean;
+      } | null;
+      next_credential_request: {
+        id: string;
+        label: string;
+        safe_collection_surface: string;
+        storage: string;
+        can_enter_in_app: boolean;
+        target_names: string[];
+        fix_href: string;
+        safe_value_description: string;
+        verifier_command: string | null;
+        safe_to_provide: string[];
+        never_provide: string[];
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        signing_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
       } | null;
       operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
@@ -1760,6 +1812,25 @@ describe("Web3 autonomous trading subsystem", () => {
     });
     expect(receipt.next_blocker?.next_action).toBe(receipt.missing_for_live_usability[0].next_action);
     expect(receipt.next_blocker?.safe_command).toContain("--require-operator-wallet");
+    expect(receipt.next_credential_request).toMatchObject({
+      label: receipt.next_blocker?.label,
+      fix_href: "/settings/integrations#settings-web3-wallet-public-key",
+      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+      storage: "browser-public-scope",
+      can_enter_in_app: true,
+      target_names: ["wallet_public_key"],
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      signing_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(receipt.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+    expect(receipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
+    expect(receipt.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
+    expect(receipt.next_credential_request?.never_provide.join(" ")).toContain("private key");
     expect(receipt.missing_owner_summary[0]).toMatchObject({
       owner: "operator",
       first_label: "Dedicated trading wallet",
@@ -1790,6 +1861,7 @@ describe("Web3 autonomous trading subsystem", () => {
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
       next_blocker: { id: string; label: string; owner: string; source: string; status: string; next_action: string; href: string; safe_command: string | null; blocks_live_capital: boolean } | null;
+      next_credential_request: { id: string; label: string; fix_href: string; verifier_command: string | null; safe_value_description: string; secret_echo_permission: string } | null;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; first_label: string; next_action: string }>;
       missing_source_summary: Array<{ source: string; missing_count: number; first_label: string; next_action: string }>;
@@ -1809,6 +1881,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.next_blocker?.label).toBe(allRowsReceipt.missing_for_live_usability[0].label);
     expect(allRowsReceipt.next_blocker?.href).toBe("/settings/integrations#settings-web3-wallet-public-key");
     expect(allRowsReceipt.next_blocker?.safe_command).toContain("--require-operator-wallet");
+    expect(allRowsReceipt.next_credential_request?.fix_href).toBe("/settings/integrations#settings-web3-wallet-public-key");
+    expect(allRowsReceipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
+    expect(allRowsReceipt.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+    expect(allRowsReceipt.next_credential_request?.secret_echo_permission).toBe("blocked");
     expect(allRowsReceipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.credential_doctor.status).toBe(receipt.credential_doctor.status);

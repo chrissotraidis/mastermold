@@ -670,6 +670,7 @@ export function SettingsWeb3CredentialConsole({
   const liveUsabilityHref = `/api/web3-live-usability-blockers?${liveUsabilityParams.toString()}`;
   const visibleLiveUsabilityBlockers = liveUsabilityReceipt.missing_for_live_usability.slice(0, 4);
   const nextLiveUsabilityBlocker = liveUsabilityReceipt.next_blocker;
+  const nextCredentialRequest = liveUsabilityReceipt.next_credential_request;
   const liveUsabilitySetupHref = nextLiveUsabilityBlocker?.href ?? (liveUsabilityReceipt.next_unlock_step?.id === "scope-wallet"
     ? "#settings-web3-wallet-public-key"
     : "#settings-web3-credentials-runway");
@@ -771,6 +772,39 @@ export function SettingsWeb3CredentialConsole({
               {nextLiveUsabilityBlocker.safe_command}
             </code>
           ) : null}
+        </div>
+      ) : null}
+
+      {nextCredentialRequest ? (
+        <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 console next credential request">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Next credential request</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{nextCredentialRequest.label}</p>
+            </div>
+            <Badge variant="outline" className={nextCredentialRequest.can_enter_in_app ? "border-engine/35 bg-engine/10 text-engine" : "border-caution/35 bg-caution/10 text-caution"}>
+              {nextCredentialRequest.can_enter_in_app ? "safe in app" : "external"}
+            </Badge>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">{nextCredentialRequest.safe_value_description}</p>
+          <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)]">
+            <div className="rounded-md border border-outline-variant/20 bg-void/25 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Storage rule</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{nextCredentialRequest.storage.replaceAll("-", " ")}</p>
+            </div>
+            <div className="rounded-md border border-outline-variant/20 bg-void/25 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Verifier after value</p>
+              <code className="mt-1 block break-all text-[11px] leading-5 text-on-surface-variant">
+                {nextCredentialRequest.verifier_command ?? operatorWalletCommand}
+              </code>
+            </div>
+          </div>
+          <a
+            href={nextCredentialRequest.fix_href}
+            className="mt-2 inline-flex min-h-9 items-center rounded-md border border-engine/30 bg-engine/10 px-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+          >
+            Open request surface
+          </a>
         </div>
       ) : null}
 

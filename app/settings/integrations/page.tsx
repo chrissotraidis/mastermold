@@ -631,6 +631,7 @@ function SettingsWeb3SetupPriorityCard({
   const nextInput = requestPacket.next_input;
   const nextUnlock = liveUsability.next_unlock_step ?? requestPacket.next_unlock_step;
   const nextBlocker = liveUsability.next_blocker;
+  const nextCredentialRequest = liveUsability.next_credential_request;
   const verifier = nextInput?.verifier_command ??
     requestPacket.verifier_commands.find((command) => command.includes("verify:web3")) ??
     "npm run verify:web3 -- --base-url=http://localhost:4010";
@@ -686,6 +687,40 @@ function SettingsWeb3SetupPriorityCard({
           {nextBlocker.safe_command ? (
             <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
               {nextBlocker.safe_command}
+            </code>
+          ) : null}
+        </div>
+      ) : null}
+
+      {nextCredentialRequest ? (
+        <div className="mt-3 rounded-md border border-engine/25 bg-surface-dim/30 p-3" aria-label="Settings Web3 priority next credential request">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Next credential request</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{nextCredentialRequest.label}</p>
+            </div>
+            <LaunchQueueBadge status={nextCredentialRequest.can_enter_in_app ? "watch" : "fail"} label={nextCredentialRequest.can_enter_in_app ? "safe in app" : "external"} />
+          </div>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">{nextCredentialRequest.safe_value_description}</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Surface</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{nextCredentialRequest.safe_collection_surface.replaceAll("-", " ")}</p>
+            </div>
+            <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Storage</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{nextCredentialRequest.storage.replaceAll("-", " ")}</p>
+            </div>
+          </div>
+          <Link
+            href={nextCredentialRequest.fix_href}
+            className="mt-2 inline-flex min-h-10 items-center justify-center rounded-md border border-engine/30 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+          >
+            Open request surface
+          </Link>
+          {nextCredentialRequest.verifier_command ? (
+            <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {nextCredentialRequest.verifier_command}
             </code>
           ) : null}
         </div>

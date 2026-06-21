@@ -279,6 +279,7 @@ function TradingCommandBoard({
   const nextUnlockStep = liveUsabilityBlockers.next_unlock_step;
   const currentInput = liveUsabilityBlockers.current_input;
   const nextBlocker = liveUsabilityBlockers.next_blocker;
+  const nextCredentialRequest = liveUsabilityBlockers.next_credential_request;
   const settingsFixHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet" || nextUnlockStep?.id === "scope-wallet"
     ? "/settings/integrations#settings-web3-wallet-public-key"
     : "/settings/integrations#settings-web3-credentials-runway";
@@ -424,6 +425,39 @@ function TradingCommandBoard({
                 {nextBlocker.safe_command ? (
                   <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
                     {nextBlocker.safe_command}
+                  </code>
+                ) : null}
+              </div>
+            ) : null}
+            {nextCredentialRequest ? (
+              <div className="mt-2 rounded-md border border-engine/20 bg-engine/[0.035] p-2" aria-label="Trading next credential request">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Next credential request</p>
+                    <p className="mt-1 text-xs font-semibold text-on-surface">{nextCredentialRequest.label}</p>
+                  </div>
+                  <span className={nextCredentialRequest.can_enter_in_app ? "rounded-md border border-engine/25 bg-engine/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-engine" : "rounded-md border border-caution/25 bg-caution/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-caution"}>
+                    {nextCredentialRequest.can_enter_in_app ? "in app" : "external"}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{nextCredentialRequest.safe_value_description}</p>
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  <p className="truncate rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[10px] leading-4 text-outline">
+                    Surface: <span className="font-semibold text-on-surface">{nextCredentialRequest.safe_collection_surface.replaceAll("-", " ")}</span>
+                  </p>
+                  <p className="truncate rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[10px] leading-4 text-outline">
+                    Storage: <span className="font-semibold text-on-surface">{nextCredentialRequest.storage.replaceAll("-", " ")}</span>
+                  </p>
+                </div>
+                <Link
+                  href={nextCredentialRequest.fix_href}
+                  className="mt-2 inline-flex min-h-9 items-center rounded-md border border-engine/30 bg-engine/10 px-2 text-[11px] font-semibold text-engine transition hover:bg-engine/15"
+                >
+                  Open request surface
+                </Link>
+                {nextCredentialRequest.verifier_command ? (
+                  <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                    {nextCredentialRequest.verifier_command}
                   </code>
                 ) : null}
               </div>

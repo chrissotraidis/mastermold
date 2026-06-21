@@ -175,7 +175,8 @@ receipt for real-money Web3 usability. It reconciles the usability status, cutov
 board, operator runbook, live-capital preflight, supervised runway, and manual live-review
 packet into missing operator inputs, signoff counts, safe next actions, verifier commands,
 the latest sanitized credential-doctor status, the next ordered unlock step, the current
-safe input contract, and live-lane readiness while keeping autonomous live trading, signing, submission,
+safe input contract, a compact next credential request with the safe value type, fix surface,
+verifier command, and never-provide boundary, and live-lane readiness while keeping autonomous live trading, signing, submission,
 wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
 It also groups missing rows by owner and evidence source so operators can see whether
 the next work belongs to wallet setup, security, ops, accounting, strategy, or review,
@@ -196,11 +197,11 @@ live-review source endpoint, verifier command, and blocked live-execution/signin
 The research health summary names the exact source/account/scenario packet being summarized and separately
 points at the live-dex persistent export packet for helper research. The live-usability
 summary carries the same receipt hash, missing-input counts, total-versus-listed live-usability row counts,
-live-lane counts, next ordered unlock step, next dependency blocker with its safe fix link and verifier command, next action, current
+live-lane counts, next ordered unlock step, next dependency blocker with its safe fix link and verifier command, next credential request, next action, current
 safe input contract, and blocked live-execution/signing/wallet/secret permissions without
 returning secrets or transaction bytes. Settings mirrors that next dependency blocker in
-the Web3 setup priority card and credential action console so the safe wallet/provider/review
-row is visible where the operator fixes credentials.
+the Web3 setup priority card and credential action console, and it also shows the compact
+credential request so the safe wallet/provider/review value is visible where the operator fixes credentials.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and a compact
