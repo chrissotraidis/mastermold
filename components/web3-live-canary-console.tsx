@@ -46,6 +46,15 @@ type CanaryLaunchStep = {
   detail: string;
 };
 
+type PrimaryCanaryGateControl = {
+  label: string;
+  detail: string;
+  tone: "engine" | "caution" | "critical";
+  href?: string;
+  onRun?: () => void;
+  disabled: boolean;
+};
+
 export function Web3LiveCanaryConsole({
   receipt,
   firstCanaryDrill,
@@ -117,6 +126,7 @@ export function Web3LiveCanaryConsole({
     .slice(firstCanaryVisibleStart + 1)
     .filter((step) => step.status === "blocked")
     .slice(0, 5);
+  const activeCanaryStep = firstCanaryDrillReceipt.next_unblock_step ?? firstCanaryVisibleSteps[0] ?? null;
   const firstCanaryStepById = new Map(firstCanaryDrillReceipt.operator_unblock_plan.map((step) => [step.id, step]));
   const liveFlagsStep = firstCanaryStepById.get("live-flags");
   const unsignedPreflightStep = firstCanaryStepById.get("unsigned-order-preflight");
@@ -154,6 +164,15 @@ export function Web3LiveCanaryConsole({
       status: canaryReceipt.post_signing_evidence_status === "settlement-accounted" ? "pass" as const : canaryReceipt.latest_signature_preview ? "watch" as const : "fail" as const,
     },
   ];
+  const primaryGateControl = buildPrimaryCanaryGateControl({
+    step: activeCanaryStep,
+    busy: busy || ownershipBusy || ownershipCheckBusy || preflightBusy || proofBusy !== null || drillBusy,
+    sourceReady,
+    proveWalletOwnership,
+    runCanaryPreflight,
+    signTinyCanary,
+    runPostSigningProofCheck,
+  });
 
   useEffect(() => {
     if (!autoProofMonitorEnabled || !sourceReady) return;
@@ -547,6 +566,30 @@ export function Web3LiveCanaryConsole({
             <p className="mt-2 text-[11px] leading-4 text-outline">
               Current blocker count {primaryCanaryBlockers.length}; the app stays unable to move funds until wallet proof, live flags, unsigned handoff, signed relay, and proof accounting all clear.
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Trading current canary gate action">
+              {primaryGateControl.href ? (
+                <Link
+                  href={primaryGateControl.href}
+                  className={primaryGateControlClassName(primaryGateControl.tone)}
+                >
+                  {primaryGateControl.label}
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={primaryGateControl.onRun}
+                  disabled={primaryGateControl.disabled}
+                  className={primaryGateControlClassName(primaryGateControl.tone)}
+                >
+                  {primaryGateControl.label}
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </button>
+              )}
+              <p className="min-w-[12rem] flex-1 text-[11px] leading-4 text-on-surface-variant">
+                {primaryGateControl.detail}
+              </p>
+            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -941,6 +984,86 @@ function CanaryMetric({
       <p className={`mt-1 truncate text-sm font-semibold ${toneClassName}`}>{value}</p>
     </div>
   );
+}
+
+function buildPrimaryCanaryGateControl(input: {
+  step: Web3FirstCanaryDrillReceipt["operator_unblock_plan"][number] | null;
+  busy: boolean;
+  sourceReady: boolean;
+  proveWalletOwnership: () => void;
+  runCanaryPreflight: () => void;
+  signTinyCanary: () => void;
+  runPostSigningProofCheck: () => void;
+}): PrimaryCanaryGateControl {
+  const step = input.step;
+  if (!input.sourceReady) {
+    return {
+      label: "Open live canary",
+      detail: "The supervised canary actions run only from the live DEX persistent trading view.",
+      tone: "critical",
+      href: "/trading?source=live-dex&account=persistent#web3-live-canary-console",
+      disabled: false,
+    };
+  }
+  if (!step) {
+    return {
+      label: "Refresh receipts",
+      detail: "No active canary gate is selected; refresh the drill receipt before taking action.",
+      tone: "caution",
+      onRun: input.runCanaryPreflight,
+      disabled: input.busy,
+    };
+  }
+  if (step.id === "wallet-ownership") {
+    return {
+      label: "Run wallet proof",
+      detail: "Signs the text-only ownership challenge with the browser wallet; it is not a transaction and cannot move funds.",
+      tone: "engine",
+      onRun: input.proveWalletOwnership,
+      disabled: input.busy,
+    };
+  }
+  if (step.id === "unsigned-order-preflight") {
+    return {
+      label: "Run canary preflight",
+      detail: "Checks wallet proof, tiny cap, live flags, source/account, and Jupiter env before any transaction prompt.",
+      tone: "caution",
+      onRun: input.runCanaryPreflight,
+      disabled: input.busy,
+    };
+  }
+  if (step.id === "signer-relay") {
+    return {
+      label: "Sign tiny canary",
+      detail: "Requests the one-shot unsigned order, prompts the external wallet, and relays only the matching signed payload.",
+      tone: "critical",
+      onRun: input.signTinyCanary,
+      disabled: input.busy,
+    };
+  }
+  if (step.id === "funded-canary-proof" || step.id === "post-signing-proof") {
+    return {
+      label: "Check proof chain",
+      detail: "Polls confirmation, settlement, and local portfolio mirror evidence for the latest signed canary.",
+      tone: "caution",
+      onRun: input.runPostSigningProofCheck,
+      disabled: input.busy,
+    };
+  }
+  return {
+    label: step.id === "jupiter-order" || step.id === "live-flags" ? "Open credential gate" : "Open current gate",
+    detail: step.action,
+    tone: step.status === "done" ? "engine" : step.status === "watch" || step.status === "next" ? "caution" : "critical",
+    href: step.safe_surface,
+    disabled: false,
+  };
+}
+
+function primaryGateControlClassName(tone: PrimaryCanaryGateControl["tone"]) {
+  const base = "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline";
+  if (tone === "engine") return `${base} border-engine/35 bg-engine/10 text-engine hover:bg-engine/15`;
+  if (tone === "caution") return `${base} border-caution/40 bg-caution/10 text-caution hover:bg-caution/15`;
+  return `${base} border-critical/45 bg-critical/10 text-critical hover:bg-critical/15`;
 }
 
 function canaryStatusClassName(status: Web3LiveTradeCanaryReceipt["status"] | Web3LiveTradeCanaryActionReceipt["status"] | Web3LiveUnsignedOrderHandoffReceipt["status"] | Web3LiveUnsignedOrderPreflightReceipt["status"]) {

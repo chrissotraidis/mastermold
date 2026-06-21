@@ -318,6 +318,10 @@ browser-wallet signature, signed relay, and confirmation/accounting, and it labe
 It also shows an always-visible `Canary gate snapshot` for wallet proof, live flags, unsigned
 handoff/request id, relay readiness, proof count, and current blocker count, so the operator can see
 why the app has not moved funds without opening JSON or running preflight first.
+That snapshot includes one current-gate action driven by the drill receipt: wallet proof runs the
+text-only proof, preflight runs the no-transaction check, signer relay opens the tiny canary signing
+flow, proof gates run the proof watcher, and external credential gates link to the exact safe setup
+surface.
 The Trading live canary console refreshes the first-canary drill after wallet proof, canary
 preflight, tiny-canary signing, proof checks, and manual receipt refresh, so the next unblock step,
 hard-fail count, proof count, and ordered gates stay current without treating paper trades, DEX
