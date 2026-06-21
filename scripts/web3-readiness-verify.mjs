@@ -550,6 +550,36 @@ async function verifyLiveUsabilityBlockersReceipt() {
   );
 }
 
+async function verifyCredentialDoctorRefreshPreview() {
+  const { response, json } = await postJson("/api/web3-credential-doctor", {
+    operator_ack: true,
+    preview_only: true,
+    refresh_supervisor: true,
+    scenario: "breakout",
+    source: "live-dex",
+    account: "persistent",
+  });
+  assert(response.status === 200, "Credential doctor refresh preview should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-credential-doctor-refresh", "Credential doctor refresh preview should expose the expected mode.", json);
+  assert(json.status === "preview", "Credential doctor refresh preview should not rewrite the local doctor receipt.", json);
+  assert(json.refreshed === false, "Credential doctor refresh preview should report refreshed=false.", json);
+  assert(json.refresh_supervisor_requested === true, "Credential doctor refresh preview should carry supervisor refresh intent.", json);
+  assert(json.api_boundary === "local-sanitized-doctor", "Credential doctor refresh should stay inside the local sanitized doctor boundary.", json);
+  assert(json.local_refresh_allowed === true, "Credential doctor refresh preview should be allowed only for the local verifier host.", json);
+  assert(json.doctor && json.doctor.mode === "web3-credential-doctor", "Credential doctor refresh preview should include the current sanitized doctor health.", json.doctor);
+  assert(Array.isArray(json.controls) && json.controls.some((control) => control.includes("trusted localhost")), "Credential doctor refresh preview should document the localhost boundary.", json.controls);
+  assert(Array.isArray(json.controls) && json.controls.some((control) => control.includes("Private keys")), "Credential doctor refresh preview should document secret boundaries.", json.controls);
+  assertBlockedAuthority("Credential doctor refresh preview", json);
+  assertBlockedWhenPresent("Credential doctor refresh preview doctor", json.doctor, [
+    "live_execution_permission",
+    "wallet_mutation_permission",
+    "private_key_storage",
+    "seed_phrase_storage",
+    "secret_echo_permission",
+  ]);
+  record("credential-doctor-refresh-preview", "pass", `${json.doctor.status}; preview did not rewrite local receipt`);
+}
+
 function assertReceiptHash(label, value) {
   assert(typeof value === "string" && /^[0-9a-f]{64}$/.test(value), `${label} should include a 64-character receipt hash.`, value);
 }
@@ -1141,6 +1171,7 @@ async function main() {
   await verifyProviderHealthReceipt();
   await verifyUsabilityStatusReceipt();
   await verifyLiveUsabilityBlockersReceipt();
+  await verifyCredentialDoctorRefreshPreview();
   await verifyLiveReadinessPackets();
   await verifyOperatorSetupPackets();
   await verifyManualLiveReviewPacket();

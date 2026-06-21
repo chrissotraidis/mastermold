@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
 import type { Web3DexDiscoveryReceipt } from "@/src/db/web3-dex-discovery";
+import type { Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import type { Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
@@ -82,6 +83,22 @@ type BrowserSolanaProvider = {
   signMessage?: (message: Uint8Array, display?: "utf8" | "hex") => Promise<Uint8Array | { signature: Uint8Array }>;
 };
 
+type Web3CredentialDoctorRefreshReceipt = {
+  mode: "web3-credential-doctor-refresh";
+  status: "preview" | "refreshed" | "blocked";
+  refreshed: boolean;
+  refresh_supervisor_requested: boolean;
+  doctor: Web3CredentialDoctorHealth;
+  summary: string;
+  next_action: string;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export function SettingsWeb3CredentialConsole({
   walletPublicKeyPreview,
   defaultWalletPublicKey,
@@ -127,12 +144,13 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"blockers" | "credentials" | "dex" | "install" | "jupiter" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
+  const [busy, setBusy] = useState<"blockers" | "credentials" | "dex" | "doctor" | "install" | "jupiter" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [browserWallet, setBrowserWallet] = useState<BrowserWalletReceipt | null>(null);
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
   const [dexReceipt, setDexReceipt] = useState<Web3DexDiscoveryReceipt | null>(null);
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
+  const [doctorRefreshReceipt, setDoctorRefreshReceipt] = useState<Web3CredentialDoctorRefreshReceipt | null>(null);
   const [localInstallReceipt, setLocalInstallReceipt] = useState<Web3LocalCredentialInstallReceipt | null>(null);
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveCapitalPreflightReceipt | null>(null);
   const [liveUsabilityReceipt, setLiveUsabilityReceipt] = useState<Web3LiveUsabilityBlockersReceipt>(initialLiveUsability);
@@ -559,6 +577,36 @@ export function SettingsWeb3CredentialConsole({
       if (announce && previousBusy === null) {
         setBusy(null);
       }
+    }
+  }
+
+  async function refreshCredentialDoctor() {
+    setBusy("doctor");
+    setMessage("Refreshing the local sanitized Web3 credential doctor receipt...");
+    try {
+      const response = await fetch("/api/web3-credential-doctor", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operator_ack: true,
+          scenario,
+          source: "live-dex",
+          account,
+          refresh_supervisor: false,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as Web3CredentialDoctorRefreshReceipt | { error: string; detail?: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Credential doctor refresh failed.");
+      }
+      setDoctorRefreshReceipt(payload);
+      const updatedBlockers = await fetchLiveUsabilityBlockers();
+      setLiveUsabilityReceipt(updatedBlockers);
+      setMessage(`Credential doctor refreshed: ${payload.doctor.status.replaceAll("-", " ")}. What is left: ${updatedBlockers.next_unlock_step?.label ?? updatedBlockers.summary}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Credential doctor refresh failed.");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -1093,12 +1141,38 @@ export function SettingsWeb3CredentialConsole({
             </button>
           </div>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-5">
+        <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
           <ConsoleMetric label="Inputs open" value={`${liveUsabilityReceipt.open_operator_input_count}`} tone={liveUsabilityReceipt.open_operator_input_count > 0 ? "caution" : "engine"} />
           <ConsoleMetric label="Real blockers" value={`${liveUsabilityReceipt.real_capital_blocker_count}`} tone={liveUsabilityReceipt.real_capital_blocker_count > 0 ? "critical" : "engine"} />
           <ConsoleMetric label="Rows listed" value={`${liveUsabilityReceipt.listed_live_usability_row_count}/${liveUsabilityReceipt.total_live_usability_row_count}`} tone={liveUsabilityReceipt.listed_live_usability_row_count < liveUsabilityReceipt.total_live_usability_row_count ? "caution" : "engine"} />
           <ConsoleMetric label="Live lanes" value={`${liveUsabilityReceipt.ready_live_lane_count}/${liveUsabilityReceipt.total_live_lane_count}`} tone={liveUsabilityReceipt.ready_live_lane_count === liveUsabilityReceipt.total_live_lane_count ? "engine" : "caution"} />
           <ConsoleMetric label="Safe actions" value={`${liveUsabilityReceipt.safe_action_count}`} tone={liveUsabilityReceipt.safe_action_count > 0 ? "engine" : "neutral"} />
+          <ConsoleMetric label="Doctor" value={liveUsabilityReceipt.credential_doctor.receipt_fresh ? "fresh" : "stale"} tone={liveUsabilityReceipt.credential_doctor.blocked_count > 0 ? "critical" : liveUsabilityReceipt.credential_doctor.receipt_fresh ? "engine" : "caution"} />
+        </div>
+        <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Settings in-app credential doctor refresh">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Credential doctor refresh</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">
+                {liveUsabilityReceipt.credential_doctor.status.replaceAll("-", " ")} · {liveUsabilityReceipt.credential_doctor.ready_count} ready · {liveUsabilityReceipt.credential_doctor.blocked_count} blocked
+              </p>
+              <p className="mt-1 text-[11px] leading-4 text-outline">
+                {doctorRefreshReceipt?.summary ?? liveUsabilityReceipt.credential_doctor.next_action}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={refreshCredentialDoctor}
+              disabled={disabled}
+              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-engine/40 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+            >
+              <RefreshCw className={cn("size-3.5 shrink-0", busy === "doctor" && "animate-spin")} aria-hidden="true" />
+              {busy === "doctor" ? "Refreshing" : "Refresh doctor"}
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-outline">
+            This calls a localhost-only status refresh and rewrites the sanitized doctor receipt. It does not send API keys, run live trades, sign, submit, or mutate wallets.
+          </p>
         </div>
         <div className="mt-3 grid gap-2" aria-label="Settings top refreshed Web3 blockers">
           {visibleLiveUsabilityBlockers.length > 0 ? visibleLiveUsabilityBlockers.map((item) => (

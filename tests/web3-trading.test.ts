@@ -25,6 +25,7 @@ import { GET as MARKET_MONITOR_HISTORY_GET } from "@/app/api/web3-market-monitor
 import { GET as OPERATOR_CREDENTIAL_HANDOFF_GET } from "@/app/api/web3-operator-credential-handoff/route";
 import { GET as OPERATOR_REQUEST_PACKET_GET } from "@/app/api/web3-operator-request-packet/route";
 import { GET as OPERATOR_RUNBOOK_GET } from "@/app/api/web3-operator-runbook/route";
+import { GET as CREDENTIAL_DOCTOR_GET, POST as CREDENTIAL_DOCTOR_POST } from "@/app/api/web3-credential-doctor/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -68,6 +69,7 @@ let prevPromotedAutopilotHistoryPath: string | undefined;
 let prevMarketMonitorHistoryPath: string | undefined;
 let prevJupiterRehearsalHistoryPath: string | undefined;
 let prevLocalAccountabilityRepairPath: string | undefined;
+let prevCredentialDoctorPath: string | undefined;
 let prevLiveExecution: string | undefined;
 let prevLiveApproval: string | undefined;
 let prevSignerProvider: string | undefined;
@@ -105,6 +107,7 @@ beforeEach(() => {
   prevMarketMonitorHistoryPath = process.env.WEB3_MARKET_MONITOR_HISTORY_PATH;
   prevJupiterRehearsalHistoryPath = process.env.WEB3_JUPITER_REHEARSAL_HISTORY_PATH;
   prevLocalAccountabilityRepairPath = process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
+  prevCredentialDoctorPath = process.env.WEB3_CREDENTIAL_DOCTOR_STATUS_PATH;
   prevLiveExecution = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   prevLiveApproval = process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
   prevSignerProvider = process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER;
@@ -136,6 +139,7 @@ beforeEach(() => {
   process.env.WEB3_MARKET_MONITOR_HISTORY_PATH = join(testRoot, "web3-market-monitor-history.json");
   process.env.WEB3_JUPITER_REHEARSAL_HISTORY_PATH = join(testRoot, "web3-jupiter-rehearsal-history.json");
   process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH = join(testRoot, "local-accountability-repair.json");
+  process.env.WEB3_CREDENTIAL_DOCTOR_STATUS_PATH = join(testRoot, "web3-credential-doctor.json");
   delete process.env.JUPITER_API_KEY;
   delete process.env.JUPITER_TRIGGER_JWT;
   delete process.env.HELIUS_API_KEY;
@@ -164,6 +168,7 @@ beforeEach(() => {
   delete process.env.MASTERMOLD_WEB3_ALERT_WEBHOOK_URL;
   delete process.env.MASTERMOLD_WEB3_RESTART_POLICY_URL;
   delete process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH;
+  delete process.env.WEB3_CREDENTIAL_DOCTOR_STATUS_PATH;
   __resetStoreForTests();
 });
 
@@ -190,6 +195,8 @@ afterEach(() => {
   else process.env.WEB3_JUPITER_REHEARSAL_HISTORY_PATH = prevJupiterRehearsalHistoryPath;
   if (prevLocalAccountabilityRepairPath === undefined) delete process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH;
   else process.env.WEB3_LOCAL_ACCOUNTABILITY_REPAIR_STATUS_PATH = prevLocalAccountabilityRepairPath;
+  if (prevCredentialDoctorPath === undefined) delete process.env.WEB3_CREDENTIAL_DOCTOR_STATUS_PATH;
+  else process.env.WEB3_CREDENTIAL_DOCTOR_STATUS_PATH = prevCredentialDoctorPath;
   if (prevLiveExecution === undefined) delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
   else process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION = prevLiveExecution;
   if (prevLiveApproval === undefined) delete process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
@@ -2464,6 +2471,93 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.seed_phrase_storage).toBe("blocked");
     expect(receipt.secret_echo_permission).toBe("blocked");
     expect(receipt.controls.some((control) => control.includes("one bounded sample-source paper supervisor round"))).toBe(true);
+  });
+
+  test("GIVEN an operator refreshes the credential doctor WHEN the in-app route is previewed THEN it remains local-only and secret-locked", async () => {
+    const remote = await CREDENTIAL_DOCTOR_POST(new Request("https://example.com/api/web3-credential-doctor", {
+      method: "POST",
+      headers: { "content-type": "application/json", host: "example.com" },
+      body: JSON.stringify({ operator_ack: true, preview_only: true }),
+    }));
+    const remoteReceipt = await json<{ status: string; local_refresh_allowed: boolean }>(remote);
+    expect(remote.status).toBe(403);
+    expect(remoteReceipt.status).toBe("blocked");
+    expect(remoteReceipt.local_refresh_allowed).toBe(false);
+
+    const noAck = await CREDENTIAL_DOCTOR_POST(new Request("http://localhost/api/web3-credential-doctor", {
+      method: "POST",
+      body: JSON.stringify({ preview_only: true }),
+    }));
+    expect(noAck.status).toBe(422);
+
+    const unsafe = await CREDENTIAL_DOCTOR_POST(new Request("http://localhost/api/web3-credential-doctor", {
+      method: "POST",
+      body: JSON.stringify({ operator_ack: true, preview_only: true, private_key: "secret-looking-canary" }),
+    }));
+    const unsafePayload = await unsafe.json();
+    expect(unsafe.status).toBe(422);
+    expect(JSON.stringify(unsafePayload)).not.toContain("secret-looking-canary");
+
+    const health = await CREDENTIAL_DOCTOR_GET(new Request("http://localhost/api/web3-credential-doctor"));
+    const healthReceipt = await json<{ mode: string; status: string; refreshed: boolean; api_boundary: string }>(health);
+    expect(health.status).toBe(200);
+    expect(healthReceipt.mode).toBe("web3-credential-doctor-refresh");
+    expect(healthReceipt.status).toBe("preview");
+    expect(healthReceipt.refreshed).toBe(false);
+    expect(healthReceipt.api_boundary).toBe("local-sanitized-doctor");
+
+    const response = await CREDENTIAL_DOCTOR_POST(new Request("http://localhost/api/web3-credential-doctor", {
+      method: "POST",
+      body: JSON.stringify({
+        operator_ack: true,
+        preview_only: true,
+        refresh_supervisor: true,
+        scenario: "breakout",
+        source: "live-dex",
+        account: "persistent",
+      }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      refreshed: boolean;
+      refresh_supervisor_requested: boolean;
+      scenario: string;
+      source: string;
+      account: string;
+      doctor: { mode: string; status: string; private_key_storage: string; secret_echo_permission: string };
+      api_boundary: string;
+      local_refresh_allowed: boolean;
+      live_execution_permission: string;
+      transaction_submission_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-credential-doctor-refresh");
+    expect(receipt.status).toBe("preview");
+    expect(receipt.refreshed).toBe(false);
+    expect(receipt.refresh_supervisor_requested).toBe(true);
+    expect(receipt.scenario).toBe("breakout");
+    expect(receipt.source).toBe("live-dex");
+    expect(receipt.account).toBe("persistent");
+    expect(receipt.doctor.mode).toBe("web3-credential-doctor");
+    expect(receipt.doctor.private_key_storage).toBe("blocked");
+    expect(receipt.doctor.secret_echo_permission).toBe("blocked");
+    expect(receipt.api_boundary).toBe("local-sanitized-doctor");
+    expect(receipt.local_refresh_allowed).toBe(true);
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.some((control) => control.includes("trusted localhost"))).toBe(true);
+    expect(receipt.controls.some((control) => control.includes("Private keys"))).toBe(true);
   });
 
   test("GIVEN supervised live is reviewed WHEN the runway route runs THEN it consolidates blocked launch lanes without secrets", async () => {

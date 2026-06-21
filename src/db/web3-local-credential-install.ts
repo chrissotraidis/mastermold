@@ -228,11 +228,12 @@ function invalidReceipt(rejectedFields: string[], summary: string): Web3LocalCre
   };
 }
 
-function isLocalCredentialInstallAllowed(request?: Request) {
+export function isLocalCredentialInstallAllowed(request?: Request) {
   if (process.env.MASTERMOLD_ALLOW_LOCAL_CREDENTIAL_INSTALL === "true") return true;
+  const requestHost = request ? new URL(request.url).host : "";
   const host = request?.headers.get("host") ?? "";
   const forwardedHost = request?.headers.get("x-forwarded-host") ?? "";
-  return [host, forwardedHost].some((value) =>
+  return [requestHost, host, forwardedHost].some((value) =>
     value.startsWith("localhost") ||
     value.startsWith("127.0.0.1") ||
     value.startsWith("[::1]") ||

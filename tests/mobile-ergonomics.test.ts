@@ -1275,6 +1275,18 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-credential-doctor.mjs")).toContain("external-review-only-sanitized-packet");
     expect(source("scripts/web3-credential-doctor.mjs")).toContain("Paper supervisor freshness");
     expect(source("src/db/web3-credential-doctor.ts")).toContain("getWeb3CredentialDoctorHealth");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("export function isLocalCredentialInstallAllowed");
+    expect(source("app/api/web3-credential-doctor/route.ts")).toContain("web3-credential-doctor-refresh");
+    expect(source("app/api/web3-credential-doctor/route.ts")).toContain("isLocalCredentialInstallAllowed");
+    expect(source("app/api/web3-credential-doctor/route.ts")).toContain("operator_ack must be true");
+    expect(source("app/api/web3-credential-doctor/route.ts")).toContain("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION: \"\"");
+    expect(source("app/api/web3-credential-doctor/route.ts")).toContain("private_key_storage: \"blocked\"");
+    expect(source("app/api/web3-credential-doctor/route.ts")).toContain("trusted localhost");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("Settings in-app credential doctor refresh");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("Refresh doctor");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("/api/web3-credential-doctor");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("refreshCredentialDoctor");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("credential_doctor.receipt_fresh");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run doctor:web3 -- --json");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run doctor-repair:web3 -- --json");
     expect(settingsPage).toContain("buildWeb3AutonomyLaunchChecklist");

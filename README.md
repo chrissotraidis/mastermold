@@ -180,6 +180,12 @@ It also groups missing rows by owner and evidence source so operators can see wh
 the next work belongs to wallet setup, security, ops, accounting, strategy, or review.
 Use `rows=all` on that same endpoint to return every dependency-ranked missing row for
 external review; the default response stays compact for dashboard panels.
+`/api/web3-credential-doctor` is the localhost-only in-app refresh endpoint for the
+sanitized Web3 credential doctor receipt used by Settings and live-usability summaries.
+It requires `operator_ack: true`, supports preview mode for `npm run verify:web3`, accepts
+only status fields, forces live-execution approval flags off while running the doctor, and
+keeps signing, submission, wallet mutation, private-key storage, seed-phrase storage, and
+secret echo blocked.
 `/api/health` also exposes a compact `web3_live_usability` summary for monitors with
 the same receipt hash, missing-input counts, total-versus-listed live-usability row counts,
 live-lane counts, next ordered unlock step, next action, and blocked live-execution/signing/wallet/secret
