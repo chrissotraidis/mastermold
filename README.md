@@ -241,9 +241,14 @@ a dedicated public wallet, explicit canary acknowledgement, `return_unsigned_tra
 `MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true`. It never accepts private keys, seed phrases,
 API keys, raw transactions, or signed payloads, and it still cannot sign, submit, store transaction
 bodies, execute, custody funds, or mutate wallets.
-Trading and Settings expose this as `Sign tiny canary`: the browser deserializes the one-shot
-transaction with `@solana/web3.js`, asks the connected wallet to sign, then posts the serialized
-signed payload to the live canary relay without storing transaction bodies or wallet authority.
+`GET /api/web3-live-unsigned-order-handoff` is the no-transaction preflight for that same exact
+canary: it checks the public wallet, tiny amount, slippage cap, live flags, source/account scope,
+and Jupiter env before any browser-wallet prompt or Jupiter order creation, and still returns no
+transaction bytes. Trading exposes this as `Canary preflight`.
+Trading and Settings expose the actual supervised handoff as `Sign tiny canary`: the browser
+deserializes the one-shot transaction with `@solana/web3.js`, asks the connected wallet to sign,
+then posts the serialized signed payload to the live canary relay without storing transaction
+bodies or wallet authority.
 The Trading canary also exposes `Check proof chain` and `Auto watch proof`, which call the guarded
 settlement watchdog for the latest signed relay to poll confirmation, reconcile the fill, refresh
 the canary receipt, and apply only the reviewed local portfolio mirror patch when evidence is clean.

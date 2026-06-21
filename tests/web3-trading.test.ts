@@ -32,7 +32,7 @@ import { GET as CREDENTIAL_REQUIREMENTS_GET } from "@/app/api/web3-credential-re
 import { GET as LIVE_ACTIVATION_INTAKE_GET, POST as LIVE_ACTIVATION_INTAKE_POST } from "@/app/api/web3-live-activation-intake/route";
 import { GET as LIVE_ACTIVATION_PLAN_GET } from "@/app/api/web3-live-activation-plan/route";
 import { GET as LIVE_TRADE_CANARY_GET, POST as LIVE_TRADE_CANARY_POST } from "@/app/api/web3-live-trade-canary/route";
-import { POST as LIVE_UNSIGNED_ORDER_HANDOFF_POST } from "@/app/api/web3-live-unsigned-order-handoff/route";
+import { GET as LIVE_UNSIGNED_ORDER_HANDOFF_GET, POST as LIVE_UNSIGNED_ORDER_HANDOFF_POST } from "@/app/api/web3-live-unsigned-order-handoff/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -2491,6 +2491,66 @@ describe("Web3 autonomous trading subsystem", () => {
 
   test("GIVEN the operator asks for a live unsigned canary order WHEN gates are missing THEN the handoff blocks safely", async () => {
     const safeWallet = "9xQeWvG816bUx9EPfYQ4mKZ8sPXc6zQnK9j8vY9J3F3";
+    const preflightResponse = await LIVE_UNSIGNED_ORDER_HANDOFF_GET(new Request(`http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=sample&account=persistent&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${safeWallet}&amount_lamports=100000`));
+    const preflightReceipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      can_request_one_shot_unsigned_order: boolean;
+      unsigned_transaction_return: string;
+      transaction_body_storage: string;
+      execute_permission: string;
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      jupiter_key_configured: boolean;
+      live_flags_ready: boolean;
+      wallet_ready: boolean;
+      blockers: string[];
+      controls: string[];
+    }>(preflightResponse);
+
+    expect(preflightResponse.status).toBe(200);
+    expect(preflightReceipt.mode).toBe("web3-live-unsigned-order-preflight");
+    expect(preflightReceipt.status).toBe("blocked");
+    expect(preflightReceipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(preflightReceipt.can_request_one_shot_unsigned_order).toBe(false);
+    expect(preflightReceipt.unsigned_transaction_return).toBe("blocked");
+    expect(preflightReceipt.transaction_body_storage).toBe("blocked");
+    expect(preflightReceipt.execute_permission).toBe("blocked");
+    expect(preflightReceipt.transaction_submission_permission).toBe("blocked");
+    expect(preflightReceipt.live_execution_permission).toBe("blocked");
+    expect(preflightReceipt.wallet_mutation_permission).toBe("blocked");
+    expect(preflightReceipt.private_key_storage).toBe("blocked");
+    expect(preflightReceipt.seed_phrase_storage).toBe("blocked");
+    expect(preflightReceipt.secret_echo_permission).toBe("blocked");
+    expect(preflightReceipt.jupiter_key_configured).toBe(false);
+    expect(preflightReceipt.live_flags_ready).toBe(false);
+    expect(preflightReceipt.wallet_ready).toBe(true);
+    expect(preflightReceipt.blockers.join(" ")).toContain("source=live-dex");
+    expect(preflightReceipt.blockers.join(" ")).toContain("JUPITER_API_KEY");
+    expect(preflightReceipt.controls.join(" ")).toContain("before any wallet prompt");
+    expect(preflightReceipt.controls.join(" ")).toContain("never calls Jupiter order creation");
+
+    const unsafePreflightCanary = "codex-preflight-private-key-never-echo";
+    const unsafePreflight = await LIVE_UNSIGNED_ORDER_HANDOFF_GET(new Request(`http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=sample&account=persistent&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${safeWallet}&private_key=${unsafePreflightCanary}`));
+    const unsafePreflightText = await unsafePreflight.text();
+    expect(unsafePreflight.status).toBe(422);
+    expect(unsafePreflightText).not.toContain(unsafePreflightCanary);
+    const unsafePreflightReceipt = JSON.parse(unsafePreflightText) as {
+      status: string;
+      unsafe_fields: string[];
+      unsigned_transaction_return: string;
+      secret_echo_permission: string;
+    };
+    expect(unsafePreflightReceipt.status).toBe("unsafe-rejected");
+    expect(unsafePreflightReceipt.unsafe_fields).toContain("private_key");
+    expect(unsafePreflightReceipt.unsigned_transaction_return).toBe("blocked");
+    expect(unsafePreflightReceipt.secret_echo_permission).toBe("blocked");
+
     const response = await LIVE_UNSIGNED_ORDER_HANDOFF_POST(new Request("http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=sample&account=persistent&cycles=0", {
       method: "POST",
       body: JSON.stringify({

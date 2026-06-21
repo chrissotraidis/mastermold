@@ -1562,6 +1562,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/trading/page.tsx")).toContain("Web3LiveCanaryConsole");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Live money canary");
     expect(source("components/web3-live-canary-console.tsx")).toContain("No real trade tested yet");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Canary preflight");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary preflight receipt");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("getTrustedBrowserWalletPublicKey");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Sign tiny canary");
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-unsigned-order-handoff?");
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-trade-canary?");
@@ -1716,7 +1719,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-live-trade-canary/route.ts")).toContain("buildWeb3LiveTradeCanaryReceipt");
     expect(source("app/api/web3-live-trade-canary/route.ts")).toContain("buildWeb3LiveTradeCanaryActionReceipt");
     expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("buildWeb3LiveUnsignedOrderHandoffReceipt");
+    expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("buildWeb3LiveUnsignedOrderPreflightReceipt");
+    expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("safePreflightQueryKeys");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("web3-live-unsigned-order-handoff");
+    expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("web3-live-unsigned-order-preflight");
+    expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("can_request_one_shot_unsigned_order");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("returned-one-shot");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("actual_live_trade_tested");

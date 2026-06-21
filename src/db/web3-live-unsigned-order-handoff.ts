@@ -21,6 +21,43 @@ export type Web3LiveUnsignedOrderHandoffInput = {
   max_slippage_bps?: unknown;
 };
 
+export type Web3LiveUnsignedOrderPreflightReceipt = {
+  mode: "web3-live-unsigned-order-preflight";
+  status: "ready" | "blocked" | "unsafe-rejected";
+  generated_at: string;
+  receipt_hash: string;
+  source: Web3TradingState["market_source"]["mode"];
+  account: Web3TradingState["paper_account"]["mode"];
+  scenario: Web3TradingState["scenario"];
+  operator_acknowledged: boolean;
+  canary_acknowledged: boolean;
+  wallet_public_key_preview: string | null;
+  canary_pair: "SOL-USDC";
+  amount_lamports: number;
+  max_lamports: number;
+  max_slippage_bps: number;
+  jupiter_key_configured: boolean;
+  live_flags_ready: boolean;
+  source_ready: boolean;
+  account_ready: boolean;
+  wallet_ready: boolean;
+  can_request_one_shot_unsigned_order: boolean;
+  unsigned_transaction_return: "blocked";
+  transaction_body_storage: "blocked";
+  signed_transaction_return: "blocked";
+  execute_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+  unsafe_fields: string[];
+  blockers: string[];
+  next_action: string;
+  controls: string[];
+};
+
 export type Web3LiveUnsignedOrderHandoffReceipt = {
   mode: "web3-live-unsigned-order-handoff";
   status: "blocked" | "unsafe-rejected" | "order-ready" | "order-failed";
@@ -62,6 +99,89 @@ export type Web3LiveUnsignedOrderHandoffReceipt = {
   controls: string[];
 };
 
+export function buildWeb3LiveUnsignedOrderPreflightReceipt(
+  state: Web3TradingState,
+  rawInput: Web3LiveUnsignedOrderHandoffInput,
+): Web3LiveUnsignedOrderPreflightReceipt {
+  const generatedAt = new Date().toISOString();
+  const unsafeFields = findUnsafeFields(rawInput);
+  const operatorAcknowledged = rawInput.operator_ack === true;
+  const canaryAcknowledged = rawInput.canary_ack === "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED";
+  const wallet = text(rawInput.wallet_public_key);
+  const amountLamports = canaryLamports(rawInput.amount_lamports);
+  const maxSlippageBps = canarySlippage(rawInput.max_slippage_bps);
+  const liveFlagsReady = liveUnsignedCanaryFlagsReady();
+  const sourceReady = state.market_source.mode === "live-dex";
+  const accountReady = state.paper_account.mode === "persistent";
+  const walletReady = Boolean(wallet) && isLikelySolanaPublicKey(wallet) && wallet !== SAMPLE_SYSTEM_WALLET;
+  const blockers = [
+    !operatorAcknowledged ? "operator_ack must be true before live canary preflight can pass." : null,
+    !canaryAcknowledged ? "canary_ack must equal I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED." : null,
+    !sourceReady ? "Live canary preflight requires source=live-dex." : null,
+    !accountReady ? "Live canary preflight requires account=persistent." : null,
+    !wallet ? "wallet_public_key is required." : null,
+    wallet && !isLikelySolanaPublicKey(wallet) ? "wallet_public_key must be a valid public Solana address." : null,
+    wallet === SAMPLE_SYSTEM_WALLET ? "The sample all-ones wallet cannot pass live canary preflight." : null,
+    amountLamports > MAX_CANARY_LAMPORTS ? `amount_lamports must be ${MAX_CANARY_LAMPORTS} or less for the first canary.` : null,
+    !process.env.JUPITER_API_KEY ? "JUPITER_API_KEY must be configured in ignored server env." : null,
+    !liveFlagsReady ? "Live canary preflight requires MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, and MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true." : null,
+  ].filter((item): item is string => Boolean(item));
+  const status: Web3LiveUnsignedOrderPreflightReceipt["status"] = unsafeFields.length > 0
+    ? "unsafe-rejected"
+    : blockers.length > 0
+      ? "blocked"
+      : "ready";
+  const allBlockers = [
+    ...unsafeFields.map((field) => `Unsafe field rejected: ${field}.`),
+    ...blockers,
+  ];
+  const receiptBase = {
+    mode: "web3-live-unsigned-order-preflight" as const,
+    status,
+    generated_at: generatedAt,
+    source: state.market_source.mode,
+    account: state.paper_account.mode,
+    scenario: state.scenario,
+    operator_acknowledged: operatorAcknowledged,
+    canary_acknowledged: canaryAcknowledged,
+    wallet_public_key_preview: previewValue(wallet),
+    canary_pair: "SOL-USDC" as const,
+    amount_lamports: amountLamports,
+    max_lamports: MAX_CANARY_LAMPORTS,
+    max_slippage_bps: maxSlippageBps,
+    jupiter_key_configured: Boolean(process.env.JUPITER_API_KEY),
+    live_flags_ready: liveFlagsReady,
+    source_ready: sourceReady,
+    account_ready: accountReady,
+    wallet_ready: walletReady,
+    can_request_one_shot_unsigned_order: status === "ready",
+    unsigned_transaction_return: "blocked" as const,
+    transaction_body_storage: "blocked" as const,
+    signed_transaction_return: "blocked" as const,
+    execute_permission: "blocked" as const,
+    transaction_submission_permission: "blocked" as const,
+    live_execution_permission: "blocked" as const,
+    wallet_mutation_permission: "blocked" as const,
+    private_key_storage: "blocked" as const,
+    seed_phrase_storage: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
+    unsafe_fields: unsafeFields,
+    blockers: [...new Set(allBlockers)].slice(0, 10),
+    next_action: unsignedPreflightNextAction(status, allBlockers),
+    controls: [
+      "This preflight checks the exact live canary wallet, caps, Jupiter env, source, account, and live flags before any wallet prompt.",
+      "It never calls Jupiter order creation, returns transaction bytes, signs, submits, stores payloads, or mutates a wallet.",
+      "If ready, the next step is the explicit one-shot unsigned handoff and browser-wallet signature prompt.",
+      "Private keys, seed phrases, keypair JSON, provider API key values, raw transactions, signed payloads, secret echo, and wallet authority remain blocked.",
+    ],
+  };
+
+  return {
+    ...receiptBase,
+    receipt_hash: hashJson(receiptBase),
+  };
+}
+
 export async function buildWeb3LiveUnsignedOrderHandoffReceipt(
   state: Web3TradingState,
   rawInput: Web3LiveUnsignedOrderHandoffInput,
@@ -75,9 +195,7 @@ export async function buildWeb3LiveUnsignedOrderHandoffReceipt(
   const wallet = text(rawInput.wallet_public_key);
   const amountLamports = canaryLamports(rawInput.amount_lamports);
   const maxSlippageBps = canarySlippage(rawInput.max_slippage_bps);
-  const liveFlagsReady = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true" &&
-    process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL === "I_UNDERSTAND_REAL_FUNDS" &&
-    process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF === "true";
+  const liveFlagsReady = liveUnsignedCanaryFlagsReady();
   const blockers = [
     !operatorAcknowledged ? "operator_ack must be true before building a live canary order." : null,
     !canaryAcknowledged ? "canary_ack must equal I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED." : null,
@@ -271,6 +389,18 @@ function unsignedHandoffNextAction(status: Web3LiveUnsignedOrderHandoffReceipt["
   if (status === "unsafe-rejected") return "Remove unsafe fields and provide only public wallet scope plus canary acknowledgements.";
   if (status === "order-failed") return blockers[0] ?? "Repair Jupiter order readiness before another canary handoff.";
   return blockers[0] ?? "Clear live unsigned canary blockers before requesting a signable order.";
+}
+
+function unsignedPreflightNextAction(status: Web3LiveUnsignedOrderPreflightReceipt["status"], blockers: string[]) {
+  if (status === "ready") return "Preflight is ready. The next action can request the one-shot unsigned Jupiter canary and open the browser-wallet signing prompt.";
+  if (status === "unsafe-rejected") return "Remove unsafe fields and preflight again with only public wallet scope and canary acknowledgements.";
+  return blockers[0] ?? "Clear live canary preflight blockers before requesting an unsigned order.";
+}
+
+function liveUnsignedCanaryFlagsReady() {
+  return process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true" &&
+    process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL === "I_UNDERSTAND_REAL_FUNDS" &&
+    process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF === "true";
 }
 
 function inspectPayload(value: string): { valid: true; hash: string; bytes: number } | { valid: false; hash: null; bytes: 0 } {

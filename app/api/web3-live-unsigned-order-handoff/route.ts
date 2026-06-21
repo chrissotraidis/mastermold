@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  buildWeb3LiveUnsignedOrderPreflightReceipt,
   buildWeb3LiveUnsignedOrderHandoffReceipt,
   type Web3LiveUnsignedOrderHandoffInput,
   type Web3LiveUnsignedOrderHandoffReceipt,
+  type Web3LiveUnsignedOrderPreflightReceipt,
 } from "@/src/db/web3-live-unsigned-order-handoff";
 import {
   getWeb3TradingStateAsync,
@@ -16,6 +18,29 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function GET(request: Request): Promise<NextResponse<Web3LiveUnsignedOrderPreflightReceipt | { error: string }>> {
+  const parsed = parseHandoffQuery(request.url);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
+
+  const search = new URL(request.url).searchParams;
+  const state = await getWeb3TradingStateAsync({
+    ...parsed.value,
+    advance: false,
+  });
+  const input: Web3LiveUnsignedOrderHandoffInput & Record<string, unknown> = {
+    operator_ack: search.get("operator_ack") === "true",
+    canary_ack: search.get("canary_ack"),
+    wallet_public_key: search.get("wallet_public_key"),
+    amount_lamports: search.get("amount_lamports"),
+    max_slippage_bps: search.get("max_slippage_bps"),
+  };
+  for (const [key] of search.entries()) {
+    if (!safePreflightQueryKeys.has(key)) input[key] = "[redacted-query-value]";
+  }
+  const receipt = buildWeb3LiveUnsignedOrderPreflightReceipt(state, input);
+  return NextResponse.json(receipt, { status: receipt.status === "unsafe-rejected" ? 422 : 200 });
+}
 
 export async function POST(request: Request): Promise<NextResponse<Web3LiveUnsignedOrderHandoffReceipt | { error: string }>> {
   const parsed = parseHandoffQuery(request.url);
@@ -66,3 +91,15 @@ function parseHandoffQuery(url: string):
     },
   };
 }
+
+const safePreflightQueryKeys = new Set([
+  "scenario",
+  "source",
+  "account",
+  "cycles",
+  "operator_ack",
+  "canary_ack",
+  "wallet_public_key",
+  "amount_lamports",
+  "max_slippage_bps",
+]);
