@@ -34,6 +34,13 @@ const AUTO_PROOF_TERMINAL_STATUSES: Web3LiveTradeCanaryReceipt["post_signing_evi
   "review-required",
 ];
 
+type CanaryLaunchStep = {
+  id: "preflight" | "wallet-signature" | "signed-relay" | "confirmation-accounting";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  detail: string;
+};
+
 export function Web3LiveCanaryConsole({
   receipt,
   source,
@@ -81,6 +88,12 @@ export function Web3LiveCanaryConsole({
     : autoProofMonitorEnabled
       ? `${autoProofAttempt}/${AUTO_PROOF_MAX_ATTEMPTS} checks`
       : "off";
+  const canaryLaunchSteps = buildCanaryLaunchSteps({
+    receipt: canaryReceipt,
+    preflightReceipt,
+    unsignedReceipt,
+    actionReceipt,
+  });
 
   useEffect(() => {
     if (!autoProofMonitorEnabled || !sourceReady) return;
@@ -428,6 +441,34 @@ export function Web3LiveCanaryConsole({
         </div>
 
         <div className="grid min-w-0 gap-2">
+          <div className="rounded-md border border-caution/25 bg-surface/60 p-3" aria-label="Trading live canary launch checklist">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Canary launch checklist</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {actualTradeTested ? "Funded canary evidence exists" : "Funded canary still not proven"}
+                </p>
+              </div>
+              <span className={evidenceStatusClassName(actualTradeTested ? "pass" : "fail")}>
+                {actualTradeTested ? "live tested" : "not live tested"}
+              </span>
+            </div>
+            <div className="mt-2 grid gap-1.5">
+              {canaryLaunchSteps.map((step) => (
+                <div key={step.id} className="grid gap-1 rounded-md border border-outline/15 bg-surface-dim/35 p-2 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                  <div className="flex items-center gap-2">
+                    <span className={evidenceStatusClassName(step.status)}>{step.status}</span>
+                    <span className="text-[11px] font-semibold text-on-surface">{step.label}</span>
+                  </div>
+                  <p className="min-w-0 text-[11px] leading-4 text-on-surface-variant">{step.detail}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              The only result that counts as a live test is a signed wallet canary that relays, confirms on-chain, reconciles settlement, and updates the local portfolio mirror.
+            </p>
+          </div>
+
           <div className="rounded-md border border-engine/20 bg-surface/60 p-3" aria-label="Trading post-signing proof chain">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
@@ -588,6 +629,78 @@ function postSigningStatusClassName(status: Web3LiveTradeCanaryReceipt["post_sig
   if (status === "settlement-accounted") return `${base} border-engine/30 bg-engine/10 text-engine`;
   if (status === "review-required") return `${base} border-critical/30 bg-critical/10 text-critical`;
   return `${base} border-caution/30 bg-caution/10 text-caution`;
+}
+
+export function buildCanaryLaunchSteps(input: {
+  receipt: Web3LiveTradeCanaryReceipt;
+  preflightReceipt: Web3LiveUnsignedOrderPreflightReceipt | null;
+  unsignedReceipt: Web3LiveUnsignedOrderHandoffReceipt | null;
+  actionReceipt: Web3LiveTradeCanaryActionReceipt | null;
+}): CanaryLaunchStep[] {
+  const { receipt, preflightReceipt, unsignedReceipt, actionReceipt } = input;
+  const preflightReady = preflightReceipt?.status === "ready";
+  const preflightFailed = Boolean(preflightReceipt && preflightReceipt.status !== "ready");
+  const unsignedReady = unsignedReceipt?.status === "order-ready";
+  const unsignedFailed = Boolean(unsignedReceipt && unsignedReceipt.status !== "order-ready");
+  const signedRelayAttempted = Boolean(
+    actionReceipt?.relay_attempted ||
+    actionReceipt?.actual_live_trade_tested ||
+    receipt.actual_live_trade_tested ||
+    receipt.latest_signature_preview ||
+    receipt.signed_relay_status === "relayed" ||
+    receipt.signed_relay_status === "confirmed",
+  );
+  const proofAccounted = receipt.post_signing_evidence_status === "settlement-accounted";
+  const proofReviewRequired = receipt.post_signing_evidence_status === "review-required";
+
+  return [
+    {
+      id: "preflight",
+      label: "Preflight",
+      status: preflightReady ? "pass" : preflightFailed ? "fail" : "watch",
+      detail: preflightReady
+        ? "Wallet, tiny cap, slippage, live flags, source, account, and Jupiter env are ready before any prompt."
+        : preflightFailed
+          ? preflightReceipt?.next_action ?? "Preflight is blocked; fix the listed wallet or live-gate issue before signing."
+          : "Run Canary preflight first. This creates no transaction and moves no funds.",
+    },
+    {
+      id: "wallet-signature",
+      label: "Wallet sign",
+      status: signedRelayAttempted || unsignedReady ? "pass" : unsignedFailed ? "fail" : preflightReady ? "watch" : "fail",
+      detail: signedRelayAttempted
+        ? "A wallet-signed canary moved into the relay path for the current request."
+        : unsignedReady
+          ? "One-shot unsigned order is ready; the external browser wallet still has to sign it."
+          : unsignedFailed
+            ? unsignedReceipt?.next_action ?? "Unsigned handoff is blocked; no wallet signature has happened."
+            : preflightReady
+              ? "Preflight passed. Next step is Sign tiny canary in the browser wallet."
+              : "No wallet signature has happened yet.",
+    },
+    {
+      id: "signed-relay",
+      label: "Relay",
+      status: receipt.actual_live_trade_tested ? "pass" : signedRelayAttempted ? "watch" : actionReceipt ? "fail" : "fail",
+      detail: receipt.actual_live_trade_tested
+        ? "The app has recorded a live relay signature for the canary request."
+        : signedRelayAttempted
+          ? "Signed relay was attempted; confirmation and accounting still need proof."
+          : actionReceipt?.next_action ?? "No signed canary relay is recorded yet.",
+    },
+    {
+      id: "confirmation-accounting",
+      label: "Proof",
+      status: proofAccounted ? "pass" : proofReviewRequired ? "fail" : signedRelayAttempted ? "watch" : "fail",
+      detail: proofAccounted
+        ? "Chain confirmation, settlement reconciliation, and the local portfolio mirror are accounted."
+        : proofReviewRequired
+          ? receipt.post_signing_next_action
+          : signedRelayAttempted
+            ? "Run Check proof chain or Auto watch proof until the canary is confirmed and mirrored."
+            : "Nothing can be confirmed or accounted until a funded canary is signed and relayed.",
+    },
+  ];
 }
 
 function getBrowserSolanaProvider(): BrowserSolanaProvider | null {

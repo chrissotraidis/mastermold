@@ -245,6 +245,9 @@ bodies, execute, custody funds, or mutate wallets.
 canary: it checks the public wallet, tiny amount, slippage cap, live flags, source/account scope,
 and Jupiter env before any browser-wallet prompt or Jupiter order creation, and still returns no
 transaction bytes. Trading exposes this as `Canary preflight`.
+The Trading canary console now shows a compact `Canary launch checklist` that separates preflight,
+browser-wallet signature, signed relay, and confirmation/accounting, and it labels the result as
+`Funded canary still not proven` until all four live-money proof stages are complete.
 Trading and Settings expose the actual supervised handoff as `Sign tiny canary`: the browser
 deserializes the one-shot transaction with `@solana/web3.js`, asks the connected wallet to sign,
 then posts the serialized signed payload to the live canary relay without storing transaction

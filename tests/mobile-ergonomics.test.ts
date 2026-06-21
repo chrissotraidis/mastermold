@@ -1562,6 +1562,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/trading/page.tsx")).toContain("Web3LiveCanaryConsole");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Live money canary");
     expect(source("components/web3-live-canary-console.tsx")).toContain("No real trade tested yet");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Canary launch checklist");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary launch checklist");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Funded canary still not proven");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("The only result that counts as a live test");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("buildCanaryLaunchSteps");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary preflight");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary preflight receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("getTrustedBrowserWalletPublicKey");
