@@ -107,5 +107,6 @@ export async function GET(request: Request): Promise<NextResponse<Web3OperatorRu
     cutover,
     preflight,
     runway,
+    currentInput: requestPacket.current_input,
   }));
 }

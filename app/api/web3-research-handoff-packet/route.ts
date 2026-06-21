@@ -109,6 +109,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3ResearchHa
     cutover,
     preflight,
     runway,
+    currentInput: requestPacket.current_input,
   });
   const manualLiveReview = buildWeb3ManualLiveReviewPacket({
     state,

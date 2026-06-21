@@ -831,6 +831,8 @@ async function verifyOperatorSetupPackets() {
   assert(Array.isArray(runbook.json.real_capital_blockers), "Operator runbook should include real-capital blockers.", runbook.json.real_capital_blockers);
   assert(Array.isArray(runbook.json.verifier_commands) && runbook.json.verifier_commands.some((command) => command.includes("verify:web3")), "Operator runbook should include verifier commands.", runbook.json.verifier_commands);
   assert(runbook.json.primary_safe_action === null || ["allowed", "gated", "blocked"].includes(runbook.json.primary_safe_action.status), "Operator runbook should expose a valid primary safe action.", runbook.json.primary_safe_action);
+  assert(runbook.json.current_input?.live_execution_permission === "blocked", "Operator runbook should expose a locked current input contract.", runbook.json.current_input);
+  assert(Array.isArray(runbook.json.current_input.target_names), "Operator runbook current input should expose safe target names.", runbook.json.current_input);
   assertBlockedAuthority("Operator runbook", runbook.json);
 
   record(

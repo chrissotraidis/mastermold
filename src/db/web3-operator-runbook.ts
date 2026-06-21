@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Web3CutoverBlockerBoard } from "./web3-cutover-blocker-board";
 import type { Web3LiveCapitalPreflightReceipt } from "./web3-live-capital-preflight";
+import type { Web3OperatorCurrentInput } from "./web3-operator-request-packet";
 import type { Web3SupervisedLiveRunway } from "./web3-supervised-live-runway";
 import type { Web3TradingState } from "./web3-trading";
 import type { Web3UsabilityStatusReceipt } from "./web3-usability-status";
@@ -38,6 +39,7 @@ export type Web3OperatorRunbookReceipt = {
   scenario: Web3TradingState["scenario"];
   summary: string;
   primary_safe_action: Web3OperatorRunbookAction | null;
+  current_input: Web3OperatorCurrentInput | null;
   next_safe_input: Web3CutoverBlockerBoard["next_safe_input"];
   next_live_lane_action: string;
   allowed_now_count: number;
@@ -68,6 +70,7 @@ export function buildWeb3OperatorRunbook(input: {
   cutover: Web3CutoverBlockerBoard;
   preflight: Web3LiveCapitalPreflightReceipt;
   runway: Web3SupervisedLiveRunway;
+  currentInput?: Web3OperatorCurrentInput | null;
   now?: Date;
 }): Web3OperatorRunbookReceipt {
   const generatedAt = (input.now ?? new Date()).toISOString();
@@ -106,6 +109,7 @@ export function buildWeb3OperatorRunbook(input: {
     scenario: input.state.scenario,
     summary: operatorRunbookSummary(status, allowedNowCount, gatedCount, blockedCount, input.cutover.open_blocker_count),
     primary_safe_action: primarySafeAction,
+    current_input: input.currentInput ?? null,
     next_safe_input: input.cutover.next_safe_input,
     next_live_lane_action: input.cutover.next_live_lane_action,
     allowed_now_count: allowedNowCount,
@@ -125,6 +129,7 @@ export function buildWeb3OperatorRunbook(input: {
     controls: [
       "This runbook is an operator action map only; it cannot sign, submit, custody funds, mutate wallets, or grant live execution.",
       "Allowed actions are limited to app review, paper-only autonomy, read-only market refresh, credential setup, and verifier commands.",
+      "The current input contract is copied from the operator request packet so runbook consumers can point at one safe next field without fetching secret-bearing forms.",
       "Gated actions name the missing setup input or review step without asking for private keys, seed phrases, raw transactions, or signed payloads.",
       "Autonomous live trading remains blocked until dedicated wallet, signer/custody, settlement, ops, accounting, profit proof, and manual live review are complete.",
     ],

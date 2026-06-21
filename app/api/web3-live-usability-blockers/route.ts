@@ -119,6 +119,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveUsabil
     cutover,
     preflight,
     runway,
+    currentInput: requestPacket.current_input,
   });
 
   return NextResponse.json(buildWeb3LiveUsabilityBlockersReceipt({

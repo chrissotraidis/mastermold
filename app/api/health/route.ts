@@ -78,6 +78,7 @@ export async function GET() {
     cutover: web3Cutover,
     preflight: web3Preflight,
     runway: web3SupervisedRunway,
+    currentInput: web3BaseRequestPacket.current_input,
   });
   const web3ManualLiveReview = buildWeb3ManualLiveReviewPacket({
     state: web3State,

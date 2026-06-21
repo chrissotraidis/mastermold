@@ -202,6 +202,9 @@ safe collection surfaces, env target names, next input, verifier commands, and a
 live-usability summary with real-capital blocker count, total-versus-listed row counts,
 live-lane counts, the next ordered unlock step, and the same live-execution/wallet-mutation/
 transaction-submission/private-key/seed-phrase/secret-echo blocks without returning raw secrets.
+`/api/web3-operator-runbook` now carries that same current safe input contract beside the
+safe action map, so monitors and cockpit panels can show the one setup field to open without
+fetching the longer request packet.
 `/api/web3-operator-request-packet` turns that same handoff into a shareable redacted
 setup packet with the live-usability summary embedded in JSON and text form, so another
 helper sees blocker counts, listed rows, the next unlock step, safe inputs, and never-provide

@@ -157,6 +157,7 @@ async function buildResearchHandoffForSearch(input: {
     cutover,
     preflight,
     runway,
+    currentInput: requestPacket.current_input,
   });
   const manualLiveReview = buildWeb3ManualLiveReviewPacket({
     state,

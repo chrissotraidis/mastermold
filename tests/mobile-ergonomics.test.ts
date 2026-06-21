@@ -730,6 +730,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Trading credential doctor status");
     expect(tradingPage).toContain("Trading current input contract");
     expect(tradingPage).toContain("Live usability current input contract");
+    expect(tradingPage).toContain("Operator runbook current input contract");
     expect(tradingPage).toContain("LiveUsabilityContractStat");
     expect(tradingPage).toContain("Open current input");
     expect(tradingPage).toContain("currentInputHref");
@@ -787,7 +788,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain('aria-label="Real-capital Web3 blockers"');
     expect(tradingPage).toContain("The runbook maps safe actions only.");
     expect(source("src/db/web3-operator-runbook.ts")).toContain("web3-operator-runbook");
+    expect(source("src/db/web3-operator-runbook.ts")).toContain("current_input: Web3OperatorCurrentInput | null");
     expect(source("src/db/web3-operator-runbook.ts")).toContain("Autonomous live trading remains blocked");
+    expect(source("app/api/web3-operator-runbook/route.ts")).toContain("currentInput: requestPacket.current_input");
     expect(source("app/api/web3-operator-runbook/route.ts")).toContain("buildWeb3OperatorRunbook");
     expect(tradingPage).toContain("TradingCommandBoard");
     expect(tradingPage).toContain("Command board");
@@ -1129,6 +1132,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsWeb3OperatorRunbookPanel");
     expect(settingsPage).toContain("Settings Web3 operator runbook");
     expect(settingsPage).toContain("Settings primary safe Web3 action");
+    expect(settingsPage).toContain("Settings runbook current input contract");
     expect(settingsPage).toContain("Settings safe Web3 run-now actions");
     expect(settingsPage).toContain("Settings real-capital Web3 blockers");
     expect(settingsPage).toContain("/api/web3-operator-runbook?source=live-dex&account=persistent");
@@ -1741,7 +1745,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_execution_permission: \"blocked\"");
     expect(source("components/review-readiness.tsx")).toContain("Settings now renders that same Web3 cutover blocker board");
     expect(source("components/review-readiness.tsx")).toContain("Settings now also renders the Web3 operator runbook");
-    expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-runbook now expose a safe operator action map");
+    expect(source("components/review-readiness.tsx")).toContain("/api/web3-operator-runbook now expose a safe operator action map plus the current input contract");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("the same `current_input` contract from the operator request packet");
+    expect(source("README.md")).toContain("/api/web3-operator-runbook` now carries that same current safe input contract");
     expect(source("components/review-readiness.tsx")).toContain("manual live-review packet");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-manual-live-review-packet");
     expect(source("components/review-readiness.tsx")).toContain("The Web3 trading cockpit now shows the same operator input packet");

@@ -134,6 +134,7 @@ export default async function IntegrationsSettingsPage() {
     cutover: web3CutoverBlockerBoard,
     preflight: web3LiveCapitalPreflight,
     runway: web3SupervisedLiveRunway,
+    currentInput: web3BaseOperatorRequestPacket.current_input,
   });
   const web3LiveUsabilityBlockers = buildWeb3LiveUsabilityBlockersReceipt({
     state: web3State,
@@ -1665,6 +1666,10 @@ function SettingsWeb3CutoverBlockerBoardPanel({ board }: { board: Web3CutoverBlo
 
 function SettingsWeb3OperatorRunbookPanel({ runbook }: { runbook: Web3OperatorRunbookReceipt }) {
   const primary = runbook.primary_safe_action;
+  const currentInput = runbook.current_input;
+  const currentInputHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet"
+    ? "#settings-web3-wallet-public-key"
+    : "#settings-web3-credentials-runway";
   const visibleActions = runbook.run_now.slice(0, 5);
   const blockers = runbook.real_capital_blockers.slice(0, 4);
   return (
@@ -1710,6 +1715,30 @@ function SettingsWeb3OperatorRunbookPanel({ runbook }: { runbook: Web3OperatorRu
           </Link>
         ) : null}
       </div>
+
+      {currentInput ? (
+        <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Settings runbook current input contract">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Current input</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{currentInput.label}</p>
+            </div>
+            <LaunchQueueBadge status="fail" label="live blocked" />
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{currentInput.next_action}</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <SettingsMetric label="Surface" value={currentInput.safe_collection_surface.replaceAll("-", " ")} />
+            <SettingsMetric label="Storage" value={currentInput.storage.replaceAll("-", " ")} />
+            <SettingsMetric label="Targets" value={currentInput.target_names.length > 0 ? currentInput.target_names.join(", ") : "none"} />
+          </div>
+          <Link
+            href={currentInputHref}
+            className="mt-2 inline-flex min-h-10 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
+          >
+            Open current input
+          </Link>
+        </div>
+      ) : null}
 
       <div className="mt-3 grid gap-2 md:grid-cols-2" aria-label="Settings safe Web3 run-now actions">
         {visibleActions.map((action) => (

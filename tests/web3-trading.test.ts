@@ -1826,6 +1826,20 @@ describe("Web3 autonomous trading subsystem", () => {
       summary: string;
       receipt_hash: string;
       primary_safe_action: { id: string; status: string; permission_scope: string } | null;
+      current_input: {
+        id: string;
+        label: string;
+        safe_collection_surface: string;
+        storage: string;
+        target_names: string[];
+        next_action: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      } | null;
       next_safe_input: { id: string; label: string; next_action: string } | null;
       next_live_lane_action: string;
       allowed_now_count: number;
@@ -1860,6 +1874,18 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(runbook.mode).toBe("web3-operator-runbook");
     expect(runbook.status).toMatch(/setup-needed|paper-operable|supervised-review-ready/);
     expect(runbook.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(runbook.current_input).toMatchObject({
+      id: "dedicated-trading-wallet",
+      label: "Dedicated trading wallet",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(runbook.current_input?.target_names).toEqual(["wallet_public_key"]);
+    expect(runbook.current_input?.next_action).toContain("public Solana trading wallet");
     expect(runbook.allowed_now_count).toBeGreaterThanOrEqual(2);
     expect(runbook.gated_count).toBeGreaterThanOrEqual(1);
     expect(runbook.blocked_count).toBeGreaterThanOrEqual(1);
@@ -1904,6 +1930,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(runbook.seed_phrase_storage).toBe("blocked");
     expect(runbook.secret_echo_permission).toBe("blocked");
     expect(runbook.controls.some((control) => control.includes("operator action map only"))).toBe(true);
+    expect(runbook.controls.some((control) => control.includes("current input contract"))).toBe(true);
     expect(text).not.toContain("test-helius-runbook-secret");
     expect(text).not.toContain("test-jupiter-runbook-secret");
   });
