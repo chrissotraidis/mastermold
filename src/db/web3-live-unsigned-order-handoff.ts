@@ -118,14 +118,14 @@ export function buildWeb3LiveUnsignedOrderPreflightReceipt(
   const unsafeFields = findUnsafeFields(rawInput);
   const operatorAcknowledged = rawInput.operator_ack === true;
   const canaryAcknowledged = rawInput.canary_ack === "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED";
-  const wallet = text(rawInput.wallet_public_key);
   const amountLamports = canaryLamports(rawInput.amount_lamports);
   const maxSlippageBps = canarySlippage(rawInput.max_slippage_bps);
   const liveFlagsReady = liveUnsignedCanaryFlagsReady();
   const sourceReady = state.market_source.mode === "live-dex";
   const accountReady = state.paper_account.mode === "persistent";
-  const walletReady = Boolean(wallet) && isLikelySolanaPublicKey(wallet) && wallet !== SAMPLE_SYSTEM_WALLET;
   const scopedWallet = scopedWalletPublicKey(state);
+  const wallet = handoffWalletPublicKey(rawInput.wallet_public_key, scopedWallet);
+  const walletReady = Boolean(wallet) && isLikelySolanaPublicKey(wallet) && wallet !== SAMPLE_SYSTEM_WALLET;
   const scopedWalletReady = isDedicatedPublicWallet(scopedWallet);
   const scopedWalletOwnershipProved = scopedWalletReady && Boolean(getLatestWeb3WalletOwnershipReceipt(scopedWallet));
   const walletMatchesScopedWallet = walletReady && scopedWalletReady && wallet === scopedWallet;
@@ -218,11 +218,11 @@ export async function buildWeb3LiveUnsignedOrderHandoffReceipt(
   const operatorAcknowledged = rawInput.operator_ack === true;
   const canaryAcknowledged = rawInput.canary_ack === "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED";
   const returnAcknowledged = rawInput.return_unsigned_transaction_ack === true;
-  const wallet = text(rawInput.wallet_public_key);
   const amountLamports = canaryLamports(rawInput.amount_lamports);
   const maxSlippageBps = canarySlippage(rawInput.max_slippage_bps);
   const liveFlagsReady = liveUnsignedCanaryFlagsReady();
   const scopedWallet = scopedWalletPublicKey(state);
+  const wallet = handoffWalletPublicKey(rawInput.wallet_public_key, scopedWallet);
   const scopedWalletReady = isDedicatedPublicWallet(scopedWallet);
   const walletReady = Boolean(wallet) && isLikelySolanaPublicKey(wallet) && wallet !== SAMPLE_SYSTEM_WALLET;
   const scopedWalletOwnershipProved = scopedWalletReady && Boolean(getLatestWeb3WalletOwnershipReceipt(scopedWallet));
@@ -522,6 +522,12 @@ function scopedWalletPublicKey(state: Web3TradingState) {
     state.live_wallet_accounting_readiness.wallet_public_key ??
     state.execution_readiness.config.wallet_public_key ??
     null;
+}
+
+function handoffWalletPublicKey(value: unknown, scopedWallet: string | null) {
+  const explicitWallet = text(value);
+  if (explicitWallet) return explicitWallet;
+  return isDedicatedPublicWallet(scopedWallet) ? scopedWallet! : "";
 }
 
 function isDedicatedPublicWallet(value: string | null) {

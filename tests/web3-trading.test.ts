@@ -3615,6 +3615,23 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(readyPreflightReceipt.wallet_matches_scoped_wallet).toBe(true);
     expect(readyPreflightReceipt.wallet_ownership_proved).toBe(true);
     expect(readyPreflightReceipt.blockers).toEqual([]);
+
+    const scopedDefaultPreflight = await LIVE_UNSIGNED_ORDER_HANDOFF_GET(new Request("http://localhost/api/web3-live-unsigned-order-handoff?scenario=breakout&source=live-dex&account=persistent&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&amount_lamports=100000&max_slippage_bps=50"));
+    const scopedDefaultReceipt = await json<{
+      status: string;
+      can_request_one_shot_unsigned_order: boolean;
+      wallet_ready: boolean;
+      wallet_matches_scoped_wallet: boolean;
+      wallet_ownership_proved: boolean;
+      blockers: string[];
+    }>(scopedDefaultPreflight);
+    expect(scopedDefaultPreflight.status).toBe(200);
+    expect(scopedDefaultReceipt.status).toBe("ready");
+    expect(scopedDefaultReceipt.can_request_one_shot_unsigned_order).toBe(true);
+    expect(scopedDefaultReceipt.wallet_ready).toBe(true);
+    expect(scopedDefaultReceipt.wallet_matches_scoped_wallet).toBe(true);
+    expect(scopedDefaultReceipt.wallet_ownership_proved).toBe(true);
+    expect(scopedDefaultReceipt.blockers.join(" ")).not.toContain("wallet_public_key is required");
     delete process.env.JUPITER_API_KEY;
     delete process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION;
     delete process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL;
@@ -3722,7 +3739,6 @@ describe("Web3 autonomous trading subsystem", () => {
         operator_ack: true,
         canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
         return_unsigned_transaction_ack: true,
-        wallet_public_key: walletPublicKey,
         amount_lamports: 100_000,
         max_slippage_bps: 50,
       }),
@@ -3731,6 +3747,7 @@ describe("Web3 autonomous trading subsystem", () => {
     const handoffReceipt = JSON.parse(handoffText) as {
       status: string;
       request_id: string | null;
+      wallet_public_key_preview: string | null;
       unsigned_transaction: string | null;
       unsigned_payload_hash: string | null;
       unsigned_payload_byte_count: number;
@@ -3747,6 +3764,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(handoff.status).toBe(200);
     expect(handoffReceipt.status).toBe("order-ready");
     expect(handoffReceipt.request_id).toBe("canary-order-001");
+    expect(handoffReceipt.wallet_public_key_preview).toBe(`${walletPublicKey.slice(0, 4)}...${walletPublicKey.slice(-4)}`);
     expect(handoffReceipt.unsigned_transaction).toBe(unsignedTransaction);
     expect(handoffReceipt.unsigned_transaction_return).toBe("returned-one-shot");
     expect(handoffReceipt.scoped_wallet_ownership_proved).toBe(true);
