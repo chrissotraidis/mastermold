@@ -718,8 +718,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("LiveUsabilityBlockersPanel");
     expect(tradingPage).toContain("Real-money usability");
     expect(tradingPage).toContain("What is left");
+    expect(tradingPage).toContain("Next unlock step");
+    expect(tradingPage).toContain("Live usability next unlock step");
     expect(tradingPage).toContain("Open blockers JSON");
     expect(tradingPage).toContain("/api/web3-live-usability-blockers?${params.toString()}");
+    expect(tradingPage).toContain("next_unlock_step");
     expect(tradingPage).toContain("missing_for_live_usability");
     expect(tradingPage).toContain("safe_next_actions");
     expect(tradingPage).toContain("This receipt answers readiness only.");
@@ -969,6 +972,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings Web3 live usability blockers");
     expect(settingsPage).toContain("What is left for real money");
     expect(settingsPage).toContain("Settings real-money missing rows");
+    expect(settingsPage).toContain("Settings live usability next unlock step");
     expect(settingsPage).toContain("Settings live usability next action");
     expect(settingsPage).toContain("Settings live usability safe actions");
     expect(settingsPage).toContain("Open what-is-left JSON");
@@ -1495,12 +1499,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-live-usability-blockers");
     expect(source("components/review-readiness.tsx")).toContain("live-usability blocker summaries");
+    expect(source("components/review-readiness.tsx")).toContain("next ordered unlock step");
     expect(source("components/review-readiness.tsx")).toContain("Settings now adds a Web3 setup runway");
     expect(source("components/review-readiness.tsx")).toContain("Settings now places that same live-usability blocker receipt");
     expect(source("README.md")).toContain("/api/web3-live-usability-blockers?source=live-dex");
     expect(source("README.md")).toContain("web3_live_usability");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-live-usability-blockers");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_live_usability");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("next ordered unlock step");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Setup runway");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Action checklist");
     expect(source("docs/web3-credentials-runbook.md")).toContain("checklist over existing safe actions");

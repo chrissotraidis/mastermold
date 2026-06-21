@@ -904,6 +904,17 @@ function SettingsWeb3LiveUsabilityBlockersPanel({ receipt }: { receipt: Web3Live
         </div>
 
         <div className="grid gap-2">
+          {receipt.next_unlock_step ? (
+            <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings live usability next unlock step">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Next unlock step</p>
+                <LaunchQueueBadge status={settingsOperatorUnlockBadgeStatus(receipt.next_unlock_step.status)} label={receipt.next_unlock_step.status} />
+              </div>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{receipt.next_unlock_step.label}</p>
+              <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{receipt.next_unlock_step.next_action}</p>
+              <p className="mt-1 truncate text-[11px] leading-4 text-outline">{receipt.next_unlock_step.storage.replaceAll("-", " ")}</p>
+            </div>
+          ) : null}
           <div className="rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Settings live usability next action">
             <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next safe action</p>
             <p className="mt-1 text-xs leading-5 text-on-surface-variant">{receipt.next_action}</p>

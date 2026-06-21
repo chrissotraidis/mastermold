@@ -17,6 +17,7 @@ import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wallet-packet/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
+import { GET as LIVE_USABILITY_BLOCKERS_GET } from "@/app/api/web3-live-usability-blockers/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
 import { GET as MANUAL_LIVE_REVIEW_PACKET_GET } from "@/app/api/web3-manual-live-review-packet/route";
@@ -1252,6 +1253,51 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.controls.some((control) => control.includes("cannot sign, submit"))).toBe(true);
     expect(text).not.toContain("test-helius-usability-secret");
     expect(text).not.toContain("test-jupiter-usability-secret");
+  });
+
+  test("GIVEN real-money blockers remain WHEN live usability blockers are requested THEN the next unlock step comes before proof work", async () => {
+    const response = await LIVE_USABILITY_BLOCKERS_GET(new Request("http://localhost/api/web3-live-usability-blockers?scenario=breakout&source=live-dex&account=persistent"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string } | null;
+      operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
+      missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-live-usability-blockers");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.next_unlock_step).toMatchObject({
+      id: "scope-wallet",
+      label: "Scope dedicated wallet",
+      storage: "browser-public-scope",
+    });
+    expect(receipt.operator_unlock_sequence.map((step) => step.id)).toEqual([
+      "scope-wallet",
+      "prove-wallet",
+      "rehearse-jupiter",
+      "choose-signer",
+      "ops-accounting",
+      "external-review",
+    ]);
+    expect(receipt.missing_for_live_usability[0]).toMatchObject({
+      id: "cutover:dedicated-trading-wallet",
+      label: "Dedicated trading wallet",
+    });
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
   });
 
   test("GIVEN live cutover blockers remain WHEN the blocker board route runs THEN it groups safe next steps without live authority", async () => {

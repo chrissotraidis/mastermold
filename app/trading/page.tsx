@@ -391,6 +391,18 @@ function TradingCommandBoard({
               <CommandBoardMetric label="Signoffs" value={`${liveUsabilityBlockers.passed_signoff_count}/${liveUsabilityBlockers.required_signoff_count}`} detail={`${liveUsabilityBlockers.failed_or_watch_signoff_count} open`} tone={liveUsabilityBlockers.failed_or_watch_signoff_count > 0 ? "caution" : "engine"} />
               <CommandBoardMetric label="Actions" value={`${liveUsabilityBlockers.safe_action_count}`} detail={`${liveUsabilityBlockers.gated_action_count} gated`} tone="engine" />
             </div>
+            {liveUsabilityBlockers.next_unlock_step ? (
+              <div className="mt-2 rounded-md border border-engine/20 bg-engine/[0.035] p-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Next unlock step</p>
+                  <span className={operatorUnlockStepClassName(liveUsabilityBlockers.next_unlock_step.status)}>
+                    {liveUsabilityBlockers.next_unlock_step.status}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs font-semibold text-on-surface">{liveUsabilityBlockers.next_unlock_step.label}</p>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{liveUsabilityBlockers.next_unlock_step.next_action}</p>
+              </div>
+            ) : null}
             <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">{liveUsabilityBlockers.next_action}</p>
           </div>
 
@@ -810,6 +822,18 @@ function LiveUsabilityBlockersPanel({
             <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Next action</p>
             <p className="mt-1 text-xs leading-5 text-on-surface-variant">{receipt.next_action}</p>
           </div>
+
+          {receipt.next_unlock_step ? (
+            <div className="mt-2 rounded-md border border-engine/20 bg-engine/[0.035] p-3" aria-label="Live usability next unlock step">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Next unlock step</p>
+                <span className={operatorUnlockStepClassName(receipt.next_unlock_step.status)}>{receipt.next_unlock_step.status}</span>
+              </div>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{receipt.next_unlock_step.label}</p>
+              <p className="mt-1 text-xs leading-5 text-on-surface-variant">{receipt.next_unlock_step.next_action}</p>
+              <p className="mt-1 truncate text-[11px] leading-4 text-outline">{receipt.next_unlock_step.storage.replaceAll("-", " ")}</p>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid min-w-0 gap-2">

@@ -56,8 +56,10 @@ export type Web3LiveUsabilityBlockersReceipt = {
     safe_collection_surface: string;
     storage: string;
   } | null;
+  next_unlock_step: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number] | null;
   next_action: string;
   summary: string;
+  operator_unlock_sequence: Web3UsabilityStatusReceipt["operator_unlock_sequence"];
   missing_for_live_usability: Web3LiveUsabilityMissingItem[];
   safe_next_actions: Array<{
     id: Web3OperatorRunbookReceipt["run_now"][number]["id"];
@@ -97,6 +99,9 @@ export type Web3LiveUsabilityBlockersHealth = {
   total_live_lane_count: number;
   safe_action_count: number;
   next_operator_input_label: string | null;
+  next_unlock_step_label: string | null;
+  next_unlock_step_status: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number]["status"] | null;
+  next_unlock_step_action: string | null;
   next_action: string;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -128,6 +133,9 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   const realCapitalBlockerCount = missing.filter((item) => item.blocks_live_capital).length;
   const failedOrWatchSignoffCount = input.manualLiveReview.failed_signoff_count + input.manualLiveReview.watch_signoff_count;
   const status = blockersStatus(input, openOperatorInputCount, failedOrWatchSignoffCount);
+  const nextUnlockStep = input.usability.operator_unlock_sequence.find((step) => step.status !== "ready") ??
+    input.usability.operator_unlock_sequence[input.usability.operator_unlock_sequence.length - 1] ??
+    null;
   const safeNextActions = input.runbook.run_now
     .filter((action) => action.status !== "blocked")
     .map((action) => ({
@@ -179,8 +187,10 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
         storage: input.cutover.next_safe_input.storage,
       }
       : null,
+    next_unlock_step: nextUnlockStep,
     next_action: liveUsabilityNextAction(status, input, missing),
     summary: liveUsabilitySummary(status, input, missing, autonomousLive?.detail),
+    operator_unlock_sequence: input.usability.operator_unlock_sequence,
     missing_for_live_usability: missing.slice(0, 14),
     safe_next_actions: safeNextActions,
     verifier_commands: verifierCommands,
@@ -233,6 +243,9 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     total_live_lane_count: receipt.total_live_lane_count,
     safe_action_count: receipt.safe_action_count,
     next_operator_input_label: receipt.next_operator_input?.label ?? null,
+    next_unlock_step_label: receipt.next_unlock_step?.label ?? null,
+    next_unlock_step_status: receipt.next_unlock_step?.status ?? null,
+    next_unlock_step_action: receipt.next_unlock_step?.next_action ?? null,
     next_action: receipt.next_action,
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -337,9 +350,35 @@ function ownerForGate(id: Web3LiveCapitalPreflightReceipt["gates"][number]["id"]
 }
 
 function missingItemRank(item: Web3LiveUsabilityMissingItem) {
+  const dependencyRank = [
+    "cutover:dedicated-trading-wallet",
+    "preflight:operator-wallet",
+    "runway:wallet",
+    "cutover:wallet-ownership-proof",
+    "cutover:jupiter-route-order-key",
+    "preflight:jupiter-order",
+    "runway:jupiter",
+    "cutover:signer-custody-choice",
+    "cutover:signer-provider-credentials",
+    "preflight:signer-custody",
+    "runway:signer",
+    "cutover:emergency-stop-target",
+    "cutover:production-worker-ops",
+    "preflight:kill-switch",
+    "runway:ops",
+    "cutover:accounting-export-target",
+    "cutover:settlement-accounting-review",
+    "preflight:settlement",
+    "runway:accounting",
+    "cutover:manual-live-approval",
+    "preflight:manual-live-review",
+    "runway:manual-review",
+  ].indexOf(item.id);
+  if (dependencyRank >= 0) return dependencyRank;
+
   const statusRank = item.status === "blocked" || item.status === "fail" ? 0 : item.status === "needed" ? 1 : 2;
   const sourceRank = item.source === "cutover" ? 0 : item.source === "preflight" ? 5 : item.source === "manual-review" ? 10 : 15;
-  return statusRank + sourceRank;
+  return 100 + statusRank + sourceRank;
 }
 
 function liveUsabilityNextAction(

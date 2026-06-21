@@ -182,6 +182,8 @@ async function verifyHealth() {
   assertReceiptHash("Health live usability", json.web3_live_usability.receipt_hash);
   assert(typeof json.web3_live_usability.open_operator_input_count === "number", "Live-usability health should expose operator input count.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.real_capital_blocker_count === "number", "Live-usability health should expose real-capital blocker count.", json.web3_live_usability);
+  assert(typeof json.web3_live_usability.next_unlock_step_label === "string" && json.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next operator unlock step.", json.web3_live_usability);
+  assert(typeof json.web3_live_usability.next_unlock_step_action === "string" && json.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", json.web3_live_usability);
   assert(json.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.wallet_mutation_permission === "blocked", "Live-usability health should keep wallet mutation blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.transaction_submission_permission === "blocked", "Live-usability health should keep transaction submission blocked.", json.web3_live_usability);
@@ -462,6 +464,9 @@ async function verifyLiveUsabilityBlockersReceipt() {
     json,
   );
   assert(Array.isArray(json.missing_for_live_usability), "Live usability blockers should include missing-for-usability rows.", json);
+  assert(json.next_unlock_step?.id === "scope-wallet", "Live usability blockers should expose the next ordered unlock step before downstream proof work.", json.next_unlock_step);
+  assert(Array.isArray(json.operator_unlock_sequence) && json.operator_unlock_sequence.map((item) => item.id).join(",") === "scope-wallet,prove-wallet,rehearse-jupiter,choose-signer,ops-accounting,external-review", "Live usability blockers should carry the ordered unlock sequence.", json.operator_unlock_sequence);
+  assert(json.missing_for_live_usability[0]?.id === "cutover:dedicated-trading-wallet", "Live usability blockers should list dedicated wallet scope before wallet proof.", json.missing_for_live_usability);
   assert(json.missing_for_live_usability.every((item) => typeof item.next_action === "string" && item.next_action.length > 0), "Live usability blocker rows should name next actions.", json.missing_for_live_usability);
   assert(Array.isArray(json.safe_next_actions) && json.safe_next_actions.length > 0, "Live usability blockers should include safe next actions.", json.safe_next_actions);
   assert(Array.isArray(json.verifier_commands) && json.verifier_commands.some((command) => command.includes("verify:web3")), "Live usability blockers should include verifier commands.", json.verifier_commands);
