@@ -149,9 +149,11 @@ it never grants live execution or wallet mutation permission. The first-canary d
 live blockers, supervised canary readiness, Jupiter order proof, unsigned-order preflight,
 and canary proof receipts together through `GET /api/web3-first-canary-drill`, `/api/health`,
 and `npm run drill-canary:web3`, but it remains read-only and cannot sign, submit, store
-wallet authority, or move funds. The Trading command center now reads that same first-canary
-drill receipt for its first-screen status, hash, hard-fail count, proof count, next post-signing
-proof step, signature preview, live-dex drill link, ordered next lane, and leading failing lanes
+wallet authority, or move funds. The drill receipt now also includes an operator unblock plan
+with the next safe step, later gated steps, safe surfaces, verifier commands, and completion
+signals for the first funded canary. The Trading command center reads that same receipt for its
+first-screen status, hash, hard-fail count, proof count, next post-signing proof step, signature
+preview, live-dex drill link, ordered next lane, leading failing lanes, and ordered unblock plan
 so the next real canary blocker is visible before the long workspace. `/api/health` also exposes `web3_live_first_canary_drill`, a canonical
 live-dex persistent first-canary health summary for monitors that need the real live-trade
 blocker without inferring it from the default app state, plus `web3_live_canary_proof`

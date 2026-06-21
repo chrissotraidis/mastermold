@@ -398,11 +398,16 @@ async function verifyHealth() {
   assert(typeof json.web3_live_usability.next_unlock_step_label === "string" && json.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next operator unlock step.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_action === "string" && json.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", json.web3_live_usability);
   assert(
-    ["cutover:dedicated-trading-wallet", "cutover:wallet-ownership-proof"].includes(json.web3_live_usability.next_blocker?.id),
+    ["cutover:dedicated-trading-wallet", "cutover:wallet-ownership-proof", "runway:wallet"].includes(json.web3_live_usability.next_blocker?.id),
     "Live-usability health should expose the next dependency-ranked blocker.",
     json.web3_live_usability,
   );
-  assert(json.web3_live_usability.next_blocker?.owner === "operator" && json.web3_live_usability.next_blocker?.source === "cutover", "Live-usability health next blocker should expose owner/source routing.", json.web3_live_usability.next_blocker);
+  assert(
+    json.web3_live_usability.next_blocker?.owner === "operator" &&
+      ["cutover", "runway"].includes(json.web3_live_usability.next_blocker?.source),
+    "Live-usability health next blocker should expose owner/source routing.",
+    json.web3_live_usability.next_blocker,
+  );
   assert(json.web3_live_usability.next_blocker?.href === "/settings/integrations#settings-web3-wallet-public-key", "Live-usability health next blocker should expose the safe fix surface.", json.web3_live_usability.next_blocker);
   assert(String(json.web3_live_usability.next_blocker?.safe_command ?? "").includes("--require-operator-wallet"), "Live-usability health next blocker should expose the strict safe verifier command.", json.web3_live_usability.next_blocker);
   assert(json.web3_live_usability.next_blocker?.blocks_live_capital === true, "Live-usability health next blocker should preserve live-capital blocking status.", json.web3_live_usability.next_blocker);

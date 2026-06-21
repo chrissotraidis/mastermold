@@ -817,6 +817,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("drill first, then prove a signed canary");
     expect(tradingPage).toContain("Trading first canary drill status");
     expect(tradingPage).toContain("Trading first canary drill lanes");
+    expect(tradingPage).toContain("Trading first canary operator unblock plan");
+    expect(tradingPage).toContain("Trading ordered first canary unblock steps");
+    expect(tradingPage).toContain("drill.operator_unblock_plan");
+    expect(tradingPage).toContain("drill.next_unblock_step");
+    expect(tradingPage).toContain("firstCanaryUnblockStepClassName");
     expect(tradingPage).toContain("Open drill receipt");
     expect(tradingPage).toContain("Trading live proof command");
     expect(tradingPage).toContain("cannot sign, submit, store wallet authority, or move funds");
@@ -1690,7 +1695,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/trading/page.tsx")).toContain("canaryProofStageClassName");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("current_input_label");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("next_lane_id");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("operator_unblock_plan");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("next_unblock_step");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("completion_signal");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("buildFirstCanaryUnblockPlan");
     expect(source("scripts/web3-first-canary-drill.mjs")).toContain("next_lane_id");
+    expect(source("scripts/web3-first-canary-drill.mjs")).toContain("operator_unblock_plan");
+    expect(source("scripts/web3-first-canary-drill.mjs")).toContain("next_unblock_step");
     expect(source("app/api/web3-first-canary-drill/route.ts")).toContain("buildWeb3FirstCanaryDrillReceipt");
     expect(source("app/api/health/route.ts")).toContain("web3_first_canary_drill");
     expect(source("app/api/health/route.ts")).toContain("web3_live_first_canary_drill");

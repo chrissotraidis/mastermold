@@ -1989,6 +1989,15 @@ describe("Web3 autonomous trading subsystem", () => {
         next_lane_status: string | null;
         next_lane_action: string | null;
         next_action: string;
+        next_unblock_step: {
+          id: string;
+          status: string;
+          safe_surface: string;
+          command: string | null;
+          completion_signal: string;
+          blocks_funded_canary: boolean;
+        } | null;
+        operator_unblock_step_count: number;
         live_execution_permission: string;
         transaction_submission_permission: string;
         wallet_mutation_permission: string;
@@ -2020,6 +2029,15 @@ describe("Web3 autonomous trading subsystem", () => {
         next_lane_status: string | null;
         next_lane_action: string | null;
         next_action: string;
+        next_unblock_step: {
+          id: string;
+          status: string;
+          safe_surface: string;
+          command: string | null;
+          completion_signal: string;
+          blocks_funded_canary: boolean;
+        } | null;
+        operator_unblock_step_count: number;
         live_execution_permission: string;
         transaction_submission_permission: string;
         wallet_mutation_permission: string;
@@ -2300,6 +2318,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_first_canary_drill.next_lane_action?.length).toBeGreaterThan(10);
     expect(receipt.web3_first_canary_drill.next_action).toBe(String(receipt.web3_first_canary_drill.next_lane_action));
     expect(receipt.web3_first_canary_drill.next_action.length).toBeGreaterThan(10);
+    expect(receipt.web3_first_canary_drill.next_unblock_step).not.toBeNull();
+    expect(["next", "watch"]).toContain(String(receipt.web3_first_canary_drill.next_unblock_step?.status));
+    expect(receipt.web3_first_canary_drill.next_unblock_step?.safe_surface.length).toBeGreaterThan(0);
+    expect(receipt.web3_first_canary_drill.next_unblock_step?.completion_signal.length).toBeGreaterThan(10);
+    expect(receipt.web3_first_canary_drill.operator_unblock_step_count).toBeGreaterThan(3);
     expect(receipt.web3_first_canary_drill.live_execution_permission).toBe("blocked");
     expect(receipt.web3_first_canary_drill.transaction_submission_permission).toBe("blocked");
     expect(receipt.web3_first_canary_drill.wallet_mutation_permission).toBe("blocked");
@@ -2322,6 +2345,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(["fail", "watch"]).toContain(String(receipt.web3_live_first_canary_drill.next_lane_status));
     expect(receipt.web3_live_first_canary_drill.next_lane_action?.length).toBeGreaterThan(10);
     expect(receipt.web3_live_first_canary_drill.next_action).toBe(String(receipt.web3_live_first_canary_drill.next_lane_action));
+    expect(receipt.web3_live_first_canary_drill.next_unblock_step).not.toBeNull();
+    expect(["next", "watch"]).toContain(String(receipt.web3_live_first_canary_drill.next_unblock_step?.status));
+    expect(receipt.web3_live_first_canary_drill.next_unblock_step?.safe_surface.length).toBeGreaterThan(0);
+    expect(receipt.web3_live_first_canary_drill.operator_unblock_step_count).toBeGreaterThan(3);
     expect(receipt.web3_live_first_canary_drill.live_execution_permission).toBe("blocked");
     expect(receipt.web3_live_first_canary_drill.transaction_submission_permission).toBe("blocked");
     expect(receipt.web3_live_first_canary_drill.wallet_mutation_permission).toBe("blocked");
@@ -2760,6 +2787,28 @@ describe("Web3 autonomous trading subsystem", () => {
       next_lane_status: string | null;
       next_lane_action: string | null;
       next_action: string;
+      next_unblock_step: {
+        id: string;
+        label: string;
+        phase: string;
+        status: string;
+        action: string;
+        safe_surface: string;
+        command: string | null;
+        completion_signal: string;
+        blocks_funded_canary: boolean;
+      } | null;
+      operator_unblock_plan: Array<{
+        id: string;
+        label: string;
+        phase: string;
+        status: string;
+        action: string;
+        safe_surface: string;
+        command: string | null;
+        completion_signal: string;
+        blocks_funded_canary: boolean;
+      }>;
       blockers: string[];
       safe_commands: string[];
       safe_surfaces: string[];
@@ -2799,6 +2848,22 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(["fail", "watch"]).toContain(String(receipt.next_lane_status));
     expect(receipt.next_action).toBe(String(receipt.next_lane_action));
     expect(receipt.next_action.length).toBeGreaterThan(10);
+    expect(receipt.next_unblock_step).not.toBeNull();
+    expect(["next", "watch"]).toContain(String(receipt.next_unblock_step?.status));
+    expect(receipt.next_unblock_step?.action.length).toBeGreaterThan(10);
+    expect(receipt.next_unblock_step?.safe_surface.length).toBeGreaterThan(0);
+    expect(receipt.next_unblock_step?.completion_signal.length).toBeGreaterThan(10);
+    expect(receipt.operator_unblock_plan.length).toBeGreaterThan(5);
+    expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("wallet-ownership");
+    expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("jupiter-order");
+    expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("unsigned-order-preflight");
+    expect(receipt.operator_unblock_plan.some((step) => step.safe_surface.includes("/settings/integrations"))).toBe(true);
+    expect(receipt.operator_unblock_plan.every((step) =>
+      ["done", "next", "blocked", "watch"].includes(step.status) &&
+      step.phase.length > 0 &&
+      step.action.length > 0 &&
+      step.completion_signal.length > 0
+    )).toBe(true);
     expect(receipt.blockers.join(" ")).toContain("JUPITER");
     expect(receipt.safe_commands).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready");
     expect(receipt.safe_commands).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");

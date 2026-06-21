@@ -21,6 +21,24 @@ export type Web3FirstCanaryDrillLane = {
   evidence_endpoint: string;
 };
 
+export type Web3FirstCanaryUnblockStep = {
+  id: Web3FirstCanaryDrillLane["id"];
+  phase:
+    | "credential-intake"
+    | "route-readiness"
+    | "canary-request"
+    | "external-signature"
+    | "proof-watch"
+    | "safety-boundary";
+  label: string;
+  status: "done" | "next" | "blocked" | "watch";
+  action: string;
+  safe_surface: string;
+  command: string | null;
+  completion_signal: string;
+  blocks_funded_canary: boolean;
+};
+
 export type Web3FirstCanaryDrillReceipt = {
   mode: "web3-first-canary-drill";
   status:
@@ -58,6 +76,8 @@ export type Web3FirstCanaryDrillReceipt = {
   next_lane_status: Web3FirstCanaryDrillLane["status"] | null;
   next_lane_action: string | null;
   next_action: string;
+  next_unblock_step: Web3FirstCanaryUnblockStep | null;
+  operator_unblock_plan: Web3FirstCanaryUnblockStep[];
   blockers: string[];
   safe_commands: string[];
   safe_surfaces: string[];
@@ -99,6 +119,8 @@ export type Web3FirstCanaryDrillHealth = {
   next_lane_status: Web3FirstCanaryDrillReceipt["next_lane_status"];
   next_lane_action: string | null;
   next_action: string;
+  next_unblock_step: Web3FirstCanaryUnblockStep | null;
+  operator_unblock_step_count: number;
   live_execution_permission: "blocked";
   transaction_submission_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -143,6 +165,10 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
   const failed = lanes.filter((lane) => lane.status === "fail");
   const watched = lanes.filter((lane) => lane.status === "watch");
   const nextLane = lanes.find((lane) => lane.status === "fail") ?? lanes.find((lane) => lane.status === "watch") ?? null;
+  const operatorUnblockPlan = buildFirstCanaryUnblockPlan(input, lanes);
+  const nextUnblockStep = operatorUnblockPlan.find((step) => step.status === "next") ??
+    operatorUnblockPlan.find((step) => step.status === "watch") ??
+    null;
   const endpointParams = `source=${input.state.market_source.mode}&account=${input.state.paper_account.mode}&scenario=${input.state.scenario}&cycles=0`;
   const base = {
     mode: "web3-first-canary-drill" as const,
@@ -175,6 +201,8 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
     next_lane_status: nextLane?.status ?? null,
     next_lane_action: nextLane?.next_action ?? null,
     next_action: firstCanaryDrillNextAction(status, nextLane, input),
+    next_unblock_step: nextUnblockStep,
+    operator_unblock_plan: operatorUnblockPlan,
     blockers: uniqueText([
       permissionDrift ? "Unexpected live execution, transaction submission, wallet mutation, or secret-storage permission appeared in a canary receipt." : null,
       nextLane?.next_action,
@@ -246,6 +274,8 @@ export function buildWeb3FirstCanaryDrillHealth(receipt: Web3FirstCanaryDrillRec
     next_lane_status: receipt.next_lane_status,
     next_lane_action: receipt.next_lane_action,
     next_action: receipt.next_action,
+    next_unblock_step: receipt.next_unblock_step,
+    operator_unblock_step_count: receipt.operator_unblock_plan.length,
     live_execution_permission: "blocked",
     transaction_submission_permission: "blocked",
     wallet_mutation_permission: "blocked",
@@ -254,6 +284,55 @@ export function buildWeb3FirstCanaryDrillHealth(receipt: Web3FirstCanaryDrillRec
     seed_phrase_storage: "blocked",
     signed_payload_storage: "blocked",
     secret_echo_permission: "blocked",
+  };
+}
+
+function buildFirstCanaryUnblockPlan(
+  input: {
+    liveUsability: Web3LiveUsabilityBlockersReceipt;
+    readiness: Web3SupervisedCanaryReadinessReceipt;
+    jupiter: Web3JupiterOrderPacket;
+    unsignedPreflight: Web3LiveUnsignedOrderPreflightReceipt;
+    canary: Web3LiveTradeCanaryReceipt;
+  },
+  lanes: Web3FirstCanaryDrillLane[],
+): Web3FirstCanaryUnblockStep[] {
+  const steps = lanes
+    .filter((lane) => lane.id !== "live-boundary")
+    .map((lane) => buildFirstCanaryUnblockStep(lane, input));
+  let nextAssigned = false;
+
+  return steps.map((step) => {
+    if (step.status === "done") return step;
+    if (!nextAssigned) {
+      nextAssigned = true;
+      return { ...step, status: step.status === "watch" ? "watch" : "next" };
+    }
+    return { ...step, status: "blocked" };
+  });
+}
+
+function buildFirstCanaryUnblockStep(
+  lane: Web3FirstCanaryDrillLane,
+  input: {
+    liveUsability: Web3LiveUsabilityBlockersReceipt;
+    readiness: Web3SupervisedCanaryReadinessReceipt;
+    jupiter: Web3JupiterOrderPacket;
+    unsignedPreflight: Web3LiveUnsignedOrderPreflightReceipt;
+    canary: Web3LiveTradeCanaryReceipt;
+  },
+): Web3FirstCanaryUnblockStep {
+  const safeSurface = firstCanarySafeSurface(lane, input);
+  return {
+    id: lane.id,
+    phase: firstCanaryUnblockPhase(lane.id),
+    label: lane.label,
+    status: lane.status === "pass" ? "done" : lane.status === "watch" ? "watch" : "blocked",
+    action: lane.next_action,
+    safe_surface: safeSurface,
+    command: firstCanaryUnblockCommand(lane, input),
+    completion_signal: firstCanaryCompletionSignal(lane.id),
+    blocks_funded_canary: lane.status !== "pass" && lane.id !== "post-signing-proof",
   };
 }
 
@@ -293,6 +372,71 @@ function buildFirstCanaryDrillLanes(
       evidence_endpoint: `/api/web3-first-canary-drill?source=${input.state.market_source.mode}&account=${input.state.paper_account.mode}&scenario=${input.state.scenario}&cycles=0`,
     },
   ];
+}
+
+function firstCanaryUnblockPhase(id: Web3FirstCanaryDrillLane["id"]): Web3FirstCanaryUnblockStep["phase"] {
+  if (id === "live-scope" || id === "dedicated-wallet" || id === "wallet-ownership") return "credential-intake";
+  if (id === "jupiter-order" || id === "live-flags") return "route-readiness";
+  if (id === "unsigned-order-preflight") return "canary-request";
+  if (id === "signer-relay" || id === "manual-live-review") return "external-signature";
+  if (id === "post-signing-proof" || id === "funded-canary-proof") return "proof-watch";
+  return "safety-boundary";
+}
+
+function firstCanarySafeSurface(
+  lane: Web3FirstCanaryDrillLane,
+  input: {
+    liveUsability: Web3LiveUsabilityBlockersReceipt;
+    readiness: Web3SupervisedCanaryReadinessReceipt;
+    jupiter: Web3JupiterOrderPacket;
+    unsignedPreflight: Web3LiveUnsignedOrderPreflightReceipt;
+    canary: Web3LiveTradeCanaryReceipt;
+  },
+) {
+  if (lane.id === "dedicated-wallet") return "/settings/integrations#settings-web3-wallet-public-key";
+  if (lane.id === "wallet-ownership") return "/settings/integrations#web3-credential-action-console";
+  if (lane.id === "jupiter-order") return "/settings/integrations#web3-credential-action-console";
+  if (lane.id === "live-flags") return "/settings/integrations#web3-credential-action-console";
+  if (lane.id === "unsigned-order-preflight") return "/trading?source=live-dex&account=persistent";
+  if (lane.id === "signer-relay") return input.readiness.canary_endpoint;
+  if (lane.id === "manual-live-review") return "/api/web3-manual-live-review-packet?source=live-dex&account=persistent";
+  if (lane.id === "funded-canary-proof" || lane.id === "post-signing-proof") return "/trading?source=live-dex&account=persistent";
+  if (lane.id === "live-scope") return "/trading?source=live-dex&account=persistent";
+  return input.liveUsability.next_blocker?.href ?? lane.evidence_endpoint;
+}
+
+function firstCanaryUnblockCommand(
+  lane: Web3FirstCanaryDrillLane,
+  input: {
+    liveUsability: Web3LiveUsabilityBlockersReceipt;
+    readiness: Web3SupervisedCanaryReadinessReceipt;
+    jupiter: Web3JupiterOrderPacket;
+    unsignedPreflight: Web3LiveUnsignedOrderPreflightReceipt;
+  },
+) {
+  if (lane.id === "dedicated-wallet" || lane.id === "wallet-ownership") {
+    return input.liveUsability.next_credential_request?.verifier_command ??
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
+  }
+  if (lane.id === "jupiter-order") return input.jupiter.strict_verifier_command;
+  if (lane.id === "live-flags" || lane.id === "unsigned-order-preflight") return input.readiness.strict_verifier_command;
+  if (lane.id === "signer-relay" || lane.id === "manual-live-review") return "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready";
+  if (lane.id === "funded-canary-proof" || lane.id === "post-signing-proof") return "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json";
+  return input.unsignedPreflight.status === "ready" ? input.readiness.strict_verifier_command : null;
+}
+
+function firstCanaryCompletionSignal(id: Web3FirstCanaryDrillLane["id"]) {
+  if (id === "live-scope") return "The drill receipt is scoped to source=live-dex and account=persistent.";
+  if (id === "dedicated-wallet") return "A non-sample public Solana wallet is saved; no private key, seed phrase, or keypair JSON was accepted.";
+  if (id === "wallet-ownership") return "A browser wallet signs the text-only ownership challenge and the app stores hash-only proof.";
+  if (id === "jupiter-order") return "Jupiter Swap V2 order proof is ready without exposing transaction bytes or API-key values.";
+  if (id === "live-flags") return "The reviewed live canary env flags are set exactly in ignored server env.";
+  if (id === "unsigned-order-preflight") return "The tiny canary unsigned-order preflight returns ready while transaction bytes remain gated to the one-shot handoff.";
+  if (id === "signer-relay") return "Only the matching externally signed tiny canary payload can be relayed; signed bytes are not stored.";
+  if (id === "manual-live-review") return "Manual live review, caps, kill switch, accounting, and operator signoffs are recorded as passing.";
+  if (id === "funded-canary-proof") return "A real canary signature is relayed, confirmed, settlement-reconciled, and mirrored into the local portfolio.";
+  if (id === "post-signing-proof") return "Signed relay, chain confirmation, settlement reconciliation, and portfolio mirror proof all pass.";
+  return "The safety boundary still blocks app-side private-key storage, seed phrases, signing, submission, wallet mutation, and secret echo.";
 }
 
 function firstCanaryDrillNextAction(

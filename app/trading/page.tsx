@@ -509,6 +509,13 @@ function firstCanaryDrillLaneClassName(status: Web3FirstCanaryDrillLane["status"
   return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
+function firstCanaryUnblockStepClassName(status: "done" | "next" | "blocked" | "watch") {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "done") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "next" || status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
 function canaryProofStageClassName(status: "pass" | "watch" | "fail") {
   const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
   if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
@@ -575,6 +582,11 @@ function LiveCanaryCommandCenter({
     ...drill.lanes.filter((lane) => lane.status === "watch"),
     ...drill.lanes.filter((lane) => lane.status === "pass"),
   ].slice(0, 4);
+  const unblockSteps = [
+    ...drill.operator_unblock_plan.filter((step) => step.status === "next" || step.status === "watch"),
+    ...drill.operator_unblock_plan.filter((step) => step.status === "blocked"),
+    ...drill.operator_unblock_plan.filter((step) => step.status === "done"),
+  ].slice(0, 5);
 
   return (
     <section
@@ -673,6 +685,47 @@ function LiveCanaryCommandCenter({
               <p className="mt-2 line-clamp-2 rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-5 text-outline">
                 {nextCredential.safe_value_description}
               </p>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-caution/25 bg-caution/[0.03] p-3" aria-label="Trading first canary operator unblock plan">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Operator unblock plan</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {drill.next_unblock_step?.label ?? "No canary blocker is next"}
+                </p>
+              </div>
+              <span className={firstCanaryUnblockStepClassName(drill.next_unblock_step?.status ?? "done")}>
+                {drill.next_unblock_step?.status ?? "done"}
+              </span>
+            </div>
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
+              {drill.next_unblock_step?.action ?? "All first-canary unblock steps are clear; run the strict proof command before any autonomy review."}
+            </p>
+            <div className="mt-2 grid gap-2" aria-label="Trading ordered first canary unblock steps">
+              {unblockSteps.map((step) => (
+                <div key={step.id} className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface/50 p-2 sm:grid-cols-[minmax(0,0.38fr)_minmax(0,1fr)]">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={firstCanaryUnblockStepClassName(step.status)}>{step.status}</span>
+                      <p className="text-xs font-semibold text-on-surface">{step.label}</p>
+                    </div>
+                    <Link href={step.safe_surface} className="mt-1 block truncate text-[11px] leading-4 text-outline transition hover:text-engine">
+                      {step.safe_surface}
+                    </Link>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{step.action}</p>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-outline">{step.completion_signal}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {drill.next_unblock_step?.command ? (
+              <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                {drill.next_unblock_step.command}
+              </code>
             ) : null}
           </div>
 
