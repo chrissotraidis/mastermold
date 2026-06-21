@@ -565,6 +565,27 @@ export function SettingsWeb3CredentialConsole({
   const disabled = busy !== null;
   const trimmedWallet = draft.wallet_public_key.trim();
   const operatorWalletReady = isLikelySolanaPublicKey(trimmedWallet) && trimmedWallet !== SAMPLE_SYSTEM_WALLET;
+  const walletGateStatus = !trimmedWallet
+    ? "missing"
+    : trimmedWallet === SAMPLE_SYSTEM_WALLET
+      ? "sample-only"
+      : operatorWalletReady
+        ? "public-ready"
+        : "invalid";
+  const walletGateSummary = walletGateStatus === "public-ready"
+    ? "Dedicated public wallet address is ready for scope save and strict operator-wallet verification."
+    : walletGateStatus === "sample-only"
+      ? "The sample all-ones wallet is demo-only and cannot satisfy real-money readiness."
+      : walletGateStatus === "invalid"
+        ? "This does not look like a valid public Solana address."
+        : "Paste or detect a dedicated public Solana wallet address to clear the current operator gate.";
+  const walletGateNextAction = walletGateStatus === "public-ready"
+    ? "Press Save public scope, then run the strict wallet verifier and prove wallet ownership with a text-only browser-wallet signature."
+    : walletGateStatus === "sample-only"
+      ? "Replace the sample all-ones wallet with a dedicated public Solana address before continuing."
+      : walletGateStatus === "invalid"
+        ? "Use a public Solana address only. Do not paste private keys, seed phrases, keypair JSON, or signed payloads."
+        : "Use Detect wallet, Connect wallet, or paste a public address into Wallet public address.";
   const localJupiterConfigured = localInstallReceipt?.configured_keys.includes("JUPITER_API_KEY") === true;
   const jupiterKeyReady = jupiterConfigured || localJupiterConfigured || draft.jupiter_api_key.trim().length > 0;
   const signerTargetCount = [
@@ -703,6 +724,62 @@ export function SettingsWeb3CredentialConsole({
               {nextOperatorInputVerifier ?? operatorWalletCommand}
             </code>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.035] p-3" aria-label="Settings dedicated Web3 wallet gate">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Dedicated wallet gate</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">{walletGateSummary}</p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">{walletGateNextAction}</p>
+          </div>
+          <Badge
+            variant="outline"
+            className={cn(
+              "border-outline-variant/35 bg-void/25 text-outline",
+              walletGateStatus === "public-ready" && "border-engine/35 bg-engine/10 text-engine",
+              walletGateStatus === "sample-only" || walletGateStatus === "invalid"
+                ? "border-critical/35 bg-critical/10 text-critical"
+                : "",
+              walletGateStatus === "missing" && "border-caution/35 bg-caution/10 text-caution",
+            )}
+          >
+            {walletGateStatus.replace("-", " ")}
+          </Badge>
+        </div>
+        <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.72fr)]">
+          <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Public address</p>
+            <p className="mt-1 break-all text-xs font-semibold text-on-surface">
+              {trimmedWallet ? previewValue(trimmedWallet) ?? "entered" : "missing"}
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-outline">Browser-public scope only.</p>
+          </div>
+          <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Strict wallet verifier</p>
+            <code className="mt-1 block break-all text-[11px] leading-5 text-on-surface-variant">{operatorWalletCommand}</code>
+          </div>
+          <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Never paste</p>
+            <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">Private keys, seed phrases, keypair JSON, transaction bytes, or signed payloads.</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href="#settings-web3-wallet-public-key"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-xs font-semibold text-caution transition hover:bg-caution/15"
+          >
+            Edit wallet field
+          </a>
+          <a
+            href="/api/web3-dedicated-wallet-packet?source=live-dex&account=persistent"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline-variant/35 bg-void/20 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+          >
+            Open wallet packet
+          </a>
         </div>
       </div>
 

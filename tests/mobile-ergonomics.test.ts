@@ -1260,6 +1260,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Go to wallet field");
     expect(settingsConsole).toContain("settings-web3-wallet-public-key");
     expect(settingsConsole).toContain("Verifier after save");
+    expect(settingsConsole).toContain("Settings dedicated Web3 wallet gate");
+    expect(settingsConsole).toContain("Dedicated wallet gate");
+    expect(settingsConsole).toContain("walletGateStatus");
+    expect(settingsConsole).toContain("sample-only");
+    expect(settingsConsole).toContain("The sample all-ones wallet is demo-only");
+    expect(settingsConsole).toContain("Strict wallet verifier");
+    expect(settingsConsole).toContain("Open wallet packet");
+    expect(settingsConsole).toContain("/api/web3-dedicated-wallet-packet?source=live-dex&account=persistent");
+    expect(settingsConsole).toContain("Private keys, seed phrases, keypair JSON, transaction bytes, or signed payloads.");
     expect(settingsPage).toContain("initialLiveUsability={liveUsabilityBlockers}");
     expect(settingsConsole).toContain("Web3LiveUsabilityBlockersReceipt");
     expect(settingsConsole).toContain("fetchLiveUsabilityBlockers");
