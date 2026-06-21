@@ -244,11 +244,12 @@ bodies, execute, custody funds, or mutate wallets.
 Trading and Settings expose this as `Sign tiny canary`: the browser deserializes the one-shot
 transaction with `@solana/web3.js`, asks the connected wallet to sign, then posts the serialized
 signed payload to the live canary relay without storing transaction bodies or wallet authority.
-The Trading canary also exposes `Check proof chain`, which calls the guarded settlement watchdog
-for the latest signed relay to poll confirmation, reconcile the fill, refresh the canary receipt,
-and apply only the reviewed local portfolio mirror patch when evidence is clean. This follow-through
-still cannot sign, submit new transactions, custody funds, mutate the wallet, or store transaction
-bodies.
+The Trading canary also exposes `Check proof chain` and `Auto watch proof`, which call the guarded
+settlement watchdog for the latest signed relay to poll confirmation, reconcile the fill, refresh
+the canary receipt, and apply only the reviewed local portfolio mirror patch when evidence is clean.
+The auto watch is bounded by a fixed cadence and attempt cap so a signed canary can be watched
+without open-ended browser churn. This follow-through still cannot sign, submit new transactions,
+custody funds, mutate the wallet, or store transaction bodies.
 `POST /api/web3-live-trade-canary` is the guarded action wrapper for the existing external
 signed-payload relay: it requires operator acknowledgement, canary acknowledgement, live-dex
 persistent scope, request id, route, and a base64 signed transaction, hashes but never echoes the

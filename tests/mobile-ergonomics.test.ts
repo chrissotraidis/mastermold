@@ -1727,6 +1727,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Post-signing proof chain");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading post-signing proof chain");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Check proof chain");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Auto watch proof");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("AUTO_PROOF_MAX_ATTEMPTS");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("AUTO_PROOF_INTERVAL_SECONDS");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("runPostSigningProofCheck(\"auto-monitor\")");
     expect(source("components/web3-live-canary-console.tsx")).toContain("settlement_watchdog");
     expect(source("components/web3-live-canary-console.tsx")).toContain("setCanaryReceipt");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("Paper and read-only DEX tests do not count as actual live trades");

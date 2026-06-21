@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, RefreshCw, ShieldCheck, Wallet, Zap } from "lucide-react";
 import Link from "next/link";
 import type { Web3LiveTradeCanaryActionReceipt, Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
@@ -27,6 +27,13 @@ type Web3LiveCanaryConsoleProps = {
   defaultWalletPublicKey: string | null;
 };
 
+const AUTO_PROOF_INTERVAL_SECONDS = 12;
+const AUTO_PROOF_MAX_ATTEMPTS = 12;
+const AUTO_PROOF_TERMINAL_STATUSES: Web3LiveTradeCanaryReceipt["post_signing_evidence_status"][] = [
+  "settlement-accounted",
+  "review-required",
+];
+
 export function Web3LiveCanaryConsole({
   receipt,
   source,
@@ -40,6 +47,9 @@ export function Web3LiveCanaryConsole({
   const [message, setMessage] = useState(receipt.next_action);
   const [busy, setBusy] = useState(false);
   const [proofBusy, setProofBusy] = useState<"refresh" | "watchdog" | null>(null);
+  const [autoProofMonitorEnabled, setAutoProofMonitorEnabled] = useState(false);
+  const [autoProofAttempt, setAutoProofAttempt] = useState(0);
+  const [autoProofLastCheckedAt, setAutoProofLastCheckedAt] = useState<string | null>(null);
   const [unsignedReceipt, setUnsignedReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
   const [actionReceipt, setActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
   const [walletPreview, setWalletPreview] = useState(previewValue(defaultWalletPublicKey));
@@ -62,6 +72,40 @@ export function Web3LiveCanaryConsole({
   const latestStatus = actionReceipt?.status ?? unsignedReceipt?.status ?? canaryReceipt.status;
   const actualTradeTested = actionReceipt?.actual_live_trade_tested ?? canaryReceipt.actual_live_trade_tested;
   const sourceReady = source === "live-dex" && account === "persistent";
+  const autoProofTerminal = AUTO_PROOF_TERMINAL_STATUSES.includes(canaryReceipt.post_signing_evidence_status);
+  const autoProofExhausted = autoProofAttempt >= AUTO_PROOF_MAX_ATTEMPTS;
+  const autoProofStatus = autoProofTerminal
+    ? canaryReceipt.post_signing_evidence_status.replaceAll("-", " ")
+    : autoProofMonitorEnabled
+      ? `${autoProofAttempt}/${AUTO_PROOF_MAX_ATTEMPTS} checks`
+      : "off";
+
+  useEffect(() => {
+    if (!autoProofMonitorEnabled || !sourceReady) return;
+    if (autoProofTerminal) {
+      setAutoProofMonitorEnabled(false);
+      return;
+    }
+    if (autoProofExhausted) {
+      setAutoProofMonitorEnabled(false);
+      setMessage("Auto proof watch reached its bounded check limit. Review the current proof chain before trying again.");
+      return;
+    }
+    if (busy || proofBusy !== null) return;
+    const timer = window.setTimeout(() => {
+      void runPostSigningProofCheck("auto-monitor");
+    }, AUTO_PROOF_INTERVAL_SECONDS * 1_000);
+    return () => window.clearTimeout(timer);
+  }, [
+    autoProofAttempt,
+    autoProofExhausted,
+    autoProofMonitorEnabled,
+    autoProofTerminal,
+    busy,
+    canaryReceipt.post_signing_evidence_status,
+    proofBusy,
+    sourceReady,
+  ]);
 
   async function refreshCanaryReceipt(mode: "manual" | "auto" = "manual") {
     setProofBusy("refresh");
@@ -79,10 +123,18 @@ export function Web3LiveCanaryConsole({
     }
   }
 
-  async function runPostSigningProofCheck(mode: "manual" | "auto" = "manual") {
+  async function runPostSigningProofCheck(mode: "manual" | "auto" | "auto-monitor" = "manual") {
     if (!sourceReady) {
       setMessage("Open the live DEX canary view before checking signed-transaction proof.");
       return;
+    }
+    if (mode === "auto-monitor") {
+      setAutoProofAttempt((attempt) => Math.min(AUTO_PROOF_MAX_ATTEMPTS, attempt + 1));
+      setAutoProofLastCheckedAt(new Date().toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+      }));
     }
     setProofBusy("watchdog");
     if (mode === "manual") {
@@ -115,7 +167,13 @@ export function Web3LiveCanaryConsole({
         "Post-signing proof check completed.";
       setMessage(summary);
       const refreshed = await refreshCanaryReceipt("auto");
-      if (refreshed.post_signing_evidence_status !== "settlement-accounted") {
+      if (refreshed.post_signing_evidence_status === "settlement-accounted") {
+        setAutoProofMonitorEnabled(false);
+        setMessage("Live canary proof chain is accounted locally. Review the mirrored fill before another canary.");
+      } else if (refreshed.post_signing_evidence_status === "review-required") {
+        setAutoProofMonitorEnabled(false);
+        setMessage(refreshed.post_signing_next_action);
+      } else {
         setMessage(refreshed.post_signing_next_action);
       }
     } catch (error) {
@@ -123,6 +181,23 @@ export function Web3LiveCanaryConsole({
     } finally {
       setProofBusy(null);
     }
+  }
+
+  function startAutoProofMonitor() {
+    if (!sourceReady) {
+      setMessage("Open the live DEX canary view before starting auto proof watch.");
+      return;
+    }
+    setAutoProofAttempt(0);
+    setAutoProofLastCheckedAt(null);
+    setAutoProofMonitorEnabled(true);
+    setMessage(`Auto proof watch started. Mastermind will check the latest signed canary every ${AUTO_PROOF_INTERVAL_SECONDS} seconds until the bounded limit or a terminal proof state.`);
+    void runPostSigningProofCheck("auto-monitor");
+  }
+
+  function stopAutoProofMonitor() {
+    setAutoProofMonitorEnabled(false);
+    setMessage("Auto proof watch stopped. The latest proof chain stays visible for manual review.");
   }
 
   async function signTinyCanary() {
@@ -189,7 +264,10 @@ export function Web3LiveCanaryConsole({
       setActionReceipt(relayPayload);
       setMessage(relayPayload.next_action);
       if (relayPayload.actual_live_trade_tested) {
-        await runPostSigningProofCheck("auto");
+        setAutoProofAttempt(0);
+        setAutoProofLastCheckedAt(null);
+        setAutoProofMonitorEnabled(true);
+        await runPostSigningProofCheck("auto-monitor");
       } else {
         await refreshCanaryReceipt("auto");
       }
@@ -276,6 +354,17 @@ export function Web3LiveCanaryConsole({
                 {proofBusy === "watchdog" ? "Checking proof" : "Check proof chain"}
               </button>
             ) : null}
+            {sourceReady ? (
+              <button
+                type="button"
+                onClick={() => (autoProofMonitorEnabled ? stopAutoProofMonitor() : startAutoProofMonitor())}
+                disabled={busy || proofBusy !== null}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
+              >
+                <RefreshCw aria-hidden="true" className={autoProofMonitorEnabled ? "size-4 animate-spin" : "size-4"} />
+                {autoProofMonitorEnabled ? "Stop auto watch" : "Auto watch proof"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => void refreshCanaryReceipt()}
@@ -288,7 +377,7 @@ export function Web3LiveCanaryConsole({
           </div>
 
           <p className="mt-3 text-xs leading-5 text-outline">
-            This control can request only a tiny one-shot unsigned Jupiter canary, ask the external browser wallet to sign it, relay the signed payload through the guarded canary endpoint, then run read-only confirmation and settlement checks. It cannot store wallet authority, private keys, seed phrases, or transaction bodies.
+            This control can request only a tiny one-shot unsigned Jupiter canary, ask the external browser wallet to sign it, relay the signed payload through the guarded canary endpoint, then run bounded read-only confirmation and settlement checks. It cannot store wallet authority, private keys, seed phrases, or transaction bodies.
           </p>
         </div>
 
@@ -321,6 +410,10 @@ export function Web3LiveCanaryConsole({
               <CanaryMetric label="Settle" value={canaryReceipt.settlement_reconciliation_status.replaceAll("-", " ")} tone={canaryReceipt.settlement_reconciliation_status === "reconciled" ? "engine" : "neutral"} />
               <CanaryMetric label="Watchdog" value={canaryReceipt.settlement_watchdog_status.replaceAll("-", " ")} tone={["mirrored", "reconciled", "confirmed"].includes(canaryReceipt.settlement_watchdog_status) ? "engine" : "neutral"} />
               <CanaryMetric label="Mirror" value={canaryReceipt.portfolio_mirror_status.replaceAll("-", " ")} tone={["applied", "duplicate"].includes(canaryReceipt.portfolio_mirror_status) ? "engine" : "neutral"} />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <CanaryMetric label="Auto watch" value={autoProofStatus} tone={autoProofMonitorEnabled || autoProofTerminal ? "engine" : autoProofExhausted ? "caution" : "neutral"} />
+              <CanaryMetric label="Last check" value={autoProofLastCheckedAt ?? "not yet"} tone={autoProofLastCheckedAt ? "caution" : "neutral"} />
             </div>
             <p className="mt-2 text-[11px] leading-4 text-outline">{canaryReceipt.post_signing_next_action}</p>
           </div>
