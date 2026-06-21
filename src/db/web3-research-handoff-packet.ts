@@ -162,7 +162,7 @@ export function buildWeb3ResearchHandoffPacket(input: {
     ...input.requestPacket.verifier_commands,
     ...input.runbook.verifier_commands,
     ...input.runway.safe_commands,
-    "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live",
+    "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live",
   ])).slice(0, 10);
   const packetBase = {
     mode: "web3-research-handoff-packet" as const,

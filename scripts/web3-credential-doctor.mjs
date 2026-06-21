@@ -310,7 +310,7 @@ function buildSafeCommands(accountSetup, launchChecklist) {
     "npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --json",
   ];
   if (walletPreview && !accountSetup?.wallet_summary?.wallet_is_sample) {
-    commands.push("npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --wallet=<public-solana-address>");
+    commands.push("npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet");
   }
   if (accountSetup?.environment_summary?.jupiter_configured) {
     commands.push("npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order");

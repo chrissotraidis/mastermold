@@ -216,7 +216,7 @@ const IMPLEMENTATION_DECISION_SPECS: ResearchImplementationDecisionSpec[] = [
     phase: "now",
     source_lanes: ["custody-architecture", "credential-storage"],
     implementation_step: "Convert the selected manual-wallet, Privy, Turnkey, or session-key recommendation into a signer policy envelope with no private-key collection.",
-    verification_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet",
+    verification_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
   },
   {
     id: "provider-stack",

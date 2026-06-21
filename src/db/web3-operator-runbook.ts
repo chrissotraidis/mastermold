@@ -234,7 +234,7 @@ function buildRunNowActions(input: {
       kind: "external-review",
       surface: "external-review",
       href: "/api/web3-manual-live-review-packet?source=live-dex&account=persistent",
-      command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live",
+      command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live",
       reason: supervised?.detail ?? input.runway.summary,
       next_action: input.runway.can_request_live_review
         ? "Send the manual live-review packet to the external reviewer; Mastermind still keeps execution blocked."

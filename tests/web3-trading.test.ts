@@ -1057,7 +1057,7 @@ describe("Web3 autonomous trading subsystem", () => {
       "npm run --silent research:web3 -- --base-url=http://localhost:4010 --json",
     ]));
     expect(packet.verifier_commands).toEqual(expect.arrayContaining([
-      "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live",
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live",
     ]));
     expect(packet.text_packet).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(packet.text_packet).toContain("## Local Export Commands");
@@ -1173,6 +1173,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.implementation_decisions.every((decision) => decision.status === "ready-to-spec")).toBe(true);
     expect(receipt.implementation_decisions.every((decision) => decision.live_authority === "blocked")).toBe(true);
     expect(receipt.implementation_decisions.some((decision) => decision.verification_command.includes("npm run verify:web3"))).toBe(true);
+    expect(receipt.implementation_decisions.find((decision) => decision.id === "custody-signer-path")?.verification_command).toBe(
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+    );
     expect(receipt.implementation_plan.status).toBe("ready-to-spec");
     expect(receipt.implementation_plan.next_owner).toBe("security");
     expect(receipt.implementation_plan.next_phase).toBe("now");

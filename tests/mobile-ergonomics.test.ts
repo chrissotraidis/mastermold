@@ -1549,6 +1549,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-wallet-ownership");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyOperatorWalletScope");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-operator-wallet");
+    expect(source("src/db/web3-research-answer-intake.ts")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("--wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live");
+    expect(source("src/db/web3-operator-runbook.ts")).toContain("--wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live");
+    expect(source("scripts/web3-credential-doctor.mjs")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("snapshotExecutionConfig");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("restoreExecutionConfig");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("restored original public wallet/risk scope after verifier canaries");
