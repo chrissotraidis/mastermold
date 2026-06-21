@@ -322,6 +322,32 @@ async function verifyHealth() {
   assert(json.web3_first_canary_drill.private_key_storage === "blocked", "First-canary drill health should keep private-key storage blocked.", json.web3_first_canary_drill);
   assert(json.web3_first_canary_drill.seed_phrase_storage === "blocked", "First-canary drill health should keep seed-phrase storage blocked.", json.web3_first_canary_drill);
   assert(json.web3_first_canary_drill.secret_echo_permission === "blocked", "First-canary drill health should keep secret echo blocked.", json.web3_first_canary_drill);
+  assert(json.web3_live_first_canary_drill?.mode === "web3-first-canary-drill-health", "Health endpoint should expose canonical live-dex first-canary drill health.", json.web3_live_first_canary_drill);
+  assert(
+    json.web3_live_first_canary_drill.source_endpoint === "/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Canonical live first-canary health should point at the live-dex persistent drill.",
+    json.web3_live_first_canary_drill,
+  );
+  assert(
+    json.web3_live_first_canary_drill.live_review_source_endpoint === "/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Canonical live first-canary health should expose the same live-review drill endpoint.",
+    json.web3_live_first_canary_drill,
+  );
+  assert(json.web3_live_first_canary_drill.actual_live_trade_tested === false, "Canonical live first-canary health should not claim a funded live canary in default verification.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.real_funds_moved_by_this_app === false, "Canonical live first-canary health should not claim real funds moved.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.proof_required_count === 4, "Canonical live first-canary health should require four proof stages.", json.web3_live_first_canary_drill);
+  assert(typeof json.web3_live_first_canary_drill.hard_fail_count === "number", "Canonical live first-canary health should expose hard fail count.", json.web3_live_first_canary_drill);
+  assert(typeof json.web3_live_first_canary_drill.next_lane_id === "string" && json.web3_live_first_canary_drill.next_lane_id.length > 0, "Canonical live first-canary health should expose the ordered next lane id.", json.web3_live_first_canary_drill);
+  assert(typeof json.web3_live_first_canary_drill.next_lane_label === "string" && json.web3_live_first_canary_drill.next_lane_label.length > 0, "Canonical live first-canary health should expose the ordered next lane label.", json.web3_live_first_canary_drill);
+  assert(["fail", "watch"].includes(json.web3_live_first_canary_drill.next_lane_status), "Canonical live first-canary health should expose a blocking or watch next lane status.", json.web3_live_first_canary_drill);
+  assert(typeof json.web3_live_first_canary_drill.next_lane_action === "string" && json.web3_live_first_canary_drill.next_lane_action.length > 0, "Canonical live first-canary health should expose the ordered next lane action.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.live_execution_permission === "blocked", "Canonical live first-canary health should keep live execution blocked.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.transaction_submission_permission === "blocked", "Canonical live first-canary health should keep transaction submission blocked.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.wallet_mutation_permission === "blocked", "Canonical live first-canary health should keep wallet mutation blocked.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.signing_permission === "blocked", "Canonical live first-canary health should keep signing blocked.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.private_key_storage === "blocked", "Canonical live first-canary health should keep private-key storage blocked.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.seed_phrase_storage === "blocked", "Canonical live first-canary health should keep seed-phrase storage blocked.", json.web3_live_first_canary_drill);
+  assert(json.web3_live_first_canary_drill.secret_echo_permission === "blocked", "Canonical live first-canary health should keep secret echo blocked.", json.web3_live_first_canary_drill);
   assert(json.web3_live_usability?.mode === "web3-live-usability-health", "Health endpoint should expose compact Web3 live-usability health.", json.web3_live_usability);
   assert(
     ["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(json.web3_live_usability.status),
@@ -371,7 +397,7 @@ async function verifyHealth() {
   assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
-  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, first-canary drill, and live-usability locks are blocked");
+  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, first-canary drill, canonical live canary drill, and live-usability locks are blocked");
 }
 
 async function verifyOperatorWalletScope() {

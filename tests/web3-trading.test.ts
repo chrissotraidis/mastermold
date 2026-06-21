@@ -1915,6 +1915,36 @@ describe("Web3 autonomous trading subsystem", () => {
         signed_payload_storage: string;
         secret_echo_permission: string;
       };
+      web3_live_first_canary_drill: {
+        mode: string;
+        status: string;
+        receipt_hash: string;
+        source_endpoint: string;
+        live_review_source_endpoint: string;
+        can_request_unsigned_order_now: boolean;
+        unsigned_order_handoff_ready: boolean;
+        signed_relay_status: string;
+        actual_live_trade_tested: boolean;
+        real_funds_moved_by_this_app: boolean;
+        proof_pass_count: number;
+        proof_required_count: number;
+        hard_fail_count: number;
+        next_blocker_label: string | null;
+        next_credential_label: string | null;
+        next_lane_id: string | null;
+        next_lane_label: string | null;
+        next_lane_status: string | null;
+        next_lane_action: string | null;
+        next_action: string;
+        live_execution_permission: string;
+        transaction_submission_permission: string;
+        wallet_mutation_permission: string;
+        signing_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        signed_payload_storage: string;
+        secret_echo_permission: string;
+      };
       web3_live_usability: {
         mode: string;
         current_input: {
@@ -2139,6 +2169,27 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_first_canary_drill.seed_phrase_storage).toBe("blocked");
     expect(receipt.web3_first_canary_drill.signed_payload_storage).toBe("blocked");
     expect(receipt.web3_first_canary_drill.secret_echo_permission).toBe("blocked");
+    expect(receipt.web3_live_first_canary_drill.mode).toBe("web3-first-canary-drill-health");
+    expect(receipt.web3_live_first_canary_drill.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.web3_live_first_canary_drill.source_endpoint).toBe("/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_live_first_canary_drill.live_review_source_endpoint).toBe("/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_live_first_canary_drill.actual_live_trade_tested).toBe(false);
+    expect(receipt.web3_live_first_canary_drill.real_funds_moved_by_this_app).toBe(false);
+    expect(receipt.web3_live_first_canary_drill.proof_required_count).toBe(4);
+    expect(receipt.web3_live_first_canary_drill.hard_fail_count).toBeGreaterThan(0);
+    expect(receipt.web3_live_first_canary_drill.next_lane_id).toBeTruthy();
+    expect(receipt.web3_live_first_canary_drill.next_lane_label?.length).toBeGreaterThan(0);
+    expect(["fail", "watch"]).toContain(String(receipt.web3_live_first_canary_drill.next_lane_status));
+    expect(receipt.web3_live_first_canary_drill.next_lane_action?.length).toBeGreaterThan(10);
+    expect(receipt.web3_live_first_canary_drill.next_action).toBe(String(receipt.web3_live_first_canary_drill.next_lane_action));
+    expect(receipt.web3_live_first_canary_drill.live_execution_permission).toBe("blocked");
+    expect(receipt.web3_live_first_canary_drill.transaction_submission_permission).toBe("blocked");
+    expect(receipt.web3_live_first_canary_drill.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.web3_live_first_canary_drill.signing_permission).toBe("blocked");
+    expect(receipt.web3_live_first_canary_drill.private_key_storage).toBe("blocked");
+    expect(receipt.web3_live_first_canary_drill.seed_phrase_storage).toBe("blocked");
+    expect(receipt.web3_live_first_canary_drill.signed_payload_storage).toBe("blocked");
+    expect(receipt.web3_live_first_canary_drill.secret_echo_permission).toBe("blocked");
     expect(receipt.web3_live_usability.mode).toBe("web3-live-usability-health");
     expect(receipt.web3_live_usability.current_input).not.toBeNull();
     expect(receipt.web3_live_usability.current_input).toMatchObject({

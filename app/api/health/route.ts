@@ -35,7 +35,7 @@ import { buildWeb3ResearchHandoffHealth, buildWeb3ResearchHandoffPacket } from "
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { buildWeb3SupervisedCanaryReadinessReceipt } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
-import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
+import { getWeb3TradingStateAsync, type TradingStateInput } from "@/src/db/web3-trading";
 import { buildWeb3UsabilityStatus } from "@/src/db/web3-usability-status";
 
 export async function GET() {
@@ -166,6 +166,7 @@ export async function GET() {
     unsignedPreflight: web3UnsignedPreflight,
     canary: web3Canary,
   });
+  const web3LiveFirstCanaryDrillHealth = await buildCanonicalLiveFirstCanaryDrillHealth();
   return NextResponse.json({
     status: "ok",
     web3_daemon_supervisor: web3DaemonSupervisor,
@@ -177,8 +178,119 @@ export async function GET() {
     web3_live_autonomy_readiness: buildWeb3LiveAutonomyReadinessHealth(web3State),
     web3_live_ignition: buildWeb3LiveIgnitionHealth(web3LiveIgnition),
     web3_first_canary_drill: buildWeb3FirstCanaryDrillHealth(web3FirstCanaryDrill),
+    web3_live_first_canary_drill: web3LiveFirstCanaryDrillHealth,
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
     web3_credential_requirements: buildWeb3CredentialRequirementsHealth(web3CredentialRequirements),
   });
+}
+
+async function buildCanonicalLiveFirstCanaryDrillHealth() {
+  const stateInput: TradingStateInput = {
+    advance: false,
+    source: "live-dex",
+    account: "persistent",
+    scenario: "breakout",
+    cycles: 0,
+  };
+  const daemonHealth = getWeb3DaemonSupervisorHealth();
+  const promotedHealth = getWeb3PromotedPaperAutopilotHealth();
+  const state = await getWeb3TradingStateAsync(stateInput);
+  const wallet = buildWeb3DedicatedWalletPacket(state);
+  const jupiter = buildWeb3JupiterOrderPacket(state);
+  const signer = buildWeb3SignerCredentialPacket(state);
+  const checklist = buildWeb3AutonomyLaunchChecklist(state, promotedHealth, daemonHealth);
+  const productionSupervisor = buildWeb3ProductionSupervisorReadiness(daemonHealth);
+  const accounting = buildWeb3AccountingLedgerReceipt(state);
+  const liveOps = buildWeb3LiveOpsPacket({
+    state,
+    productionSupervisor,
+    emergencyStop: buildWeb3EmergencyStopDrillReceipt({ reason: "health canonical live canary preview", operator_ack: true }),
+    accounting,
+  });
+  const runway = buildWeb3SupervisedLiveRunway({
+    state,
+    wallet,
+    jupiter,
+    signer,
+    liveOps,
+  });
+  const usability = buildWeb3UsabilityStatus({
+    state,
+    launchChecklist: checklist,
+    supervisedRunway: runway,
+  });
+  const handoff = buildWeb3OperatorCredentialHandoffReceipt({
+    accountSetup: buildWeb3AccountSetupReceipt(state),
+    acquisition: buildWeb3AccountAcquisitionReceipt(state),
+    launchChecklist: checklist,
+  });
+  const requestPacket = buildWeb3OperatorRequestPacket(handoff, { usability });
+  const cutover = buildWeb3CutoverBlockerBoard({
+    requestPacket,
+    runway,
+    usability,
+  });
+  const preflight = buildWeb3LiveCapitalPreflightReceipt({
+    state,
+    checklist,
+  });
+  const manualLiveReview = buildWeb3ManualLiveReviewPacket({
+    state,
+    checklist,
+    preflight,
+    liveOps,
+    runway,
+  });
+  const runbook = buildWeb3OperatorRunbook({
+    state,
+    usability,
+    cutover,
+    preflight,
+    runway,
+    currentInput: requestPacket.current_input,
+  });
+  const liveUsability = buildWeb3LiveUsabilityBlockersReceipt({
+    state,
+    usability,
+    cutover,
+    runbook,
+    preflight,
+    manualLiveReview,
+    runway,
+    currentInput: requestPacket.current_input,
+    rowScope: "all",
+  });
+  const canary = buildWeb3LiveTradeCanaryReceipt(state);
+  const ignition = buildWeb3LiveIgnitionReceipt({
+    state,
+    liveUsability,
+    canary,
+  });
+  const unsignedPreflight = buildWeb3LiveUnsignedOrderPreflightReceipt(state, {
+    operator_ack: true,
+    canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+    wallet_public_key: state.execution_readiness.config.wallet_public_key,
+    amount_lamports: 100_000,
+    max_slippage_bps: state.execution_readiness.config.max_slippage_bps,
+  });
+  const readiness = buildWeb3SupervisedCanaryReadinessReceipt({
+    state,
+    wallet,
+    jupiter,
+    signer,
+    livePreflight: preflight,
+    ignition,
+    unsignedPreflight,
+    canary,
+  });
+  const receipt = buildWeb3FirstCanaryDrillReceipt({
+    state,
+    liveUsability,
+    readiness,
+    jupiter,
+    unsignedPreflight,
+    canary,
+  });
+  return buildWeb3FirstCanaryDrillHealth(receipt);
 }
