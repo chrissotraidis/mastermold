@@ -404,22 +404,9 @@ export function SettingsWeb3CredentialConsole({
 
   async function runUnsignedCanaryPreflight() {
     setBusy("canary-preflight");
-    setMessage("Checking the exact tiny canary wallet, caps, Jupiter env, and live flags before any transaction prompt...");
+    setMessage("Checking the saved tiny canary wallet, caps, Jupiter env, and live flags before any wallet or transaction prompt...");
     try {
-      const provider = getBrowserSolanaProvider();
-      let publicKey = provider?.publicKey?.toString() ?? draft.wallet_public_key.trim();
-      if ((!publicKey || !isLikelySolanaPublicKey(publicKey)) && provider && typeof provider.connect === "function") {
-        const result = await provider.connect({ onlyIfTrusted: true }).catch(() => null);
-        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? draft.wallet_public_key.trim();
-      }
-      if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
-        throw new Error("Save or connect a valid public Solana wallet before the canary preflight.");
-      }
-      setDraft((current) => ({
-        ...current,
-        wallet_public_key: publicKey,
-        signer_mode: "external-wallet",
-      }));
+      const publicKey = draft.wallet_public_key.trim();
       const params = new URLSearchParams({
         scenario,
         source: "live-dex",
@@ -427,10 +414,12 @@ export function SettingsWeb3CredentialConsole({
         cycles: String(cycles),
         operator_ack: "true",
         canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
-        wallet_public_key: publicKey,
         amount_lamports: "100000",
         max_slippage_bps: String(Math.max(1, Math.min(100, Math.trunc(Number(draft.max_slippage_bps) || 50)))),
       });
+      if (publicKey && isLikelySolanaPublicKey(publicKey)) {
+        params.set("wallet_public_key", publicKey);
+      }
       const response = await fetch(`/api/web3-live-unsigned-order-handoff?${params.toString()}`);
       const payload = (await response.json().catch(() => null)) as Web3LiveUnsignedOrderPreflightReceipt | { error: string } | null;
       if (!response.ok || !payload || "error" in payload) {

@@ -1708,6 +1708,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary preflight");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary preflight receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("getTrustedBrowserWalletPublicKey");
+    expect(source("components/web3-live-canary-console.tsx")).not.toContain("preflightParams.set(\"wallet_public_key\"");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("setWalletPreview(previewValue(defaultWalletPublicKey))");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Web3FirstCanaryDrillReceipt");
     expect(source("app/trading/page.tsx")).toContain("firstCanaryDrill={firstCanaryDrill}");
     expect(source("components/web3-live-canary-console.tsx")).toContain("refreshFirstCanaryDrill");
@@ -2082,6 +2084,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors that same first-canary drill receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now refreshes that first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now includes the same no-transaction Canary preflight as Trading");
+    expect(source("components/review-readiness.tsx")).toContain("without connecting a browser wallet for preflight");
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now refreshes the first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now includes a no-signature Check wallet action");
     expect(source("components/review-readiness.tsx")).toContain("Trading now server-renders the latest hash-only wallet ownership receipt");

@@ -258,16 +258,10 @@ export function Web3LiveCanaryConsole({
       if (!sourceReady) {
         throw new Error("Open the live DEX canary view before running canary preflight.");
       }
-      const publicKey = await getTrustedBrowserWalletPublicKey();
-      const wallet = publicKey && isLikelySolanaPublicKey(publicKey) ? publicKey : defaultWalletPublicKey;
-      if (!wallet || !isLikelySolanaPublicKey(wallet)) {
-        throw new Error("Connect or save a valid public Solana wallet before canary preflight.");
-      }
-      setWalletPreview(previewValue(wallet));
+      setWalletPreview(previewValue(defaultWalletPublicKey));
       const preflightParams = new URLSearchParams(params);
       preflightParams.set("operator_ack", "true");
       preflightParams.set("canary_ack", "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED");
-      preflightParams.set("wallet_public_key", wallet);
       preflightParams.set("amount_lamports", "100000");
       preflightParams.set("max_slippage_bps", String(Math.max(1, Math.min(100, Math.trunc(maxSlippageBps || 50)))));
       const response = await fetch(`/api/web3-live-unsigned-order-handoff?${preflightParams.toString()}`);

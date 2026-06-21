@@ -300,10 +300,10 @@ a matching dedicated public wallet, hash-only browser-wallet ownership proof, ex
 API keys, raw transactions, or signed payloads, and it still cannot sign, submit, store transaction
 bodies, execute, custody funds, or mutate wallets.
 `GET /api/web3-live-unsigned-order-handoff` is the no-transaction preflight for that same exact
-canary: it checks the request wallet against the scoped wallet, hash-only ownership proof, tiny amount,
-slippage cap, live flags, source/account scope, and Jupiter env before any browser-wallet prompt or
-Jupiter order creation, and still returns no transaction bytes. Trading and Settings expose this as
-`Canary preflight` before `Sign tiny canary`.
+canary: it checks the saved scoped wallet or typed public wallet against hash-only ownership proof,
+tiny amount, slippage cap, live flags, source/account scope, and Jupiter env before any browser-wallet
+connection prompt, transaction prompt, or Jupiter order creation, and still returns no transaction
+bytes. Trading and Settings expose this as `Canary preflight` before `Sign tiny canary`.
 The Trading canary console now shows a compact `Canary launch checklist` that separates preflight,
 browser-wallet signature, signed relay, and confirmation/accounting, and it labels the result as
 `Funded canary still not proven` until all four live-money proof stages are complete.
