@@ -175,6 +175,7 @@ export function SettingsWeb3CredentialConsole({
   const [firstCanaryDrillReceipt, setFirstCanaryDrillReceipt] = useState<Web3FirstCanaryDrillReceipt>(initialFirstCanaryDrill);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
+  const [liveCanaryConsentArmed, setLiveCanaryConsentArmed] = useState(false);
 
   function updateDraft(field: keyof Draft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -436,6 +437,10 @@ export function SettingsWeb3CredentialConsole({
   }
 
   async function signAndRelayLiveCanary() {
+    if (!liveCanaryConsentArmed) {
+      setMessage("Arm the final tiny-canary acknowledgement before opening a transaction signing prompt.");
+      return;
+    }
     setBusy("live-canary");
     setMessage("Building a tiny gated canary order for browser-wallet transaction signing...");
     try {
@@ -509,6 +514,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setLiveCanaryActionReceipt(relayPayload);
       setMessage(relayPayload.next_action);
+      setLiveCanaryConsentArmed(false);
       void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live canary signing flow failed.");
@@ -1554,10 +1560,23 @@ export function SettingsWeb3CredentialConsole({
             <ShieldCheck className={cn("size-3.5 shrink-0", busy === "canary-preflight" && "animate-pulse")} aria-hidden="true" />
             {busy === "canary-preflight" ? "Checking canary" : "Canary preflight"}
           </button>
+          <label
+            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-critical/30 bg-critical/[0.035] px-3 py-2 text-xs font-semibold text-critical"
+            aria-label="Settings final live canary acknowledgement"
+          >
+            <input
+              type="checkbox"
+              checked={liveCanaryConsentArmed}
+              onChange={(event) => setLiveCanaryConsentArmed(event.currentTarget.checked)}
+              disabled={disabled}
+              className="size-4 shrink-0 accent-red-500"
+            />
+            <span className="leading-4">I understand this can move real funds</span>
+          </label>
           <button
             type="button"
             onClick={() => void signAndRelayLiveCanary()}
-            disabled={disabled}
+            disabled={disabled || !liveCanaryConsentArmed}
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
           >
             <Zap className={cn("size-3.5 shrink-0", busy === "live-canary" && "animate-pulse")} aria-hidden="true" />

@@ -368,9 +368,11 @@ promotes that proof step into `next_blocker` and `next_credential_request`, poin
 at Trading, and lists `Check wallet`, `Prove wallet`, strict verification, and receipt refresh as
 the proof runway instead of re-asking for the public wallet address.
 Trading and Settings expose the actual supervised handoff as `Sign tiny canary`: the browser
+first requires a visible final acknowledgement that the tiny canary can move real funds,
 deserializes the one-shot transaction with `@solana/web3.js`, asks the connected wallet to sign,
 then posts the serialized signed payload to the live canary relay without storing transaction
-bodies or wallet authority.
+bodies or wallet authority. The acknowledgement resets after a relay attempt so a later canary
+cannot reuse an old armed state.
 The Trading canary also exposes `Check proof chain` and `Auto watch proof`, which call the guarded
 settlement watchdog for the latest signed relay to poll confirmation, reconcile the fill, refresh
 the canary receipt, and apply only the reviewed local portfolio mirror patch when evidence is clean.

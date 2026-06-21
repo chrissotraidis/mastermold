@@ -1490,6 +1490,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Install selected flags");
     expect(settingsConsole).toContain("settings-web3-live-flag-fields");
     expect(settingsConsole).toContain("Installing them prepares the review path, but it still cannot sign, submit, custody funds, or mutate wallets.");
+    expect(settingsConsole).toContain("Settings final live canary acknowledgement");
+    expect(settingsConsole).toContain("liveCanaryConsentArmed");
+    expect(settingsConsole).toContain("Arm the final tiny-canary acknowledgement before opening a transaction signing prompt.");
     expect(settingsConsole).toContain("public-wallet-scope");
     expect(settingsConsole).toContain("read-provider-rail");
     expect(settingsConsole).toContain("jupiter-order-rail");
@@ -1752,6 +1755,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("These remain blocked until the current proof succeeds");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Paper trades, DEX reads, and Jupiter rehearsals do not count");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Sign tiny canary");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading final live canary acknowledgement");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Arm tiny live canary");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("liveCanaryConsentArmed");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Arm the final tiny-canary acknowledgement before opening a transaction signing prompt.");
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-unsigned-order-handoff?");
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-trade-canary?");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading unsigned canary receipt");

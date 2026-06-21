@@ -95,6 +95,7 @@ export function Web3LiveCanaryConsole({
   const [ownershipChallengeReceipt, setOwnershipChallengeReceipt] = useState<Web3WalletOwnershipChallengeReceipt | null>(null);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(initialWalletOwnershipReceipt);
   const [ownershipCheckBusy, setOwnershipCheckBusy] = useState(false);
+  const [liveCanaryConsentArmed, setLiveCanaryConsentArmed] = useState(false);
   const [walletPreview, setWalletPreview] = useState(previewValue(defaultWalletPublicKey));
 
   const params = new URLSearchParams({
@@ -185,6 +186,7 @@ export function Web3LiveCanaryConsole({
     runCanaryPreflight,
     signTinyCanary,
     runPostSigningProofCheck,
+    liveCanaryConsentArmed,
   });
 
   useEffect(() => {
@@ -443,6 +445,10 @@ export function Web3LiveCanaryConsole({
   }
 
   async function signTinyCanary() {
+    if (!liveCanaryConsentArmed) {
+      setMessage("Arm the final tiny-canary acknowledgement before opening a transaction signing prompt.");
+      return;
+    }
     setBusy(true);
     setMessage("Preparing the tiny SOL-to-USDC canary handoff for browser-wallet signing...");
     try {
@@ -505,6 +511,7 @@ export function Web3LiveCanaryConsole({
       }
       setActionReceipt(relayPayload);
       setMessage(relayPayload.next_action);
+      setLiveCanaryConsentArmed(false);
       if (relayPayload.actual_live_trade_tested) {
         setAutoProofAttempt(0);
         setAutoProofLastCheckedAt(null);
@@ -656,6 +663,25 @@ export function Web3LiveCanaryConsole({
             </div>
           </div>
 
+          <label
+            className="mt-3 flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-critical/25 bg-critical/[0.035] p-3 text-sm text-on-surface-variant"
+            aria-label="Trading final live canary acknowledgement"
+          >
+            <input
+              type="checkbox"
+              checked={liveCanaryConsentArmed}
+              onChange={(event) => setLiveCanaryConsentArmed(event.currentTarget.checked)}
+              disabled={busy || ownershipBusy || ownershipCheckBusy || preflightBusy}
+              className="mt-1 size-4 shrink-0 accent-red-500"
+            />
+            <span className="min-w-0 leading-5">
+              <span className="block font-semibold text-on-surface">Arm tiny live canary</span>
+              <span className="block text-xs leading-5 text-outline">
+                I understand this can move real funds if every gate passes, and I want the next Sign tiny canary click to open the external wallet transaction prompt.
+              </span>
+            </span>
+          </label>
+
           <div className="mt-3 flex flex-wrap gap-2">
             {sourceReady ? (
               <>
@@ -689,7 +715,7 @@ export function Web3LiveCanaryConsole({
                 <button
                   type="button"
                   onClick={() => void signTinyCanary()}
-                  disabled={busy || ownershipBusy || ownershipCheckBusy || preflightBusy}
+                  disabled={busy || ownershipBusy || ownershipCheckBusy || preflightBusy || !liveCanaryConsentArmed}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 text-sm font-semibold text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
                 >
                   <Wallet aria-hidden="true" className={busy ? "size-4 animate-pulse" : "size-4"} />
@@ -1095,6 +1121,7 @@ function buildPrimaryCanaryGateControl(input: {
   runCanaryPreflight: () => void;
   signTinyCanary: () => void;
   runPostSigningProofCheck: () => void;
+  liveCanaryConsentArmed: boolean;
 }): PrimaryCanaryGateControl {
   const step = input.step;
   if (!input.sourceReady) {
@@ -1136,10 +1163,12 @@ function buildPrimaryCanaryGateControl(input: {
   if (step.id === "signer-relay") {
     return {
       label: "Sign tiny canary",
-      detail: "Requests the one-shot unsigned order, prompts the external wallet, and relays only the matching signed payload.",
+      detail: input.liveCanaryConsentArmed
+        ? "Requests the one-shot unsigned order, prompts the external wallet, and relays only the matching signed payload."
+        : "Arm the tiny-canary acknowledgement before opening the external wallet transaction prompt.",
       tone: "critical",
       onRun: input.signTinyCanary,
-      disabled: input.busy,
+      disabled: input.busy || !input.liveCanaryConsentArmed,
     };
   }
   if (step.id === "funded-canary-proof" || step.id === "post-signing-proof") {
