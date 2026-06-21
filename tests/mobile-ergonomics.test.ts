@@ -1033,6 +1033,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("SettingsWeb3ResearchAnswerConsole");
     expect(settingsPage).toContain("Settings Web3 research handoff packet");
     expect(settingsPage).toContain("Settings Web3 research next unlock step");
+    expect(settingsPage).toContain("Settings Web3 research live-usability summary");
     expect(settingsPage).toContain("Settings Web3 research questions");
     expect(settingsPage).toContain("Settings Web3 research open blockers");
     expect(settingsPage).toContain("Settings Web3 research export commands");
@@ -1040,6 +1041,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Next Ordered Unlock Step");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Operator Unlock Sequence");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_usability");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Live Usability Summary");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Rows listed:");
     expect(settingsPage).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
     expect(settingsPage).toContain("validated export commands only");
     expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Settings Web3 research answer intake");

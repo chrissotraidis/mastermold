@@ -798,6 +798,10 @@ async function verifyResearchHandoffPacket() {
   assert(Array.isArray(json.current_capabilities) && json.current_capabilities.length >= 4, "Research handoff packet should summarize current capabilities.", json.current_capabilities);
   assert(Array.isArray(json.operator_unlock_sequence) && json.operator_unlock_sequence.map((item) => item.id).join(",") === "scope-wallet,prove-wallet,rehearse-jupiter,choose-signer,ops-accounting,external-review", "Research handoff packet should carry the ordered unlock sequence.", json.operator_unlock_sequence);
   assert(json.operator_unlock_sequence.some((item) => item.id === json.next_unlock_step?.id), "Research handoff packet should expose the next ordered unlock step.", json.next_unlock_step);
+  assert(json.live_usability?.mode === "web3-operator-credential-live-usability-summary", "Research handoff packet should carry the live-usability summary.", json.live_usability);
+  assert(typeof json.live_usability.real_capital_blocker_count === "number", "Research handoff live-usability summary should expose real-money blocker count.", json.live_usability);
+  assert(json.live_usability.total_live_usability_row_count >= json.live_usability.listed_live_usability_row_count, "Research handoff live-usability listed rows should not exceed total rows.", json.live_usability);
+  assert(json.live_usability.evidence_endpoint === "GET /api/web3-live-usability-blockers", "Research handoff live-usability summary should point to the full blocker endpoint.", json.live_usability);
   assert(Array.isArray(json.open_operator_inputs), "Research handoff packet should include open operator inputs.", json.open_operator_inputs);
   assert(Array.isArray(json.live_capital_blockers), "Research handoff packet should include live-capital blockers.", json.live_capital_blockers);
   assert(Array.isArray(json.research_questions) && json.research_questions.length >= 10, "Research handoff packet should include the research question set.", json.research_questions);
@@ -814,6 +818,7 @@ async function verifyResearchHandoffPacket() {
   assert(Array.isArray(json.verifier_commands) && json.verifier_commands.some((command) => command.includes("--require-operator-wallet")), "Research handoff packet should include strict verifier commands.", json.verifier_commands);
   assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind Web3 Research Handoff Packet"), "Research handoff packet should include pasteable text.", json.text_packet);
   assert(json.text_packet.includes("Next Ordered Unlock Step") && json.text_packet.includes("Operator Unlock Sequence"), "Research handoff text should include the ordered unlock sequence.", json.text_packet);
+  assert(json.text_packet.includes("Live Usability Summary") && json.text_packet.includes("Rows listed:"), "Research handoff text should include the live-usability summary.", json.text_packet);
   assert(json.text_packet.includes("Never Provide"), "Research handoff text should include never-provide boundary.", json.text_packet);
   assert(json.live_execution_permission === "blocked", "Research handoff packet must keep live execution blocked.", json);
   assert(json.wallet_mutation_permission === "blocked", "Research handoff packet must keep wallet mutation blocked.", json);

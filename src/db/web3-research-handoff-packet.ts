@@ -55,6 +55,7 @@ export type Web3ResearchHandoffPacket = {
   current_capabilities: string[];
   next_unlock_step: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number] | null;
   operator_unlock_sequence: Web3UsabilityStatusReceipt["operator_unlock_sequence"];
+  live_usability: Web3OperatorRequestPacket["live_usability"];
   open_operator_inputs: Array<{
     id: Web3OperatorRequestPacket["required_inputs"][number]["id"];
     label: string;
@@ -157,6 +158,9 @@ export function buildWeb3ResearchHandoffPacket(input: {
     `Operator runbook has ${input.runbook.allowed_now_count} safe action${input.runbook.allowed_now_count === 1 ? "" : "s"} available now.`,
     `Cutover board has ${input.cutover.open_blocker_count} open blocker${input.cutover.open_blocker_count === 1 ? "" : "s"} across operator, security, ops, accounting, and review owners.`,
     `Manual live review is ${input.manualLiveReview.status.replaceAll("-", " ")} with ${input.manualLiveReview.passed_signoff_count}/${input.manualLiveReview.required_signoff_count} signoffs passing.`,
+    input.requestPacket.live_usability
+      ? `Live-usability summary shows ${input.requestPacket.live_usability.real_capital_blocker_count} real-money blocker${input.requestPacket.live_usability.real_capital_blocker_count === 1 ? "" : "s"} with ${input.requestPacket.live_usability.listed_live_usability_row_count}/${input.requestPacket.live_usability.total_live_usability_row_count} rows listed.`
+      : "Live-usability summary is not attached; load the blocker endpoint before external research.",
   ];
   const verifierCommands = Array.from(new Set([
     ...input.requestPacket.verifier_commands,
@@ -188,6 +192,7 @@ export function buildWeb3ResearchHandoffPacket(input: {
     current_capabilities: currentCapabilities,
     next_unlock_step: nextUnlockStep,
     operator_unlock_sequence: input.usability.operator_unlock_sequence,
+    live_usability: input.requestPacket.live_usability,
     open_operator_inputs: openOperatorInputs,
     live_capital_blockers: liveCapitalBlockers,
     research_questions: researchQuestions,
@@ -409,6 +414,18 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
       `  Evidence: ${step.evidence}`,
     ].join("\n")).join("\n")
     : "- No operator unlock sequence is available in this packet.";
+  const liveUsability = packet.live_usability
+    ? [
+      `- Status: ${packet.live_usability.status}`,
+      `- Real-money blockers: ${packet.live_usability.real_capital_blocker_count}`,
+      `- Rows listed: ${packet.live_usability.listed_live_usability_row_count}/${packet.live_usability.total_live_usability_row_count}`,
+      `- Live lanes ready: ${packet.live_usability.ready_live_lane_count}/${packet.live_usability.total_live_lane_count}`,
+      packet.live_usability.next_unlock_step_label
+        ? `- Next unlock: ${packet.live_usability.next_unlock_step_label}; ${packet.live_usability.next_unlock_step_action}`
+        : `- Next action: ${packet.live_usability.next_action}`,
+      `- Evidence: ${packet.live_usability.evidence_endpoint}; receipt ${packet.live_usability.receipt_hash}`,
+    ].join("\n")
+    : "- No live-usability summary is attached. Load GET /api/web3-live-usability-blockers before live review.";
 
   return [
     "# Mastermind Web3 Research Handoff Packet",
@@ -437,6 +454,9 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
     "",
     "## Operator Unlock Sequence",
     unlockSequence,
+    "",
+    "## Live Usability Summary",
+    liveUsability,
     "",
     "## Open Operator Inputs",
     openInputs,

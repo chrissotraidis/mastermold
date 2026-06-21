@@ -192,9 +192,9 @@ helper sees blocker counts, listed rows, the next unlock step, safe inputs, and 
 boundaries in one pasteable artifact.
 `/api/web3-research-handoff-packet?source=live-dex` is the paste-ready research brief for
 another helper. It includes the next ordered unlock step, the six-step operator unlock
-sequence, open operator inputs, live-capital blockers, source endpoints, and research
-questions while keeping secrets, transaction bytes, signing, wallet mutation, and live
-execution blocked.
+sequence, compact live-usability summary, open operator inputs, live-capital blockers,
+source endpoints, and research questions while keeping secrets, transaction bytes, signing,
+wallet mutation, and live execution blocked.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.

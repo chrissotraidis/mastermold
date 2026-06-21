@@ -1122,6 +1122,7 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
   const nowQuestions = packet.research_questions.filter((question) => question.priority === "now").slice(0, 4);
   const liveBlockers = packet.live_capital_blockers.slice(0, 4);
   const openInputs = packet.open_operator_inputs.slice(0, 4);
+  const liveUsability = packet.live_usability;
   return (
     <div id="settings-web3-research-handoff" className="rounded-md border border-violet/30 bg-violet/[0.045] p-3" aria-label="Settings Web3 research handoff packet">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1145,6 +1146,25 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
         <SettingsMetric label="Live blockers" value={`${packet.live_capital_blockers.length}`} />
         <SettingsMetric label="Ready lanes" value={`${packet.app_state.ready_credential_lanes}/${packet.app_state.total_credential_lanes}`} />
       </div>
+
+      {liveUsability ? (
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings Web3 research live-usability summary">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Live-usability summary</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">
+                {liveUsability.real_capital_blocker_count} real-money blockers · {liveUsability.listed_live_usability_row_count}/{liveUsability.total_live_usability_row_count} rows listed
+              </p>
+            </div>
+            <LaunchQueueBadge status="fail" label={liveUsability.status.replaceAll("-", " ")} />
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+            {liveUsability.next_unlock_step_label
+              ? `Next unlock: ${liveUsability.next_unlock_step_label}. ${liveUsability.next_unlock_step_action}`
+              : liveUsability.next_action}
+          </p>
+        </div>
+      ) : null}
 
       {packet.next_unlock_step ? (
         <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 research next unlock step">
