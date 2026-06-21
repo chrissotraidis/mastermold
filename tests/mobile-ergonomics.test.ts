@@ -1636,6 +1636,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading unsigned canary receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading signed canary relay receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("VersionedTransaction.deserialize");
+    expect(source("package.json")).toContain("\"prove-canary:web3\": \"node scripts/web3-live-canary-proof.mjs\"");
+    expect(source("README.md")).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");
+    expect(source("scripts/web3-live-canary-proof.mjs")).toContain("mode: \"web3-live-canary-proof\"");
+    expect(source("scripts/web3-live-canary-proof.mjs")).toContain("settlement_watchdog");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("browser_wallet_signature_flow: \"gated-unsigned-handoff\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("transaction_submission_permission: \"blocked\"");
     expect(source("scripts/web3-market-monitor.mjs")).toContain("secret_echo_permission: \"blocked\"");

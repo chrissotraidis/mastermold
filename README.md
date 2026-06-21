@@ -94,6 +94,7 @@ npm run monitor:web3 -- --base-url=http://localhost:4010 --source=live-dex --jso
 npm run preflight-live:web3 -- --base-url=http://localhost:4010 --ticks=2 --runs=2 --json
 npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
 npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
+npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json
 npm run verify:web3 -- --base-url=http://localhost:4010
 npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet
 npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
@@ -126,7 +127,10 @@ alpha, and consistency thresholds all have to pass before the report grants pape
 permission. The live-capital preflight then combines the live-readiness audit, daemon
 handoff boundary, and repeat proof gate; by default it fails closed if real-capital readiness
 appears without explicit `--allow-live-ready` review, and it never signs, submits, or moves
-funds. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
+funds. The live canary proof command reads the canary receipt and can optionally run the
+guarded settlement watchdog for the latest stored signature; it exits nonzero until signed
+relay, chain confirmation, settlement reconciliation, and local portfolio mirror proof all
+pass. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
 metadata; it requires relayed transactions to keep signature/request/payload evidence and
 can poll the latest audited relayed signature with Solana `getSignatureStatuses` through
 the guarded `confirmation_poll` API path. Confirmed transactions must map to a landed
