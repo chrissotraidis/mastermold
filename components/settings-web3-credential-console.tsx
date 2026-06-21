@@ -590,6 +590,17 @@ export function SettingsWeb3CredentialConsole({
   const operatorWalletCommand = `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${commandWallet} --require-operator-wallet`;
   const dexLiveCommand = "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live";
   const combinedStrictCommand = `${operatorWalletCommand} --require-jupiter-order --require-dex-live`;
+  const liveUsabilityParams = new URLSearchParams({
+    scenario,
+    source: "live-dex",
+    account,
+    cycles: String(cycles),
+  });
+  const liveUsabilityHref = `/api/web3-live-usability-blockers?${liveUsabilityParams.toString()}`;
+  const visibleLiveUsabilityBlockers = liveUsabilityReceipt.missing_for_live_usability.slice(0, 4);
+  const liveUsabilitySetupHref = liveUsabilityReceipt.next_unlock_step?.id === "scope-wallet"
+    ? "#settings-web3-wallet-public-key"
+    : "#settings-web3-credentials-runway";
   const actionChecklist = buildConsoleActionChecklist({
     hasProviderInput: [
       draft.helius_api_key,
@@ -977,21 +988,67 @@ export function SettingsWeb3CredentialConsole({
               {liveUsabilityReceipt.next_unlock_step?.next_action ?? liveUsabilityReceipt.next_action}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void refreshLiveUsabilityBlockers()}
-            disabled={disabled}
-            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-caution/40 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
-          >
-            <RefreshCw className={cn("size-3.5 shrink-0", busy === "blockers" && "animate-spin")} aria-hidden="true" />
-            {busy === "blockers" ? "Refreshing" : "Refresh blockers"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={liveUsabilitySetupHref}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-xs font-semibold text-caution transition hover:bg-caution/15"
+            >
+              Open current gate
+            </a>
+            <a
+              href={liveUsabilityHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline-variant/35 bg-void/20 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open blocker JSON
+            </a>
+            <button
+              type="button"
+              onClick={() => void refreshLiveUsabilityBlockers()}
+              disabled={disabled}
+              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-caution/40 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+            >
+              <RefreshCw className={cn("size-3.5 shrink-0", busy === "blockers" && "animate-spin")} aria-hidden="true" />
+              {busy === "blockers" ? "Refreshing" : "Refresh blockers"}
+            </button>
+          </div>
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-4">
           <ConsoleMetric label="Inputs open" value={`${liveUsabilityReceipt.open_operator_input_count}`} tone={liveUsabilityReceipt.open_operator_input_count > 0 ? "caution" : "engine"} />
           <ConsoleMetric label="Real blockers" value={`${liveUsabilityReceipt.real_capital_blocker_count}`} tone={liveUsabilityReceipt.real_capital_blocker_count > 0 ? "critical" : "engine"} />
           <ConsoleMetric label="Live lanes" value={`${liveUsabilityReceipt.ready_live_lane_count}/${liveUsabilityReceipt.total_live_lane_count}`} tone={liveUsabilityReceipt.ready_live_lane_count === liveUsabilityReceipt.total_live_lane_count ? "engine" : "caution"} />
           <ConsoleMetric label="Safe actions" value={`${liveUsabilityReceipt.safe_action_count}`} tone={liveUsabilityReceipt.safe_action_count > 0 ? "engine" : "neutral"} />
+        </div>
+        <div className="mt-3 grid gap-2" aria-label="Settings top refreshed Web3 blockers">
+          {visibleLiveUsabilityBlockers.length > 0 ? visibleLiveUsabilityBlockers.map((item) => (
+            <div key={item.id} className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                    {item.owner.replace("-", " ")} · {item.source.replace("-", " ")}
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border-outline-variant/35 bg-surface-dim/35 text-outline",
+                    (item.status === "needed" || item.status === "watch") && "border-caution/35 bg-caution/10 text-caution",
+                    (item.status === "blocked" || item.status === "fail") && "border-critical/35 bg-critical/10 text-critical",
+                    item.status === "review" && "border-violet/35 bg-violet/10 text-violet",
+                  )}
+                >
+                  {item.status}
+                </Badge>
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.next_action}</p>
+            </div>
+          )) : (
+            <p className="rounded-md border border-engine/25 bg-engine/[0.04] p-2 text-xs leading-5 text-on-surface-variant">
+              No missing live-usability rows are listed in this receipt; external live review and in-app live authority locks still apply.
+            </p>
+          )}
         </div>
         <p className="mt-2 text-xs leading-5 text-outline">
           This receipt refreshes after wallet scope, provider checks, DEX tests, Jupiter rehearsal, wallet proof, and preflight. It names the next safe operator step only; live execution, signing, submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.

@@ -1267,8 +1267,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Settings Web3 what is left after latest action");
     expect(settingsConsole).toContain("What is left after latest action");
     expect(settingsConsole).toContain("Refresh blockers");
+    expect(settingsConsole).toContain("Open current gate");
+    expect(settingsConsole).toContain("Open blocker JSON");
+    expect(settingsConsole).toContain("visibleLiveUsabilityBlockers");
+    expect(settingsConsole).toContain("missing_for_live_usability.slice(0, 4)");
+    expect(settingsConsole).toContain("Settings top refreshed Web3 blockers");
     expect(settingsConsole).toContain("Inputs open");
     expect(settingsConsole).toContain("Real blockers");
+    expect(settingsConsole).toContain("No missing live-usability rows are listed");
     expect(settingsConsole).toContain("This receipt refreshes after wallet scope");
     expect(settingsPage).toContain("nextOperatorInputLabel={operatorRequestPacket.next_input?.label");
     expect(settingsConsole).toContain("Provider evidence");
