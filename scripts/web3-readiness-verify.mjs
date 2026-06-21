@@ -310,6 +310,10 @@ async function verifyHealth() {
   assert(json.web3_first_canary_drill.real_funds_moved_by_this_app === false, "First-canary drill health should not claim real funds moved.", json.web3_first_canary_drill);
   assert(json.web3_first_canary_drill.proof_required_count === 4, "First-canary drill health should require four proof stages.", json.web3_first_canary_drill);
   assert(typeof json.web3_first_canary_drill.hard_fail_count === "number", "First-canary drill health should expose hard fail count.", json.web3_first_canary_drill);
+  assert(typeof json.web3_first_canary_drill.next_lane_id === "string" && json.web3_first_canary_drill.next_lane_id.length > 0, "First-canary drill health should expose the ordered next lane id.", json.web3_first_canary_drill);
+  assert(typeof json.web3_first_canary_drill.next_lane_label === "string" && json.web3_first_canary_drill.next_lane_label.length > 0, "First-canary drill health should expose the ordered next lane label.", json.web3_first_canary_drill);
+  assert(["fail", "watch"].includes(json.web3_first_canary_drill.next_lane_status), "First-canary drill health should expose a blocking or watch next lane status.", json.web3_first_canary_drill);
+  assert(typeof json.web3_first_canary_drill.next_lane_action === "string" && json.web3_first_canary_drill.next_lane_action.length > 0, "First-canary drill health should expose the ordered next lane action.", json.web3_first_canary_drill);
   assert(typeof json.web3_first_canary_drill.next_action === "string" && json.web3_first_canary_drill.next_action.length > 0, "First-canary drill health should expose the next action.", json.web3_first_canary_drill);
   assert(json.web3_first_canary_drill.live_execution_permission === "blocked", "First-canary drill health should keep live execution blocked.", json.web3_first_canary_drill);
   assert(json.web3_first_canary_drill.transaction_submission_permission === "blocked", "First-canary drill health should keep transaction submission blocked.", json.web3_first_canary_drill);
@@ -1565,6 +1569,10 @@ async function verifyFirstCanaryDrill() {
   assert(json.proof_pass_count === 0, "Default first canary drill should have zero post-signing proof stages passed.", json);
   assert(json.proof_required_count === 4, "First canary drill should require four proof stages.", json);
   assert(typeof json.hard_fail_count === "number" && json.hard_fail_count > 0, "Default first canary drill should expose hard blockers.", json);
+  assert(json.next_lane_id === "jupiter-order", "First canary drill should expose the first ordered failing canary lane.", json);
+  assert(json.next_lane_label === "Jupiter route/order proof", "First canary drill should name the first ordered failing canary lane.", json);
+  assert(json.next_lane_status === "fail", "First canary drill should expose the first ordered lane status.", json);
+  assert(json.next_lane_action === json.next_action, "Blocked first canary drill should align next action with the ordered lane action.", json);
   assert(String(json.source_endpoint ?? "").includes("/api/web3-first-canary-drill"), "First canary drill should link itself.", json);
   assert(json.live_review_source_endpoint === "/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0", "First canary drill should expose the live review endpoint.", json);
   assert(String(json.strict_ready_command ?? "").includes("drill-canary:web3"), "First canary drill should expose its strict command.", json);

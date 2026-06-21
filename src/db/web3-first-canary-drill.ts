@@ -53,6 +53,10 @@ export type Web3FirstCanaryDrillReceipt = {
   proof_required_count: 4;
   hard_fail_count: number;
   watch_count: number;
+  next_lane_id: Web3FirstCanaryDrillLane["id"] | null;
+  next_lane_label: string | null;
+  next_lane_status: Web3FirstCanaryDrillLane["status"] | null;
+  next_lane_action: string | null;
   next_action: string;
   blockers: string[];
   safe_commands: string[];
@@ -89,6 +93,10 @@ export type Web3FirstCanaryDrillHealth = {
   hard_fail_count: number;
   next_blocker_label: string | null;
   next_credential_label: string | null;
+  next_lane_id: Web3FirstCanaryDrillReceipt["next_lane_id"];
+  next_lane_label: string | null;
+  next_lane_status: Web3FirstCanaryDrillReceipt["next_lane_status"];
+  next_lane_action: string | null;
   next_action: string;
   live_execution_permission: "blocked";
   transaction_submission_permission: "blocked";
@@ -161,9 +169,14 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
     proof_required_count: 4 as const,
     hard_fail_count: failed.length,
     watch_count: watched.length,
+    next_lane_id: nextLane?.id ?? null,
+    next_lane_label: nextLane?.label ?? null,
+    next_lane_status: nextLane?.status ?? null,
+    next_lane_action: nextLane?.next_action ?? null,
     next_action: firstCanaryDrillNextAction(status, nextLane, input),
     blockers: uniqueText([
       permissionDrift ? "Unexpected live execution, transaction submission, wallet mutation, or secret-storage permission appeared in a canary receipt." : null,
+      nextLane?.next_action,
       ...input.liveUsability.missing_for_live_usability.slice(0, 6).map((item) => item.next_action),
       ...input.readiness.blockers.slice(0, 6),
       ...input.canary.blockers.slice(0, 6),
@@ -226,6 +239,10 @@ export function buildWeb3FirstCanaryDrillHealth(receipt: Web3FirstCanaryDrillRec
     hard_fail_count: receipt.hard_fail_count,
     next_blocker_label: receipt.next_blocker_label,
     next_credential_label: receipt.next_credential_label,
+    next_lane_id: receipt.next_lane_id,
+    next_lane_label: receipt.next_lane_label,
+    next_lane_status: receipt.next_lane_status,
+    next_lane_action: receipt.next_lane_action,
     next_action: receipt.next_action,
     live_execution_permission: "blocked",
     transaction_submission_permission: "blocked",

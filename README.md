@@ -151,7 +151,7 @@ and canary proof receipts together through `GET /api/web3-first-canary-drill`, `
 and `npm run drill-canary:web3`, but it remains read-only and cannot sign, submit, store
 wallet authority, or move funds. The Trading command center now reads that same first-canary
 drill receipt for its first-screen status, hash, hard-fail count, proof count, live-dex drill
-link, and leading failing lanes so the next real canary blocker is visible before the long
+link, ordered next lane, and leading failing lanes so the next real canary blocker is visible before the long
 workspace. `verify:web3` is a Node-only
 operator check for machines without Bun: against a running app, it snapshots the saved
 public wallet/risk scope, proves health receipts, execution input validation, public-wallet

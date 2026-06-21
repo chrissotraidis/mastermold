@@ -1666,6 +1666,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(source("app/trading/page.tsx")).toContain("drill.strict_ready_command");
     expect(source("app/trading/page.tsx")).toContain("First canary drill");
+    expect(source("app/trading/page.tsx")).toContain("drill.next_lane_label");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("next_lane_id");
+    expect(source("scripts/web3-first-canary-drill.mjs")).toContain("next_lane_id");
     expect(source("app/api/web3-first-canary-drill/route.ts")).toContain("buildWeb3FirstCanaryDrillReceipt");
     expect(source("app/api/health/route.ts")).toContain("web3_first_canary_drill");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("mode: \"web3-first-canary-drill\"");

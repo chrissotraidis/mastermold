@@ -105,6 +105,10 @@ describe("Web3 first canary drill command", () => {
     expect(report.exit_code).toBe(0);
     expect(report.actual_live_trade_tested).toBe(false);
     expect(report.real_funds_moved_by_this_app).toBe(false);
+    expect(report.next_lane_id).toBe("dedicated-wallet");
+    expect(report.next_lane_label).toBe("Dedicated wallet");
+    expect(report.next_lane_status).toBe("fail");
+    expect(report.next_lane_action).toBe(report.next_action);
     expect(report.live_execution_permission).toBe("blocked");
     expect(report.transaction_submission_permission).toBe("blocked");
     expect(report.wallet_mutation_permission).toBe("blocked");
@@ -133,10 +137,18 @@ describe("Web3 first canary drill command", () => {
         status: "ready",
         can_request_one_shot_unsigned_order: true,
       },
+      jupiter: {
+        ...blockedReceipts.jupiter,
+        status: "ready",
+      },
     });
 
     expect(report.status).toBe("ready-to-request-unsigned-order");
     expect(report.exit_code).toBe(0);
+    expect(report.next_lane_id).toBeTruthy();
+    expect(report.next_lane_label.length).toBeGreaterThan(0);
+    expect(report.next_lane_action.length).toBeGreaterThan(0);
+    expect(report.next_action).toContain("Request one tiny unsigned order");
     expect(report.wallet_public_key_present).toBe(true);
     expect(report.unsigned_order_handoff_ready).toBe(true);
     expect(report.actual_live_trade_tested).toBe(false);
@@ -160,6 +172,10 @@ describe("Web3 first canary drill command", () => {
         status: "ready",
         can_request_one_shot_unsigned_order: true,
       },
+      jupiter: {
+        ...blockedReceipts.jupiter,
+        status: "ready",
+      },
       canary: {
         ...blockedReceipts.canary,
         status: "live-relay-evidence-recorded",
@@ -178,6 +194,8 @@ describe("Web3 first canary drill command", () => {
 
     expect(report.status).toBe("canary-proven");
     expect(report.proof_pass_count).toBe(4);
+    expect(report.next_lane_id).toBeTruthy();
+    expect(report.next_action).toContain("strict live-canary verifier");
     expect(report.live_execution_permission).toBe("blocked");
     expect(report.wallet_mutation_permission).toBe("blocked");
   });

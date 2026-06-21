@@ -1901,6 +1901,10 @@ describe("Web3 autonomous trading subsystem", () => {
         hard_fail_count: number;
         next_blocker_label: string | null;
         next_credential_label: string | null;
+        next_lane_id: string | null;
+        next_lane_label: string | null;
+        next_lane_status: string | null;
+        next_lane_action: string | null;
         next_action: string;
         live_execution_permission: string;
         transaction_submission_permission: string;
@@ -2121,6 +2125,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_first_canary_drill.proof_pass_count).toBe(0);
     expect(receipt.web3_first_canary_drill.proof_required_count).toBe(4);
     expect(receipt.web3_first_canary_drill.hard_fail_count).toBeGreaterThan(0);
+    expect(receipt.web3_first_canary_drill.next_lane_id).toBeTruthy();
+    expect(receipt.web3_first_canary_drill.next_lane_label?.length).toBeGreaterThan(0);
+    expect(["fail", "watch"]).toContain(String(receipt.web3_first_canary_drill.next_lane_status));
+    expect(receipt.web3_first_canary_drill.next_lane_action?.length).toBeGreaterThan(10);
+    expect(receipt.web3_first_canary_drill.next_action).toBe(String(receipt.web3_first_canary_drill.next_lane_action));
     expect(receipt.web3_first_canary_drill.next_action.length).toBeGreaterThan(10);
     expect(receipt.web3_first_canary_drill.live_execution_permission).toBe("blocked");
     expect(receipt.web3_first_canary_drill.transaction_submission_permission).toBe("blocked");
@@ -2536,6 +2545,10 @@ describe("Web3 autonomous trading subsystem", () => {
       proof_pass_count: number;
       proof_required_count: number;
       hard_fail_count: number;
+      next_lane_id: string | null;
+      next_lane_label: string | null;
+      next_lane_status: string | null;
+      next_lane_action: string | null;
       next_action: string;
       blockers: string[];
       safe_commands: string[];
@@ -2570,6 +2583,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.proof_pass_count).toBe(0);
     expect(receipt.proof_required_count).toBe(4);
     expect(receipt.hard_fail_count).toBeGreaterThan(0);
+    expect(receipt.next_lane_id).toBeTruthy();
+    expect(receipt.lanes.map((lane) => lane.id)).toContain(String(receipt.next_lane_id));
+    expect(receipt.next_lane_label?.length).toBeGreaterThan(0);
+    expect(["fail", "watch"]).toContain(String(receipt.next_lane_status));
+    expect(receipt.next_action).toBe(String(receipt.next_lane_action));
     expect(receipt.next_action.length).toBeGreaterThan(10);
     expect(receipt.blockers.join(" ")).toContain("JUPITER");
     expect(receipt.safe_commands).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready");

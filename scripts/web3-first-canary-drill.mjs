@@ -114,12 +114,17 @@ export function buildFirstCanaryDrillReport({
   const nextLane = lanes.find((lane) => lane.status === "fail") ?? lanes.find((lane) => lane.status === "watch") ?? null;
   const blockersText = uniqueText([
     permissionBreach ? "A canary receipt exposed unexpected live execution, transaction submission, wallet mutation, or secret-storage permission." : null,
+    nextLane?.next_action,
     ...(Array.isArray(blockers?.missing_for_live_usability) ? blockers.missing_for_live_usability.slice(0, 6).map((item) => item.next_action) : []),
     ...(Array.isArray(readiness?.blockers) ? readiness.blockers.slice(0, 6) : []),
     ...(Array.isArray(canary?.blockers) ? canary.blockers.slice(0, 6) : []),
   ]);
   const nextAction = status === "canary-proven"
     ? "Run the strict live-canary verifier, then review risk caps before another canary."
+    : status === "ready-to-relay-signed-payload"
+      ? "Relay only the matching externally signed tiny canary payload, then run proof watcher until settlement is accounted."
+      : status === "ready-to-request-unsigned-order"
+        ? "Request one tiny unsigned order, sign it in the browser wallet, relay the signed payload, then stop for proof."
     : nextLane?.next_action ?? blockers?.next_action ?? readiness?.next_action ?? canary?.next_action ?? "Complete the next first-canary blocker.";
 
   return {
@@ -149,6 +154,10 @@ export function buildFirstCanaryDrillReport({
     proof_required_count: 4,
     hard_fail_count: failed.length,
     watch_count: watched.length,
+    next_lane_id: nextLane?.id ?? null,
+    next_lane_label: nextLane?.label ?? null,
+    next_lane_status: nextLane?.status ?? null,
+    next_lane_action: nextLane?.next_action ?? null,
     next_action: nextAction,
     blockers: blockersText,
     safe_commands: uniqueText([

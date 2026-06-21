@@ -608,14 +608,14 @@ function LiveCanaryCommandCenter({
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">First canary drill</p>
-                <p className="mt-1 text-sm font-semibold text-on-surface">{nextBlocker?.label ?? nextCredential?.label ?? nextCanaryLane?.label ?? "First funded canary"}</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{drill.next_lane_label ?? nextCanaryLane?.label ?? nextBlocker?.label ?? nextCredential?.label ?? "First funded canary"}</p>
               </div>
               <span className={firstCanaryDrillStatusClassName(drill.status)}>
                 {drill.status.replaceAll("-", " ")}
               </span>
             </div>
             <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
-              {nextCanaryLane?.next_action ?? drill.next_action}
+              {drill.next_lane_action ?? nextCanaryLane?.next_action ?? drill.next_action}
             </p>
             {nextCredential?.safe_value_description ? (
               <p className="mt-2 line-clamp-2 rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-5 text-outline">
