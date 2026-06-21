@@ -69,7 +69,9 @@ export function Web3LiveCanaryConsole({
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveUnsignedOrderPreflightReceipt | null>(null);
   const [unsignedReceipt, setUnsignedReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
   const [actionReceipt, setActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
+  const [ownershipChallengeReceipt, setOwnershipChallengeReceipt] = useState<Web3WalletOwnershipChallengeReceipt | null>(null);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
+  const [ownershipCheckBusy, setOwnershipCheckBusy] = useState(false);
   const [walletPreview, setWalletPreview] = useState(previewValue(defaultWalletPublicKey));
 
   const params = new URLSearchParams({
@@ -281,6 +283,36 @@ export function Web3LiveCanaryConsole({
     }
   }
 
+  async function checkWalletOwnershipChallenge() {
+    setOwnershipCheckBusy(true);
+    setMessage("Checking the text-only wallet ownership challenge without asking for a signature...");
+    try {
+      if (!sourceReady) {
+        throw new Error("Open the live DEX canary view before checking wallet ownership proof.");
+      }
+      const trustedPublicKey = await getTrustedBrowserWalletPublicKey();
+      const savedPublicKey = defaultWalletPublicKey && isLikelySolanaPublicKey(defaultWalletPublicKey)
+        ? defaultWalletPublicKey
+        : null;
+      if (trustedPublicKey && savedPublicKey && trustedPublicKey !== savedPublicKey) {
+        throw new Error("Connected browser wallet does not match the saved dedicated trading wallet. Switch wallets or update the public wallet scope first.");
+      }
+      const wallet = trustedPublicKey && isLikelySolanaPublicKey(trustedPublicKey) ? trustedPublicKey : savedPublicKey;
+      if (!wallet || !isLikelySolanaPublicKey(wallet)) {
+        throw new Error("Connect or save a valid public Solana wallet before checking the ownership challenge.");
+      }
+      setWalletPreview(previewValue(wallet));
+      const payload = await requestWalletOwnershipChallengeReceipt(wallet);
+      setOwnershipChallengeReceipt(payload);
+      setMessage(payload.next_action);
+      await refreshFirstCanaryDrill("auto").catch(() => null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Wallet ownership challenge check failed.");
+    } finally {
+      setOwnershipCheckBusy(false);
+    }
+  }
+
   async function proveWalletOwnership() {
     setOwnershipBusy(true);
     setMessage("Requesting a text-only wallet ownership signature. This is not a transaction and cannot move funds...");
@@ -297,8 +329,16 @@ export function Web3LiveCanaryConsole({
       if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
         throw new Error("Connect a valid public Solana wallet before proving ownership.");
       }
+      if (defaultWalletPublicKey && isLikelySolanaPublicKey(defaultWalletPublicKey) && publicKey !== defaultWalletPublicKey) {
+        throw new Error("Connected browser wallet does not match the saved dedicated trading wallet. Switch wallets or update the public wallet scope first.");
+      }
       setWalletPreview(previewValue(publicKey));
-      const challenge = await requestWalletOwnershipChallenge(publicKey);
+      const challengeReceipt = await requestWalletOwnershipChallengeReceipt(publicKey);
+      setOwnershipChallengeReceipt(challengeReceipt);
+      const challenge = challengeReceipt.message;
+      if (!challenge) {
+        throw new Error(challengeReceipt.next_action);
+      }
       const signed = await provider.signMessage(new TextEncoder().encode(challenge), "utf8");
       const signatureBytes = signed instanceof Uint8Array ? signed : signed.signature;
       if (!(signatureBytes instanceof Uint8Array)) {
@@ -444,7 +484,7 @@ export function Web3LiveCanaryConsole({
                 <button
                   type="button"
                   onClick={() => void runCanaryPreflight()}
-                  disabled={busy || ownershipBusy || preflightBusy}
+                  disabled={busy || ownershipBusy || ownershipCheckBusy || preflightBusy}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/40 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
                 >
                   <ShieldCheck aria-hidden="true" className={preflightBusy ? "size-4 animate-pulse" : "size-4"} />
@@ -453,7 +493,7 @@ export function Web3LiveCanaryConsole({
                 <button
                   type="button"
                   onClick={() => void proveWalletOwnership()}
-                  disabled={busy || ownershipBusy || preflightBusy}
+                  disabled={busy || ownershipBusy || ownershipCheckBusy || preflightBusy}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
                 >
                   <ShieldCheck aria-hidden="true" className={ownershipBusy ? "size-4 animate-pulse" : "size-4"} />
@@ -461,8 +501,17 @@ export function Web3LiveCanaryConsole({
                 </button>
                 <button
                   type="button"
+                  onClick={() => void checkWalletOwnershipChallenge()}
+                  disabled={busy || ownershipBusy || ownershipCheckBusy || preflightBusy}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-outline/25 bg-surface-dim/55 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
+                >
+                  <ShieldCheck aria-hidden="true" className={ownershipCheckBusy ? "size-4 animate-pulse" : "size-4"} />
+                  {ownershipCheckBusy ? "Checking wallet" : "Check wallet"}
+                </button>
+                <button
+                  type="button"
                   onClick={() => void signTinyCanary()}
-                  disabled={busy || ownershipBusy || preflightBusy}
+                  disabled={busy || ownershipBusy || ownershipCheckBusy || preflightBusy}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-critical/45 bg-critical/10 px-3 py-2 text-sm font-semibold text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
                 >
                   <Wallet aria-hidden="true" className={busy ? "size-4 animate-pulse" : "size-4"} />
@@ -683,6 +732,28 @@ export function Web3LiveCanaryConsole({
                 <CanaryMetric label="Submit" value={ownershipReceipt.transaction_submission_permission} tone="neutral" />
               </div>
               <p className="mt-2 text-[11px] leading-4 text-outline">{ownershipReceipt.next_action}</p>
+            </div>
+          ) : null}
+
+          {ownershipChallengeReceipt ? (
+            <div className="rounded-md border border-engine/20 bg-surface/60 p-3" aria-label="Trading wallet ownership challenge receipt">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Wallet challenge</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{ownershipChallengeReceipt.status}</p>
+                </div>
+                <span className={evidenceStatusClassName(ownershipChallengeReceipt.status === "ready" ? "watch" : "fail")}>
+                  {ownershipChallengeReceipt.message_return.replaceAll("-", " ")}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <CanaryMetric label="Wallet" value={ownershipChallengeReceipt.wallet_public_key_preview} tone={ownershipChallengeReceipt.status === "ready" ? "engine" : "critical"} />
+                <CanaryMetric label="Message" value={ownershipChallengeReceipt.message_storage} tone="neutral" />
+                <CanaryMetric label="Tx signing" value={ownershipChallengeReceipt.transaction_signing_permission} tone="neutral" />
+                <CanaryMetric label="Submit" value={ownershipChallengeReceipt.transaction_submission_permission} tone="neutral" />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-outline">{ownershipChallengeReceipt.next_action}</p>
+              <p className="mt-1 truncate text-[10px] leading-4 text-outline">receipt {ownershipChallengeReceipt.receipt_hash.slice(0, 10)}</p>
             </div>
           ) : null}
 
@@ -933,13 +1004,13 @@ function bytesToBase64(bytes: Uint8Array) {
   return window.btoa(binary);
 }
 
-async function requestWalletOwnershipChallenge(walletPublicKey: string) {
+async function requestWalletOwnershipChallengeReceipt(walletPublicKey: string) {
   const response = await fetch(`/api/web3-wallet-ownership?wallet_public_key=${encodeURIComponent(walletPublicKey)}`);
   const payload = await response.json().catch(() => null) as Web3WalletOwnershipChallengeReceipt | { error: string } | null;
   if (!response.ok || !payload || "error" in payload || payload.status !== "ready" || !payload.message) {
     throw new Error(payload && "error" in payload ? payload.error : "Wallet ownership challenge failed.");
   }
-  return payload.message;
+  return payload;
 }
 
 function serializeSignedWalletTransaction(value: unknown): Uint8Array | null {

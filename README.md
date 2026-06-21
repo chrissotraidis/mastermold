@@ -309,6 +309,10 @@ It also exposes `Prove wallet` in the same live canary console, using the existi
 transaction signature, private key, seed phrase, wallet mutation, or fund movement. That flow now
 starts with a server-issued `GET /api/web3-wallet-ownership?wallet_public_key=...` challenge
 receipt, then stores only hashes after the browser wallet signs the text challenge.
+Trading also exposes `Check wallet` beside `Prove wallet`; it fetches the same text-only challenge
+receipt for the connected or saved dedicated wallet without asking for a signature, blocks mismatched
+connected wallets, and refreshes the first-canary drill so the wallet-control gate can be diagnosed
+before any wallet prompt.
 Trading and Settings expose the actual supervised handoff as `Sign tiny canary`: the browser
 deserializes the one-shot transaction with `@solana/web3.js`, asks the connected wallet to sign,
 then posts the serialized signed payload to the live canary relay without storing transaction
