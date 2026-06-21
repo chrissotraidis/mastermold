@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, RefreshCw, ShieldCheck, Wallet, Zap } from "lucide-react";
 import Link from "next/link";
+import type { Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
 import type { Web3LiveTradeCanaryActionReceipt, Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import type { Web3LiveUnsignedOrderHandoffReceipt, Web3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
 import type { Web3WalletOwnershipChallengeReceipt, Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
@@ -21,6 +22,7 @@ type BrowserSolanaProvider = {
 
 type Web3LiveCanaryConsoleProps = {
   receipt: Web3LiveTradeCanaryReceipt;
+  firstCanaryDrill: Web3FirstCanaryDrillReceipt;
   source: TradingMarketSource;
   account: TradingAccountMode;
   scenario: TradingScenario;
@@ -45,6 +47,7 @@ type CanaryLaunchStep = {
 
 export function Web3LiveCanaryConsole({
   receipt,
+  firstCanaryDrill,
   source,
   account,
   scenario,
@@ -53,10 +56,12 @@ export function Web3LiveCanaryConsole({
   defaultWalletPublicKey,
 }: Web3LiveCanaryConsoleProps) {
   const [canaryReceipt, setCanaryReceipt] = useState(receipt);
+  const [firstCanaryDrillReceipt, setFirstCanaryDrillReceipt] = useState(firstCanaryDrill);
   const [message, setMessage] = useState(receipt.next_action);
   const [busy, setBusy] = useState(false);
   const [ownershipBusy, setOwnershipBusy] = useState(false);
   const [preflightBusy, setPreflightBusy] = useState(false);
+  const [drillBusy, setDrillBusy] = useState(false);
   const [proofBusy, setProofBusy] = useState<"refresh" | "watchdog" | null>(null);
   const [autoProofMonitorEnabled, setAutoProofMonitorEnabled] = useState(false);
   const [autoProofAttempt, setAutoProofAttempt] = useState(0);
@@ -80,6 +85,7 @@ export function Web3LiveCanaryConsole({
     cycles: String(cycles),
   });
   const canaryHref = `/api/web3-live-trade-canary?${currentParams.toString()}`;
+  const drillHref = `/api/web3-first-canary-drill?${currentParams.toString()}`;
   const unsignedHref = `/api/web3-live-unsigned-order-handoff?${params.toString()}`;
   const liveTradingHref = `/trading?source=live-dex${account !== "persistent" ? "&account=persistent" : ""}`;
   const latestStatus = actionReceipt?.status ?? unsignedReceipt?.status ?? preflightReceipt?.status ?? canaryReceipt.status;
@@ -142,6 +148,28 @@ export function Web3LiveCanaryConsole({
     }
   }
 
+  async function refreshFirstCanaryDrill(mode: "manual" | "auto" = "manual") {
+    setDrillBusy(true);
+    try {
+      const response = await fetch(drillHref);
+      const payload = await response.json().catch(() => null) as Web3FirstCanaryDrillReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "First canary drill refresh failed.");
+      }
+      setFirstCanaryDrillReceipt(payload);
+      if (mode === "manual") setMessage(payload.next_action);
+      return payload;
+    } finally {
+      setDrillBusy(false);
+    }
+  }
+
+  async function refreshCanaryConsoleReceipts(mode: "manual" | "auto" = "manual") {
+    const refreshed = await refreshCanaryReceipt(mode);
+    await refreshFirstCanaryDrill("auto").catch(() => null);
+    return refreshed;
+  }
+
   async function runPostSigningProofCheck(mode: "manual" | "auto" | "auto-monitor" = "manual") {
     if (!sourceReady) {
       setMessage("Open the live DEX canary view before checking signed-transaction proof.");
@@ -185,7 +213,7 @@ export function Web3LiveCanaryConsole({
         payload.signature_confirmation_poll?.summary ??
         "Post-signing proof check completed.";
       setMessage(summary);
-      const refreshed = await refreshCanaryReceipt("auto");
+      const refreshed = await refreshCanaryConsoleReceipts("auto");
       if (refreshed.post_signing_evidence_status === "settlement-accounted") {
         setAutoProofMonitorEnabled(false);
         setMessage("Live canary proof chain is accounted locally. Review the mirrored fill before another canary.");
@@ -245,6 +273,7 @@ export function Web3LiveCanaryConsole({
       }
       setPreflightReceipt(payload);
       setMessage(payload.next_action);
+      await refreshFirstCanaryDrill("auto").catch(() => null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live canary preflight failed.");
     } finally {
@@ -291,7 +320,7 @@ export function Web3LiveCanaryConsole({
       }
       setOwnershipReceipt(payload);
       setMessage(payload.summary);
-      await refreshCanaryReceipt("auto");
+      await refreshCanaryConsoleReceipts("auto");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Wallet ownership proof failed.");
     } finally {
@@ -368,7 +397,7 @@ export function Web3LiveCanaryConsole({
         setAutoProofMonitorEnabled(true);
         await runPostSigningProofCheck("auto-monitor");
       } else {
-        await refreshCanaryReceipt("auto");
+        await refreshCanaryConsoleReceipts("auto");
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Tiny canary signing failed.");
@@ -486,12 +515,12 @@ export function Web3LiveCanaryConsole({
             ) : null}
             <button
               type="button"
-              onClick={() => void refreshCanaryReceipt()}
-              disabled={busy || proofBusy !== null}
+              onClick={() => void refreshCanaryConsoleReceipts()}
+              disabled={busy || proofBusy !== null || drillBusy}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine disabled:cursor-not-allowed disabled:text-outline"
             >
-              <RefreshCw aria-hidden="true" className={proofBusy === "refresh" ? "size-4 animate-spin" : "size-4"} />
-              Refresh receipt
+              <RefreshCw aria-hidden="true" className={proofBusy === "refresh" || drillBusy ? "size-4 animate-spin" : "size-4"} />
+              Refresh receipts
             </button>
           </div>
 
@@ -501,6 +530,60 @@ export function Web3LiveCanaryConsole({
         </div>
 
         <div className="grid min-w-0 gap-2">
+          <div className="rounded-md border border-critical/20 bg-surface/55 p-3" aria-label="Trading refreshed first canary drill status">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">First canary drill</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {firstCanaryDrillReceipt.next_unblock_step?.label ?? firstCanaryDrillReceipt.next_lane_label ?? "First funded canary"}
+                </p>
+              </div>
+              <span className={firstCanaryDrillStatusClassName(firstCanaryDrillReceipt.status)}>
+                {firstCanaryDrillReceipt.status.replaceAll("-", " ")}
+              </span>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              {firstCanaryDrillReceipt.next_unblock_step?.action ?? firstCanaryDrillReceipt.next_lane_action ?? firstCanaryDrillReceipt.next_action}
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <CanaryMetric label="Actual trade" value={firstCanaryDrillReceipt.actual_live_trade_tested ? "yes" : "no"} tone={firstCanaryDrillReceipt.actual_live_trade_tested ? "engine" : "critical"} />
+              <CanaryMetric label="Proof" value={`${firstCanaryDrillReceipt.proof_pass_count}/${firstCanaryDrillReceipt.proof_required_count}`} tone={firstCanaryDrillReceipt.actual_live_trade_tested ? "engine" : "critical"} />
+              <CanaryMetric label="Hard fails" value={`${firstCanaryDrillReceipt.hard_fail_count}`} tone={firstCanaryDrillReceipt.hard_fail_count > 0 ? "critical" : "engine"} />
+              <CanaryMetric label="Unsigned" value={firstCanaryDrillReceipt.can_request_unsigned_order_now ? "ready" : "blocked"} tone={firstCanaryDrillReceipt.can_request_unsigned_order_now ? "caution" : "critical"} />
+            </div>
+            <div className="mt-2 grid gap-1.5" aria-label="Trading refreshed first canary ordered gates">
+              {firstCanaryDrillReceipt.operator_unblock_plan.slice(0, 4).map((step) => (
+                <div key={step.id} className="grid gap-1 rounded-md border border-outline/15 bg-surface-dim/35 p-2 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+                  <div className="flex items-center gap-2">
+                    <span className={firstCanaryUnblockStepClassName(step.status)}>{step.status}</span>
+                    <span className="truncate text-[11px] font-semibold text-on-surface">{step.label}</span>
+                  </div>
+                  <p className="min-w-0 text-[11px] leading-4 text-on-surface-variant">{step.action}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void refreshFirstCanaryDrill()}
+                disabled={busy || preflightBusy || proofBusy !== null || drillBusy}
+                className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-outline/20 bg-surface-dim/55 px-2.5 py-1.5 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine disabled:cursor-not-allowed disabled:text-outline"
+              >
+                <RefreshCw aria-hidden="true" className={drillBusy ? "size-3.5 animate-spin" : "size-3.5"} />
+                Refresh drill
+              </button>
+              <Link
+                href={drillHref}
+                className="inline-flex min-h-9 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-2.5 py-1.5 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+              >
+                Open drill JSON
+              </Link>
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              Paper trades, DEX reads, and Jupiter rehearsals do not count as live-trade proof; only the signed, relayed, confirmed, reconciled, and mirrored canary does.
+            </p>
+          </div>
+
           <div className="rounded-md border border-caution/25 bg-surface/60 p-3" aria-label="Trading live canary launch checklist">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
@@ -710,6 +793,22 @@ function postSigningStatusClassName(status: Web3LiveTradeCanaryReceipt["post_sig
   if (status === "settlement-accounted") return `${base} border-engine/30 bg-engine/10 text-engine`;
   if (status === "review-required") return `${base} border-critical/30 bg-critical/10 text-critical`;
   return `${base} border-caution/30 bg-caution/10 text-caution`;
+}
+
+function firstCanaryDrillStatusClassName(status: Web3FirstCanaryDrillReceipt["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "canary-proven" || status === "ready-to-request-unsigned-order" || status === "ready-to-relay-signed-payload") {
+    return `${base} border-engine/30 bg-engine/10 text-engine`;
+  }
+  if (status === "unsafe-permission-drift") return `${base} border-critical/30 bg-critical/10 text-critical`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
+function firstCanaryUnblockStepClassName(status: Web3FirstCanaryDrillReceipt["operator_unblock_plan"][number]["status"]) {
+  const base = "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "done") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "next" || status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
 export function buildCanaryLaunchSteps(input: {

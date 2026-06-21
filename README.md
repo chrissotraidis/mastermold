@@ -300,6 +300,10 @@ transaction bytes. Trading and Settings expose this as `Canary preflight` before
 The Trading canary console now shows a compact `Canary launch checklist` that separates preflight,
 browser-wallet signature, signed relay, and confirmation/accounting, and it labels the result as
 `Funded canary still not proven` until all four live-money proof stages are complete.
+The Trading live canary console refreshes the first-canary drill after wallet proof, canary
+preflight, tiny-canary signing, proof checks, and manual receipt refresh, so the next unblock step,
+hard-fail count, proof count, and ordered gates stay current without treating paper trades, DEX
+reads, or Jupiter rehearsals as live-trade proof.
 It also exposes `Prove wallet` in the same live canary console, using the existing text-only
 `/api/web3-wallet-ownership` flow so the operator can clear the next wallet-control gate without a
 transaction signature, private key, seed phrase, wallet mutation, or fund movement. That flow now

@@ -182,6 +182,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
           />
           <Web3LiveCanaryConsole
             receipt={liveTradeCanary}
+            firstCanaryDrill={firstCanaryDrill}
             source={source}
             account={account}
             scenario={initialState.scenario}

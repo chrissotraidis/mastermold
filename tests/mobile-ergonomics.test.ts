@@ -1702,6 +1702,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary preflight");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary preflight receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("getTrustedBrowserWalletPublicKey");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Web3FirstCanaryDrillReceipt");
+    expect(source("app/trading/page.tsx")).toContain("firstCanaryDrill={firstCanaryDrill}");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("refreshFirstCanaryDrill");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-first-canary-drill?");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading refreshed first canary drill status");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading refreshed first canary ordered gates");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Paper trades, DEX reads, and Jupiter rehearsals do not count");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Sign tiny canary");
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-unsigned-order-handoff?");
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-live-trade-canary?");
@@ -2049,6 +2056,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings mirrors that same first-canary operator unblock plan");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings credential console refreshes both the live-usability blocker receipt and the first-canary drill");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings also has the same `Canary preflight` button as Trading");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Trading live canary console refreshes the first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("web3_operator_runbook summary");
     expect(source("components/review-readiness.tsx")).toContain("live-review runbook endpoint");
     expect(source("components/review-readiness.tsx")).toContain("next dependency blocker");
@@ -2062,6 +2070,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors that same first-canary drill receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now refreshes that first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now includes the same no-transaction Canary preflight as Trading");
+    expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now refreshes the first-canary drill");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");
