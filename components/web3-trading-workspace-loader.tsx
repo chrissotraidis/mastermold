@@ -16,7 +16,7 @@ import type { Web3PromotedPaperAutopilotHealth } from "@/src/db/web3-promoted-pa
 import type { Web3ProviderHealthReceipt } from "@/src/db/web3-provider-health";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3SignerHandoffReceipt } from "@/src/db/web3-signer-handoff";
-import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
+import type { AutonomousCandleRefreshRecordRequest, AutonomousDaemonLeaseRequest, ExecutionUpdate, TradingAccountMode, TradingMarketSource, Web3TradingState } from "@/src/db/web3-trading";
 
 type OperatorFocusMode = "cockpit" | "market" | "portfolio" | "wiring";
 type QuickBusyState = "refresh" | "route" | "route-repair" | "chart" | "loop" | "session" | "minute" | "promoted" | "source" | "reset" | "dry-run-setup" | "order-rehearsal" | "account-setup" | "provider-health" | "signer-handoff" | "accounting-ledger" | "emergency-stop" | "supervisor-refresh";
@@ -107,11 +107,15 @@ export function Web3TradingWorkspaceLoader({
   initialSupervisorHealth,
   initialPromotedAutopilotHealth,
   initialLaunchChecklist,
+  initialSource = "live-dex",
+  initialAccount = "persistent",
 }: {
   initialState?: Web3TradingState;
   initialSupervisorHealth?: Web3DaemonSupervisorHealth;
   initialPromotedAutopilotHealth?: Web3PromotedPaperAutopilotHealth;
   initialLaunchChecklist?: Web3AutonomyLaunchChecklist;
+  initialSource?: TradingMarketSource;
+  initialAccount?: TradingAccountMode;
 }) {
   const [state, setState] = useState<Web3TradingState | undefined>(initialState);
   const [supervisorHealth, setSupervisorHealth] = useState<Web3DaemonSupervisorHealth | undefined>(initialSupervisorHealth);
@@ -146,7 +150,12 @@ export function Web3TradingWorkspaceLoader({
   useEffect(() => {
     if (state) return;
     const controller = new AbortController();
-    fetch("/api/web3-trading?account=persistent&source=sample", { signal: controller.signal })
+    const params = new URLSearchParams({
+      account: initialAccount,
+      source: initialSource,
+      advance: "false",
+    });
+    fetch(`/api/web3-trading?${params.toString()}`, { signal: controller.signal, cache: "no-store" })
       .then(async (response) => {
         const payload = (await response.json()) as Web3TradingState | { error: string };
         if (!response.ok || "error" in payload) {
@@ -159,7 +168,7 @@ export function Web3TradingWorkspaceLoader({
         setError(reason instanceof Error ? reason.message : "The autonomous trading state could not be loaded.");
       });
     return () => controller.abort();
-  }, [state]);
+  }, [initialAccount, initialSource, state]);
 
   useEffect(() => {
     let cancelled = false;

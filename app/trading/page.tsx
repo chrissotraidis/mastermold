@@ -203,22 +203,24 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
             preflight={liveCapitalPreflight}
             liveUsabilityBlockers={liveUsabilityBlockers}
           />
-          <ReadinessReceiptsDrawer>
-            <LiveIgnitionPanel receipt={liveIgnition} />
-            <SupervisedCanaryReadinessPanel receipt={supervisedCanaryReadiness} />
-            <LiveAutonomyReadinessPanel readiness={initialState.autonomous_live_autonomy_readiness} source={source} account={account} scenario={initialState.scenario} />
-            <LiveUsabilityBlockersPanel receipt={liveUsabilityBlockers} source={source} account={account} />
-            <UsabilityStatusPanel status={usabilityStatus} source={source} account={account} />
-            <CutoverBlockerBoardPanel board={cutoverBlockerBoard} source={source} account={account} />
-            <OperatorRunbookPanel runbook={operatorRunbook} source={source} account={account} />
-          </ReadinessReceiptsDrawer>
+          <ReadinessReceiptsDrawer
+            source={source}
+            account={account}
+            scenario={initialState.scenario}
+            liveIgnitionStatus={liveIgnition.status}
+            canaryReadinessStatus={supervisedCanaryReadiness.status}
+            liveAutonomyStatus={initialState.autonomous_live_autonomy_readiness.status}
+            liveUsabilityStatus={liveUsabilityBlockers.status}
+            usabilityMode={usabilityStatus.current_mode}
+            cutoverSummary={`${cutoverBlockerBoard.open_blocker_count} open blockers`}
+            runbookSummary={`${operatorRunbook.allowed_now_count} safe actions`}
+          />
           <MarketMonitorHistoryPanel history={monitorHistory} />
 
           <Web3TradingWorkspaceLoader
-            initialState={initialState}
-            initialSupervisorHealth={supervisorHealth}
             initialPromotedAutopilotHealth={promotedAutopilotHealth}
-            initialLaunchChecklist={launchChecklist}
+            initialSource={source}
+            initialAccount={account}
           />
         </div>
       </div>
@@ -1327,7 +1329,80 @@ function formatTradingCompactCurrency(value: number) {
   }).format(value);
 }
 
-function ReadinessReceiptsDrawer({ children }: { children: React.ReactNode }) {
+function ReadinessReceiptsDrawer({
+  source,
+  account,
+  scenario,
+  liveIgnitionStatus,
+  canaryReadinessStatus,
+  liveAutonomyStatus,
+  liveUsabilityStatus,
+  usabilityMode,
+  cutoverSummary,
+  runbookSummary,
+}: {
+  source: "sample" | "live-dex";
+  account: "persistent" | "ephemeral";
+  scenario: string;
+  liveIgnitionStatus: string;
+  canaryReadinessStatus: string;
+  liveAutonomyStatus: string;
+  liveUsabilityStatus: string;
+  usabilityMode: string;
+  cutoverSummary: string;
+  runbookSummary: string;
+}) {
+  const params = new URLSearchParams({ source, account, scenario, cycles: "0" });
+  const receiptHref = (path: string, extra?: Record<string, string>) => {
+    const nextParams = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(extra ?? {})) nextParams.set(key, value);
+    return `${path}?${nextParams.toString()}`;
+  };
+  const receipts = [
+    {
+      label: "Live ignition",
+      status: liveIgnitionStatus,
+      detail: "Launch envelope, live locks, and canary transition checks.",
+      href: receiptHref("/api/web3-live-ignition"),
+    },
+    {
+      label: "First canary readiness",
+      status: canaryReadinessStatus,
+      detail: "Supervised lanes for wallet proof, Jupiter, relay, and settlement.",
+      href: receiptHref("/api/web3-supervised-canary-readiness"),
+    },
+    {
+      label: "Live autonomy gate",
+      status: liveAutonomyStatus,
+      detail: "Final unattended real-capital gate; read-only until all proof passes.",
+      href: receiptHref("/api/web3-live-autonomy-readiness"),
+    },
+    {
+      label: "What is left",
+      status: liveUsabilityStatus,
+      detail: "Dependency-ranked live usability blockers and safe next input.",
+      href: receiptHref("/api/web3-live-usability-blockers", { rows: "all" }),
+    },
+    {
+      label: "Usability dossier",
+      status: usabilityMode,
+      detail: "Copilot, paper, dry-run, supervised-live, and locked-live capabilities.",
+      href: receiptHref("/api/web3-usability-status"),
+    },
+    {
+      label: "Cutover board",
+      status: cutoverSummary,
+      detail: "Owner-grouped setup blockers for wallet, security, ops, and review.",
+      href: receiptHref("/api/web3-cutover-blocker-board"),
+    },
+    {
+      label: "Operator runbook",
+      status: runbookSummary,
+      detail: "Allowed actions, gated actions, verifier commands, and safe surfaces.",
+      href: receiptHref("/api/web3-operator-runbook"),
+    },
+  ];
+
   return (
     <details className="group min-w-0">
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-md border border-outline/15 bg-surface/70 px-3 py-2 text-sm font-semibold text-on-surface transition hover:border-engine/35 hover:text-engine">
@@ -1339,11 +1414,54 @@ function ReadinessReceiptsDrawer({ children }: { children: React.ReactNode }) {
           shown
         </span>
       </summary>
-      <div className="mt-3 space-y-3">
-        {children}
+      <div className="mt-3 rounded-md border border-outline/15 bg-surface/70 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Compact evidence index</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">Full receipts stay linked, not pre-rendered</p>
+          </div>
+          <span className="rounded-md border border-engine/25 bg-engine/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-engine">
+            lighter cockpit
+          </span>
+        </div>
+        <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
+          The default cockpit keeps the long audit bodies out of first paint. Open a receipt when you need the full blocker audit, verifier commands, or reviewer evidence.
+        </p>
+        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3" aria-label="Trading linked readiness receipt index">
+          {receipts.map((receipt) => (
+            <Link
+              key={receipt.label}
+              href={receipt.href}
+              className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface-dim/45 p-3 transition hover:border-engine/35"
+            >
+              <div className="flex min-w-0 items-start justify-between gap-2">
+                <p className="truncate text-sm font-semibold text-on-surface">{receipt.label}</p>
+                <span className={readinessReceiptIndexStatusClassName(receipt.status)}>
+                  {receipt.status.replaceAll("-", " ")}
+                </span>
+              </div>
+              <p className="line-clamp-2 text-xs leading-5 text-on-surface-variant">{receipt.detail}</p>
+            </Link>
+          ))}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-outline">
+          These receipt links are read-only. They cannot sign, submit transactions, store wallet authority, mutate balances, or approve autonomous live trading.
+        </p>
       </div>
     </details>
   );
+}
+
+function readinessReceiptIndexStatusClassName(status: string) {
+  const normalized = status.toLowerCase();
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (normalized.includes("blocked") || normalized.includes("needed") || normalized.includes("locked")) {
+    return `${base} border-critical/30 bg-critical/10 text-critical`;
+  }
+  if (normalized.includes("input") || normalized.includes("gated") || normalized.includes("watch") || normalized.includes("open")) {
+    return `${base} border-caution/30 bg-caution/10 text-caution`;
+  }
+  return `${base} border-engine/30 bg-engine/10 text-engine`;
 }
 
 function UsabilityStatusPanel({

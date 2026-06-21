@@ -705,28 +705,31 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<ReadinessReceiptsDrawer"),
     );
     expect(tradingPage.indexOf("<ReadinessReceiptsDrawer")).toBeLessThan(
-      tradingPage.indexOf("<LiveIgnitionPanel"),
-    );
-    expect(tradingPage.indexOf("<LiveIgnitionPanel")).toBeLessThan(
-      tradingPage.indexOf("<SupervisedCanaryReadinessPanel"),
-    );
-    expect(tradingPage.indexOf("<SupervisedCanaryReadinessPanel")).toBeLessThan(
-      tradingPage.indexOf("<LiveUsabilityBlockersPanel"),
-    );
-    expect(tradingPage.indexOf("<LiveUsabilityBlockersPanel")).toBeLessThan(
-      tradingPage.indexOf("<UsabilityStatusPanel"),
-    );
-    expect(tradingPage.indexOf("<UsabilityStatusPanel")).toBeLessThan(
-      tradingPage.indexOf("<CutoverBlockerBoardPanel"),
-    );
-    expect(tradingPage.indexOf("<CutoverBlockerBoardPanel")).toBeLessThan(
-      tradingPage.indexOf("<OperatorRunbookPanel"),
-    );
-    expect(tradingPage.indexOf("<OperatorRunbookPanel")).toBeLessThan(
       tradingPage.indexOf("<MarketMonitorHistoryPanel"),
     );
+    expect(tradingPage).toContain("initialSource={source}");
+    expect(tradingPage).toContain("initialAccount={account}");
+    expect(tradingPage).not.toContain("initialState={initialState}");
+    expect(source("components/web3-trading-workspace-loader.tsx")).toContain('initialSource = "live-dex"');
+    expect(source("components/web3-trading-workspace-loader.tsx")).toContain("source: initialSource");
+    expect(source("components/web3-trading-workspace-loader.tsx")).toContain("account: initialAccount");
+    expect(source("components/web3-trading-workspace-loader.tsx")).toContain("cache: \"no-store\"");
+    expect(tradingPage).not.toContain("<LiveIgnitionPanel receipt={liveIgnition}");
+    expect(tradingPage).not.toContain("<LiveUsabilityBlockersPanel receipt={liveUsabilityBlockers}");
     expect(tradingPage).toContain("ReadinessReceiptsDrawer");
     expect(tradingPage).toContain("Readiness receipts and runbook");
+    expect(tradingPage).toContain("Compact evidence index");
+    expect(tradingPage).toContain("Full receipts stay linked, not pre-rendered");
+    expect(tradingPage).toContain("Trading linked readiness receipt index");
+    expect(tradingPage).toContain("lighter cockpit");
+    expect(tradingPage).toContain("The default cockpit keeps the long audit bodies out of first paint.");
+    expect(tradingPage).toContain("/api/web3-live-ignition");
+    expect(tradingPage).toContain("/api/web3-supervised-canary-readiness");
+    expect(tradingPage).toContain("/api/web3-live-autonomy-readiness");
+    expect(tradingPage).toContain("/api/web3-live-usability-blockers");
+    expect(tradingPage).toContain("/api/web3-usability-status");
+    expect(tradingPage).toContain("/api/web3-cutover-blocker-board");
+    expect(tradingPage).toContain("/api/web3-operator-runbook");
     expect(tradingPage).toContain("LiveUsabilityBlockersPanel");
     expect(tradingPage).toContain("Real-money usability");
     expect(tradingPage).toContain("What is left");
@@ -2248,6 +2251,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("compact safe-to-provide request packet");
     expect(source("components/review-readiness.tsx")).toContain("read-only live DEX cockpit");
     expect(source("components/review-readiness.tsx")).toContain("defaults plain /trading to Live DEX read");
+    expect(source("components/review-readiness.tsx")).toContain("compact linked evidence index");
+    expect(source("components/review-readiness.tsx")).toContain("defers its bulky trading-state and launch-checklist payloads");
     expect(settingsPage).toContain("Open Web3 wiring");
     expect(settingsPage).toContain('href="/trading?source=sample"');
     expect(settingsPage).toContain('href="/trading?source=live-dex"');
