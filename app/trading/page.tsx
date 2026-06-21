@@ -33,6 +33,7 @@ import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/
 import { buildWeb3SupervisedCanaryReadinessReceipt, type Web3SupervisedCanaryReadinessLane, type Web3SupervisedCanaryReadinessReceipt } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3UsabilityStatus, type Web3UsabilityStatusReceipt } from "@/src/db/web3-usability-status";
 import { getWeb3TradingStateAsync, isTradingAccountMode, isTradingMarketSource } from "@/src/db/web3-trading";
+import { getLatestWeb3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     account,
     source,
   });
+  const latestWalletOwnership = getLatestWeb3WalletOwnershipReceipt(initialState.execution_readiness.config.wallet_public_key);
   const supervisorHealth = getWeb3DaemonSupervisorHealth();
   const promotedAutopilotHealth = getWeb3PromotedPaperAutopilotHealth();
   const monitorHistory = getWeb3MarketMonitorHistory();
@@ -183,6 +185,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
           <Web3LiveCanaryConsole
             receipt={liveTradeCanary}
             firstCanaryDrill={firstCanaryDrill}
+            initialWalletOwnershipReceipt={latestWalletOwnership}
             source={source}
             account={account}
             scenario={initialState.scenario}

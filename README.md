@@ -313,6 +313,9 @@ Trading also exposes `Check wallet` beside `Prove wallet`; it fetches the same t
 receipt for the connected or saved dedicated wallet without asking for a signature, blocks mismatched
 connected wallets, and refreshes the first-canary drill so the wallet-control gate can be diagnosed
 before any wallet prompt.
+Trading server-renders the latest hash-only wallet ownership receipt for the scoped public wallet,
+so proof created from Settings or an earlier Trading session is visible in the live canary console
+after reload before another canary attempt.
 Trading and Settings expose the actual supervised handoff as `Sign tiny canary`: the browser
 deserializes the one-shot transaction with `@solana/web3.js`, asks the connected wallet to sign,
 then posts the serialized signed payload to the live canary relay without storing transaction

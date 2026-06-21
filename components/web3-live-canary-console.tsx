@@ -23,6 +23,7 @@ type BrowserSolanaProvider = {
 type Web3LiveCanaryConsoleProps = {
   receipt: Web3LiveTradeCanaryReceipt;
   firstCanaryDrill: Web3FirstCanaryDrillReceipt;
+  initialWalletOwnershipReceipt: Web3WalletOwnershipReceipt | null;
   source: TradingMarketSource;
   account: TradingAccountMode;
   scenario: TradingScenario;
@@ -48,6 +49,7 @@ type CanaryLaunchStep = {
 export function Web3LiveCanaryConsole({
   receipt,
   firstCanaryDrill,
+  initialWalletOwnershipReceipt,
   source,
   account,
   scenario,
@@ -70,7 +72,7 @@ export function Web3LiveCanaryConsole({
   const [unsignedReceipt, setUnsignedReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
   const [actionReceipt, setActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
   const [ownershipChallengeReceipt, setOwnershipChallengeReceipt] = useState<Web3WalletOwnershipChallengeReceipt | null>(null);
-  const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
+  const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(initialWalletOwnershipReceipt);
   const [ownershipCheckBusy, setOwnershipCheckBusy] = useState(false);
   const [walletPreview, setWalletPreview] = useState(previewValue(defaultWalletPublicKey));
 
