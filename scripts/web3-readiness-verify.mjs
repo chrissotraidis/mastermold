@@ -940,6 +940,21 @@ async function verifyResearchHandoffPacket() {
   assert(json.live_usability.evidence_endpoint === "GET /api/web3-live-usability-blockers", "Research handoff live-usability summary should point to the full blocker endpoint.", json.live_usability);
   assert(Array.isArray(json.open_operator_inputs), "Research handoff packet should include open operator inputs.", json.open_operator_inputs);
   assert(Array.isArray(json.live_capital_blockers), "Research handoff packet should include live-capital blockers.", json.live_capital_blockers);
+  assert(Array.isArray(json.credential_requirements) && json.credential_requirements.length >= 8, "Research handoff packet should include credential requirements.", json.credential_requirements);
+  assert(
+    ["dedicated-public-wallet", "wallet-ownership-proof", "read-provider-rail", "jupiter-order-rail", "signer-policy", "ops-emergency-stop", "accounting-ledger", "risk-policy", "manual-live-review"].every((id) =>
+      json.credential_requirements.some((item) =>
+        item.id === id &&
+        item.live_execution_permission === "blocked" &&
+        item.wallet_mutation_permission === "blocked" &&
+        item.secret_echo_permission === "blocked"
+      ),
+    ),
+    "Research handoff credential requirements should cover wallet, provider, Jupiter, signer, ops, accounting, risk, and review gates while keeping live locks blocked.",
+    json.credential_requirements,
+  );
+  assert(json.credential_requirements.some((item) => item.id === "dedicated-public-wallet" && item.target_names?.includes("wallet_public_key")), "Research handoff credential requirements should point to the public wallet target.", json.credential_requirements);
+  assert(json.credential_requirements.some((item) => item.id === "jupiter-order-rail" && item.target_names?.includes("JUPITER_API_KEY")), "Research handoff credential requirements should point to the Jupiter env target.", json.credential_requirements);
   assert(Array.isArray(json.research_questions) && json.research_questions.length >= 10, "Research handoff packet should include the research question set.", json.research_questions);
   assert(
     ["custody-architecture", "provider-stack", "moonshot-data-sources", "risk-gates", "credential-storage", "profit-proof"].every((id) =>
@@ -955,6 +970,7 @@ async function verifyResearchHandoffPacket() {
   assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind Web3 Research Handoff Packet"), "Research handoff packet should include pasteable text.", json.text_packet);
   assert(json.text_packet.includes("Next Ordered Unlock Step") && json.text_packet.includes("Operator Unlock Sequence"), "Research handoff text should include the ordered unlock sequence.", json.text_packet);
   assert(json.text_packet.includes("Live Usability Summary") && json.text_packet.includes("Rows listed:"), "Research handoff text should include the live-usability summary.", json.text_packet);
+  assert(json.text_packet.includes("Credential Requirements") && json.text_packet.includes("Dedicated public wallet") && json.text_packet.includes("Done when:"), "Research handoff text should include the credential requirements packet.", json.text_packet);
   assert(json.text_packet.includes("Never Provide"), "Research handoff text should include never-provide boundary.", json.text_packet);
   assert(json.live_execution_permission === "blocked", "Research handoff packet must keep live execution blocked.", json);
   assert(json.wallet_mutation_permission === "blocked", "Research handoff packet must keep wallet mutation blocked.", json);

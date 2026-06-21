@@ -1087,6 +1087,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings Web3 research handoff packet");
     expect(settingsPage).toContain("Settings Web3 research next unlock step");
     expect(settingsPage).toContain("Settings Web3 research live-usability summary");
+    expect(settingsPage).toContain("Settings Web3 credential requirements packet");
+    expect(settingsPage).toContain("Credential requirements packet");
+    expect(settingsPage).toContain("packet.credential_requirements");
+    expect(settingsPage).toContain("safe_value_type");
+    expect(settingsPage).toContain("completion_signal");
     expect(settingsPage).toContain("Settings Web3 research questions");
     expect(settingsPage).toContain("Settings Web3 research open blockers");
     expect(settingsPage).toContain("Settings Web3 research export commands");
@@ -1096,6 +1101,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Operator Unlock Sequence");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_usability");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Live Usability Summary");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("credential_requirements");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Credential Requirements");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("buildCredentialRequirements");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("dedicated-public-wallet");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("manual-live-review");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("Rows listed:");
     expect(settingsPage).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
     expect(settingsPage).toContain("validated export commands only");

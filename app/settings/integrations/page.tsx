@@ -1259,6 +1259,7 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
   const nowQuestions = packet.research_questions.filter((question) => question.priority === "now").slice(0, 4);
   const liveBlockers = packet.live_capital_blockers.slice(0, 4);
   const openInputs = packet.open_operator_inputs.slice(0, 4);
+  const credentialRequirements = packet.credential_requirements.slice(0, 6);
   const liveUsability = packet.live_usability;
   const currentInput = packet.current_input;
   return (
@@ -1281,6 +1282,7 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
       <div className="mt-3 grid gap-2 sm:grid-cols-4">
         <SettingsMetric label="Questions" value={`${packet.research_questions.length}`} />
         <SettingsMetric label="Need now" value={`${nowQuestions.length}`} />
+        <SettingsMetric label="Credential asks" value={`${packet.credential_requirements.length}`} />
         <SettingsMetric label="Live blockers" value={`${packet.live_capital_blockers.length}`} />
         <SettingsMetric label="Ready lanes" value={`${packet.app_state.ready_credential_lanes}/${packet.app_state.total_credential_lanes}`} />
       </div>
@@ -1319,6 +1321,45 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
           </p>
         </div>
       ) : null}
+
+      <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 credential requirements packet">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Credential requirements packet</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              {packet.credential_requirements.filter((item) => item.priority === "needed-now").length} needed now · {packet.credential_requirements.length} total safe asks
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">
+              Give this structured list to a helper or operator when collecting credentials. It names safe value types, storage rules, target names, and done signals without requesting wallet secrets.
+            </p>
+          </div>
+          <LaunchQueueBadge status="watch" label="safe asks only" />
+        </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          {credentialRequirements.map((requirement) => (
+            <div key={requirement.id} className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-on-surface">{requirement.label}</p>
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                    {requirement.owner.replace("-", " ")} · {requirement.priority.replace("-", " ")}
+                  </p>
+                </div>
+                <LaunchQueueBadge status={requirement.priority === "needed-now" ? "fail" : requirement.priority === "before-live" ? "watch" : "pass"} label={requirement.blocks_live_capital ? "blocks live" : "review"} />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{requirement.safe_value_type}</p>
+              <p className="mt-1 text-[10px] leading-4 text-outline">Surface: {requirement.safe_collection_surface}</p>
+              <p className="mt-1 break-words font-mono text-[10px] leading-4 text-outline">
+                {requirement.target_names.join(", ")}
+              </p>
+              <p className="mt-1 text-[10px] leading-4 text-outline">Done: {requirement.completion_signal}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-outline">
+          Every requirement keeps live execution, wallet mutation, and secret echo blocked; private keys, seed phrases, raw transactions, and signed payloads are never requested.
+        </p>
+      </div>
 
       {packet.next_unlock_step ? (
         <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 research next unlock step">

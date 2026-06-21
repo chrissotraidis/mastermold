@@ -1123,6 +1123,21 @@ describe("Web3 autonomous trading subsystem", () => {
       } | null;
       open_operator_inputs: Array<{ id: string; env_targets: string[]; storage: string; safe_collection_surface: string }>;
       live_capital_blockers: Array<{ id: string; label: string; status: string; next_action: string }>;
+      credential_requirements: Array<{
+        id: string;
+        label: string;
+        owner: string;
+        priority: string;
+        safe_value_type: string;
+        safe_collection_surface: string;
+        storage_rule: string;
+        target_names: string[];
+        research_question_ids: string[];
+        completion_signal: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        secret_echo_permission: string;
+      }>;
       research_questions: Array<{ id: string; priority: string; category: string; question: string; expected_answer_format: string }>;
       safe_to_share: string[];
       never_provide: string[];
@@ -1197,6 +1212,36 @@ describe("Web3 autonomous trading subsystem", () => {
       "live-dex",
       "signer-custody",
     ]));
+    expect(packet.credential_requirements.map((item) => item.id)).toEqual([
+      "dedicated-public-wallet",
+      "wallet-ownership-proof",
+      "read-provider-rail",
+      "jupiter-order-rail",
+      "signer-policy",
+      "ops-emergency-stop",
+      "accounting-ledger",
+      "risk-policy",
+      "manual-live-review",
+    ]);
+    expect(packet.credential_requirements[0]).toMatchObject({
+      label: "Dedicated public wallet",
+      owner: "operator",
+      priority: "needed-now",
+      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+      storage_rule: "browser-public-scope",
+      target_names: ["wallet_public_key"],
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(packet.credential_requirements.find((item) => item.id === "jupiter-order-rail")?.target_names).toContain("JUPITER_API_KEY");
+    expect(packet.credential_requirements.find((item) => item.id === "signer-policy")?.research_question_ids).toEqual(expect.arrayContaining(["custody-architecture", "risk-gates"]));
+    expect(packet.credential_requirements.every((item) =>
+      item.completion_signal.length > 0 &&
+      item.live_execution_permission === "blocked" &&
+      item.wallet_mutation_permission === "blocked" &&
+      item.secret_echo_permission === "blocked"
+    )).toBe(true);
     expect(packet.research_questions.map((item) => item.id)).toEqual(expect.arrayContaining([
       "custody-architecture",
       "provider-stack",
@@ -1222,6 +1267,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.text_packet).toContain("wallet_public_key");
     expect(packet.text_packet).toContain("## Operator Unlock Sequence");
     expect(packet.text_packet).toContain("## Live Usability Summary");
+    expect(packet.text_packet).toContain("## Credential Requirements");
+    expect(packet.text_packet).toContain("Dedicated public wallet");
+    expect(packet.text_packet).toContain("Done when:");
     expect(packet.text_packet).toContain("Rows listed:");
     expect(packet.text_packet).toContain("GET /api/web3-live-usability-blockers");
     expect(packet.text_packet).toContain("Scope dedicated wallet");

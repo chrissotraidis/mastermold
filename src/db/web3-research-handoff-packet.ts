@@ -30,6 +30,33 @@ export type Web3ResearchQuestion = {
   expected_answer_format: string;
 };
 
+export type Web3CredentialRequirement = {
+  id:
+    | "dedicated-public-wallet"
+    | "wallet-ownership-proof"
+    | "read-provider-rail"
+    | "jupiter-order-rail"
+    | "signer-policy"
+    | "ops-emergency-stop"
+    | "accounting-ledger"
+    | "risk-policy"
+    | "manual-live-review";
+  label: string;
+  owner: "operator" | "security" | "ops" | "accounting" | "strategy" | "manual-review";
+  priority: "needed-now" | "before-live" | "external-review";
+  safe_value_type: string;
+  safe_collection_surface: string;
+  storage_rule: string;
+  target_names: string[];
+  research_question_ids: Web3ResearchQuestion["id"][];
+  completion_signal: string;
+  next_action: string;
+  blocks_live_capital: boolean;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export type Web3ResearchHandoffPacket = {
   mode: "web3-research-handoff-packet";
   status: "research-needed" | "ready-for-operator-input" | "ready-for-external-review";
@@ -72,6 +99,7 @@ export type Web3ResearchHandoffPacket = {
     status: Web3LiveCapitalPreflightReceipt["gates"][number]["status"];
     next_action: string;
   }>;
+  credential_requirements: Web3CredentialRequirement[];
   research_questions: Web3ResearchQuestion[];
   safe_to_share: string[];
   never_provide: string[];
@@ -102,6 +130,8 @@ export type Web3ResearchHandoffHealth = {
   strategy_review_question_count: number;
   open_operator_input_count: number;
   live_capital_blocker_count: number;
+  credential_requirement_count: number;
+  needed_now_requirement_count: number;
   current_input: Web3OperatorRequestPacket["current_input"];
   next_question: string;
   next_operator_input: string;
@@ -148,6 +178,7 @@ export function buildWeb3ResearchHandoffPacket(input: {
       next_action: gate.next_action,
     }));
   const researchQuestions = buildResearchQuestions();
+  const credentialRequirements = buildCredentialRequirements(input.requestPacket, researchQuestions);
   const nextUnlockStep = input.usability.operator_unlock_sequence.find((step) => step.status !== "ready") ??
     input.usability.operator_unlock_sequence[input.usability.operator_unlock_sequence.length - 1] ??
     null;
@@ -200,6 +231,7 @@ export function buildWeb3ResearchHandoffPacket(input: {
     current_input: input.requestPacket.current_input,
     open_operator_inputs: openOperatorInputs,
     live_capital_blockers: liveCapitalBlockers,
+    credential_requirements: credentialRequirements,
     research_questions: researchQuestions,
     safe_to_share: input.requestPacket.safe_to_provide,
     never_provide: input.requestPacket.never_provide,
@@ -261,6 +293,8 @@ export function buildWeb3ResearchHandoffHealth(packet: Web3ResearchHandoffPacket
     strategy_review_question_count: strategyReviewQuestions.length,
     open_operator_input_count: packet.open_operator_inputs.length,
     live_capital_blocker_count: packet.live_capital_blockers.length,
+    credential_requirement_count: packet.credential_requirements.length,
+    needed_now_requirement_count: packet.credential_requirements.filter((item) => item.priority === "needed-now").length,
     current_input: packet.current_input,
     next_question: firstQuestion?.question ?? "No research questions are open.",
     next_operator_input: packet.open_operator_inputs[0]?.next_action ?? "No required operator input is open.",
@@ -275,6 +309,195 @@ export function buildWeb3ResearchHandoffHealth(packet: Web3ResearchHandoffPacket
     seed_phrase_storage: "blocked",
     secret_echo_permission: "blocked",
   };
+}
+
+function buildCredentialRequirements(
+  requestPacket: Web3OperatorRequestPacket,
+  researchQuestions: Web3ResearchQuestion[],
+): Web3CredentialRequirement[] {
+  const questionIds = new Set(researchQuestions.map((question) => question.id));
+  const currentInput = requestPacket.current_input;
+  const openInputById = new Map<string, Web3OperatorRequestPacket["required_inputs"][number]>(
+    requestPacket.required_inputs.map((input) => [input.id, input]),
+  );
+  const targetNames = (id: string, fallback: string[]) => {
+    const targets = openInputById.get(id)?.env_targets ?? [];
+    return targets.length > 0 ? targets : fallback;
+  };
+  const currentAction = currentInput?.id === "dedicated-trading-wallet"
+    ? currentInput.next_action
+    : "Save a dedicated public Solana trading wallet address in Settings; do not paste private keys or seed phrases.";
+  const linkedQuestions = (...ids: Web3ResearchQuestion["id"][]) => ids.filter((id) => questionIds.has(id));
+
+  return [
+    {
+      id: "dedicated-public-wallet",
+      label: "Dedicated public wallet",
+      owner: "operator",
+      priority: "needed-now",
+      safe_value_type: "Public Solana wallet address only",
+      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+      storage_rule: "browser-public-scope",
+      target_names: ["wallet_public_key"],
+      research_question_ids: linkedQuestions("credential-storage", "custody-architecture"),
+      completion_signal: "Strict operator-wallet verifier passes with --require-operator-wallet and the sample all-ones wallet is rejected.",
+      next_action: currentAction,
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "wallet-ownership-proof",
+      label: "Wallet ownership proof",
+      owner: "operator",
+      priority: "needed-now",
+      safe_value_type: "Text-message signature receipt with hashes only",
+      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+      storage_rule: "hash-only-local-receipt",
+      target_names: ["wallet_public_key", "wallet_ownership_signature_hash"],
+      research_question_ids: linkedQuestions("custody-architecture", "credential-storage"),
+      completion_signal: "Wallet proof receipt stores challenge/signature hashes only and transaction signing stays blocked.",
+      next_action: "Connect the browser wallet only for a public-address prompt, then sign the app's text-only ownership message.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "read-provider-rail",
+      label: "Read provider rail",
+      owner: "operator",
+      priority: "needed-now",
+      safe_value_type: "Helius API key or Solana RPC/WebSocket target",
+      safe_collection_surface: "/settings/integrations#settings-web3-credentials-runway",
+      storage_rule: "ignored-server-env-or-session-only-test",
+      target_names: targetNames("provider-read-rail", ["HELIUS_API_KEY", "SOLANA_RPC_URL", "SOLANA_WS_URL"]),
+      research_question_ids: linkedQuestions("provider-stack", "moonshot-data-sources", "credential-storage"),
+      completion_signal: "Credential test or doctor receipt reports read-provider rail evidence without echoing the key or endpoint secret.",
+      next_action: "Configure Helius/Solana read targets locally or run a session-only provider test from Settings.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "jupiter-order-rail",
+      label: "Jupiter order rail",
+      owner: "operator",
+      priority: "needed-now",
+      safe_value_type: "Jupiter API key for quote/order rehearsal",
+      safe_collection_surface: "/settings/integrations#settings-web3-credentials-runway",
+      storage_rule: "ignored-server-env-or-session-only-test",
+      target_names: targetNames("jupiter-route-order-key", ["JUPITER_API_KEY"]),
+      research_question_ids: linkedQuestions("provider-stack", "latency-budget", "credential-storage"),
+      completion_signal: "Jupiter rehearsal records quote and unsigned-order readiness while withholding transaction bytes.",
+      next_action: "Add JUPITER_API_KEY through ignored local env or a one-shot Settings rehearsal, then run the strict order verifier.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "signer-policy",
+      label: "Signer and custody policy",
+      owner: "security",
+      priority: "before-live",
+      safe_value_type: "Signer provider mode, policy ids, and external custody decision",
+      safe_collection_surface: "external-review-plus-ignored-env-targets",
+      storage_rule: "provider-vault-or-external-wallet-only",
+      target_names: [
+        "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
+        "PRIVY_APP_ID",
+        "PRIVY_SOLANA_WALLET_ID",
+        "TURNKEY_ORGANIZATION_ID",
+        "TURNKEY_SOLANA_WALLET_ACCOUNT",
+        "MASTERMOLD_SESSION_POLICY_HASH",
+      ],
+      research_question_ids: linkedQuestions("custody-architecture", "first-live-mode", "risk-gates", "credential-storage"),
+      completion_signal: "Signer packet shows provider choice and policy evidence, while wallet private keys, seed phrases, and raw/signed transactions remain absent.",
+      next_action: "Choose manual external wallet, Privy, Turnkey, or reviewed session-key policy before any supervised live request.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "ops-emergency-stop",
+      label: "Ops and emergency stop",
+      owner: "ops",
+      priority: "before-live",
+      safe_value_type: "Emergency contact/webhook target plus worker owner/process/restart targets",
+      safe_collection_surface: "/settings/integrations#settings-web3-credentials-runway",
+      storage_rule: "ignored-server-env-target-names",
+      target_names: [
+        "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL",
+        "MASTERMOLD_EMERGENCY_STOP_CONTACT",
+        "MASTERMOLD_WEB3_PROCESS_MANAGER",
+        "MASTERMOLD_WEB3_WORKER_OWNER",
+        "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+        "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+      ],
+      research_question_ids: linkedQuestions("go-live-checklist", "latency-budget", "compliance-boundaries"),
+      completion_signal: "Live-ops packet reports emergency-stop and production-worker review targets without dispatching webhooks or starting workers.",
+      next_action: "Name the emergency-stop and production-worker review targets, then refresh live ops/preflight receipts.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "accounting-ledger",
+      label: "Accounting ledger",
+      owner: "accounting",
+      priority: "before-live",
+      safe_value_type: "Tax/export target and settlement reconciliation policy",
+      safe_collection_surface: "/settings/integrations#settings-web3-credentials-runway",
+      storage_rule: "ignored-server-env-target-name-or-external-review",
+      target_names: targetNames("accounting-export-target", ["MASTERMOLD_TAX_LEDGER_EXPORT_PATH"]),
+      research_question_ids: linkedQuestions("settlement-accounting", "go-live-checklist"),
+      completion_signal: "Accounting ledger receipt proves redacted settlement/export readiness without wallet mutation.",
+      next_action: "Set the accounting/export target or document the external ledger workflow before real-capital review.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "risk-policy",
+      label: "Risk policy",
+      owner: "strategy",
+      priority: "before-live",
+      safe_value_type: "Trade caps, daily cap, slippage cap, drawdown brake, and token-entry rules",
+      safe_collection_surface: "/settings/integrations#settings-web3-credentials-runway",
+      storage_rule: "dry-run-policy-and-external-review",
+      target_names: ["max_trade_usd", "daily_spend_cap_usd", "max_slippage_bps", "risk_policy_review"],
+      research_question_ids: linkedQuestions("risk-gates", "profit-proof", "go-live-checklist"),
+      completion_signal: "Live-capital preflight reports risk gates as pass/watch with manual live review still required.",
+      next_action: "Confirm the numeric risk caps and hard blockers for slippage, liquidity, holder concentration, authority risk, quote age, and kill switch.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "manual-live-review",
+      label: "Manual live review",
+      owner: "manual-review",
+      priority: "external-review",
+      safe_value_type: "External approval decision after wallet, provider, signer, ops, accounting, and profit-proof gates pass",
+      safe_collection_surface: "external-review",
+      storage_rule: "external-approval-record-only",
+      target_names: ["MASTERMOLD_LIVE_OPERATOR_APPROVAL"],
+      research_question_ids: linkedQuestions("first-live-mode", "compliance-boundaries", "profit-proof", "go-live-checklist"),
+      completion_signal: "Manual live-review packet reports all required signoffs passing; in-app autonomous live authority remains blocked until a separate executor exists.",
+      next_action: "Request external review only after the strict wallet, Jupiter, live DEX, signer, ops, accounting, and proof gates pass.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+  ];
 }
 
 function buildResearchQuestions(): Web3ResearchQuestion[] {
@@ -414,6 +637,19 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
     `  Why: ${question.why_it_matters}`,
     `  Answer format: ${question.expected_answer_format}`,
   ].join("\n")).join("\n");
+  const credentialRequirements = packet.credential_requirements.map((requirement) => [
+    `- ${requirement.label}`,
+    `  Owner: ${requirement.owner}`,
+    `  Priority: ${requirement.priority}`,
+    `  Safe value: ${requirement.safe_value_type}`,
+    `  Surface: ${requirement.safe_collection_surface}`,
+    `  Storage: ${requirement.storage_rule}`,
+    requirement.target_names.length > 0 ? `  Target names: ${requirement.target_names.join(", ")}` : null,
+    requirement.research_question_ids.length > 0 ? `  Related questions: ${requirement.research_question_ids.join(", ")}` : null,
+    `  Done when: ${requirement.completion_signal}`,
+    `  Next action: ${requirement.next_action}`,
+    "  Live execution, wallet mutation, and secret echo: blocked",
+  ].filter(Boolean).join("\n")).join("\n");
   const unlockSequence = packet.operator_unlock_sequence.length > 0
     ? packet.operator_unlock_sequence.map((step, index) => [
       `- ${index + 1}. ${step.label}: ${step.status}`,
@@ -482,6 +718,9 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
     "",
     "## Open Operator Inputs",
     openInputs,
+    "",
+    "## Credential Requirements",
+    credentialRequirements,
     "",
     "## Live Capital Blockers",
     blockers,
