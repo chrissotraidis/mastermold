@@ -40,7 +40,7 @@ import { GET as SIGNER_HANDOFF_GET } from "@/app/api/web3-signer-handoff/route";
 import { POST as SUPERVISOR_REFRESH_POST } from "@/app/api/web3-supervisor-refresh/route";
 import { GET as SUPERVISED_LIVE_RUNWAY_GET } from "@/app/api/web3-supervised-live-runway/route";
 import { GET as USABILITY_STATUS_GET } from "@/app/api/web3-usability-status/route";
-import { POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
+import { GET as WALLET_OWNERSHIP_GET, POST as WALLET_OWNERSHIP_POST } from "@/app/api/web3-wallet-ownership/route";
 import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route";
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3CredentialsSetupReadiness } from "@/src/db/web3-credentials";
@@ -4468,13 +4468,43 @@ describe("Web3 autonomous trading subsystem", () => {
     const keyPair = await globalThis.crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]) as CryptoKeyPair;
     const rawPublicKey = await globalThis.crypto.subtle.exportKey("raw", keyPair.publicKey);
     const walletPublicKey = base58Encode(new Uint8Array(rawPublicKey));
-    const message = [
-      "Mastermind Web3 wallet ownership challenge",
-      `Wallet: ${walletPublicKey}`,
-      "Purpose: prove public wallet control only",
-      "No transaction signing or wallet mutation is authorized.",
-      "Issued: 2026-06-19T00:00:00.000Z",
-    ].join("\n");
+    const challengeResponse = await WALLET_OWNERSHIP_GET(new Request(`http://localhost/api/web3-wallet-ownership?wallet_public_key=${walletPublicKey}`));
+    const challengeReceipt = await json<{
+      mode: string;
+      status: string;
+      message: string | null;
+      message_return: string;
+      message_storage: string;
+      transaction_signing_permission: string;
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(challengeResponse);
+    expect(challengeResponse.status).toBe(200);
+    expect(challengeReceipt.mode).toBe("web3-wallet-ownership-challenge");
+    expect(challengeReceipt.status).toBe("ready");
+    expect(challengeReceipt.message).toContain("Mastermind Web3 wallet ownership challenge");
+    expect(challengeReceipt.message).toContain(`Wallet: ${walletPublicKey}`);
+    expect(challengeReceipt.message).toContain("No transaction signing or wallet mutation is authorized.");
+    expect(challengeReceipt.message_return).toBe("returned-for-signing");
+    expect(challengeReceipt.message_storage).toBe("not-stored");
+    expect(challengeReceipt.transaction_signing_permission).toBe("blocked");
+    expect(challengeReceipt.transaction_submission_permission).toBe("blocked");
+    expect(challengeReceipt.live_execution_permission).toBe("blocked");
+    expect(challengeReceipt.wallet_mutation_permission).toBe("blocked");
+    expect(challengeReceipt.private_key_storage).toBe("blocked");
+    expect(challengeReceipt.seed_phrase_storage).toBe("blocked");
+    expect(challengeReceipt.secret_echo_permission).toBe("blocked");
+    expect(challengeReceipt.controls.some((control) => control.includes("plain text"))).toBe(true);
+    const malformedChallengeRequest = await WALLET_OWNERSHIP_GET(new Request("http://localhost/api/web3-wallet-ownership?wallet_public_key=not-a-wallet"));
+    expect(malformedChallengeRequest.status).toBe(422);
+
+    const message = challengeReceipt.message;
+    if (!message) throw new Error("Expected wallet ownership challenge message.");
     const signature = await globalThis.crypto.subtle.sign({ name: "Ed25519" }, keyPair.privateKey, new TextEncoder().encode(message));
     const signatureBase64 = bytesToBase64ForTest(signature);
 

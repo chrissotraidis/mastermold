@@ -250,7 +250,9 @@ browser-wallet signature, signed relay, and confirmation/accounting, and it labe
 `Funded canary still not proven` until all four live-money proof stages are complete.
 It also exposes `Prove wallet` in the same live canary console, using the existing text-only
 `/api/web3-wallet-ownership` flow so the operator can clear the next wallet-control gate without a
-transaction signature, private key, seed phrase, wallet mutation, or fund movement.
+transaction signature, private key, seed phrase, wallet mutation, or fund movement. That flow now
+starts with a server-issued `GET /api/web3-wallet-ownership?wallet_public_key=...` challenge
+receipt, then stores only hashes after the browser wallet signs the text challenge.
 Trading and Settings expose the actual supervised handoff as `Sign tiny canary`: the browser
 deserializes the one-shot transaction with `@solana/web3.js`, asks the connected wallet to sign,
 then posts the serialized signed payload to the live canary relay without storing transaction

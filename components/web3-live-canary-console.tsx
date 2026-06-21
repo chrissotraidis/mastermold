@@ -5,7 +5,7 @@ import { ArrowRight, RefreshCw, ShieldCheck, Wallet, Zap } from "lucide-react";
 import Link from "next/link";
 import type { Web3LiveTradeCanaryActionReceipt, Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import type { Web3LiveUnsignedOrderHandoffReceipt, Web3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
-import type { Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
+import type { Web3WalletOwnershipChallengeReceipt, Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
 import type { TradingAccountMode, TradingMarketSource, TradingScenario, Web3TradingState } from "@/src/db/web3-trading";
 
 type BrowserSolanaProvider = {
@@ -269,7 +269,7 @@ export function Web3LiveCanaryConsole({
         throw new Error("Connect a valid public Solana wallet before proving ownership.");
       }
       setWalletPreview(previewValue(publicKey));
-      const challenge = buildWalletOwnershipChallenge(publicKey);
+      const challenge = await requestWalletOwnershipChallenge(publicKey);
       const signed = await provider.signMessage(new TextEncoder().encode(challenge), "utf8");
       const signatureBytes = signed instanceof Uint8Array ? signed : signed.signature;
       if (!(signatureBytes instanceof Uint8Array)) {
@@ -834,14 +834,13 @@ function bytesToBase64(bytes: Uint8Array) {
   return window.btoa(binary);
 }
 
-function buildWalletOwnershipChallenge(walletPublicKey: string) {
-  return [
-    "Mastermind Web3 wallet ownership challenge",
-    `Wallet: ${walletPublicKey}`,
-    "Purpose: prove public wallet control only",
-    "No transaction signing or wallet mutation is authorized.",
-    `Issued: ${new Date().toISOString()}`,
-  ].join("\n");
+async function requestWalletOwnershipChallenge(walletPublicKey: string) {
+  const response = await fetch(`/api/web3-wallet-ownership?wallet_public_key=${encodeURIComponent(walletPublicKey)}`);
+  const payload = await response.json().catch(() => null) as Web3WalletOwnershipChallengeReceipt | { error: string } | null;
+  if (!response.ok || !payload || "error" in payload || payload.status !== "ready" || !payload.message) {
+    throw new Error(payload && "error" in payload ? payload.error : "Wallet ownership challenge failed.");
+  }
+  return payload.message;
 }
 
 function serializeSignedWalletTransaction(value: unknown): Uint8Array | null {

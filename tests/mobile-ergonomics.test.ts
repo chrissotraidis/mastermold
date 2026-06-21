@@ -1480,6 +1480,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Connect wallet");
     expect(settingsConsole).toContain("Prove ownership");
     expect(settingsConsole).toContain("/api/web3-wallet-ownership");
+    expect(settingsConsole).toContain("requestWalletOwnershipChallenge");
     expect(settingsConsole).toContain("Wallet ownership receipt");
     expect(settingsConsole).toContain("Settings wallet ownership receipt");
     expect(settingsConsole).toContain("wallet ownership proof signs text only");
@@ -1569,8 +1570,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("buildCanaryLaunchSteps");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Prove wallet");
     expect(source("components/web3-live-canary-console.tsx")).toContain("/api/web3-wallet-ownership");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("requestWalletOwnershipChallenge");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Web3WalletOwnershipChallengeReceipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading wallet ownership receipt");
-    expect(source("components/web3-live-canary-console.tsx")).toContain("No transaction signing or wallet mutation is authorized.");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary preflight");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary preflight receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("getTrustedBrowserWalletPublicKey");
@@ -1652,9 +1654,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("then restores");
     expect(source("README.md")).toContain("the saved public wallet/risk scope before exit");
     expect(source("app/api/web3-wallet-ownership/route.ts")).toContain("buildWeb3WalletOwnershipReceipt");
+    expect(source("app/api/web3-wallet-ownership/route.ts")).toContain("buildWeb3WalletOwnershipChallengeReceipt");
+    expect(source("app/api/web3-wallet-ownership/route.ts")).toContain("export async function GET");
     expect(source("app/api/web3-dex-discovery/route.ts")).toContain("buildWeb3DexDiscoveryReceipt");
     expect(source("app/api/web3-live-capital-preflight/route.ts")).toContain("buildWeb3LiveCapitalPreflightReceipt");
     expect(source("src/db/web3-wallet-ownership.ts")).toContain("web3-wallet-ownership-receipt");
+    expect(source("src/db/web3-wallet-ownership.ts")).toContain("web3-wallet-ownership-challenge");
+    expect(source("src/db/web3-wallet-ownership.ts")).toContain("returned-for-signing");
+    expect(source("src/db/web3-wallet-ownership.ts")).toContain("message_storage: \"not-stored\"");
     expect(source("src/db/web3-wallet-ownership.ts")).toContain("appendWeb3ExecutionAudit");
     expect(source("src/db/web3-wallet-ownership.ts")).toContain("getLatestWeb3WalletOwnershipReceipt");
     expect(source("src/db/web3-wallet-ownership.ts")).toContain("transaction_signing_permission: \"blocked\"");

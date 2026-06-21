@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
 import {
+  buildWeb3WalletOwnershipChallengeReceipt,
   buildWeb3WalletOwnershipReceipt,
   persistWeb3WalletOwnershipReceipt,
   validateWalletOwnershipInput,
+  type Web3WalletOwnershipChallengeReceipt,
   type Web3WalletOwnershipReceipt,
 } from "@/src/db/web3-wallet-ownership";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+export async function GET(request: Request): Promise<NextResponse<Web3WalletOwnershipChallengeReceipt | { error: string }>> {
+  const url = new URL(request.url);
+  const walletPublicKey = url.searchParams.get("wallet_public_key")?.trim() ?? "";
+  const receipt = buildWeb3WalletOwnershipChallengeReceipt(walletPublicKey);
+  if (receipt.status !== "ready") {
+    return NextResponse.json(receipt, { status: 422 });
+  }
+  return NextResponse.json(receipt);
+}
 
 export async function POST(request: Request): Promise<NextResponse<Web3WalletOwnershipReceipt | { error: string }>> {
   let body: unknown;

@@ -14,7 +14,7 @@ import type { Web3LiveUnsignedOrderHandoffReceipt } from "@/src/db/web3-live-uns
 import type { Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import type { Web3LocalCredentialInstallReceipt } from "@/src/db/web3-local-credential-install";
 import type { Web3TradingState } from "@/src/db/web3-trading";
-import type { Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
+import type { Web3WalletOwnershipChallengeReceipt, Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
 
 type SettingsWeb3CredentialConsoleProps = {
   walletPublicKeyPreview: string | null;
@@ -535,7 +535,7 @@ export function SettingsWeb3CredentialConsole({
       if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
         throw new Error("Connect a valid public Solana wallet before proving ownership.");
       }
-      const challenge = buildWalletOwnershipChallenge(publicKey);
+      const challenge = await requestWalletOwnershipChallenge(publicKey);
       const signed = await provider.signMessage(new TextEncoder().encode(challenge), "utf8");
       const signatureBytes = signed instanceof Uint8Array ? signed : signed.signature;
       if (!(signatureBytes instanceof Uint8Array)) {
@@ -2156,20 +2156,19 @@ function buildBrowserWalletReceipt({
   };
 }
 
-function buildWalletOwnershipChallenge(walletPublicKey: string) {
-  return [
-    "Mastermind Web3 wallet ownership challenge",
-    `Wallet: ${walletPublicKey}`,
-    "Purpose: prove public wallet control only",
-    "No transaction signing or wallet mutation is authorized.",
-    `Issued: ${new Date().toISOString()}`,
-  ].join("\n");
-}
-
 function bytesToBase64(bytes: Uint8Array) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return window.btoa(binary);
+}
+
+async function requestWalletOwnershipChallenge(walletPublicKey: string) {
+  const response = await fetch(`/api/web3-wallet-ownership?wallet_public_key=${encodeURIComponent(walletPublicKey)}`);
+  const payload = await response.json().catch(() => null) as Web3WalletOwnershipChallengeReceipt | { error: string } | null;
+  if (!response.ok || !payload || "error" in payload || payload.status !== "ready" || !payload.message) {
+    throw new Error(payload && "error" in payload ? payload.error : "Wallet ownership challenge failed.");
+  }
+  return payload.message;
 }
 
 function base64ToBytes(value: string) {

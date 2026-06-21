@@ -5216,8 +5216,8 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
                       {source.replace("-", " ")}
                     </span>
                   ))}
-                  {item.blockers.slice(0, 2).map((blocker) => (
-                    <span key={blocker} className="rounded-md border border-caution/40 bg-caution/10 px-2 py-1 text-xs text-caution">
+                  {item.blockers.slice(0, 2).map((blocker, blockerIndex) => (
+                    <span key={`${item.id}-blocker-${blockerIndex}-${blocker}`} className="rounded-md border border-caution/40 bg-caution/10 px-2 py-1 text-xs text-caution">
                       {blocker}
                     </span>
                   ))}
@@ -6742,8 +6742,8 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
                         <span className={cn("rounded-md border px-2 py-1 text-xs", item.priority === "now" ? "border-critical/40 bg-critical/10 text-critical" : item.priority === "next" ? "border-caution/40 bg-caution/10 text-caution" : "border-outline-variant/40 bg-void/30 text-outline")}>
                           {item.priority}
                         </span>
-                        {item.blockers.slice(0, 2).map((blocker) => (
-                          <span key={blocker} className="rounded-md border border-outline-variant/40 bg-void/30 px-2 py-1 text-xs text-outline">
+                        {item.blockers.slice(0, 2).map((blocker, blockerIndex) => (
+                          <span key={`${item.id}-blocker-${blockerIndex}-${blocker}`} className="rounded-md border border-outline-variant/40 bg-void/30 px-2 py-1 text-xs text-outline">
                             {blocker}
                           </span>
                         ))}
@@ -10424,8 +10424,8 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
           <Panel tint="act" className="p-4 sm:p-5">
             <PanelHeader as="h2" icon={ShieldAlert} title="Live gate" right={<Chip tone="critical">Locked</Chip>} />
             <ul className="relative z-10 space-y-2 text-sm leading-6 text-on-surface-variant">
-              {state.execution_gate.live_blockers.map((blocker) => (
-                <li key={blocker} className="flex gap-2">
+              {state.execution_gate.live_blockers.map((blocker, blockerIndex) => (
+                <li key={`live-blocker-${blockerIndex}-${blocker}`} className="flex gap-2">
                   <span className="mt-2 size-1.5 shrink-0 rounded-full bg-critical" />
                   <span>{blocker}</span>
                 </li>
@@ -12494,8 +12494,8 @@ function AutonomousTradeDecisionPanel({
 
       {governor.blockers.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {governor.blockers.slice(0, 3).map((blocker) => (
-            <Chip key={blocker} tone="caution">{blocker}</Chip>
+          {governor.blockers.slice(0, 3).map((blocker, blockerIndex) => (
+            <Chip key={`governor-blocker-${blockerIndex}-${blocker}`} tone="caution">{blocker}</Chip>
           ))}
         </div>
       ) : null}
@@ -15682,8 +15682,8 @@ function CommandCenterPanel({
         </div>
         {execution.blockers.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            {execution.blockers.slice(0, 3).map((blocker) => (
-              <span key={blocker} className="rounded-md border border-caution/40 bg-caution/10 px-2 py-1 text-xs leading-5 text-caution">
+            {execution.blockers.slice(0, 3).map((blocker, blockerIndex) => (
+              <span key={`execution-blocker-${blockerIndex}-${blocker}`} className="rounded-md border border-caution/40 bg-caution/10 px-2 py-1 text-xs leading-5 text-caution">
                 {blocker}
               </span>
             ))}
@@ -15862,8 +15862,8 @@ function HighFrequencyProfitRacePanel({
 	      </div>
       {execution.live_route_blockers.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          {execution.live_route_blockers.slice(0, 3).map((blocker) => (
-            <span key={blocker} className="rounded-md border border-caution/40 bg-caution/10 px-2 py-1 text-xs leading-5 text-caution">
+          {execution.live_route_blockers.slice(0, 3).map((blocker, blockerIndex) => (
+            <span key={`live-route-blocker-${blockerIndex}-${blocker}`} className="rounded-md border border-caution/40 bg-caution/10 px-2 py-1 text-xs leading-5 text-caution">
               {blocker}
             </span>
           ))}
@@ -16112,8 +16112,8 @@ function MissionPriceTapeChart({
                 {trigger}
               </p>
             ))}
-            {tape.candle_signal.blockers.slice(0, 2).map((blocker) => (
-              <p key={blocker} className="rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-xs leading-5 text-critical">
+            {tape.candle_signal.blockers.slice(0, 2).map((blocker, blockerIndex) => (
+              <p key={`candle-blocker-${blockerIndex}-${blocker}`} className="rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-xs leading-5 text-critical">
                 {blocker}
               </p>
             ))}
@@ -16181,8 +16181,8 @@ function MissionPriceTapeChart({
               ) : null}
               {tape.paper_decision.blockers.length > 0 ? (
                 <div className="mt-3 grid gap-2 md:grid-cols-2">
-                  {tape.paper_decision.blockers.slice(0, 2).map((blocker) => (
-                    <p key={blocker} className="rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-xs leading-5 text-critical">
+                  {tape.paper_decision.blockers.slice(0, 2).map((blocker, blockerIndex) => (
+                    <p key={`paper-decision-blocker-${blockerIndex}-${blocker}`} className="rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-xs leading-5 text-critical">
                       {blocker}
                     </p>
                   ))}
@@ -16239,8 +16239,8 @@ function MissionPriceTapeChart({
                     {trigger}
                   </p>
                 ))}
-                {positionCandleGuard.blockers.slice(0, 2).map((blocker) => (
-                  <p key={blocker} className="rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-xs leading-5 text-critical">
+                {positionCandleGuard.blockers.slice(0, 2).map((blocker, blockerIndex) => (
+                  <p key={`position-candle-blocker-${blockerIndex}-${blocker}`} className="rounded-md border border-critical/30 bg-critical/10 px-3 py-2 text-xs leading-5 text-critical">
                     {blocker}
                   </p>
                 ))}

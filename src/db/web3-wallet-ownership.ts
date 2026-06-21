@@ -23,6 +23,61 @@ export type Web3WalletOwnershipReceipt = {
   controls: string[];
 };
 
+export type Web3WalletOwnershipChallengeReceipt = {
+  mode: "web3-wallet-ownership-challenge";
+  status: "ready" | "blocked";
+  generated_at: string;
+  receipt_hash: string;
+  wallet_public_key_preview: string;
+  message: string | null;
+  message_return: "returned-for-signing" | "blocked";
+  message_storage: "not-stored";
+  transaction_signing_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+  next_action: string;
+  controls: string[];
+};
+
+export function buildWeb3WalletOwnershipChallengeReceipt(walletPublicKey: string): Web3WalletOwnershipChallengeReceipt {
+  const generatedAt = new Date().toISOString();
+  const walletReady = isLikelySolanaPublicKey(walletPublicKey);
+  const message = walletReady ? buildWalletOwnershipChallenge(walletPublicKey, generatedAt) : null;
+  const base = {
+    mode: "web3-wallet-ownership-challenge" as const,
+    status: walletReady ? "ready" as const : "blocked" as const,
+    generated_at: generatedAt,
+    wallet_public_key_preview: previewValue(walletPublicKey),
+    message,
+    message_return: walletReady ? "returned-for-signing" as const : "blocked" as const,
+    message_storage: "not-stored" as const,
+    transaction_signing_permission: "blocked" as const,
+    transaction_submission_permission: "blocked" as const,
+    live_execution_permission: "blocked" as const,
+    wallet_mutation_permission: "blocked" as const,
+    private_key_storage: "blocked" as const,
+    seed_phrase_storage: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
+    next_action: walletReady
+      ? "Ask the browser wallet to sign this text-only ownership challenge; this is not a transaction and cannot move funds."
+      : "Connect or enter a valid public Solana wallet before requesting an ownership challenge.",
+    controls: [
+      "This challenge is plain text for public wallet ownership proof only.",
+      "It is returned only so the external browser wallet can sign the text message.",
+      "The challenge route does not store the message, request transaction signing, submit transactions, custody funds, mutate wallets, or accept private keys.",
+      "The POST receipt stores hash evidence only after a valid Ed25519 message signature is provided.",
+    ],
+  };
+  return {
+    ...base,
+    receipt_hash: sha256Hex(JSON.stringify(base)),
+  };
+}
+
 export async function buildWeb3WalletOwnershipReceipt({
   walletPublicKey,
   message,
@@ -122,6 +177,16 @@ function validateOwnershipChallenge(message: string, walletPublicKey: string) {
     message.includes(`Wallet: ${walletPublicKey}`) &&
     message.includes("Purpose: prove public wallet control only") &&
     message.includes("No transaction signing or wallet mutation is authorized.");
+}
+
+export function buildWalletOwnershipChallenge(walletPublicKey: string, issuedAt = new Date().toISOString()) {
+  return [
+    "Mastermind Web3 wallet ownership challenge",
+    `Wallet: ${walletPublicKey}`,
+    "Purpose: prove public wallet control only",
+    "No transaction signing or wallet mutation is authorized.",
+    `Issued: ${issuedAt}`,
+  ].join("\n");
 }
 
 async function verifyEd25519Signature({

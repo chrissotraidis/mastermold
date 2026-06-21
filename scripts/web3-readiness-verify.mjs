@@ -432,13 +432,20 @@ async function verifyWalletOwnershipReceipt() {
   const keyPair = await subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
   const rawPublicKey = await subtle.exportKey("raw", keyPair.publicKey);
   const proofWalletPublicKey = base58Encode(new Uint8Array(rawPublicKey));
-  const message = [
-    "Mastermind Web3 wallet ownership challenge",
-    `Wallet: ${proofWalletPublicKey}`,
-    "Purpose: prove public wallet control only",
-    "No transaction signing or wallet mutation is authorized.",
-    "Issued: 2026-06-19T00:00:00.000Z",
-  ].join("\n");
+  const challenge = await requestJson(`/api/web3-wallet-ownership?wallet_public_key=${encodeURIComponent(proofWalletPublicKey)}`);
+  assert(challenge.response.status === 200, "Wallet ownership challenge should return for a valid public wallet.", challenge.json);
+  assert(challenge.json.mode === "web3-wallet-ownership-challenge", "Wallet ownership challenge should expose the expected mode.", challenge.json);
+  assert(challenge.json.status === "ready", "Wallet ownership challenge should be ready for a valid public wallet.", challenge.json);
+  assert(typeof challenge.json.message === "string" && challenge.json.message.includes(proofWalletPublicKey), "Wallet ownership challenge should include the public wallet in text.", challenge.json);
+  assert(challenge.json.message_return === "returned-for-signing", "Wallet ownership challenge should return text only for signing.", challenge.json);
+  assert(challenge.json.message_storage === "not-stored", "Wallet ownership challenge should not store the raw message.", challenge.json);
+  assert(challenge.json.transaction_signing_permission === "blocked", "Wallet ownership challenge must not authorize transaction signing.", challenge.json);
+  assert(challenge.json.transaction_submission_permission === "blocked", "Wallet ownership challenge must not authorize transaction submission.", challenge.json);
+  assert(challenge.json.wallet_mutation_permission === "blocked", "Wallet ownership challenge must not authorize wallet mutation.", challenge.json);
+  assert(challenge.json.private_key_storage === "blocked", "Wallet ownership challenge must block private-key storage.", challenge.json);
+  const malformedChallenge = await requestJson("/api/web3-wallet-ownership?wallet_public_key=not-a-wallet");
+  assert(malformedChallenge.response.status === 422, "Wallet ownership challenge should reject malformed public wallets.", malformedChallenge.json);
+  const message = challenge.json.message;
   const signature = await subtle.sign({ name: "Ed25519" }, keyPair.privateKey, new TextEncoder().encode(message));
   const signatureBase64 = Buffer.from(signature).toString("base64");
 
