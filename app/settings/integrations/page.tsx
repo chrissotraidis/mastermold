@@ -659,6 +659,7 @@ function Web3CredentialsRunwayCard({
               maxSlippageBps={state.execution_readiness.config.max_slippage_bps}
               jupiterConfigured={receipt.environment_summary.jupiter_configured}
               initialLiveUsability={liveUsabilityBlockers}
+              initialFirstCanaryDrill={firstCanaryDrill}
               scenario={state.scenario}
               source={state.market_source.mode}
               account={state.paper_account.mode}

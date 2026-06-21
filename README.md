@@ -157,7 +157,10 @@ preview, live-dex drill link, ordered next lane, leading failing lanes, and orde
 so the next real canary blocker is visible before the long workspace. Settings now reads the
 same first-canary drill receipt inside the live trading setup launchpad, placing the next
 unblock step, safe action surface, verifier command, and ordered first-canary unblock steps
-next to the credential console that clears wallet and provider gates. `/api/health` also exposes `web3_live_first_canary_drill`, a canonical
+next to the credential console that clears wallet and provider gates. The Settings credential
+console also refreshes the first-canary drill after safe wallet, provider, Jupiter, preflight,
+and canary actions so the app-visible next live-trade blocker changes without a page reload.
+`/api/health` also exposes `web3_live_first_canary_drill`, a canonical
 live-dex persistent first-canary health summary for monitors that need the real live-trade
 blocker without inferring it from the default app state, plus `web3_live_canary_proof`
 for the compact post-signing proof chain after a signed canary exists. The drill health

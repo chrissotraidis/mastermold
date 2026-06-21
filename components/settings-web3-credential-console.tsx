@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { Web3CredentialsSetupReadiness, Web3SignerSetupMode } from "@/src/db/web3-credentials";
 import type { Web3DexDiscoveryReceipt } from "@/src/db/web3-dex-discovery";
 import type { Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
+import type { Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import type { Web3LiveTradeCanaryActionReceipt } from "@/src/db/web3-live-trade-canary";
@@ -28,6 +29,7 @@ type SettingsWeb3CredentialConsoleProps = {
   maxSlippageBps: number;
   jupiterConfigured: boolean;
   initialLiveUsability: Web3LiveUsabilityBlockersReceipt;
+  initialFirstCanaryDrill: Web3FirstCanaryDrillReceipt;
   scenario: string;
   source: string;
   account: string;
@@ -117,6 +119,7 @@ export function SettingsWeb3CredentialConsole({
   maxSlippageBps,
   jupiterConfigured,
   initialLiveUsability,
+  initialFirstCanaryDrill,
   scenario,
   source,
   account,
@@ -153,7 +156,7 @@ export function SettingsWeb3CredentialConsole({
     daily_spend_cap_usd: String(dailySpendCapUsd),
     max_slippage_bps: String(maxSlippageBps),
   });
-  const [busy, setBusy] = useState<"blockers" | "credentials" | "dex" | "doctor" | "install" | "jupiter" | "live-canary" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
+  const [busy, setBusy] = useState<"blockers" | "canary-drill" | "credentials" | "dex" | "doctor" | "install" | "jupiter" | "live-canary" | "ownership" | "preflight" | "scope" | "wallet" | null>(null);
   const [message, setMessage] = useState("Session-only fields are empty by default. Leave keys blank to use server environment values.");
   const [browserWallet, setBrowserWallet] = useState<BrowserWalletReceipt | null>(null);
   const [credentialResult, setCredentialResult] = useState<(Web3CredentialsSetupReadiness & { checked_at?: string; network_tested?: boolean }) | null>(null);
@@ -165,6 +168,7 @@ export function SettingsWeb3CredentialConsole({
   const [unsignedCanaryReceipt, setUnsignedCanaryReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
   const [liveCanaryActionReceipt, setLiveCanaryActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
   const [liveUsabilityReceipt, setLiveUsabilityReceipt] = useState<Web3LiveUsabilityBlockersReceipt>(initialLiveUsability);
+  const [firstCanaryDrillReceipt, setFirstCanaryDrillReceipt] = useState<Web3FirstCanaryDrillReceipt>(initialFirstCanaryDrill);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
 
@@ -200,7 +204,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setCredentialResult(payload);
       setMessage(payload.summary);
-      void refreshLiveUsabilityBlockers({ announce: false });
+      void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Credential test failed.");
     } finally {
@@ -303,7 +307,7 @@ export function SettingsWeb3CredentialConsole({
         production_restart_policy_url: "",
       }));
       setMessage(payload.summary);
-      void refreshLiveUsabilityBlockers({ announce: false });
+      void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Local credential install failed.");
     } finally {
@@ -336,7 +340,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setJupiterReceipt(payload);
       setMessage(payload.narrative);
-      void refreshLiveUsabilityBlockers({ announce: false });
+      void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Jupiter rehearsal failed.");
     } finally {
@@ -361,7 +365,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setDexReceipt(payload);
       setMessage(payload.summary);
-      void refreshLiveUsabilityBlockers({ announce: false });
+      void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "DEX scanner test failed.");
     } finally {
@@ -386,7 +390,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setPreflightReceipt(payload);
       setMessage(payload.summary);
-      void refreshLiveUsabilityBlockers({ announce: false });
+      void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live-capital preflight failed.");
     } finally {
@@ -468,7 +472,7 @@ export function SettingsWeb3CredentialConsole({
       }
       setLiveCanaryActionReceipt(relayPayload);
       setMessage(relayPayload.next_action);
-      void refreshLiveUsabilityBlockers({ announce: false });
+      void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live canary signing flow failed.");
     } finally {
@@ -577,7 +581,7 @@ export function SettingsWeb3CredentialConsole({
       }));
       setOwnershipReceipt(payload);
       setMessage(payload.summary);
-      void refreshLiveUsabilityBlockers({ announce: false });
+      void refreshCredentialAndCanaryState({ announce: false });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Wallet ownership proof failed.");
     } finally {
@@ -628,13 +632,14 @@ export function SettingsWeb3CredentialConsole({
         updatedAt: payload.execution_readiness.config.updated_at,
       });
       try {
-        const updatedBlockers = await fetchLiveUsabilityBlockers();
+        const { liveUsability: updatedBlockers, firstCanaryDrill } = await refreshCredentialAndCanaryState({ announce: false });
         setLiveUsabilityReceipt(updatedBlockers);
-        setMessage(`Public wallet scope and dry-run caps are saved. What is left: ${updatedBlockers.next_unlock_step?.label ?? updatedBlockers.summary}.`);
+        setFirstCanaryDrillReceipt(firstCanaryDrill);
+        setMessage(`Public wallet scope and dry-run caps are saved. First canary next step: ${firstCanaryDrill.next_unblock_step?.label ?? updatedBlockers.next_unlock_step?.label ?? updatedBlockers.summary}.`);
       } catch (refreshError) {
         setMessage(refreshError instanceof Error
-          ? `Public wallet scope and dry-run caps are saved, but the what-is-left refresh failed: ${refreshError.message}`
-          : "Public wallet scope and dry-run caps are saved, but the what-is-left refresh failed.");
+          ? `Public wallet scope and dry-run caps are saved, but the live-canary refresh failed: ${refreshError.message}`
+          : "Public wallet scope and dry-run caps are saved, but the live-canary refresh failed.");
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Public scope could not be saved.");
@@ -659,21 +664,48 @@ export function SettingsWeb3CredentialConsole({
     return payload;
   }
 
+  async function fetchFirstCanaryDrill() {
+    const params = new URLSearchParams({
+      scenario,
+      source: "live-dex",
+      account: "persistent",
+      cycles: String(cycles),
+    });
+    const response = await fetch(`/api/web3-first-canary-drill?${params.toString()}`);
+    const payload = (await response.json().catch(() => null)) as Web3FirstCanaryDrillReceipt | { error: string } | null;
+    if (!response.ok || !payload || "error" in payload) {
+      throw new Error(payload && "error" in payload ? payload.error : "First-canary drill refresh failed.");
+    }
+    return payload;
+  }
+
+  async function refreshCredentialAndCanaryState({ announce = true }: { announce?: boolean } = {}) {
+    const [liveUsability, firstCanaryDrill] = await Promise.all([
+      fetchLiveUsabilityBlockers(),
+      fetchFirstCanaryDrill(),
+    ]);
+    setLiveUsabilityReceipt(liveUsability);
+    setFirstCanaryDrillReceipt(firstCanaryDrill);
+    if (announce) {
+      setMessage(`First canary refreshed: ${firstCanaryDrill.next_unblock_step?.label ?? firstCanaryDrill.status.replaceAll("-", " ")}.`);
+    }
+    return { liveUsability, firstCanaryDrill };
+  }
+
   async function refreshLiveUsabilityBlockers({ announce = true }: { announce?: boolean } = {}) {
     const previousBusy = busy;
     if (announce) {
-      setBusy("blockers");
-      setMessage("Refreshing the consolidated Web3 what-is-left receipt...");
+      setBusy("canary-drill");
+      setMessage("Refreshing the first-canary drill and consolidated Web3 what-is-left receipts...");
     }
     try {
-      const payload = await fetchLiveUsabilityBlockers();
-      setLiveUsabilityReceipt(payload);
+      const { liveUsability, firstCanaryDrill } = await refreshCredentialAndCanaryState({ announce: false });
       if (announce) {
-        setMessage(`What is left refreshed: ${payload.summary}`);
+        setMessage(`First canary refreshed: ${firstCanaryDrill.next_unblock_step?.label ?? firstCanaryDrill.status.replaceAll("-", " ")}. What is left: ${liveUsability.summary}`);
       }
     } catch (error) {
       if (announce) {
-        setMessage(error instanceof Error ? error.message : "What-is-left refresh failed.");
+        setMessage(error instanceof Error ? error.message : "First-canary refresh failed.");
       }
     } finally {
       if (announce && previousBusy === null) {
@@ -702,9 +734,8 @@ export function SettingsWeb3CredentialConsole({
         throw new Error(payload && "error" in payload ? payload.error : "Credential doctor refresh failed.");
       }
       setDoctorRefreshReceipt(payload);
-      const updatedBlockers = await fetchLiveUsabilityBlockers();
-      setLiveUsabilityReceipt(updatedBlockers);
-      setMessage(`Credential doctor refreshed: ${payload.doctor.status.replaceAll("-", " ")}. What is left: ${updatedBlockers.next_unlock_step?.label ?? updatedBlockers.summary}.`);
+      const { liveUsability: updatedBlockers, firstCanaryDrill } = await refreshCredentialAndCanaryState({ announce: false });
+      setMessage(`Credential doctor refreshed: ${payload.doctor.status.replaceAll("-", " ")}. First canary next step: ${firstCanaryDrill.next_unblock_step?.label ?? updatedBlockers.next_unlock_step?.label ?? updatedBlockers.summary}.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Credential doctor refresh failed.");
     } finally {
@@ -778,6 +809,19 @@ export function SettingsWeb3CredentialConsole({
   const visibleLiveUsabilityBlockers = liveUsabilityReceipt.missing_for_live_usability.slice(0, 4);
   const nextLiveUsabilityBlocker = liveUsabilityReceipt.next_blocker;
   const nextCredentialRequest = liveUsabilityReceipt.next_credential_request;
+  const firstCanaryParams = new URLSearchParams({
+    scenario,
+    source: "live-dex",
+    account: "persistent",
+    cycles: String(cycles),
+  });
+  const firstCanaryHref = `/api/web3-first-canary-drill?${firstCanaryParams.toString()}`;
+  const firstCanaryNextStep = firstCanaryDrillReceipt.next_unblock_step;
+  const visibleFirstCanarySteps = [
+    ...firstCanaryDrillReceipt.operator_unblock_plan.filter((step) => step.status === "next" || step.status === "watch"),
+    ...firstCanaryDrillReceipt.operator_unblock_plan.filter((step) => step.status === "blocked"),
+    ...firstCanaryDrillReceipt.operator_unblock_plan.filter((step) => step.status === "done"),
+  ].slice(0, 3);
   const liveUsabilitySetupHref = nextLiveUsabilityBlocker?.href ?? (liveUsabilityReceipt.next_unlock_step?.id === "scope-wallet"
     ? "#settings-web3-wallet-public-key"
     : "#settings-web3-credentials-runway");
@@ -1443,8 +1487,8 @@ export function SettingsWeb3CredentialConsole({
               disabled={disabled}
               className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-caution/40 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
             >
-              <RefreshCw className={cn("size-3.5 shrink-0", busy === "blockers" && "animate-spin")} aria-hidden="true" />
-              {busy === "blockers" ? "Refreshing" : "Refresh blockers"}
+              <RefreshCw className={cn("size-3.5 shrink-0", busy === "canary-drill" && "animate-spin")} aria-hidden="true" />
+              {busy === "canary-drill" ? "Refreshing" : "Refresh blockers"}
             </button>
           </div>
         </div>
@@ -1455,6 +1499,66 @@ export function SettingsWeb3CredentialConsole({
           <ConsoleMetric label="Live lanes" value={`${liveUsabilityReceipt.ready_live_lane_count}/${liveUsabilityReceipt.total_live_lane_count}`} tone={liveUsabilityReceipt.ready_live_lane_count === liveUsabilityReceipt.total_live_lane_count ? "engine" : "caution"} />
           <ConsoleMetric label="Safe actions" value={`${liveUsabilityReceipt.safe_action_count}`} tone={liveUsabilityReceipt.safe_action_count > 0 ? "engine" : "neutral"} />
           <ConsoleMetric label="Doctor" value={liveUsabilityReceipt.credential_doctor.receipt_fresh ? "fresh" : "stale"} tone={liveUsabilityReceipt.credential_doctor.blocked_count > 0 ? "critical" : liveUsabilityReceipt.credential_doctor.receipt_fresh ? "engine" : "caution"} />
+        </div>
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings refreshed first canary drill status">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">First canary drill refresh</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">
+                {firstCanaryNextStep?.label ?? firstCanaryDrillReceipt.status.replaceAll("-", " ")}
+              </p>
+              <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">
+                {firstCanaryNextStep?.action ?? firstCanaryDrillReceipt.next_action}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={firstCanaryNextStep?.safe_surface ?? firstCanaryHref}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-critical/35 bg-critical/10 px-3 py-2 text-xs font-semibold text-critical transition hover:bg-critical/15"
+              >
+                Open canary gate
+              </a>
+              <a
+                href={firstCanaryHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline-variant/35 bg-void/20 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+              >
+                Open drill JSON
+              </a>
+              <button
+                type="button"
+                onClick={() => void refreshLiveUsabilityBlockers()}
+                disabled={disabled}
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-critical/40 bg-critical/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-critical transition hover:bg-critical/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+              >
+                <RefreshCw className={cn("size-3.5 shrink-0", busy === "canary-drill" && "animate-spin")} aria-hidden="true" />
+                {busy === "canary-drill" ? "Refreshing" : "Refresh canary"}
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-4">
+            <ConsoleMetric label="Actual trade" value={firstCanaryDrillReceipt.actual_live_trade_tested ? "yes" : "no"} tone={firstCanaryDrillReceipt.actual_live_trade_tested ? "engine" : "critical"} />
+            <ConsoleMetric label="Funds moved" value={firstCanaryDrillReceipt.real_funds_moved_by_this_app ? "yes" : "no"} tone={firstCanaryDrillReceipt.real_funds_moved_by_this_app ? "engine" : "critical"} />
+            <ConsoleMetric label="Proof" value={`${firstCanaryDrillReceipt.proof_pass_count}/${firstCanaryDrillReceipt.proof_required_count}`} tone={firstCanaryDrillReceipt.proof_pass_count === firstCanaryDrillReceipt.proof_required_count ? "engine" : "caution"} />
+            <ConsoleMetric label="Hard fails" value={`${firstCanaryDrillReceipt.hard_fail_count}`} tone={firstCanaryDrillReceipt.hard_fail_count > 0 ? "critical" : "engine"} />
+          </div>
+          <div className="mt-2 grid gap-1.5" aria-label="Settings refreshed first canary ordered gates">
+            {visibleFirstCanarySteps.map((step) => (
+              <div key={step.id} className="grid gap-2 rounded-md border border-outline-variant/25 bg-void/20 p-2 sm:grid-cols-[minmax(0,0.38fr)_minmax(0,1fr)]">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-on-surface">{step.label}</p>
+                  <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                    {step.status} · {step.phase.replaceAll("-", " ")}
+                  </p>
+                </div>
+                <p className="min-w-0 text-[11px] leading-4 text-on-surface-variant">{step.completion_signal}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-outline">
+            This refresh is still read-only. Paper trades, DEX reads, and Jupiter rehearsals do not count as a live canary until the signed relay, confirmation, settlement, and portfolio mirror proof pass.
+          </p>
         </div>
         <div className="mt-3 rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Settings in-app credential doctor refresh">
           <div className="flex flex-wrap items-start justify-between gap-2">
