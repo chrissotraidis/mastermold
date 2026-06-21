@@ -232,6 +232,28 @@ async function verifyHealth() {
   assert(json.web3_credential_requirements.private_key_storage === "blocked", "Credential requirements health should keep private-key storage blocked.", json.web3_credential_requirements);
   assert(json.web3_credential_requirements.seed_phrase_storage === "blocked", "Credential requirements health should keep seed-phrase storage blocked.", json.web3_credential_requirements);
   assert(json.web3_credential_requirements.secret_echo_permission === "blocked", "Credential requirements health should keep secret echo blocked.", json.web3_credential_requirements);
+  assert(json.web3_live_activation?.mode === "web3-live-activation-health", "Health endpoint should expose Web3 live activation health.", json.web3_live_activation);
+  assertReceiptHash("Health live activation", json.web3_live_activation.receipt_hash);
+  assert(["operator-input-needed", "verification-needed", "external-review-needed", "activation-ready", "blocked"].includes(json.web3_live_activation.status), "Live activation health should expose a known status.", json.web3_live_activation);
+  assert(json.web3_live_activation.readiness_score >= 0 && json.web3_live_activation.readiness_score <= 100, "Live activation health score should be bounded.", json.web3_live_activation);
+  assert(json.web3_live_activation.activation_permitted === false, "Live activation health should keep activation blocked.", json.web3_live_activation);
+  assert(json.web3_live_activation.can_trade_real_capital === false, "Live activation health should keep real-capital trading blocked.", json.web3_live_activation);
+  assert(json.web3_live_activation.live_execution_permitted === false, "Live activation health should keep live execution disabled.", json.web3_live_activation);
+  assert(json.web3_live_activation.milestone_count >= 10, "Live activation health should expose activation milestone count.", json.web3_live_activation);
+  assert(json.web3_live_activation.next_milestone?.id === "dedicated-public-wallet", "Live activation health should expose the dedicated wallet as the next milestone.", json.web3_live_activation);
+  assert(json.web3_live_activation.source_endpoint.includes("/api/web3-live-activation-plan"), "Live activation health should link its standalone endpoint.", json.web3_live_activation);
+  assert(
+    json.web3_live_activation.live_review_source_endpoint === "/api/web3-live-activation-plan?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Live activation health should expose the live-review activation plan separately.",
+    json.web3_live_activation,
+  );
+  assert(json.web3_live_activation.live_execution_permission === "blocked", "Live activation health should keep live execution blocked.", json.web3_live_activation);
+  assert(json.web3_live_activation.wallet_mutation_permission === "blocked", "Live activation health should keep wallet mutation blocked.", json.web3_live_activation);
+  assert(json.web3_live_activation.transaction_submission_permission === "blocked", "Live activation health should keep transaction submission blocked.", json.web3_live_activation);
+  assert(json.web3_live_activation.signing_permission === "blocked", "Live activation health should keep signing blocked.", json.web3_live_activation);
+  assert(json.web3_live_activation.private_key_storage === "blocked", "Live activation health should keep private-key storage blocked.", json.web3_live_activation);
+  assert(json.web3_live_activation.seed_phrase_storage === "blocked", "Live activation health should keep seed-phrase storage blocked.", json.web3_live_activation);
+  assert(json.web3_live_activation.secret_echo_permission === "blocked", "Live activation health should keep secret echo blocked.", json.web3_live_activation);
   assert(json.web3_live_autonomy_readiness?.mode === "web3-live-autonomy-readiness-health", "Health endpoint should expose compact Web3 live-autonomy readiness.", json.web3_live_autonomy_readiness);
   assert(
     ["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"].includes(json.web3_live_autonomy_readiness.status),
@@ -301,7 +323,7 @@ async function verifyHealth() {
   assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
-  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-autonomy, and live-usability locks are blocked");
+  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, and live-usability locks are blocked");
 }
 
 async function verifyOperatorWalletScope() {
@@ -1106,6 +1128,42 @@ async function verifyCredentialRequirementsPacket() {
   record("credential-requirements-packet", "pass", `${json.status}; ${json.requirement_count} safe asks`);
 }
 
+async function verifyLiveActivationPlanPacket() {
+  const { response, json } = await requestJson("/api/web3-live-activation-plan?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Live activation plan should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-live-activation-plan", "Live activation plan should expose the expected mode.", json);
+  assert(["operator-input-needed", "verification-needed", "external-review-needed", "activation-ready", "blocked"].includes(json.status), "Live activation plan should expose a known status.", json);
+  assertReceiptHash("Live activation plan", json.receipt_hash);
+  assert(json.activation_permitted === false, "Live activation plan must not permit activation.", json);
+  assert(json.can_trade_real_capital === false, "Live activation plan must keep real-capital trading blocked.", json);
+  assert(json.live_execution_permitted === false, "Live activation plan must keep live execution disabled.", json);
+  assert(json.next_milestone?.id === "dedicated-public-wallet", "Live activation plan should expose the dedicated wallet as the next milestone.", json.next_milestone);
+  assert(String(json.next_milestone?.verifier_command ?? "").includes("--require-operator-wallet"), "Live activation plan next milestone should expose the strict wallet verifier.", json.next_milestone);
+  assert(Array.isArray(json.milestones) && json.milestones.length >= 10, "Live activation plan should include ordered milestones.", json.milestones);
+  assert(json.milestones.some((item) => item.id === "live-autonomy-final-gate"), "Live activation plan should include the final live-autonomy gate.", json.milestones);
+  assert(json.milestones.every((item) => item.blocks_live_capital === true && typeof item.completion_signal === "string" && item.completion_signal.length > 0), "Live activation milestones should block live capital and name completion signals.", json.milestones);
+  assert(Array.isArray(json.activation_commands) && json.activation_commands.some((command) => command.includes("activate:web3")), "Live activation plan should expose its export command.", json.activation_commands);
+  assert(Array.isArray(json.activation_commands) && json.activation_commands.some((command) => command.includes("--require-jupiter-order")), "Live activation plan should include strict Jupiter verification.", json.activation_commands);
+  assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind Web3 Live Activation Plan"), "Live activation plan should include paste-ready markdown.", json.text_packet);
+  assert(json.text_packet.includes("## Next Milestone") && json.text_packet.includes("wallet_public_key"), "Live activation text should include the next public wallet milestone.", json.text_packet);
+  assert(json.text_packet.includes("## Never Provide") && json.text_packet.includes("Seed phrase or mnemonic"), "Live activation text should include never-provide boundaries.", json.text_packet);
+  assert(json.source_endpoint.includes("/api/web3-live-activation-plan"), "Live activation plan should link itself.", json);
+  assert(
+    json.live_review_source_endpoint === "/api/web3-live-activation-plan?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "Live activation plan should expose the live-review source endpoint.",
+    json,
+  );
+  assert(json.live_execution_permission === "blocked", "Live activation plan must keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Live activation plan must keep wallet mutation blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "Live activation plan must keep transaction submission blocked.", json);
+  assert(json.signing_permission === "blocked", "Live activation plan must keep signing blocked.", json);
+  assert(json.private_key_storage === "blocked", "Live activation plan must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "Live activation plan must block seed-phrase storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Live activation plan must block secret echo.", json);
+  assertNoLeak("live activation plan packet", json);
+  record("live-activation-plan", "pass", `${json.status}; ${json.milestones.length} milestones`);
+}
+
 async function verifyResearchAnswerIntake() {
   const answer = [
     "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
@@ -1373,6 +1431,7 @@ async function main() {
   await verifyManualLiveReviewPacket();
   await verifyResearchHandoffPacket();
   await verifyCredentialRequirementsPacket();
+  await verifyLiveActivationPlanPacket();
   await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();

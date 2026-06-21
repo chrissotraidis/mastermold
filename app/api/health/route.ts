@@ -12,6 +12,7 @@ import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-p
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { buildWeb3LiveActivationPlan, buildWeb3LiveActivationPlanHealth } from "@/src/db/web3-live-activation-plan";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveAutonomyReadinessHealth } from "@/src/db/web3-live-autonomy-readiness";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
@@ -121,6 +122,11 @@ export async function GET() {
     manualLiveReview: web3ManualLiveReview,
   });
   const web3CredentialRequirements = buildWeb3CredentialRequirementsReceipt(web3ResearchHandoff);
+  const web3LiveActivationPlan = buildWeb3LiveActivationPlan({
+    requirements: web3CredentialRequirements,
+    liveUsability: web3LiveUsability,
+    liveAutonomy: web3State.autonomous_live_autonomy_readiness,
+  });
   return NextResponse.json({
     status: "ok",
     web3_daemon_supervisor: web3DaemonSupervisor,
@@ -128,6 +134,7 @@ export async function GET() {
     web3_promoted_paper_autopilot: web3PromotedPaperAutopilot,
     web3_profit_proof: buildWeb3ProfitProofReadiness({ promotedHealth: web3PromotedPaperAutopilot }),
     web3_operator_runbook: buildWeb3OperatorRunbookHealth(web3Runbook),
+    web3_live_activation: buildWeb3LiveActivationPlanHealth(web3LiveActivationPlan),
     web3_live_autonomy_readiness: buildWeb3LiveAutonomyReadinessHealth(web3State),
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),

@@ -29,6 +29,7 @@ import { GET as OPERATOR_REQUEST_PACKET_GET } from "@/app/api/web3-operator-requ
 import { GET as OPERATOR_RUNBOOK_GET } from "@/app/api/web3-operator-runbook/route";
 import { GET as CREDENTIAL_DOCTOR_GET, POST as CREDENTIAL_DOCTOR_POST } from "@/app/api/web3-credential-doctor/route";
 import { GET as CREDENTIAL_REQUIREMENTS_GET } from "@/app/api/web3-credential-requirements/route";
+import { GET as LIVE_ACTIVATION_PLAN_GET } from "@/app/api/web3-live-activation-plan/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -1733,6 +1734,40 @@ describe("Web3 autonomous trading subsystem", () => {
         seed_phrase_storage: string;
         secret_echo_permission: string;
       };
+      web3_live_activation: {
+        mode: string;
+        status: string;
+        receipt_hash: string;
+        source: string;
+        account: string;
+        scenario: string;
+        readiness_score: number;
+        live_autonomy_status: string;
+        live_usability_status: string;
+        can_run_unattended: boolean;
+        can_trade_real_capital: boolean;
+        live_execution_permitted: boolean;
+        activation_permitted: boolean;
+        milestone_count: number;
+        real_capital_blocker_count: number;
+        next_milestone: {
+          id: string;
+          label: string;
+          status: string;
+          verifier_command: string | null;
+          target_names: string[];
+        } | null;
+        next_action: string;
+        source_endpoint: string;
+        live_review_source_endpoint: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        signing_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      };
       web3_live_autonomy_readiness: {
         mode: string;
         status: string;
@@ -1911,6 +1946,28 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_credential_requirements.private_key_storage).toBe("blocked");
     expect(receipt.web3_credential_requirements.seed_phrase_storage).toBe("blocked");
     expect(receipt.web3_credential_requirements.secret_echo_permission).toBe("blocked");
+    expect(receipt.web3_live_activation.mode).toBe("web3-live-activation-health");
+    expect(["operator-input-needed", "verification-needed", "external-review-needed", "activation-ready", "blocked"]).toContain(receipt.web3_live_activation.status);
+    expect(receipt.web3_live_activation.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.web3_live_activation.readiness_score).toBeGreaterThanOrEqual(0);
+    expect(receipt.web3_live_activation.readiness_score).toBeLessThanOrEqual(100);
+    expect(receipt.web3_live_activation.activation_permitted).toBe(false);
+    expect(receipt.web3_live_activation.can_trade_real_capital).toBe(false);
+    expect(receipt.web3_live_activation.live_execution_permitted).toBe(false);
+    expect(receipt.web3_live_activation.milestone_count).toBeGreaterThanOrEqual(10);
+    expect(receipt.web3_live_activation.next_milestone).toMatchObject({
+      id: "dedicated-public-wallet",
+      target_names: ["wallet_public_key"],
+    });
+    expect(receipt.web3_live_activation.source_endpoint).toContain("/api/web3-live-activation-plan");
+    expect(receipt.web3_live_activation.live_review_source_endpoint).toBe("/api/web3-live-activation-plan?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_live_activation.live_execution_permission).toBe("blocked");
+    expect(receipt.web3_live_activation.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.web3_live_activation.transaction_submission_permission).toBe("blocked");
+    expect(receipt.web3_live_activation.signing_permission).toBe("blocked");
+    expect(receipt.web3_live_activation.private_key_storage).toBe("blocked");
+    expect(receipt.web3_live_activation.seed_phrase_storage).toBe("blocked");
+    expect(receipt.web3_live_activation.secret_echo_permission).toBe("blocked");
     expect(receipt.web3_live_autonomy_readiness.mode).toBe("web3-live-autonomy-readiness-health");
     expect(["paper-only", "daemon-gated", "signature-gated", "submit-gated", "live-ready", "blocked"]).toContain(receipt.web3_live_autonomy_readiness.status);
     expect(["sample", "live-dex"]).toContain(receipt.web3_live_autonomy_readiness.source);
@@ -2054,6 +2111,100 @@ describe("Web3 autonomous trading subsystem", () => {
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("source must be sample or live-dex");
+  });
+
+  test("GIVEN an operator needs one go-live packet WHEN the live activation plan route runs THEN it orders safe milestones without activation authority", async () => {
+    const response = await LIVE_ACTIVATION_PLAN_GET(new Request("http://localhost/api/web3-live-activation-plan?scenario=breakout&source=sample&account=persistent&cycles=0"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      summary: string;
+      readiness_score: number;
+      can_run_unattended: boolean;
+      can_trade_real_capital: boolean;
+      live_execution_permitted: boolean;
+      activation_permitted: boolean;
+      milestone_count: number;
+      next_milestone: {
+        id: string;
+        label: string;
+        owner: string;
+        status: string;
+        target_names: string[];
+        verifier_command: string | null;
+      } | null;
+      milestones: Array<{
+        id: string;
+        label: string;
+        owner: string;
+        status: string;
+        safe_value_type: string;
+        safe_collection_surface: string;
+        storage_rule: string;
+        target_names: string[];
+        completion_signal: string;
+        verifier_command: string | null;
+        blocks_live_capital: boolean;
+      }>;
+      activation_commands: string[];
+      text_packet: string;
+      safe_to_provide: string[];
+      never_provide: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-live-activation-plan");
+    expect(["operator-input-needed", "verification-needed", "external-review-needed", "activation-ready", "blocked"]).toContain(receipt.status);
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.readiness_score).toBeGreaterThanOrEqual(0);
+    expect(receipt.readiness_score).toBeLessThanOrEqual(100);
+    expect(receipt.activation_permitted).toBe(false);
+    expect(receipt.can_trade_real_capital).toBe(false);
+    expect(receipt.live_execution_permitted).toBe(false);
+    expect(receipt.next_milestone).toMatchObject({
+      id: "dedicated-public-wallet",
+      label: "Dedicated public wallet",
+      owner: "operator",
+      status: "next",
+      target_names: ["wallet_public_key"],
+    });
+    expect(receipt.next_milestone?.verifier_command).toContain("--require-operator-wallet");
+    expect(receipt.milestones.map((item) => item.id)).toContain("live-autonomy-final-gate");
+    expect(receipt.milestones.length).toBeGreaterThanOrEqual(10);
+    expect(receipt.milestones.every((item) =>
+      ["next", "blocked", "external-review", "watch", "ready"].includes(item.status) &&
+      item.safe_value_type.length > 0 &&
+      item.safe_collection_surface.length > 0 &&
+      item.storage_rule.length > 0 &&
+      item.completion_signal.length > 0 &&
+      item.blocks_live_capital === true
+    )).toBe(true);
+    expect(receipt.activation_commands.some((command) => command.includes("activate:web3"))).toBe(true);
+    expect(receipt.activation_commands.some((command) => command.includes("--require-jupiter-order"))).toBe(true);
+    expect(receipt.text_packet).toContain("# Mastermind Web3 Live Activation Plan");
+    expect(receipt.text_packet).toContain("## Next Milestone");
+    expect(receipt.text_packet).toContain("## Never Provide");
+    expect(receipt.never_provide.join(" ")).toContain("Wallet private key");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.signing_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+
+    const invalid = await LIVE_ACTIVATION_PLAN_GET(new Request("http://localhost/api/web3-live-activation-plan?account=hot-wallet"));
+    const invalidReceipt = await json<{ error: string }>(invalid);
+    expect(invalid.status).toBe(422);
+    expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");
   });
 
   test("GIVEN real-money blockers remain WHEN live usability blockers are requested THEN the next unlock step comes before proof work", async () => {

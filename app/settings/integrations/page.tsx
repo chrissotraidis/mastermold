@@ -21,6 +21,7 @@ import { buildWeb3AccountAcquisitionReceipt, type Web3AccountAcquisitionReceipt 
 import { buildWeb3AccountSetupReceipt, type Web3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { buildWeb3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
 import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor";
+import { buildWeb3CredentialRequirementsReceipt } from "@/src/db/web3-credential-requirements";
 import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
@@ -28,6 +29,7 @@ import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop
 import { buildWeb3JupiterOrderPacket, type Web3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { getWeb3JupiterRehearsalHistory, type Web3JupiterRehearsalHistory } from "@/src/db/web3-jupiter-rehearsal-history";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { buildWeb3LiveActivationPlan, type Web3LiveActivationPlan } from "@/src/db/web3-live-activation-plan";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
@@ -167,6 +169,12 @@ export default async function IntegrationsSettingsPage() {
     runway: web3SupervisedLiveRunway,
     manualLiveReview: web3ManualLiveReviewPacket,
   });
+  const web3CredentialRequirements = buildWeb3CredentialRequirementsReceipt(web3ResearchHandoffPacket);
+  const web3LiveActivationPlan = buildWeb3LiveActivationPlan({
+    requirements: web3CredentialRequirements,
+    liveUsability: web3LiveUsabilityBlockers,
+    liveAutonomy: web3State.autonomous_live_autonomy_readiness,
+  });
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -184,6 +192,10 @@ export default async function IntegrationsSettingsPage() {
             requestPacket={web3OperatorRequestPacket}
             researchPacket={web3ResearchHandoffPacket}
           />
+        </div>
+
+        <div className="mb-8">
+          <SettingsWeb3LiveActivationPlanPanel plan={web3LiveActivationPlan} />
         </div>
 
         <div className="mb-8">
@@ -798,6 +810,93 @@ function SettingsWeb3SetupPriorityCard({
 
       <p className="mt-2 text-xs leading-5 text-outline">
         This first-screen card is navigation and status only. It cannot save secrets, sign, submit, mutate wallets, custody funds, or unlock autonomous live trading.
+      </p>
+    </section>
+  );
+}
+
+function SettingsWeb3LiveActivationPlanPanel({ plan }: { plan: Web3LiveActivationPlan }) {
+  const nextMilestone = plan.next_milestone;
+  const topMilestones = plan.milestones.slice(0, 5);
+
+  return (
+    <section
+      aria-label="Settings Web3 live activation plan"
+      className="rounded-md border border-caution/35 bg-caution/[0.045] p-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Live activation plan</p>
+          <h2 className="mt-1 text-lg font-semibold text-on-surface">
+            {nextMilestone ? `Next: ${nextMilestone.label}` : plan.status.replaceAll("-", " ")}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">{plan.summary}</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={plan.activation_permitted ? "pass" : "fail"} label="activation blocked" />
+          <LaunchQueueBadge status={plan.can_trade_real_capital ? "pass" : "fail"} label="real capital blocked" />
+          <LaunchQueueBadge status={plan.live_execution_permitted ? "pass" : "fail"} label="live execution blocked" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <SettingsMetric label="Activation" value={plan.status.replaceAll("-", " ")} />
+        <SettingsMetric label="Final gate" value={`${plan.readiness_score}/100`} />
+        <SettingsMetric label="Milestones" value={`${plan.milestone_count}`} />
+        <SettingsMetric label="Blockers" value={`${plan.real_capital_blocker_count}`} />
+      </div>
+
+      {nextMilestone ? (
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Settings Web3 live activation next milestone">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Next milestone</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{nextMilestone.label}</p>
+            </div>
+            <LaunchQueueBadge status={nextMilestone.status === "ready" ? "pass" : nextMilestone.status === "watch" || nextMilestone.status === "external-review" ? "watch" : "fail"} label={nextMilestone.status.replaceAll("-", " ")} />
+          </div>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">{nextMilestone.next_action}</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <SettingsMetric label="Owner" value={nextMilestone.owner.replaceAll("-", " ")} />
+            <SettingsMetric label="Surface" value={nextMilestone.safe_collection_surface.replaceAll("-", " ")} />
+            <SettingsMetric label="Targets" value={nextMilestone.target_names.join(", ") || "none"} />
+          </div>
+          {nextMilestone.verifier_command ? (
+            <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {nextMilestone.verifier_command}
+            </code>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-3 grid gap-2" aria-label="Settings Web3 live activation milestones">
+        {topMilestones.map((milestone, index) => (
+          <div key={milestone.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-2 rounded-md border border-outline-variant/25 bg-surface-dim/30 p-2">
+            <span className="flex size-6 items-center justify-center rounded-md border border-outline-variant/30 bg-surface text-[10px] font-semibold text-outline">
+              {index + 1}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-on-surface">{milestone.label}</p>
+              <p className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-outline">{milestone.completion_signal}</p>
+            </div>
+            <LaunchQueueBadge status={milestone.status === "ready" ? "pass" : milestone.status === "watch" || milestone.status === "external-review" ? "watch" : "fail"} label={milestone.status.replaceAll("-", " ")} />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <CopyRedactedPacketButton text={plan.text_packet} label="Copy activation plan" ariaLabel="Copy Web3 live activation plan" />
+        <Link
+          href={plan.source_endpoint}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-outline-variant/30 bg-surface-dim/45 px-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+        >
+          Open JSON
+          <ExternalLink aria-hidden="true" className="size-3.5" />
+        </Link>
+      </div>
+
+      <p className="mt-3 text-xs leading-5 text-outline">
+        This plan is a coordination packet only. It cannot sign, submit, custody funds, mutate wallets, store private keys, store seed phrases, echo secrets, or unlock autonomous live trading.
       </p>
     </section>
   );

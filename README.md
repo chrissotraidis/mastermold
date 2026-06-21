@@ -212,6 +212,13 @@ cockpit and external monitors. It reports whether the system can run unattended,
 wallet trading is allowed, the live trade cap, route TTL pressure, next wake cadence, blockers, and
 the ordered final gate list only; it cannot sign, submit, custody funds, mutate wallets, store private
 keys or seed phrases, or enable live execution.
+`/api/web3-live-activation-plan` now consolidates the credential requirements, live-usability blockers,
+and final autonomy gate into one operator go/no-go packet with ordered milestones, the next safe
+milestone, strict verifier commands, paste-ready Markdown, and compact `/api/health`
+`web3_live_activation` status. Run `npm run --silent activate:web3 -- --base-url=http://localhost:4010`
+to export the same redacted plan as Markdown, or add `--json` for the full receipt. It is an activation
+plan only: activation, live execution, signing, transaction submission, wallet mutation, private-key
+storage, seed-phrase storage, and secret echo remain blocked.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and a compact
