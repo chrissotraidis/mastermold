@@ -2,6 +2,7 @@ import { Database, ExternalLink, KeyRound, LockKeyhole, PlugZap, RefreshCw, Shie
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { BrainInitializationPanel } from "@/components/brain-initialization-panel";
+import { CopyRedactedPacketButton } from "@/components/copy-redacted-packet-button";
 import { PageHeader } from "@/components/page-header";
 import { IntegrationKeyInput } from "@/components/integration-key-input";
 import { ManualHoldingsPanel } from "@/components/manual-holdings-panel";
@@ -1282,12 +1283,18 @@ function SettingsWeb3OperatorRequestPacketPanel({ packet }: { packet: Web3Operat
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-black/20 p-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Redacted request text</p>
-          <Link
-            href="/api/web3-operator-request-packet?source=live-dex&account=persistent"
-            className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
-          >
-            Open JSON
-          </Link>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <CopyRedactedPacketButton
+              text={packet.text_packet}
+              ariaLabel="Copy Web3 operator request packet"
+            />
+            <Link
+              href="/api/web3-operator-request-packet?source=live-dex&account=persistent"
+              className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-semibold text-engine hover:text-engine/80"
+            >
+              Open JSON
+            </Link>
+          </div>
         </div>
         <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md border border-outline-variant/20 bg-void/50 p-2 text-[11px] leading-5 text-on-surface-variant">
           {packet.text_packet}

@@ -1029,6 +1029,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 operator share packet");
     expect(settingsPage).toContain("Settings Web3 operator request next unlock step");
     expect(settingsPage).toContain("Redacted request text");
+    expect(settingsPage).toContain("CopyRedactedPacketButton");
+    expect(settingsPage).toContain("Copy Web3 operator request packet");
     expect(settingsPage).toContain("/api/web3-operator-request-packet?source=live-dex&account=persistent");
     expect(settingsPage).toContain("buildWeb3CutoverBlockerBoard");
     expect(settingsPage).toContain("buildWeb3UsabilityStatus");
@@ -1164,6 +1166,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("Next Ordered Unlock Step");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("Operator Unlock Sequence");
     expect(source("src/db/web3-operator-request-packet.ts")).toContain("Live execution: blocked");
+    expect(source("components/copy-redacted-packet-button.tsx")).toContain('"use client"');
+    expect(source("components/copy-redacted-packet-button.tsx")).toContain("navigator.clipboard.writeText(text)");
+    expect(source("components/copy-redacted-packet-button.tsx")).toContain("Clipboard access was blocked");
     expect(source("app/api/web3-operator-request-packet/route.ts")).toContain("buildWeb3OperatorRequestPacket");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("Dedicated trading wallet");
     expect(source("src/db/web3-launch-checklist.ts")).toContain("Jupiter route/order key");
