@@ -46,7 +46,7 @@ import { buildWeb3ResearchHandoffPacket, type Web3ResearchHandoffPacket } from "
 import { buildWeb3SignerCredentialPacket, type Web3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
-import { buildWeb3UsabilityStatus } from "@/src/db/web3-usability-status";
+import { buildWeb3UsabilityStatus, type Web3UsabilityStatusReceipt } from "@/src/db/web3-usability-status";
 
 const statusLabels: Record<IntegrationStatusJson["status"], string> = {
   connected: "Test passed",
@@ -184,6 +184,7 @@ export default async function IntegrationsSettingsPage() {
             operatorRequestPacket={web3OperatorRequestPacket}
             cutoverBlockerBoard={web3CutoverBlockerBoard}
             operatorRunbook={web3OperatorRunbook}
+            usabilityStatus={web3UsabilityStatus}
             liveUsabilityBlockers={web3LiveUsabilityBlockers}
             researchHandoffPacket={web3ResearchHandoffPacket}
             state={web3State}
@@ -239,6 +240,7 @@ function Web3CredentialsRunwayCard({
   operatorRequestPacket,
   cutoverBlockerBoard,
   operatorRunbook,
+  usabilityStatus,
   liveUsabilityBlockers,
   researchHandoffPacket,
   state,
@@ -258,6 +260,7 @@ function Web3CredentialsRunwayCard({
   operatorRequestPacket: Web3OperatorRequestPacket;
   cutoverBlockerBoard: Web3CutoverBlockerBoard;
   operatorRunbook: Web3OperatorRunbookReceipt;
+  usabilityStatus: Web3UsabilityStatusReceipt;
   liveUsabilityBlockers: Web3LiveUsabilityBlockersReceipt;
   researchHandoffPacket: Web3ResearchHandoffPacket;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
@@ -305,6 +308,7 @@ function Web3CredentialsRunwayCard({
             runbook={operatorRunbook}
             cutover={cutoverBlockerBoard}
           />
+          <SettingsWeb3OperatorUnlockSequence usability={usabilityStatus} />
           <SettingsWeb3OperatorSetupRunway
             handoff={operatorCredentialHandoff}
             requestPacket={operatorRequestPacket}
@@ -709,6 +713,51 @@ function SettingsWeb3CredentialCommandCenter({
 
       <p className="mt-2 text-xs leading-5 text-outline">
         The command center is a safe-entry map only; it cannot store private keys, store seed phrases, sign, submit, mutate wallets, or approve autonomous live trading.
+      </p>
+    </div>
+  );
+}
+
+function SettingsWeb3OperatorUnlockSequence({ usability }: { usability: Web3UsabilityStatusReceipt }) {
+  const sequence = usability.operator_unlock_sequence;
+  const nextStep = sequence.find((step) => step.status !== "ready") ?? sequence[sequence.length - 1];
+  const readyCount = sequence.filter((step) => step.status === "ready").length;
+  return (
+    <div className="rounded-md border border-engine/30 bg-engine/[0.04] p-3" aria-label="Settings Web3 operator unlock sequence">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Operator unlock sequence</p>
+          <p className="mt-1 text-base font-semibold text-on-surface">
+            {nextStep ? `Next in order: ${nextStep.label}` : "Unlock sequence is ready for review"}
+          </p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            Wallet scope comes before wallet proof, Jupiter rehearsal, signer review, ops/accounting, and external live review. This is the same ordered receipt shown in the trading cockpit.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={readyCount === sequence.length ? "pass" : "watch"} label={`${readyCount}/${sequence.length} ready`} />
+          <LaunchQueueBadge status="fail" label="live blocked" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-3" aria-label="Settings Web3 ordered unlock steps">
+        {sequence.map((step, index) => (
+          <div key={step.id} className="min-w-0 rounded-md border border-outline-variant/25 bg-void/20 p-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Step {index + 1}</p>
+                <p className="mt-1 truncate text-sm font-semibold text-on-surface">{step.label}</p>
+              </div>
+              <LaunchQueueBadge status={settingsOperatorUnlockBadgeStatus(step.status)} label={step.status} />
+            </div>
+            <p className="mt-2 line-clamp-2 text-xs leading-5 text-on-surface-variant">{step.next_action}</p>
+            <p className="mt-2 truncate text-[11px] leading-4 text-outline">{step.storage.replaceAll("-", " ")}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Ordered unlock steps expose public, env-target, hash-only, or external-review work only. Private keys, seed phrases, raw keypairs, transaction bodies, signed payloads, signing, submission, wallet mutation, and autonomous live trading remain blocked.
       </p>
     </div>
   );
@@ -2488,6 +2537,12 @@ function LaunchQueueBadge({
       {label}
     </Badge>
   );
+}
+
+function settingsOperatorUnlockBadgeStatus(status: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number]["status"]): "pass" | "watch" | "fail" {
+  if (status === "ready") return "pass";
+  if (status === "active" || status === "review") return "watch";
+  return "fail";
 }
 
 type CredentialQueueStatus = "ready" | "missing" | "review" | "blocked";

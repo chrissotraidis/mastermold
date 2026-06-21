@@ -941,8 +941,18 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Open runbook");
     expect(settingsPage).toContain("The command center is a safe-entry map only");
     expect(settingsPage.indexOf("<SettingsWeb3CredentialCommandCenter")).toBeLessThan(
+      settingsPage.indexOf("<SettingsWeb3OperatorUnlockSequence"),
+    );
+    expect(settingsPage.indexOf("<SettingsWeb3OperatorUnlockSequence")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3OperatorSetupRunway"),
     );
+    expect(settingsPage).toContain("SettingsWeb3OperatorUnlockSequence");
+    expect(settingsPage).toContain("Settings Web3 operator unlock sequence");
+    expect(settingsPage).toContain("Settings Web3 ordered unlock steps");
+    expect(settingsPage).toContain("Next in order");
+    expect(settingsPage).toContain("Wallet scope comes before wallet proof");
+    expect(settingsPage).toContain("same ordered receipt shown in the trading cockpit");
+    expect(settingsPage).toContain("Private keys, seed phrases, raw keypairs");
     expect(settingsPage.indexOf("<SettingsWeb3OperatorSetupRunway")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3LiveUsabilityBlockersPanel"),
     );
