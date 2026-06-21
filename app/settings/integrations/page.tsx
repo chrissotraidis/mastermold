@@ -551,6 +551,10 @@ function Web3CredentialsRunwayCard({
             <SettingsWeb3CredentialConsole
               walletPublicKeyPreview={receipt.wallet_summary.wallet_public_key_preview}
               defaultWalletPublicKey={scopedWallet}
+              nextOperatorInputLabel={operatorRequestPacket.next_input?.label ?? operatorRequestPacket.next_unlock_step?.label ?? null}
+              nextOperatorInputAction={operatorRequestPacket.next_input?.next_action ?? operatorRequestPacket.next_unlock_step?.next_action ?? null}
+              nextOperatorInputStorage={operatorRequestPacket.next_input?.storage ?? operatorRequestPacket.next_unlock_step?.storage ?? null}
+              nextOperatorInputVerifier={operatorRequestPacket.next_input?.verifier_command ?? null}
               maxTradeUsd={state.execution_readiness.config.max_trade_usd}
               dailySpendCapUsd={state.execution_readiness.config.daily_spend_cap_usd}
               maxSlippageBps={state.execution_readiness.config.max_slippage_bps}

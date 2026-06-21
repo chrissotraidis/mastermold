@@ -15,6 +15,10 @@ import type { Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership"
 type SettingsWeb3CredentialConsoleProps = {
   walletPublicKeyPreview: string | null;
   defaultWalletPublicKey: string;
+  nextOperatorInputLabel: string | null;
+  nextOperatorInputAction: string | null;
+  nextOperatorInputStorage: string | null;
+  nextOperatorInputVerifier: string | null;
   maxTradeUsd: number;
   dailySpendCapUsd: number;
   maxSlippageBps: number;
@@ -79,6 +83,10 @@ type BrowserSolanaProvider = {
 export function SettingsWeb3CredentialConsole({
   walletPublicKeyPreview,
   defaultWalletPublicKey,
+  nextOperatorInputLabel,
+  nextOperatorInputAction,
+  nextOperatorInputStorage,
+  nextOperatorInputVerifier,
   maxTradeUsd,
   dailySpendCapUsd,
   maxSlippageBps,
@@ -596,6 +604,41 @@ export function SettingsWeb3CredentialConsole({
         </p>
       </div>
 
+      <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.04] p-2" aria-label="Settings Web3 next operator unlock">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next operator unlock</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">
+              {nextOperatorInputLabel ?? nextConsoleAction.label}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              {nextOperatorInputAction ?? nextConsoleAction.next_action}
+            </p>
+          </div>
+          <a
+            href="#settings-web3-wallet-public-key"
+            className="inline-flex min-h-9 items-center rounded-md border border-caution/35 bg-caution/10 px-2 text-xs font-semibold text-caution transition hover:bg-caution/15"
+          >
+            Go to wallet field
+          </a>
+        </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)]">
+          <div className="rounded-md border border-outline-variant/20 bg-void/25 p-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Storage rule</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              {(nextOperatorInputStorage ?? "browser-public-scope").replaceAll("-", " ")}
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-outline">Public wallet scope only; private keys and seed phrases stay blocked.</p>
+          </div>
+          <div className="rounded-md border border-outline-variant/20 bg-void/25 p-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Verifier after save</p>
+            <code className="mt-1 block break-all text-[11px] leading-5 text-on-surface-variant">
+              {nextOperatorInputVerifier ?? operatorWalletCommand}
+            </code>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-3 grid gap-2 lg:grid-cols-2">
         <ConsoleInput
           label="Helius API key"
@@ -643,6 +686,7 @@ export function SettingsWeb3CredentialConsole({
           onChange={(value) => updateDraft("tax_ledger_export_path", value)}
         />
         <ConsoleInput
+          id="settings-web3-wallet-public-key"
           label="Wallet public address"
           value={draft.wallet_public_key}
           placeholder="Public Solana address only"
@@ -1224,12 +1268,14 @@ function formatMissingTargets(keys: string[]) {
 }
 
 function ConsoleInput({
+  id,
   label,
   value,
   onChange,
   placeholder,
   type = "text",
 }: {
+  id?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -1240,6 +1286,7 @@ function ConsoleInput({
     <label className="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-outline">
       {label}
       <input
+        id={id}
         type={type}
         value={value}
         placeholder={placeholder}

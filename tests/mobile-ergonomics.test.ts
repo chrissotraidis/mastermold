@@ -1232,6 +1232,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Settings Web3 credential action checklist");
     expect(settingsConsole).toContain("Action checklist");
     expect(settingsConsole).toContain("Next safe control:");
+    expect(settingsConsole).toContain("Settings Web3 next operator unlock");
+    expect(settingsConsole).toContain("Next operator unlock");
+    expect(settingsConsole).toContain("Go to wallet field");
+    expect(settingsConsole).toContain("settings-web3-wallet-public-key");
+    expect(settingsConsole).toContain("Verifier after save");
+    expect(settingsPage).toContain("nextOperatorInputLabel={operatorRequestPacket.next_input?.label");
     expect(settingsConsole).toContain("Provider evidence");
     expect(settingsConsole).toContain("Public wallet scope");
     expect(settingsConsole).toContain("Live DEX proof");
