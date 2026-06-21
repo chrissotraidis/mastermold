@@ -1255,6 +1255,15 @@ async function verifyLiveTradeCanary() {
   assert(json.unsigned_transaction_return === "withheld", "Live trade canary should disclose unsigned transaction withholding.", json);
   assert(json.live_execution_gate_enabled === false, "Live trade canary should keep the current live execution gate locked.", json);
   assert(json.signed_relay_accepts_payload === false, "Live trade canary should not accept signed payloads in the sample check.", json);
+  assert(json.confirmation_poll_status === "not-run", "Live trade canary should disclose missing confirmation polling in sample verification.", json);
+  assert(json.settlement_reconciliation_status === "not-run", "Live trade canary should disclose missing settlement reconciliation in sample verification.", json);
+  assert(json.settlement_watchdog_status === "not-run", "Live trade canary should disclose missing settlement watchdog evidence in sample verification.", json);
+  assert(json.portfolio_mirror_status === "not-run", "Live trade canary should disclose missing portfolio mirror accounting in sample verification.", json);
+  assert(json.post_signing_evidence_status === "needs-signed-relay", "Live trade canary should point to the first missing post-signing proof.", json);
+  assert(Array.isArray(json.post_signing_evidence) && json.post_signing_evidence.length === 4, "Live trade canary should expose the four-stage post-signing proof chain.", json);
+  assert(json.post_signing_evidence.map((item) => item.id).join(",") === "signed-relay,chain-confirmation,settlement-reconciliation,portfolio-mirror", "Live trade canary proof chain should stay ordered.", json.post_signing_evidence);
+  assert(json.post_signing_evidence.every((item) => ["pass", "watch", "fail"].includes(item.status)), "Live trade canary proof stages should expose known statuses.", json.post_signing_evidence);
+  assert(typeof json.post_signing_next_action === "string" && json.post_signing_next_action.length > 0, "Live trade canary should expose the next post-signing action.", json);
   assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("No confirmed live transaction signature")), "Live trade canary should name missing live-trade evidence.", json.blockers);
   assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("does not return unsigned transaction bytes")), "Live trade canary should name the gated browser-signing handoff path.", json.blockers);
   assert(Array.isArray(json.required_for_real_canary) && json.required_for_real_canary.some((item) => item.includes("web3-live-unsigned-order-handoff")), "Live trade canary should list signer or unsigned-handoff requirements.", json.required_for_real_canary);

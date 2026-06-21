@@ -204,6 +204,38 @@ export function Web3LiveCanaryConsole({
         </div>
 
         <div className="grid min-w-0 gap-2">
+          <div className="rounded-md border border-engine/20 bg-surface/60 p-3" aria-label="Trading post-signing proof chain">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Post-signing proof chain</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {receipt.post_signing_evidence_status.replaceAll("-", " ")}
+                </p>
+              </div>
+              <span className={postSigningStatusClassName(receipt.post_signing_evidence_status)}>
+                {receipt.post_signing_evidence.filter((item) => item.status === "pass").length}/4 proven
+              </span>
+            </div>
+            <div className="mt-2 grid gap-1.5">
+              {receipt.post_signing_evidence.map((item) => (
+                <div key={item.id} className="grid gap-1 rounded-md border border-outline/15 bg-surface-dim/35 p-2 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                  <div className="flex items-center gap-2">
+                    <span className={evidenceStatusClassName(item.status)}>{item.status}</span>
+                    <span className="text-[11px] font-semibold text-on-surface">{item.label}</span>
+                  </div>
+                  <p className="min-w-0 text-[11px] leading-4 text-on-surface-variant">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <CanaryMetric label="Confirm" value={receipt.confirmation_poll_status.replaceAll("-", " ")} tone={receipt.confirmation_poll_status === "confirmed" ? "engine" : "neutral"} />
+              <CanaryMetric label="Settle" value={receipt.settlement_reconciliation_status.replaceAll("-", " ")} tone={receipt.settlement_reconciliation_status === "reconciled" ? "engine" : "neutral"} />
+              <CanaryMetric label="Watchdog" value={receipt.settlement_watchdog_status.replaceAll("-", " ")} tone={["mirrored", "reconciled", "confirmed"].includes(receipt.settlement_watchdog_status) ? "engine" : "neutral"} />
+              <CanaryMetric label="Mirror" value={receipt.portfolio_mirror_status.replaceAll("-", " ")} tone={["applied", "duplicate"].includes(receipt.portfolio_mirror_status) ? "engine" : "neutral"} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">{receipt.post_signing_next_action}</p>
+          </div>
+
           <div className="rounded-md border border-critical/20 bg-surface/55 p-3" aria-label="Trading live canary blockers">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
@@ -293,6 +325,20 @@ function canaryStatusClassName(status: Web3LiveTradeCanaryReceipt["status"] | We
   if (status === "live-relay-evidence-recorded" || status === "order-ready") return `${base} border-engine/35 bg-engine/10 text-engine`;
   if (status === "relay-attempted" || status === "ready-for-external-signed-payload" || status === "order-failed") return `${base} border-caution/35 bg-caution/10 text-caution`;
   return `${base} border-critical/35 bg-critical/10 text-critical`;
+}
+
+function evidenceStatusClassName(status: Web3LiveTradeCanaryReceipt["post_signing_evidence"][number]["status"]) {
+  const base = "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
+function postSigningStatusClassName(status: Web3LiveTradeCanaryReceipt["post_signing_evidence_status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "settlement-accounted") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "review-required") return `${base} border-critical/30 bg-critical/10 text-critical`;
+  return `${base} border-caution/30 bg-caution/10 text-caution`;
 }
 
 function getBrowserSolanaProvider(): BrowserSolanaProvider | null {

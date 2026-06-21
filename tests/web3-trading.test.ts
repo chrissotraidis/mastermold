@@ -2366,6 +2366,13 @@ describe("Web3 autonomous trading subsystem", () => {
       signed_relay_accepts_payload: boolean;
       current_request_id: string | null;
       latest_signature_preview: string | null;
+      confirmation_poll_status: string;
+      settlement_reconciliation_status: string;
+      settlement_watchdog_status: string;
+      portfolio_mirror_status: string;
+      post_signing_evidence_status: string;
+      post_signing_evidence: Array<{ id: string; status: string; detail: string; next_action: string }>;
+      post_signing_next_action: string;
       blockers: string[];
       required_for_real_canary: string[];
       transaction_submission_permission: string;
@@ -2390,6 +2397,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.signed_relay_accepts_payload).toBe(false);
     expect(receipt.current_request_id).toBeNull();
     expect(receipt.latest_signature_preview).toBeNull();
+    expect(receipt.confirmation_poll_status).toBe("not-run");
+    expect(receipt.settlement_reconciliation_status).toBe("not-run");
+    expect(receipt.settlement_watchdog_status).toBe("not-run");
+    expect(receipt.portfolio_mirror_status).toBe("not-run");
+    expect(receipt.post_signing_evidence_status).toBe("needs-signed-relay");
+    expect(receipt.post_signing_evidence.map((item) => item.id)).toEqual([
+      "signed-relay",
+      "chain-confirmation",
+      "settlement-reconciliation",
+      "portfolio-mirror",
+    ]);
+    expect(receipt.post_signing_evidence.every((item) => item.status === "fail")).toBe(true);
+    expect(receipt.post_signing_next_action).toContain("Clear live DEX");
     expect(receipt.blockers.join(" ")).toContain("No confirmed live transaction signature");
     expect(receipt.blockers.join(" ")).toContain("does not return unsigned transaction bytes");
     expect(receipt.required_for_real_canary.join(" ")).toContain("Dedicated non-sample public wallet");

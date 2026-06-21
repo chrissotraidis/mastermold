@@ -1,6 +1,14 @@
 import { createHash } from "node:crypto";
 import type { Web3TradingState } from "./web3-trading";
 
+export type Web3LiveTradeCanaryEvidenceItem = {
+  id: "signed-relay" | "chain-confirmation" | "settlement-reconciliation" | "portfolio-mirror";
+  label: string;
+  status: "pass" | "watch" | "fail";
+  detail: string;
+  next_action: string;
+};
+
 export type Web3LiveTradeCanaryReceipt = {
   mode: "web3-live-trade-canary";
   status: "blocked" | "ready-for-external-signed-payload" | "live-relay-evidence-recorded";
@@ -24,6 +32,13 @@ export type Web3LiveTradeCanaryReceipt = {
   current_request_id: string | null;
   latest_signature_preview: string | null;
   latest_confirmation_status: string | null;
+  confirmation_poll_status: NonNullable<Web3TradingState["signature_confirmation_poll"]>["status"] | "not-run";
+  settlement_reconciliation_status: NonNullable<Web3TradingState["settlement_fill_reconciliation"]>["status"] | "not-run";
+  settlement_watchdog_status: NonNullable<Web3TradingState["autonomous_settlement_watchdog"]>["status"] | "not-run";
+  portfolio_mirror_status: NonNullable<Web3TradingState["portfolio_mirror_apply"]>["status"] | "not-run";
+  post_signing_evidence_status: "needs-signed-relay" | "needs-confirmation" | "needs-settlement" | "needs-mirror-review" | "settlement-accounted" | "review-required";
+  post_signing_evidence: Web3LiveTradeCanaryEvidenceItem[];
+  post_signing_next_action: string;
   blockers: string[];
   required_for_real_canary: string[];
   next_action: string;
@@ -163,6 +178,10 @@ export function buildWeb3LiveTradeCanaryReceipt(
       ? "ready-for-external-signed-payload"
       : "blocked";
   const blockers = liveTradeCanaryBlockers(state, readyForExternalSignedPayload, actualLiveTradeTested);
+  const postSigningEvidence = buildPostSigningEvidence(state, actualLiveTradeTested);
+  const postSigningEvidenceStatus = postSigningEvidenceStatusFrom(postSigningEvidence, signature);
+  const postSigningNextAction = postSigningEvidence.find((item) => item.status !== "pass")?.next_action ??
+    "Settlement is accounted for in the local mirror; review caps, PnL, and stop conditions before another canary.";
   const receiptBase = {
     mode: "web3-live-trade-canary" as const,
     status,
@@ -185,6 +204,13 @@ export function buildWeb3LiveTradeCanaryReceipt(
     current_request_id: state.signed_transaction_relay.request_id,
     latest_signature_preview: previewSignature(signature),
     latest_confirmation_status: state.signed_transaction_relay.confirmation_status ?? latest?.confirmation_status ?? null,
+    confirmation_poll_status: state.signature_confirmation_poll?.status ?? "not-run" as const,
+    settlement_reconciliation_status: state.settlement_fill_reconciliation?.status ?? "not-run" as const,
+    settlement_watchdog_status: state.autonomous_settlement_watchdog?.status ?? "not-run" as const,
+    portfolio_mirror_status: state.portfolio_mirror_apply?.status ?? "not-run" as const,
+    post_signing_evidence_status: postSigningEvidenceStatus,
+    post_signing_evidence: postSigningEvidence,
+    post_signing_next_action: postSigningNextAction,
     blockers,
     required_for_real_canary: [
       "Dedicated non-sample public wallet with explicit spend caps and kill switch cleared.",
@@ -235,6 +261,86 @@ function liveTradeCanaryBlockers(
   ].filter((item): item is string => Boolean(item));
 
   return [...new Set(blockers)].slice(0, 12);
+}
+
+function buildPostSigningEvidence(
+  state: Web3TradingState,
+  actualLiveTradeTested: boolean,
+): Web3LiveTradeCanaryEvidenceItem[] {
+  const relay = state.signed_transaction_relay;
+  const confirmation = state.signature_confirmation_poll;
+  const settlement = state.settlement_fill_reconciliation;
+  const watchdog = state.autonomous_settlement_watchdog;
+  const mirror = state.portfolio_mirror_apply;
+  const relayConfirmed = relay.status === "confirmed" || confirmation?.status === "confirmed";
+  const settlementReconciled = settlement?.status === "reconciled" || watchdog?.status === "reconciled" || watchdog?.status === "mirrored";
+  const mirrorAccounted = mirror?.status === "applied" || mirror?.status === "duplicate" || watchdog?.status === "mirrored" || watchdog?.status === "duplicate";
+
+  return [
+    {
+      id: "signed-relay",
+      label: "Signed relay",
+      status: actualLiveTradeTested ? "pass" : relay.can_accept_signed_payload ? "watch" : "fail",
+      detail: actualLiveTradeTested
+        ? `Signature ${previewSignature(relay.latest_signature) ?? "recorded"} was relayed by the guarded canary path.`
+        : relay.can_accept_signed_payload
+          ? "The relay can accept one external signed payload for the current request."
+          : "No live signed transaction has been relayed by this app.",
+      next_action: relay.can_accept_signed_payload
+        ? "Use the browser wallet canary button with tiny caps, then inspect the relay receipt."
+        : "Clear live DEX, wallet, signer, cap, and request-id gates before attempting a canary.",
+    },
+    {
+      id: "chain-confirmation",
+      label: "Chain confirmation",
+      status: relayConfirmed ? "pass" : confirmation?.status === "pending" ? "watch" : actualLiveTradeTested ? "watch" : "fail",
+      detail: relayConfirmed
+        ? `Confirmation status is ${relay.confirmation_status ?? confirmation?.confirmation_status ?? "recorded"}.`
+        : confirmation?.status === "pending"
+          ? "Confirmation polling is waiting on the signature."
+          : "No confirmed chain status has been recorded for the signed payload.",
+      next_action: actualLiveTradeTested
+        ? "Run the signature confirmation poll until the signature is confirmed or failed."
+        : "Relay a signed canary transaction before polling confirmation.",
+    },
+    {
+      id: "settlement-reconciliation",
+      label: "Settlement reconciliation",
+      status: settlementReconciled ? "pass" : settlement?.status === "pending" ? "watch" : relayConfirmed ? "watch" : "fail",
+      detail: settlementReconciled
+        ? `Settlement fill was reconciled${settlement?.fill_amount ? ` for ${settlement.fill_amount}` : ""}.`
+        : settlement?.status === "ambiguous"
+          ? "Settlement evidence is ambiguous and needs operator review."
+          : "No provider/RPC fill reconciliation is attached to this live signature yet.",
+      next_action: relayConfirmed
+        ? "Run settlement reconciliation with wallet owner, mint, and max-fill cap evidence."
+        : "Confirm the transaction before reconciling fills.",
+    },
+    {
+      id: "portfolio-mirror",
+      label: "Portfolio mirror",
+      status: mirrorAccounted ? "pass" : settlementReconciled ? "watch" : "fail",
+      detail: mirrorAccounted
+        ? `Local portfolio mirror status is ${mirror?.status ?? watchdog?.status ?? "accounted"}.`
+        : "The confirmed fill has not been applied or marked duplicate in the local portfolio mirror.",
+      next_action: settlementReconciled
+        ? "Apply or review the portfolio mirror patch before another canary."
+        : "Reconcile settlement before updating the portfolio mirror.",
+    },
+  ];
+}
+
+function postSigningEvidenceStatusFrom(
+  evidence: Web3LiveTradeCanaryEvidenceItem[],
+  signature: string | null,
+): Web3LiveTradeCanaryReceipt["post_signing_evidence_status"] {
+  if (evidence.some((item) => item.status === "fail" && item.id !== "signed-relay" && signature)) return "review-required";
+  if (evidence.every((item) => item.status === "pass")) return "settlement-accounted";
+  const firstOpen = evidence.find((item) => item.status !== "pass");
+  if (!firstOpen || firstOpen.id === "signed-relay") return "needs-signed-relay";
+  if (firstOpen.id === "chain-confirmation") return "needs-confirmation";
+  if (firstOpen.id === "settlement-reconciliation") return "needs-settlement";
+  return "needs-mirror-review";
 }
 
 function liveTradeCanaryNextAction(status: Web3LiveTradeCanaryReceipt["status"], blockers: string[]) {

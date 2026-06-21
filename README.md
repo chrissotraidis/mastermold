@@ -229,6 +229,9 @@ wallet mutation, private-key storage, seed-phrase storage, and secret echo block
 live trade has actually been tested through Mastermind, whether any real funds moved through the
 app, whether the signed relay can accept an external signed payload, and why browser-wallet live
 signing now needs the separate gated unsigned-order handoff before a browser wallet can sign.
+It also reports the post-signing proof chain: signed relay, chain confirmation, settlement/fill
+reconciliation, and portfolio mirror accounting. A wallet signature by itself is not treated as a
+complete live-trade proof until those follow-through stages are recorded or explicitly blocked.
 Paper loops, read-only DEX checks, and Jupiter rehearsals do not count as actual live trades.
 `POST /api/web3-live-unsigned-order-handoff` is the tiny live canary bridge: it can return a
 one-shot SOL-to-USDC Jupiter unsigned transaction only after `source=live-dex`, `account=persistent`,
