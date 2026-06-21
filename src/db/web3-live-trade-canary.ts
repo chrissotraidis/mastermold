@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Web3TradingState } from "./web3-trading";
+import { getLatestWeb3WalletOwnershipReceipt } from "./web3-wallet-ownership";
 
 export type Web3LiveTradeCanaryEvidenceItem = {
   id: "signed-relay" | "chain-confirmation" | "settlement-reconciliation" | "portfolio-mirror";
@@ -345,14 +346,35 @@ function liveTradeCanaryBlockers(
   readyForExternalSignedPayload: boolean,
   actualLiveTradeTested: boolean,
 ) {
+  const walletPublicKey = state.autonomous_custody_mandate.wallet_public_key ??
+    state.live_wallet_accounting_readiness.wallet_public_key ??
+    state.execution_readiness.config.wallet_public_key ??
+    null;
+  const walletScoped = Boolean(walletPublicKey);
+  const walletLooksLikePublicKey = typeof walletPublicKey === "string" && isLikelySolanaPublicKey(walletPublicKey);
+  const walletIsSample = walletPublicKey === SAMPLE_SYSTEM_WALLET;
+  const dedicatedWalletScoped = walletScoped && walletLooksLikePublicKey && !walletIsSample;
+  const walletOwnershipProved = dedicatedWalletScoped && Boolean(getLatestWeb3WalletOwnershipReceipt(walletPublicKey));
+  const liveScopeReady = state.market_source.mode === "live-dex" && state.paper_account.mode === "persistent";
+  const jupiterConfigured = Boolean(process.env.JUPITER_API_KEY);
+  const liveFlagsReady = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true" &&
+    process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL === "I_UNDERSTAND_REAL_FUNDS" &&
+    process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF === "true";
   const failChecks = state.live_execution_arming.checks
     .filter((check) => check.status === "fail")
     .map((check) => `${check.label}: ${check.detail}`);
   const blockers = [
-    !actualLiveTradeTested ? "No confirmed live transaction signature has been recorded by this app." : null,
-    "This canary receipt does not return unsigned transaction bytes; use the gated /api/web3-live-unsigned-order-handoff route before browser-wallet signing.",
+    !liveScopeReady ? "Open the live DEX trading cockpit with account=persistent before requesting canary evidence." : null,
+    !walletScoped ? "Add a dedicated public Solana trading wallet address in Settings; never paste a private key or seed phrase." : null,
+    walletScoped && !walletLooksLikePublicKey ? "Replace the scoped wallet with a valid public Solana address." : null,
+    walletIsSample ? "Replace the sample all-ones wallet with a dedicated public Solana address before canary review." : null,
+    dedicatedWalletScoped && !walletOwnershipProved ? "Run Prove ownership with the connected browser wallet; this signs text only and cannot move funds." : null,
+    !jupiterConfigured ? "Add JUPITER_API_KEY in ignored server env or use a one-shot Settings rehearsal test." : null,
+    !liveFlagsReady ? "Set the exact live canary flags in ignored server env before requesting the one-shot unsigned order." : null,
     !state.signed_transaction_relay.request_id ? "No active signed-relay request id is ready for a canary trade." : null,
     !readyForExternalSignedPayload ? "Signed relay is not currently ready to accept an external signed payload." : null,
+    "This canary receipt does not return unsigned transaction bytes; use the gated /api/web3-live-unsigned-order-handoff route before browser-wallet signing.",
+    !actualLiveTradeTested ? "No confirmed live transaction signature has been recorded by this app." : null,
     ...state.execution_gate.live_blockers,
     ...failChecks,
     ...state.signed_transaction_relay.blockers,
@@ -489,6 +511,12 @@ function isConfirmedStatus(status: "processed" | "confirmed" | "finalized" | nul
   return status === "confirmed" || status === "finalized";
 }
 
+function isLikelySolanaPublicKey(value: string) {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
 function hashJson(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
+
+const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";

@@ -3187,6 +3187,7 @@ describe("Web3 autonomous trading subsystem", () => {
       post_signing_evidence: Array<{ id: string; status: string; detail: string; next_action: string }>;
       post_signing_next_action: string;
       blockers: string[];
+      next_action: string;
       required_for_real_canary: string[];
       transaction_submission_permission: string;
       live_execution_permission: string;
@@ -3223,6 +3224,8 @@ describe("Web3 autonomous trading subsystem", () => {
     ]);
     expect(receipt.post_signing_evidence.every((item) => item.status === "fail")).toBe(true);
     expect(receipt.post_signing_next_action).toContain("Clear live DEX");
+    expect(receipt.next_action).toContain("Open the live DEX trading cockpit");
+    expect(receipt.blockers[0]).toContain("Open the live DEX trading cockpit");
     expect(receipt.blockers.join(" ")).toContain("No confirmed live transaction signature");
     expect(receipt.blockers.join(" ")).toContain("does not return unsigned transaction bytes");
     expect(receipt.required_for_real_canary.join(" ")).toContain("Dedicated non-sample public wallet");
@@ -3235,6 +3238,24 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.secret_echo_permission).toBe("blocked");
     expect(receipt.controls.join(" ")).toContain("Browser-wallet signing is wired only through the gated one-shot");
     expect(receipt.controls.join(" ")).toContain("Paper and read-only DEX tests do not count as actual live trades");
+
+    const liveResponse = await LIVE_TRADE_CANARY_GET(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const liveReceipt = await json<{
+      status: string;
+      actual_live_trade_tested: boolean;
+      next_action: string;
+      blockers: string[];
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+    }>(liveResponse);
+    expect(liveResponse.status).toBe(200);
+    expect(liveReceipt.status).toBe("blocked");
+    expect(liveReceipt.actual_live_trade_tested).toBe(false);
+    expect(liveReceipt.blockers[0]).toMatch(/Add a dedicated|Replace the scoped wallet|Replace the sample|Run Prove ownership|Add JUPITER_API_KEY|Set the exact live canary flags/);
+    expect(liveReceipt.blockers[0]).not.toContain("No confirmed live transaction signature");
+    expect(liveReceipt.next_action).toBe(liveReceipt.blockers[0]);
+    expect(liveReceipt.live_execution_permission).toBe("blocked");
+    expect(liveReceipt.wallet_mutation_permission).toBe("blocked");
 
     const signedPayload = Buffer.from("signed-payload-canary-never-echo").toString("base64");
     const actionResponse = await LIVE_TRADE_CANARY_POST(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=sample&account=persistent&cycles=0", {

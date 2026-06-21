@@ -1429,6 +1429,8 @@ async function verifyLiveTradeCanary() {
   assert(json.post_signing_evidence.map((item) => item.id).join(",") === "signed-relay,chain-confirmation,settlement-reconciliation,portfolio-mirror", "Live trade canary proof chain should stay ordered.", json.post_signing_evidence);
   assert(json.post_signing_evidence.every((item) => ["pass", "watch", "fail"].includes(item.status)), "Live trade canary proof stages should expose known statuses.", json.post_signing_evidence);
   assert(typeof json.post_signing_next_action === "string" && json.post_signing_next_action.length > 0, "Live trade canary should expose the next post-signing action.", json);
+  assert(json.next_action?.includes("Open the live DEX trading cockpit"), "Sample live trade canary should route the operator to live DEX before signature proof work.", json);
+  assert(json.blockers?.[0]?.includes("Open the live DEX trading cockpit"), "Sample live trade canary should order source scope before missing signature proof.", json.blockers);
   assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("No confirmed live transaction signature")), "Live trade canary should name missing live-trade evidence.", json.blockers);
   assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("does not return unsigned transaction bytes")), "Live trade canary should name the gated browser-signing handoff path.", json.blockers);
   assert(Array.isArray(json.required_for_real_canary) && json.required_for_real_canary.some((item) => item.includes("web3-live-unsigned-order-handoff")), "Live trade canary should list signer or unsigned-handoff requirements.", json.required_for_real_canary);
@@ -1473,6 +1475,16 @@ async function verifyLiveTradeCanary() {
   assert(unsafe.json.status === "unsafe-rejected", "Live trade canary unsafe action should expose unsafe rejection.", unsafe.json);
   assert(Array.isArray(unsafe.json.unsafe_fields) && unsafe.json.unsafe_fields.includes("private_key"), "Live trade canary unsafe action should name unsafe field paths only.", unsafe.json);
   assertNoLeak("live trade canary unsafe action", unsafe.json);
+
+  const live = await requestJson("/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(live.response.status === 200, "Live-scoped canary receipt should return 200.", { status: live.response.status, json: live.json });
+  assert(live.json.actual_live_trade_tested === false, "Live-scoped canary should not claim a funded trade in default verification.", live.json);
+  assert(
+    /Add a dedicated|Replace the scoped wallet|Replace the sample|Run Prove ownership|Add JUPITER_API_KEY|Set the exact live canary flags/.test(String(live.json.blockers?.[0] ?? "")),
+    "Live-scoped canary should put the next prerequisite before the missing signature proof.",
+    live.json.blockers,
+  );
+  assert(!String(live.json.blockers?.[0] ?? "").includes("No confirmed live transaction signature"), "Live-scoped canary should not lead with the final proof blocker before prerequisite gates.", live.json.blockers);
 
   const preflightPath = `/api/web3-live-unsigned-order-handoff?source=sample&account=persistent&scenario=breakout&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${encodeURIComponent(walletPublicKey)}&amount_lamports=100000`;
   const preflight = await requestJson(preflightPath);

@@ -285,6 +285,9 @@ It also reports the post-signing proof chain: signed relay, chain confirmation, 
 reconciliation, and portfolio mirror accounting. A wallet signature by itself is not treated as a
 complete live-trade proof until those follow-through stages are recorded or explicitly blocked.
 Paper loops, read-only DEX checks, and Jupiter rehearsals do not count as actual live trades.
+The blocker list is ordered by prerequisites first, so the live-dex receipt points at wallet
+ownership proof, Jupiter setup, live canary flags, or request-id readiness before the final
+missing-signature proof.
 `POST /api/web3-live-unsigned-order-handoff` is the tiny live canary bridge: it can return a
 one-shot SOL-to-USDC Jupiter unsigned transaction only after `source=live-dex`, `account=persistent`,
 a dedicated public wallet, explicit canary acknowledgement, `return_unsigned_transaction_ack`, server
