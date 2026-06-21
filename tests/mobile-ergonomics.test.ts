@@ -1783,6 +1783,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("next_unblock_step");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("completion_signal");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("buildFirstCanaryUnblockPlan");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("firstCanaryOperatorAction");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("Wait for wallet proof, Jupiter order proof, live flags, and unsigned preflight before opening the external wallet transaction prompt.");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("Complete external live review for the tiny cap, emergency stop, settlement/accounting owner, and operator signoff");
     expect(source("scripts/web3-first-canary-drill.mjs")).toContain("next_lane_id");
     expect(source("scripts/web3-first-canary-drill.mjs")).toContain("operator_unblock_plan");
     expect(source("scripts/web3-first-canary-drill.mjs")).toContain("next_unblock_step");

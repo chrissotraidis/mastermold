@@ -2981,6 +2981,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.operator_unblock_plan.find((step) => step.id === "wallet-ownership")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "unsigned-order-preflight")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.safe_surface).toBe("/trading?source=live-dex&account=persistent#web3-live-canary-console");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "signer-relay")?.action).toContain("external wallet transaction prompt");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "manual-live-review")?.action).toContain("external live review");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.action).toContain("signed tiny-canary relay");
+    expect(receipt.operator_unblock_plan.map((step) => step.action).join(" ")).not.toContain("Hash-only wallet ownership proof");
+    expect(receipt.operator_unblock_plan.map((step) => step.action).join(" ")).not.toContain("Spend: $0 remains");
     expect(receipt.operator_unblock_plan.some((step) => step.safe_surface.includes("/settings/integrations"))).toBe(true);
     expect(receipt.operator_unblock_plan.every((step) =>
       ["done", "next", "blocked", "watch"].includes(step.status) &&

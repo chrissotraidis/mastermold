@@ -332,12 +332,41 @@ function buildFirstCanaryUnblockStep(
     phase: firstCanaryUnblockPhase(lane.id),
     label: lane.label,
     status: lane.status === "pass" ? "done" : lane.status === "watch" ? "watch" : "blocked",
-    action: lane.next_action,
+    action: firstCanaryOperatorAction(lane, input),
     safe_surface: safeSurface,
     command: firstCanaryUnblockCommand(lane, input),
     completion_signal: firstCanaryCompletionSignal(lane.id),
     blocks_funded_canary: lane.status !== "pass" && lane.id !== "post-signing-proof",
   };
+}
+
+function firstCanaryOperatorAction(
+  lane: Web3FirstCanaryDrillLane,
+  input: {
+    liveUsability: Web3LiveUsabilityBlockersReceipt;
+    readiness: Web3SupervisedCanaryReadinessReceipt;
+    jupiter: Web3JupiterOrderPacket;
+    unsignedPreflight: Web3LiveUnsignedOrderPreflightReceipt;
+    canary: Web3LiveTradeCanaryReceipt;
+  },
+) {
+  if (lane.id === "live-scope") return "Keep the live canary on source=live-dex and account=persistent before any wallet or route proof.";
+  if (lane.id === "dedicated-wallet") return "Save a dedicated public Solana trading wallet; never paste a private key, seed phrase, or keypair JSON.";
+  if (lane.id === "wallet-ownership") return "Run Prove wallet with the matching browser wallet; this signs text only and cannot move funds.";
+  if (lane.id === "jupiter-order") return "Add JUPITER_API_KEY in ignored server env or run a one-shot Settings rehearsal until Jupiter order proof is ready.";
+  if (lane.id === "live-flags") return "Set the three exact first-canary live flags in ignored server env, then rerun the wallet/order verifier.";
+  if (lane.id === "unsigned-order-preflight") return "Run Canary preflight in Trading to check the exact wallet, tiny amount, live flags, and Jupiter env before any transaction prompt.";
+  if (lane.id === "signer-relay") {
+    return input.readiness.can_relay_signed_payload_now
+      ? "Use Sign tiny canary with the visible acknowledgement armed; relay only the matching externally signed payload, then stop for proof."
+      : "Wait for wallet proof, Jupiter order proof, live flags, and unsigned preflight before opening the external wallet transaction prompt.";
+  }
+  if (lane.id === "manual-live-review") return "Complete external live review for the tiny cap, emergency stop, settlement/accounting owner, and operator signoff before treating the canary as reviewed.";
+  if (lane.id === "funded-canary-proof") return "After a signed relay exists, run proof watch until chain confirmation, settlement reconciliation, and portfolio mirror proof all pass.";
+  if (lane.id === "post-signing-proof") return input.canary.latest_signature_preview
+    ? input.canary.post_signing_next_action
+    : "Do not run proof watch until a signed tiny-canary relay exists; first clear wallet, Jupiter, live flag, preflight, and signer-relay gates.";
+  return lane.next_action;
 }
 
 function buildFirstCanaryDrillLanes(
