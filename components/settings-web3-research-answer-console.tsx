@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { BrainCircuit, ShieldCheck } from "lucide-react";
+import { BrainCircuit, ClipboardList, RotateCcw, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Web3ResearchAnswerIntakeReceipt } from "@/src/db/web3-research-answer-intake";
+import type { Web3ResearchQuestion } from "@/src/db/web3-research-handoff-packet";
 
 type SettingsWeb3ResearchAnswerConsoleProps = {
   scenario: string;
   source: string;
   account: string;
   cycles: number;
+  questions: Web3ResearchQuestion[];
 };
 
 export function SettingsWeb3ResearchAnswerConsole({
@@ -18,11 +20,21 @@ export function SettingsWeb3ResearchAnswerConsole({
   source,
   account,
   cycles,
+  questions,
 }: SettingsWeb3ResearchAnswerConsoleProps) {
   const [answersText, setAnswersText] = useState("");
   const [receipt, setReceipt] = useState<Web3ResearchAnswerIntakeReceipt | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Paste redacted helper answers after exporting the research handoff packet.");
+
+  const nowQuestions = questions.filter((question) => question.priority === "now");
+  const templateQuestions = nowQuestions.length > 0 ? nowQuestions : questions;
+  const answerTemplate = buildResearchAnswerTemplate(questions);
+
+  function useTemplate() {
+    setAnswersText(answerTemplate);
+    setMessage("Template loaded. Replace each answer line with redacted recommendations only.");
+  }
 
   async function reviewAnswers() {
     setBusy(true);
@@ -67,6 +79,59 @@ export function SettingsWeb3ResearchAnswerConsole({
         <div className="flex flex-wrap justify-end gap-1.5">
           <ResearchAnswerBadge status={receipt?.status ?? "waiting-for-answers"} />
           <Badge variant="outline" className="border-critical/35 bg-critical/10 text-xs text-critical">live blocked</Badge>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" aria-label="Settings Web3 research answer template guide">
+        <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-2">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-violet">Answer template</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">Paste-back format for the helper bot</p>
+            </div>
+            <Badge variant="outline" className="border-outline-variant/40 bg-surface-dim/45 text-xs text-outline">
+              {questions.length} lanes
+            </Badge>
+          </div>
+          <p className="mt-2 text-[11px] leading-5 text-on-surface-variant">
+            Use the template to keep answers structured by lane. The intake checker scores coverage and rejects secret-looking values before anything reaches a launch decision queue.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={useTemplate}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet/35 bg-violet/10 px-3 py-2 text-xs font-semibold text-violet transition hover:bg-violet/15"
+            >
+              <ClipboardList aria-hidden="true" className="size-4" />
+              Use template
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAnswersText("");
+                setReceipt(null);
+                setMessage("Paste redacted helper answers after exporting the research handoff packet.");
+              }}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-outline-variant/35 bg-black/15 px-3 py-2 text-xs font-semibold text-outline transition hover:bg-black/25"
+            >
+              <RotateCcw aria-hidden="true" className="size-4" />
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-outline-variant/25 bg-black/15 p-2" aria-label="Settings Web3 research answer required lanes">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Answer first</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {templateQuestions.slice(0, 4).map((question) => (
+              <div key={question.id} className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <p className="text-xs font-semibold text-on-surface">{question.question}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">
+                  {question.category} · {question.expected_answer_format}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -206,6 +271,29 @@ export function SettingsWeb3ResearchAnswerConsole({
       </p>
     </div>
   );
+}
+
+function buildResearchAnswerTemplate(questions: Web3ResearchQuestion[]) {
+  const lines = [
+    "# Mastermind Web3 Research Answers",
+    "",
+    "Do not include API keys, private keys, seed phrases, raw transactions, signed payloads, account passwords, or custody credentials.",
+    "Answer each lane with a concrete recommendation, the evidence source, risks, and implementation boundary.",
+    "",
+  ];
+
+  for (const question of questions) {
+    lines.push(`## ${question.id}`);
+    lines.push(`Question: ${question.question}`);
+    lines.push(`Expected format: ${question.expected_answer_format}`);
+    lines.push("Recommendation:");
+    lines.push("Evidence source:");
+    lines.push("Risk boundary:");
+    lines.push("Implementation notes:");
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
 
 function ResearchMetric({ label, value }: { label: string; value: string }) {

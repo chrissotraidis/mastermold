@@ -1562,6 +1562,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-answer-intake.ts")).toContain("Implementation plan is sequencing evidence only.");
     expect(source("src/db/web3-research-answer-intake.ts")).toContain("live_authority: \"blocked\"");
     expect(source("app/api/web3-research-answer-intake/route.ts")).toContain("assertResearchAnswerTextIsSafe");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Settings Web3 research answer template guide");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Use template");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Mastermind Web3 Research Answers");
+    expect(source("components/settings-web3-research-answer-console.tsx")).toContain("Do not include API keys, private keys, seed phrases");
+    expect(source("app/settings/integrations/page.tsx")).toContain("questions={packet.research_questions}");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("lane-by-lane answer template");
+    expect(source("components/review-readiness.tsx")).toContain("lane-by-lane paste-back answer template");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("What is the safest Solana custody architecture");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("live_execution_permission: \"blocked\"");
     expect(source("components/review-readiness.tsx")).toContain("Settings now renders that same Web3 cutover blocker board");

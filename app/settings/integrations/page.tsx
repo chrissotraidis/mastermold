@@ -1099,6 +1099,7 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
           source={packet.source}
           account={packet.account}
           cycles={0}
+          questions={packet.research_questions}
         />
       </div>
 
