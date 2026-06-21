@@ -325,7 +325,9 @@ transaction signature, private key, seed phrase, wallet mutation, or fund moveme
 starts with a server-issued `GET /api/web3-wallet-ownership?wallet_public_key=...` challenge
 receipt, expires that text challenge after 10 minutes, rejects stale or future-dated ownership
 messages, then stores only hashes plus issue/expiry/age metadata after the browser wallet signs the
-text challenge.
+text challenge. Account setup can still show durable proof evidence, but the first funded canary
+preflight, unsigned-order handoff, and signed-payload relay require current proof and tell the
+operator to rerun `Prove wallet` when the hash-only receipt is too old.
 Trading also exposes `Check wallet` beside `Prove wallet`; it fetches the same text-only challenge
 receipt for the connected or saved dedicated wallet without asking for a signature, blocks mismatched
 connected wallets, and refreshes the first-canary drill so the wallet-control gate can be diagnosed

@@ -1440,6 +1440,10 @@ async function verifyLiveTradeCanary() {
   assert(json.actual_live_trade_tested === false, "Live trade canary should truthfully say no real live trade has been tested in this local sample check.", json);
   assert(json.real_funds_moved_by_this_app === false, "Live trade canary should not claim funds moved in sample verification.", json);
   assert(json.can_submit_from_app_now === false, "Live trade canary should not be ready to submit from sample verification.", json);
+  assert(json.wallet_ownership_proved === true, "Live trade canary should see the verifier's hash-only wallet ownership proof.", json);
+  assert(json.wallet_ownership_current_for_canary === true, "Live trade canary should require current wallet ownership proof for the canary path.", json);
+  assert(typeof json.wallet_ownership_age_seconds === "number" && json.wallet_ownership_age_seconds >= 0 && json.wallet_ownership_age_seconds <= 600, "Live trade canary should report current wallet proof age.", json);
+  assert(json.wallet_ownership_max_age_seconds === 600, "Live trade canary should expose the canary wallet proof freshness window.", json);
   assert(json.browser_wallet_signature_flow === "gated-unsigned-handoff", "Live trade canary should disclose the gated browser-wallet signing bridge.", json);
   assert(json.unsigned_transaction_return === "withheld", "Live trade canary should disclose unsigned transaction withholding.", json);
   assert(json.live_execution_gate_enabled === false, "Live trade canary should keep the current live execution gate locked.", json);
@@ -1503,6 +1507,7 @@ async function verifyLiveTradeCanary() {
   const live = await requestJson("/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0");
   assert(live.response.status === 200, "Live-scoped canary receipt should return 200.", { status: live.response.status, json: live.json });
   assert(live.json.actual_live_trade_tested === false, "Live-scoped canary should not claim a funded trade in default verification.", live.json);
+  assert(live.json.wallet_ownership_current_for_canary === true, "Live-scoped canary should see current wallet proof after verifier ownership proof.", live.json);
   assert(
     /Add a dedicated|Replace the scoped wallet|Replace the sample|Run Prove ownership|Add JUPITER_API_KEY|Set the exact live canary flags/.test(String(live.json.blockers?.[0] ?? "")),
     "Live-scoped canary should put the next prerequisite before the missing signature proof.",
@@ -1519,6 +1524,7 @@ async function verifyLiveTradeCanary() {
   assert(preflight.json.status === "blocked", "Live unsigned order preflight should block sample-source requests.", preflight.json);
   assert(preflight.json.can_request_one_shot_unsigned_order === false, "Live unsigned order preflight should not permit one-shot unsigned order requests while blocked.", preflight.json);
   assert(preflight.json.scoped_wallet_ownership_proved === true, "Live unsigned order preflight should see the scoped hash-only wallet ownership proof.", preflight.json);
+  assert(preflight.json.scoped_wallet_ownership_current_for_canary === true, "Live unsigned order preflight should require current scoped wallet proof.", preflight.json);
   assert(
     walletPublicKey === DEFAULT_WALLET ? preflight.json.wallet_matches_scoped_wallet === false : preflight.json.wallet_matches_scoped_wallet === true,
     "Live unsigned order preflight should report whether the request wallet matches the scoped wallet.",
@@ -1529,6 +1535,12 @@ async function verifyLiveTradeCanary() {
     "Live unsigned order preflight should prove ownership only for the exact request wallet.",
     preflight.json,
   );
+  assert(
+    walletPublicKey === DEFAULT_WALLET ? preflight.json.wallet_ownership_current_for_canary === false : preflight.json.wallet_ownership_current_for_canary === true,
+    "Live unsigned order preflight should require current ownership only for the exact request wallet.",
+    preflight.json,
+  );
+  assert(preflight.json.wallet_ownership_max_age_seconds === 600, "Live unsigned order preflight should expose the wallet proof max age.", preflight.json);
   assert(preflight.json.unsigned_transaction_return === "blocked", "Live unsigned order preflight must not return unsigned transaction bytes.", preflight.json);
   assert(preflight.json.transaction_body_storage === "blocked", "Live unsigned order preflight must not store transaction bodies.", preflight.json);
   assert(preflight.json.execute_permission === "blocked", "Live unsigned order preflight must not execute orders.", preflight.json);
@@ -1565,6 +1577,7 @@ async function verifyLiveTradeCanary() {
   assert(unsignedHandoff.json.status === "blocked", "Live unsigned order handoff should block sample-source requests.", unsignedHandoff.json);
   assert(unsignedHandoff.json.unsigned_transaction === null, "Live unsigned order handoff must not return unsigned bytes while blocked.", unsignedHandoff.json);
   assert(unsignedHandoff.json.scoped_wallet_ownership_proved === true, "Live unsigned order handoff should see scoped hash-only wallet proof before order creation.", unsignedHandoff.json);
+  assert(unsignedHandoff.json.scoped_wallet_ownership_current_for_canary === true, "Live unsigned order handoff should require current scoped wallet proof before order creation.", unsignedHandoff.json);
   assert(
     walletPublicKey === DEFAULT_WALLET ? unsignedHandoff.json.wallet_matches_scoped_wallet === false : unsignedHandoff.json.wallet_matches_scoped_wallet === true,
     "Live unsigned order handoff should report request wallet continuity with scoped wallet.",
@@ -1573,6 +1586,11 @@ async function verifyLiveTradeCanary() {
   assert(
     walletPublicKey === DEFAULT_WALLET ? unsignedHandoff.json.wallet_ownership_proved === false : unsignedHandoff.json.wallet_ownership_proved === true,
     "Live unsigned order handoff should prove ownership only for the exact request wallet.",
+    unsignedHandoff.json,
+  );
+  assert(
+    walletPublicKey === DEFAULT_WALLET ? unsignedHandoff.json.wallet_ownership_current_for_canary === false : unsignedHandoff.json.wallet_ownership_current_for_canary === true,
+    "Live unsigned order handoff should require current ownership only for the exact request wallet.",
     unsignedHandoff.json,
   );
   assert(unsignedHandoff.json.unsigned_transaction_return === "blocked", "Live unsigned order handoff should mark unsigned return blocked.", unsignedHandoff.json);

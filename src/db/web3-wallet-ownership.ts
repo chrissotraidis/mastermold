@@ -3,6 +3,7 @@ import { store } from "./store";
 
 const WALLET_OWNERSHIP_CHALLENGE_MAX_AGE_SECONDS = 10 * 60;
 const WALLET_OWNERSHIP_CHALLENGE_FUTURE_SKEW_SECONDS = 60;
+export const WEB3_CANARY_WALLET_OWNERSHIP_MAX_AGE_SECONDS = WALLET_OWNERSHIP_CHALLENGE_MAX_AGE_SECONDS;
 
 export type Web3WalletOwnershipReceipt = {
   mode: "web3-wallet-ownership-receipt";
@@ -164,6 +165,26 @@ export function getLatestWeb3WalletOwnershipReceipt(walletPublicKey?: string | n
     receipt.signature_verified &&
     (!expectedPreview || receipt.wallet_public_key_preview === expectedPreview)
   ) ?? null;
+}
+
+export function getWeb3WalletOwnershipCanaryStatus(walletPublicKey?: string | null, now = new Date()) {
+  const receipt = getLatestWeb3WalletOwnershipReceipt(walletPublicKey);
+  const ageSeconds = receipt ? walletOwnershipReceiptAgeSeconds(receipt, now) : null;
+  const expiresAt = receipt ? walletOwnershipReceiptExpiresAt(receipt) : null;
+  const currentForCanary = Boolean(
+    receipt &&
+    ageSeconds !== null &&
+    ageSeconds >= 0 &&
+    ageSeconds <= WEB3_CANARY_WALLET_OWNERSHIP_MAX_AGE_SECONDS,
+  );
+  return {
+    receipt,
+    proved: Boolean(receipt),
+    current_for_canary: currentForCanary,
+    age_seconds: ageSeconds,
+    expires_at: expiresAt,
+    max_age_seconds: WEB3_CANARY_WALLET_OWNERSHIP_MAX_AGE_SECONDS,
+  };
 }
 
 export function validateWalletOwnershipInput(input: unknown):
@@ -331,6 +352,18 @@ function parseChallengeIssuedAt(message: string) {
   if (!issuedLine) return null;
   const issuedAt = new Date(issuedLine.slice("Issued: ".length).trim());
   return Number.isFinite(issuedAt.getTime()) ? issuedAt : null;
+}
+
+function walletOwnershipReceiptAgeSeconds(receipt: Web3WalletOwnershipReceipt, now = new Date()) {
+  const generatedMs = Date.parse(receipt.generated_at);
+  if (!Number.isFinite(generatedMs)) return null;
+  return Math.floor((now.getTime() - generatedMs) / 1_000);
+}
+
+function walletOwnershipReceiptExpiresAt(receipt: Web3WalletOwnershipReceipt) {
+  const generatedMs = Date.parse(receipt.generated_at);
+  if (!Number.isFinite(generatedMs)) return null;
+  return new Date(generatedMs + WEB3_CANARY_WALLET_OWNERSHIP_MAX_AGE_SECONDS * 1_000).toISOString();
 }
 
 function isLikelySolanaPublicKey(value: string) {

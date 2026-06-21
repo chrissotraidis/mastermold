@@ -394,9 +394,17 @@ function buildSupervisedCanaryReadinessLanes(input: {
     {
       id: "wallet-ownership",
       label: "Wallet ownership proof",
-      status: input.wallet.wallet_ownership_proved ? "pass" : input.wallet.dedicated_wallet_scoped ? "fail" : "watch",
-      detail: input.wallet.wallet_ownership_proved ? "A hash-only text-message ownership receipt is present." : "The dedicated wallet still needs a browser-wallet text signature proof.",
-      next_action: input.wallet.wallet_ownership_proved ? "Use the hash-only receipt as first-canary review evidence." : "Run Prove ownership; this signs text only and cannot move funds.",
+      status: input.unsignedPreflight.wallet_ownership_current_for_canary ? "pass" : input.wallet.dedicated_wallet_scoped ? "fail" : "watch",
+      detail: input.unsignedPreflight.wallet_ownership_current_for_canary
+        ? "A current hash-only text-message ownership receipt is present for the first canary."
+        : input.wallet.wallet_ownership_proved
+          ? "Wallet ownership proof exists, but it is too old for the first funded canary."
+          : "The dedicated wallet still needs a browser-wallet text signature proof.",
+      next_action: input.unsignedPreflight.wallet_ownership_current_for_canary
+        ? "Use the current hash-only receipt as first-canary review evidence."
+        : input.wallet.wallet_ownership_proved
+          ? "Re-run Prove ownership; this signs text only and cannot move funds."
+          : "Run Prove ownership; this signs text only and cannot move funds.",
       evidence_endpoint: "/api/web3-wallet-ownership",
       blocks_first_canary: true,
     },

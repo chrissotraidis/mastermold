@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Web3TradingState } from "./web3-trading";
-import { getLatestWeb3WalletOwnershipReceipt } from "./web3-wallet-ownership";
+import { getWeb3WalletOwnershipCanaryStatus } from "./web3-wallet-ownership";
 
 export type Web3LiveTradeCanaryEvidenceItem = {
   id: "signed-relay" | "chain-confirmation" | "settlement-reconciliation" | "portfolio-mirror";
@@ -21,6 +21,11 @@ export type Web3LiveTradeCanaryReceipt = {
   actual_live_trade_tested: boolean;
   real_funds_moved_by_this_app: boolean;
   can_submit_from_app_now: boolean;
+  wallet_ownership_proved: boolean;
+  wallet_ownership_current_for_canary: boolean;
+  wallet_ownership_age_seconds: number | null;
+  wallet_ownership_expires_at: string | null;
+  wallet_ownership_max_age_seconds: number;
   browser_wallet_signature_flow: "gated-unsigned-handoff";
   unsigned_transaction_return: "withheld";
   live_execution_gate_enabled: boolean;
@@ -233,7 +238,9 @@ export function buildWeb3LiveTradeCanaryReceipt(
   const signature = state.signed_transaction_relay.latest_signature ?? latest?.relay_signature ?? null;
   const relayConfirmed = isConfirmedLiveRelay(state, latest);
   const actualLiveTradeTested = Boolean(signature && relayConfirmed);
-  const readyForExternalSignedPayload = state.live_execution_arming.submit_ready &&
+  const walletOwnership = liveTradeCanaryWalletOwnershipStatus(state, now);
+  const readyForExternalSignedPayload = walletOwnership.current_for_canary &&
+    state.live_execution_arming.submit_ready &&
     state.signed_transaction_relay.can_accept_signed_payload &&
     Boolean(state.signed_transaction_relay.request_id);
   const status: Web3LiveTradeCanaryReceipt["status"] = actualLiveTradeTested
@@ -241,7 +248,7 @@ export function buildWeb3LiveTradeCanaryReceipt(
     : readyForExternalSignedPayload
       ? "ready-for-external-signed-payload"
       : "blocked";
-  const blockers = liveTradeCanaryBlockers(state, readyForExternalSignedPayload, actualLiveTradeTested);
+  const blockers = liveTradeCanaryBlockers(state, readyForExternalSignedPayload, actualLiveTradeTested, walletOwnership);
   const postSigningEvidence = buildPostSigningEvidence(state, signature);
   const postSigningEvidenceStatus = postSigningEvidenceStatusFrom(postSigningEvidence, signature);
   const postSigningNextAction = postSigningEvidence.find((item) => item.status !== "pass")?.next_action ??
@@ -256,6 +263,11 @@ export function buildWeb3LiveTradeCanaryReceipt(
     actual_live_trade_tested: actualLiveTradeTested,
     real_funds_moved_by_this_app: actualLiveTradeTested,
     can_submit_from_app_now: readyForExternalSignedPayload,
+    wallet_ownership_proved: walletOwnership.proved,
+    wallet_ownership_current_for_canary: walletOwnership.current_for_canary,
+    wallet_ownership_age_seconds: walletOwnership.age_seconds,
+    wallet_ownership_expires_at: walletOwnership.expires_at,
+    wallet_ownership_max_age_seconds: walletOwnership.max_age_seconds,
     browser_wallet_signature_flow: "gated-unsigned-handoff" as const,
     unsigned_transaction_return: "withheld" as const,
     live_execution_gate_enabled: state.execution_gate.live_execution_enabled,
@@ -282,6 +294,7 @@ export function buildWeb3LiveTradeCanaryReceipt(
       "Explicit live env flags: MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true and MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS.",
       "A reviewed signer path or gated /api/web3-live-unsigned-order-handoff browser-wallet path that can produce a signed payload without storing private keys, seed phrases, raw keypairs, or signed payloads in Mastermind.",
       "A current request id and payload hash that match the signed transaction or provider-managed submit status.",
+      "A current hash-only wallet ownership proof recorded shortly before the first funded canary.",
       "Manual live review, accounting/export target, stop drill, and loss-limit signoff.",
     ],
     next_action: liveTradeCanaryNextAction(status, blockers),
@@ -345,6 +358,7 @@ function liveTradeCanaryBlockers(
   state: Web3TradingState,
   readyForExternalSignedPayload: boolean,
   actualLiveTradeTested: boolean,
+  walletOwnership: ReturnType<typeof liveTradeCanaryWalletOwnershipStatus>,
 ) {
   const walletPublicKey = state.autonomous_custody_mandate.wallet_public_key ??
     state.live_wallet_accounting_readiness.wallet_public_key ??
@@ -354,7 +368,8 @@ function liveTradeCanaryBlockers(
   const walletLooksLikePublicKey = typeof walletPublicKey === "string" && isLikelySolanaPublicKey(walletPublicKey);
   const walletIsSample = walletPublicKey === SAMPLE_SYSTEM_WALLET;
   const dedicatedWalletScoped = walletScoped && walletLooksLikePublicKey && !walletIsSample;
-  const walletOwnershipProved = dedicatedWalletScoped && Boolean(getLatestWeb3WalletOwnershipReceipt(walletPublicKey));
+  const walletOwnershipProved = dedicatedWalletScoped && walletOwnership.proved;
+  const walletOwnershipCurrentForCanary = dedicatedWalletScoped && walletOwnership.current_for_canary;
   const liveScopeReady = state.market_source.mode === "live-dex" && state.paper_account.mode === "persistent";
   const jupiterConfigured = Boolean(process.env.JUPITER_API_KEY);
   const liveFlagsReady = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true" &&
@@ -366,6 +381,7 @@ function liveTradeCanaryBlockers(
     walletScoped && !walletLooksLikePublicKey ? "Replace the scoped wallet with a valid public Solana address." : null,
     walletIsSample ? "Replace the sample all-ones wallet with a dedicated public Solana address before canary review." : null,
     dedicatedWalletScoped && !walletOwnershipProved ? "Run Prove ownership with the connected browser wallet; this signs text only and cannot move funds." : null,
+    dedicatedWalletScoped && walletOwnershipProved && !walletOwnershipCurrentForCanary ? "Re-run Prove ownership with the connected browser wallet; the hash-only wallet proof is too old for the first funded canary." : null,
     !jupiterConfigured ? "Add JUPITER_API_KEY in ignored server env or use a one-shot Settings rehearsal test." : null,
     !liveFlagsReady ? "Set the exact live canary flags in ignored server env before requesting the one-shot unsigned order." : null,
     !state.signed_transaction_relay.request_id ? "No active signed-relay request id is ready for a canary trade." : null,
@@ -375,6 +391,14 @@ function liveTradeCanaryBlockers(
   ].filter((item): item is string => Boolean(item));
 
   return [...new Set(blockers)].slice(0, 12);
+}
+
+function liveTradeCanaryWalletOwnershipStatus(state: Web3TradingState, now: Date) {
+  const walletPublicKey = state.autonomous_custody_mandate.wallet_public_key ??
+    state.live_wallet_accounting_readiness.wallet_public_key ??
+    state.execution_readiness.config.wallet_public_key ??
+    null;
+  return getWeb3WalletOwnershipCanaryStatus(walletPublicKey, now);
 }
 
 function buildPostSigningEvidence(
