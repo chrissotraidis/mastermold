@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, ShieldCheck, Wallet, Zap } from "lucide-react";
+import { ArrowRight, RefreshCw, ShieldCheck, Wallet, Zap } from "lucide-react";
 import Link from "next/link";
 import type { Web3LiveTradeCanaryActionReceipt, Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import type { Web3LiveUnsignedOrderHandoffReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
-import type { TradingAccountMode, TradingMarketSource, TradingScenario } from "@/src/db/web3-trading";
+import type { TradingAccountMode, TradingMarketSource, TradingScenario, Web3TradingState } from "@/src/db/web3-trading";
 
 type BrowserSolanaProvider = {
   isPhantom?: boolean;
@@ -36,8 +36,10 @@ export function Web3LiveCanaryConsole({
   maxSlippageBps,
   defaultWalletPublicKey,
 }: Web3LiveCanaryConsoleProps) {
+  const [canaryReceipt, setCanaryReceipt] = useState(receipt);
   const [message, setMessage] = useState(receipt.next_action);
   const [busy, setBusy] = useState(false);
+  const [proofBusy, setProofBusy] = useState<"refresh" | "watchdog" | null>(null);
   const [unsignedReceipt, setUnsignedReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
   const [actionReceipt, setActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
   const [walletPreview, setWalletPreview] = useState(previewValue(defaultWalletPublicKey));
@@ -57,9 +59,71 @@ export function Web3LiveCanaryConsole({
   const canaryHref = `/api/web3-live-trade-canary?${currentParams.toString()}`;
   const unsignedHref = `/api/web3-live-unsigned-order-handoff?${params.toString()}`;
   const liveTradingHref = `/trading?source=live-dex${account !== "persistent" ? "&account=persistent" : ""}`;
-  const latestStatus = actionReceipt?.status ?? unsignedReceipt?.status ?? receipt.status;
-  const actualTradeTested = actionReceipt?.actual_live_trade_tested ?? receipt.actual_live_trade_tested;
+  const latestStatus = actionReceipt?.status ?? unsignedReceipt?.status ?? canaryReceipt.status;
+  const actualTradeTested = actionReceipt?.actual_live_trade_tested ?? canaryReceipt.actual_live_trade_tested;
   const sourceReady = source === "live-dex" && account === "persistent";
+
+  async function refreshCanaryReceipt(mode: "manual" | "auto" = "manual") {
+    setProofBusy("refresh");
+    try {
+      const response = await fetch(canaryHref);
+      const payload = await response.json().catch(() => null) as Web3LiveTradeCanaryReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Live canary receipt refresh failed.");
+      }
+      setCanaryReceipt(payload);
+      if (mode === "manual") setMessage(payload.post_signing_next_action);
+      return payload;
+    } finally {
+      setProofBusy(null);
+    }
+  }
+
+  async function runPostSigningProofCheck(mode: "manual" | "auto" = "manual") {
+    if (!sourceReady) {
+      setMessage("Open the live DEX canary view before checking signed-transaction proof.");
+      return;
+    }
+    setProofBusy("watchdog");
+    if (mode === "manual") {
+      setMessage("Checking confirmation, settlement, and local accounting evidence for the latest signed canary...");
+    }
+    try {
+      const response = await fetch("/api/web3-trading", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario,
+          cycles,
+          source: "live-dex",
+          account: "persistent",
+          advance: false,
+          settlement_watchdog: {
+            action: "run",
+            apply_mirror: true,
+            commitment: "confirmed",
+            search_transaction_history: true,
+          },
+        }),
+      });
+      const payload = await response.json().catch(() => null) as Web3TradingState | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Post-signing proof check failed.");
+      }
+      const summary = payload.autonomous_settlement_watchdog?.summary ??
+        payload.signature_confirmation_poll?.summary ??
+        "Post-signing proof check completed.";
+      setMessage(summary);
+      const refreshed = await refreshCanaryReceipt("auto");
+      if (refreshed.post_signing_evidence_status !== "settlement-accounted") {
+        setMessage(refreshed.post_signing_next_action);
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Post-signing proof check failed.");
+    } finally {
+      setProofBusy(null);
+    }
+  }
 
   async function signTinyCanary() {
     setBusy(true);
@@ -124,6 +188,11 @@ export function Web3LiveCanaryConsole({
       }
       setActionReceipt(relayPayload);
       setMessage(relayPayload.next_action);
+      if (relayPayload.actual_live_trade_tested) {
+        await runPostSigningProofCheck("auto");
+      } else {
+        await refreshCanaryReceipt("auto");
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Tiny canary signing failed.");
     } finally {
@@ -158,8 +227,8 @@ export function Web3LiveCanaryConsole({
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <CanaryMetric label="Actual trade" value={actualTradeTested ? "yes" : "no"} tone={actualTradeTested ? "engine" : "critical"} />
-            <CanaryMetric label="Browser sign" value={receipt.browser_wallet_signature_flow.replaceAll("-", " ")} tone="caution" />
-            <CanaryMetric label="Submit path" value={receipt.transaction_submission_permission.replaceAll("-", " ")} tone={receipt.can_submit_from_app_now ? "caution" : "neutral"} />
+            <CanaryMetric label="Browser sign" value={canaryReceipt.browser_wallet_signature_flow.replaceAll("-", " ")} tone="caution" />
+            <CanaryMetric label="Submit path" value={canaryReceipt.transaction_submission_permission.replaceAll("-", " ")} tone={canaryReceipt.can_submit_from_app_now ? "caution" : "neutral"} />
             <CanaryMetric label="Wallet" value={walletPreview ?? "not connected"} tone={walletPreview ? "caution" : "neutral"} />
           </div>
 
@@ -196,10 +265,30 @@ export function Web3LiveCanaryConsole({
             >
               Open canary JSON
             </Link>
+            {sourceReady ? (
+              <button
+                type="button"
+                onClick={() => void runPostSigningProofCheck()}
+                disabled={busy || proofBusy !== null}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
+              >
+                <RefreshCw aria-hidden="true" className={proofBusy === "watchdog" ? "size-4 animate-spin" : "size-4"} />
+                {proofBusy === "watchdog" ? "Checking proof" : "Check proof chain"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void refreshCanaryReceipt()}
+              disabled={busy || proofBusy !== null}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine disabled:cursor-not-allowed disabled:text-outline"
+            >
+              <RefreshCw aria-hidden="true" className={proofBusy === "refresh" ? "size-4 animate-spin" : "size-4"} />
+              Refresh receipt
+            </button>
           </div>
 
           <p className="mt-3 text-xs leading-5 text-outline">
-            This control can request only a tiny one-shot unsigned Jupiter canary, ask the external browser wallet to sign it, and relay the signed payload through the guarded canary endpoint. It cannot store wallet authority, private keys, seed phrases, or transaction bodies.
+            This control can request only a tiny one-shot unsigned Jupiter canary, ask the external browser wallet to sign it, relay the signed payload through the guarded canary endpoint, then run read-only confirmation and settlement checks. It cannot store wallet authority, private keys, seed phrases, or transaction bodies.
           </p>
         </div>
 
@@ -209,15 +298,15 @@ export function Web3LiveCanaryConsole({
               <div className="min-w-0">
                 <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Post-signing proof chain</p>
                 <p className="mt-1 text-sm font-semibold text-on-surface">
-                  {receipt.post_signing_evidence_status.replaceAll("-", " ")}
+                  {canaryReceipt.post_signing_evidence_status.replaceAll("-", " ")}
                 </p>
               </div>
-              <span className={postSigningStatusClassName(receipt.post_signing_evidence_status)}>
-                {receipt.post_signing_evidence.filter((item) => item.status === "pass").length}/4 proven
+              <span className={postSigningStatusClassName(canaryReceipt.post_signing_evidence_status)}>
+                {canaryReceipt.post_signing_evidence.filter((item) => item.status === "pass").length}/4 proven
               </span>
             </div>
             <div className="mt-2 grid gap-1.5">
-              {receipt.post_signing_evidence.map((item) => (
+              {canaryReceipt.post_signing_evidence.map((item) => (
                 <div key={item.id} className="grid gap-1 rounded-md border border-outline/15 bg-surface-dim/35 p-2 sm:grid-cols-[7rem_minmax(0,1fr)]">
                   <div className="flex items-center gap-2">
                     <span className={evidenceStatusClassName(item.status)}>{item.status}</span>
@@ -228,12 +317,12 @@ export function Web3LiveCanaryConsole({
               ))}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <CanaryMetric label="Confirm" value={receipt.confirmation_poll_status.replaceAll("-", " ")} tone={receipt.confirmation_poll_status === "confirmed" ? "engine" : "neutral"} />
-              <CanaryMetric label="Settle" value={receipt.settlement_reconciliation_status.replaceAll("-", " ")} tone={receipt.settlement_reconciliation_status === "reconciled" ? "engine" : "neutral"} />
-              <CanaryMetric label="Watchdog" value={receipt.settlement_watchdog_status.replaceAll("-", " ")} tone={["mirrored", "reconciled", "confirmed"].includes(receipt.settlement_watchdog_status) ? "engine" : "neutral"} />
-              <CanaryMetric label="Mirror" value={receipt.portfolio_mirror_status.replaceAll("-", " ")} tone={["applied", "duplicate"].includes(receipt.portfolio_mirror_status) ? "engine" : "neutral"} />
+              <CanaryMetric label="Confirm" value={canaryReceipt.confirmation_poll_status.replaceAll("-", " ")} tone={canaryReceipt.confirmation_poll_status === "confirmed" ? "engine" : "neutral"} />
+              <CanaryMetric label="Settle" value={canaryReceipt.settlement_reconciliation_status.replaceAll("-", " ")} tone={canaryReceipt.settlement_reconciliation_status === "reconciled" ? "engine" : "neutral"} />
+              <CanaryMetric label="Watchdog" value={canaryReceipt.settlement_watchdog_status.replaceAll("-", " ")} tone={["mirrored", "reconciled", "confirmed"].includes(canaryReceipt.settlement_watchdog_status) ? "engine" : "neutral"} />
+              <CanaryMetric label="Mirror" value={canaryReceipt.portfolio_mirror_status.replaceAll("-", " ")} tone={["applied", "duplicate"].includes(canaryReceipt.portfolio_mirror_status) ? "engine" : "neutral"} />
             </div>
-            <p className="mt-2 text-[11px] leading-4 text-outline">{receipt.post_signing_next_action}</p>
+            <p className="mt-2 text-[11px] leading-4 text-outline">{canaryReceipt.post_signing_next_action}</p>
           </div>
 
           <div className="rounded-md border border-critical/20 bg-surface/55 p-3" aria-label="Trading live canary blockers">
@@ -241,13 +330,13 @@ export function Web3LiveCanaryConsole({
               <div className="min-w-0">
                 <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Blocking real trade proof</p>
                 <p className="mt-1 text-sm font-semibold text-on-surface">
-                  {receipt.blockers.length > 0 ? `${receipt.blockers.length} blocker${receipt.blockers.length === 1 ? "" : "s"}` : "No listed blocker"}
+                  {canaryReceipt.blockers.length > 0 ? `${canaryReceipt.blockers.length} blocker${canaryReceipt.blockers.length === 1 ? "" : "s"}` : "No listed blocker"}
                 </p>
               </div>
               <ShieldCheck aria-hidden="true" className="size-4 text-outline" />
             </div>
             <ul className="mt-2 grid gap-1.5 text-[11px] leading-4 text-on-surface-variant">
-              {(actionReceipt?.blockers ?? unsignedReceipt?.blockers ?? receipt.blockers).slice(0, 4).map((blocker) => (
+              {(actionReceipt?.blockers ?? unsignedReceipt?.blockers ?? canaryReceipt.blockers).slice(0, 4).map((blocker) => (
                 <li key={blocker}>{blocker}</li>
               ))}
             </ul>
