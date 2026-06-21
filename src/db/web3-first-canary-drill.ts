@@ -91,6 +91,7 @@ export type Web3FirstCanaryDrillHealth = {
   proof_pass_count: number;
   proof_required_count: 4;
   hard_fail_count: number;
+  current_input_label: string | null;
   next_blocker_label: string | null;
   next_credential_label: string | null;
   next_lane_id: Web3FirstCanaryDrillReceipt["next_lane_id"];
@@ -237,6 +238,7 @@ export function buildWeb3FirstCanaryDrillHealth(receipt: Web3FirstCanaryDrillRec
     proof_pass_count: receipt.proof_pass_count,
     proof_required_count: receipt.proof_required_count,
     hard_fail_count: receipt.hard_fail_count,
+    current_input_label: receipt.current_input_label,
     next_blocker_label: receipt.next_blocker_label,
     next_credential_label: receipt.next_credential_label,
     next_lane_id: receipt.next_lane_id,

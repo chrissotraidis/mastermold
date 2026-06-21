@@ -617,6 +617,16 @@ function LiveCanaryCommandCenter({
             <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
               {drill.next_lane_action ?? nextCanaryLane?.next_action ?? drill.next_action}
             </p>
+            {drill.current_input_label ? (
+              <div className="mt-2 grid gap-1.5 sm:grid-cols-2" aria-label="Trading canary queue split">
+                <p className="truncate rounded-md border border-critical/15 bg-critical/[0.025] px-2 py-1 text-[11px] leading-5 text-outline">
+                  Canary lane: <span className="font-semibold text-on-surface">{drill.next_lane_label ?? nextCanaryLane?.label ?? "review"}</span>
+                </p>
+                <p className="truncate rounded-md border border-caution/20 bg-caution/[0.035] px-2 py-1 text-[11px] leading-5 text-outline">
+                  Credential intake: <span className="font-semibold text-on-surface">{drill.current_input_label}</span>
+                </p>
+              </div>
+            ) : null}
             {nextCredential?.safe_value_description ? (
               <p className="mt-2 line-clamp-2 rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-5 text-outline">
                 {nextCredential.safe_value_description}

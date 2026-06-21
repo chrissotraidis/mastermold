@@ -310,6 +310,7 @@ async function verifyHealth() {
   assert(json.web3_first_canary_drill.real_funds_moved_by_this_app === false, "First-canary drill health should not claim real funds moved.", json.web3_first_canary_drill);
   assert(json.web3_first_canary_drill.proof_required_count === 4, "First-canary drill health should require four proof stages.", json.web3_first_canary_drill);
   assert(typeof json.web3_first_canary_drill.hard_fail_count === "number", "First-canary drill health should expose hard fail count.", json.web3_first_canary_drill);
+  assert(typeof json.web3_first_canary_drill.current_input_label === "string" && json.web3_first_canary_drill.current_input_label.length > 0, "First-canary drill health should expose the broader credential-intake label.", json.web3_first_canary_drill);
   assert(typeof json.web3_first_canary_drill.next_lane_id === "string" && json.web3_first_canary_drill.next_lane_id.length > 0, "First-canary drill health should expose the ordered next lane id.", json.web3_first_canary_drill);
   assert(typeof json.web3_first_canary_drill.next_lane_label === "string" && json.web3_first_canary_drill.next_lane_label.length > 0, "First-canary drill health should expose the ordered next lane label.", json.web3_first_canary_drill);
   assert(["fail", "watch"].includes(json.web3_first_canary_drill.next_lane_status), "First-canary drill health should expose a blocking or watch next lane status.", json.web3_first_canary_drill);
@@ -337,6 +338,7 @@ async function verifyHealth() {
   assert(json.web3_live_first_canary_drill.real_funds_moved_by_this_app === false, "Canonical live first-canary health should not claim real funds moved.", json.web3_live_first_canary_drill);
   assert(json.web3_live_first_canary_drill.proof_required_count === 4, "Canonical live first-canary health should require four proof stages.", json.web3_live_first_canary_drill);
   assert(typeof json.web3_live_first_canary_drill.hard_fail_count === "number", "Canonical live first-canary health should expose hard fail count.", json.web3_live_first_canary_drill);
+  assert(typeof json.web3_live_first_canary_drill.current_input_label === "string" && json.web3_live_first_canary_drill.current_input_label.length > 0, "Canonical live first-canary health should expose the broader credential-intake label.", json.web3_live_first_canary_drill);
   assert(typeof json.web3_live_first_canary_drill.next_lane_id === "string" && json.web3_live_first_canary_drill.next_lane_id.length > 0, "Canonical live first-canary health should expose the ordered next lane id.", json.web3_live_first_canary_drill);
   assert(typeof json.web3_live_first_canary_drill.next_lane_label === "string" && json.web3_live_first_canary_drill.next_lane_label.length > 0, "Canonical live first-canary health should expose the ordered next lane label.", json.web3_live_first_canary_drill);
   assert(["fail", "watch"].includes(json.web3_live_first_canary_drill.next_lane_status), "Canonical live first-canary health should expose a blocking or watch next lane status.", json.web3_live_first_canary_drill);

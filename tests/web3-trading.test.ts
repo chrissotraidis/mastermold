@@ -1899,6 +1899,7 @@ describe("Web3 autonomous trading subsystem", () => {
         proof_pass_count: number;
         proof_required_count: number;
         hard_fail_count: number;
+        current_input_label: string | null;
         next_blocker_label: string | null;
         next_credential_label: string | null;
         next_lane_id: string | null;
@@ -1929,6 +1930,7 @@ describe("Web3 autonomous trading subsystem", () => {
         proof_pass_count: number;
         proof_required_count: number;
         hard_fail_count: number;
+        current_input_label: string | null;
         next_blocker_label: string | null;
         next_credential_label: string | null;
         next_lane_id: string | null;
@@ -2155,6 +2157,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_first_canary_drill.proof_pass_count).toBe(0);
     expect(receipt.web3_first_canary_drill.proof_required_count).toBe(4);
     expect(receipt.web3_first_canary_drill.hard_fail_count).toBeGreaterThan(0);
+    expect(receipt.web3_first_canary_drill.current_input_label?.length).toBeGreaterThan(0);
     expect(receipt.web3_first_canary_drill.next_lane_id).toBeTruthy();
     expect(receipt.web3_first_canary_drill.next_lane_label?.length).toBeGreaterThan(0);
     expect(["fail", "watch"]).toContain(String(receipt.web3_first_canary_drill.next_lane_status));
@@ -2177,6 +2180,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_first_canary_drill.real_funds_moved_by_this_app).toBe(false);
     expect(receipt.web3_live_first_canary_drill.proof_required_count).toBe(4);
     expect(receipt.web3_live_first_canary_drill.hard_fail_count).toBeGreaterThan(0);
+    expect(receipt.web3_live_first_canary_drill.current_input_label?.length).toBeGreaterThan(0);
     expect(receipt.web3_live_first_canary_drill.next_lane_id).toBeTruthy();
     expect(receipt.web3_live_first_canary_drill.next_lane_label?.length).toBeGreaterThan(0);
     expect(["fail", "watch"]).toContain(String(receipt.web3_live_first_canary_drill.next_lane_status));
