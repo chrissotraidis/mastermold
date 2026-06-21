@@ -225,6 +225,11 @@ signer-provider mode, ops/accounting flags, risk caps, and manual-review flags. 
 keys, seed phrases, API keys, transaction bytes, signed payloads, and secret-looking fields, echoes
 only redacted readiness evidence, and still keeps live execution, signing, transaction submission,
 wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
+`/api/web3-live-trade-canary` is the truthful live-money test receipt. It says whether a real
+live trade has actually been tested through Mastermind, whether any real funds moved through the
+app, whether the signed relay can accept an external signed payload, and why browser-wallet live
+signing is not currently possible from the UI because unsigned transaction bytes are withheld.
+Paper loops, read-only DEX checks, and Jupiter rehearsals do not count as actual live trades.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and a compact

@@ -32,6 +32,7 @@ import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } fr
 import { buildWeb3LiveActivationPlan, type Web3LiveActivationPlan } from "@/src/db/web3-live-activation-plan";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveOpsPacket, type Web3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
+import { buildWeb3LiveTradeCanaryReceipt, type Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import {
   buildWeb3ManualLiveReviewPacket,
@@ -175,6 +176,7 @@ export default async function IntegrationsSettingsPage() {
     liveUsability: web3LiveUsabilityBlockers,
     liveAutonomy: web3State.autonomous_live_autonomy_readiness,
   });
+  const web3LiveTradeCanary = buildWeb3LiveTradeCanaryReceipt(web3State);
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -196,6 +198,10 @@ export default async function IntegrationsSettingsPage() {
 
         <div className="mb-8">
           <SettingsWeb3LiveActivationPlanPanel plan={web3LiveActivationPlan} />
+        </div>
+
+        <div className="mb-8">
+          <SettingsWeb3LiveTradeCanaryPanel receipt={web3LiveTradeCanary} />
         </div>
 
         <div className="mb-8">
@@ -811,6 +817,63 @@ function SettingsWeb3SetupPriorityCard({
       <p className="mt-2 text-xs leading-5 text-outline">
         This first-screen card is navigation and status only. It cannot save secrets, sign, submit, mutate wallets, custody funds, or unlock autonomous live trading.
       </p>
+    </section>
+  );
+}
+
+function SettingsWeb3LiveTradeCanaryPanel({ receipt }: { receipt: Web3LiveTradeCanaryReceipt }) {
+  const canaryEndpoint = `/api/web3-live-trade-canary?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`;
+
+  return (
+    <section
+      aria-label="Settings Web3 live trade canary"
+      className="rounded-md border border-critical/35 bg-critical/[0.035] p-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Live trade canary</p>
+          <h2 className="mt-1 text-lg font-semibold text-on-surface">
+            Actual live trade tested: {receipt.actual_live_trade_tested ? "yes" : "no"}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">{receipt.next_action}</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={receipt.actual_live_trade_tested ? "pass" : "fail"} label={receipt.status.replaceAll("-", " ")} />
+          <LaunchQueueBadge status={receipt.can_submit_from_app_now ? "watch" : "fail"} label={receipt.can_submit_from_app_now ? "external payload ready" : "submit blocked"} />
+          <LaunchQueueBadge status="fail" label="browser signer absent" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <SettingsMetric label="Live gate" value={receipt.live_execution_gate_enabled ? "enabled" : "locked"} />
+        <SettingsMetric label="Relay" value={receipt.signed_relay_status.replaceAll("-", " ")} />
+        <SettingsMetric label="Request" value={receipt.current_request_id ?? "none"} />
+        <SettingsMetric label="Signature" value={receipt.latest_signature_preview ?? "none"} />
+      </div>
+
+      <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2">
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Current blocker</p>
+        <p className="mt-1 text-xs leading-5 text-on-surface-variant">{receipt.blockers[0] ?? "No blocker reported."}</p>
+        <p className="mt-2 text-[11px] leading-4 text-outline">
+          Paper, DEX-read, and Jupiter rehearsal checks do not count as live trades. This panel only turns green after live relay evidence records a real signature.
+        </p>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href={canaryEndpoint}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-outline-variant/30 bg-surface-dim/45 px-2 text-xs font-semibold text-on-surface-variant transition hover:border-critical/35 hover:text-critical"
+        >
+          Open canary JSON
+          <ExternalLink aria-hidden="true" className="size-3.5" />
+        </Link>
+        <Badge variant="outline" className="border-outline-variant/40 bg-surface-dim/45 text-outline">
+          unsigned tx {receipt.unsigned_transaction_return}
+        </Badge>
+        <Badge variant="outline" className="border-outline-variant/40 bg-surface-dim/45 text-outline">
+          wallet mutation {receipt.wallet_mutation_permission}
+        </Badge>
+      </div>
     </section>
   );
 }

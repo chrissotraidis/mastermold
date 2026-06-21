@@ -31,6 +31,7 @@ import { GET as CREDENTIAL_DOCTOR_GET, POST as CREDENTIAL_DOCTOR_POST } from "@/
 import { GET as CREDENTIAL_REQUIREMENTS_GET } from "@/app/api/web3-credential-requirements/route";
 import { GET as LIVE_ACTIVATION_INTAKE_GET, POST as LIVE_ACTIVATION_INTAKE_POST } from "@/app/api/web3-live-activation-intake/route";
 import { GET as LIVE_ACTIVATION_PLAN_GET } from "@/app/api/web3-live-activation-plan/route";
+import { GET as LIVE_TRADE_CANARY_GET } from "@/app/api/web3-live-trade-canary/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -2338,6 +2339,64 @@ describe("Web3 autonomous trading subsystem", () => {
       method: "POST",
       body: JSON.stringify({ operator_ack: true }),
     }));
+    const invalidReceipt = await json<{ error: string }>(invalid);
+    expect(invalid.status).toBe(422);
+    expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");
+  });
+
+  test("GIVEN the operator asks whether live money has actually traded WHEN the canary route runs THEN it answers truthfully with blockers", async () => {
+    const response = await LIVE_TRADE_CANARY_GET(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=sample&account=persistent&cycles=0"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      actual_live_trade_tested: boolean;
+      real_funds_moved_by_this_app: boolean;
+      can_submit_from_app_now: boolean;
+      browser_wallet_signature_flow: boolean;
+      unsigned_transaction_return: string;
+      live_execution_gate_enabled: boolean;
+      signed_relay_status: string;
+      signed_relay_accepts_payload: boolean;
+      current_request_id: string | null;
+      latest_signature_preview: string | null;
+      blockers: string[];
+      required_for_real_canary: string[];
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-live-trade-canary");
+    expect(["blocked", "ready-for-external-signed-payload", "live-relay-evidence-recorded"]).toContain(receipt.status);
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.actual_live_trade_tested).toBe(false);
+    expect(receipt.real_funds_moved_by_this_app).toBe(false);
+    expect(receipt.can_submit_from_app_now).toBe(false);
+    expect(receipt.browser_wallet_signature_flow).toBe(false);
+    expect(receipt.unsigned_transaction_return).toBe("withheld");
+    expect(receipt.live_execution_gate_enabled).toBe(false);
+    expect(receipt.signed_relay_accepts_payload).toBe(false);
+    expect(receipt.current_request_id).toBeNull();
+    expect(receipt.latest_signature_preview).toBeNull();
+    expect(receipt.blockers.join(" ")).toContain("No confirmed live transaction signature");
+    expect(receipt.blockers.join(" ")).toContain("withholds unsigned transaction bytes");
+    expect(receipt.required_for_real_canary.join(" ")).toContain("Dedicated non-sample public wallet");
+    expect(receipt.required_for_real_canary.join(" ")).toContain("reviewed signer path");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.join(" ")).toContain("Paper and read-only DEX tests do not count as actual live trades");
+
+    const invalid = await LIVE_TRADE_CANARY_GET(new Request("http://localhost/api/web3-live-trade-canary?account=hot-wallet"));
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");

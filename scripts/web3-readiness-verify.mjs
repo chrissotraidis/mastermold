@@ -299,7 +299,11 @@ async function verifyHealth() {
   assert(typeof json.web3_live_usability.credential_doctor_next_action === "string" && json.web3_live_usability.credential_doctor_next_action.length > 0, "Live-usability health should expose credential doctor next action.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_label === "string" && json.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next operator unlock step.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_action === "string" && json.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", json.web3_live_usability);
-  assert(json.web3_live_usability.next_blocker?.id === "cutover:dedicated-trading-wallet", "Live-usability health should expose the next dependency-ranked blocker.", json.web3_live_usability);
+  assert(
+    ["cutover:dedicated-trading-wallet", "cutover:wallet-ownership-proof"].includes(json.web3_live_usability.next_blocker?.id),
+    "Live-usability health should expose the next dependency-ranked blocker.",
+    json.web3_live_usability,
+  );
   assert(json.web3_live_usability.next_blocker?.owner === "operator" && json.web3_live_usability.next_blocker?.source === "cutover", "Live-usability health next blocker should expose owner/source routing.", json.web3_live_usability.next_blocker);
   assert(json.web3_live_usability.next_blocker?.href === "/settings/integrations#settings-web3-wallet-public-key", "Live-usability health next blocker should expose the safe fix surface.", json.web3_live_usability.next_blocker);
   assert(String(json.web3_live_usability.next_blocker?.safe_command ?? "").includes("--require-operator-wallet"), "Live-usability health next blocker should expose the strict safe verifier command.", json.web3_live_usability.next_blocker);
@@ -1238,6 +1242,32 @@ async function verifyLiveActivationIntake() {
   record("live-activation-intake", "pass", `${safe.json.accepted_milestone_count} safe milestones; unsafe fields rejected`);
 }
 
+async function verifyLiveTradeCanary() {
+  const { response, json } = await requestJson("/api/web3-live-trade-canary?source=sample&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Live trade canary should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-live-trade-canary", "Live trade canary should expose the expected mode.", json);
+  assert(["blocked", "ready-for-external-signed-payload", "live-relay-evidence-recorded"].includes(json.status), "Live trade canary should expose a known status.", json);
+  assertReceiptHash("Live trade canary", json.receipt_hash);
+  assert(json.actual_live_trade_tested === false, "Live trade canary should truthfully say no real live trade has been tested in this local sample check.", json);
+  assert(json.real_funds_moved_by_this_app === false, "Live trade canary should not claim funds moved in sample verification.", json);
+  assert(json.can_submit_from_app_now === false, "Live trade canary should not be ready to submit from sample verification.", json);
+  assert(json.browser_wallet_signature_flow === false, "Live trade canary should disclose that browser-wallet signing is not wired.", json);
+  assert(json.unsigned_transaction_return === "withheld", "Live trade canary should disclose unsigned transaction withholding.", json);
+  assert(json.live_execution_gate_enabled === false, "Live trade canary should keep the current live execution gate locked.", json);
+  assert(json.signed_relay_accepts_payload === false, "Live trade canary should not accept signed payloads in the sample check.", json);
+  assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("No confirmed live transaction signature")), "Live trade canary should name missing live-trade evidence.", json.blockers);
+  assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("withholds unsigned transaction bytes")), "Live trade canary should name the missing browser-signing path.", json.blockers);
+  assert(Array.isArray(json.required_for_real_canary) && json.required_for_real_canary.some((item) => item.includes("reviewed signer path")), "Live trade canary should list signer requirements.", json.required_for_real_canary);
+  assert(json.transaction_submission_permission === "blocked", "Live trade canary must keep transaction submission blocked in sample verification.", json);
+  assert(json.live_execution_permission === "blocked", "Live trade canary must keep live execution blocked in sample verification.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Live trade canary must keep wallet mutation blocked.", json);
+  assert(json.private_key_storage === "blocked", "Live trade canary must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "Live trade canary must block seed-phrase storage.", json);
+  assert(json.secret_echo_permission === "blocked", "Live trade canary must block secret echo.", json);
+  assertNoLeak("live trade canary", json);
+  record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}`);
+}
+
 async function verifyResearchAnswerIntake() {
   const answer = [
     "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
@@ -1507,6 +1537,7 @@ async function main() {
   await verifyCredentialRequirementsPacket();
   await verifyLiveActivationPlanPacket();
   await verifyLiveActivationIntake();
+  await verifyLiveTradeCanary();
   await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();
