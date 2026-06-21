@@ -895,6 +895,8 @@ describe("Web3 autonomous trading subsystem", () => {
       status: string;
       receipt_hash: string;
       handoff_receipt_hash: string;
+      next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string; evidence: string } | null;
+      operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       next_input: { id: string; label: string; next_action: string } | null;
       required_inputs: Array<{ id: string; env_targets: string[]; storage: string; safe_collection_surface: string; verifier_command: string | null }>;
       review_inputs: Array<{ id: string }>;
@@ -917,6 +919,18 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.status).toBe("needs-input");
     expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(packet.handoff_receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(packet.next_unlock_step).toMatchObject({
+      id: "scope-wallet",
+      status: "active",
+    });
+    expect(packet.operator_unlock_sequence.map((step) => step.id)).toEqual([
+      "scope-wallet",
+      "prove-wallet",
+      "rehearse-jupiter",
+      "choose-signer",
+      "ops-accounting",
+      "external-review",
+    ]);
     expect(packet.next_input?.id).toBe("dedicated-trading-wallet");
     expect(packet.required_inputs.map((item) => item.id)).toEqual(expect.arrayContaining([
       "jupiter-route-order-key",
@@ -938,6 +952,8 @@ describe("Web3 autonomous trading subsystem", () => {
       "npm run doctor:web3 -- --json",
     ]));
     expect(packet.text_packet).toContain("# Mastermind Web3 Operator Request Packet");
+    expect(packet.text_packet).toContain("Next Ordered Unlock Step");
+    expect(packet.text_packet).toContain("Operator Unlock Sequence");
     expect(packet.text_packet).toContain("JUPITER_API_KEY");
     expect(packet.text_packet).toContain("MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL");
     expect(packet.text_packet).toContain("Never Provide");

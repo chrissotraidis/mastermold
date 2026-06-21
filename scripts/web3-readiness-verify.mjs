@@ -636,6 +636,10 @@ async function verifyOperatorSetupPackets() {
   assert(Array.isArray(requestPacket.json.never_provide) && requestPacket.json.never_provide.includes("Seed phrase or mnemonic"), "Operator request packet should keep seed phrases in never-provide list.", requestPacket.json.never_provide);
   assert(Array.isArray(requestPacket.json.verifier_commands) && requestPacket.json.verifier_commands.some((command) => command.includes("verify:web3")), "Operator request packet should include verifier commands.", requestPacket.json.verifier_commands);
   assert(typeof requestPacket.json.text_packet === "string" && requestPacket.json.text_packet.includes("# Mastermind Web3 Operator Request Packet"), "Operator request packet should include pasteable text.", requestPacket.json.text_packet);
+  assert(Array.isArray(requestPacket.json.operator_unlock_sequence) && requestPacket.json.operator_unlock_sequence.map((item) => item.id).join(",") === "scope-wallet,prove-wallet,rehearse-jupiter,choose-signer,ops-accounting,external-review", "Operator request packet should carry the ordered unlock sequence.", requestPacket.json.operator_unlock_sequence);
+  assert(requestPacket.json.operator_unlock_sequence.some((item) => item.id === requestPacket.json.next_unlock_step?.id), "Operator request packet should expose the next ordered unlock step.", requestPacket.json.next_unlock_step);
+  assert(requestPacket.json.text_packet.includes("Next Ordered Unlock Step"), "Operator request text should name the next ordered unlock step.", requestPacket.json.text_packet);
+  assert(requestPacket.json.text_packet.includes("Operator Unlock Sequence"), "Operator request text should include the ordered unlock sequence.", requestPacket.json.text_packet);
   assert(requestPacket.json.text_packet.includes("Never Provide"), "Operator request text should include the never-provide boundary.", requestPacket.json.text_packet);
   assertBlockedAuthority("Operator request packet", requestPacket.json);
 

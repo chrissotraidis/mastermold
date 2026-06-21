@@ -92,7 +92,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3ResearchHa
     acquisition: buildWeb3AccountAcquisitionReceipt(state),
     launchChecklist,
   });
-  const requestPacket = buildWeb3OperatorRequestPacket(handoff);
+  const requestPacket = buildWeb3OperatorRequestPacket(handoff, { usability });
   const cutover = buildWeb3CutoverBlockerBoard({
     requestPacket,
     runway,

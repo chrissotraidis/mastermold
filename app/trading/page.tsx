@@ -76,11 +76,12 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     launchChecklist,
     supervisedRunway: supervisedLiveRunway,
   });
-  const operatorRequestPacket = buildWeb3OperatorRequestPacket(buildWeb3OperatorCredentialHandoffReceipt({
+  const operatorCredentialHandoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup,
     acquisition: buildWeb3AccountAcquisitionReceipt(initialState),
     launchChecklist,
-  }));
+  });
+  const operatorRequestPacket = buildWeb3OperatorRequestPacket(operatorCredentialHandoff, { usability: usabilityStatus });
   const cutoverBlockerBoard = buildWeb3CutoverBlockerBoard({
     requestPacket: operatorRequestPacket,
     runway: supervisedLiveRunway,

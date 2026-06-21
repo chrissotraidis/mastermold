@@ -140,7 +140,7 @@ async function buildResearchHandoffForSearch(input: {
     acquisition: buildWeb3AccountAcquisitionReceipt(state),
     launchChecklist,
   });
-  const requestPacket = buildWeb3OperatorRequestPacket(handoff);
+  const requestPacket = buildWeb3OperatorRequestPacket(handoff, { usability });
   const cutover = buildWeb3CutoverBlockerBoard({
     requestPacket,
     runway,

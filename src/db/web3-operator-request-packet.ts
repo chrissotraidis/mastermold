@@ -3,6 +3,7 @@ import type {
   Web3OperatorCredentialHandoffInput,
   Web3OperatorCredentialHandoffReceipt,
 } from "./web3-operator-credential-handoff";
+import type { Web3OperatorUnlockStep, Web3UsabilityStatusReceipt } from "./web3-usability-status";
 
 export type Web3OperatorRequestPacketInput = {
   id: Web3OperatorCredentialHandoffInput["id"];
@@ -26,6 +27,8 @@ export type Web3OperatorRequestPacket = {
   summary: string;
   receipt_hash: string;
   handoff_receipt_hash: string;
+  next_unlock_step: Web3OperatorUnlockStep | null;
+  operator_unlock_sequence: Web3OperatorUnlockStep[];
   next_input: Web3OperatorRequestPacketInput | null;
   required_inputs: Web3OperatorRequestPacketInput[];
   review_inputs: Web3OperatorRequestPacketInput[];
@@ -42,7 +45,10 @@ export type Web3OperatorRequestPacket = {
   controls: string[];
 };
 
-export function buildWeb3OperatorRequestPacket(handoff: Web3OperatorCredentialHandoffReceipt): Web3OperatorRequestPacket {
+export function buildWeb3OperatorRequestPacket(
+  handoff: Web3OperatorCredentialHandoffReceipt,
+  options: { usability?: Web3UsabilityStatusReceipt } = {},
+): Web3OperatorRequestPacket {
   const generatedAt = new Date().toISOString();
   const openRequired = handoff.inputs
     .filter((item) => item.priority !== "review-before-live" && item.status !== "ready")
@@ -51,6 +57,10 @@ export function buildWeb3OperatorRequestPacket(handoff: Web3OperatorCredentialHa
     .filter((item) => item.priority === "review-before-live" || item.status === "review")
     .map(toRequestInput);
   const nextInput = handoff.next_input ? toRequestInput(handoff.next_input) : openRequired[0] ?? reviewInputs[0] ?? null;
+  const operatorUnlockSequence = options.usability?.operator_unlock_sequence ?? [];
+  const nextUnlockStep = operatorUnlockSequence.find((step) => step.status !== "ready") ??
+    operatorUnlockSequence[operatorUnlockSequence.length - 1] ??
+    null;
   const verifierCommands = Array.from(new Set([
     ...handoff.safe_commands,
     ...handoff.inputs.map((item) => item.verifier_command).filter((command): command is string => Boolean(command)),
@@ -64,6 +74,8 @@ export function buildWeb3OperatorRequestPacket(handoff: Web3OperatorCredentialHa
       ? `Mastermind still needs ${openRequired.length} required Web3 setup input${openRequired.length === 1 ? "" : "s"} before supervised trading review.`
       : "Required Web3 setup inputs are ready; keep live review external.",
     handoff_receipt_hash: handoff.receipt_hash,
+    next_unlock_step: nextUnlockStep,
+    operator_unlock_sequence: operatorUnlockSequence,
     next_input: nextInput,
     required_inputs: openRequired,
     review_inputs: reviewInputs,
@@ -78,6 +90,7 @@ export function buildWeb3OperatorRequestPacket(handoff: Web3OperatorCredentialHa
     secret_echo_permission: "blocked" as const,
     controls: [
       "This packet is safe to share with a research/helper agent because it contains target names and status only.",
+      "When a usability receipt is supplied, the packet carries the ordered unlock sequence so setup helpers can resolve wallet scope before downstream proof and review work.",
       "It asks for public wallet, server-env API keys, ops contacts, accounting target, signer/custody decision, and manual review decisions; it never asks for wallet private keys or seed phrases.",
       "Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.",
     ],
@@ -127,13 +140,30 @@ function renderOperatorRequestText(packet: Omit<Web3OperatorRequestPacket, "rece
   const reviewLines = packet.review_inputs.length > 0
     ? packet.review_inputs.slice(0, 6).map((item) => `- ${item.label}: ${item.next_action}`).join("\n")
     : "- No review inputs are open.";
+  const unlockLines = packet.operator_unlock_sequence.length > 0
+    ? packet.operator_unlock_sequence.map((step, index) => [
+      `- ${index + 1}. ${step.label}`,
+      `  Status: ${step.status}`,
+      `  Storage: ${step.storage.replaceAll("-", " ")}`,
+      `  Next action: ${step.next_action}`,
+      `  Evidence: ${step.evidence}`,
+    ].join("\n")).join("\n")
+    : "- No ordered unlock sequence was attached.";
   return [
     "# Mastermind Web3 Operator Request Packet",
     "",
     packet.summary,
     "",
+    "## Next Ordered Unlock Step",
+    packet.next_unlock_step
+      ? `${packet.next_unlock_step.label}: ${packet.next_unlock_step.status}; ${packet.next_unlock_step.next_action}`
+      : "No ordered unlock step was attached.",
+    "",
     "## Next Safe Input",
     packet.next_input ? `${packet.next_input.label}: ${packet.next_input.next_action}` : "No next input is open.",
+    "",
+    "## Operator Unlock Sequence",
+    unlockLines,
     "",
     "## Required Inputs",
     requiredLines,

@@ -114,11 +114,13 @@ export default async function IntegrationsSettingsPage() {
     acquisition: web3AcquisitionReceipt,
     launchChecklist: web3LaunchChecklist,
   });
-  const web3OperatorRequestPacket = buildWeb3OperatorRequestPacket(web3OperatorCredentialHandoff);
   const web3UsabilityStatus = buildWeb3UsabilityStatus({
     state: web3State,
     launchChecklist: web3LaunchChecklist,
     supervisedRunway: web3SupervisedLiveRunway,
+  });
+  const web3OperatorRequestPacket = buildWeb3OperatorRequestPacket(web3OperatorCredentialHandoff, {
+    usability: web3UsabilityStatus,
   });
   const web3CutoverBlockerBoard = buildWeb3CutoverBlockerBoard({
     requestPacket: web3OperatorRequestPacket,
@@ -1232,6 +1234,20 @@ function SettingsWeb3OperatorRequestPacketPanel({ packet }: { packet: Web3Operat
         </div>
         <LaunchQueueBadge status={packet.status === "needs-input" ? "watch" : "pass"} label={`${packet.required_inputs.length} open`} />
       </div>
+
+      {packet.next_unlock_step ? (
+        <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 operator request next unlock step">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Next ordered unlock step</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{packet.next_unlock_step.label}</p>
+            </div>
+            <LaunchQueueBadge status={settingsOperatorUnlockBadgeStatus(packet.next_unlock_step.status)} label={packet.next_unlock_step.status} />
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{packet.next_unlock_step.next_action}</p>
+          <p className="mt-1 truncate text-[11px] leading-4 text-outline">{packet.next_unlock_step.storage.replaceAll("-", " ")}</p>
+        </div>
+      ) : null}
 
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         {openInputs.length > 0 ? openInputs.map((item) => (

@@ -62,7 +62,7 @@ export async function GET() {
     acquisition: buildWeb3AccountAcquisitionReceipt(web3State),
     launchChecklist: web3LaunchChecklist,
   });
-  const web3RequestPacket = buildWeb3OperatorRequestPacket(web3Handoff);
+  const web3RequestPacket = buildWeb3OperatorRequestPacket(web3Handoff, { usability: web3Usability });
   const web3Cutover = buildWeb3CutoverBlockerBoard({
     requestPacket: web3RequestPacket,
     runway: web3SupervisedRunway,
