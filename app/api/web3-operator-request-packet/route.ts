@@ -129,6 +129,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3OperatorRe
     preflight,
     manualLiveReview,
     runway,
+    currentInput: baseRequestPacket.current_input,
   });
   const handoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup,

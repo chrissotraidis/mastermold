@@ -129,6 +129,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveUsabil
     preflight,
     manualLiveReview,
     runway,
+    currentInput: requestPacket.current_input,
     rowScope: rows,
   }));
 }

@@ -94,6 +94,7 @@ export async function GET() {
     preflight: web3Preflight,
     manualLiveReview: web3ManualLiveReview,
     runway: web3SupervisedRunway,
+    currentInput: web3BaseRequestPacket.current_input,
   });
   const web3EnrichedHandoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup: web3AccountSetup,

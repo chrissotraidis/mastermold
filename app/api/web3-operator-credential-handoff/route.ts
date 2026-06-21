@@ -131,6 +131,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3OperatorCr
     preflight,
     manualLiveReview,
     runway,
+    currentInput: requestPacket.current_input,
   });
 
   return NextResponse.json(buildWeb3OperatorCredentialHandoffReceipt({

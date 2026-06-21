@@ -143,6 +143,7 @@ export default async function IntegrationsSettingsPage() {
     preflight: web3LiveCapitalPreflight,
     manualLiveReview: web3ManualLiveReviewPacket,
     runway: web3SupervisedLiveRunway,
+    currentInput: web3BaseOperatorRequestPacket.current_input,
     credentialDoctor: web3CredentialDoctor,
   });
   const web3OperatorCredentialHandoff = buildWeb3OperatorCredentialHandoffReceipt({

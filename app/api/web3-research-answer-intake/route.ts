@@ -173,6 +173,7 @@ async function buildResearchHandoffForSearch(input: {
     preflight,
     manualLiveReview,
     runway,
+    currentInput: requestPacket.current_input,
   });
   const handoff = buildWeb3OperatorCredentialHandoffReceipt({
     accountSetup,

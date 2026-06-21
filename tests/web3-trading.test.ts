@@ -1569,6 +1569,21 @@ describe("Web3 autonomous trading subsystem", () => {
       total_live_usability_row_count: number;
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
+      current_input: {
+        id: string;
+        label: string;
+        safe_collection_surface: string;
+        storage: string;
+        target_names: string[];
+        next_action: string;
+        verifier_command: string | null;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      } | null;
       next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string } | null;
       operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
@@ -1606,6 +1621,20 @@ describe("Web3 autonomous trading subsystem", () => {
       label: "Scope dedicated wallet",
       storage: "browser-public-scope",
     });
+    expect(receipt.current_input).not.toBeNull();
+    expect(receipt.current_input).toMatchObject({
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(receipt.current_input?.target_names.length).toBeGreaterThan(0);
+    expect(receipt.current_input?.target_names.join(" ")).not.toContain("test-");
+    expect(receipt.current_input?.safe_collection_surface.length).toBeGreaterThan(0);
+    expect(receipt.current_input?.storage.length).toBeGreaterThan(0);
+    expect(receipt.current_input?.next_action.length).toBeGreaterThan(0);
     expect(receipt.operator_unlock_sequence.map((step) => step.id)).toEqual([
       "scope-wallet",
       "prove-wallet",

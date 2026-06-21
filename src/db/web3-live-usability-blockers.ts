@@ -83,6 +83,7 @@ export type Web3LiveUsabilityBlockersReceipt = {
   total_live_lane_count: number;
   safe_action_count: number;
   gated_action_count: number;
+  current_input: Web3OperatorCurrentInput | null;
   next_operator_input: {
     label: string;
     next_action: string;
@@ -163,6 +164,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   preflight: Web3LiveCapitalPreflightReceipt;
   manualLiveReview: Web3ManualLiveReviewPacket;
   runway: Web3SupervisedLiveRunway;
+  currentInput?: Web3OperatorCurrentInput | null;
   credentialDoctor?: Web3CredentialDoctorHealth;
   now?: Date;
   rowScope?: "compact" | "all";
@@ -232,6 +234,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     total_live_lane_count: input.runway.total_lane_count,
     safe_action_count: input.runbook.allowed_now_count,
     gated_action_count: input.runbook.gated_count,
+    current_input: input.currentInput ?? null,
     next_operator_input: input.cutover.next_safe_input
       ? {
         label: input.cutover.next_safe_input.label,
@@ -287,6 +290,7 @@ export function buildWeb3LiveUsabilityBlockersHealth(
   receipt: Web3LiveUsabilityBlockersReceipt,
   currentInput: Web3OperatorCurrentInput | null = null,
 ): Web3LiveUsabilityBlockersHealth {
+  const healthCurrentInput = currentInput ?? receipt.current_input;
   return {
     mode: "web3-live-usability-health",
     status: receipt.status,
@@ -303,7 +307,7 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     ready_live_lane_count: receipt.ready_live_lane_count,
     total_live_lane_count: receipt.total_live_lane_count,
     safe_action_count: receipt.safe_action_count,
-    current_input: currentInput,
+    current_input: healthCurrentInput,
     next_operator_input_label: receipt.next_operator_input?.label ?? null,
     next_unlock_step_label: receipt.next_unlock_step?.label ?? null,
     next_unlock_step_status: receipt.next_unlock_step?.status ?? null,

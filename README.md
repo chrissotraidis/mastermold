@@ -174,7 +174,8 @@ transaction submission, account creation, private-key storage, and wallet mutati
 receipt for real-money Web3 usability. It reconciles the usability status, cutover
 board, operator runbook, live-capital preflight, supervised runway, and manual live-review
 packet into missing operator inputs, signoff counts, safe next actions, verifier commands,
-the latest sanitized credential-doctor status, the next ordered unlock step, and live-lane readiness while keeping autonomous live trading, signing, submission,
+the latest sanitized credential-doctor status, the next ordered unlock step, the current
+safe input contract, and live-lane readiness while keeping autonomous live trading, signing, submission,
 wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
 It also groups missing rows by owner and evidence source so operators can see whether
 the next work belongs to wallet setup, security, ops, accounting, strategy, or review.

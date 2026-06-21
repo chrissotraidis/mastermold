@@ -728,6 +728,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("open the JSON for every dependency-ranked blocker");
     expect(tradingPage).toContain("Lead owner:");
     expect(tradingPage).toContain("Trading credential doctor status");
+    expect(tradingPage).toContain("Trading current input contract");
+    expect(tradingPage).toContain("liveUsabilityBlockers.current_input");
+    expect(tradingPage).toContain("currentInput.target_names");
+    expect(tradingPage).toContain("currentInput.verifier_command");
     expect(tradingPage).toContain("Live usability credential doctor summary");
     expect(tradingPage).toContain("credentialDoctorBadgeClassName");
     expect(tradingPage).toContain("credential_doctor");
@@ -785,7 +789,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Command board");
     expect(tradingPage).toContain("WalletNetWorthCurve");
     expect(tradingPage).toContain("First-screen Web3 wallet net worth curve");
-    expect(tradingPage).toContain('const settingsFixHref = nextUnlockStep?.id === "scope-wallet"');
+    expect(tradingPage).toContain('const settingsFixHref = currentInput?.id === "dedicated-trading-wallet"');
+    expect(tradingPage).toContain('currentInput?.unlock_step_id === "scope-wallet"');
     expect(tradingPage).toContain('"/settings/integrations#settings-web3-wallet-public-key"');
     expect(tradingPage).toContain('"/settings/integrations#settings-web3-credentials-runway"');
     expect(tradingPage).toContain("Fix wallet gate");
@@ -1629,6 +1634,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("total_live_usability_row_count");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("listed_live_usability_row_count");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("current_input: Web3OperatorCurrentInput | null");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("currentInput?: Web3OperatorCurrentInput | null");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("current_input: input.currentInput ?? null");
+    expect(source("app/api/web3-live-usability-blockers/route.ts")).toContain("currentInput: requestPacket.current_input");
+    expect(source("app/trading/page.tsx")).toContain("currentInput: operatorRequestPacket.current_input");
     expect(source("app/api/health/route.ts")).toContain("buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input)");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
@@ -1669,6 +1678,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("next ordered unlock step");
     expect(source("components/review-readiness.tsx")).toContain("Settings now adds a Web3 setup runway");
     expect(source("components/review-readiness.tsx")).toContain("Settings now places that same live-usability blocker receipt");
+    expect(source("components/review-readiness.tsx")).toContain("trading command board now shows that current input contract");
     expect(source("README.md")).toContain("/api/web3-live-usability-blockers?source=live-dex");
     expect(source("README.md")).toContain("web3_live_usability");
     expect(source("README.md")).toContain("total-versus-listed live-usability row counts");

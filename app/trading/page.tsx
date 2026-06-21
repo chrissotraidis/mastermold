@@ -113,6 +113,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     preflight: liveCapitalPreflight,
     manualLiveReview,
     runway: supervisedLiveRunway,
+    currentInput: operatorRequestPacket.current_input,
   });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
@@ -275,10 +276,11 @@ function TradingCommandBoard({
         ? "caution"
         : "neutral";
   const nextUnlockStep = liveUsabilityBlockers.next_unlock_step;
-  const settingsFixHref = nextUnlockStep?.id === "scope-wallet"
+  const currentInput = liveUsabilityBlockers.current_input;
+  const settingsFixHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet" || nextUnlockStep?.id === "scope-wallet"
     ? "/settings/integrations#settings-web3-wallet-public-key"
     : "/settings/integrations#settings-web3-credentials-runway";
-  const settingsFixLabel = nextUnlockStep?.id === "scope-wallet" ? "Fix wallet gate" : "Fix gates";
+  const settingsFixLabel = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet" || nextUnlockStep?.id === "scope-wallet" ? "Fix wallet gate" : "Fix gates";
   const leadMissingOwner = liveUsabilityBlockers.missing_owner_summary[0];
 
   return (
@@ -398,6 +400,36 @@ function TradingCommandBoard({
               <CommandBoardMetric label="Signoffs" value={`${liveUsabilityBlockers.passed_signoff_count}/${liveUsabilityBlockers.required_signoff_count}`} detail={`${liveUsabilityBlockers.failed_or_watch_signoff_count} open`} tone={liveUsabilityBlockers.failed_or_watch_signoff_count > 0 ? "caution" : "engine"} />
               <CommandBoardMetric label="Actions" value={`${liveUsabilityBlockers.safe_action_count}`} detail={`${liveUsabilityBlockers.gated_action_count} gated`} tone="engine" />
             </div>
+            {currentInput ? (
+              <div className="mt-2 rounded-md border border-caution/25 bg-caution/[0.04] p-2" aria-label="Trading current input contract">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Current input</p>
+                    <p className="mt-1 text-xs font-semibold text-on-surface">{currentInput.label}</p>
+                  </div>
+                  <span className="rounded-md border border-critical/20 bg-critical/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-critical">
+                    live blocked
+                  </span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{currentInput.next_action}</p>
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-3">
+                  <p className="truncate rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[10px] leading-4 text-outline">
+                    Surface: <span className="font-semibold text-on-surface">{currentInput.safe_collection_surface.replaceAll("-", " ")}</span>
+                  </p>
+                  <p className="truncate rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[10px] leading-4 text-outline">
+                    Storage: <span className="font-semibold text-on-surface">{currentInput.storage.replaceAll("-", " ")}</span>
+                  </p>
+                  <p className="truncate rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[10px] leading-4 text-outline">
+                    Targets: <span className="font-semibold text-on-surface">{currentInput.target_names.length > 0 ? currentInput.target_names.join(", ") : "none"}</span>
+                  </p>
+                </div>
+                {currentInput.verifier_command ? (
+                  <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                    {currentInput.verifier_command}
+                  </code>
+                ) : null}
+              </div>
+            ) : null}
             <div className="mt-2 rounded-md border border-outline/15 bg-surface-dim/35 p-2" aria-label="Trading credential doctor status">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
