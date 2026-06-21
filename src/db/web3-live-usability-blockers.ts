@@ -57,6 +57,7 @@ export type Web3LiveUsabilityNextBlocker = {
   status: Web3LiveUsabilityMissingItem["status"];
   next_action: string;
   href: string;
+  safe_command: string | null;
   blocks_live_capital: boolean;
 };
 
@@ -213,7 +214,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   const ownerSummary = summarizeMissingByOwner(missing);
   const sourceSummary = summarizeMissingBySource(missing);
   const credentialDoctor = summarizeCredentialDoctor(input.credentialDoctor ?? getWeb3CredentialDoctorHealth());
-  const nextBlocker = summarizeNextBlocker(missing[0]);
+  const nextBlocker = summarizeNextBlocker(missing[0], input.currentInput ?? null);
   const verifierCommands = Array.from(new Set([
     ...input.runbook.verifier_commands,
     ...input.manualLiveReview.safe_commands,
@@ -343,7 +344,10 @@ export function buildWeb3LiveUsabilityBlockersHealth(
   };
 }
 
-function summarizeNextBlocker(item: Web3LiveUsabilityMissingItem | undefined): Web3LiveUsabilityNextBlocker | null {
+function summarizeNextBlocker(
+  item: Web3LiveUsabilityMissingItem | undefined,
+  currentInput: Web3OperatorCurrentInput | null,
+): Web3LiveUsabilityNextBlocker | null {
   if (!item) return null;
   return {
     id: item.id,
@@ -353,6 +357,7 @@ function summarizeNextBlocker(item: Web3LiveUsabilityMissingItem | undefined): W
     status: item.status,
     next_action: item.next_action,
     href: nextBlockerHref(item),
+    safe_command: nextBlockerSafeCommand(item, currentInput),
     blocks_live_capital: item.blocks_live_capital,
   };
 }
@@ -382,6 +387,25 @@ function nextBlockerHref(item: Web3LiveUsabilityMissingItem) {
     return "/settings/integrations#settings-web3-research-handoff";
   }
   return "/settings/integrations#settings-web3-credentials-runway";
+}
+
+function nextBlockerSafeCommand(
+  item: Web3LiveUsabilityMissingItem,
+  currentInput: Web3OperatorCurrentInput | null,
+) {
+  if (currentInput?.verifier_command && item.id.includes(currentInput.id)) {
+    return currentInput.verifier_command;
+  }
+  if (item.id.includes("dedicated-trading-wallet") || item.id.includes("operator-wallet") || item.id === "runway:wallet") {
+    return "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
+  }
+  if (item.id.includes("jupiter")) {
+    return "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order";
+  }
+  if (item.id.includes("production-worker") || item.id.includes("emergency-stop")) {
+    return "npm run doctor:web3 -- --json";
+  }
+  return null;
 }
 
 function summarizeCredentialDoctor(health: Web3CredentialDoctorHealth): Web3LiveUsabilityCredentialDoctorSummary {

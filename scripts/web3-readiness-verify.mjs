@@ -235,6 +235,7 @@ async function verifyHealth() {
   assert(json.web3_live_usability.next_blocker?.id === "cutover:dedicated-trading-wallet", "Live-usability health should expose the next dependency-ranked blocker.", json.web3_live_usability);
   assert(json.web3_live_usability.next_blocker?.owner === "operator" && json.web3_live_usability.next_blocker?.source === "cutover", "Live-usability health next blocker should expose owner/source routing.", json.web3_live_usability.next_blocker);
   assert(json.web3_live_usability.next_blocker?.href === "/settings/integrations#settings-web3-wallet-public-key", "Live-usability health next blocker should expose the safe fix surface.", json.web3_live_usability.next_blocker);
+  assert(String(json.web3_live_usability.next_blocker?.safe_command ?? "").includes("--require-operator-wallet"), "Live-usability health next blocker should expose the strict safe verifier command.", json.web3_live_usability.next_blocker);
   assert(json.web3_live_usability.next_blocker?.blocks_live_capital === true, "Live-usability health next blocker should preserve live-capital blocking status.", json.web3_live_usability.next_blocker);
   assert(json.web3_live_usability.current_input?.live_execution_permission === "blocked", "Live-usability health should expose a locked current input contract.", json.web3_live_usability);
   assert(Array.isArray(json.web3_live_usability.current_input.target_names), "Live-usability health current input should expose safe target names.", json.web3_live_usability.current_input);

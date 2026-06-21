@@ -421,6 +421,11 @@ function TradingCommandBoard({
                 >
                   Open blocker control
                 </Link>
+                {nextBlocker.safe_command ? (
+                  <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                    {nextBlocker.safe_command}
+                  </code>
+                ) : null}
               </div>
             ) : null}
             {currentInput ? (
@@ -950,6 +955,11 @@ function LiveUsabilityBlockersPanel({
               >
                 Open blocker control
               </Link>
+              {nextBlocker.safe_command ? (
+                <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                  {nextBlocker.safe_command}
+                </code>
+              ) : null}
             </div>
           ) : null}
 

@@ -766,6 +766,11 @@ export function SettingsWeb3CredentialConsole({
               {nextLiveUsabilityBlocker.owner.replaceAll("-", " ")} · {nextLiveUsabilityBlocker.source.replaceAll("-", " ")} · {nextLiveUsabilityBlocker.blocks_live_capital ? "blocks live capital" : "review item"}
             </span>
           </div>
+          {nextLiveUsabilityBlocker.safe_command ? (
+            <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {nextLiveUsabilityBlocker.safe_command}
+            </code>
+          ) : null}
         </div>
       ) : null}
 
