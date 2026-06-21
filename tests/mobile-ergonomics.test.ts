@@ -1081,12 +1081,19 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("buildWeb3LiveIgnitionReceipt");
     expect(settingsPage).toContain("buildWeb3LiveUnsignedOrderPreflightReceipt");
     expect(settingsPage).toContain("buildWeb3SupervisedCanaryReadinessReceipt");
+    expect(settingsPage).toContain("buildWeb3FirstCanaryDrillReceipt");
     expect(settingsPage).toContain("supervisedCanaryReadiness.canary_attempt_contract");
     expect(settingsPage).toContain("Settings first live canary attempt contract");
     expect(settingsPage).toContain("First live canary attempt");
     expect(settingsPage).toContain("This is the exact live-trade attempt contract.");
     expect(settingsPage).toContain("attempt.exact_next_command");
     expect(settingsPage).toContain("Next missing input");
+    expect(settingsPage).toContain("firstCanaryDrill.operator_unblock_plan");
+    expect(settingsPage).toContain("firstCanaryDrill.next_unblock_step");
+    expect(settingsPage).toContain("Settings first canary operator unblock plan");
+    expect(settingsPage).toContain("Settings ordered first canary unblock steps");
+    expect(settingsPage).toContain("Operator unblock plan");
+    expect(settingsPage).toContain("firstCanaryUnblockBadgeStatus");
     expect(settingsPage).toContain("No funded live trade has been tested by this app yet.");
     expect(settingsPage).toContain("public wallet scope, text-only wallet proof, ignored server-env provider keys, and external review status");
     expect(settingsPage).toContain("Private keys and seed phrases are rejected.");
@@ -2007,6 +2014,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("safe fix link");
     expect(source("README.md")).toContain("verifier command");
     expect(source("README.md")).toContain("Settings mirrors that next dependency blocker");
+    expect(source("README.md")).toContain("Settings now reads the");
+    expect(source("README.md")).toContain("ordered first-canary unblock steps");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_operator_runbook");
     expect(source("docs/web3-credentials-runbook.md")).toContain("live_review_source_endpoint");
     expect(source("docs/web3-credentials-runbook.md")).toContain("next dependency blocker");
@@ -2017,6 +2026,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("docs/web3-credentials-runbook.md")).toContain("safe fix link");
     expect(source("docs/web3-credentials-runbook.md")).toContain("verifier command");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Settings mirrors that same next dependency blocker");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Settings mirrors that same first-canary operator unblock plan");
     expect(source("components/review-readiness.tsx")).toContain("web3_operator_runbook summary");
     expect(source("components/review-readiness.tsx")).toContain("live-review runbook endpoint");
     expect(source("components/review-readiness.tsx")).toContain("next dependency blocker");
@@ -2027,6 +2037,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("safe fix link");
     expect(source("components/review-readiness.tsx")).toContain("verifier command");
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors the same next dependency blocker");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors that same first-canary drill receipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");

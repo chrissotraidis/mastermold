@@ -26,6 +26,7 @@ import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/sr
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
+import { buildWeb3FirstCanaryDrillReceipt, type Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
 import { buildWeb3JupiterOrderPacket, type Web3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { getWeb3JupiterRehearsalHistory, type Web3JupiterRehearsalHistory } from "@/src/db/web3-jupiter-rehearsal-history";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
@@ -202,6 +203,14 @@ export default async function IntegrationsSettingsPage() {
     unsignedPreflight: web3UnsignedCanaryPreflight,
     canary: web3LiveTradeCanary,
   });
+  const web3FirstCanaryDrill = buildWeb3FirstCanaryDrillReceipt({
+    state: web3State,
+    liveUsability: web3LiveUsabilityBlockers,
+    readiness: web3SupervisedCanaryReadiness,
+    jupiter: web3JupiterOrderPacket,
+    unsignedPreflight: web3UnsignedCanaryPreflight,
+    canary: web3LiveTradeCanary,
+  });
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -254,6 +263,7 @@ export default async function IntegrationsSettingsPage() {
             liveUsabilityBlockers={web3LiveUsabilityBlockers}
             liveTradeCanary={web3LiveTradeCanary}
             supervisedCanaryReadiness={web3SupervisedCanaryReadiness}
+            firstCanaryDrill={web3FirstCanaryDrill}
             researchHandoffPacket={web3ResearchHandoffPacket}
             state={web3State}
           />
@@ -312,6 +322,7 @@ function Web3CredentialsRunwayCard({
   liveUsabilityBlockers,
   liveTradeCanary,
   supervisedCanaryReadiness,
+  firstCanaryDrill,
   researchHandoffPacket,
   state,
 }: {
@@ -334,6 +345,7 @@ function Web3CredentialsRunwayCard({
   liveUsabilityBlockers: Web3LiveUsabilityBlockersReceipt;
   liveTradeCanary: Web3LiveTradeCanaryReceipt;
   supervisedCanaryReadiness: Web3SupervisedCanaryReadinessReceipt;
+  firstCanaryDrill: Web3FirstCanaryDrillReceipt;
   researchHandoffPacket: Web3ResearchHandoffPacket;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
@@ -390,6 +402,7 @@ function Web3CredentialsRunwayCard({
             liveUsability={liveUsabilityBlockers}
             liveTradeCanary={liveTradeCanary}
             supervisedCanaryReadiness={supervisedCanaryReadiness}
+            firstCanaryDrill={firstCanaryDrill}
           />
           <SettingsWeb3CredentialCommandCenter
             handoff={operatorCredentialHandoff}
@@ -702,16 +715,24 @@ function SettingsWeb3LiveCredentialLaunchpad({
   liveUsability,
   liveTradeCanary,
   supervisedCanaryReadiness,
+  firstCanaryDrill,
 }: {
   rows: SettingsWeb3LaunchpadRow[];
   handoff: Web3OperatorCredentialHandoffReceipt;
   liveUsability: Web3LiveUsabilityBlockersReceipt;
   liveTradeCanary: Web3LiveTradeCanaryReceipt;
   supervisedCanaryReadiness: Web3SupervisedCanaryReadinessReceipt;
+  firstCanaryDrill: Web3FirstCanaryDrillReceipt;
 }) {
   const readyRows = rows.filter((row) => row.status === "ready").length;
   const nextRow = rows.find((row) => row.status === "active" || row.status === "blocked" || row.status === "review") ?? rows[0];
   const attempt = supervisedCanaryReadiness.canary_attempt_contract;
+  const nextUnblockStep = firstCanaryDrill.next_unblock_step;
+  const unblockSteps = [
+    ...firstCanaryDrill.operator_unblock_plan.filter((step) => step.status === "next" || step.status === "watch"),
+    ...firstCanaryDrill.operator_unblock_plan.filter((step) => step.status === "blocked"),
+    ...firstCanaryDrill.operator_unblock_plan.filter((step) => step.status === "done"),
+  ].slice(0, 4);
   const strictVerifier = nextRow?.command ??
     handoff.next_input?.verifier_command ??
     liveUsability.current_input?.verifier_command ??
@@ -776,6 +797,56 @@ function SettingsWeb3LiveCredentialLaunchpad({
           <p className="mt-2 text-[11px] leading-4 text-outline">
             Next missing input: {attempt.missing_inputs[0]}
           </p>
+        ) : null}
+      </div>
+
+      <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.03] p-2" aria-label="Settings first canary operator unblock plan">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Operator unblock plan</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              {nextUnblockStep?.label ?? "No canary blocker is next"}
+            </p>
+            <p className="mt-1 text-[11px] leading-4 text-outline">
+              {nextUnblockStep?.action ?? "All first-canary unblock steps are clear; run the strict proof command before any autonomy review."}
+            </p>
+          </div>
+          <LaunchQueueBadge status={firstCanaryUnblockBadgeStatus(nextUnblockStep?.status ?? "done")} label={nextUnblockStep?.status ?? "done"} />
+        </div>
+        <div className="mt-2 grid gap-2" aria-label="Settings ordered first canary unblock steps">
+          {unblockSteps.map((step) => (
+            <div key={step.id} className="grid min-w-0 gap-2 rounded-md border border-outline-variant/25 bg-void/20 p-2 sm:grid-cols-[minmax(0,0.38fr)_minmax(0,1fr)]">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold text-on-surface">{step.label}</p>
+                  <LaunchQueueBadge status={firstCanaryUnblockBadgeStatus(step.status)} label={step.status} />
+                </div>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                  {step.phase.replaceAll("-", " ")}
+                </p>
+                <Link
+                  href={step.safe_surface}
+                  className="mt-1 inline-flex min-h-10 max-w-full items-center rounded-md px-1 text-[11px] font-semibold text-engine transition hover:text-engine/80"
+                >
+                  <span className="truncate">{step.safe_surface}</span>
+                </Link>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] leading-4 text-on-surface-variant">{step.action}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{step.completion_signal}</p>
+                {step.command ? (
+                  <code className="mt-1 block overflow-x-auto whitespace-nowrap rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+                    {step.command}
+                  </code>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+        {nextUnblockStep?.command ? (
+          <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1.5 text-[11px] leading-5 text-on-surface-variant">
+            {nextUnblockStep.command}
+          </code>
         ) : null}
       </div>
 
@@ -948,6 +1019,12 @@ function buildSettingsWeb3LiveCredentialLaunchpadRows({
 function launchpadBadgeStatus(status: SettingsWeb3LaunchpadRow["status"]) {
   if (status === "ready") return "pass";
   if (status === "active" || status === "review") return "watch";
+  return "fail";
+}
+
+function firstCanaryUnblockBadgeStatus(status: Web3FirstCanaryDrillReceipt["operator_unblock_plan"][number]["status"]) {
+  if (status === "done") return "pass";
+  if (status === "next" || status === "watch") return "watch";
   return "fail";
 }
 

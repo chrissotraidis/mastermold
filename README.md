@@ -154,7 +154,10 @@ with the next safe step, later gated steps, safe surfaces, verifier commands, an
 signals for the first funded canary. The Trading command center reads that same receipt for its
 first-screen status, hash, hard-fail count, proof count, next post-signing proof step, signature
 preview, live-dex drill link, ordered next lane, leading failing lanes, and ordered unblock plan
-so the next real canary blocker is visible before the long workspace. `/api/health` also exposes `web3_live_first_canary_drill`, a canonical
+so the next real canary blocker is visible before the long workspace. Settings now reads the
+same first-canary drill receipt inside the live trading setup launchpad, placing the next
+unblock step, safe action surface, verifier command, and ordered first-canary unblock steps
+next to the credential console that clears wallet and provider gates. `/api/health` also exposes `web3_live_first_canary_drill`, a canonical
 live-dex persistent first-canary health summary for monitors that need the real live-trade
 blocker without inferring it from the default app state, plus `web3_live_canary_proof`
 for the compact post-signing proof chain after a signed canary exists. The drill health
@@ -230,7 +233,7 @@ safe input contract, and blocked live-execution/signing/wallet/secret permission
 returning secrets or transaction bytes. Settings mirrors that next dependency blocker in
 the Web3 setup priority card, live trading setup launchpad, and credential action console.
 The launchpad condenses the next safe input, wallet proof, Jupiter order proof, signer/custody,
-live blocker board, and tiny canary proof into one no-secrets view, and Settings also shows
+live blocker board, tiny canary proof, and the first-canary operator unblock plan into one no-secrets view, and Settings also shows
 the compact credential request, verification runway, completion criteria, and safe credential profile
 so the safe wallet/provider/review value, non-secret lane status, follow-up proof path, and done
 condition are visible where the operator fixes credentials.
@@ -252,7 +255,8 @@ tiny unsigned order, relay a signed payload, or prove a real canary yet.
 It also exposes a `web3-first-live-canary-attempt-contract` object naming the current attempt stage,
 whether anything is runnable now, the exact endpoint/command to use, missing inputs, required
 acknowledgements, and the safety boundary before a funded canary is attempted; Settings and
-Trading both surface the same contract, and `/api/health` mirrors the canonical live-dex/persistent
+Trading both surface the same contract. Settings also mirrors the first-canary drill's ordered
+unblock plan beside that contract, and `/api/health` mirrors the canonical live-dex/persistent
 version as `web3_live_canary_attempt`.
 It keeps `can_autonomously_trade_real_money_now=false` until the supervised canary has actually
 relayed, confirmed, reconciled settlement, and mirrored the local portfolio; it cannot sign, submit,
