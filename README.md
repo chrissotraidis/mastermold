@@ -215,6 +215,9 @@ and `/trading` shows the current input contract in both the first-screen command
 and expanded readiness receipt.
 Use `rows=all` on that same endpoint to return every dependency-ranked missing row for
 external review; the default response stays compact for dashboard panels.
+The compact response ranks first-canary setup lanes ahead of paper/preflight market chores, so
+wallet proof, Jupiter setup, live flags, signer relay, and review work are not hidden behind an
+unrelated paper refresh row.
 `/api/web3-first-canary-handoff?source=live-dex&account=persistent&scenario=breakout&cycles=0`
 is the compact first funded canary handoff for another operator or helper. It combines the
 first-canary drill and credential requirements into a redacted packet with completed gates,

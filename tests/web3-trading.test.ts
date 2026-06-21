@@ -4028,6 +4028,12 @@ describe("Web3 autonomous trading subsystem", () => {
       id: "cutover:dedicated-trading-wallet",
       label: "Dedicated trading wallet",
     });
+    const compactMissingIds = receipt.missing_for_live_usability.map((item) => item.id);
+    const jupiterRunwayIndex = compactMissingIds.indexOf("runway:jupiter");
+    const jupiterPreflightIndex = compactMissingIds.indexOf("preflight:jupiter-order");
+    if (jupiterRunwayIndex >= 0 && jupiterPreflightIndex >= 0) {
+      expect(jupiterRunwayIndex).toBeLessThan(jupiterPreflightIndex);
+    }
     expect(receipt.next_blocker).toMatchObject({
       owner: "operator",
       blocks_live_capital: true,
