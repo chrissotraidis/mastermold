@@ -1698,6 +1698,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyLiveTradeCanary");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-trade-canary?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-trade-canary");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3-live-unsigned-order-preflight");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("unsafe preflight");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchAnswerIntake");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-research-answer-intake?source=sample&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("implementation_decisions");

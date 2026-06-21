@@ -144,7 +144,7 @@ operator check for machines without Bun: against a running app, it snapshots the
 public wallet/risk scope, proves health receipts, execution input validation, public-wallet
 dry-run scope save, credential validate-only redaction, text-only `/api/web3-wallet-ownership`
 receipt boundaries, manual live-review packet boundaries, deterministic DEX discovery receipt
-boundaries, one-shot Jupiter rehearsal redaction, private-field rejection, and the live
+boundaries, one-shot Jupiter rehearsal redaction, live canary preflight, private-field rejection, and the live
 execution/wallet mutation locks, then restores the saved public wallet/risk scope before exit. Add
 `--require-jupiter-order` after a `JUPITER_API_KEY`
 or `WEB3_VERIFY_JUPITER_API_KEY` is available to fail closed until quote and unsigned-order

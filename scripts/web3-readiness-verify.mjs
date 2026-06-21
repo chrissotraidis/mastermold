@@ -1309,6 +1309,36 @@ async function verifyLiveTradeCanary() {
   assert(Array.isArray(unsafe.json.unsafe_fields) && unsafe.json.unsafe_fields.includes("private_key"), "Live trade canary unsafe action should name unsafe field paths only.", unsafe.json);
   assertNoLeak("live trade canary unsafe action", unsafe.json);
 
+  const preflightPath = `/api/web3-live-unsigned-order-handoff?source=sample&account=persistent&scenario=breakout&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${encodeURIComponent(walletPublicKey)}&amount_lamports=100000`;
+  const preflight = await requestJson(preflightPath);
+  assert(preflight.response.status === 200, "Live unsigned order preflight should return a blocked receipt in sample verification.", { status: preflight.response.status, json: preflight.json });
+  assert(preflight.json.mode === "web3-live-unsigned-order-preflight", "Live unsigned order preflight should expose the expected mode.", preflight.json);
+  assert(preflight.json.status === "blocked", "Live unsigned order preflight should block sample-source requests.", preflight.json);
+  assert(preflight.json.can_request_one_shot_unsigned_order === false, "Live unsigned order preflight should not permit one-shot unsigned order requests while blocked.", preflight.json);
+  assert(preflight.json.unsigned_transaction_return === "blocked", "Live unsigned order preflight must not return unsigned transaction bytes.", preflight.json);
+  assert(preflight.json.transaction_body_storage === "blocked", "Live unsigned order preflight must not store transaction bodies.", preflight.json);
+  assert(preflight.json.execute_permission === "blocked", "Live unsigned order preflight must not execute orders.", preflight.json);
+  assert(preflight.json.transaction_submission_permission === "blocked", "Live unsigned order preflight must keep transaction submission blocked.", preflight.json);
+  assert(preflight.json.live_execution_permission === "blocked", "Live unsigned order preflight must keep live execution blocked.", preflight.json);
+  assert(preflight.json.wallet_mutation_permission === "blocked", "Live unsigned order preflight must keep wallet mutation blocked.", preflight.json);
+  assert(preflight.json.private_key_storage === "blocked", "Live unsigned order preflight must block private-key storage.", preflight.json);
+  assert(preflight.json.seed_phrase_storage === "blocked", "Live unsigned order preflight must block seed-phrase storage.", preflight.json);
+  assert(preflight.json.secret_echo_permission === "blocked", "Live unsigned order preflight must block secret echo.", preflight.json);
+  assert(Array.isArray(preflight.json.blockers) && preflight.json.blockers.some((blocker) => blocker.includes("source=live-dex")), "Live unsigned order preflight should require live-dex source.", preflight.json.blockers);
+  assert(Array.isArray(preflight.json.controls) && preflight.json.controls.some((control) => control.includes("before any wallet prompt")), "Live unsigned order preflight should document the pre-prompt boundary.", preflight.json.controls);
+  assert(Array.isArray(preflight.json.controls) && preflight.json.controls.some((control) => control.includes("never calls Jupiter order creation")), "Live unsigned order preflight should document the no-order boundary.", preflight.json.controls);
+  assertNoLeak("live unsigned order preflight", preflight.json);
+
+  const unsafePreflight = await requestJson(`/api/web3-live-unsigned-order-handoff?source=sample&account=persistent&scenario=breakout&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${encodeURIComponent(walletPublicKey)}&private_key=${encodeURIComponent(CANARY_SECRET)}&raw_transaction=raw-query-canary-never-echo`);
+  assert(unsafePreflight.response.status === 422, "Live unsigned order preflight should reject unsafe query fields.", { status: unsafePreflight.response.status, json: unsafePreflight.json });
+  assert(unsafePreflight.json.status === "unsafe-rejected", "Live unsigned order unsafe preflight should expose unsafe rejection.", unsafePreflight.json);
+  assert(Array.isArray(unsafePreflight.json.unsafe_fields) && unsafePreflight.json.unsafe_fields.includes("private_key"), "Live unsigned order unsafe preflight should name private_key.", unsafePreflight.json);
+  assert(Array.isArray(unsafePreflight.json.unsafe_fields) && unsafePreflight.json.unsafe_fields.includes("raw_transaction"), "Live unsigned order unsafe preflight should name raw_transaction.", unsafePreflight.json);
+  assert(unsafePreflight.json.unsigned_transaction_return === "blocked", "Live unsigned order unsafe preflight must keep unsigned return blocked.", unsafePreflight.json);
+  assert(unsafePreflight.text.includes(CANARY_SECRET) === false, "Live unsigned order unsafe preflight must not echo private canary text.", unsafePreflight.text);
+  assert(unsafePreflight.text.includes("raw-query-canary-never-echo") === false, "Live unsigned order unsafe preflight must not echo raw query canary text.", unsafePreflight.text);
+  assertNoLeak("live unsigned order unsafe preflight", unsafePreflight.json);
+
   const unsignedHandoff = await postJson("/api/web3-live-unsigned-order-handoff?source=sample&account=persistent&scenario=breakout&cycles=0", {
     operator_ack: true,
     canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
@@ -1343,7 +1373,7 @@ async function verifyLiveTradeCanary() {
   assert(unsafeUnsigned.text.includes(CANARY_SECRET) === false, "Live unsigned order unsafe handoff must not echo private canary text.", unsafeUnsigned.text);
   assert(unsafeUnsigned.text.includes("raw-transaction-canary-never-echo") === false, "Live unsigned order unsafe handoff must not echo raw transaction canary text.", unsafeUnsigned.text);
   assertNoLeak("live unsigned order unsafe handoff", unsafeUnsigned.json);
-  record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}; signed payload and unsigned handoff actions blocked safely`);
+  record("live-trade-canary", "pass", `${json.status}; actual live trade tested: ${json.actual_live_trade_tested}; preflight, signed payload, and unsigned handoff actions blocked safely`);
 }
 
 async function verifyResearchAnswerIntake() {
