@@ -96,6 +96,8 @@ export type Web3LiveUsabilityBlockersHealth = {
   open_operator_input_count: number;
   open_cutover_blocker_count: number;
   real_capital_blocker_count: number;
+  total_live_usability_row_count: number;
+  listed_live_usability_row_count: number;
   failed_or_watch_signoff_count: number;
   ready_live_lane_count: number;
   total_live_lane_count: number;
@@ -243,6 +245,8 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     open_operator_input_count: receipt.open_operator_input_count,
     open_cutover_blocker_count: receipt.open_cutover_blocker_count,
     real_capital_blocker_count: receipt.real_capital_blocker_count,
+    total_live_usability_row_count: receipt.total_live_usability_row_count,
+    listed_live_usability_row_count: receipt.listed_live_usability_row_count,
     failed_or_watch_signoff_count: receipt.failed_or_watch_signoff_count,
     ready_live_lane_count: receipt.ready_live_lane_count,
     total_live_lane_count: receipt.total_live_lane_count,

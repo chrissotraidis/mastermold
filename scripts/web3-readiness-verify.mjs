@@ -184,6 +184,9 @@ async function verifyHealth() {
   assertReceiptHash("Health live usability", json.web3_live_usability.receipt_hash);
   assert(typeof json.web3_live_usability.open_operator_input_count === "number", "Live-usability health should expose operator input count.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.real_capital_blocker_count === "number", "Live-usability health should expose real-capital blocker count.", json.web3_live_usability);
+  assert(typeof json.web3_live_usability.total_live_usability_row_count === "number", "Live-usability health should expose total live-usability row count.", json.web3_live_usability);
+  assert(typeof json.web3_live_usability.listed_live_usability_row_count === "number", "Live-usability health should expose listed live-usability row count.", json.web3_live_usability);
+  assert(json.web3_live_usability.total_live_usability_row_count >= json.web3_live_usability.listed_live_usability_row_count, "Live-usability health listed rows should not exceed total rows.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_label === "string" && json.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next operator unlock step.", json.web3_live_usability);
   assert(typeof json.web3_live_usability.next_unlock_step_action === "string" && json.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", json.web3_live_usability);
   assert(json.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", json.web3_live_usability);

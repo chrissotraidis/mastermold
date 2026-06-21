@@ -177,9 +177,9 @@ packet into missing operator inputs, signoff counts, safe next actions, verifier
 the next ordered unlock step, and live-lane readiness while keeping autonomous live trading, signing, submission,
 wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
 `/api/health` also exposes a compact `web3_live_usability` summary for monitors with
-the same receipt hash, missing-input counts, live-lane counts, next ordered unlock step,
-next action, and blocked live-execution/signing/wallet/secret permissions without returning
-secrets or transaction bytes.
+the same receipt hash, missing-input counts, total-versus-listed live-usability row counts,
+live-lane counts, next ordered unlock step, next action, and blocked live-execution/signing/wallet/secret
+permissions without returning secrets or transaction bytes.
 `/api/web3-operator-credential-handoff` is the redacted credential handoff contract for
 operators and external research agents. It lists allowed inputs, never-requested fields,
 safe collection surfaces, env target names, next input, verifier commands, and the same

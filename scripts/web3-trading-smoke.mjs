@@ -101,6 +101,9 @@ async function main() {
   assert(typeof health.web3_live_usability.receipt_hash === "string" && health.web3_live_usability.receipt_hash.length === 64, "Live-usability health should expose a receipt hash.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.open_operator_input_count === "number", "Live-usability health should expose missing operator input count.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.real_capital_blocker_count === "number", "Live-usability health should expose real-capital blocker count.", health.web3_live_usability);
+  assert(typeof health.web3_live_usability.total_live_usability_row_count === "number", "Live-usability health should expose total live-usability row count.", health.web3_live_usability);
+  assert(typeof health.web3_live_usability.listed_live_usability_row_count === "number", "Live-usability health should expose listed live-usability row count.", health.web3_live_usability);
+  assert(health.web3_live_usability.total_live_usability_row_count >= health.web3_live_usability.listed_live_usability_row_count, "Live-usability health listed rows should not exceed total rows.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.next_unlock_step_label === "string" && health.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next unlock step.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.next_unlock_step_action === "string" && health.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", health.web3_live_usability);
   assert(health.web3_live_usability.live_execution_permission === "blocked", "Live-usability health should keep live execution blocked.", health.web3_live_usability);
