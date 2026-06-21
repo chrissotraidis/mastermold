@@ -119,7 +119,12 @@ export function buildFirstCanaryDrillReport({
   const blockersText = uniqueText([
     permissionBreach ? "A canary receipt exposed unexpected live execution, transaction submission, wallet mutation, or secret-storage permission." : null,
     nextLane?.next_action,
-    ...(Array.isArray(blockers?.missing_for_live_usability) ? blockers.missing_for_live_usability.slice(0, 6).map((item) => item.next_action) : []),
+    ...(Array.isArray(blockers?.missing_for_live_usability)
+      ? blockers.missing_for_live_usability
+        .filter(isFirstCanaryScopedLiveUsabilityBlocker)
+        .slice(0, 6)
+        .map((item) => item.next_action)
+      : []),
     ...(Array.isArray(readiness?.blockers) ? readiness.blockers.slice(0, 6) : []),
     ...(Array.isArray(canary?.blockers) ? canary.blockers.slice(0, 6) : []),
   ]);
@@ -450,6 +455,11 @@ function uniqueText(values) {
 
 function hasUnexpectedPermission(value) {
   return typeof value === "string" && value !== "blocked";
+}
+
+function isFirstCanaryScopedLiveUsabilityBlocker(item) {
+  if (item?.source === "preflight") return false;
+  return !/(paper sizing|dry-run|backfill|profit gate|paper wallet)/i.test(item?.next_action ?? "");
 }
 
 async function main() {

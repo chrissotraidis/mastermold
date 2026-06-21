@@ -41,6 +41,8 @@ const blockedReceipts = {
     missing_for_live_usability: [
       { next_action: "Save a dedicated public trading wallet." },
       { next_action: "Prove wallet ownership with a text-only signature." },
+      { next_action: "Request a read-only dex backfill refresh for FARTCOIN before the next paper sizing decision." },
+      { next_action: "Repair dry-run accountability before paper sizing.", source: "preflight" },
     ],
   },
   readiness: {
@@ -120,6 +122,9 @@ describe("Web3 first canary drill command", () => {
     expect(report.safe_commands).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(report.safe_commands).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");
     expect(report.controls.join(" ")).toContain("read-only");
+    expect(report.blockers.join(" ")).not.toContain("FARTCOIN");
+    expect(report.blockers.join(" ")).not.toContain("paper sizing");
+    expect(report.blockers.join(" ")).not.toContain("dry-run");
   });
 
   test("GIVEN readiness and unsigned preflight are clear WHEN the report is built THEN it only reaches unsigned-order request readiness", () => {
