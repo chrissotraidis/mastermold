@@ -815,7 +815,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Open live cockpit");
     expect(tradingPage).toContain("Canary drill commands");
     expect(tradingPage).toContain("drill first, then prove a signed canary");
-    expect(tradingPage).toContain("Trading live command next blocker");
+    expect(tradingPage).toContain("Trading first canary drill status");
+    expect(tradingPage).toContain("Trading first canary drill lanes");
+    expect(tradingPage).toContain("Open drill receipt");
     expect(tradingPage).toContain("Trading live proof command");
     expect(tradingPage).toContain("cannot sign, submit, store wallet authority, or move funds");
     expect(tradingPage).toContain("Command board");
@@ -1662,7 +1664,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("GET /api/web3-first-canary-drill");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
-    expect(source("app/trading/page.tsx")).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json");
+    expect(source("app/trading/page.tsx")).toContain("drill.strict_ready_command");
+    expect(source("app/trading/page.tsx")).toContain("First canary drill");
     expect(source("app/api/web3-first-canary-drill/route.ts")).toContain("buildWeb3FirstCanaryDrillReceipt");
     expect(source("app/api/health/route.ts")).toContain("web3_first_canary_drill");
     expect(source("src/db/web3-first-canary-drill.ts")).toContain("mode: \"web3-first-canary-drill\"");

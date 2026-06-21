@@ -12,6 +12,7 @@ import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/sr
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
+import { buildWeb3FirstCanaryDrillReceipt, type Web3FirstCanaryDrillLane, type Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { getWeb3MarketMonitorHistory, type Web3MarketMonitorHistory } from "@/src/db/web3-market-monitor-history";
 import { buildWeb3OperatorCredentialHandoffReceipt } from "@/src/db/web3-operator-credential-handoff";
@@ -147,6 +148,14 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     unsignedPreflight: unsignedCanaryPreflight,
     canary: liveTradeCanary,
   });
+  const firstCanaryDrill = buildWeb3FirstCanaryDrillReceipt({
+    state: initialState,
+    liveUsability: liveUsabilityBlockers,
+    readiness: supervisedCanaryReadiness,
+    jupiter: jupiterOrder,
+    unsignedPreflight: unsignedCanaryPreflight,
+    canary: liveTradeCanary,
+  });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -169,6 +178,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
             readiness={supervisedCanaryReadiness}
             blockers={liveUsabilityBlockers}
             canary={liveTradeCanary}
+            drill={firstCanaryDrill}
           />
           <Web3LiveCanaryConsole
             receipt={liveTradeCanary}
@@ -452,6 +462,20 @@ function supervisedCanaryLaneClassName(status: Web3SupervisedCanaryReadinessLane
   return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
+function firstCanaryDrillStatusClassName(status: Web3FirstCanaryDrillReceipt["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "canary-proven" || status === "ready-to-relay-signed-payload") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "ready-to-request-unsigned-order") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
+function firstCanaryDrillLaneClassName(status: Web3FirstCanaryDrillLane["status"]) {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
 function TradingSourceLink({
   href,
   active,
@@ -488,20 +512,27 @@ function LiveCanaryCommandCenter({
   readiness,
   blockers,
   canary,
+  drill,
 }: {
   ignition: Web3LiveIgnitionReceipt;
   readiness: Web3SupervisedCanaryReadinessReceipt;
   blockers: Web3LiveUsabilityBlockersReceipt;
   canary: ReturnType<typeof buildWeb3LiveTradeCanaryReceipt>;
+  drill: Web3FirstCanaryDrillReceipt;
 }) {
-  const canaryProven = canary.actual_live_trade_tested && canary.real_funds_moved_by_this_app;
+  const canaryProven = drill.status === "canary-proven" && drill.actual_live_trade_tested && drill.real_funds_moved_by_this_app;
   const nextCredential = blockers.next_credential_request;
   const nextBlocker = blockers.next_blocker;
-  const nextCanaryLane = readiness.lanes.find((lane) => lane.id === readiness.next_lane_id);
-  const drillCommand = "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json";
-  const proofCommand = "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json";
+  const nextCanaryLane = drill.lanes.find((lane) => lane.status === "fail") ?? drill.lanes.find((lane) => lane.status === "watch") ?? readiness.lanes.find((lane) => lane.id === readiness.next_lane_id);
+  const drillCommand = drill.strict_ready_command.replace(" --require-ready", "");
+  const proofCommand = drill.strict_proof_command;
   const liveHref = "/trading?source=live-dex&account=persistent";
-  const proofHref = `/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=${canary.scenario}&cycles=0`;
+  const drillHref = drill.live_review_source_endpoint;
+  const leadingDrillLanes = [
+    ...drill.lanes.filter((lane) => lane.status === "fail"),
+    ...drill.lanes.filter((lane) => lane.status === "watch"),
+    ...drill.lanes.filter((lane) => lane.status === "pass"),
+  ].slice(0, 4);
 
   return (
     <section
@@ -520,31 +551,33 @@ function LiveCanaryCommandCenter({
                 <h2 id="web3-live-command-center-title" className="mt-1 font-display text-xl font-semibold text-on-surface">
                   {canaryProven
                     ? "Funded canary proof is accounted"
-                    : readiness.can_request_unsigned_order_now
+                    : drill.status === "ready-to-request-unsigned-order"
                       ? "Tiny canary can be prepared for review"
+                      : drill.status === "ready-to-relay-signed-payload"
+                        ? "Signed canary relay is the next stop"
                       : "No real trade tested yet"}
                 </h2>
                 <p className="mt-1 line-clamp-3 max-w-3xl text-sm leading-6 text-on-surface-variant">
-                  {canaryProven ? canary.post_signing_next_action : blockers.next_action}
+                  {drill.next_action}
                 </p>
               </div>
             </div>
-            <span className={liveIgnitionStatusClassName(ignition.status)}>
-              {ignition.status.replaceAll("-", " ")}
+            <span className={firstCanaryDrillStatusClassName(drill.status)}>
+              {drill.status.replaceAll("-", " ")}
             </span>
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <LiveUsabilityStat label="Live trade" value={canaryProven ? "proven" : "not tested"} tone={canaryProven ? "engine" : "critical"} />
-            <LiveUsabilityStat label="Unsigned order" value={readiness.can_request_unsigned_order_now ? "ready" : "blocked"} tone={readiness.can_request_unsigned_order_now ? "caution" : "critical"} />
-            <LiveUsabilityStat label="Signed relay" value={readiness.can_relay_signed_payload_now ? "ready" : "blocked"} tone={readiness.can_relay_signed_payload_now ? "engine" : "critical"} />
-            <LiveUsabilityStat label="Proof" value={`${canary.post_signing_evidence.filter((item) => item.status === "pass").length}/4`} tone={canaryProven ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Unsigned order" value={drill.can_request_unsigned_order_now ? "ready" : "blocked"} tone={drill.can_request_unsigned_order_now ? "caution" : "critical"} />
+            <LiveUsabilityStat label="Signed relay" value={drill.signed_relay_status.replaceAll("-", " ")} tone={drill.signed_relay_status === "ready" || drill.signed_relay_status === "relayed" ? "engine" : "critical"} />
+            <LiveUsabilityStat label="Proof" value={`${drill.proof_pass_count}/${drill.proof_required_count}`} tone={canaryProven ? "engine" : "critical"} />
           </div>
 
           <div className="hidden gap-2 sm:mt-3 sm:grid sm:grid-cols-3">
-            <LiveUsabilityContractStat label="Source" value={canary.source === "live-dex" ? "Live DEX" : "sample"} />
-            <LiveUsabilityContractStat label="Account" value={canary.account} />
-            <LiveUsabilityContractStat label="Canary status" value={canary.post_signing_evidence_status.replaceAll("-", " ")} />
+            <LiveUsabilityContractStat label="Drill source" value={drill.source === "live-dex" ? "Live DEX" : "sample"} />
+            <LiveUsabilityContractStat label="Hard fails" value={`${drill.hard_fail_count}`} />
+            <LiveUsabilityContractStat label="Drill hash" value={drill.receipt_hash.slice(0, 12)} />
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -562,33 +595,50 @@ function LiveCanaryCommandCenter({
               {nextCredential?.label ?? nextBlocker?.label ?? "Fix next gate"}
             </Link>
             <Link
-              href={proofHref}
+              href={drillHref}
               className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
             >
-              Open proof receipt
+              Open drill receipt
             </Link>
           </div>
         </div>
 
         <div className="grid min-w-0 gap-3">
-          <div className="rounded-md border border-critical/20 bg-critical/[0.025] p-3" aria-label="Trading live command next blocker">
+          <div className="rounded-md border border-critical/20 bg-critical/[0.025] p-3" aria-label="Trading first canary drill status">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Next blocking dependency</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">First canary drill</p>
                 <p className="mt-1 text-sm font-semibold text-on-surface">{nextBlocker?.label ?? nextCredential?.label ?? nextCanaryLane?.label ?? "First funded canary"}</p>
               </div>
-              <span className="rounded-md border border-critical/30 bg-critical/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-critical">
-                live blocked
+              <span className={firstCanaryDrillStatusClassName(drill.status)}>
+                {drill.status.replaceAll("-", " ")}
               </span>
             </div>
             <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
-              {nextBlocker?.next_action ?? nextCredential?.next_action ?? readiness.next_action}
+              {nextCanaryLane?.next_action ?? drill.next_action}
             </p>
             {nextCredential?.safe_value_description ? (
               <p className="mt-2 line-clamp-2 rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-5 text-outline">
                 {nextCredential.safe_value_description}
               </p>
             ) : null}
+          </div>
+
+          <div className="grid min-w-0 gap-2" aria-label="Trading first canary drill lanes">
+            {leadingDrillLanes.map((lane) => (
+              <div key={lane.id} className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface/55 p-2.5 sm:grid-cols-[minmax(0,0.42fr)_minmax(0,1fr)]">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={firstCanaryDrillLaneClassName(lane.status)}>{lane.status}</span>
+                    <p className="text-xs font-semibold text-on-surface">{lane.label}</p>
+                  </div>
+                  <Link href={lane.evidence_endpoint} className="mt-1 block truncate text-[11px] leading-4 text-outline transition hover:text-engine">
+                    {lane.evidence_endpoint}
+                  </Link>
+                </div>
+                <p className="line-clamp-3 text-[11px] leading-4 text-on-surface-variant">{lane.detail}</p>
+              </div>
+            ))}
           </div>
 
           <details className="rounded-md border border-outline/15 bg-surface-dim/40 p-3" aria-label="Trading live proof command">
