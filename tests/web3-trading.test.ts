@@ -47,6 +47,7 @@ import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3CredentialsSetupReadiness } from "@/src/db/web3-credentials";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
+import { liveCanaryRequestContinuityBlockers, type Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
 import {
   getWeb3PromotedPaperAutopilotHealth,
@@ -2792,6 +2793,9 @@ describe("Web3 autonomous trading subsystem", () => {
       relay_attempted: boolean;
       signed_payload_received: boolean;
       signed_payload_echoed: boolean;
+      expected_request_id: string | null;
+      request_continuity_status: string;
+      current_relay_ready: boolean;
       signed_payload_hash: string | null;
       signed_payload_byte_count: number;
       blockers: string[];
@@ -2804,9 +2808,13 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(actionReceipt.relay_attempted).toBe(false);
     expect(actionReceipt.signed_payload_received).toBe(true);
     expect(actionReceipt.signed_payload_echoed).toBe(false);
+    expect(actionReceipt.expected_request_id).toBeNull();
+    expect(actionReceipt.request_continuity_status).toBe("missing-current-request");
+    expect(actionReceipt.current_relay_ready).toBe(false);
     expect(actionReceipt.signed_payload_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(actionReceipt.signed_payload_byte_count).toBeGreaterThan(0);
     expect(actionReceipt.blockers.join(" ")).toContain("source=live-dex");
+    expect(actionReceipt.blockers.join(" ")).toContain("No active canary request id");
     expect(actionReceipt.transaction_submission_permission).toBe("blocked");
     expect(actionReceipt.private_key_storage).toBe("blocked");
     expect(actionReceipt.secret_echo_permission).toBe("blocked");
@@ -2835,6 +2843,23 @@ describe("Web3 autonomous trading subsystem", () => {
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");
+  });
+
+  test("GIVEN a signed canary payload references an old order WHEN request continuity is checked THEN the relay is blocked before submission", async () => {
+    const response = await LIVE_TRADE_CANARY_GET(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=sample&account=persistent&cycles=0"));
+    const receipt = await json<Web3LiveTradeCanaryReceipt>(response);
+    const missing = liveCanaryRequestContinuityBlockers(receipt, "stale-order-001");
+    const readyReceipt: Web3LiveTradeCanaryReceipt = {
+      ...receipt,
+      current_request_id: "order-current-001",
+      can_submit_from_app_now: true,
+    };
+    const mismatch = liveCanaryRequestContinuityBlockers(readyReceipt, "stale-order-001");
+    const matched = liveCanaryRequestContinuityBlockers(readyReceipt, "order-current-001");
+
+    expect(missing.join(" ")).toContain("No active canary request id");
+    expect(mismatch).toEqual(["request_id must match the current canary request order-current-001."]);
+    expect(matched).toEqual([]);
   });
 
   test("GIVEN the operator asks for a live unsigned canary order WHEN gates are missing THEN the handoff blocks safely", async () => {

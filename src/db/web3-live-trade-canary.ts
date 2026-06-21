@@ -63,6 +63,9 @@ export type Web3LiveTradeCanaryActionReceipt = {
   actual_live_trade_tested: boolean;
   real_funds_moved_by_this_app: boolean;
   request_id: string | null;
+  expected_request_id: string | null;
+  request_continuity_status: "matched" | "missing-current-request" | "mismatch" | "relay-not-ready" | "not-checked";
+  current_relay_ready: boolean;
   route: "jupiter-swap-v2" | "solana-rpc" | null;
   signed_payload_received: boolean;
   signed_payload_echoed: false;
@@ -126,6 +129,9 @@ export function buildWeb3LiveTradeCanaryActionReceipt(input: {
     actual_live_trade_tested: actualLiveTradeTested,
     real_funds_moved_by_this_app: after.real_funds_moved_by_this_app,
     request_id: input.requestId,
+    expected_request_id: input.before.current_request_id,
+    request_continuity_status: liveCanaryRequestContinuityStatus(input.before, input.requestId),
+    current_relay_ready: input.before.can_submit_from_app_now,
     route: input.route,
     signed_payload_received: Boolean(input.signedPayloadHash),
     signed_payload_echoed: false as const,
@@ -157,6 +163,33 @@ export function buildWeb3LiveTradeCanaryActionReceipt(input: {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
   };
+}
+
+export function liveCanaryRequestContinuityBlockers(
+  before: Web3LiveTradeCanaryReceipt,
+  requestId: string,
+): string[] {
+  if (!before.current_request_id) {
+    return ["No active canary request id is ready; request a fresh one-shot unsigned order before relaying a signed payload."];
+  }
+  if (requestId !== before.current_request_id) {
+    return [`request_id must match the current canary request ${before.current_request_id}.`];
+  }
+  if (!before.can_submit_from_app_now) {
+    return ["Current canary relay is not ready to accept a signed payload; clear the signed-relay readiness gate first."];
+  }
+  return [];
+}
+
+function liveCanaryRequestContinuityStatus(
+  before: Web3LiveTradeCanaryReceipt,
+  requestId: string | null,
+): Web3LiveTradeCanaryActionReceipt["request_continuity_status"] {
+  if (!requestId) return "not-checked";
+  if (!before.current_request_id) return "missing-current-request";
+  if (requestId !== before.current_request_id) return "mismatch";
+  if (!before.can_submit_from_app_now) return "relay-not-ready";
+  return "matched";
 }
 
 export function buildWeb3LiveTradeCanaryReceipt(

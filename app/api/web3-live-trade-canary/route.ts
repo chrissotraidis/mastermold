@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   buildWeb3LiveTradeCanaryActionReceipt,
   buildWeb3LiveTradeCanaryReceipt,
+  liveCanaryRequestContinuityBlockers,
   type Web3LiveTradeCanaryActionReceipt,
   type Web3LiveTradeCanaryReceipt,
 } from "@/src/db/web3-live-trade-canary";
@@ -68,6 +69,7 @@ export async function POST(request: Request): Promise<NextResponse<Web3LiveTrade
     !requestId ? "request_id is required so the signed payload can be matched to the current order request." : null,
     !route ? "route must be jupiter-swap-v2 or solana-rpc." : null,
     signedPayloadByteCount > 0 && signedPayloadByteCount > 2_500_000 ? "signed_transaction payload is too large for canary relay." : null,
+    requestId ? liveCanaryRequestContinuityBlockers(before, requestId)[0] ?? null : null,
   ].filter((item): item is string => Boolean(item));
 
   if (unsafeFields.length > 0 || blockers.length > 0) {
