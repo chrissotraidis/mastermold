@@ -80,6 +80,18 @@ export type Web3LiveUsabilityCredentialRequest = {
   blocks_live_capital: boolean;
   safe_to_provide: string[];
   never_provide: string[];
+  verification_runway: Array<{
+    id: string;
+    label: string;
+    surface: "settings" | "browser-wallet" | "local-command" | "read-only-api" | "external-review";
+    href: string | null;
+    command: string | null;
+    status: "next" | "after-input" | "gated" | "external";
+    next_action: string;
+    live_execution_permission: "blocked";
+    wallet_mutation_permission: "blocked";
+    secret_echo_permission: "blocked";
+  }>;
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
   transaction_submission_permission: "blocked";
@@ -420,6 +432,7 @@ function summarizeNextCredentialRequest(
     blocks_live_capital: nextBlocker?.blocks_live_capital ?? true,
     safe_to_provide: safeToProvide.slice(0, 6),
     never_provide: neverProvide.slice(0, 6),
+    verification_runway: credentialRequestVerificationRunway(id, verifierCommand, fixHref),
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     transaction_submission_permission: "blocked",
@@ -427,6 +440,131 @@ function summarizeNextCredentialRequest(
     private_key_storage: "blocked",
     seed_phrase_storage: "blocked",
     secret_echo_permission: "blocked",
+  };
+}
+
+function credentialRequestVerificationRunway(
+  id: string,
+  verifierCommand: string | null,
+  fixHref: string,
+): Web3LiveUsabilityCredentialRequest["verification_runway"] {
+  const normalized = id.toLowerCase();
+  if (normalized.includes("wallet")) {
+    return [
+      verificationRunwayStep({
+        id: "save-public-wallet",
+        label: "Save public wallet scope",
+        surface: "settings",
+        href: fixHref,
+        command: null,
+        status: "next",
+        next_action: "Save only the dedicated public Solana wallet address in Settings.",
+      }),
+      verificationRunwayStep({
+        id: "strict-wallet-verifier",
+        label: "Run wallet verifier",
+        surface: "local-command",
+        href: null,
+        command: verifierCommand,
+        status: "after-input",
+        next_action: "Run the strict operator-wallet verifier and keep the sample wallet rejected.",
+      }),
+      verificationRunwayStep({
+        id: "prove-wallet-ownership",
+        label: "Prove wallet ownership",
+        surface: "browser-wallet",
+        href: "/settings/integrations#web3-credential-action-console",
+        command: null,
+        status: "after-input",
+        next_action: "Use the browser wallet to sign the text-only ownership challenge; this is not a transaction signature.",
+      }),
+      verificationRunwayStep({
+        id: "refresh-live-usability",
+        label: "Refresh what is left",
+        surface: "read-only-api",
+        href: "/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all",
+        command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+        status: "after-input",
+        next_action: "Refresh the live-usability receipt so the next blocker advances only after the wallet gate proves out.",
+      }),
+    ];
+  }
+  if (normalized.includes("jupiter")) {
+    return [
+      verificationRunwayStep({
+        id: "install-jupiter-key",
+        label: "Install Jupiter key",
+        surface: "settings",
+        href: fixHref,
+        command: null,
+        status: "next",
+        next_action: "Add JUPITER_API_KEY through ignored local env or a session-only Settings test.",
+      }),
+      verificationRunwayStep({
+        id: "strict-jupiter-verifier",
+        label: "Run Jupiter verifier",
+        surface: "local-command",
+        href: null,
+        command: verifierCommand ?? "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+        status: "after-input",
+        next_action: "Prove quote and unsigned order readiness while transaction bytes stay withheld.",
+      }),
+      verificationRunwayStep({
+        id: "refresh-live-usability",
+        label: "Refresh what is left",
+        surface: "read-only-api",
+        href: "/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all",
+        command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+        status: "after-input",
+        next_action: "Refresh the live-usability receipt after route/order proof is recorded.",
+      }),
+    ];
+  }
+  return [
+    verificationRunwayStep({
+      id: "open-safe-surface",
+      label: "Open safe setup surface",
+      surface: fixHref.includes("/api/") ? "read-only-api" : "settings",
+      href: fixHref,
+      command: null,
+      status: "next",
+      next_action: "Open the linked safe setup surface and provide only the requested redacted value or review decision.",
+    }),
+    verificationRunwayStep({
+      id: "run-safe-verifier",
+      label: "Run safe verifier",
+      surface: "local-command",
+      href: null,
+      command: verifierCommand ?? "npm run verify:web3 -- --base-url=http://localhost:4010",
+      status: "after-input",
+      next_action: "Run the safe verifier after the setup value changes.",
+    }),
+    verificationRunwayStep({
+      id: "refresh-live-usability",
+      label: "Refresh what is left",
+      surface: "read-only-api",
+      href: "/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all",
+      command: "npm run verify:web3 -- --base-url=http://localhost:4010",
+      status: "after-input",
+      next_action: "Refresh the live-usability receipt and confirm live authority is still blocked.",
+    }),
+  ];
+}
+
+function verificationRunwayStep(input: {
+  id: string;
+  label: string;
+  surface: Web3LiveUsabilityCredentialRequest["verification_runway"][number]["surface"];
+  href: string | null;
+  command: string | null;
+  status: Web3LiveUsabilityCredentialRequest["verification_runway"][number]["status"];
+  next_action: string;
+}) {
+  return {
+    ...input,
+    live_execution_permission: "blocked" as const,
+    wallet_mutation_permission: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
   };
 }
 

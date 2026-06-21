@@ -1555,6 +1555,14 @@ describe("Web3 autonomous trading subsystem", () => {
           verifier_command: string | null;
           safe_to_provide: string[];
           never_provide: string[];
+          verification_runway: Array<{
+            id: string;
+            label: string;
+            command: string | null;
+            live_execution_permission: string;
+            wallet_mutation_permission: string;
+            secret_echo_permission: string;
+          }>;
           live_execution_permission: string;
           wallet_mutation_permission: string;
           transaction_submission_permission: string;
@@ -1676,6 +1684,18 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_usability.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.next_credential_request?.never_provide.join(" ")).toContain("private key");
+    expect(receipt.web3_live_usability.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
+      "save-public-wallet",
+      "strict-wallet-verifier",
+      "prove-wallet-ownership",
+      "refresh-live-usability",
+    ]);
+    expect(receipt.web3_live_usability.next_credential_request?.verification_runway[1]?.command).toContain("--require-operator-wallet");
+    expect(receipt.web3_live_usability.next_credential_request?.verification_runway.every((step) =>
+      step.live_execution_permission === "blocked" &&
+      step.wallet_mutation_permission === "blocked" &&
+      step.secret_echo_permission === "blocked"
+    )).toBe(true);
     expect(receipt.web3_live_usability.live_execution_permission).toBe("blocked");
     expect(receipt.web3_live_usability.wallet_mutation_permission).toBe("blocked");
     expect(receipt.web3_live_usability.transaction_submission_permission).toBe("blocked");
@@ -1732,6 +1752,15 @@ describe("Web3 autonomous trading subsystem", () => {
         verifier_command: string | null;
         safe_to_provide: string[];
         never_provide: string[];
+        verification_runway: Array<{
+          id: string;
+          label: string;
+          href: string | null;
+          command: string | null;
+          live_execution_permission: string;
+          wallet_mutation_permission: string;
+          secret_echo_permission: string;
+        }>;
         live_execution_permission: string;
         wallet_mutation_permission: string;
         transaction_submission_permission: string;
@@ -1831,6 +1860,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     expect(receipt.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.next_credential_request?.never_provide.join(" ")).toContain("private key");
+    expect(receipt.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
+      "save-public-wallet",
+      "strict-wallet-verifier",
+      "prove-wallet-ownership",
+      "refresh-live-usability",
+    ]);
+    expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/settings/integrations#settings-web3-wallet-public-key");
+    expect(receipt.next_credential_request?.verification_runway[1]?.command).toContain("--require-operator-wallet");
+    expect(receipt.next_credential_request?.verification_runway.every((step) =>
+      step.live_execution_permission === "blocked" &&
+      step.wallet_mutation_permission === "blocked" &&
+      step.secret_echo_permission === "blocked"
+    )).toBe(true);
     expect(receipt.missing_owner_summary[0]).toMatchObject({
       owner: "operator",
       first_label: "Dedicated trading wallet",
@@ -1861,7 +1903,7 @@ describe("Web3 autonomous trading subsystem", () => {
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
       next_blocker: { id: string; label: string; owner: string; source: string; status: string; next_action: string; href: string; safe_command: string | null; blocks_live_capital: boolean } | null;
-      next_credential_request: { id: string; label: string; fix_href: string; verifier_command: string | null; safe_value_description: string; secret_echo_permission: string } | null;
+      next_credential_request: { id: string; label: string; fix_href: string; verifier_command: string | null; safe_value_description: string; verification_runway: Array<{ id: string; command: string | null }>; secret_echo_permission: string } | null;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; first_label: string; next_action: string }>;
       missing_source_summary: Array<{ source: string; missing_count: number; first_label: string; next_action: string }>;
@@ -1884,6 +1926,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.next_credential_request?.fix_href).toBe("/settings/integrations#settings-web3-wallet-public-key");
     expect(allRowsReceipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     expect(allRowsReceipt.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+    expect(allRowsReceipt.next_credential_request?.verification_runway[1]?.command).toContain("--require-operator-wallet");
     expect(allRowsReceipt.next_credential_request?.secret_echo_permission).toBe("blocked");
     expect(allRowsReceipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);

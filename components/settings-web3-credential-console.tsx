@@ -805,6 +805,27 @@ export function SettingsWeb3CredentialConsole({
           >
             Open request surface
           </a>
+          <div className="mt-2 grid gap-1.5" aria-label="Settings Web3 console credential verification runway">
+            {nextCredentialRequest.verification_runway.slice(0, 4).map((step, index) => (
+              <div key={step.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-2 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <span className="flex size-5 items-center justify-center rounded-md border border-outline-variant/25 bg-black/20 text-[10px] font-semibold text-outline">
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-on-surface">{step.label}</p>
+                  <p className="mt-0.5 text-[10px] leading-4 text-outline">{step.next_action}</p>
+                  {step.href ? (
+                    <a href={step.href} className="mt-1 inline-flex min-h-8 items-center rounded-md px-1 text-[10px] font-semibold text-engine">
+                      Open step
+                    </a>
+                  ) : null}
+                  {step.command ? (
+                    <code className="mt-1 block break-all text-[10px] leading-4 text-outline">{step.command}</code>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
