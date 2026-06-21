@@ -424,6 +424,9 @@ async function verifyUsabilityStatusReceipt() {
   assert(json.capabilities.some((item) => item.id === "jupiter-dry-run"), "Web3 usability status should report the Jupiter dry-run lane.", json.capabilities);
   assert(json.capabilities.some((item) => item.id === "supervised-live"), "Web3 usability status should report the supervised live lane.", json.capabilities);
   assert(json.capabilities.some((item) => item.id === "autonomous-live" && item.status === "locked"), "Web3 usability status should keep autonomous live locked.", json.capabilities);
+  assert(Array.isArray(json.operator_unlock_sequence) && json.operator_unlock_sequence.length === 6, "Web3 usability status should expose the operator unlock sequence.", json);
+  assert(json.operator_unlock_sequence.map((item) => item.id).join(",") === "scope-wallet,prove-wallet,rehearse-jupiter,choose-signer,ops-accounting,external-review", "Web3 usability status should keep the operator unlock sequence ordered.", json.operator_unlock_sequence);
+  assert(json.operator_unlock_sequence.some((item) => item.id === "external-review" && String(item.evidence).includes("live execution remains blocked")), "Web3 usability status should keep external review behind the live boundary.", json.operator_unlock_sequence);
   assert(typeof json.next_gate_label === "string" && json.next_gate_label.length > 0, "Web3 usability status should name the next gate.", json);
   assert(typeof json.next_gate_action === "string" && json.next_gate_action.length > 0, "Web3 usability status should name the next action.", json);
   assert(json.live_execution_permission === "blocked", "Web3 usability status must keep live execution blocked.", json);

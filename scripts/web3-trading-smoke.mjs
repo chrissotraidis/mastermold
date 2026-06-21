@@ -252,6 +252,9 @@ async function main() {
   assert(html.includes("Autonomous session ticket receipt"), "Trading page should expose a review receipt for session caps, budgets, order boundary, and live-gate status.");
   assert(html.includes("Profit proof"), "Trading page should expose whether the autonomous paper loop is making money before the long workbench.");
   assert(html.includes("Proof thresholds"), "Trading page should expose the promoted paper proof threshold matrix.");
+  assert(html.includes("Operator unlock sequence"), "Trading page should expose the ordered operator unlock sequence.");
+  assert(html.includes("Scope dedicated wallet"), "Trading page should put dedicated wallet scope at the front of the unlock sequence.");
+  assert(html.includes("Public/env targets only; never private keys or seed phrases."), "Trading page should disclose safe credential boundaries in the unlock sequence.");
   assert(html.includes("Autonomous profit accountability chart"), "Trading page should chart paper PnL, win rate, fills, loop feedback, and outcome memory before the long workbench.");
   assert(html.includes("Profit accountability loop receipt"), "Trading page should expose a review receipt for paper profit accountability, loop feedback, outcome memory, and live-gate status.");
   assert(html.includes("Accountability repair plan"), "Trading page should expose the local paper accountability repair plan in the compact cockpit.");

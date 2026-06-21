@@ -460,9 +460,9 @@ export function buildWeb3AutonomyLaunchChecklist(
 function selectNextOperatorAction(operatorInputs: Web3AutonomyLaunchOperatorInput[]) {
   const priority: Web3AutonomyLaunchOperatorInput["id"][] = [
     "helius-solana-read-rail",
-    "jupiter-route-order-key",
     "dedicated-trading-wallet",
     "wallet-ownership-proof",
+    "jupiter-route-order-key",
     "signer-custody-choice",
     "signer-provider-credentials",
     "settlement-accounting-review",

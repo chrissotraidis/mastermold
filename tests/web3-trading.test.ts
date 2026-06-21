@@ -813,7 +813,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.private_key_storage).toBe("blocked");
     expect(receipt.seed_phrase_storage).toBe("blocked");
     expect(receipt.secret_echo_permission).toBe("blocked");
-    expect(receipt.next_input?.id).toBe("jupiter-route-order-key");
+    expect(receipt.next_input?.id).toBe("dedicated-trading-wallet");
     expect(receipt.inputs.find((item) => item.id === "helius-solana-read-rail")).toMatchObject({
       input_kind: "api-key",
       safe_collection_surface: "settings-console",
@@ -916,7 +916,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.status).toBe("needs-input");
     expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(packet.handoff_receipt_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(packet.next_input?.id).toBe("jupiter-route-order-key");
+    expect(packet.next_input?.id).toBe("dedicated-trading-wallet");
     expect(packet.required_inputs.map((item) => item.id)).toEqual(expect.arrayContaining([
       "jupiter-route-order-key",
       "dedicated-trading-wallet",
@@ -1190,6 +1190,7 @@ describe("Web3 autonomous trading subsystem", () => {
       next_gate_action: string;
       summary: string;
       capabilities: Array<{ id: string; label: string; status: string; next_action: string; evidence: string[] }>;
+      operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       safe_commands: string[];
       live_execution_permission: string;
       wallet_mutation_permission: string;
@@ -1222,6 +1223,19 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.capabilities.find((capability) => capability.id === "jupiter-dry-run")?.evidence).toEqual(expect.arrayContaining([
       expect.stringContaining("Route status"),
     ]));
+    expect(receipt.operator_unlock_sequence.map((step) => step.id)).toEqual([
+      "scope-wallet",
+      "prove-wallet",
+      "rehearse-jupiter",
+      "choose-signer",
+      "ops-accounting",
+      "external-review",
+    ]);
+    expect(receipt.operator_unlock_sequence.find((step) => step.id === "scope-wallet")).toMatchObject({
+      label: "Scope dedicated wallet",
+      storage: "browser-public-scope",
+    });
+    expect(receipt.operator_unlock_sequence.find((step) => step.id === "external-review")?.evidence).toContain("live execution remains blocked");
     expect(receipt.next_gate_label.length).toBeGreaterThan(0);
     expect(receipt.next_gate_action.length).toBeGreaterThan(0);
     expect(receipt.usable_count + receipt.gated_count + receipt.locked_count).toBeGreaterThanOrEqual(3);
@@ -1300,7 +1314,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(board.now_count).toBeGreaterThanOrEqual(3);
     expect(board.before_live_count).toBeGreaterThanOrEqual(2);
     expect(board.review_count).toBeGreaterThanOrEqual(1);
-    expect(board.next_safe_input?.id).toBe("jupiter-route-order-key");
+    expect(board.next_safe_input?.id).toBe("dedicated-trading-wallet");
     expect(board.next_live_lane_action.length).toBeGreaterThan(0);
     expect(board.owner_counts.operator).toBeGreaterThanOrEqual(3);
     expect(board.owner_counts.ops).toBeGreaterThanOrEqual(1);
@@ -8314,9 +8328,9 @@ describe("Web3 autonomous trading subsystem", () => {
       storage: "server-env",
     });
     expect(envReadyChecklist.next_operator_action).toMatchObject({
-      id: "jupiter-route-order-key",
+      id: "dedicated-trading-wallet",
       status: "needed",
-      storage: "server-env",
+      storage: "browser-public-scope",
     });
     delete process.env.HELIUS_API_KEY;
     expect(launchChecklist.operator_inputs_needed.map((item) => item.id)).toEqual(expect.arrayContaining([

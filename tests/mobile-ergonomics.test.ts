@@ -735,6 +735,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Live readiness dossier");
     expect(tradingPage).toContain("Open JSON");
     expect(tradingPage).toContain("Credentials");
+    expect(tradingPage).toContain("Operator unlock sequence");
+    expect(tradingPage).toContain('aria-label="Web3 usability operator unlock sequence"');
+    expect(tradingPage).toContain("operator_unlock_sequence");
+    expect(tradingPage).toContain("Public/env targets only; never private keys or seed phrases.");
     expect(tradingPage).toContain("Capability evidence");
     expect(tradingPage).toContain('aria-label="Web3 capability status rail"');
     expect(tradingPage).toContain("flex-nowrap gap-2 overflow-x-auto");
@@ -769,6 +773,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Preflight");
     expect(tradingPage).toContain("Next usable gate");
     expect(tradingPage).toContain("Live review lanes");
+    expect(tradingPage).toContain('aria-label="Web3 operator unlock sequence"');
     expect(tradingPage).toContain("Inputs still needed");
     expect(tradingPage).toContain("no secrets here");
     expect(tradingPage).toContain("This command board is paper and read-only evidence.");
@@ -781,6 +786,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-usability-blockers");
     expect(tradingPage).toContain("buildWeb3UsabilityStatus");
     expect(source("src/db/web3-usability-status.ts")).toContain("web3-usability-status");
+    expect(source("src/db/web3-usability-status.ts")).toContain("buildOperatorUnlockSequence");
+    expect(source("src/db/web3-usability-status.ts")).toContain("scope-wallet");
+    expect(source("src/db/web3-usability-status.ts")).toContain("rehearse-jupiter");
     expect(source("src/db/web3-usability-status.ts")).toContain("Copilot and paper autonomy can be usable while dry-run orders");
     expect(source("app/api/web3-usability-status/route.ts")).toContain("buildWeb3UsabilityStatus");
     expect(source("lib/paper-copy.ts")).toContain("Simulator example saved for later review.");
@@ -1408,6 +1416,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyProviderHealthReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyWalletOwnershipReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyUsabilityStatusReceipt");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("operator_unlock_sequence");
+    expect(source("components/review-readiness.tsx")).toContain("ordered operator unlock sequence");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-usability-status?source=live-dex&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("usability-status-receipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyLiveReadinessPackets");

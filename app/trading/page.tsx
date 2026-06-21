@@ -394,6 +394,34 @@ function TradingCommandBoard({
             <p className="mt-2 line-clamp-2 text-xs leading-5 text-outline">{liveUsabilityBlockers.next_action}</p>
           </div>
 
+          <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Web3 operator unlock sequence">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Operator unlock sequence</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {status.operator_unlock_sequence.find((step) => step.status !== "ready")?.label ?? "External review packet"}
+                </p>
+              </div>
+              <span className="rounded-md border border-engine/25 bg-engine/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-engine">
+                ordered
+              </span>
+            </div>
+            <div className="mt-2 grid gap-1.5">
+              {status.operator_unlock_sequence.slice(0, 4).map((step, index) => (
+                <div key={step.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2 rounded-md border border-outline/15 bg-surface-dim/35 p-2">
+                  <span className="mt-0.5 flex size-5 items-center justify-center rounded-md border border-outline/20 bg-surface text-[10px] font-semibold text-outline">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-on-surface">{step.label}</p>
+                    <p className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-outline">{step.next_action}</p>
+                  </div>
+                  <span className={operatorUnlockStepClassName(step.status)}>{step.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-md border border-outline/15 bg-surface/65 p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Inputs still needed</p>
@@ -648,6 +676,28 @@ function UsabilityStatusPanel({
         </div>
       </div>
 
+      <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-3" aria-label="Web3 usability operator unlock sequence">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Operator unlock sequence</p>
+          <p className="text-[11px] leading-4 text-outline">Public/env targets only; never private keys or seed phrases.</p>
+        </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-3">
+          {status.operator_unlock_sequence.map((step, index) => (
+            <div key={step.id} className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/45 p-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Step {index + 1}</p>
+                  <p className="mt-0.5 truncate text-xs font-semibold text-on-surface">{step.label}</p>
+                </div>
+                <span className={operatorUnlockStepClassName(step.status)}>{step.status}</span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{step.next_action}</p>
+              <p className="mt-1 truncate text-[10px] leading-4 text-outline">{step.storage.replaceAll("-", " ")}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="mt-3 flex min-w-0 flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" aria-label="Web3 capability status rail">
         {status.capabilities.map((capability) => (
           <div key={capability.id} className="inline-flex min-h-9 min-w-0 max-w-[12rem] shrink-0 items-center gap-2 rounded-md border border-outline/15 bg-surface-dim/45 px-2.5 py-1.5 sm:max-w-full">
@@ -705,6 +755,13 @@ function usabilityCapabilityClassName(status: Web3UsabilityStatusReceipt["capabi
   if (status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
   if (status === "gated") return `${base} border-caution/30 bg-caution/10 text-caution`;
   return `${base} border-outline/20 bg-surface text-outline`;
+}
+
+function operatorUnlockStepClassName(status: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number]["status"]) {
+  if (status === "ready") return "rounded-md border border-engine/30 bg-engine/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-engine";
+  if (status === "review") return "rounded-md border border-caution/30 bg-caution/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-caution";
+  if (status === "active") return "rounded-md border border-outline/25 bg-surface px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant";
+  return "rounded-md border border-critical/30 bg-critical/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-critical";
 }
 
 function LiveUsabilityBlockersPanel({

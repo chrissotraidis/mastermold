@@ -25,6 +25,21 @@ export type Web3UsabilityCapability = {
   evidence: string[];
 };
 
+export type Web3OperatorUnlockStep = {
+  id:
+    | "scope-wallet"
+    | "prove-wallet"
+    | "rehearse-jupiter"
+    | "choose-signer"
+    | "ops-accounting"
+    | "external-review";
+  label: string;
+  status: "ready" | "active" | "blocked" | "review";
+  storage: string;
+  next_action: string;
+  evidence: string;
+};
+
 export type Web3UsabilityStatusReceipt = {
   mode: "web3-usability-status";
   status: Web3UsabilityStatus;
@@ -38,6 +53,7 @@ export type Web3UsabilityStatusReceipt = {
   next_gate_action: string;
   summary: string;
   capabilities: Web3UsabilityCapability[];
+  operator_unlock_sequence: Web3OperatorUnlockStep[];
   safe_commands: string[];
   live_execution_permission: "blocked";
   wallet_mutation_permission: "blocked";
@@ -57,6 +73,7 @@ export function buildWeb3UsabilityStatus(input: {
 }): Web3UsabilityStatusReceipt {
   const generatedAt = (input.now ?? new Date()).toISOString();
   const capabilities = buildCapabilities(input);
+  const operatorUnlockSequence = buildOperatorUnlockSequence(input.launchChecklist, input.supervisedRunway);
   const usableCount = capabilities.filter((capability) => capability.status === "usable").length;
   const gatedCount = capabilities.filter((capability) => capability.status === "gated").length;
   const lockedCount = capabilities.filter((capability) => capability.status === "locked").length;
@@ -76,6 +93,7 @@ export function buildWeb3UsabilityStatus(input: {
     next_gate_action: nextGate.next_action,
     summary: usabilitySummary(status, currentMode, nextGate.label),
     capabilities,
+    operator_unlock_sequence: operatorUnlockSequence,
     safe_commands: [
       "npm run verify:web3 -- --base-url=http://localhost:4010",
       "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live",
@@ -227,6 +245,119 @@ function nextUsabilityGate(
     label: "Manual live review",
     next_action: supervisedRunway.next_action,
   };
+}
+
+function buildOperatorUnlockSequence(
+  launchChecklist: Web3AutonomyLaunchChecklist,
+  supervisedRunway: Web3SupervisedLiveRunway,
+): Web3OperatorUnlockStep[] {
+  const inputById = new Map(launchChecklist.operator_inputs_needed.map((item) => [item.id, item]));
+  const laneById = new Map(supervisedRunway.lanes.map((lane) => [lane.id, lane]));
+  const wallet = inputById.get("dedicated-trading-wallet");
+  const ownership = inputById.get("wallet-ownership-proof");
+  const jupiter = inputById.get("jupiter-route-order-key");
+  const signerChoice = inputById.get("signer-custody-choice");
+  const signerCredentials = inputById.get("signer-provider-credentials");
+  const settlement = inputById.get("settlement-accounting-review");
+  const manualApproval = inputById.get("manual-live-approval");
+  const opsLane = laneById.get("ops");
+  const accountingLane = laneById.get("accounting");
+
+  return [
+    {
+      id: "scope-wallet",
+      label: "Scope dedicated wallet",
+      status: operatorInputUnlockStatus(wallet?.status),
+      storage: wallet?.storage ?? "browser-public-scope",
+      next_action: wallet?.next_action ?? "Save a dedicated public Solana trading wallet address in Settings.",
+      evidence: wallet?.detail ?? "Dedicated public wallet scope is missing.",
+    },
+    {
+      id: "prove-wallet",
+      label: "Prove wallet control",
+      status: operatorInputUnlockStatus(ownership?.status),
+      storage: ownership?.storage ?? "hash-only-local-receipt",
+      next_action: ownership?.next_action ?? "Scope the dedicated wallet first, then prove ownership.",
+      evidence: ownership?.detail ?? "Wallet ownership proof waits for wallet scope.",
+    },
+    {
+      id: "rehearse-jupiter",
+      label: "Rehearse Jupiter order",
+      status: operatorInputUnlockStatus(jupiter?.status),
+      storage: jupiter?.storage ?? "server-env",
+      next_action: jupiter?.next_action ?? "Add JUPITER_API_KEY in ignored server env or a one-shot test, then rehearse the order path.",
+      evidence: jupiter?.detail ?? "Jupiter route/order proof is missing.",
+    },
+    {
+      id: "choose-signer",
+      label: "Choose signer path",
+      status: signerUnlockStatus(signerChoice?.status, signerCredentials?.status),
+      storage: signerCredentials?.storage ?? signerChoice?.storage ?? "external-operator-review",
+      next_action: signerCredentials?.status === "blocked"
+        ? signerCredentials.next_action
+        : signerChoice?.next_action ?? "Keep manual external wallet approval until a reviewed signer path exists.",
+      evidence: [
+        signerChoice?.detail,
+        signerCredentials?.detail,
+      ].filter(Boolean).join(" "),
+    },
+    {
+      id: "ops-accounting",
+      label: "Finish ops and accounting",
+      status: opsAccountingUnlockStatus(opsLane?.status, accountingLane?.status, settlement?.status),
+      storage: settlement?.storage ?? "external-operator-review",
+      next_action: firstOpenNextAction([
+        opsLane?.status !== "ready" && opsLane?.status !== "review" ? opsLane?.next_action : null,
+        accountingLane?.status !== "ready" && accountingLane?.status !== "review" ? accountingLane?.next_action : null,
+        settlement?.status !== "review" && settlement?.status !== "ready" ? settlement?.next_action : null,
+      ]) ?? "Review ops, accounting, and settlement evidence before external live review.",
+      evidence: [
+        opsLane ? `Ops ${opsLane.status}.` : null,
+        accountingLane ? `Accounting ${accountingLane.status}.` : null,
+        settlement ? settlement.detail : null,
+      ].filter(Boolean).join(" "),
+    },
+    {
+      id: "external-review",
+      label: "Request external review",
+      status: supervisedRunway.can_request_live_review ? "review" : "blocked",
+      storage: manualApproval?.storage ?? "external-operator-review",
+      next_action: manualApproval?.next_action ?? supervisedRunway.next_action,
+      evidence: `${supervisedRunway.ready_lane_count}/${supervisedRunway.total_lane_count} supervised-live lanes ready; live execution remains blocked.`,
+    },
+  ];
+}
+
+function operatorInputUnlockStatus(status: Web3AutonomyLaunchChecklist["operator_inputs_needed"][number]["status"] | undefined): Web3OperatorUnlockStep["status"] {
+  if (status === "ready") return "ready";
+  if (status === "review") return "review";
+  if (status === "blocked") return "blocked";
+  return "active";
+}
+
+function signerUnlockStatus(
+  choiceStatus: Web3AutonomyLaunchChecklist["operator_inputs_needed"][number]["status"] | undefined,
+  credentialStatus: Web3AutonomyLaunchChecklist["operator_inputs_needed"][number]["status"] | undefined,
+): Web3OperatorUnlockStep["status"] {
+  if (choiceStatus === "ready" && (credentialStatus === "ready" || credentialStatus === "review")) return "ready";
+  if (credentialStatus === "blocked") return "blocked";
+  if (choiceStatus === "review" || credentialStatus === "review") return "review";
+  return "active";
+}
+
+function opsAccountingUnlockStatus(
+  opsStatus: Web3SupervisedLiveRunway["lanes"][number]["status"] | undefined,
+  accountingStatus: Web3SupervisedLiveRunway["lanes"][number]["status"] | undefined,
+  settlementStatus: Web3AutonomyLaunchChecklist["operator_inputs_needed"][number]["status"] | undefined,
+): Web3OperatorUnlockStep["status"] {
+  const statuses = [opsStatus, accountingStatus, settlementStatus].filter(Boolean);
+  if (statuses.every((status) => status === "ready" || status === "review")) return "review";
+  if (statuses.some((status) => status === "blocked")) return "blocked";
+  return "active";
+}
+
+function firstOpenNextAction(actions: Array<string | false | null | undefined>) {
+  return actions.find((action): action is string => typeof action === "string" && action.length > 0) ?? null;
 }
 
 function currentUsabilityMode(
