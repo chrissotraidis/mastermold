@@ -1353,7 +1353,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("total_live_usability_row_count");
     expect(settingsConsole).toContain("No missing live-usability rows are listed");
     expect(settingsConsole).toContain("This receipt refreshes after wallet scope");
-    expect(settingsPage).toContain("nextOperatorInputLabel={operatorRequestPacket.next_input?.label");
+    expect(settingsPage).toContain("nextOperatorInputLabel={operatorRequestPacket.current_input?.label");
+    expect(settingsPage).toContain("Settings Web3 current input contract");
+    expect(settingsPage).toContain("Settings Web3 research current input contract");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("current_input: Web3OperatorCurrentInput | null");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("function buildCurrentInput");
+    expect(source("src/db/web3-operator-request-packet.ts")).toContain("Current Input Contract");
+    expect(source("src/db/web3-research-handoff-packet.ts")).toContain("current_input: Web3OperatorRequestPacket[\"current_input\"]");
     expect(settingsConsole).toContain("Provider evidence");
     expect(settingsConsole).toContain("Public wallet scope");
     expect(settingsConsole).toContain("Live DEX proof");

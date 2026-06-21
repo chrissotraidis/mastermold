@@ -569,10 +569,10 @@ function Web3CredentialsRunwayCard({
             <SettingsWeb3CredentialConsole
               walletPublicKeyPreview={receipt.wallet_summary.wallet_public_key_preview}
               defaultWalletPublicKey={scopedWallet}
-              nextOperatorInputLabel={operatorRequestPacket.next_input?.label ?? operatorRequestPacket.next_unlock_step?.label ?? null}
-              nextOperatorInputAction={operatorRequestPacket.next_input?.next_action ?? operatorRequestPacket.next_unlock_step?.next_action ?? null}
-              nextOperatorInputStorage={operatorRequestPacket.next_input?.storage ?? operatorRequestPacket.next_unlock_step?.storage ?? null}
-              nextOperatorInputVerifier={operatorRequestPacket.next_input?.verifier_command ?? null}
+              nextOperatorInputLabel={operatorRequestPacket.current_input?.label ?? operatorRequestPacket.next_input?.label ?? operatorRequestPacket.next_unlock_step?.label ?? null}
+              nextOperatorInputAction={operatorRequestPacket.current_input?.next_action ?? operatorRequestPacket.next_input?.next_action ?? operatorRequestPacket.next_unlock_step?.next_action ?? null}
+              nextOperatorInputStorage={operatorRequestPacket.current_input?.storage ?? operatorRequestPacket.next_input?.storage ?? operatorRequestPacket.next_unlock_step?.storage ?? null}
+              nextOperatorInputVerifier={operatorRequestPacket.current_input?.verifier_command ?? operatorRequestPacket.next_input?.verifier_command ?? null}
               maxTradeUsd={state.execution_readiness.config.max_trade_usd}
               dailySpendCapUsd={state.execution_readiness.config.daily_spend_cap_usd}
               maxSlippageBps={state.execution_readiness.config.max_slippage_bps}
@@ -1171,6 +1171,7 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
   const liveBlockers = packet.live_capital_blockers.slice(0, 4);
   const openInputs = packet.open_operator_inputs.slice(0, 4);
   const liveUsability = packet.live_usability;
+  const currentInput = packet.current_input;
   return (
     <div id="settings-web3-research-handoff" className="rounded-md border border-violet/30 bg-violet/[0.045] p-3" aria-label="Settings Web3 research handoff packet">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1210,6 +1211,22 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
             {liveUsability.next_unlock_step_label
               ? `Next unlock: ${liveUsability.next_unlock_step_label}. ${liveUsability.next_unlock_step_action}`
               : liveUsability.next_action}
+          </p>
+        </div>
+      ) : null}
+
+      {currentInput ? (
+        <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.04] p-2" aria-label="Settings Web3 research current input contract">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Current input contract</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{currentInput.label}</p>
+            </div>
+            <LaunchQueueBadge status={currentInput.status === "ready" ? "pass" : currentInput.status === "blocked" ? "fail" : "watch"} label={currentInput.source.replace("-", " ")} />
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{currentInput.next_action}</p>
+          <p className="mt-1 text-[10px] leading-4 text-outline">
+            Surface: {currentInput.safe_collection_surface.replaceAll("-", " ")} · Storage: {currentInput.storage.replaceAll("-", " ")}
           </p>
         </div>
       ) : null}
@@ -1415,6 +1432,7 @@ function SettingsWeb3OperatorIntakeBoard({ receipt }: { receipt: Web3OperatorCre
 function SettingsWeb3OperatorRequestPacketPanel({ packet }: { packet: Web3OperatorRequestPacket }) {
   const openInputs = packet.required_inputs.slice(0, 4);
   const nextInput = packet.next_input;
+  const currentInput = packet.current_input;
   return (
     <div className="rounded-md border border-engine/25 bg-surface-dim/30 p-3" aria-label="Web3 operator share packet">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1427,6 +1445,42 @@ function SettingsWeb3OperatorRequestPacketPanel({ packet }: { packet: Web3Operat
         </div>
         <LaunchQueueBadge status={packet.status === "needs-input" ? "watch" : "pass"} label={`${packet.required_inputs.length} open`} />
       </div>
+
+      {currentInput ? (
+        <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.04] p-2" aria-label="Settings Web3 current input contract">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Current input contract</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{currentInput.label}</p>
+            </div>
+            <LaunchQueueBadge status={currentInput.status === "ready" ? "pass" : currentInput.status === "blocked" ? "fail" : "watch"} label={currentInput.source.replace("-", " ")} />
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{currentInput.next_action}</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Surface</p>
+              <p className="mt-1 text-[11px] font-semibold text-on-surface">{currentInput.safe_collection_surface.replaceAll("-", " ")}</p>
+            </div>
+            <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Storage</p>
+              <p className="mt-1 text-[11px] font-semibold text-on-surface">{currentInput.storage.replaceAll("-", " ")}</p>
+            </div>
+            <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Targets</p>
+              <p className="mt-1 break-all text-[11px] font-semibold text-on-surface">{currentInput.target_names.length > 0 ? currentInput.target_names.join(", ") : "none"}</p>
+            </div>
+            <div className="rounded-md border border-critical/20 bg-critical/[0.025] p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Authority</p>
+              <p className="mt-1 text-[11px] font-semibold text-on-surface">live blocked</p>
+            </div>
+          </div>
+          {currentInput.verifier_command ? (
+            <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+              {currentInput.verifier_command}
+            </code>
+          ) : null}
+        </div>
+      ) : null}
 
       {packet.next_unlock_step ? (
         <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 operator request next unlock step">

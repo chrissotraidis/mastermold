@@ -202,12 +202,15 @@ transaction-submission/private-key/seed-phrase/secret-echo blocks without return
 `/api/web3-operator-request-packet` turns that same handoff into a shareable redacted
 setup packet with the live-usability summary embedded in JSON and text form, so another
 helper sees blocker counts, listed rows, the next unlock step, safe inputs, and never-provide
-boundaries in one pasteable artifact.
+boundaries in one pasteable artifact. It also carries a `current_input` contract and
+`Current Input Contract` text section that name the one safe next input, target env or
+browser-storage names, verifier command, storage rule, collection surface, and blocked
+live/signing/wallet/secret permissions.
 `/api/web3-research-handoff-packet?source=live-dex` is the paste-ready research brief for
 another helper. It includes the next ordered unlock step, the six-step operator unlock
 sequence, compact live-usability summary, open operator inputs, live-capital blockers,
-source endpoints, and research questions while keeping secrets, transaction bytes, signing,
-wallet mutation, and live execution blocked.
+source endpoints, current safe input contract, and research questions while keeping secrets,
+transaction bytes, signing, wallet mutation, and live execution blocked.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.

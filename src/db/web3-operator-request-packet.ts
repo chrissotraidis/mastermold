@@ -20,6 +20,30 @@ export type Web3OperatorRequestPacketInput = {
   secret_handling: string;
 };
 
+export type Web3OperatorCurrentInput = {
+  id: string;
+  label: string;
+  status: string;
+  source: "operator-input" | "unlock-step" | "review";
+  priority: string;
+  safe_collection_surface: string;
+  storage: string;
+  can_enter_in_app: boolean;
+  target_names: string[];
+  next_action: string;
+  verifier_command: string | null;
+  unlock_step_id: string | null;
+  unlock_step_label: string | null;
+  live_usability_status: string | null;
+  live_usability_receipt_hash: string | null;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export type Web3OperatorRequestPacket = {
   mode: "web3-operator-request-packet";
   status: "needs-input" | "ready-for-review";
@@ -30,6 +54,7 @@ export type Web3OperatorRequestPacket = {
   next_unlock_step: Web3OperatorUnlockStep | null;
   operator_unlock_sequence: Web3OperatorUnlockStep[];
   live_usability: Web3OperatorCredentialHandoffReceipt["live_usability"];
+  current_input: Web3OperatorCurrentInput | null;
   next_input: Web3OperatorRequestPacketInput | null;
   required_inputs: Web3OperatorRequestPacketInput[];
   review_inputs: Web3OperatorRequestPacketInput[];
@@ -62,11 +87,17 @@ export function buildWeb3OperatorRequestPacket(
   const nextUnlockStep = operatorUnlockSequence.find((step) => step.status !== "ready") ??
     operatorUnlockSequence[operatorUnlockSequence.length - 1] ??
     null;
+  const status: Web3OperatorRequestPacket["status"] = openRequired.length > 0 ? "needs-input" : "ready-for-review";
+  const currentInput = buildCurrentInput({
+    nextInput,
+    nextUnlockStep,
+    liveUsability: handoff.live_usability,
+    status,
+  });
   const verifierCommands = Array.from(new Set([
     ...handoff.safe_commands,
     ...handoff.inputs.map((item) => item.verifier_command).filter((command): command is string => Boolean(command)),
   ])).slice(0, 8);
-  const status: Web3OperatorRequestPacket["status"] = openRequired.length > 0 ? "needs-input" : "ready-for-review";
   const packetBase = {
     mode: "web3-operator-request-packet" as const,
     status,
@@ -78,6 +109,7 @@ export function buildWeb3OperatorRequestPacket(
     next_unlock_step: nextUnlockStep,
     operator_unlock_sequence: operatorUnlockSequence,
     live_usability: handoff.live_usability,
+    current_input: currentInput,
     next_input: nextInput,
     required_inputs: openRequired,
     review_inputs: reviewInputs,
@@ -125,6 +157,70 @@ function toRequestInput(input: Web3OperatorCredentialHandoffInput): Web3Operator
     verifier_command: input.verifier_command,
     secret_handling: input.secret_handling,
   };
+}
+
+function buildCurrentInput({
+  nextInput,
+  nextUnlockStep,
+  liveUsability,
+  status,
+}: {
+  nextInput: Web3OperatorRequestPacketInput | null;
+  nextUnlockStep: Web3OperatorUnlockStep | null;
+  liveUsability: Web3OperatorCredentialHandoffReceipt["live_usability"];
+  status: Web3OperatorRequestPacket["status"];
+}): Web3OperatorCurrentInput | null {
+  if (nextInput) {
+    return {
+      id: nextInput.id,
+      label: nextInput.label,
+      status: nextInput.status,
+      source: "operator-input",
+      priority: nextInput.priority,
+      safe_collection_surface: nextInput.safe_collection_surface,
+      storage: nextInput.storage,
+      can_enter_in_app: nextInput.can_enter_in_app,
+      target_names: nextInput.env_targets,
+      next_action: nextInput.next_action,
+      verifier_command: nextInput.verifier_command,
+      unlock_step_id: nextUnlockStep?.id ?? null,
+      unlock_step_label: nextUnlockStep?.label ?? null,
+      live_usability_status: liveUsability?.status ?? null,
+      live_usability_receipt_hash: liveUsability?.receipt_hash ?? null,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    };
+  }
+  if (nextUnlockStep) {
+    return {
+      id: nextUnlockStep.id,
+      label: nextUnlockStep.label,
+      status: nextUnlockStep.status,
+      source: status === "ready-for-review" ? "review" : "unlock-step",
+      priority: status === "ready-for-review" ? "review-before-live" : "required-now",
+      safe_collection_surface: "external-review",
+      storage: nextUnlockStep.storage,
+      can_enter_in_app: false,
+      target_names: [],
+      next_action: nextUnlockStep.next_action,
+      verifier_command: null,
+      unlock_step_id: nextUnlockStep.id,
+      unlock_step_label: nextUnlockStep.label,
+      live_usability_status: liveUsability?.status ?? null,
+      live_usability_receipt_hash: liveUsability?.receipt_hash ?? null,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    };
+  }
+  return null;
 }
 
 function renderOperatorRequestText(packet: Omit<Web3OperatorRequestPacket, "receipt_hash" | "text_packet">) {
@@ -176,6 +272,19 @@ function renderOperatorRequestText(packet: Omit<Web3OperatorRequestPacket, "rece
     "",
     "## Next Safe Input",
     packet.next_input ? `${packet.next_input.label}: ${packet.next_input.next_action}` : "No next input is open.",
+    "",
+    "## Current Input Contract",
+    packet.current_input
+      ? [
+        `${packet.current_input.label}: ${packet.current_input.next_action}`,
+        `Source: ${packet.current_input.source}`,
+        `Surface: ${packet.current_input.safe_collection_surface.replaceAll("-", " ")}`,
+        `Storage: ${packet.current_input.storage.replaceAll("-", " ")}`,
+        packet.current_input.target_names.length > 0 ? `Target names: ${packet.current_input.target_names.join(", ")}` : null,
+        packet.current_input.verifier_command ? `Verify: ${packet.current_input.verifier_command}` : null,
+        "Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo: blocked",
+      ].filter(Boolean).join("\n")
+      : "No current input is open.",
     "",
     "## Operator Unlock Sequence",
     unlockLines,

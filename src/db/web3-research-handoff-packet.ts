@@ -56,6 +56,7 @@ export type Web3ResearchHandoffPacket = {
   next_unlock_step: Web3UsabilityStatusReceipt["operator_unlock_sequence"][number] | null;
   operator_unlock_sequence: Web3UsabilityStatusReceipt["operator_unlock_sequence"];
   live_usability: Web3OperatorRequestPacket["live_usability"];
+  current_input: Web3OperatorRequestPacket["current_input"];
   open_operator_inputs: Array<{
     id: Web3OperatorRequestPacket["required_inputs"][number]["id"];
     label: string;
@@ -195,6 +196,7 @@ export function buildWeb3ResearchHandoffPacket(input: {
     next_unlock_step: nextUnlockStep,
     operator_unlock_sequence: input.usability.operator_unlock_sequence,
     live_usability: input.requestPacket.live_usability,
+    current_input: input.requestPacket.current_input,
     open_operator_inputs: openOperatorInputs,
     live_capital_blockers: liveCapitalBlockers,
     research_questions: researchQuestions,
@@ -430,6 +432,17 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
       `- Evidence: ${packet.live_usability.evidence_endpoint}; receipt ${packet.live_usability.receipt_hash}`,
     ].join("\n")
     : "- No live-usability summary is attached. Load GET /api/web3-live-usability-blockers before live review.";
+  const currentInput = packet.current_input
+    ? [
+      `- ${packet.current_input.label}: ${packet.current_input.next_action}`,
+      `- Source: ${packet.current_input.source}`,
+      `- Surface: ${packet.current_input.safe_collection_surface.replaceAll("-", " ")}`,
+      `- Storage: ${packet.current_input.storage.replaceAll("-", " ")}`,
+      packet.current_input.target_names.length > 0 ? `- Target names: ${packet.current_input.target_names.join(", ")}` : null,
+      packet.current_input.verifier_command ? `- Verify: ${packet.current_input.verifier_command}` : null,
+      "- Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo: blocked",
+    ].filter(Boolean).join("\n")
+    : "- No current input is open.";
 
   return [
     "# Mastermind Web3 Research Handoff Packet",
@@ -455,6 +468,9 @@ function renderResearchHandoffText(packet: Omit<Web3ResearchHandoffPacket, "rece
     packet.next_unlock_step
       ? `- ${packet.next_unlock_step.label}: ${packet.next_unlock_step.status}; ${packet.next_unlock_step.next_action}`
       : "- No ordered unlock step is open.",
+    "",
+    "## Current Input Contract",
+    currentInput,
     "",
     "## Operator Unlock Sequence",
     unlockSequence,

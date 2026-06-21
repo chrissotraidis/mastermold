@@ -945,6 +945,24 @@ describe("Web3 autonomous trading subsystem", () => {
         next_unlock_step_action: string | null;
         evidence_endpoint: string;
       } | null;
+      current_input: {
+        id: string;
+        label: string;
+        source: string;
+        safe_collection_surface: string;
+        storage: string;
+        target_names: string[];
+        next_action: string;
+        verifier_command: string | null;
+        unlock_step_id: string | null;
+        live_usability_receipt_hash: string | null;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      } | null;
       next_input: { id: string; label: string; next_action: string } | null;
       required_inputs: Array<{ id: string; env_targets: string[]; storage: string; safe_collection_surface: string; verifier_command: string | null }>;
       review_inputs: Array<{ id: string }>;
@@ -992,6 +1010,23 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(requestLiveUsability.ready_live_lane_count).toBeLessThanOrEqual(requestLiveUsability.total_live_lane_count);
     expect(requestLiveUsability.next_unlock_step_label).toBe("Scope dedicated wallet");
     expect(requestLiveUsability.next_unlock_step_action).toContain("public Solana trading wallet");
+    expect(packet.current_input).toMatchObject({
+      id: "dedicated-trading-wallet",
+      label: "Dedicated trading wallet",
+      source: "operator-input",
+      safe_collection_surface: "settings-console",
+      storage: "browser-public-scope",
+      unlock_step_id: "scope-wallet",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(packet.current_input?.target_names).toEqual(["wallet_public_key"]);
+    expect(packet.current_input?.next_action).toContain("public Solana trading wallet");
+    expect(packet.current_input?.live_usability_receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(packet.next_input?.id).toBe("dedicated-trading-wallet");
     expect(packet.required_inputs.map((item) => item.id)).toEqual(expect.arrayContaining([
       "jupiter-route-order-key",
@@ -1014,6 +1049,8 @@ describe("Web3 autonomous trading subsystem", () => {
     ]));
     expect(packet.text_packet).toContain("# Mastermind Web3 Operator Request Packet");
     expect(packet.text_packet).toContain("Next Ordered Unlock Step");
+    expect(packet.text_packet).toContain("Current Input Contract");
+    expect(packet.text_packet).toContain("wallet_public_key");
     expect(packet.text_packet).toContain("Operator Unlock Sequence");
     expect(packet.text_packet).toContain("Live Usability Summary");
     expect(packet.text_packet).toContain("Rows listed:");
@@ -1069,6 +1106,21 @@ describe("Web3 autonomous trading subsystem", () => {
         next_unlock_step_action: string | null;
         evidence_endpoint: string;
       } | null;
+      current_input: {
+        id: string;
+        label: string;
+        source: string;
+        safe_collection_surface: string;
+        storage: string;
+        target_names: string[];
+        next_action: string;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        secret_echo_permission: string;
+      } | null;
       open_operator_inputs: Array<{ id: string; env_targets: string[]; storage: string; safe_collection_surface: string }>;
       live_capital_blockers: Array<{ id: string; label: string; status: string; next_action: string }>;
       research_questions: Array<{ id: string; priority: string; category: string; question: string; expected_answer_format: string }>;
@@ -1121,6 +1173,20 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(researchLiveUsability.ready_live_lane_count).toBeLessThanOrEqual(researchLiveUsability.total_live_lane_count);
     expect(researchLiveUsability.next_unlock_step_label).toBe("Scope dedicated wallet");
     expect(researchLiveUsability.next_unlock_step_action).toContain("public Solana trading wallet");
+    expect(packet.current_input).toMatchObject({
+      id: "dedicated-trading-wallet",
+      label: "Dedicated trading wallet",
+      source: "operator-input",
+      safe_collection_surface: "settings-console",
+      storage: "browser-public-scope",
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      private_key_storage: "blocked",
+      seed_phrase_storage: "blocked",
+      secret_echo_permission: "blocked",
+    });
+    expect(packet.current_input?.target_names).toEqual(["wallet_public_key"]);
     expect(packet.open_operator_inputs.map((item) => item.id)).toEqual(expect.arrayContaining([
       "dedicated-trading-wallet",
       "emergency-stop-target",
@@ -1152,6 +1218,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.text_packet).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(packet.text_packet).toContain("## Local Export Commands");
     expect(packet.text_packet).toContain("## Next Ordered Unlock Step");
+    expect(packet.text_packet).toContain("## Current Input Contract");
+    expect(packet.text_packet).toContain("wallet_public_key");
     expect(packet.text_packet).toContain("## Operator Unlock Sequence");
     expect(packet.text_packet).toContain("## Live Usability Summary");
     expect(packet.text_packet).toContain("Rows listed:");
