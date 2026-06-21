@@ -218,6 +218,9 @@ external review; the default response stays compact for dashboard panels.
 The compact response ranks first-canary setup lanes ahead of paper/preflight market chores, so
 wallet proof, Jupiter setup, live flags, signer relay, and review work are not hidden behind an
 unrelated paper refresh row.
+Live-capital preflight rows in that response also use canary-specific next actions for Jupiter
+order proof, signer/custody, settlement, and manual review, so the real-money queue does not show
+paper-market refresh or sizing instructions as the way to unlock a funded canary.
 `/api/web3-first-canary-handoff?source=live-dex&account=persistent&scenario=breakout&cycles=0`
 is the compact first funded canary handoff for another operator or helper. It combines the
 first-canary drill and credential requirements into a redacted packet with completed gates,

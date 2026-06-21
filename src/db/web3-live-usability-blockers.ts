@@ -915,7 +915,7 @@ function buildMissingItems(input: {
         owner: ownerForGate(gate.id),
         source: "preflight",
         status: gate.status === "fail" ? "fail" : "watch",
-        next_action: gate.next_action,
+        next_action: liveUsabilityPreflightNextAction(gate),
         blocks_live_capital: gate.blocks_live_capital,
       })),
     ...input.manualLiveReview.signoffs
@@ -1006,6 +1006,22 @@ function ownerForGate(id: Web3LiveCapitalPreflightReceipt["gates"][number]["id"]
   if (id === "settlement") return "accounting";
   if (id === "profit-proof") return "strategy";
   return "ops";
+}
+
+function liveUsabilityPreflightNextAction(gate: Web3LiveCapitalPreflightReceipt["gates"][number]) {
+  if (gate.id === "jupiter-order") {
+    return "Add JUPITER_API_KEY in ignored server env or run a one-shot Settings Jupiter rehearsal, then run the strict --require-jupiter-order verifier; transaction bytes stay withheld.";
+  }
+  if (gate.id === "signer-custody") {
+    return "Choose manual external wallet custody or a reviewed policy signer, then build the signer handoff receipt without private keys, seed phrases, raw transactions, or signed payload storage.";
+  }
+  if (gate.id === "settlement") {
+    return "Prove submitted-to-landed confirmation, settlement reconciliation, and local portfolio mirror accounting with redacted receipts before live review.";
+  }
+  if (gate.id === "manual-live-review") {
+    return "Complete the external manual-live review packet after wallet proof, Jupiter order proof, signer/custody, ops/accounting, and funded-canary proof are ready.";
+  }
+  return gate.next_action;
 }
 
 function missingItemRank(item: Web3LiveUsabilityMissingItem) {

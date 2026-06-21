@@ -4034,6 +4034,14 @@ describe("Web3 autonomous trading subsystem", () => {
     if (jupiterRunwayIndex >= 0 && jupiterPreflightIndex >= 0) {
       expect(jupiterRunwayIndex).toBeLessThan(jupiterPreflightIndex);
     }
+    const jupiterPreflight = receipt.missing_for_live_usability.find((item) => item.id === "preflight:jupiter-order");
+    expect(jupiterPreflight?.next_action).toContain("JUPITER_API_KEY");
+    expect(jupiterPreflight?.next_action).toContain("--require-jupiter-order");
+    expect(jupiterPreflight?.next_action).not.toContain("read-only dex backfill");
+    expect(jupiterPreflight?.next_action).not.toContain("FARTCOIN");
+    const signerPreflight = receipt.missing_for_live_usability.find((item) => item.id === "preflight:signer-custody");
+    expect(signerPreflight?.next_action).toContain("signer handoff receipt");
+    expect(signerPreflight?.next_action).not.toContain("Spend:");
     expect(receipt.next_blocker).toMatchObject({
       owner: "operator",
       blocks_live_capital: true,
