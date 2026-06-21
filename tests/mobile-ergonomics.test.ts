@@ -985,6 +985,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain('href="#settings-web3-research-handoff"');
     expect(settingsPage).toContain("Settings Web3 priority next verifier");
     expect(settingsPage).toContain("Settings Web3 priority boundary");
+    expect(settingsPage).toContain("Settings Web3 priority next dependency blocker");
+    expect(settingsPage).toContain("const nextBlocker = liveUsability.next_blocker");
+    expect(settingsPage).toContain("blocks live capital");
     expect(settingsPage).toContain("This first-screen card is navigation and status only");
     expect(settingsPage.indexOf("<SettingsWeb3SetupPriorityCard")).toBeLessThan(
       settingsPage.indexOf("<ManualHoldingsPanel"),
@@ -1334,6 +1337,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Next safe control:");
     expect(settingsConsole).toContain("Settings Web3 next operator unlock");
     expect(settingsConsole).toContain("Next operator unlock");
+    expect(settingsConsole).toContain("Settings Web3 console next dependency blocker");
+    expect(settingsConsole).toContain("nextLiveUsabilityBlocker");
+    expect(settingsConsole).toContain("Open blocker control");
     expect(settingsConsole).toContain("Go to wallet field");
     expect(settingsConsole).toContain("settings-web3-wallet-public-key");
     expect(settingsConsole).toContain("Verifier after save");
@@ -1664,12 +1670,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("README.md")).toContain("web3_operator_runbook");
     expect(source("README.md")).toContain("live-review source endpoint");
     expect(source("README.md")).toContain("next dependency blocker");
+    expect(source("README.md")).toContain("Settings mirrors that next dependency blocker");
     expect(source("docs/web3-credentials-runbook.md")).toContain("web3_operator_runbook");
     expect(source("docs/web3-credentials-runbook.md")).toContain("live_review_source_endpoint");
     expect(source("docs/web3-credentials-runbook.md")).toContain("next dependency blocker");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Settings mirrors that same next dependency blocker");
     expect(source("components/review-readiness.tsx")).toContain("web3_operator_runbook summary");
     expect(source("components/review-readiness.tsx")).toContain("live-review runbook endpoint");
     expect(source("components/review-readiness.tsx")).toContain("next dependency blocker");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors the same next dependency blocker");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-trading?source=live-dex");

@@ -669,6 +669,7 @@ export function SettingsWeb3CredentialConsole({
   });
   const liveUsabilityHref = `/api/web3-live-usability-blockers?${liveUsabilityParams.toString()}`;
   const visibleLiveUsabilityBlockers = liveUsabilityReceipt.missing_for_live_usability.slice(0, 4);
+  const nextLiveUsabilityBlocker = liveUsabilityReceipt.next_blocker;
   const liveUsabilitySetupHref = liveUsabilityReceipt.next_unlock_step?.id === "scope-wallet"
     ? "#settings-web3-wallet-public-key"
     : "#settings-web3-credentials-runway";
@@ -741,6 +742,32 @@ export function SettingsWeb3CredentialConsole({
           Checklist actions use the controls below. They can save public scope, install allowed local env targets, or build redacted receipts; they cannot sign, submit, mutate wallets, store seed phrases, or unlock live trading.
         </p>
       </div>
+
+      {nextLiveUsabilityBlocker ? (
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings Web3 console next dependency blocker">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Next dependency blocker</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{nextLiveUsabilityBlocker.label}</p>
+            </div>
+            <Badge variant="outline" className="border-critical/35 bg-critical/10 text-critical">
+              {nextLiveUsabilityBlocker.status}
+            </Badge>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">{nextLiveUsabilityBlocker.next_action}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <a
+              href={liveUsabilitySetupHref}
+              className="inline-flex min-h-9 items-center rounded-md border border-critical/30 bg-critical/10 px-2 text-xs font-semibold text-critical transition hover:bg-critical/15"
+            >
+              Open blocker control
+            </a>
+            <span className="min-w-0 truncate text-[11px] leading-4 text-outline">
+              {nextLiveUsabilityBlocker.owner.replaceAll("-", " ")} · {nextLiveUsabilityBlocker.source.replaceAll("-", " ")} · {nextLiveUsabilityBlocker.blocks_live_capital ? "blocks live capital" : "review item"}
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.04] p-2" aria-label="Settings Web3 next operator unlock">
         <div className="flex flex-wrap items-start justify-between gap-2">

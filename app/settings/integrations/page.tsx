@@ -630,6 +630,7 @@ function SettingsWeb3SetupPriorityCard({
 }) {
   const nextInput = requestPacket.next_input;
   const nextUnlock = liveUsability.next_unlock_step ?? requestPacket.next_unlock_step;
+  const nextBlocker = liveUsability.next_blocker;
   const verifier = nextInput?.verifier_command ??
     requestPacket.verifier_commands.find((command) => command.includes("verify:web3")) ??
     "npm run verify:web3 -- --base-url=http://localhost:4010";
@@ -662,6 +663,22 @@ function SettingsWeb3SetupPriorityCard({
         <SettingsMetric label="Research questions" value={`${researchPacket.research_questions.length}`} />
         <SettingsMetric label="Verifier" value={verifier.includes("--require-operator-wallet") ? "wallet gate" : "base gate"} />
       </div>
+
+      {nextBlocker ? (
+        <div className="mt-3 rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Settings Web3 priority next dependency blocker">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Next dependency blocker</p>
+              <p className="mt-1 text-sm font-semibold text-on-surface">{nextBlocker.label}</p>
+            </div>
+            <LaunchQueueBadge status={nextBlocker.status === "needed" || nextBlocker.status === "watch" || nextBlocker.status === "review" ? "watch" : "fail"} label={nextBlocker.status} />
+          </div>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">{nextBlocker.next_action}</p>
+          <p className="mt-1 truncate text-[11px] leading-4 text-outline">
+            {nextBlocker.owner.replaceAll("-", " ")} · {nextBlocker.source.replaceAll("-", " ")} · {nextBlocker.blocks_live_capital ? "blocks live capital" : "review item"}
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)]">
         <div className="rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2" aria-label="Settings Web3 priority next verifier">
