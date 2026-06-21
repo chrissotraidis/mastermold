@@ -19,7 +19,7 @@ import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wallet-packet/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LIVE_AUTONOMY_READINESS_GET } from "@/app/api/web3-live-autonomy-readiness/route";
-import { GET as LIVE_IGNITION_GET } from "@/app/api/web3-live-ignition/route";
+import { GET as LIVE_IGNITION_GET, POST as LIVE_IGNITION_POST } from "@/app/api/web3-live-ignition/route";
 import { GET as LIVE_USABILITY_BLOCKERS_GET } from "@/app/api/web3-live-usability-blockers/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
@@ -2234,6 +2234,100 @@ describe("Web3 autonomous trading subsystem", () => {
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("account must be ephemeral or persistent");
+  });
+
+  test("GIVEN a runner asks for a live ignition envelope WHEN gates are not proven THEN the action receipt stays blocked and redacted", async () => {
+    const response = await LIVE_IGNITION_POST(new Request("http://localhost/api/web3-live-ignition?scenario=breakout&source=live-dex&account=persistent&cycles=0", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "prepare-supervised-canary",
+        operator_ack: true,
+        live_capital_ack: "I_UNDERSTAND_REAL_FUNDS",
+      }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      action: string;
+      operator_acknowledged: boolean;
+      live_capital_acknowledged: boolean;
+      can_autonomously_trade_real_money_now: boolean;
+      can_start_supervised_canary_now: boolean;
+      actual_live_trade_tested: boolean;
+      launch_envelope: {
+        kind: string;
+        summary: string;
+        preflight_endpoint: string | null;
+        unsigned_handoff_endpoint: string | null;
+        canary_endpoint: string | null;
+        daemon_command: string | null;
+        required_acknowledgements: string[];
+        body_contract: string[];
+        forbidden_fields: string[];
+        transaction_bytes_return: string;
+        signed_payload_storage: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+      };
+      blockers: string[];
+      transaction_submission_permission: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-live-ignition-action");
+    expect(receipt.status).toBe("blocked");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.action).toBe("prepare-supervised-canary");
+    expect(receipt.operator_acknowledged).toBe(true);
+    expect(receipt.live_capital_acknowledged).toBe(true);
+    expect(receipt.can_autonomously_trade_real_money_now).toBe(false);
+    expect(receipt.can_start_supervised_canary_now).toBe(false);
+    expect(receipt.actual_live_trade_tested).toBe(false);
+    expect(receipt.launch_envelope.kind).toBe("none");
+    expect(receipt.launch_envelope.canary_endpoint).toContain("/api/web3-live-trade-canary");
+    expect(receipt.launch_envelope.transaction_bytes_return).toBe("blocked");
+    expect(receipt.launch_envelope.signed_payload_storage).toBe("blocked");
+    expect(receipt.launch_envelope.private_key_storage).toBe("blocked");
+    expect(receipt.launch_envelope.seed_phrase_storage).toBe("blocked");
+    expect(receipt.launch_envelope.forbidden_fields.join(" ")).toContain("private_key");
+    expect(receipt.blockers.join(" ")).toContain("can_start_supervised_canary_now=true");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.join(" ")).toContain("prepares a launch envelope only");
+
+    const unsafe = await LIVE_IGNITION_POST(new Request("http://localhost/api/web3-live-ignition?scenario=breakout&source=live-dex&account=persistent&cycles=0", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "prepare-supervised-canary",
+        operator_ack: true,
+        live_capital_ack: "I_UNDERSTAND_REAL_FUNDS",
+        private_key: "seed phrase should never be here",
+      }),
+    }));
+    const unsafeReceipt = await json<{
+      status: string;
+      unsafe_fields: string[];
+      launch_envelope: { kind: string };
+      secret_echo_permission: string;
+    }>(unsafe);
+    expect(unsafe.status).toBe(422);
+    expect(unsafeReceipt.status).toBe("unsafe-rejected");
+    expect(unsafeReceipt.unsafe_fields).toContain("private_key");
+    expect(unsafeReceipt.launch_envelope.kind).toBe("none");
+    expect(unsafeReceipt.secret_echo_permission).toBe("blocked");
   });
 
   test("GIVEN an operator needs one go-live packet WHEN the live activation plan route runs THEN it orders safe milestones without activation authority", async () => {

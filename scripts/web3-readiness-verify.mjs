@@ -1395,7 +1395,8 @@ async function verifyLiveTradeCanary() {
 }
 
 async function verifyLiveIgnition() {
-  const { response, json } = await requestJson("/api/web3-live-ignition?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  const endpoint = "/api/web3-live-ignition?source=live-dex&account=persistent&scenario=breakout&cycles=0";
+  const { response, json } = await requestJson(endpoint);
   assert(response.status === 200, "Live ignition should return 200.", { status: response.status, json });
   assert(json.mode === "web3-live-ignition", "Live ignition should expose the expected mode.", json);
   assert(["blocked", "supervised-canary-ready", "canary-proven", "autonomy-ready"].includes(json.status), "Live ignition should expose a known status.", json);
@@ -1419,7 +1420,47 @@ async function verifyLiveIgnition() {
   assert(json.seed_phrase_storage === "blocked", "Live ignition must block seed-phrase storage.", json);
   assert(json.secret_echo_permission === "blocked", "Live ignition must block secret echo.", json);
   assertNoLeak("live ignition", json);
-  record("live-ignition", "pass", `${json.status}; autonomous real-money trading: ${json.can_autonomously_trade_real_money_now}; actual live trade tested: ${json.actual_live_trade_tested}`);
+
+  const action = await postJson(endpoint, {
+    action: "prepare-supervised-canary",
+    operator_ack: true,
+    live_capital_ack: "I_UNDERSTAND_REAL_FUNDS",
+  });
+  assert(action.response.status === 200, "Live ignition action should return a receipt even when blocked.", { status: action.response.status, json: action.json });
+  assert(action.json.mode === "web3-live-ignition-action", "Live ignition action should expose the action mode.", action.json);
+  assert(action.json.status === "blocked", "Live ignition action should stay blocked until supervised canary gates are proven.", action.json);
+  assertReceiptHash("Live ignition action", action.json.receipt_hash);
+  assert(action.json.can_autonomously_trade_real_money_now === false, "Live ignition action should not claim autonomous real-money trading.", action.json);
+  assert(action.json.can_start_supervised_canary_now === false, "Live ignition action should not emit a canary envelope before gates are proven.", action.json);
+  assert(action.json.actual_live_trade_tested === false, "Live ignition action should not claim a funded live canary.", action.json);
+  assert(action.json.launch_envelope?.kind === "none", "Live ignition action should keep the launch envelope blocked by default.", action.json.launch_envelope);
+  assert(action.json.launch_envelope?.transaction_bytes_return === "blocked", "Live ignition action should not return transaction bytes by default.", action.json.launch_envelope);
+  assert(Array.isArray(action.json.launch_envelope?.forbidden_fields) && action.json.launch_envelope.forbidden_fields.includes("private_key"), "Live ignition action should publish forbidden secret fields.", action.json.launch_envelope);
+  assert(Array.isArray(action.json.blockers) && action.json.blockers.join(" ").includes("can_start_supervised_canary_now=true"), "Live ignition action should name the missing supervised canary gate.", action.json.blockers);
+  assert(action.json.transaction_submission_permission === "blocked", "Live ignition action must keep transaction submission blocked by default.", action.json);
+  assert(action.json.live_execution_permission === "blocked", "Live ignition action must keep live execution blocked by default.", action.json);
+  assert(action.json.wallet_mutation_permission === "blocked", "Live ignition action must keep wallet mutation blocked.", action.json);
+  assert(action.json.private_key_storage === "blocked", "Live ignition action must block private-key storage.", action.json);
+  assert(action.json.seed_phrase_storage === "blocked", "Live ignition action must block seed-phrase storage.", action.json);
+  assert(action.json.secret_echo_permission === "blocked", "Live ignition action must block secret echo.", action.json);
+  assert(String(action.json.controls?.join(" ") ?? "").includes("prepares a launch envelope only"), "Live ignition action should state that it only prepares an envelope.", action.json.controls);
+  assertNoLeak("live ignition action", action.json);
+
+  const unsafe = await postJson(endpoint, {
+    action: "prepare-supervised-canary",
+    operator_ack: true,
+    live_capital_ack: "I_UNDERSTAND_REAL_FUNDS",
+    private_key: CANARY_SECRET,
+  });
+  assert(unsafe.response.status === 422, "Live ignition action should reject unsafe secret fields.", { status: unsafe.response.status, json: unsafe.json });
+  assert(unsafe.json.status === "unsafe-rejected", "Live ignition unsafe action should expose unsafe-rejected status.", unsafe.json);
+  assert(Array.isArray(unsafe.json.unsafe_fields) && unsafe.json.unsafe_fields.includes("private_key"), "Live ignition unsafe action should name private_key.", unsafe.json);
+  assert(unsafe.json.launch_envelope?.kind === "none", "Live ignition unsafe action should not emit a launch envelope.", unsafe.json.launch_envelope);
+  assert(unsafe.json.secret_echo_permission === "blocked", "Live ignition unsafe action should keep secret echo blocked.", unsafe.json);
+  assert(unsafe.text.includes(CANARY_SECRET) === false, "Live ignition unsafe action must not echo secret canary text.", unsafe.text);
+  assertNoLeak("live ignition unsafe action", unsafe.json);
+
+  record("live-ignition", "pass", `${json.status}; launch envelope ${action.json.status}; autonomous real-money trading: ${json.can_autonomously_trade_real_money_now}; actual live trade tested: ${json.actual_live_trade_tested}`);
 }
 
 async function verifyResearchAnswerIntake() {

@@ -217,9 +217,12 @@ keys or seed phrases, or enable live execution.
 `/api/web3-live-ignition` is the bot-facing real-money ignition go/no-go receipt. It reconciles
 live scope, wallet scope, Jupiter route/order proof, signer relay, autonomy readiness, canary proof,
 and the safety boundary into one status for the trading cockpit, `/api/health`, and `npm run verify:web3`.
+`POST /api/web3-live-ignition` can prepare a machine-readable launch envelope for either the next
+supervised canary or a future bounded autonomous launch, but only after explicit acknowledgements and
+only when the existing ignition gates say the step is allowed.
 It keeps `can_autonomously_trade_real_money_now=false` until the supervised canary has actually
 relayed, confirmed, reconciled settlement, and mirrored the local portfolio; it cannot sign, submit,
-return transaction bytes, store wallet authority, or mutate wallets.
+return transaction bytes from the ignition action, store wallet authority, echo secrets, or mutate wallets.
 `/api/web3-live-activation-plan` now consolidates the credential requirements, live-usability blockers,
 and final autonomy gate into one operator go/no-go packet with ordered milestones, the next safe
 milestone, strict verifier commands, paste-ready Markdown, and compact `/api/health`

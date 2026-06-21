@@ -9,7 +9,13 @@ import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
-import { buildWeb3LiveIgnitionReceipt, type Web3LiveIgnitionReceipt } from "@/src/db/web3-live-ignition";
+import {
+  buildWeb3LiveIgnitionActionReceipt,
+  buildWeb3LiveIgnitionReceipt,
+  type Web3LiveIgnitionActionMode,
+  type Web3LiveIgnitionActionReceipt,
+  type Web3LiveIgnitionReceipt,
+} from "@/src/db/web3-live-ignition";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
@@ -39,8 +45,42 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveIgniti
   const parsed = parseIgnitionQuery(request.url);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
 
+  const ignition = await buildIgnitionFromQuery(parsed.value);
+  return NextResponse.json(ignition);
+}
+
+export async function POST(request: Request): Promise<NextResponse<Web3LiveIgnitionActionReceipt | { error: string }>> {
+  const parsed = parseIgnitionQuery(request.url);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 422 });
+  }
+
+  if (!isPlainObject(body)) {
+    return NextResponse.json({ error: "Request body must be a live ignition action object." }, { status: 422 });
+  }
+
+  const action = body.action === "prepare-autonomous-live" ? body.action : "prepare-supervised-canary";
+  const ignition = await buildIgnitionFromQuery(parsed.value);
+  const unsafeFields = findUnsafeFields(body);
+  const receipt = buildWeb3LiveIgnitionActionReceipt({
+    ignition,
+    action: action as Web3LiveIgnitionActionMode,
+    operatorAcknowledged: body.operator_ack === true,
+    liveCapitalAcknowledged: body.live_capital_ack === "I_UNDERSTAND_REAL_FUNDS",
+    unsafeFields,
+  });
+
+  return NextResponse.json(receipt, { status: receipt.status === "unsafe-rejected" ? 422 : 200 });
+}
+
+async function buildIgnitionFromQuery(value: { scenario: TradingScenario; source: TradingMarketSource; account: TradingAccountMode; cycles: number }) {
   const state = await getWeb3TradingStateAsync({
-    ...parsed.value,
+    ...value,
     advance: false,
   });
   const supervisorHealth = getWeb3DaemonSupervisorHealth();
@@ -109,11 +149,11 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveIgniti
     currentInput: requestPacket.current_input,
   });
 
-  return NextResponse.json(buildWeb3LiveIgnitionReceipt({
+  return buildWeb3LiveIgnitionReceipt({
     state,
     liveUsability,
     canary: buildWeb3LiveTradeCanaryReceipt(state),
-  }));
+  });
 }
 
 function parseIgnitionQuery(url: string):
@@ -147,4 +187,47 @@ function parseIgnitionQuery(url: string):
       cycles,
     },
   };
+}
+
+function findUnsafeFields(value: unknown, path = ""): string[] {
+  if (!isPlainObject(value)) return [];
+  return Object.entries(value).flatMap(([key, child]) => {
+    const childPath = path ? `${path}.${key}` : key;
+    const unsafeKey = unsafeKeyPatterns.some((pattern) => pattern.test(key));
+    const unsafeValue = typeof child === "string" && looksSecretLike(child);
+    const nested = isPlainObject(child) ? findUnsafeFields(child, childPath) : [];
+    return [
+      unsafeKey || unsafeValue ? childPath : null,
+      ...nested,
+    ].filter((item): item is string => Boolean(item));
+  });
+}
+
+const unsafeKeyPatterns = [
+  /private/i,
+  /seed/i,
+  /mnemonic/i,
+  /keypair/i,
+  /secret/i,
+  /password/i,
+  /token/i,
+  /api[_-]?key/i,
+  /raw[_-]?transaction/i,
+  /unsigned[_-]?transaction/i,
+  /signed[_-]?transaction/i,
+  /signed[_-]?payload/i,
+  /transaction[_-]?bytes/i,
+];
+
+function looksSecretLike(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/api-key=|bearer\s+[A-Za-z0-9._-]{16,}|sk-[A-Za-z0-9_-]{16,}/i.test(trimmed)) return true;
+  if (/private[_\s-]?key|seed\s+phrase|mnemonic|keypair/i.test(trimmed)) return true;
+  if (trimmed.split(/\s+/).length >= 12 && /^[a-z\s]+$/i.test(trimmed)) return true;
+  return false;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

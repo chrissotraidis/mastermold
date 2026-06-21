@@ -826,8 +826,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-ignition.ts")).toContain("can_autonomously_trade_real_money_now");
     expect(source("src/db/web3-live-ignition.ts")).toContain("No funded live trade has been tested by this app yet.");
     expect(source("src/db/web3-live-ignition.ts")).toContain("bot-facing go/no-go");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("buildWeb3LiveIgnitionActionReceipt");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("web3-live-ignition-action");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("prepare-supervised-canary");
+    expect(source("src/db/web3-live-ignition.ts")).toContain("prepares a launch envelope only");
     expect(source("src/db/web3-live-ignition.ts")).toContain("Private keys, seed phrases");
     expect(source("app/api/web3-live-ignition/route.ts")).toContain("buildWeb3LiveIgnitionReceipt");
+    expect(source("app/api/web3-live-ignition/route.ts")).toContain("buildWeb3LiveIgnitionActionReceipt");
+    expect(source("app/api/web3-live-ignition/route.ts")).toContain("export async function POST");
+    expect(source("app/api/web3-live-ignition/route.ts")).toContain("findUnsafeFields");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("web3-live-usability-blockers");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("what is left before real-money Web3 usability");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("cutover setup blocker");
@@ -1743,6 +1750,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyLiveIgnition");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-live-ignition?source=live-dex&account=persistent");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("live-ignition");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3-live-ignition-action");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("prepare-supervised-canary");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("launch envelope");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("unsafe-rejected");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("web3-live-unsigned-order-preflight");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("unsafe preflight");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyResearchAnswerIntake");
@@ -1771,6 +1782,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("buildWeb3LiveUnsignedOrderPreflightReceipt");
     expect(source("app/api/web3-live-unsigned-order-handoff/route.ts")).toContain("safePreflightQueryKeys");
     expect(source("app/api/web3-live-ignition/route.ts")).toContain("buildWeb3LiveIgnitionReceipt");
+    expect(source("app/api/web3-live-ignition/route.ts")).toContain("buildWeb3LiveIgnitionActionReceipt");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("web3-live-unsigned-order-handoff");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("web3-live-unsigned-order-preflight");
     expect(source("src/db/web3-live-unsigned-order-handoff.ts")).toContain("can_request_one_shot_unsigned_order");
