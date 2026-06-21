@@ -147,7 +147,8 @@ apply request for the persistent paper mirror; it still blocks unless confirmed 
 evidence, fill price, filled quantity, handoff notional, and idempotency all reconcile, and
 it never grants live execution or wallet mutation permission. The first-canary drill reads
 live blockers, supervised canary readiness, Jupiter order proof, unsigned-order preflight,
-and canary proof receipts together, but it remains read-only and cannot sign, submit, store
+and canary proof receipts together through `GET /api/web3-first-canary-drill`, `/api/health`,
+and `npm run drill-canary:web3`, but it remains read-only and cannot sign, submit, store
 wallet authority, or move funds. `verify:web3` is a Node-only
 operator check for machines without Bun: against a running app, it snapshots the saved
 public wallet/risk scope, proves health receipts, execution input validation, public-wallet

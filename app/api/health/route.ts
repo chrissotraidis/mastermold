@@ -10,6 +10,7 @@ import {
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
+import { buildWeb3FirstCanaryDrillHealth, buildWeb3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
 import { buildWeb3LiveActivationPlan, buildWeb3LiveActivationPlanHealth } from "@/src/db/web3-live-activation-plan";
@@ -18,6 +19,7 @@ import { buildWeb3LiveAutonomyReadinessHealth } from "@/src/db/web3-live-autonom
 import { buildWeb3LiveIgnitionHealth, buildWeb3LiveIgnitionReceipt } from "@/src/db/web3-live-ignition";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
+import { buildWeb3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
 import {
   buildWeb3LiveUsabilityBlockersHealth,
   buildWeb3LiveUsabilityBlockersReceipt,
@@ -31,6 +33,7 @@ import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production
 import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
 import { buildWeb3ResearchHandoffHealth, buildWeb3ResearchHandoffPacket } from "@/src/db/web3-research-handoff-packet";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
+import { buildWeb3SupervisedCanaryReadinessReceipt } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
 import { getWeb3TradingStateAsync } from "@/src/db/web3-trading";
 import { buildWeb3UsabilityStatus } from "@/src/db/web3-usability-status";
@@ -46,6 +49,9 @@ export async function GET() {
   );
   const web3ProductionSupervisor = buildWeb3ProductionSupervisorReadiness(web3DaemonSupervisor);
   const web3Accounting = buildWeb3AccountingLedgerReceipt(web3State);
+  const web3Wallet = buildWeb3DedicatedWalletPacket(web3State);
+  const web3Jupiter = buildWeb3JupiterOrderPacket(web3State);
+  const web3Signer = buildWeb3SignerCredentialPacket(web3State);
   const web3LiveOps = buildWeb3LiveOpsPacket({
     state: web3State,
     productionSupervisor: web3ProductionSupervisor,
@@ -54,9 +60,9 @@ export async function GET() {
   });
   const web3SupervisedRunway = buildWeb3SupervisedLiveRunway({
     state: web3State,
-    wallet: buildWeb3DedicatedWalletPacket(web3State),
-    jupiter: buildWeb3JupiterOrderPacket(web3State),
-    signer: buildWeb3SignerCredentialPacket(web3State),
+    wallet: web3Wallet,
+    jupiter: web3Jupiter,
+    signer: web3Signer,
     liveOps: web3LiveOps,
   });
   const web3Usability = buildWeb3UsabilityStatus({
@@ -129,10 +135,36 @@ export async function GET() {
     liveUsability: web3LiveUsability,
     liveAutonomy: web3State.autonomous_live_autonomy_readiness,
   });
+  const web3Canary = buildWeb3LiveTradeCanaryReceipt(web3State);
   const web3LiveIgnition = buildWeb3LiveIgnitionReceipt({
     state: web3State,
     liveUsability: web3LiveUsability,
-    canary: buildWeb3LiveTradeCanaryReceipt(web3State),
+    canary: web3Canary,
+  });
+  const web3UnsignedPreflight = buildWeb3LiveUnsignedOrderPreflightReceipt(web3State, {
+    operator_ack: true,
+    canary_ack: "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED",
+    wallet_public_key: web3State.execution_readiness.config.wallet_public_key,
+    amount_lamports: 100_000,
+    max_slippage_bps: web3State.execution_readiness.config.max_slippage_bps,
+  });
+  const web3CanaryReadiness = buildWeb3SupervisedCanaryReadinessReceipt({
+    state: web3State,
+    wallet: web3Wallet,
+    jupiter: web3Jupiter,
+    signer: web3Signer,
+    livePreflight: web3Preflight,
+    ignition: web3LiveIgnition,
+    unsignedPreflight: web3UnsignedPreflight,
+    canary: web3Canary,
+  });
+  const web3FirstCanaryDrill = buildWeb3FirstCanaryDrillReceipt({
+    state: web3State,
+    liveUsability: web3LiveUsability,
+    readiness: web3CanaryReadiness,
+    jupiter: web3Jupiter,
+    unsignedPreflight: web3UnsignedPreflight,
+    canary: web3Canary,
   });
   return NextResponse.json({
     status: "ok",
@@ -144,6 +176,7 @@ export async function GET() {
     web3_live_activation: buildWeb3LiveActivationPlanHealth(web3LiveActivationPlan),
     web3_live_autonomy_readiness: buildWeb3LiveAutonomyReadinessHealth(web3State),
     web3_live_ignition: buildWeb3LiveIgnitionHealth(web3LiveIgnition),
+    web3_first_canary_drill: buildWeb3FirstCanaryDrillHealth(web3FirstCanaryDrill),
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
     web3_credential_requirements: buildWeb3CredentialRequirementsHealth(web3CredentialRequirements),

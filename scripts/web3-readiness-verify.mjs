@@ -291,6 +291,33 @@ async function verifyHealth() {
   assert(json.web3_live_ignition.can_autonomously_trade_real_money_now === false, "Live ignition health should keep autonomous real-money trading false in default verification.", json.web3_live_ignition);
   assert(json.web3_live_ignition.actual_live_trade_tested === false, "Live ignition health should not claim a funded live canary in default verification.", json.web3_live_ignition);
   assert(typeof json.web3_live_ignition.blocker_count === "number", "Live ignition health should expose blocker count.", json.web3_live_ignition);
+  assert(json.web3_first_canary_drill?.mode === "web3-first-canary-drill-health", "Health endpoint should expose compact first-canary drill health.", json.web3_first_canary_drill);
+  assert(
+    ["blocked", "ready-to-request-unsigned-order", "ready-to-relay-signed-payload", "canary-proven", "unsafe-permission-drift"].includes(json.web3_first_canary_drill.status),
+    "First-canary drill health should expose a known status.",
+    json.web3_first_canary_drill,
+  );
+  assertReceiptHash("Health first canary drill", json.web3_first_canary_drill.receipt_hash);
+  assert(json.web3_first_canary_drill.source_endpoint.includes("/api/web3-first-canary-drill"), "First-canary drill health should link its standalone endpoint.", json.web3_first_canary_drill);
+  assert(
+    json.web3_first_canary_drill.live_review_source_endpoint === "/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    "First-canary drill health should expose the live-review drill endpoint separately.",
+    json.web3_first_canary_drill,
+  );
+  assert(json.web3_first_canary_drill.can_request_unsigned_order_now === false, "First-canary drill health should not say unsigned order is ready in default verification.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.unsigned_order_handoff_ready === false, "First-canary drill health should not say unsigned handoff is ready in default verification.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.actual_live_trade_tested === false, "First-canary drill health should not claim a funded live canary in default verification.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.real_funds_moved_by_this_app === false, "First-canary drill health should not claim real funds moved.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.proof_required_count === 4, "First-canary drill health should require four proof stages.", json.web3_first_canary_drill);
+  assert(typeof json.web3_first_canary_drill.hard_fail_count === "number", "First-canary drill health should expose hard fail count.", json.web3_first_canary_drill);
+  assert(typeof json.web3_first_canary_drill.next_action === "string" && json.web3_first_canary_drill.next_action.length > 0, "First-canary drill health should expose the next action.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.live_execution_permission === "blocked", "First-canary drill health should keep live execution blocked.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.transaction_submission_permission === "blocked", "First-canary drill health should keep transaction submission blocked.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.wallet_mutation_permission === "blocked", "First-canary drill health should keep wallet mutation blocked.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.signing_permission === "blocked", "First-canary drill health should keep signing blocked.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.private_key_storage === "blocked", "First-canary drill health should keep private-key storage blocked.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.seed_phrase_storage === "blocked", "First-canary drill health should keep seed-phrase storage blocked.", json.web3_first_canary_drill);
+  assert(json.web3_first_canary_drill.secret_echo_permission === "blocked", "First-canary drill health should keep secret echo blocked.", json.web3_first_canary_drill);
   assert(json.web3_live_usability?.mode === "web3-live-usability-health", "Health endpoint should expose compact Web3 live-usability health.", json.web3_live_usability);
   assert(
     ["operator-input-needed", "external-review-needed", "live-review-ready", "autonomous-live-locked"].includes(json.web3_live_usability.status),
@@ -340,7 +367,7 @@ async function verifyHealth() {
   assert(json.web3_live_usability.private_key_storage === "blocked", "Live-usability health should keep private-key storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", json.web3_live_usability);
   assert(json.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", json.web3_live_usability);
-  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, and live-usability locks are blocked");
+  record("health", "pass", "live, wallet mutation, runbook, research handoff, live-activation, live-autonomy, live-ignition, first-canary drill, and live-usability locks are blocked");
 }
 
 async function verifyOperatorWalletScope() {
@@ -1525,6 +1552,46 @@ async function verifySupervisedCanaryReadiness() {
   record("supervised-canary-readiness", "pass", `${json.status}; unsigned order ready: ${json.can_request_unsigned_order_now}; signed relay ready: ${json.can_relay_signed_payload_now}; actual live trade tested: ${json.actual_live_trade_tested}`);
 }
 
+async function verifyFirstCanaryDrill() {
+  const { response, json } = await requestJson("/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "First canary drill should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-first-canary-drill", "First canary drill should expose the expected mode.", json);
+  assert(["blocked", "ready-to-request-unsigned-order", "ready-to-relay-signed-payload", "canary-proven", "unsafe-permission-drift"].includes(json.status), "First canary drill should expose a known status.", json);
+  assertReceiptHash("First canary drill", json.receipt_hash);
+  assert(json.can_request_unsigned_order_now === false, "Default first canary drill should not say unsigned order is ready.", json);
+  assert(json.unsigned_order_handoff_ready === false, "Default first canary drill should not say unsigned handoff is ready.", json);
+  assert(json.actual_live_trade_tested === false, "Default first canary drill should not claim a funded canary.", json);
+  assert(json.real_funds_moved_by_this_app === false, "Default first canary drill should not claim real funds moved.", json);
+  assert(json.proof_pass_count === 0, "Default first canary drill should have zero post-signing proof stages passed.", json);
+  assert(json.proof_required_count === 4, "First canary drill should require four proof stages.", json);
+  assert(typeof json.hard_fail_count === "number" && json.hard_fail_count > 0, "Default first canary drill should expose hard blockers.", json);
+  assert(String(json.source_endpoint ?? "").includes("/api/web3-first-canary-drill"), "First canary drill should link itself.", json);
+  assert(json.live_review_source_endpoint === "/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0", "First canary drill should expose the live review endpoint.", json);
+  assert(String(json.strict_ready_command ?? "").includes("drill-canary:web3"), "First canary drill should expose its strict command.", json);
+  assert(String(json.strict_proof_command ?? "").includes("prove-canary:web3"), "First canary drill should expose the canary proof command.", json);
+  assert(Array.isArray(json.safe_commands) && json.safe_commands.some((command) => command.includes("drill-canary:web3")), "First canary drill should expose safe command-line verification.", json.safe_commands);
+  assert(Array.isArray(json.safe_surfaces) && json.safe_surfaces.some((surface) => surface.includes("/trading?source=live-dex")), "First canary drill should expose safe operator surfaces.", json.safe_surfaces);
+  assert(Array.isArray(json.lanes) && json.lanes.some((lane) => lane.id === "unsigned-order-preflight") && json.lanes.some((lane) => lane.id === "post-signing-proof") && json.lanes.some((lane) => lane.id === "live-boundary"), "First canary drill should include unsigned, post-signing, and boundary lanes.", json.lanes);
+  assert(json.lanes.every((lane) => ["pass", "watch", "fail"].includes(lane.status) && lane.evidence_endpoint), "First canary drill lanes should be actionable.", json.lanes);
+  assert(json.live_execution_permission === "blocked", "First canary drill must keep live execution blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "First canary drill must keep transaction submission blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "First canary drill must keep wallet mutation blocked.", json);
+  assert(json.signing_permission === "blocked", "First canary drill must keep signing blocked.", json);
+  assert(json.private_key_storage === "blocked", "First canary drill must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "First canary drill must block seed-phrase storage.", json);
+  assert(json.signed_payload_storage === "blocked", "First canary drill must block signed payload storage.", json);
+  assert(json.secret_echo_permission === "blocked", "First canary drill must block secret echo.", json);
+  assert(String(json.controls?.join(" ") ?? "").includes("cannot sign, submit"), "First canary drill should state that it cannot sign or submit.", json.controls);
+  assertNoLeak("first canary drill", json);
+
+  const unsafe = await requestJson("/api/web3-first-canary-drill?private_key=never");
+  assert(unsafe.response.status === 422, "First canary drill should reject unsafe query fields.", { status: unsafe.response.status, json: unsafe.json });
+  assert(String(unsafe.json.error ?? "").includes("Unsafe query field"), "First canary drill unsafe query should name the rejection.", unsafe.json);
+  assertNoLeak("first canary drill unsafe query", unsafe.json);
+
+  record("first-canary-drill", "pass", `${json.status}; unsigned order ready: ${json.can_request_unsigned_order_now}; signed relay: ${json.signed_relay_status}; actual live trade tested: ${json.actual_live_trade_tested}`);
+}
+
 async function verifyResearchAnswerIntake() {
   const answer = [
     "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
@@ -1798,6 +1865,7 @@ async function main() {
   await verifyStrictLiveCanaryProof();
   await verifyLiveIgnition();
   await verifySupervisedCanaryReadiness();
+  await verifyFirstCanaryDrill();
   await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();

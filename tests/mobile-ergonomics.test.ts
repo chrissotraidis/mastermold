@@ -1659,10 +1659,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("VersionedTransaction.deserialize");
     expect(source("package.json")).toContain("\"drill-canary:web3\": \"node scripts/web3-first-canary-drill.mjs\"");
     expect(source("README.md")).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json");
+    expect(source("README.md")).toContain("GET /api/web3-first-canary-drill");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(source("app/trading/page.tsx")).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json");
+    expect(source("app/api/web3-first-canary-drill/route.ts")).toContain("buildWeb3FirstCanaryDrillReceipt");
+    expect(source("app/api/health/route.ts")).toContain("web3_first_canary_drill");
+    expect(source("src/db/web3-first-canary-drill.ts")).toContain("mode: \"web3-first-canary-drill\"");
     expect(source("scripts/web3-first-canary-drill.mjs")).toContain("mode: \"web3-first-canary-drill\"");
-    expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run drill-canary:web3 command");
+    expect(source("components/review-readiness.tsx")).toContain("GET /api/web3-first-canary-drill");
     expect(source("package.json")).toContain("\"prove-canary:web3\": \"node scripts/web3-live-canary-proof.mjs\"");
     expect(source("README.md")).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");

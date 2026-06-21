@@ -17,6 +17,7 @@ import { GET as JUPITER_ORDER_PACKET_GET } from "@/app/api/web3-jupiter-order-pa
 import { GET as PROVIDER_HEALTH_GET } from "@/app/api/web3-provider-health/route";
 import { GET as DEX_DISCOVERY_GET } from "@/app/api/web3-dex-discovery/route";
 import { GET as DEDICATED_WALLET_PACKET_GET } from "@/app/api/web3-dedicated-wallet-packet/route";
+import { GET as FIRST_CANARY_DRILL_GET } from "@/app/api/web3-first-canary-drill/route";
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LIVE_AUTONOMY_READINESS_GET } from "@/app/api/web3-live-autonomy-readiness/route";
 import { GET as LIVE_IGNITION_GET, POST as LIVE_IGNITION_POST } from "@/app/api/web3-live-ignition/route";
@@ -1884,6 +1885,32 @@ describe("Web3 autonomous trading subsystem", () => {
         next_gate_label: string | null;
         blocker_count: number;
       };
+      web3_first_canary_drill: {
+        mode: string;
+        status: string;
+        receipt_hash: string;
+        source_endpoint: string;
+        live_review_source_endpoint: string;
+        can_request_unsigned_order_now: boolean;
+        unsigned_order_handoff_ready: boolean;
+        signed_relay_status: string;
+        actual_live_trade_tested: boolean;
+        real_funds_moved_by_this_app: boolean;
+        proof_pass_count: number;
+        proof_required_count: number;
+        hard_fail_count: number;
+        next_blocker_label: string | null;
+        next_credential_label: string | null;
+        next_action: string;
+        live_execution_permission: string;
+        transaction_submission_permission: string;
+        wallet_mutation_permission: string;
+        signing_permission: string;
+        private_key_storage: string;
+        seed_phrase_storage: string;
+        signed_payload_storage: string;
+        secret_echo_permission: string;
+      };
       web3_live_usability: {
         mode: string;
         current_input: {
@@ -2082,6 +2109,27 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.web3_live_ignition.can_autonomously_trade_real_money_now).toBe(false);
     expect(receipt.web3_live_ignition.actual_live_trade_tested).toBe(false);
     expect(receipt.web3_live_ignition.blocker_count).toBeGreaterThan(0);
+    expect(receipt.web3_first_canary_drill.mode).toBe("web3-first-canary-drill-health");
+    expect(["blocked", "ready-to-request-unsigned-order", "ready-to-relay-signed-payload", "canary-proven", "unsafe-permission-drift"]).toContain(receipt.web3_first_canary_drill.status);
+    expect(receipt.web3_first_canary_drill.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.web3_first_canary_drill.source_endpoint).toContain("/api/web3-first-canary-drill");
+    expect(receipt.web3_first_canary_drill.live_review_source_endpoint).toBe("/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.web3_first_canary_drill.can_request_unsigned_order_now).toBe(false);
+    expect(receipt.web3_first_canary_drill.unsigned_order_handoff_ready).toBe(false);
+    expect(receipt.web3_first_canary_drill.actual_live_trade_tested).toBe(false);
+    expect(receipt.web3_first_canary_drill.real_funds_moved_by_this_app).toBe(false);
+    expect(receipt.web3_first_canary_drill.proof_pass_count).toBe(0);
+    expect(receipt.web3_first_canary_drill.proof_required_count).toBe(4);
+    expect(receipt.web3_first_canary_drill.hard_fail_count).toBeGreaterThan(0);
+    expect(receipt.web3_first_canary_drill.next_action.length).toBeGreaterThan(10);
+    expect(receipt.web3_first_canary_drill.live_execution_permission).toBe("blocked");
+    expect(receipt.web3_first_canary_drill.transaction_submission_permission).toBe("blocked");
+    expect(receipt.web3_first_canary_drill.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.web3_first_canary_drill.signing_permission).toBe("blocked");
+    expect(receipt.web3_first_canary_drill.private_key_storage).toBe("blocked");
+    expect(receipt.web3_first_canary_drill.seed_phrase_storage).toBe("blocked");
+    expect(receipt.web3_first_canary_drill.signed_payload_storage).toBe("blocked");
+    expect(receipt.web3_first_canary_drill.secret_echo_permission).toBe("blocked");
     expect(receipt.web3_live_usability.mode).toBe("web3-live-usability-health");
     expect(receipt.web3_live_usability.current_input).not.toBeNull();
     expect(receipt.web3_live_usability.current_input).toMatchObject({
@@ -2469,6 +2517,86 @@ describe("Web3 autonomous trading subsystem", () => {
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("source must be sample or live-dex");
+  });
+
+  test("GIVEN the operator needs one first-canary truth source WHEN the drill route runs THEN it consolidates blockers without live authority", async () => {
+    const response = await FIRST_CANARY_DRILL_GET(new Request("http://localhost/api/web3-first-canary-drill?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      supervised_canary_status: string;
+      can_request_unsigned_order_now: boolean;
+      unsigned_preflight_status: string;
+      unsigned_order_handoff_ready: boolean;
+      jupiter_order_status: string;
+      signed_relay_status: string;
+      actual_live_trade_tested: boolean;
+      real_funds_moved_by_this_app: boolean;
+      proof_pass_count: number;
+      proof_required_count: number;
+      hard_fail_count: number;
+      next_action: string;
+      blockers: string[];
+      safe_commands: string[];
+      safe_surfaces: string[];
+      source_endpoint: string;
+      live_review_source_endpoint: string;
+      strict_ready_command: string;
+      strict_proof_command: string;
+      lanes: Array<{ id: string; status: string; evidence_endpoint: string }>;
+      live_execution_permission: string;
+      transaction_submission_permission: string;
+      wallet_mutation_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      signed_payload_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-first-canary-drill");
+    expect(receipt.status).toBe("blocked");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.supervised_canary_status).toBe("blocked");
+    expect(receipt.can_request_unsigned_order_now).toBe(false);
+    expect(receipt.unsigned_preflight_status).toBe("blocked");
+    expect(receipt.unsigned_order_handoff_ready).toBe(false);
+    expect(["missing-key", "wallet-needed", "rehearsal-needed", "review-ready"]).toContain(receipt.jupiter_order_status);
+    expect(receipt.actual_live_trade_tested).toBe(false);
+    expect(receipt.real_funds_moved_by_this_app).toBe(false);
+    expect(receipt.proof_pass_count).toBe(0);
+    expect(receipt.proof_required_count).toBe(4);
+    expect(receipt.hard_fail_count).toBeGreaterThan(0);
+    expect(receipt.next_action.length).toBeGreaterThan(10);
+    expect(receipt.blockers.join(" ")).toContain("JUPITER");
+    expect(receipt.safe_commands).toContain("npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready");
+    expect(receipt.safe_commands).toContain("npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json");
+    expect(receipt.safe_surfaces).toContain("/trading?source=live-dex&account=persistent");
+    expect(receipt.source_endpoint).toContain("/api/web3-first-canary-drill");
+    expect(receipt.live_review_source_endpoint).toBe("/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(receipt.strict_ready_command).toContain("drill-canary:web3");
+    expect(receipt.strict_proof_command).toContain("prove-canary:web3");
+    expect(receipt.lanes.map((lane) => lane.id)).toContain("unsigned-order-preflight");
+    expect(receipt.lanes.map((lane) => lane.id)).toContain("post-signing-proof");
+    expect(receipt.lanes.map((lane) => lane.id)).toContain("live-boundary");
+    expect(receipt.lanes.every((lane) => ["pass", "watch", "fail"].includes(lane.status) && lane.evidence_endpoint.length > 0)).toBe(true);
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.signing_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.signed_payload_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(receipt.controls.join(" ")).toContain("cannot sign, submit");
+
+    const unsafe = await FIRST_CANARY_DRILL_GET(new Request("http://localhost/api/web3-first-canary-drill?private_key=never"));
+    const unsafeReceipt = await json<{ error: string }>(unsafe);
+    expect(unsafe.status).toBe(422);
+    expect(unsafeReceipt.error).toContain("Unsafe query field");
   });
 
   test("GIVEN an operator needs one go-live packet WHEN the live activation plan route runs THEN it orders safe milestones without activation authority", async () => {
