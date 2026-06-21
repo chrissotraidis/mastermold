@@ -1126,6 +1126,36 @@ function SettingsWeb3LiveTradeCanaryPanel({ receipt }: { receipt: Web3LiveTradeC
         </p>
       </div>
 
+      <div className="mt-3 rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings post-signing proof chain">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Post-signing proof chain</p>
+            <p className="mt-1 text-xs font-semibold text-on-surface">
+              {receipt.post_signing_evidence_status.replaceAll("-", " ")}
+            </p>
+          </div>
+          <LaunchQueueBadge
+            status={receipt.post_signing_evidence.every((item) => item.status === "pass") ? "pass" : receipt.latest_signature_preview ? "watch" : "fail"}
+            label={`${receipt.post_signing_evidence.filter((item) => item.status === "pass").length}/${receipt.post_signing_evidence.length} proven`}
+          />
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+          {receipt.post_signing_next_action}
+        </p>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          {receipt.post_signing_evidence.map((item) => (
+            <div key={item.id} className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="text-xs font-semibold text-on-surface">{item.label}</p>
+                <LaunchQueueBadge status={item.status} label={item.status} />
+              </div>
+              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.detail}</p>
+              <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-outline">{item.next_action}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="mt-3 rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Tiny unsigned order handoff</p>
         <p className="mt-1 text-xs leading-5 text-on-surface-variant">

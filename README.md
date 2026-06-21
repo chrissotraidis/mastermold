@@ -299,6 +299,9 @@ the canary receipt, and apply only the reviewed local portfolio mirror patch whe
 The auto watch is bounded by a fixed cadence and attempt cap so a signed canary can be watched
 without open-ended browser churn. This follow-through still cannot sign, submit new transactions,
 custody funds, mutate the wallet, or store transaction bodies.
+Settings now mirrors the same post-signing proof chain as visible rows beside the live canary
+handoff commands, so signed relay, chain confirmation, settlement reconciliation, and portfolio
+mirror accounting are not hidden in the JSON receipt during real canary setup.
 `POST /api/web3-live-trade-canary` is the guarded action wrapper for the existing external
 signed-payload relay: it requires operator acknowledgement, canary acknowledgement, live-dex
 persistent scope, request id, route, and a base64 signed transaction, hashes but never echoes the

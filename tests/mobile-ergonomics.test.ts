@@ -1869,6 +1869,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("signed_payload_echoed");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("post_signing_evidence_status");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("settlement-accounted");
+    expect(source("app/settings/integrations/page.tsx")).toContain("Settings post-signing proof chain");
+    expect(source("app/settings/integrations/page.tsx")).toContain("receipt.post_signing_evidence.map");
+    expect(source("app/settings/integrations/page.tsx")).toContain("receipt.post_signing_next_action");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Post-signing proof chain");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading post-signing proof chain");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Check proof chain");
