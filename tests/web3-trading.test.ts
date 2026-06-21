@@ -2482,6 +2482,12 @@ describe("Web3 autonomous trading subsystem", () => {
         target_names: ["hash-only wallet ownership receipt"],
       });
       expect(receipt.web3_live_usability.next_credential_request?.safe_value_description).toContain("text-message ownership proof");
+      expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide).toEqual([
+        "Text-message signature receipt with hashes only",
+        "hash-only wallet ownership receipt",
+      ]);
+      expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide.join(" ")).not.toContain("JUPITER_API_KEY");
+      expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide.join(" ")).not.toContain("HELIUS_API_KEY");
       expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("hash evidence");
       expect(receipt.web3_live_usability.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
         "check-wallet-challenge",
@@ -2496,6 +2502,10 @@ describe("Web3 autonomous trading subsystem", () => {
       });
       expect(receipt.web3_live_usability.next_credential_request?.id).toContain("dedicated-trading-wallet");
       expect(receipt.web3_live_usability.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+      expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide).toEqual([
+        "Dedicated Solana public wallet address",
+        "Browser-safe public wallet scope",
+      ]);
       expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("strict operator-wallet verifier");
       expect(receipt.web3_live_usability.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
         "save-public-wallet",
@@ -4052,6 +4062,12 @@ describe("Web3 autonomous trading subsystem", () => {
         target_names: ["hash-only wallet ownership receipt"],
       });
       expect(receipt.next_credential_request?.safe_value_description).toContain("text-message ownership proof");
+      expect(receipt.next_credential_request?.safe_to_provide).toEqual([
+        "Text-message signature receipt with hashes only",
+        "hash-only wallet ownership receipt",
+      ]);
+      expect(receipt.next_credential_request?.safe_to_provide.join(" ")).not.toContain("JUPITER_API_KEY");
+      expect(receipt.next_credential_request?.safe_to_provide.join(" ")).not.toContain("HELIUS_API_KEY");
       expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("hash evidence");
       expect(receipt.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
         "check-wallet-challenge",
@@ -4068,6 +4084,10 @@ describe("Web3 autonomous trading subsystem", () => {
         target_names: ["wallet_public_key"],
       });
       expect(receipt.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
+      expect(receipt.next_credential_request?.safe_to_provide).toEqual([
+        "Dedicated Solana public wallet address",
+        "Browser-safe public wallet scope",
+      ]);
       expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("sample all-ones wallet is rejected");
       expect(receipt.next_credential_request?.verification_runway.map((step) => step.id)).toEqual([
         "save-public-wallet",

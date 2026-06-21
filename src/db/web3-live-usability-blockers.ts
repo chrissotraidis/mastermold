@@ -430,7 +430,7 @@ function summarizeNextCredentialRequest(
     blocker_id: nextBlocker?.id ?? null,
     blocker_owner: nextBlocker?.owner ?? null,
     blocks_live_capital: nextBlocker?.blocks_live_capital ?? true,
-    safe_to_provide: safeToProvide.slice(0, 6),
+    safe_to_provide: credentialRequestSafeToProvide(id, currentInput, nextBlocker, safeToProvide),
     never_provide: neverProvide.slice(0, 6),
     completion_criteria: credentialRequestCompletionCriteria(id),
     verification_runway: credentialRequestVerificationRunway(id, verifierCommand, fixHref),
@@ -442,6 +442,60 @@ function summarizeNextCredentialRequest(
     seed_phrase_storage: "blocked",
     secret_echo_permission: "blocked",
   };
+}
+
+function credentialRequestSafeToProvide(
+  id: string,
+  currentInput: Web3OperatorCurrentInput | null,
+  nextBlocker: Web3LiveUsabilityNextBlocker | null,
+  fallback: string[],
+) {
+  const normalized = `${id} ${currentInput?.target_names.join(" ") ?? ""} ${nextBlocker?.id ?? ""}`.toLowerCase();
+  if (normalized.includes("wallet-ownership") || normalized.includes("hash-only wallet ownership")) {
+    return [
+      "Text-message signature receipt with hashes only",
+      "hash-only wallet ownership receipt",
+    ];
+  }
+  if (normalized.includes("wallet")) {
+    return [
+      "Dedicated Solana public wallet address",
+      "Browser-safe public wallet scope",
+    ];
+  }
+  if (normalized.includes("jupiter")) {
+    return [
+      "JUPITER_API_KEY in ignored server env",
+      "JUPITER_API_KEY in a one-shot Settings credential test",
+    ];
+  }
+  if (normalized.includes("helius") || normalized.includes("rpc") || normalized.includes("read-provider")) {
+    return [
+      "HELIUS_API_KEY in ignored server env",
+      "SOLANA_RPC_URL in ignored server env",
+      "SOLANA_WS_URL in ignored server env",
+    ];
+  }
+  if (normalized.includes("signer") || normalized.includes("custody")) {
+    return [
+      "Signer provider mode",
+      "Signer provider target names",
+      "Policy identifier or policy hash",
+    ];
+  }
+  if (normalized.includes("accounting") || normalized.includes("settlement")) {
+    return [
+      "Accounting export target name",
+      "Settlement review status",
+    ];
+  }
+  if (normalized.includes("production") || normalized.includes("emergency") || normalized.includes("ops")) {
+    return [
+      "Emergency-stop contact or webhook target name",
+      "Production worker owner/process/restart target names",
+    ];
+  }
+  return fallback.slice(0, 6);
 }
 
 function shouldUseCurrentInputForCredentialRequest(
