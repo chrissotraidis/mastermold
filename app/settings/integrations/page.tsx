@@ -227,6 +227,7 @@ export default async function IntegrationsSettingsPage() {
             operatorRunbook={web3OperatorRunbook}
             usabilityStatus={web3UsabilityStatus}
             liveUsabilityBlockers={web3LiveUsabilityBlockers}
+            liveTradeCanary={web3LiveTradeCanary}
             researchHandoffPacket={web3ResearchHandoffPacket}
             state={web3State}
           />
@@ -283,6 +284,7 @@ function Web3CredentialsRunwayCard({
   operatorRunbook,
   usabilityStatus,
   liveUsabilityBlockers,
+  liveTradeCanary,
   researchHandoffPacket,
   state,
 }: {
@@ -303,6 +305,7 @@ function Web3CredentialsRunwayCard({
   operatorRunbook: Web3OperatorRunbookReceipt;
   usabilityStatus: Web3UsabilityStatusReceipt;
   liveUsabilityBlockers: Web3LiveUsabilityBlockersReceipt;
+  liveTradeCanary: Web3LiveTradeCanaryReceipt;
   researchHandoffPacket: Web3ResearchHandoffPacket;
   state: Awaited<ReturnType<typeof getWeb3TradingStateAsync>>;
 }) {
@@ -320,6 +323,16 @@ function Web3CredentialsRunwayCard({
     credentialQueue.find((item) => item.status === "review") ??
     credentialQueue[0];
   const jupiterAcquisition = acquisition.items.find((item) => item.id === "jupiter");
+  const launchpadRows = buildSettingsWeb3LiveCredentialLaunchpadRows({
+    credentialQueue,
+    handoff: operatorCredentialHandoff,
+    requestPacket: operatorRequestPacket,
+    dedicatedWalletPacket,
+    jupiterOrderPacket,
+    signerPacket,
+    liveUsability: liveUsabilityBlockers,
+    liveTradeCanary,
+  });
 
   return (
     <section id="settings-web3-credentials-runway" aria-labelledby="web3-credential-runway-title">
@@ -343,6 +356,12 @@ function Web3CredentialsRunwayCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-4 p-5 pt-0">
+          <SettingsWeb3LiveCredentialLaunchpad
+            rows={launchpadRows}
+            handoff={operatorCredentialHandoff}
+            liveUsability={liveUsabilityBlockers}
+            liveTradeCanary={liveTradeCanary}
+          />
           <SettingsWeb3CredentialCommandCenter
             handoff={operatorCredentialHandoff}
             requestPacket={operatorRequestPacket}
@@ -635,6 +654,253 @@ function Web3CredentialsRunwayCard({
       </Card>
     </section>
   );
+}
+
+type SettingsWeb3LaunchpadRow = {
+  id: string;
+  label: string;
+  status: "ready" | "active" | "review" | "blocked";
+  detail: string;
+  next_action: string;
+  storage: string;
+  href: string;
+  command: string | null;
+};
+
+function SettingsWeb3LiveCredentialLaunchpad({
+  rows,
+  handoff,
+  liveUsability,
+  liveTradeCanary,
+}: {
+  rows: SettingsWeb3LaunchpadRow[];
+  handoff: Web3OperatorCredentialHandoffReceipt;
+  liveUsability: Web3LiveUsabilityBlockersReceipt;
+  liveTradeCanary: Web3LiveTradeCanaryReceipt;
+}) {
+  const readyRows = rows.filter((row) => row.status === "ready").length;
+  const nextRow = rows.find((row) => row.status === "active" || row.status === "blocked" || row.status === "review") ?? rows[0];
+  const strictVerifier = nextRow?.command ??
+    handoff.next_input?.verifier_command ??
+    liveUsability.current_input?.verifier_command ??
+    "npm run verify:web3 -- --base-url=http://localhost:4010";
+  const nextSurface = nextRow?.storage.split("·")[0]?.trim() || handoff.next_input?.safe_collection_surface.replaceAll("-", " ") || "review";
+
+  return (
+    <div className="rounded-md border border-engine/35 bg-engine/[0.06] p-3" aria-label="Settings Web3 live credential launchpad">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Live trading setup launchpad</p>
+          <p className="mt-1 text-base font-semibold text-on-surface">
+            {nextRow ? `Next: ${nextRow.label}` : "Setup evidence is ready for strict review"}
+          </p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            {nextRow?.next_action ?? liveUsability.next_action}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={readyRows === rows.length ? "pass" : "watch"} label={`${readyRows}/${rows.length} ready`} />
+          <LaunchQueueBadge status={liveTradeCanary.actual_live_trade_tested ? "pass" : "fail"} label={liveTradeCanary.actual_live_trade_tested ? "trade tested" : "trade untested"} />
+          <LaunchQueueBadge status="fail" label="wallet authority blocked" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <SettingsMetric label="Safe inputs" value={`${handoff.ready_count}/${handoff.inputs.length}`} />
+        <SettingsMetric label="Live blockers" value={`${liveUsability.real_capital_blocker_count}`} />
+        <SettingsMetric label="Canary" value={liveTradeCanary.actual_live_trade_tested ? "tested" : "not tested"} />
+        <SettingsMetric label="Next surface" value={nextSurface} />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.55fr)]">
+        <div className="grid gap-2" aria-label="Settings Web3 live credential launchpad proof lanes">
+          {rows.map((row) => (
+            <div key={row.id} className="grid min-w-0 gap-2 rounded-md border border-outline-variant/25 bg-void/20 p-2 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_auto] sm:items-start">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold text-on-surface">{row.label}</p>
+                  <LaunchQueueBadge status={launchpadBadgeStatus(row.status)} label={row.status} />
+                </div>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{row.storage}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] leading-4 text-on-surface-variant">{row.detail}</p>
+                <p className="mt-1 text-[11px] leading-4 text-outline">{row.next_action}</p>
+              </div>
+              <Link
+                href={row.href}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline-variant/25 bg-surface-dim/45 px-2 py-1.5 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+              >
+                Open
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings Web3 live credential launchpad boundary">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Safety boundary</p>
+          <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+            This launchpad accepts only public wallet scope, text-only wallet proof, ignored server-env provider keys, and external review status.
+          </p>
+          <ul className="mt-2 grid gap-1 text-[11px] leading-4 text-outline">
+            <li>Private keys and seed phrases are rejected.</li>
+            <li>Raw transactions and signed payloads are not stored here.</li>
+            <li>Live execution stays blocked until the canary proof records a real confirmed signature.</li>
+          </ul>
+          <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+            {strictVerifier}
+          </code>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildSettingsWeb3LiveCredentialLaunchpadRows({
+  credentialQueue,
+  handoff,
+  requestPacket,
+  dedicatedWalletPacket,
+  jupiterOrderPacket,
+  signerPacket,
+  liveUsability,
+  liveTradeCanary,
+}: {
+  credentialQueue: CredentialQueueItem[];
+  handoff: Web3OperatorCredentialHandoffReceipt;
+  requestPacket: Web3OperatorRequestPacket;
+  dedicatedWalletPacket: Web3DedicatedWalletPacket;
+  jupiterOrderPacket: Web3JupiterOrderPacket;
+  signerPacket: Web3SignerCredentialPacket;
+  liveUsability: Web3LiveUsabilityBlockersReceipt;
+  liveTradeCanary: Web3LiveTradeCanaryReceipt;
+}): SettingsWeb3LaunchpadRow[] {
+  const walletStatus = dedicatedWalletPacket.wallet_ownership_proved
+    ? "ready"
+    : dedicatedWalletPacket.dedicated_wallet_scoped
+      ? "active"
+      : "blocked";
+  const jupiterStatus = jupiterOrderPacket.swap_v2_order_ready
+    ? "ready"
+    : jupiterOrderPacket.jupiter_configured && jupiterOrderPacket.dedicated_wallet_scoped
+      ? "active"
+      : "blocked";
+  const signerStatus = signerPacket.status === "review-ready"
+    ? "ready"
+    : signerPacket.status === "needs-policy" || signerPacket.status === "needs-signer-request"
+      ? "review"
+      : "blocked";
+  const blockerStatus = liveUsability.real_capital_blocker_count === 0
+    ? "ready"
+    : liveUsability.open_operator_input_count > 0
+      ? "active"
+      : "review";
+  const canaryStatus = liveTradeCanary.actual_live_trade_tested
+    ? "ready"
+    : liveTradeCanary.status === "ready-for-external-signed-payload"
+      ? "active"
+      : "blocked";
+  const packetNextInput = handoff.next_input ?? requestPacket.next_input;
+  const nextInput = packetNextInput && !settingsWeb3LaunchpadInputAlreadyCovered(packetNextInput.id, {
+    walletReady: walletStatus === "ready",
+    dedicatedWalletReady: dedicatedWalletPacket.dedicated_wallet_scoped,
+    jupiterReady: jupiterStatus === "ready",
+  })
+    ? packetNextInput
+    : null;
+  const nextCredential = credentialQueue.find((item) => item.status === "missing" || item.status === "blocked" || item.status === "review");
+
+  return [
+    {
+      id: "next-safe-input",
+      label: nextInput?.label ?? nextCredential?.label ?? "Strict verifier review",
+      status: nextInput || nextCredential ? "active" : "ready",
+      detail: nextInput?.secret_handling ?? nextCredential?.detail ?? "All safe credential lanes have current evidence.",
+      next_action: nextInput?.next_action ?? nextCredential?.action ?? "Run strict verification before any live review.",
+      storage: nextInput
+        ? `${nextInput.safe_collection_surface.replaceAll("-", " ")} · ${nextInput.storage.replaceAll("-", " ")}`
+        : nextCredential?.storage ?? "status-only receipt",
+      href: nextInput ? settingsWeb3LaunchpadHrefForInput(nextInput) : "#web3-credential-action-console",
+      command: nextInput?.verifier_command ?? requestPacket.verifier_commands[0] ?? null,
+    },
+    {
+      id: "wallet-proof",
+      label: "Wallet proof",
+      status: walletStatus,
+      detail: dedicatedWalletPacket.summary,
+      next_action: dedicatedWalletPacket.next_action,
+      storage: "public address plus hash-only text signature",
+      href: "#settings-web3-wallet-public-key",
+      command: dedicatedWalletPacket.strict_verifier_command,
+    },
+    {
+      id: "jupiter-order-proof",
+      label: "Jupiter order proof",
+      status: jupiterStatus,
+      detail: jupiterOrderPacket.summary,
+      next_action: jupiterOrderPacket.next_action,
+      storage: "server env or one-shot key; transaction bytes withheld",
+      href: "#web3-credential-action-console",
+      command: jupiterOrderPacket.strict_verifier_command,
+    },
+    {
+      id: "signer-custody-proof",
+      label: "Signer and custody",
+      status: signerStatus,
+      detail: signerPacket.summary,
+      next_action: signerPacket.next_action,
+      storage: signerPacket.credential_storage_permission.replaceAll("-", " "),
+      href: "/api/web3-signer-credential-packet?source=live-dex&account=persistent",
+      command: null,
+    },
+    {
+      id: "live-blocker-proof",
+      label: "Live blocker board",
+      status: blockerStatus,
+      detail: liveUsability.summary,
+      next_action: liveUsability.next_action,
+      storage: "redacted readiness receipts only",
+      href: "/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all",
+      command: "npm run verify:web3 -- --base-url=http://localhost:4010",
+    },
+    {
+      id: "tiny-canary-proof",
+      label: "Tiny canary proof",
+      status: canaryStatus,
+      detail: liveTradeCanary.actual_live_trade_tested
+        ? "A live canary signature has been recorded and can be reviewed."
+        : "No funded live trade has been tested by this app yet.",
+      next_action: liveTradeCanary.next_action,
+      storage: "signed payload bytes are hashed, not echoed or stored",
+      href: "/trading?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+      command: null,
+    },
+  ];
+}
+
+function launchpadBadgeStatus(status: SettingsWeb3LaunchpadRow["status"]) {
+  if (status === "ready") return "pass";
+  if (status === "active" || status === "review") return "watch";
+  return "fail";
+}
+
+function settingsWeb3LaunchpadHrefForInput(input: Web3OperatorRequestPacket["next_input"]) {
+  if (!input) return "#web3-credential-action-console";
+  if (input.id === "dedicated-trading-wallet") return "#settings-web3-wallet-public-key";
+  if (input.id === "wallet-ownership-proof") return "#web3-credential-action-console";
+  if (input.safe_collection_surface === "manual-review") return "/api/web3-manual-live-review-packet?source=live-dex&account=persistent";
+  if (input.safe_collection_surface === "external-system") return "/api/web3-operator-request-packet?source=live-dex&account=persistent";
+  return "#web3-credential-action-console";
+}
+
+function settingsWeb3LaunchpadInputAlreadyCovered(
+  id: string,
+  status: { walletReady: boolean; dedicatedWalletReady: boolean; jupiterReady: boolean },
+) {
+  if (id === "dedicated-trading-wallet") return status.dedicatedWalletReady;
+  if (id === "wallet-ownership-proof") return status.walletReady;
+  if (id === "jupiter-route-order-key") return status.jupiterReady;
+  return false;
 }
 
 function SettingsWeb3SetupPriorityCard({

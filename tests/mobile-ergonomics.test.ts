@@ -1009,6 +1009,20 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain('id="settings-web3-credentials-runway"');
     expect(settingsPage).toContain('id="settings-web3-research-handoff"');
     expect(settingsPage).toContain("SettingsWeb3CredentialConsole");
+    expect(settingsPage).toContain("SettingsWeb3LiveCredentialLaunchpad");
+    expect(settingsPage).toContain("Settings Web3 live credential launchpad");
+    expect(settingsPage).toContain("Live trading setup launchpad");
+    expect(settingsPage).toContain("Settings Web3 live credential launchpad proof lanes");
+    expect(settingsPage).toContain("Settings Web3 live credential launchpad boundary");
+    expect(settingsPage).toContain("No funded live trade has been tested by this app yet.");
+    expect(settingsPage).toContain("public wallet scope, text-only wallet proof, ignored server-env provider keys, and external review status");
+    expect(settingsPage).toContain("Private keys and seed phrases are rejected.");
+    expect(settingsPage).toContain("signed payload bytes are hashed, not echoed or stored");
+    expect(settingsPage).toContain("settingsWeb3LaunchpadHrefForInput");
+    expect(settingsPage).toContain("settingsWeb3LaunchpadInputAlreadyCovered");
+    expect(settingsPage.indexOf("<SettingsWeb3LiveCredentialLaunchpad")).toBeLessThan(
+      settingsPage.indexOf("<SettingsWeb3CredentialCommandCenter"),
+    );
     expect(settingsPage.indexOf("<SettingsWeb3CredentialCommandCenter")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3OperatorIntakeBoard"),
     );

@@ -203,10 +203,12 @@ summary carries the same receipt hash, missing-input counts, total-versus-listed
 live-lane counts, next ordered unlock step, next dependency blocker with its safe fix link and verifier command, next credential request with its verification runway and completion criteria, next action, current
 safe input contract, and blocked live-execution/signing/wallet/secret permissions without
 returning secrets or transaction bytes. Settings mirrors that next dependency blocker in
-the Web3 setup priority card and credential action console, and it also shows the compact
-credential request, verification runway, completion criteria, and safe credential profile
-so the safe wallet/provider/review value, non-secret lane status, follow-up proof path, and
-done condition are visible where the operator fixes credentials.
+the Web3 setup priority card, live trading setup launchpad, and credential action console.
+The launchpad condenses the next safe input, wallet proof, Jupiter order proof, signer/custody,
+live blocker board, and tiny canary proof into one no-secrets view, and Settings also shows
+the compact credential request, verification runway, completion criteria, and safe credential profile
+so the safe wallet/provider/review value, non-secret lane status, follow-up proof path, and done
+condition are visible where the operator fixes credentials.
 `/api/web3-live-autonomy-readiness` exposes that same final transition gate directly for the trading
 cockpit and external monitors. It reports whether the system can run unattended, whether real-capital
 wallet trading is allowed, the live trade cap, route TTL pressure, next wake cadence, blockers, and
