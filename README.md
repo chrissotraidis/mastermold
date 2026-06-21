@@ -325,6 +325,10 @@ That snapshot includes one current-gate action driven by the drill receipt: wall
 text-only proof, preflight runs the no-transaction check, signer relay opens the tiny canary signing
 flow, proof gates run the proof watcher, and external credential gates link to the exact safe setup
 surface.
+It now also includes a compact first-canary execution rail under the gate snapshot. The rail starts
+at the current drill step, labels the next few canary gates as now/next/queued/done, shows whether
+the action lives in Trading, Settings, a read-only receipt, or a verifier, and keeps live execution,
+submission, signing authority, and wallet mutation blocked until the actual proof chain clears.
 The Trading live canary console refreshes the first-canary drill after wallet proof, canary
 preflight, tiny-canary signing, proof checks, and manual receipt refresh, so the next unblock step,
 hard-fail count, proof count, and ordered gates stay current without treating paper trades, DEX

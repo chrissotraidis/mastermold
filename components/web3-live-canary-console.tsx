@@ -46,6 +46,18 @@ type CanaryLaunchStep = {
   detail: string;
 };
 
+type CanaryExecutionRailItem = {
+  id: string;
+  label: string;
+  status: Web3FirstCanaryDrillReceipt["operator_unblock_plan"][number]["status"];
+  phase: "now" | "next" | "queued" | "done";
+  action: string;
+  safeSurface: string;
+  surfaceLabel: string;
+  blocksFundedCanary: boolean;
+  verifierCommand: string | null;
+};
+
 type PrimaryCanaryGateControl = {
   label: string;
   detail: string;
@@ -132,6 +144,7 @@ export function Web3LiveCanaryConsole({
   const unsignedPreflightStep = firstCanaryStepById.get("unsigned-order-preflight");
   const signerRelayStep = firstCanaryStepById.get("signer-relay");
   const primaryCanaryBlockers = actionReceipt?.blockers ?? unsignedReceipt?.blockers ?? preflightReceipt?.blockers ?? canaryReceipt.blockers;
+  const canaryExecutionRail = buildCanaryExecutionRail(firstCanaryDrillReceipt.operator_unblock_plan, activeCanaryStep?.id ?? null);
   const canaryGateSnapshot = [
     {
       id: "wallet-proof",
@@ -590,6 +603,57 @@ export function Web3LiveCanaryConsole({
                 {primaryGateControl.detail}
               </p>
             </div>
+            <div className="mt-3 rounded-md border border-outline/15 bg-surface-dim/35 p-2" aria-label="Trading first canary execution rail">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Current canary step</p>
+                  <p className="mt-1 text-xs font-semibold text-on-surface">
+                    {canaryExecutionRail[0]?.label ?? "Refresh the canary drill"}
+                  </p>
+                </div>
+                <span className={firstCanaryUnblockStepClassName(canaryExecutionRail[0]?.status ?? "blocked")}>
+                  {canaryExecutionRail[0]?.phase ?? "now"}
+                </span>
+              </div>
+              <div className="mt-2 grid gap-2 lg:grid-cols-3" aria-label="Trading canary execution rail steps">
+                {canaryExecutionRail.map((item) => {
+                  const railContent = (
+                    <>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className={canaryExecutionRailPhaseClassName(item.phase)}>{item.phase}</span>
+                        <span className={firstCanaryUnblockStepClassName(item.status)}>{item.status}</span>
+                      </div>
+                      <p className="mt-1 truncate text-xs font-semibold text-on-surface">{item.label}</p>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{item.action}</p>
+                      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                        <p className="truncate rounded-md border border-outline/15 bg-surface/45 px-2 py-1 text-[10px] leading-4 text-outline">
+                          Action surface: <span className="font-semibold text-on-surface">{item.surfaceLabel}</span>
+                        </p>
+                        <p className="truncate rounded-md border border-outline/15 bg-surface/45 px-2 py-1 text-[10px] leading-4 text-outline">
+                          Live capital: <span className="font-semibold text-on-surface">{item.blocksFundedCanary ? "blocked" : "review"}</span>
+                        </p>
+                      </div>
+                    </>
+                  );
+                  return item.safeSurface.startsWith("/") ? (
+                    <Link
+                      key={item.id}
+                      href={item.safeSurface}
+                      className="min-w-0 rounded-md border border-outline/15 bg-surface/55 p-2 transition hover:border-engine/35"
+                    >
+                      {railContent}
+                    </Link>
+                  ) : (
+                    <div key={item.id} className="min-w-0 rounded-md border border-outline/15 bg-surface/55 p-2">
+                      {railContent}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-outline">
+                This execution rail follows the drill receipt only. It does not grant signing, submission, wallet mutation, or autonomous live trading authority.
+              </p>
+            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -984,6 +1048,43 @@ function CanaryMetric({
       <p className={`mt-1 truncate text-sm font-semibold ${toneClassName}`}>{value}</p>
     </div>
   );
+}
+
+function buildCanaryExecutionRail(
+  steps: Web3FirstCanaryDrillReceipt["operator_unblock_plan"],
+  activeStepId: string | null,
+): CanaryExecutionRailItem[] {
+  const activeIndex = activeStepId
+    ? steps.findIndex((step) => step.id === activeStepId)
+    : steps.findIndex((step) => step.status === "next" || step.status === "watch" || step.status === "blocked");
+  const startIndex = Math.max(0, activeIndex);
+  return steps.slice(startIndex, startIndex + 5).map((step, index) => ({
+    id: step.id,
+    label: step.label,
+    status: step.status,
+    phase: step.status === "done" ? "done" : index === 0 ? "now" : index === 1 ? "next" : "queued",
+    action: step.action,
+    safeSurface: step.safe_surface,
+    surfaceLabel: canaryExecutionSurfaceLabel(step.safe_surface, step.command),
+    blocksFundedCanary: step.blocks_funded_canary,
+    verifierCommand: step.command,
+  }));
+}
+
+function canaryExecutionSurfaceLabel(safeSurface: string, command: string | null) {
+  if (safeSurface.includes("#web3-live-canary-console")) return "Trading console";
+  if (safeSurface.startsWith("/settings")) return "Settings";
+  if (safeSurface.startsWith("/api/")) return "Read-only receipt";
+  if (command) return "Local verifier";
+  return "External review";
+}
+
+function canaryExecutionRailPhaseClassName(phase: CanaryExecutionRailItem["phase"]) {
+  const base = "rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (phase === "now") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  if (phase === "next") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (phase === "done") return `${base} border-engine/20 bg-engine/[0.06] text-engine`;
+  return `${base} border-outline/20 bg-surface-dim/45 text-outline`;
 }
 
 function buildPrimaryCanaryGateControl(input: {

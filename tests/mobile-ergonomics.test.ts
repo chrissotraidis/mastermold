@@ -1978,6 +1978,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading canary gate snapshot");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary gate snapshot");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading current canary gate action");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading first canary execution rail");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading canary execution rail steps");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Current canary step");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Action surface:");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("buildCanaryExecutionRail");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("canaryExecutionSurfaceLabel");
     expect(source("components/web3-live-canary-console.tsx")).toContain("buildPrimaryCanaryGateControl");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Run wallet proof");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Open credential gate");
