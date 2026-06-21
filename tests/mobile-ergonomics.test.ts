@@ -929,6 +929,24 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).not.toContain("selected chat provider");
     expect(settingsPage).toContain("Web3 trading credentials");
     expect(settingsPage).toContain("Secure setup state for the autonomous Web3 paper desk");
+    expect(settingsPage).toContain("SettingsWeb3SetupPriorityCard");
+    expect(settingsPage).toContain("Settings Web3 setup priority");
+    expect(settingsPage).toContain("Web3 setup priority");
+    expect(settingsPage).toContain("Go to wallet field");
+    expect(settingsPage).toContain('href="#settings-web3-wallet-public-key"');
+    expect(settingsPage).toContain('href="#settings-web3-credentials-runway"');
+    expect(settingsPage).toContain('href="#settings-web3-research-handoff"');
+    expect(settingsPage).toContain("Settings Web3 priority next verifier");
+    expect(settingsPage).toContain("Settings Web3 priority boundary");
+    expect(settingsPage).toContain("This first-screen card is navigation and status only");
+    expect(settingsPage.indexOf("<SettingsWeb3SetupPriorityCard")).toBeLessThan(
+      settingsPage.indexOf("<ManualHoldingsPanel"),
+    );
+    expect(settingsPage.indexOf("<SettingsWeb3SetupPriorityCard")).toBeLessThan(
+      settingsPage.indexOf("<Web3CredentialsRunwayCard"),
+    );
+    expect(settingsPage).toContain('id="settings-web3-credentials-runway"');
+    expect(settingsPage).toContain('id="settings-web3-research-handoff"');
     expect(settingsPage).toContain("SettingsWeb3CredentialConsole");
     expect(settingsPage.indexOf("<SettingsWeb3CredentialCommandCenter")).toBeLessThan(
       settingsPage.indexOf("<SettingsWeb3OperatorIntakeBoard"),
@@ -1534,6 +1552,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now surfaces the Web3 operator input packet");
     expect(source("components/review-readiness.tsx")).toContain("Settings now opens Web3 credentials with an operator intake board");
     expect(source("components/review-readiness.tsx")).toContain("Settings now starts Web3 credentials with a command center");
+    expect(source("components/review-readiness.tsx")).toContain("first-screen Web3 setup priority card");
     expect(source("components/review-readiness.tsx")).toContain("Settings now includes a Web3 research handoff packet");
     expect(source("components/review-readiness.tsx")).toContain("owner/phase implementation plan and queue");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run research:web3 command");

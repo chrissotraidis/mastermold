@@ -162,9 +162,17 @@ export default async function IntegrationsSettingsPage() {
       <div className="mx-auto max-w-4xl">
         <PageHeader
           title="Settings"
-          subtitle="Add holdings, test account access, set up live chat, and see what is safe before trusting a daily read."
+          subtitle="Add holdings, test account access, set up live chat, and finish safe Web3 trading setup before trusting automation."
           provenance={publicProvenanceLabel}
         />
+
+        <div className="mb-8">
+          <SettingsWeb3SetupPriorityCard
+            liveUsability={web3LiveUsabilityBlockers}
+            requestPacket={web3OperatorRequestPacket}
+            researchPacket={web3ResearchHandoffPacket}
+          />
+        </div>
 
         <div className="mb-8">
           <ManualHoldingsPanel holdings={portfolio.manual_holdings} />
@@ -284,7 +292,7 @@ function Web3CredentialsRunwayCard({
   const jupiterAcquisition = acquisition.items.find((item) => item.id === "jupiter");
 
   return (
-    <section aria-labelledby="web3-credential-runway-title">
+    <section id="settings-web3-credentials-runway" aria-labelledby="web3-credential-runway-title">
       <Card className="border-engine/30 bg-engine/[0.045]">
         <CardHeader className="space-y-4 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -594,6 +602,102 @@ function Web3CredentialsRunwayCard({
           </p>
         </CardContent>
       </Card>
+    </section>
+  );
+}
+
+function SettingsWeb3SetupPriorityCard({
+  liveUsability,
+  requestPacket,
+  researchPacket,
+}: {
+  liveUsability: Web3LiveUsabilityBlockersReceipt;
+  requestPacket: Web3OperatorRequestPacket;
+  researchPacket: Web3ResearchHandoffPacket;
+}) {
+  const nextInput = requestPacket.next_input;
+  const nextUnlock = liveUsability.next_unlock_step ?? requestPacket.next_unlock_step;
+  const verifier = nextInput?.verifier_command ??
+    requestPacket.verifier_commands.find((command) => command.includes("verify:web3")) ??
+    "npm run verify:web3 -- --base-url=http://localhost:4010";
+
+  return (
+    <section
+      aria-label="Settings Web3 setup priority"
+      className="rounded-md border border-engine/35 bg-engine/[0.055] p-4"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Web3 setup priority</p>
+          <h2 className="mt-1 text-lg font-semibold text-on-surface">
+            {nextInput ? `Next: ${nextInput.label}` : nextUnlock ? `Next: ${nextUnlock.label}` : "Web3 setup is ready for review"}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+            {nextInput?.next_action ?? nextUnlock?.next_action ?? liveUsability.next_action}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={liveUsability.open_operator_input_count > 0 ? "fail" : "watch"} label={`${liveUsability.open_operator_input_count} inputs`} />
+          <LaunchQueueBadge status={liveUsability.real_capital_blocker_count > 0 ? "fail" : "watch"} label={`${liveUsability.real_capital_blocker_count} blockers`} />
+          <LaunchQueueBadge status="fail" label="live blocked" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <SettingsMetric label="Live lanes" value={`${liveUsability.ready_live_lane_count}/${liveUsability.total_live_lane_count}`} />
+        <SettingsMetric label="Research questions" value={`${researchPacket.research_questions.length}`} />
+        <SettingsMetric label="Verifier" value={verifier.includes("--require-operator-wallet") ? "wallet gate" : "base gate"} />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.7fr)]">
+        <div className="rounded-md border border-outline-variant/25 bg-surface-dim/35 p-2" aria-label="Settings Web3 priority next verifier">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">After the next input</p>
+          <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[11px] leading-5 text-on-surface-variant">
+            {verifier}
+          </code>
+        </div>
+        <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings Web3 priority boundary">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Never here</p>
+          <p className="mt-2 text-xs leading-5 text-on-surface-variant">
+            Private keys, seed phrases, raw keypairs, signed payloads, and live trading approval stay outside Settings.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href="#settings-web3-wallet-public-key"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15"
+        >
+          <WalletCards aria-hidden="true" className="size-4" />
+          Go to wallet field
+        </Link>
+        <Link
+          href="#settings-web3-credentials-runway"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-outline-variant/35 bg-black/15 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:bg-black/25"
+        >
+          <KeyRound aria-hidden="true" className="size-4" />
+          Open Web3 runway
+        </Link>
+        <Link
+          href="#settings-web3-research-handoff"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet/35 bg-violet/10 px-3 py-2 text-sm font-semibold text-violet transition hover:bg-violet/15"
+        >
+          <PlugZap aria-hidden="true" className="size-4" />
+          Send research packet
+        </Link>
+        <Link
+          href="/trading?source=live-dex"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15"
+        >
+          <ExternalLink aria-hidden="true" className="size-4" />
+          Open Live DEX read
+        </Link>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        This first-screen card is navigation and status only. It cannot save secrets, sign, submit, mutate wallets, custody funds, or unlock autonomous live trading.
+      </p>
     </section>
   );
 }
@@ -1006,7 +1110,7 @@ function SettingsWeb3ResearchHandoffPanel({ packet }: { packet: Web3ResearchHand
   const liveBlockers = packet.live_capital_blockers.slice(0, 4);
   const openInputs = packet.open_operator_inputs.slice(0, 4);
   return (
-    <div className="rounded-md border border-violet/30 bg-violet/[0.045] p-3" aria-label="Settings Web3 research handoff packet">
+    <div id="settings-web3-research-handoff" className="rounded-md border border-violet/30 bg-violet/[0.045] p-3" aria-label="Settings Web3 research handoff packet">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-violet">Research handoff</p>
