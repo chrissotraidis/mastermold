@@ -979,6 +979,8 @@ function SettingsWeb3OperatorSetupRunway({
 function SettingsWeb3LiveUsabilityBlockersPanel({ receipt }: { receipt: Web3LiveUsabilityBlockersReceipt }) {
   const topMissing = receipt.missing_for_live_usability.slice(0, 4);
   const safeActions = receipt.safe_next_actions.slice(0, 3);
+  const ownerSummary = receipt.missing_owner_summary.slice(0, 4);
+  const sourceSummary = receipt.missing_source_summary.slice(0, 4);
   return (
     <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-3" aria-label="Settings Web3 live usability blockers">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1000,6 +1002,31 @@ function SettingsWeb3LiveUsabilityBlockersPanel({ receipt }: { receipt: Web3Live
         <SettingsMetric label="Live lanes" value={`${receipt.ready_live_lane_count}/${receipt.total_live_lane_count}`} />
         <SettingsMetric label="Signoffs" value={`${receipt.passed_signoff_count}/${receipt.required_signoff_count}`} />
         <SettingsMetric label="Safe actions" value={`${receipt.safe_action_count}`} />
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-2" aria-label="Settings Web3 blocker owner and evidence summary">
+        <div className="rounded-md border border-outline-variant/25 bg-surface-dim/30 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Owner split</p>
+          <div className="mt-2 grid gap-1">
+            {ownerSummary.map((item) => (
+              <p key={item.owner} className="flex min-w-0 items-center justify-between gap-2 text-[11px] leading-4 text-on-surface-variant">
+                <span className="truncate capitalize">{item.owner.replaceAll("-", " ")}</span>
+                <span className="shrink-0 font-semibold text-on-surface">{item.missing_count}</span>
+              </p>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-surface-dim/30 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Evidence split</p>
+          <div className="mt-2 grid gap-1">
+            {sourceSummary.map((item) => (
+              <p key={item.source} className="flex min-w-0 items-center justify-between gap-2 text-[11px] leading-4 text-on-surface-variant">
+                <span className="truncate capitalize">{item.source.replaceAll("-", " ")}</span>
+                <span className="shrink-0 font-semibold text-on-surface">{item.missing_count}</span>
+              </p>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.78fr)]">

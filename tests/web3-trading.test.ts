@@ -1390,6 +1390,8 @@ describe("Web3 autonomous trading subsystem", () => {
       next_unlock_step: { id: string; label: string; status: string; storage: string; next_action: string } | null;
       operator_unlock_sequence: Array<{ id: string; label: string; status: string; storage: string; next_action: string; evidence: string }>;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
+      missing_owner_summary: Array<{ owner: string; missing_count: number; real_capital_blocker_count: number; first_label: string; next_action: string; sources: string[] }>;
+      missing_source_summary: Array<{ source: string; missing_count: number; real_capital_blocker_count: number; first_label: string; next_action: string }>;
       live_execution_permission: string;
       wallet_mutation_permission: string;
       transaction_submission_permission: string;
@@ -1424,6 +1426,17 @@ describe("Web3 autonomous trading subsystem", () => {
       id: "cutover:dedicated-trading-wallet",
       label: "Dedicated trading wallet",
     });
+    expect(receipt.missing_owner_summary[0]).toMatchObject({
+      owner: "operator",
+      first_label: "Dedicated trading wallet",
+    });
+    expect(receipt.missing_owner_summary[0].sources).toEqual(expect.arrayContaining(["cutover", "preflight", "runway"]));
+    expect(receipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(receipt.total_live_usability_row_count);
+    expect(receipt.missing_source_summary[0]).toMatchObject({
+      source: "cutover",
+      first_label: "Dedicated trading wallet",
+    });
+    expect(receipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(receipt.total_live_usability_row_count);
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");
     expect(receipt.transaction_submission_permission).toBe("blocked");
@@ -1438,6 +1451,8 @@ describe("Web3 autonomous trading subsystem", () => {
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
+      missing_owner_summary: Array<{ owner: string; missing_count: number; first_label: string; next_action: string }>;
+      missing_source_summary: Array<{ source: string; missing_count: number; first_label: string; next_action: string }>;
       live_execution_permission: string;
       wallet_mutation_permission: string;
       secret_echo_permission: string;
@@ -1449,6 +1464,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.listed_live_usability_row_count).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_for_live_usability.length).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_for_live_usability.length).toBeGreaterThanOrEqual(receipt.missing_for_live_usability.length);
+    expect(allRowsReceipt.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
+    expect(allRowsReceipt.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0)).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.controls.some((control) => control.includes("rows=all"))).toBe(true);
     expect(allRowsReceipt.live_execution_permission).toBe("blocked");
     expect(allRowsReceipt.wallet_mutation_permission).toBe("blocked");

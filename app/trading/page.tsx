@@ -279,6 +279,7 @@ function TradingCommandBoard({
     ? "/settings/integrations#settings-web3-wallet-public-key"
     : "/settings/integrations#settings-web3-credentials-runway";
   const settingsFixLabel = nextUnlockStep?.id === "scope-wallet" ? "Fix wallet gate" : "Fix gates";
+  const leadMissingOwner = liveUsabilityBlockers.missing_owner_summary[0];
 
   return (
     <section
@@ -397,6 +398,11 @@ function TradingCommandBoard({
               <CommandBoardMetric label="Signoffs" value={`${liveUsabilityBlockers.passed_signoff_count}/${liveUsabilityBlockers.required_signoff_count}`} detail={`${liveUsabilityBlockers.failed_or_watch_signoff_count} open`} tone={liveUsabilityBlockers.failed_or_watch_signoff_count > 0 ? "caution" : "engine"} />
               <CommandBoardMetric label="Actions" value={`${liveUsabilityBlockers.safe_action_count}`} detail={`${liveUsabilityBlockers.gated_action_count} gated`} tone="engine" />
             </div>
+            {leadMissingOwner ? (
+              <p className="mt-2 line-clamp-2 text-[11px] leading-4 text-outline">
+                Lead owner: {leadMissingOwner.owner.replaceAll("-", " ")} has {leadMissingOwner.missing_count} row{leadMissingOwner.missing_count === 1 ? "" : "s"} open; next is {leadMissingOwner.first_label}.
+              </p>
+            ) : null}
             {nextUnlockStep ? (
               <div className="mt-2 rounded-md border border-engine/20 bg-engine/[0.035] p-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -801,6 +807,8 @@ function LiveUsabilityBlockersPanel({
   params.set("rows", "all");
   const href = `/api/web3-live-usability-blockers?${params.toString()}`;
   const missing = receipt.missing_for_live_usability.slice(0, 6);
+  const ownerSummary = receipt.missing_owner_summary.slice(0, 4);
+  const sourceSummary = receipt.missing_source_summary.slice(0, 4);
 
   return (
     <section
@@ -854,6 +862,31 @@ function LiveUsabilityBlockersPanel({
         </div>
 
         <div className="grid min-w-0 gap-2">
+          <div className="grid gap-2 sm:grid-cols-2" aria-label="Live usability blocker owner and source summary">
+            <div className="rounded-md border border-outline/15 bg-surface/50 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Owner split</p>
+              <div className="mt-2 grid gap-1">
+                {ownerSummary.map((item) => (
+                  <p key={item.owner} className="flex min-w-0 items-center justify-between gap-2 text-[11px] leading-4 text-on-surface-variant">
+                    <span className="truncate capitalize">{item.owner.replaceAll("-", " ")}</span>
+                    <span className="shrink-0 font-semibold text-on-surface">{item.missing_count}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-md border border-outline/15 bg-surface/50 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Evidence split</p>
+              <div className="mt-2 grid gap-1">
+                {sourceSummary.map((item) => (
+                  <p key={item.source} className="flex min-w-0 items-center justify-between gap-2 text-[11px] leading-4 text-on-surface-variant">
+                    <span className="truncate capitalize">{item.source.replaceAll("-", " ")}</span>
+                    <span className="shrink-0 font-semibold text-on-surface">{item.missing_count}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {missing.length > 0 ? missing.map((item) => (
             <div key={item.id} className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface-dim/45 p-2.5 sm:grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)_auto] sm:items-center">
               <div className="min-w-0">

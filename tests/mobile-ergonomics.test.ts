@@ -726,8 +726,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Open all blockers JSON");
     expect(tradingPage).toContain('params.set("rows", "all")');
     expect(tradingPage).toContain("open the JSON for every dependency-ranked blocker");
+    expect(tradingPage).toContain("Lead owner:");
+    expect(tradingPage).toContain("Live usability blocker owner and source summary");
+    expect(tradingPage).toContain("Owner split");
+    expect(tradingPage).toContain("Evidence split");
     expect(tradingPage).toContain("next_unlock_step");
     expect(tradingPage).toContain("missing_for_live_usability");
+    expect(tradingPage).toContain("missing_owner_summary");
+    expect(tradingPage).toContain("missing_source_summary");
     expect(tradingPage).toContain("safe_next_actions");
     expect(tradingPage).toContain("This receipt answers readiness only.");
     expect(tradingPage).toContain("Web3 market source switch");
@@ -796,6 +802,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("total_live_usability_row_count");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("listed_live_usability_row_count");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("live_usability_row_scope");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("missing_owner_summary");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("missing_source_summary");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("summarizeMissingByOwner");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("summarizeMissingBySource");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("rows=all");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("total live-usability row");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("dependency-ranked row");
@@ -1014,6 +1024,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Settings live usability next unlock step");
     expect(settingsPage).toContain("Settings live usability next action");
     expect(settingsPage).toContain("Settings live usability safe actions");
+    expect(settingsPage).toContain("Settings Web3 blocker owner and evidence summary");
+    expect(settingsPage).toContain("Owner split");
+    expect(settingsPage).toContain("Evidence split");
     expect(settingsPage).toContain("Open all blockers JSON");
     expect(settingsPage).toContain("/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all");
     expect(settingsPage).toContain("This is a readiness receipt only.");

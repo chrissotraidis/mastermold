@@ -19,6 +19,23 @@ export type Web3LiveUsabilityMissingItem = {
   blocks_live_capital: boolean;
 };
 
+export type Web3LiveUsabilityOwnerSummary = {
+  owner: Web3LiveUsabilityBlockerOwner;
+  missing_count: number;
+  real_capital_blocker_count: number;
+  first_label: string;
+  next_action: string;
+  sources: Web3LiveUsabilityMissingItem["source"][];
+};
+
+export type Web3LiveUsabilitySourceSummary = {
+  source: Web3LiveUsabilityMissingItem["source"];
+  missing_count: number;
+  real_capital_blocker_count: number;
+  first_label: string;
+  next_action: string;
+};
+
 export type Web3LiveUsabilityBlockersReceipt = {
   mode: "web3-live-usability-blockers";
   status:
@@ -64,6 +81,8 @@ export type Web3LiveUsabilityBlockersReceipt = {
   summary: string;
   operator_unlock_sequence: Web3UsabilityStatusReceipt["operator_unlock_sequence"];
   missing_for_live_usability: Web3LiveUsabilityMissingItem[];
+  missing_owner_summary: Web3LiveUsabilityOwnerSummary[];
+  missing_source_summary: Web3LiveUsabilitySourceSummary[];
   safe_next_actions: Array<{
     id: Web3OperatorRunbookReceipt["run_now"][number]["id"];
     label: string;
@@ -156,6 +175,8 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     .slice(0, 6);
   const rowScope = input.rowScope ?? "compact";
   const listedMissing = rowScope === "all" ? missing : missing.slice(0, 14);
+  const ownerSummary = summarizeMissingByOwner(missing);
+  const sourceSummary = summarizeMissingBySource(missing);
   const verifierCommands = Array.from(new Set([
     ...input.runbook.verifier_commands,
     ...input.manualLiveReview.safe_commands,
@@ -203,6 +224,8 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     summary: liveUsabilitySummary(status, input, missing, autonomousLive?.detail),
     operator_unlock_sequence: input.usability.operator_unlock_sequence,
     missing_for_live_usability: listedMissing,
+    missing_owner_summary: ownerSummary,
+    missing_source_summary: sourceSummary,
     safe_next_actions: safeNextActions,
     verifier_commands: verifierCommands,
     evidence_endpoints: [
@@ -225,7 +248,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     controls: [
       "This receipt answers what is left before real-money Web3 usability; it is not an execution endpoint.",
       "Safe actions are limited to cockpit review, paper autonomy, read-only market refresh, credential setup, verifier commands, and external review packets.",
-      "It summarizes target names, labels, next actions, and blocker counts only; provider secrets, wallet secrets, transaction bodies, signatures, and webhook values are never returned.",
+      "It summarizes target names, owner/source groups, labels, next actions, and blocker counts only; provider secrets, wallet secrets, transaction bodies, signatures, and webhook values are never returned.",
       "Pass rows=all to inspect every dependency-ranked missing row; the default receipt stays compact for dashboards.",
       "Autonomous live trading remains locked in-app even when supervised live review becomes externally requestable.",
     ],
@@ -353,6 +376,53 @@ function buildMissingItems(input: {
       return true;
     })
     .sort((a, b) => missingItemRank(a) - missingItemRank(b));
+}
+
+function summarizeMissingByOwner(items: Web3LiveUsabilityMissingItem[]): Web3LiveUsabilityOwnerSummary[] {
+  const groups = new Map<Web3LiveUsabilityBlockerOwner, Web3LiveUsabilityMissingItem[]>();
+  items.forEach((item) => {
+    const group = groups.get(item.owner) ?? [];
+    group.push(item);
+    groups.set(item.owner, group);
+  });
+
+  return Array.from(groups.entries())
+    .map(([owner, group]) => ({
+      owner,
+      missing_count: group.length,
+      real_capital_blocker_count: group.filter((item) => item.blocks_live_capital).length,
+      first_label: group[0]?.label ?? "No blocker",
+      next_action: group[0]?.next_action ?? "No action is open for this owner.",
+      sources: Array.from(new Set(group.map((item) => item.source))).sort((a, b) => sourceRank(a) - sourceRank(b)),
+    }))
+    .sort((a, b) => ownerRank(a.owner) - ownerRank(b.owner));
+}
+
+function summarizeMissingBySource(items: Web3LiveUsabilityMissingItem[]): Web3LiveUsabilitySourceSummary[] {
+  const groups = new Map<Web3LiveUsabilityMissingItem["source"], Web3LiveUsabilityMissingItem[]>();
+  items.forEach((item) => {
+    const group = groups.get(item.source) ?? [];
+    group.push(item);
+    groups.set(item.source, group);
+  });
+
+  return Array.from(groups.entries())
+    .map(([source, group]) => ({
+      source,
+      missing_count: group.length,
+      real_capital_blocker_count: group.filter((item) => item.blocks_live_capital).length,
+      first_label: group[0]?.label ?? "No blocker",
+      next_action: group[0]?.next_action ?? "No action is open for this source.",
+    }))
+    .sort((a, b) => sourceRank(a.source) - sourceRank(b.source));
+}
+
+function ownerRank(owner: Web3LiveUsabilityBlockerOwner) {
+  return ["operator", "security", "ops", "accounting", "strategy", "manual-review"].indexOf(owner);
+}
+
+function sourceRank(source: Web3LiveUsabilityMissingItem["source"]) {
+  return ["cutover", "preflight", "runway", "manual-review"].indexOf(source);
 }
 
 function ownerForGate(id: Web3LiveCapitalPreflightReceipt["gates"][number]["id"]): Web3LiveUsabilityBlockerOwner {

@@ -176,6 +176,8 @@ board, operator runbook, live-capital preflight, supervised runway, and manual l
 packet into missing operator inputs, signoff counts, safe next actions, verifier commands,
 the next ordered unlock step, and live-lane readiness while keeping autonomous live trading, signing, submission,
 wallet mutation, private-key storage, seed-phrase storage, and secret echo blocked.
+It also groups missing rows by owner and evidence source so operators can see whether
+the next work belongs to wallet setup, security, ops, accounting, strategy, or review.
 Use `rows=all` on that same endpoint to return every dependency-ranked missing row for
 external review; the default response stays compact for dashboard panels.
 `/api/health` also exposes a compact `web3_live_usability` summary for monitors with

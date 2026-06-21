@@ -473,6 +473,18 @@ async function verifyLiveUsabilityBlockersReceipt() {
     json,
   );
   assert(Array.isArray(json.missing_for_live_usability), "Live usability blockers should include missing-for-usability rows.", json);
+  assert(Array.isArray(json.missing_owner_summary) && json.missing_owner_summary.length > 0, "Live usability blockers should include owner summary rows.", json.missing_owner_summary);
+  assert(Array.isArray(json.missing_source_summary) && json.missing_source_summary.length > 0, "Live usability blockers should include source summary rows.", json.missing_source_summary);
+  assert(
+    json.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0) === json.total_live_usability_row_count,
+    "Live usability blocker owner summary should reconcile to total rows.",
+    json.missing_owner_summary,
+  );
+  assert(
+    json.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0) === json.total_live_usability_row_count,
+    "Live usability blocker source summary should reconcile to total rows.",
+    json.missing_source_summary,
+  );
   assert(
     typeof json.summary === "string" && json.summary.includes("cutover setup blocker") && json.summary.includes("total live-usability row") && json.summary.includes("dependency-ranked row"),
     "Live usability blockers summary should distinguish cutover blockers from dependency-ranked usability rows.",
@@ -498,6 +510,16 @@ async function verifyLiveUsabilityBlockersReceipt() {
   assert(allRows.json.live_usability_row_scope === "all", "Live usability blockers all-row receipt should expose all row scope.", allRows.json);
   assert(allRows.json.listed_live_usability_row_count === allRows.json.total_live_usability_row_count, "Live usability blockers rows=all should list every safe missing row.", allRows.json);
   assert(allRows.json.missing_for_live_usability.length === allRows.json.total_live_usability_row_count, "Live usability blockers rows=all rows should match total count.", allRows.json.missing_for_live_usability);
+  assert(
+    allRows.json.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0) === allRows.json.total_live_usability_row_count,
+    "Live usability blockers rows=all owner summary should reconcile to total rows.",
+    allRows.json.missing_owner_summary,
+  );
+  assert(
+    allRows.json.missing_source_summary.reduce((sum, item) => sum + item.missing_count, 0) === allRows.json.total_live_usability_row_count,
+    "Live usability blockers rows=all source summary should reconcile to total rows.",
+    allRows.json.missing_source_summary,
+  );
   assert(
     typeof allRows.json.summary === "string" && allRows.json.summary.includes("all dependency-ranked rows are listed"),
     "Live usability blockers rows=all summary should say all rows are listed.",
