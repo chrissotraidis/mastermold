@@ -1761,6 +1761,42 @@ async function verifyFirstCanaryDrill() {
   record("first-canary-drill", "pass", `${json.status}; unsigned order ready: ${json.can_request_unsigned_order_now}; signed relay: ${json.signed_relay_status}; actual live trade tested: ${json.actual_live_trade_tested}`);
 }
 
+async function verifyFirstCanaryHandoff() {
+  const { response, json } = await requestJson("/api/web3-first-canary-handoff?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "First canary handoff should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-first-canary-handoff", "First canary handoff should expose the expected mode.", json);
+  assert(["operator-input-needed", "ready-to-request-unsigned-order", "ready-to-relay-signed-payload", "canary-proven", "blocked"].includes(json.status), "First canary handoff should expose a known status.", json);
+  assertReceiptHash("First canary handoff", json.receipt_hash);
+  assertReceiptHash("First canary handoff drill source", json.first_canary_drill_hash);
+  assertReceiptHash("First canary handoff credential requirements source", json.credential_requirements_hash);
+  assert(json.actual_live_trade_tested === false, "Default first canary handoff should not claim a funded canary.", json);
+  assert(json.real_funds_moved_by_this_app === false, "Default first canary handoff should not claim real funds moved.", json);
+  assert(json.proof_pass_count === 0, "Default first canary handoff should expose zero post-signing proof stages passed.", json);
+  assert(json.proof_required_count === 4, "First canary handoff should require four proof stages.", json);
+  assert(json.next_operator_step === null || typeof json.next_operator_step.action === "string", "First canary handoff should expose the next operator step.", json.next_operator_step);
+  assert(Array.isArray(json.done_steps), "First canary handoff should expose completed first-canary steps.", json.done_steps);
+  assert(Array.isArray(json.open_steps) && json.open_steps.length > 0, "First canary handoff should expose open first-canary steps.", json.open_steps);
+  assert(Array.isArray(json.safe_to_provide_now) && json.safe_to_provide_now.length > 0, "First canary handoff should expose safe-to-provide values.", json.safe_to_provide_now);
+  assert(Array.isArray(json.never_provide) && json.never_provide.length > 0, "First canary handoff should expose never-provide values.", json.never_provide);
+  assert(Array.isArray(json.proof_completion_criteria) && json.proof_completion_criteria.length === 4, "First canary handoff should expose proof completion criteria.", json.proof_completion_criteria);
+  assert(Array.isArray(json.source_endpoints) && json.source_endpoints.some((endpoint) => endpoint.includes("/api/web3-first-canary-drill")) && json.source_endpoints.some((endpoint) => endpoint.includes("/api/web3-credential-requirements")), "First canary handoff should link its source packets.", json.source_endpoints);
+  assert(Array.isArray(json.safe_commands) && json.safe_commands.some((command) => command.includes("drill-canary:web3")) && json.safe_commands.some((command) => command.includes("prove-canary:web3")), "First canary handoff should expose canary commands.", json.safe_commands);
+  assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind First Funded Canary Handoff"), "First canary handoff should include paste-ready markdown.", json.text_packet);
+  assert(json.text_packet.includes("Actual live trade tested: false"), "First canary handoff markdown should state that live proof is not complete.", json.text_packet);
+  assert(json.text_packet.includes("## Next Operator Step"), "First canary handoff markdown should include the next operator step.", json.text_packet);
+  assert(json.text_packet.includes("## Never Provide"), "First canary handoff markdown should include never-provide boundaries.", json.text_packet);
+  assert(json.live_execution_permission === "blocked", "First canary handoff must keep live execution blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "First canary handoff must keep transaction submission blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "First canary handoff must keep wallet mutation blocked.", json);
+  assert(json.signing_permission === "blocked", "First canary handoff must keep signing blocked.", json);
+  assert(json.private_key_storage === "blocked", "First canary handoff must block private-key storage.", json);
+  assert(json.seed_phrase_storage === "blocked", "First canary handoff must block seed-phrase storage.", json);
+  assert(json.signed_payload_storage === "blocked", "First canary handoff must block signed-payload storage.", json);
+  assert(json.secret_echo_permission === "blocked", "First canary handoff must block secret echo.", json);
+  assertNoLeak("first canary handoff", json);
+  record("first-canary-handoff", "pass", `${json.status}; next ${json.next_operator_step?.id ?? "none"}; actual live trade tested: ${json.actual_live_trade_tested}`);
+}
+
 async function verifyResearchAnswerIntake() {
   const answer = [
     "Custody: compare Turnkey, Privy, manual external wallet, policy wallet, session key, caps, private key never-store, and seed phrase never-store.",
@@ -2035,6 +2071,7 @@ async function main() {
   await verifyLiveIgnition();
   await verifySupervisedCanaryReadiness();
   await verifyFirstCanaryDrill();
+  await verifyFirstCanaryHandoff();
   await verifyResearchAnswerIntake();
   await verifyDexDiscoveryReceipt();
   await verifyStrictDexLiveReadiness();

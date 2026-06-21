@@ -215,6 +215,14 @@ and `/trading` shows the current input contract in both the first-screen command
 and expanded readiness receipt.
 Use `rows=all` on that same endpoint to return every dependency-ranked missing row for
 external review; the default response stays compact for dashboard panels.
+`/api/web3-first-canary-handoff?source=live-dex&account=persistent&scenario=breakout&cycles=0`
+is the compact first funded canary handoff for another operator or helper. It combines the
+first-canary drill and credential requirements into a redacted packet with completed gates,
+open canary steps, the next operator action, safe-to-provide values, never-provide values,
+proof criteria, source endpoints, and strict commands while live execution, signing,
+submission, wallet mutation, private-key storage, seed-phrase storage, signed-payload storage,
+and secret echo remain blocked. `npm run --silent handoff-canary:web3 -- --base-url=http://localhost:4010`
+prints the same packet as paste-ready Markdown, or `--json` returns the receipt.
 `/api/web3-credential-doctor` is the localhost-only in-app refresh endpoint for the
 sanitized Web3 credential doctor receipt used by Settings and live-usability summaries.
 It requires `operator_ack: true`, supports preview mode for `npm run verify:web3`, accepts
