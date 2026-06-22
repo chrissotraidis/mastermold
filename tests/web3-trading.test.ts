@@ -3722,9 +3722,21 @@ describe("Web3 autonomous trading subsystem", () => {
       private_key_storage: string;
       seed_phrase_storage: string;
       secret_echo_permission: string;
-      current_input: { id: string; safe_surface: string; verifier_command: string | null } | null;
+      current_input: {
+        id: string;
+        label: string;
+        safe_surface: string;
+        verifier_command: string | null;
+        next_action: string;
+      } | null;
       local_credentials: { configured_count: number; missing_count: number; runtime_effective: boolean; next_action: string };
-      counts: { real_capital_blockers: number; open_operator_inputs: number; funded_proof_rows_ready: number };
+      counts: {
+        real_capital_blockers: number;
+        open_operator_inputs: number;
+        credential_requirements_open: number;
+        live_usability_rows: number;
+        funded_proof_rows_ready: number;
+      };
       lanes: Array<{ id: string; status: string; counts_as_funded_trade_proof: boolean }>;
       evidence_endpoints: string[];
       summary: string;
@@ -3748,9 +3760,13 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(usabilitySummary.seed_phrase_storage).toBe("blocked");
     expect(usabilitySummary.secret_echo_permission).toBe("blocked");
     expect(usabilitySummary.current_input?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
+    expect(usabilitySummary.current_input?.label).toBe("Dedicated trading wallet");
+    expect(usabilitySummary.current_input?.next_action).toContain("Save a dedicated public Solana trading wallet address");
     expect(usabilitySummary.local_credentials.runtime_effective).toBe(true);
     expect(usabilitySummary.counts.real_capital_blockers).toBeGreaterThan(0);
     expect(usabilitySummary.counts.open_operator_inputs).toBeGreaterThan(0);
+    expect(usabilitySummary.counts.credential_requirements_open).toBe(1);
+    expect(usabilitySummary.counts.live_usability_rows).toBeGreaterThan(1);
     expect(usabilitySummary.counts.funded_proof_rows_ready).toBe(0);
     expect(usabilitySummary.lanes.find((lane) => lane.id === "paper-autonomy")).toMatchObject({
       status: "usable",
@@ -3765,8 +3781,11 @@ describe("Web3 autonomous trading subsystem", () => {
       counts_as_funded_trade_proof: false,
     });
     expect(usabilitySummary.evidence_endpoints).toContain("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
+    expect(usabilitySummary.evidence_endpoints).toContain("GET /api/web3-live-capital-preflight");
     expect(usabilitySummary.evidence_endpoints).toContain("/api/web3-live-test-ledger?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(usabilitySummary.summary).toContain("Not usable for funded autonomous trading yet");
+    expect(usabilitySummary.summary).not.toContain("Compact summary");
+    expect(usabilitySummary.next_action).toContain("Save a dedicated public Solana trading wallet address");
     expect(usabilitySummary.controls.join(" ")).toContain("cannot sign");
 
     const walletContractResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_GET(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0"));

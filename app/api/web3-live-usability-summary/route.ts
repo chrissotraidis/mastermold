@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
 const LIVE_USABILITY_SOURCE_TIMEOUT_MS = 8_000;
 
 export async function GET(request: Request): Promise<NextResponse<Web3LiveUsabilitySummaryReceipt | { error: string }>> {
-  const includeFullSource = new URL(request.url).searchParams.get("full") === "1";
+  const searchParams = new URL(request.url).searchParams;
+  const compactOnly = searchParams.get("compact") === "1" || searchParams.get("full") === "0";
   const [ledgerResponse, localCredentialsResponse] = await Promise.all([
     LIVE_TEST_LEDGER_GET(new Request(request.url, { headers: request.headers })),
     LOCAL_CREDENTIALS_GET(new Request(localCredentialsUrl(request.url), { headers: request.headers })),
@@ -38,14 +39,14 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveUsabil
     });
   }
 
-  if (!includeFullSource) {
+  if (compactOnly) {
     return NextResponse.json(buildWeb3LiveUsabilitySummaryFallbackReceipt({
       source: ledger.source,
       account: ledger.account,
       scenario: ledger.scenario,
       liveTestLedger: ledger,
       localCredentials,
-      reason: "Compact summary uses the fail-closed live-test ledger and local credential health; open /api/web3-live-usability-blockers?rows=all for the full blocker packet.",
+      reason: "Compact summary was explicitly requested; open the default summary or /api/web3-live-usability-blockers?rows=all for the full blocker packet.",
     }));
   }
 

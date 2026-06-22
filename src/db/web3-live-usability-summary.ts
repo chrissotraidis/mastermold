@@ -173,7 +173,7 @@ export function buildWeb3LiveUsabilitySummaryFallbackReceipt(input: {
       safe_surface: input.liveTestLedger.next_required_input.safe_surface,
       storage: input.liveTestLedger.next_required_input.safe_value_type,
       verifier_command: input.liveTestLedger.next_required_input.verifier_command,
-      next_action: input.liveTestLedger.next_required_input.completion_signal,
+      next_action: input.liveTestLedger.next_action,
     }
     : null;
   const lanes = [
@@ -250,7 +250,7 @@ export function buildWeb3LiveUsabilitySummaryFallbackReceipt(input: {
       "Raw transaction bytes or signed payloads in chat.",
       "Provider secrets outside the approved local credential installer.",
     ],
-    summary: `Not usable for funded autonomous trading yet: ${input.reason}`,
+    summary: `Not usable for funded autonomous trading yet: ${input.reason} Next safe input: ${currentInput?.label ?? "review the live-test ledger"}.`,
     next_action: currentInput?.next_action ?? input.liveTestLedger.next_action,
     controls: [
       "This fallback summary failed closed because the full live-usability blocker packet could not be built quickly enough.",
@@ -272,7 +272,7 @@ function currentInputFrom(liveUsability: Web3LiveUsabilityBlockersReceipt): Web3
     return {
       id: request.id,
       label: request.label,
-      safe_surface: request.safe_collection_surface,
+      safe_surface: actionableSurface(request.fix_href, request.safe_collection_surface),
       storage: request.storage,
       verifier_command: request.verifier_command,
       next_action: request.next_action,
@@ -283,11 +283,18 @@ function currentInputFrom(liveUsability: Web3LiveUsabilityBlockersReceipt): Web3
   return {
     id: input.id,
     label: input.label,
-    safe_surface: input.safe_collection_surface,
+    safe_surface: actionableSurface(null, input.safe_collection_surface),
     storage: input.storage,
     verifier_command: input.verifier_command,
     next_action: input.next_action,
   };
+}
+
+function actionableSurface(fixHref: string | null | undefined, safeCollectionSurface: string) {
+  if (fixHref && fixHref !== "#") return fixHref;
+  if (safeCollectionSurface === "trading-console") return "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console";
+  if (safeCollectionSurface === "settings-console") return "/settings/integrations#settings-web3-credentials-runway";
+  return safeCollectionSurface;
 }
 
 function summaryStatus(input: {

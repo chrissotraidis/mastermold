@@ -215,9 +215,12 @@ async function verifyLiveUsabilitySummary() {
   assert(json.can_run_unattended_now === false, "Live-usability summary should keep unattended trading disabled.", json);
   assert(json.live_execution_permission === "blocked", "Live-usability summary should keep live execution blocked.", json);
   assert(json.wallet_mutation_permission === "blocked", "Live-usability summary should keep wallet mutation blocked.", json);
+  assert(json.current_input?.safe_surface?.includes("/trading?source=live-dex"), "Live-usability summary should point the first safe input at Trading.", json.current_input);
+  assert(json.counts?.live_usability_rows > 1, "Default live-usability summary should include the blocker-backed row count, not only the compact fallback.", json.counts);
   assert(json.lanes?.find((lane) => lane.id === "funded-wallet-trade")?.status === "blocked", "Live-usability summary should block the funded wallet lane.", json.lanes);
   assert(json.lanes?.find((lane) => lane.id === "autonomous-real-capital")?.status === "blocked", "Live-usability summary should block autonomous real capital.", json.lanes);
   assert(json.summary.includes("Not usable for funded autonomous trading yet"), "Live-usability summary should answer the usability question directly.", json);
+  assert(!json.summary.includes("Compact summary"), "Default live-usability summary should not use the compact fallback when the blocker packet is available.", json.summary);
   record("live-usability-summary", "pass", json.next_action || "funded autonomy remains unusable");
 }
 
