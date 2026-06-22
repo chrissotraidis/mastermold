@@ -21,7 +21,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const LIVE_CANARY_STATUS_TIMEOUT_MS = 6_000;
+const LIVE_CANARY_STATUS_TIMEOUT_MS = 25_000;
 
 export async function GET(request: Request): Promise<NextResponse<Web3LiveTradeCanaryReceipt | { error: string }>> {
   const parsed = parseCanaryQuery(request.url);
