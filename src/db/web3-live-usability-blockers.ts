@@ -10,6 +10,7 @@ import type { Web3TradingState } from "./web3-trading";
 import type { Web3UsabilityStatusReceipt } from "./web3-usability-status";
 
 const CANONICAL_LIVE_CANARY_SURFACE = "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console";
+const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";
 
 export type Web3LiveUsabilityBlockerOwner = "operator" | "security" | "ops" | "accounting" | "strategy" | "manual-review";
 
@@ -885,8 +886,12 @@ function scopeCurrentInput(
   walletPublicKey: string | null | undefined,
 ): Web3OperatorCurrentInput | null {
   if (!currentInput) return null;
+  const safeCollectionSurface = currentInput.id === "dedicated-trading-wallet"
+    ? "trading-console"
+    : currentInput.safe_collection_surface;
   return {
     ...currentInput,
+    safe_collection_surface: safeCollectionSurface,
     verifier_command: walletScopedCommand(currentInput.verifier_command, walletPublicKey),
   };
 }
@@ -1217,6 +1222,7 @@ function liveUsabilitySummary(
 function safeWalletCommandValue(walletPublicKey: string | null | undefined) {
   if (typeof walletPublicKey !== "string") return null;
   const trimmed = walletPublicKey.trim();
+  if (trimmed === SAMPLE_SYSTEM_WALLET) return null;
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed)) return null;
   return trimmed;
 }

@@ -4270,6 +4270,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.current_input?.target_names.length).toBeGreaterThan(0);
     expect(receipt.current_input?.target_names.join(" ")).not.toContain("test-");
     expect(receipt.current_input?.safe_collection_surface.length).toBeGreaterThan(0);
+    if (receipt.current_input?.id === "dedicated-trading-wallet") {
+      expect(receipt.current_input.safe_collection_surface).toBe("trading-console");
+    }
     expect(receipt.current_input?.storage.length).toBeGreaterThan(0);
     expect(receipt.current_input?.next_action.length).toBeGreaterThan(0);
     expect(receipt.operator_unlock_sequence.map((step) => step.id)).toEqual([
@@ -4301,6 +4304,9 @@ describe("Web3 autonomous trading subsystem", () => {
     const signerRunway = receipt.missing_for_live_usability.find((item) => item.id === "runway:signer");
     expect(signerRunway?.next_action).toMatch(/Save a dedicated public trading wallet|Run Prove ownership|reviewed policy signer/);
     expect(signerRunway?.next_action).not.toContain("Hash-only wallet ownership proof");
+    const operatorWalletPreflight = receipt.missing_for_live_usability.find((item) => item.id === "preflight:operator-wallet");
+    expect(operatorWalletPreflight?.next_action).toContain("Trading live canary console");
+    expect(operatorWalletPreflight?.next_action).not.toContain("in Settings");
     expect(receipt.next_blocker).toMatchObject({
       owner: "operator",
       blocks_live_capital: true,
@@ -4378,18 +4384,20 @@ describe("Web3 autonomous trading subsystem", () => {
       expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     }
     expect(receipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
+    const sampleWallet = "11111111111111111111111111111111";
+    const walletCommandText = [
+      receipt.operator_wallet_strict_command,
+      receipt.current_input?.verifier_command,
+      receipt.next_blocker?.safe_command,
+      receipt.next_credential_request?.verifier_command,
+      ...(receipt.next_credential_request?.verification_runway.map((step) => step.command) ?? []),
+      ...receipt.verifier_commands,
+    ].filter(Boolean).join(" ");
+    expect(walletCommandText).not.toContain(`--wallet=${sampleWallet}`);
     if (receipt.operator_wallet_public_key) {
-      const commandText = [
-        receipt.operator_wallet_strict_command,
-        receipt.current_input?.verifier_command,
-        receipt.next_blocker?.safe_command,
-        receipt.next_credential_request?.verifier_command,
-        ...(receipt.next_credential_request?.verification_runway.map((step) => step.command) ?? []),
-        ...receipt.verifier_commands,
-      ].filter(Boolean).join(" ");
       expect(receipt.operator_wallet_strict_command).toBe(`npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${receipt.operator_wallet_public_key} --require-operator-wallet`);
-      expect(commandText).toContain(`--wallet=${receipt.operator_wallet_public_key}`);
-      expect(commandText).not.toContain("<public-solana-address>");
+      expect(walletCommandText).toContain(`--wallet=${receipt.operator_wallet_public_key}`);
+      expect(walletCommandText).not.toContain("<public-solana-address>");
     }
     expect(receipt.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.next_credential_request?.never_provide.join(" ")).toContain("private key");

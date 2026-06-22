@@ -147,7 +147,7 @@ function buildLiveCapitalPreflightGates(
         : "No valid public Solana wallet is scoped.",
       next_action: walletScoped && !sampleWallet
         ? "Keep using a dedicated public trading wallet; never enter private keys."
-        : "Save a dedicated public Solana trading wallet in Settings before live review.",
+        : "Save a dedicated public Solana trading wallet in the Trading live canary console before live review.",
       blocks_live_capital: true,
     },
     {

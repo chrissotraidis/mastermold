@@ -461,6 +461,7 @@ function previewValue(value) {
 function safeWalletCommandValue(walletPublicKey) {
   if (typeof walletPublicKey !== "string") return null;
   const trimmed = walletPublicKey.trim();
+  if (trimmed === "11111111111111111111111111111111") return null;
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed)) return null;
   return trimmed;
 }
