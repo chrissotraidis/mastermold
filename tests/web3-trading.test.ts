@@ -2771,6 +2771,12 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "fail",
       detail: "No funded live trade has been tested by this app yet.",
     });
+    const ignitionWalletScope = receipt.checks.find((check) => check.id === "wallet-scope");
+    if (ignitionWalletScope?.status === "fail") {
+      expect(ignitionWalletScope.next_action).toContain("Save a dedicated public Solana trading wallet address");
+      expect(ignitionWalletScope.evidence_endpoint).toContain("#web3-live-canary-console");
+      expect(receipt.next_action).not.toContain("Run Prove ownership");
+    }
     expect(receipt.checks.find((check) => check.id === "wallet-ownership")).toMatchObject({
       status: expect.stringMatching(/^(pass|watch|fail)$/),
     });

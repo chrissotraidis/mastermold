@@ -422,7 +422,9 @@ function buildLiveIgnitionChecks(
   const jupiterCheck = state.execution_readiness.checks.find((check) => check.id === "jupiter");
   const liveFlagsReady = state.live_execution_arming.checks.every((check) => check.status === "pass");
   const sourceReady = state.market_source.mode === "live-dex" && state.paper_account.mode === "persistent";
-  const walletReady = walletCheck?.status === "pass";
+  const canaryWalletInput = canary.required_inputs.find((item) => item.id === "dedicated-public-wallet");
+  const walletReady = canaryWalletInput?.status === "done";
+  const walletScopeNextAction = "Save a dedicated public Solana trading wallet address in the Trading live canary console; do not paste private keys or seed phrases.";
   const walletOwnershipReady = isWalletOwnershipReady(liveUsability);
   const routeReady = jupiterCheck?.status === "pass" && state.autonomous_order_handoff.status !== "blocked";
   const signerReady = state.signed_transaction_relay.can_accept_signed_payload || state.autonomous_signer_ops.can_request_signature;
@@ -446,10 +448,12 @@ function buildLiveIgnitionChecks(
       label: "Wallet scope",
       status: walletReady ? "pass" : "fail",
       detail: walletReady
-        ? walletCheck?.detail ?? "A non-sample public wallet is present in execution readiness."
-        : walletCheck?.detail ?? "A dedicated non-sample public wallet is still missing.",
-      next_action: walletReady ? "Prove wallet ownership before the canary if not already recorded." : "Add only the public Solana wallet address in Settings.",
-      evidence_endpoint: "/settings/integrations#settings-web3-wallet-public-key",
+        ? walletCheck?.detail ?? "A non-sample public wallet is present in canary readiness."
+        : "The canary receipt still needs a dedicated non-sample public Solana wallet.",
+      next_action: walletReady
+        ? "Prove wallet ownership before the canary if not already recorded."
+        : walletScopeNextAction,
+      evidence_endpoint: canaryWalletInput?.safe_surface ?? "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
     },
     {
       id: "wallet-ownership",
@@ -461,7 +465,7 @@ function buildLiveIgnitionChecks(
           ? "A hash-only browser-wallet text signature proof is recorded for the dedicated wallet."
           : "The dedicated wallet still needs a browser-wallet text signature proof before any unsigned canary order.",
       next_action: !walletReady
-        ? "Add only the public Solana wallet address in Settings."
+        ? walletScopeNextAction
         : walletOwnershipReady
           ? "Keep the hash-only ownership receipt attached to the first canary review."
           : "Run Prove ownership with the connected browser wallet; this signs text only and cannot move funds.",
