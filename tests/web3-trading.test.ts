@@ -4055,7 +4055,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(signerPreflight?.next_action).toContain("signer handoff receipt");
     expect(signerPreflight?.next_action).not.toContain("Spend:");
     const signerRunway = receipt.missing_for_live_usability.find((item) => item.id === "runway:signer");
-    expect(signerRunway?.next_action).toMatch(/Save a dedicated public trading wallet|Run Prove ownership/);
+    expect(signerRunway?.next_action).toMatch(/Save a dedicated public trading wallet|Run Prove ownership|reviewed policy signer/);
     expect(signerRunway?.next_action).not.toContain("Hash-only wallet ownership proof");
     expect(receipt.next_blocker).toMatchObject({
       owner: "operator",
@@ -4189,6 +4189,14 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.listed_live_usability_row_count).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_for_live_usability.length).toBe(allRowsReceipt.total_live_usability_row_count);
     expect(allRowsReceipt.missing_for_live_usability.length).toBeGreaterThanOrEqual(receipt.missing_for_live_usability.length);
+    const allRowsActionText = allRowsReceipt.missing_for_live_usability.map((item) => item.next_action).join(" ");
+    expect(allRowsActionText).not.toContain("Spend: $0 remains");
+    expect(allRowsActionText).not.toContain("Every transaction lifecycle is blocked");
+    expect(allRowsActionText).not.toContain("blocked custody with $0");
+    expect(allRowsActionText).not.toContain("Request a read-only dex backfill refresh for FARTCOIN");
+    expect(allRowsActionText).toContain("signer handoff receipt");
+    expect(allRowsActionText).toContain("settlement reconciliation");
+    expect(allRowsActionText).toContain("JUPITER_API_KEY");
     expect(allRowsReceipt.next_blocker?.id).toBe(receipt.next_blocker?.id);
     expect(allRowsReceipt.next_blocker?.label).toBe(receipt.next_blocker?.label);
     expect(allRowsReceipt.next_blocker?.href).toBe(receipt.next_blocker?.href);
@@ -5413,6 +5421,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.passed_signoff_count + packet.watch_signoff_count + packet.failed_signoff_count).toBe(packet.signoffs.length);
     expect(["operator-wallet", "jupiter-order", "manual-live-review", "supervised-runway", "live-ops"].every((id) => packet.signoffs.some((item) => item.id === id))).toBe(true);
     expect(packet.signoffs.every((item) => item.next_action.length > 0)).toBe(true);
+    expect(packet.signoffs.map((item) => item.next_action).join(" ")).not.toContain("Spend: $0 remains");
+    expect(packet.signoffs.map((item) => item.next_action).join(" ")).not.toContain("Every transaction lifecycle is blocked");
+    expect(packet.signoffs.find((item) => item.id === "signer-custody")?.next_action).toContain("signer handoff receipt");
+    expect(packet.signoffs.find((item) => item.id === "settlement")?.next_action).toContain("settlement reconciliation");
+    expect(packet.signoffs.find((item) => item.id === "jupiter-order")?.next_action).toContain("JUPITER_API_KEY");
     expect(packet.evidence_links).toContain("GET /api/web3-live-capital-preflight");
     expect(packet.evidence_links).toContain("GET /api/web3-supervised-live-runway");
     expect(packet.safe_commands.some((command) => command.includes("--require-dex-live"))).toBe(true);

@@ -839,6 +839,19 @@ async function verifyLiveUsabilityBlockersReceipt() {
     "Live usability blockers rows should expose operator actions instead of raw signer evidence labels.",
     allRows.json.missing_for_live_usability,
   );
+  const allRowsText = JSON.stringify(allRows.json);
+  for (const rawFragment of [
+    "Spend: $0 remains",
+    "Every transaction lifecycle is blocked",
+    "blocked custody with $0",
+    "Request a read-only dex backfill refresh for FARTCOIN",
+  ]) {
+    assert(
+      !allRowsText.includes(rawFragment),
+      "Live usability blockers rows should expose operator actions instead of raw preflight/manual-review fragments.",
+      { rawFragment, rows: allRows.json.missing_for_live_usability },
+    );
+  }
   assert(
     allRows.json.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0) === allRows.json.total_live_usability_row_count,
     "Live usability blockers rows=all owner summary should reconcile to total rows.",

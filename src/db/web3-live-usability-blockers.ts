@@ -928,7 +928,7 @@ function buildMissingItems(input: {
         owner: signoff.reviewer,
         source: "manual-review",
         status: signoff.status === "fail" ? "fail" : "watch",
-        next_action: signoff.next_action,
+        next_action: liveUsabilityManualReviewNextAction(signoff),
         blocks_live_capital: signoff.blocks_live_capital,
       })),
     ...input.runway.lanes
@@ -939,7 +939,7 @@ function buildMissingItems(input: {
         owner: lane.id === "accounting" ? "accounting" : lane.id === "ops" ? "ops" : lane.id === "signer" ? "security" : lane.id === "manual-review" ? "manual-review" : "operator",
         source: "runway",
         status: lane.status === "ready" ? "review" : lane.status,
-        next_action: lane.next_action,
+        next_action: liveUsabilityRunwayNextAction(lane),
         blocks_live_capital: true,
       })),
   ];
@@ -1011,8 +1011,22 @@ function ownerForGate(id: Web3LiveCapitalPreflightReceipt["gates"][number]["id"]
 }
 
 function liveUsabilityPreflightNextAction(gate: Web3LiveCapitalPreflightReceipt["gates"][number]) {
+  if (gate.id === "provider-read-rail") {
+    return gate.status === "pass"
+      ? "Keep read-provider credentials server-scoped and redacted before manual live review."
+      : "Configure Helius/Solana read credentials and Jupiter route evidence in ignored server env or one-shot tests.";
+  }
+  if (gate.id === "live-dex") {
+    return "Run the read-only live DEX monitor until mapped live pairs, source coverage, and candle evidence are current; do not submit trades.";
+  }
   if (gate.id === "jupiter-order") {
     return "Add JUPITER_API_KEY in ignored server env or run a one-shot Settings Jupiter rehearsal, then run the strict --require-jupiter-order verifier; transaction bytes stay withheld.";
+  }
+  if (gate.id === "risk-policy") {
+    return "Set positive max trade, daily cap, slippage, and loss controls before any supervised live review.";
+  }
+  if (gate.id === "kill-switch") {
+    return "Keep the emergency stop tested and clear only after live-capital preflight and review gates pass.";
   }
   if (gate.id === "signer-custody") {
     return "Choose manual external wallet custody or a reviewed policy signer, then build the signer handoff receipt without private keys, seed phrases, raw transactions, or signed payload storage.";
@@ -1024,6 +1038,55 @@ function liveUsabilityPreflightNextAction(gate: Web3LiveCapitalPreflightReceipt[
     return "Complete the external manual-live review packet after wallet proof, Jupiter order proof, signer/custody, ops/accounting, and funded-canary proof are ready.";
   }
   return gate.next_action;
+}
+
+function liveUsabilityManualReviewNextAction(signoff: Web3ManualLiveReviewPacket["signoffs"][number]) {
+  if (signoff.id === "provider-read-rail") {
+    return signoff.status === "pass"
+      ? "Keep read-provider credentials server-scoped and redacted before manual live review."
+      : "Configure Helius/Solana read credentials and Jupiter route evidence in ignored server env or one-shot tests.";
+  }
+  if (signoff.id === "jupiter-order") {
+    return "Add JUPITER_API_KEY in ignored server env or run a one-shot Settings Jupiter rehearsal, then run the strict --require-jupiter-order verifier; transaction bytes stay withheld.";
+  }
+  if (signoff.id === "signer-custody") {
+    return "Choose manual external wallet custody or a reviewed policy signer, then build the signer handoff receipt without private keys, seed phrases, raw transactions, or signed payload storage.";
+  }
+  if (signoff.id === "settlement") {
+    return "Prove submitted-to-landed confirmation, settlement reconciliation, and local portfolio mirror accounting with redacted receipts before live review.";
+  }
+  if (signoff.id === "manual-live-review") {
+    return "Complete the external manual-live review packet after wallet proof, Jupiter order proof, signer/custody, ops/accounting, and funded-canary proof are ready.";
+  }
+  if (signoff.id === "supervised-runway") {
+    return "Clear the supervised-live runway lanes for wallet proof, Jupiter order proof, signer/custody, ops, accounting, and manual review.";
+  }
+  if (signoff.id === "live-ops") {
+    return "Refresh production supervisor, emergency-stop, worker, and accounting evidence before external manual live review.";
+  }
+  return signoff.next_action;
+}
+
+function liveUsabilityRunwayNextAction(lane: Web3SupervisedLiveRunway["lanes"][number]) {
+  if (lane.id === "wallet") {
+    return "Run Prove ownership with the connected browser wallet; this signs text only and cannot move funds.";
+  }
+  if (lane.id === "jupiter") {
+    return "Add JUPITER_API_KEY in ignored server env or use a one-shot Settings rehearsal test.";
+  }
+  if (lane.id === "signer") {
+    return "Choose manual external wallet custody or a reviewed policy signer after wallet proof and Jupiter order proof are ready.";
+  }
+  if (lane.id === "ops") {
+    return "Refresh production supervisor evidence and configure emergency-stop plus worker targets for external review.";
+  }
+  if (lane.id === "accounting") {
+    return "Set MASTERMOLD_TAX_LEDGER_EXPORT_PATH or choose an external accounting workflow.";
+  }
+  if (lane.id === "manual-review") {
+    return "Keep live flags unset until external review approves process, signer, settlement, and emergency-stop controls.";
+  }
+  return lane.next_action;
 }
 
 function missingItemRank(item: Web3LiveUsabilityMissingItem) {

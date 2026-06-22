@@ -150,7 +150,7 @@ function buildSignoffs(
       reviewer: reviewerForGate(gate.id),
       status: gate.status,
       evidence: gate.evidence,
-      next_action: gate.next_action,
+      next_action: manualLiveReviewSignoffNextAction(gate),
       blocks_live_capital: gate.blocks_live_capital,
     })),
     {
@@ -180,6 +180,27 @@ function reviewerForGate(id: Web3LiveCapitalPreflightGate["id"]): Web3ManualLive
   if (id === "settlement") return "accounting";
   if (id === "profit-proof") return "strategy";
   return "ops";
+}
+
+function manualLiveReviewSignoffNextAction(gate: Web3LiveCapitalPreflightGate) {
+  if (gate.id === "provider-read-rail") {
+    return gate.status === "pass"
+      ? "Keep read-provider credentials server-scoped and redacted before manual live review."
+      : "Configure Helius/Solana read credentials and Jupiter route evidence in ignored server env or one-shot tests.";
+  }
+  if (gate.id === "jupiter-order") {
+    return "Add JUPITER_API_KEY in ignored server env or run a one-shot Settings Jupiter rehearsal, then run the strict --require-jupiter-order verifier; transaction bytes stay withheld.";
+  }
+  if (gate.id === "signer-custody") {
+    return "Choose manual external wallet custody or a reviewed policy signer, then build the signer handoff receipt without private keys, seed phrases, raw transactions, or signed payload storage.";
+  }
+  if (gate.id === "settlement") {
+    return "Prove submitted-to-landed confirmation, settlement reconciliation, and local portfolio mirror accounting with redacted receipts before live review.";
+  }
+  if (gate.id === "manual-live-review") {
+    return "Complete the external manual-live review packet after wallet proof, Jupiter order proof, signer/custody, ops/accounting, and funded-canary proof are ready.";
+  }
+  return gate.next_action;
 }
 
 function manualLiveReviewSummary(
