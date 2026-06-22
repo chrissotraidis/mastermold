@@ -1483,6 +1483,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("buildSafeCredentialProfile");
     expect(settingsConsole).toContain("non-secret lanes ready");
     expect(settingsConsole).toContain("Settings first canary live flag arming");
+    expect(settingsConsole).toContain("settings-web3-first-canary-live-flags");
     expect(settingsConsole).toContain("First canary live flags");
     expect(settingsConsole).toContain("Settings first canary live flag checklist");
     expect(settingsConsole).toContain("buildFirstCanaryFlagItems");

@@ -1011,7 +1011,11 @@ export function SettingsWeb3CredentialConsole({
         </p>
       </div>
 
-      <div className="mt-3 rounded-md border border-caution/30 bg-caution/[0.035] p-3" aria-label="Settings first canary live flag arming">
+      <div
+        id="settings-web3-first-canary-live-flags"
+        className="mt-3 scroll-mt-24 rounded-md border border-caution/30 bg-caution/[0.035] p-3"
+        aria-label="Settings first canary live flag arming"
+      >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">First canary live flags</p>
