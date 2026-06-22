@@ -81,6 +81,11 @@ confined to the local paper ledger unless signer, custody, relay, approval, and 
 gates are explicitly built and cleared. A static enforcement test fails if an unguarded
 trade/order/write endpoint is ever introduced.
 
+For the 2026 Web3 autonomy push, see
+[`docs/autonomous-trading-reorientation.md`](docs/autonomous-trading-reorientation.md)
+for the current truth map: what runs, what is blocked, and the shortest path to proving a
+tiny funded canary before any autonomous real-capital claim.
+
 ### Web3 autonomous paper daemon
 
 The Web3 trading workspace can be driven without the browser by the bounded paper daemon:
@@ -109,8 +114,9 @@ npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary
 ```
 
 The `status-canary:web3` command and `/api/web3-canary-status` receipt include
-`safe_next_commands` for the active wallet scope/proof/status path, so the running app can
-show copyable public-value setup commands without granting signing, submission, or wallet
+`gate_progression` plus `safe_next_commands` for the active wallet
+scope/proof/status path, so the running app can show the ordered live-canary gate chain and
+copyable public-value setup commands without granting signing, submission, or wallet
 mutation authority.
 
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON

@@ -144,6 +144,7 @@ export function buildCanaryStatusPacket({ canary, ignition, local, http = {} }) 
       : "blocked";
   const endpointParams = `source=${ignition.source}&account=${ignition.account}&scenario=${ignition.scenario}&cycles=0`;
   const safeNextCommands = buildSafeNextCommands(canary, endpointParams);
+  const gateProgression = buildGateProgression(canary);
 
   return {
     mode: "web3-canary-status",
@@ -160,6 +161,7 @@ export function buildCanaryStatusPacket({ canary, ignition, local, http = {} }) 
     next_required_input_id: nextInputId,
     next_required_input_label: canary.next_required_input?.label ?? null,
     next_action: ignition.next_action || canary.next_action,
+    gate_progression: gateProgression,
     safe_next_commands: safeNextCommands,
     blocker_count: Math.max(Number(ignition.blocker_count ?? 0), Array.isArray(canary.blockers) ? canary.blockers.length : 0),
     signed_relay_status: canary.signed_relay_status,
@@ -193,6 +195,25 @@ export function buildCanaryStatusPacket({ canary, ignition, local, http = {} }) 
       "Private keys, seed phrases, API key values, raw transactions, signed payload storage, wallet mutation, and secret echo remain blocked.",
     ],
   };
+}
+
+function buildGateProgression(canary) {
+  const currentInputId = canary.next_required_input?.id ?? null;
+  return canary.required_inputs.map((input) => ({
+    id: input.id,
+    label: input.label,
+    status: input.status,
+    owner: input.owner,
+    is_current: input.id === currentInputId,
+    safe_surface: input.safe_surface,
+    target_names: input.target_names,
+    verifier_command: input.verifier_command,
+    completion_signal: input.completion_signal,
+    live_execution_permission: input.live_execution_permission,
+    transaction_submission_permission: input.transaction_submission_permission,
+    wallet_mutation_permission: input.wallet_mutation_permission,
+    secret_echo_permission: input.secret_echo_permission,
+  }));
 }
 
 function buildSafeNextCommands(canary, endpointParams) {
@@ -360,6 +381,8 @@ export function verifyCanaryStatusPacket(packet) {
   assert(packet.mode === "web3-canary-status", "Canary status packet should expose the expected mode.", packet);
   assert(["blocked", "ready-for-supervised-canary", "canary-proven", "can-autonomously-trade"].includes(packet.status), "Canary status should use a known status.", packet);
   assert(packet.alignment?.status === "pass", "Canary status should report receipt alignment.", packet);
+  assert(Array.isArray(packet.gate_progression) && packet.gate_progression.length > 0, "Canary status should expose ordered gate progression.", packet);
+  assert(packet.gate_progression.every((step) => step.live_execution_permission === "blocked" && step.transaction_submission_permission === "blocked" && step.wallet_mutation_permission === "blocked" && step.secret_echo_permission === "blocked"), "Gate progression must keep live authority blocked.", packet.gate_progression);
   assert(Array.isArray(packet.safe_next_commands) && packet.safe_next_commands.length > 0, "Canary status should expose safe next commands.", packet);
   assert(packet.safe_next_commands.every((command) => command.live_execution_permission === "blocked" && command.transaction_submission_permission === "blocked" && command.wallet_mutation_permission === "blocked" && command.secret_echo_permission === "blocked"), "Safe next commands must keep live authority blocked.", packet.safe_next_commands);
   assert(packet.live_execution_permission === "blocked", "Canary status should keep live execution blocked until a separate launch gate changes it.", packet);
@@ -390,6 +413,9 @@ function markdown(packet) {
     "",
     "## Next Action",
     packet.next_action,
+    "",
+    "## Gate Progression",
+    ...packet.gate_progression.map((step) => `- ${step.label}: ${step.status}${step.is_current ? " (current)" : ""}`),
     "",
     "## Safe Commands",
     ...packet.safe_next_commands.map((command) => `- ${command.label}: ${command.command}`),

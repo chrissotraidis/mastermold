@@ -2386,6 +2386,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run credentials-local:web3 command");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-canary-status");
     expect(source("components/review-readiness.tsx")).toContain("Running app canary status panel");
+    expect(source("components/review-readiness.tsx")).toContain("gate_progression");
     expect(source("components/review-readiness.tsx")).toContain("safe_next_commands");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run scope-wallet:web3 command");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run prove-wallet:web3 command");
@@ -2426,6 +2427,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-canary-status.mjs")).toContain("/api/web3-local-credentials");
     expect(source("scripts/web3-canary-status.mjs")).toContain("# Mastermind Web3 Canary Status");
     expect(source("scripts/web3-canary-status.mjs")).toContain("actual_live_trade_tested");
+    expect(source("scripts/web3-canary-status.mjs")).toContain("gate_progression");
+    expect(source("src/db/web3-canary-status.ts")).toContain("gate_progression");
     expect(source("scripts/web3-canary-status.mjs")).toContain("safe_next_commands");
     expect(source("src/db/web3-canary-status.ts")).toContain("safe_next_commands");
     expect(source("app/trading/page.tsx")).toContain("Running app safe next commands");

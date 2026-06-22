@@ -20,6 +20,7 @@ export type Web3CanaryStatusReceipt = {
   next_required_input_id: Web3LiveTradeCanaryRequiredInput["id"] | null;
   next_required_input_label: string | null;
   next_action: string;
+  gate_progression: Web3CanaryStatusGateProgressionStep[];
   safe_next_commands: Web3CanaryStatusSafeCommand[];
   blocker_count: number;
   signed_relay_status: Web3LiveTradeCanaryReceipt["signed_relay_status"];
@@ -53,6 +54,22 @@ export type Web3CanaryStatusReceipt = {
   seed_phrase_storage: "blocked";
   secret_echo_permission: "blocked";
   controls: string[];
+};
+
+export type Web3CanaryStatusGateProgressionStep = {
+  id: Web3LiveTradeCanaryRequiredInput["id"];
+  label: string;
+  status: Web3LiveTradeCanaryRequiredInput["status"];
+  owner: Web3LiveTradeCanaryRequiredInput["owner"];
+  is_current: boolean;
+  safe_surface: string;
+  target_names: string[];
+  verifier_command: string | null;
+  completion_signal: string;
+  live_execution_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  secret_echo_permission: "blocked";
 };
 
 export type Web3CanaryStatusSafeCommand = {
@@ -106,6 +123,7 @@ export function buildWeb3CanaryStatusReceipt(input: {
         : "blocked";
   const endpointParams = `source=${input.ignition.source}&account=${input.ignition.account}&scenario=${input.ignition.scenario}&cycles=0`;
   const safeNextCommands = buildSafeNextCommands(input.canary, endpointParams);
+  const gateProgression = buildGateProgression(input.canary);
   const receiptBase = {
     mode: "web3-canary-status" as const,
     status,
@@ -122,6 +140,7 @@ export function buildWeb3CanaryStatusReceipt(input: {
     next_required_input_id: nextRequiredInput?.id ?? null,
     next_required_input_label: nextRequiredInput?.label ?? null,
     next_action: input.ignition.next_action || input.canary.next_action,
+    gate_progression: gateProgression,
     safe_next_commands: safeNextCommands,
     blocker_count: Math.max(input.ignition.blocker_count, input.canary.blockers.length),
     signed_relay_status: input.canary.signed_relay_status,
@@ -165,6 +184,25 @@ export function buildWeb3CanaryStatusReceipt(input: {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
   };
+}
+
+function buildGateProgression(canary: Web3LiveTradeCanaryReceipt): Web3CanaryStatusGateProgressionStep[] {
+  const currentInputId = canary.next_required_input?.id ?? null;
+  return canary.required_inputs.map((input) => ({
+    id: input.id,
+    label: input.label,
+    status: input.status,
+    owner: input.owner,
+    is_current: input.id === currentInputId,
+    safe_surface: input.safe_surface,
+    target_names: input.target_names,
+    verifier_command: input.verifier_command,
+    completion_signal: input.completion_signal,
+    live_execution_permission: input.live_execution_permission,
+    transaction_submission_permission: input.transaction_submission_permission,
+    wallet_mutation_permission: input.wallet_mutation_permission,
+    secret_echo_permission: input.secret_echo_permission,
+  }));
 }
 
 function buildSafeNextCommands(canary: Web3LiveTradeCanaryReceipt, endpointParams: string): Web3CanaryStatusSafeCommand[] {

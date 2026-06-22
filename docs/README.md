@@ -9,6 +9,7 @@ This folder separates repo documentation from the product source references that
 - `ref/financial-agent-blueprint-v3-buildspec.md`: original build-level blueprint with engineering, risk, data, orchestration, and evaluation details.
 - `mobile-native-product-overhaul-plan.md`: current product overhaul plan for the next implementation push, based on the 2026-06-08 app critique and the original PRD.
 - `web3-credentials-runbook.md`: Web3 provider, wallet, Jupiter, signer-mode, and risk-cap setup flow for read-only verification and dry-run rehearsal.
+- `autonomous-trading-reorientation.md`: current truth map for the autonomous Web3 trading goal, what is proven, what is blocked, and the shortest path to a tiny funded canary proof.
 
 ## Related Root Documents
 

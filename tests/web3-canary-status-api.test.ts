@@ -26,6 +26,13 @@ describe("web3 canary status API", () => {
     expect(receipt.canary_endpoint).toContain("/api/web3-live-trade-canary");
     expect(receipt.ignition_endpoint).toContain("/api/web3-live-ignition");
     expect(receipt.local_credentials_endpoint).toBe("/api/web3-local-credentials");
+    expect(receipt.gate_progression.map((step: { id: string }) => step.id)).toContain("dedicated-public-wallet");
+    expect(receipt.gate_progression.some((step: { is_current: boolean }) => step.is_current)).toBe(true);
+    expect(receipt.gate_progression.every((step: { live_execution_permission: string; transaction_submission_permission: string; wallet_mutation_permission: string }) =>
+      step.live_execution_permission === "blocked" &&
+      step.transaction_submission_permission === "blocked" &&
+      step.wallet_mutation_permission === "blocked"
+    )).toBe(true);
     expect(receipt.safe_next_commands.length).toBeGreaterThan(0);
     expect(receipt.safe_next_commands.some((command: { command: string }) => command.command.includes("status-canary:web3"))).toBe(true);
     expect(receipt.safe_next_commands.every((command: { live_execution_permission: string; wallet_mutation_permission: string; secret_echo_permission: string }) =>

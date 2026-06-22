@@ -5,7 +5,27 @@ import {
   runWeb3CanaryStatus,
 } from "../scripts/web3-canary-status.mjs";
 
+function requiredInput(overrides = {}) {
+  return {
+    id: "dedicated-public-wallet",
+    label: "Dedicated public wallet",
+    status: "needed-now",
+    owner: "operator",
+    safe_value_type: "Dedicated public Solana wallet address only.",
+    safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+    target_names: ["wallet_public_key"],
+    verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+    completion_signal: "A non-sample public Solana wallet is saved from the Trading live canary console.",
+    live_execution_permission: "blocked",
+    transaction_submission_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
+    ...overrides,
+  };
+}
+
 function canaryReceipt(overrides = {}) {
+  const nextRequiredInput = overrides.next_required_input ?? requiredInput();
   return {
     mode: "web3-live-trade-canary",
     status: "blocked",
@@ -19,21 +39,35 @@ function canaryReceipt(overrides = {}) {
     current_request_id: null,
     latest_signature_preview: null,
     blockers: ["Replace the sample wallet."],
-    next_required_input: {
-      id: "dedicated-public-wallet",
-      label: "Dedicated public wallet",
-      status: "needed-now",
-      owner: "operator",
-      safe_value_type: "Dedicated public Solana wallet address only.",
-      safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
-      target_names: ["wallet_public_key"],
-      verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
-      completion_signal: "A non-sample public Solana wallet is saved from the Trading live canary console.",
-      live_execution_permission: "blocked",
-      transaction_submission_permission: "blocked",
-      wallet_mutation_permission: "blocked",
-      secret_echo_permission: "blocked",
-    },
+    next_required_input: nextRequiredInput,
+    required_inputs: overrides.required_inputs ?? [
+      nextRequiredInput,
+      requiredInput({
+        id: "wallet-ownership-proof",
+        label: "Wallet ownership proof",
+        status: "blocked",
+        owner: "external-wallet",
+        target_names: ["wallet_public_key", "web3-wallet-ownership challenge hash"],
+        verifier_command: null,
+        completion_signal: "wallet_ownership_current_for_canary=true on /api/web3-live-trade-canary.",
+      }),
+      requiredInput({
+        id: "jupiter-order-rail",
+        label: "Jupiter order rail",
+        status: "blocked",
+        target_names: ["JUPITER_API_KEY"],
+        verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+        completion_signal: "Jupiter rehearsal and live unsigned-order preflight no longer report missing JUPITER_API_KEY.",
+      }),
+      requiredInput({
+        id: "first-canary-live-flags",
+        label: "First canary live flags",
+        status: "blocked",
+        target_names: ["MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION", "MASTERMOLD_LIVE_OPERATOR_APPROVAL", "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF"],
+        verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary-flags",
+        completion_signal: "live_execution_gate_enabled=true and unsigned-order handoff no longer reports missing live canary flags.",
+      }),
+    ],
     next_action: "Replace the sample all-ones wallet with a dedicated public Solana address before canary review.",
     transaction_submission_permission: "blocked",
     live_execution_permission: "blocked",
@@ -113,6 +147,14 @@ describe("web3 canary status command", () => {
     expect(packet.next_gate_id).toBe("wallet-scope");
     expect(packet.next_required_input_id).toBe("dedicated-public-wallet");
     expect(packet.alignment.status).toBe("pass");
+    expect(packet.gate_progression.map((step) => step.id)).toEqual([
+      "dedicated-public-wallet",
+      "wallet-ownership-proof",
+      "jupiter-order-rail",
+      "first-canary-live-flags",
+    ]);
+    expect(packet.gate_progression.find((step) => step.id === "dedicated-public-wallet")?.is_current).toBe(true);
+    expect(packet.gate_progression.every((step) => step.live_execution_permission === "blocked")).toBe(true);
     expect(packet.safe_next_commands.map((command) => command.id)).toEqual([
       "validate-public-wallet",
       "save-public-wallet-scope",
