@@ -64,6 +64,51 @@ export type Web3DedicatedWalletIntakeContract = {
   controls: string[];
 };
 
+export type Web3DedicatedWalletIntakeValidationStatus =
+  | "valid-public-wallet"
+  | "sample-wallet-rejected"
+  | "invalid-wallet"
+  | "invalid-risk-caps"
+  | "unsafe-input-rejected";
+
+export type Web3DedicatedWalletIntakeValidationReceipt = {
+  mode: "web3-dedicated-wallet-intake-validation";
+  status: Web3DedicatedWalletIntakeValidationStatus;
+  generated_at: string;
+  receipt_hash: string;
+  source: Web3TradingState["market_source"]["mode"];
+  account: Web3TradingState["paper_account"]["mode"];
+  scenario: Web3TradingState["scenario"];
+  wallet_public_key_preview: string | null;
+  wallet_public_key_valid: boolean;
+  sample_wallet_rejected: boolean;
+  can_save_public_scope: boolean;
+  accepted_field_paths: string[];
+  rejected_field_paths: string[];
+  unsafe_field_paths: string[];
+  risk_caps: {
+    max_trade_usd: number | null;
+    daily_spend_cap_usd: number | null;
+    max_slippage_bps: number | null;
+    valid: boolean;
+    blockers: string[];
+  };
+  existing_save_endpoint: "/api/web3-trading";
+  existing_save_method: "POST";
+  save_body_template: Web3DedicatedWalletIntakeContract["existing_save_body_template"];
+  verifier_command: string;
+  next_action: string;
+  summary: string;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  signing_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  secret_echo_permission: "blocked";
+  controls: string[];
+};
+
 export function buildWeb3DedicatedWalletIntakeContract(input: {
   state: Web3TradingState;
   wallet: Web3DedicatedWalletPacket;
@@ -203,6 +248,89 @@ export function buildWeb3DedicatedWalletIntakeContract(input: {
   };
 }
 
+export function validateWeb3DedicatedWalletIntake(input: {
+  state: Web3TradingState;
+  body: unknown;
+  now?: Date;
+}): Web3DedicatedWalletIntakeValidationReceipt {
+  const generatedAt = (input.now ?? new Date()).toISOString();
+  const body = isRecord(input.body) ? input.body : {};
+  const unsafeFieldPaths = findUnsafeWalletIntakeFieldPaths(body);
+  const walletValue = extractString(body, ["execution", "wallet_public_key"]) ?? extractString(body, ["wallet_public_key"]);
+  const walletPath = hasPath(body, ["execution", "wallet_public_key"]) ? "execution.wallet_public_key" : hasPath(body, ["wallet_public_key"]) ? "wallet_public_key" : null;
+  const walletValid = isLikelySolanaPublicKey(walletValue);
+  const sampleWalletRejected = walletValue === SAMPLE_SYSTEM_WALLET;
+  const riskCaps = validateRiskCaps(body, input.state);
+  const acceptedFieldPaths = [
+    walletPath,
+    hasPath(body, ["execution", "max_trade_usd"]) ? "execution.max_trade_usd" : null,
+    hasPath(body, ["execution", "daily_spend_cap_usd"]) ? "execution.daily_spend_cap_usd" : null,
+    hasPath(body, ["execution", "max_slippage_bps"]) ? "execution.max_slippage_bps" : null,
+  ].filter((path): path is string => Boolean(path));
+  const status: Web3DedicatedWalletIntakeValidationStatus = unsafeFieldPaths.length > 0
+    ? "unsafe-input-rejected"
+    : !walletValid
+      ? "invalid-wallet"
+      : sampleWalletRejected
+        ? "sample-wallet-rejected"
+        : !riskCaps.valid
+          ? "invalid-risk-caps"
+          : "valid-public-wallet";
+  const canSavePublicScope = status === "valid-public-wallet";
+  const saveBodyTemplate = buildSaveBodyTemplate(input.state, riskCaps);
+  const receiptBase = {
+    mode: "web3-dedicated-wallet-intake-validation" as const,
+    status,
+    generated_at: generatedAt,
+    source: input.state.market_source.mode,
+    account: input.state.paper_account.mode,
+    scenario: input.state.scenario,
+    wallet_public_key_preview: previewWallet(walletValue),
+    wallet_public_key_valid: walletValid,
+    sample_wallet_rejected: sampleWalletRejected,
+    can_save_public_scope: canSavePublicScope,
+    accepted_field_paths: acceptedFieldPaths,
+    rejected_field_paths: [
+      "private_key",
+      "seed_phrase",
+      "mnemonic",
+      "keypair",
+      "wallet_secret",
+      "raw_transaction",
+      "unsigned_transaction",
+      "signed_transaction",
+      "signed_payload",
+      "api_key",
+    ],
+    unsafe_field_paths: unsafeFieldPaths,
+    risk_caps: riskCaps,
+    existing_save_endpoint: "/api/web3-trading" as const,
+    existing_save_method: "POST" as const,
+    save_body_template: saveBodyTemplate,
+    verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+    next_action: validationNextAction(status),
+    summary: validationSummary(status),
+    live_execution_permission: "blocked" as const,
+    wallet_mutation_permission: "blocked" as const,
+    transaction_submission_permission: "blocked" as const,
+    signing_permission: "blocked" as const,
+    private_key_storage: "blocked" as const,
+    seed_phrase_storage: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
+    controls: [
+      "This validation route checks public wallet scope only; it does not save state.",
+      "Responses include wallet previews and field paths only; private keys, seed phrases, keypairs, transaction bodies, signed payloads, and API keys are rejected without echoing values.",
+      "A valid receipt still only permits the existing dry-run public-scope save path; it cannot sign, submit, custody funds, mutate wallets, or unlock live execution.",
+      "The sample all-ones system wallet is always rejected for funded canary readiness.",
+    ],
+  };
+
+  return {
+    ...receiptBase,
+    receipt_hash: hashJson(receiptBase),
+  };
+}
+
 function intakeStatus(wallet: Web3DedicatedWalletPacket): Web3DedicatedWalletIntakeContract["status"] {
   if (wallet.wallet_is_sample) return "sample-wallet-rejected";
   if (!wallet.dedicated_wallet_scoped) return "public-wallet-needed";
@@ -217,6 +345,138 @@ function intakeSummary(status: Web3DedicatedWalletIntakeContract["status"]) {
   return "A dedicated public Solana wallet address is the next safe operator input.";
 }
 
+function buildSaveBodyTemplate(
+  state: Web3TradingState,
+  riskCaps: Web3DedicatedWalletIntakeValidationReceipt["risk_caps"],
+): Web3DedicatedWalletIntakeContract["existing_save_body_template"] {
+  const maxTradeUsd = riskCaps.max_trade_usd ?? Math.max(1, state.execution_readiness.config.max_trade_usd || 25);
+  const dailySpendCapUsd = riskCaps.daily_spend_cap_usd ?? Math.max(maxTradeUsd, state.execution_readiness.config.daily_spend_cap_usd || 100);
+  const maxSlippageBps = riskCaps.max_slippage_bps ?? Math.max(1, Math.min(2_000, state.execution_readiness.config.max_slippage_bps || 150));
+  return {
+    scenario: state.scenario,
+    source: state.market_source.mode,
+    account: state.paper_account.mode,
+    cycles: 0,
+    advance: false,
+    execution: {
+      mode: "dry-run",
+      kill_switch: false,
+      wallet_public_key: "<public-solana-address>",
+      signer_simulation_enabled: true,
+      signer_session_label: "settings-external-wallet",
+      signer_network: "devnet",
+      max_trade_usd: maxTradeUsd,
+      daily_spend_cap_usd: dailySpendCapUsd,
+      max_slippage_bps: maxSlippageBps,
+    },
+  };
+}
+
+function validateRiskCaps(body: Record<string, unknown>, state: Web3TradingState): Web3DedicatedWalletIntakeValidationReceipt["risk_caps"] {
+  const execution = isRecord(body.execution) ? body.execution : {};
+  const fallbackMaxTrade = Math.max(1, state.execution_readiness.config.max_trade_usd || 25);
+  const maxTradeUsd = numericField(execution.max_trade_usd, fallbackMaxTrade);
+  const dailySpendCapUsd = numericField(execution.daily_spend_cap_usd, Math.max(maxTradeUsd ?? fallbackMaxTrade, state.execution_readiness.config.daily_spend_cap_usd || 100));
+  const maxSlippageBps = numericField(execution.max_slippage_bps, Math.max(1, Math.min(2_000, state.execution_readiness.config.max_slippage_bps || 150)));
+  const blockers = [
+    maxTradeUsd === null || maxTradeUsd <= 0 ? "execution.max_trade_usd must be positive." : null,
+    dailySpendCapUsd === null || dailySpendCapUsd < (maxTradeUsd ?? fallbackMaxTrade) ? "execution.daily_spend_cap_usd must be at least max_trade_usd." : null,
+    maxSlippageBps === null || !Number.isInteger(maxSlippageBps) || maxSlippageBps < 1 || maxSlippageBps > 2_000 ? "execution.max_slippage_bps must be an integer from 1 to 2000." : null,
+  ].filter((blocker): blocker is string => Boolean(blocker));
+  return {
+    max_trade_usd: maxTradeUsd,
+    daily_spend_cap_usd: dailySpendCapUsd,
+    max_slippage_bps: maxSlippageBps,
+    valid: blockers.length === 0,
+    blockers,
+  };
+}
+
+function numericField(value: unknown, fallback: number) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function validationNextAction(status: Web3DedicatedWalletIntakeValidationStatus) {
+  if (status === "valid-public-wallet") return "Save this public wallet scope through /api/web3-trading, then run the strict operator-wallet verifier.";
+  if (status === "sample-wallet-rejected") return "Replace the sample all-ones wallet with a dedicated public Solana trading wallet address.";
+  if (status === "invalid-risk-caps") return "Fix the dry-run caps before saving public wallet scope.";
+  if (status === "unsafe-input-rejected") return "Remove private keys, seed phrases, keypairs, transaction bodies, signed payloads, and API-key fields before validating again.";
+  return "Enter a valid dedicated public Solana wallet address only.";
+}
+
+function validationSummary(status: Web3DedicatedWalletIntakeValidationStatus) {
+  if (status === "valid-public-wallet") return "Public wallet scope is valid for dry-run saving; live execution remains blocked.";
+  if (status === "sample-wallet-rejected") return "The sample all-ones system wallet is safe for tests but rejected for funded canary readiness.";
+  if (status === "invalid-risk-caps") return "Wallet shape is acceptable, but dry-run risk caps need correction before saving.";
+  if (status === "unsafe-input-rejected") return "Unsafe wallet or transaction fields were rejected without storing or echoing values.";
+  return "The wallet field is missing or is not a valid public Solana address.";
+}
+
+function findUnsafeWalletIntakeFieldPaths(value: unknown, prefix = ""): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => findUnsafeWalletIntakeFieldPaths(item, `${prefix}[${index}]`));
+  }
+  if (!isRecord(value)) return [];
+  return Object.entries(value).flatMap(([key, child]) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const unsafe = UNSAFE_WALLET_INTAKE_KEYS.some((needle) => normalized.includes(needle));
+    return [
+      unsafe ? path : null,
+      ...findUnsafeWalletIntakeFieldPaths(child, path),
+    ].filter((item): item is string => Boolean(item));
+  });
+}
+
+function extractString(value: Record<string, unknown>, path: string[]) {
+  let current: unknown = value;
+  for (const segment of path) {
+    if (!isRecord(current)) return null;
+    current = current[segment];
+  }
+  return typeof current === "string" ? current.trim() : null;
+}
+
+function hasPath(value: Record<string, unknown>, path: string[]) {
+  let current: unknown = value;
+  for (const segment of path) {
+    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, segment)) return false;
+    current = current[segment];
+  }
+  return true;
+}
+
+function previewWallet(value: string | null) {
+  if (!value) return null;
+  if (value.length <= 12) return value;
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
+}
+
+function isLikelySolanaPublicKey(value: string | null | undefined) {
+  return Boolean(value && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 function hashJson(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
+
+const SAMPLE_SYSTEM_WALLET = "11111111111111111111111111111111";
+
+const UNSAFE_WALLET_INTAKE_KEYS = [
+  "privatekey",
+  "seedphrase",
+  "mnemonic",
+  "keypair",
+  "walletsecret",
+  "rawtransaction",
+  "unsignedtransaction",
+  "signedtransaction",
+  "signedpayload",
+  "apikey",
+];

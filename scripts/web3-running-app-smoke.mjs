@@ -172,10 +172,11 @@ async function verifySettingsCredentialsPage() {
   assert(text.includes("Web3 trading credentials"), "Settings should render the Web3 credential runway.", text);
   assert(text.includes("Wallet intake contract"), "Settings should expose the wallet intake contract.", text);
   assert(text.includes("Accepted fields") && text.includes("Rejected fields"), "Settings should show safe and rejected wallet intake fields.", text);
+  assert(text.includes("Validate-only wallet intake") && text.includes("POST /api/web3-dedicated-wallet-intake-contract"), "Settings should expose validate-only wallet intake before saving.", text);
   assert(text.includes("Open contract JSON"), "Settings should link the wallet intake contract JSON.", text);
   assert(text.includes("/api/web3-dedicated-wallet-intake-contract"), "Settings should include the wallet intake contract endpoint.", text);
   assert(text.includes("live blocked") && text.includes("secrets rejected"), "Settings should keep the wallet intake safety boundary visible.", text);
-  record("settings-credentials-page", "pass", "Settings renders the wallet intake contract with accepted/rejected fields and live authority blocked");
+  record("settings-credentials-page", "pass", "Settings renders the wallet intake contract with validate-only POST, accepted/rejected fields, and live authority blocked");
 }
 
 async function verifyCanaryReceipt() {

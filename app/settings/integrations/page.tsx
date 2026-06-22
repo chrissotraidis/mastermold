@@ -3430,6 +3430,20 @@ function SettingsDedicatedWalletIntakeContractPanel({ contract }: { contract: We
         <SettingsMetric label="Signer" value={contract.existing_save_body_template.execution.signer_session_label.replaceAll("-", " ")} />
       </div>
 
+      <div className="mt-3 rounded-md border border-engine/20 bg-engine/[0.035] p-2" aria-label="Settings Web3 validate-only wallet intake">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Validate-only wallet intake</p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              POST the public wallet scope here first to check wallet shape, sample-wallet rejection, dry-run caps, and secret-field rejection without saving state.
+            </p>
+          </div>
+          <code className="max-w-full break-all rounded-md border border-engine/20 bg-void/25 px-2 py-1 text-[10px] leading-4 text-engine">
+            POST /api/web3-dedicated-wallet-intake-contract
+          </code>
+        </div>
+      </div>
+
       <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.72fr)]">
         <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 wallet accepted fields">
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -3501,6 +3515,12 @@ function SettingsDedicatedWalletIntakeContractPanel({ contract }: { contract: We
           className="inline-flex min-h-10 items-center rounded-md border border-engine/30 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
         >
           Open contract JSON
+        </Link>
+        <Link
+          href="/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0"
+          className="inline-flex min-h-10 items-center rounded-md border border-engine/30 bg-surface-dim/45 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/10"
+        >
+          Validate-only POST
         </Link>
         <Link
           href="/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console"

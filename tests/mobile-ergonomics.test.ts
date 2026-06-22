@@ -1402,7 +1402,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Wallet intake contract");
     expect(settingsPage).toContain("Accepted fields");
     expect(settingsPage).toContain("Rejected fields");
+    expect(settingsPage).toContain("Validate-only wallet intake");
+    expect(settingsPage).toContain("POST /api/web3-dedicated-wallet-intake-contract");
     expect(settingsPage).toContain("Open contract JSON");
+    expect(settingsPage).toContain("Validate-only POST");
     expect(settingsPage).toContain("/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0");
     expect(settingsPage).toContain("Private keys, seed phrases, keypairs, transaction bodies, signed payloads, and API keys are not part of wallet scope.");
     expect(settingsPage.indexOf("<SettingsDedicatedWalletPacketPanel")).toBeLessThan(
@@ -2328,6 +2331,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("browser Solana wallet only far enough to read the public address");
     expect(source("components/review-readiness.tsx")).toContain("text-only wallet ownership proof");
     expect(source("components/review-readiness.tsx")).toContain("live-capital preflight receipt");
+    expect(source("components/review-readiness.tsx")).toContain("validate-only POST");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-live-usability-blockers");
     expect(source("components/review-readiness.tsx")).toContain("live-usability blocker summaries");
     expect(source("components/review-readiness.tsx")).toContain("separates cutover setup blockers from total versus listed dependency-ranked live-usability rows");

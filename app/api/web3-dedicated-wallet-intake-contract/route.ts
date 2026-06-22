@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import {
   buildWeb3DedicatedWalletIntakeContract,
+  validateWeb3DedicatedWalletIntake,
   type Web3DedicatedWalletIntakeContract,
+  type Web3DedicatedWalletIntakeValidationReceipt,
 } from "@/src/db/web3-dedicated-wallet-intake-contract";
 import {
   getWeb3TradingStateAsync,
@@ -33,6 +35,29 @@ export async function GET(request: Request): Promise<NextResponse<Web3DedicatedW
     state,
     wallet: buildWeb3DedicatedWalletPacket(state),
   }));
+}
+
+export async function POST(request: Request): Promise<NextResponse<Web3DedicatedWalletIntakeValidationReceipt | { error: string }>> {
+  const parsed = parseWalletIntakeQuery(request.url);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "wallet intake validation body must be JSON." }, { status: 422 });
+  }
+
+  const state = await getWeb3TradingStateAsync({
+    scenario: parsed.value.scenario,
+    source: parsed.value.source,
+    account: parsed.value.account,
+    cycles: parsed.value.cycles,
+    advance: false,
+  });
+  const receipt = validateWeb3DedicatedWalletIntake({ state, body });
+  const status = receipt.status === "valid-public-wallet" || receipt.status === "sample-wallet-rejected" ? 200 : 422;
+  return NextResponse.json(receipt, { status });
 }
 
 function parseWalletIntakeQuery(url: string):

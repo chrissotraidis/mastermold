@@ -10,7 +10,7 @@ import { GET as ACCOUNT_ACQUISITION_GET } from "@/app/api/web3-account-acquisiti
 import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as CUTOVER_BLOCKER_BOARD_GET } from "@/app/api/web3-cutover-blocker-board/route";
-import { GET as DEDICATED_WALLET_INTAKE_CONTRACT_GET } from "@/app/api/web3-dedicated-wallet-intake-contract/route";
+import { GET as DEDICATED_WALLET_INTAKE_CONTRACT_GET, POST as DEDICATED_WALLET_INTAKE_CONTRACT_POST } from "@/app/api/web3-dedicated-wallet-intake-contract/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
 import { GET as JUPITER_REHEARSAL_HISTORY_GET } from "@/app/api/web3-jupiter-rehearsal-history/route";
@@ -3864,6 +3864,103 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(walletContract.seed_phrase_storage).toBe("blocked");
     expect(walletContract.secret_echo_permission).toBe("blocked");
     expect(walletContract.controls.join(" ")).toContain("intake map only");
+
+    const safeWallet = "7YWHmMjUwvQJwHqZzsYvg59WKAVAHwiUL1b5LrsULv2C";
+    const validWalletValidationResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_POST(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        execution: {
+          wallet_public_key: safeWallet,
+          max_trade_usd: 25,
+          daily_spend_cap_usd: 100,
+          max_slippage_bps: 150,
+        },
+      }),
+    }));
+    const validWalletValidationText = await validWalletValidationResponse.text();
+    const validWalletValidation = JSON.parse(validWalletValidationText) as {
+      mode: string;
+      status: string;
+      source: string;
+      wallet_public_key_preview: string;
+      wallet_public_key_valid: boolean;
+      sample_wallet_rejected: boolean;
+      can_save_public_scope: boolean;
+      accepted_field_paths: string[];
+      unsafe_field_paths: string[];
+      risk_caps: { valid: boolean; max_trade_usd: number; daily_spend_cap_usd: number; max_slippage_bps: number };
+      save_body_template: { execution: { wallet_public_key: string } };
+      verifier_command: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      receipt_hash: string;
+    };
+    expect(validWalletValidationResponse.status).toBe(200);
+    expect(validWalletValidation.mode).toBe("web3-dedicated-wallet-intake-validation");
+    expect(validWalletValidation.status).toBe("valid-public-wallet");
+    expect(validWalletValidation.source).toBe("live-dex");
+    expect(validWalletValidation.wallet_public_key_preview).toBe("7YWHmMjU...Lv2C");
+    expect(validWalletValidationText).not.toContain(safeWallet);
+    expect(validWalletValidation.wallet_public_key_valid).toBe(true);
+    expect(validWalletValidation.sample_wallet_rejected).toBe(false);
+    expect(validWalletValidation.can_save_public_scope).toBe(true);
+    expect(validWalletValidation.accepted_field_paths).toEqual(expect.arrayContaining(["execution.wallet_public_key", "execution.max_trade_usd", "execution.daily_spend_cap_usd", "execution.max_slippage_bps"]));
+    expect(validWalletValidation.unsafe_field_paths).toEqual([]);
+    expect(validWalletValidation.risk_caps).toMatchObject({ valid: true, max_trade_usd: 25, daily_spend_cap_usd: 100, max_slippage_bps: 150 });
+    expect(validWalletValidation.save_body_template.execution.wallet_public_key).toBe("<public-solana-address>");
+    expect(validWalletValidation.verifier_command).toContain("--wallet=<public-solana-address>");
+    expect(validWalletValidation.live_execution_permission).toBe("blocked");
+    expect(validWalletValidation.wallet_mutation_permission).toBe("blocked");
+    expect(validWalletValidation.transaction_submission_permission).toBe("blocked");
+    expect(validWalletValidation.signing_permission).toBe("blocked");
+    expect(validWalletValidation.private_key_storage).toBe("blocked");
+    expect(validWalletValidation.seed_phrase_storage).toBe("blocked");
+    expect(validWalletValidation.secret_echo_permission).toBe("blocked");
+    expect(validWalletValidation.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+
+    const sampleWalletValidationResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_POST(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ execution: { wallet_public_key: "11111111111111111111111111111111" } }),
+    }));
+    const sampleWalletValidation = await json<{ status: string; sample_wallet_rejected: boolean; can_save_public_scope: boolean; next_action: string }>(sampleWalletValidationResponse);
+    expect(sampleWalletValidationResponse.status).toBe(200);
+    expect(sampleWalletValidation.status).toBe("sample-wallet-rejected");
+    expect(sampleWalletValidation.sample_wallet_rejected).toBe(true);
+    expect(sampleWalletValidation.can_save_public_scope).toBe(false);
+    expect(sampleWalletValidation.next_action).toContain("Replace the sample all-ones wallet");
+
+    const unsafeSecret = "super-secret-private-key-never-echo";
+    const unsafeWalletValidationResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_POST(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ execution: { wallet_public_key: safeWallet, private_key: unsafeSecret } }),
+    }));
+    const unsafeWalletValidationText = await unsafeWalletValidationResponse.text();
+    const unsafeWalletValidation = JSON.parse(unsafeWalletValidationText) as { status: string; unsafe_field_paths: string[]; can_save_public_scope: boolean; next_action: string };
+    expect(unsafeWalletValidationResponse.status).toBe(422);
+    expect(unsafeWalletValidation.status).toBe("unsafe-input-rejected");
+    expect(unsafeWalletValidation.unsafe_field_paths).toContain("execution.private_key");
+    expect(unsafeWalletValidation.can_save_public_scope).toBe(false);
+    expect(unsafeWalletValidation.next_action).toContain("Remove private keys");
+    expect(unsafeWalletValidationText).not.toContain(unsafeSecret);
+
+    const invalidWalletValidationResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_POST(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ execution: { wallet_public_key: "not-a-wallet" } }),
+    }));
+    const invalidWalletValidation = await json<{ status: string; can_save_public_scope: boolean; next_action: string }>(invalidWalletValidationResponse);
+    expect(invalidWalletValidationResponse.status).toBe(422);
+    expect(invalidWalletValidation.status).toBe("invalid-wallet");
+    expect(invalidWalletValidation.can_save_public_scope).toBe(false);
+    expect(invalidWalletValidation.next_action).toContain("valid dedicated public Solana wallet");
 
     const invalidLedgerResponse = await LIVE_TEST_LEDGER_GET(new Request("http://localhost/api/web3-live-test-ledger?account=hot-wallet"));
     const invalidLedgerReceipt = await json<{ error: string }>(invalidLedgerResponse);
