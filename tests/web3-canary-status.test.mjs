@@ -23,6 +23,16 @@ function canaryReceipt(overrides = {}) {
       id: "dedicated-public-wallet",
       label: "Dedicated public wallet",
       status: "needed-now",
+      owner: "operator",
+      safe_value_type: "Dedicated public Solana wallet address only.",
+      safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+      target_names: ["wallet_public_key"],
+      verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+      completion_signal: "A non-sample public Solana wallet is saved from the Trading live canary console.",
+      live_execution_permission: "blocked",
+      transaction_submission_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
     },
     next_action: "Replace the sample all-ones wallet with a dedicated public Solana address before canary review.",
     transaction_submission_permission: "blocked",
@@ -101,6 +111,17 @@ describe("web3 canary status command", () => {
     expect(packet.next_gate_id).toBe("wallet-scope");
     expect(packet.next_required_input_id).toBe("dedicated-public-wallet");
     expect(packet.alignment.status).toBe("pass");
+    expect(packet.safe_next_commands.map((command) => command.id)).toEqual([
+      "validate-public-wallet",
+      "save-public-wallet-scope",
+      "fetch-wallet-ownership-challenge",
+      "dedicated-public-wallet-strict-verifier",
+      "rerun-canary-status",
+    ]);
+    expect(packet.safe_next_commands.every((command) => command.live_execution_permission === "blocked")).toBe(true);
+    expect(packet.safe_next_commands.every((command) => command.transaction_submission_permission === "blocked")).toBe(true);
+    expect(packet.safe_next_commands.find((command) => command.id === "save-public-wallet-scope")?.command).toContain("scope-wallet:web3");
+    expect(packet.safe_next_commands.find((command) => command.id === "fetch-wallet-ownership-challenge")?.command).toContain("prove-wallet:web3");
   });
 
   test("GIVEN unsafe flags WHEN args are parsed THEN the command refuses them before fetch", async () => {

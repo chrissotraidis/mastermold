@@ -108,6 +108,11 @@ npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live
 npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary
 ```
 
+The `status-canary:web3` command and `/api/web3-canary-status` receipt include
+`safe_next_commands` for the active wallet scope/proof/status path, so the running app can
+show copyable public-value setup commands without granting signing, submission, or wallet
+mutation authority.
+
 The runner calls `/api/web3-trading` with the persisted daemon lease guard, records JSON
 receipts, refuses real-capital autonomy, and exits on conflicting runners. It is intended
 for local/paper monitoring and rehearsal only; live signing, transaction submission, and

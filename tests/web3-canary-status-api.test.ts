@@ -26,5 +26,12 @@ describe("web3 canary status API", () => {
     expect(receipt.canary_endpoint).toContain("/api/web3-live-trade-canary");
     expect(receipt.ignition_endpoint).toContain("/api/web3-live-ignition");
     expect(receipt.local_credentials_endpoint).toBe("/api/web3-local-credentials");
+    expect(receipt.safe_next_commands.length).toBeGreaterThan(0);
+    expect(receipt.safe_next_commands.some((command: { command: string }) => command.command.includes("status-canary:web3"))).toBe(true);
+    expect(receipt.safe_next_commands.every((command: { live_execution_permission: string; wallet_mutation_permission: string; secret_echo_permission: string }) =>
+      command.live_execution_permission === "blocked" &&
+      command.wallet_mutation_permission === "blocked" &&
+      command.secret_echo_permission === "blocked"
+    )).toBe(true);
   });
 });

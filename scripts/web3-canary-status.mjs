@@ -140,8 +140,10 @@ export function buildCanaryStatusPacket({ canary, ignition, local, http = {} }) 
     : actualLiveTradeTested && realFundsMoved
       ? "canary-proven"
       : canStartSupervisedCanary
-        ? "ready-for-supervised-canary"
-        : "blocked";
+      ? "ready-for-supervised-canary"
+      : "blocked";
+  const endpointParams = `source=${ignition.source}&account=${ignition.account}&scenario=${ignition.scenario}&cycles=0`;
+  const safeNextCommands = buildSafeNextCommands(canary, endpointParams);
 
   return {
     mode: "web3-canary-status",
@@ -158,6 +160,7 @@ export function buildCanaryStatusPacket({ canary, ignition, local, http = {} }) 
     next_required_input_id: nextInputId,
     next_required_input_label: canary.next_required_input?.label ?? null,
     next_action: ignition.next_action || canary.next_action,
+    safe_next_commands: safeNextCommands,
     blocker_count: Math.max(Number(ignition.blocker_count ?? 0), Array.isArray(canary.blockers) ? canary.blockers.length : 0),
     signed_relay_status: canary.signed_relay_status,
     current_request_id: canary.current_request_id ?? null,
@@ -175,8 +178,8 @@ export function buildCanaryStatusPacket({ canary, ignition, local, http = {} }) 
       detail: alignmentDetail,
     },
     http_status: http,
-    canary_endpoint: `/api/web3-live-trade-canary?source=${ignition.source}&account=${ignition.account}&scenario=${ignition.scenario}&cycles=0`,
-    ignition_endpoint: `/api/web3-live-ignition?source=${ignition.source}&account=${ignition.account}&scenario=${ignition.scenario}&cycles=0`,
+    canary_endpoint: `/api/web3-live-trade-canary?${endpointParams}`,
+    ignition_endpoint: `/api/web3-live-ignition?${endpointParams}`,
     local_credentials_endpoint: "/api/web3-local-credentials",
     transaction_submission_permission: canary.transaction_submission_permission,
     live_execution_permission: ignition.live_execution_permission,
@@ -190,6 +193,106 @@ export function buildCanaryStatusPacket({ canary, ignition, local, http = {} }) 
       "Private keys, seed phrases, API key values, raw transactions, signed payload storage, wallet mutation, and secret echo remain blocked.",
     ],
   };
+}
+
+function buildSafeNextCommands(canary, endpointParams) {
+  const nextInput = canary.next_required_input;
+  const common = {
+    live_execution_permission: "blocked",
+    transaction_submission_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
+  };
+  const commands = [];
+
+  if (nextInput?.id === "dedicated-public-wallet") {
+    commands.push(
+      {
+        id: "validate-public-wallet",
+        label: "Validate public wallet",
+        command: "npm run validate-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json",
+        purpose: "Checks the public wallet and proof runway without saving state.",
+        safe_surface: "/api/web3-dedicated-wallet-intake-contract",
+        completion_signal: "The validation receipt reports valid-public-wallet and can_save_public_scope=true.",
+        uses_placeholder: true,
+        ...common,
+      },
+      {
+        id: "save-public-wallet-scope",
+        label: "Save public wallet scope",
+        command: "npm run scope-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --save --json",
+        purpose: "Saves only the dedicated public wallet and dry-run caps, then refreshes canary status.",
+        safe_surface: nextInput.safe_surface,
+        completion_signal: "The canary status next gate advances to wallet-ownership.",
+        uses_placeholder: true,
+        ...common,
+      },
+      {
+        id: "fetch-wallet-ownership-challenge",
+        label: "Fetch ownership challenge after scope",
+        command: "npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json",
+        purpose: "Fetches public text for browser-wallet ownership proof after the public wallet is scoped.",
+        safe_surface: "/api/web3-wallet-ownership",
+        completion_signal: "The command returns status=challenge-ready and message_base64 for external message signing.",
+        uses_placeholder: true,
+        ...common,
+      },
+    );
+  } else if (nextInput?.id === "wallet-ownership-proof") {
+    commands.push(
+      {
+        id: "fetch-wallet-ownership-challenge",
+        label: "Fetch ownership challenge",
+        command: "npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<scoped-public-solana-address> --json",
+        purpose: "Fetches the text-only challenge for the already scoped public wallet.",
+        safe_surface: "/api/web3-wallet-ownership",
+        completion_signal: "The command returns status=challenge-ready and message_base64 for external message signing.",
+        uses_placeholder: true,
+        ...common,
+      },
+      {
+        id: "submit-wallet-ownership-proof",
+        label: "Submit ownership signature",
+        command: "npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<scoped-public-solana-address> --message-base64=<challenge-text-base64> --signature-base64=<wallet-message-signature> --json",
+        purpose: "Submits an external browser-wallet message signature and stores hash-only proof.",
+        safe_surface: "/api/web3-wallet-ownership",
+        completion_signal: "The proof receipt reports proof-verified and the live canary sees wallet_ownership_current_for_canary=true.",
+        uses_placeholder: true,
+        ...common,
+      },
+    );
+  }
+
+  if (nextInput?.verifier_command) {
+    commands.push({
+      id: `${nextInput.id}-strict-verifier`,
+      label: `${nextInput.label} verifier`,
+      command: nextInput.verifier_command,
+      purpose: "Runs the strict verifier for the current required input without granting live authority.",
+      safe_surface: nextInput.safe_surface,
+      completion_signal: nextInput.completion_signal,
+      uses_placeholder: nextInput.verifier_command.includes("<"),
+      ...common,
+    });
+  }
+
+  commands.push({
+    id: "rerun-canary-status",
+    label: "Rerun canary status",
+    command: "npm run status-canary:web3 -- --base-url=http://localhost:4010 --json",
+    purpose: "Confirms the running app's next gate after the safe input is handled.",
+    safe_surface: `/api/web3-canary-status?${endpointParams}`,
+    completion_signal: "The status receipt shows the next gate changed, or still names the active blocker.",
+    uses_placeholder: false,
+    ...common,
+  });
+
+  const seen = new Set();
+  return commands.filter((command) => {
+    if (seen.has(command.command)) return false;
+    seen.add(command.command);
+    return true;
+  }).slice(0, 5);
 }
 
 function verifySourceReceipts(canary, ignition, local, http) {
@@ -228,6 +331,8 @@ export function verifyCanaryStatusPacket(packet) {
   assert(packet.mode === "web3-canary-status", "Canary status packet should expose the expected mode.", packet);
   assert(["blocked", "ready-for-supervised-canary", "canary-proven", "can-autonomously-trade"].includes(packet.status), "Canary status should use a known status.", packet);
   assert(packet.alignment?.status === "pass", "Canary status should report receipt alignment.", packet);
+  assert(Array.isArray(packet.safe_next_commands) && packet.safe_next_commands.length > 0, "Canary status should expose safe next commands.", packet);
+  assert(packet.safe_next_commands.every((command) => command.live_execution_permission === "blocked" && command.transaction_submission_permission === "blocked" && command.wallet_mutation_permission === "blocked" && command.secret_echo_permission === "blocked"), "Safe next commands must keep live authority blocked.", packet.safe_next_commands);
   assert(packet.live_execution_permission === "blocked", "Canary status should keep live execution blocked until a separate launch gate changes it.", packet);
   assert(packet.wallet_mutation_permission === "blocked", "Canary status should keep wallet mutation blocked.", packet);
   assert(packet.private_key_storage === "blocked", "Canary status should keep private key storage blocked.", packet);
@@ -256,6 +361,9 @@ function markdown(packet) {
     "",
     "## Next Action",
     packet.next_action,
+    "",
+    "## Safe Commands",
+    ...packet.safe_next_commands.map((command) => `- ${command.label}: ${command.command}`),
     "",
     "## Alignment",
     packet.alignment.detail,

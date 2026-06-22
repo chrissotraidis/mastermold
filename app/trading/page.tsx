@@ -962,8 +962,23 @@ function LiveCanaryCommandCenter({
               <LiveUsabilityStat label="Credentials" value={`${status.local_credentials.configured_count}/${status.local_credentials.configured_count + status.local_credentials.missing_count}`} tone={status.local_credentials.missing_count === 0 ? "engine" : "caution"} />
               <LiveUsabilityStat label="Alignment" value={status.alignment.status} tone="engine" />
             </div>
+            <div className="mt-3 grid gap-2" aria-label="Running app safe next commands">
+              {status.safe_next_commands.slice(0, 3).map((command) => (
+                <div key={command.id} className="rounded-md border border-outline/15 bg-surface/60 p-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-on-surface">{command.label}</p>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                      {command.uses_placeholder ? "needs public value" : "ready"}
+                    </span>
+                  </div>
+                  <code className="mt-1 block overflow-x-auto whitespace-nowrap rounded border border-outline/10 bg-black/20 px-2 py-1 text-[10px] leading-5 text-outline">
+                    {command.command}
+                  </code>
+                </div>
+              ))}
+            </div>
             <p className="mt-2 text-[11px] leading-4 text-outline">
-              {status.alignment.detail} This panel is read-only and cannot sign, submit, store wallet authority, or move funds.
+              {status.alignment.detail} Safe commands are public/env-target setup only; this panel is read-only and cannot sign, submit, store wallet authority, or move funds.
             </p>
           </div>
 

@@ -20,6 +20,7 @@ export type Web3CanaryStatusReceipt = {
   next_required_input_id: Web3LiveTradeCanaryRequiredInput["id"] | null;
   next_required_input_label: string | null;
   next_action: string;
+  safe_next_commands: Web3CanaryStatusSafeCommand[];
   blocker_count: number;
   signed_relay_status: Web3LiveTradeCanaryReceipt["signed_relay_status"];
   current_request_id: string | null;
@@ -52,6 +53,20 @@ export type Web3CanaryStatusReceipt = {
   seed_phrase_storage: "blocked";
   secret_echo_permission: "blocked";
   controls: string[];
+};
+
+export type Web3CanaryStatusSafeCommand = {
+  id: string;
+  label: string;
+  command: string;
+  purpose: string;
+  safe_surface: string;
+  completion_signal: string;
+  uses_placeholder: boolean;
+  live_execution_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  secret_echo_permission: "blocked";
 };
 
 const strictGateMap: Partial<Record<Web3LiveTradeCanaryRequiredInput["id"], NonNullable<Web3LiveIgnitionReceipt["next_gate_id"]>>> = {
@@ -90,6 +105,7 @@ export function buildWeb3CanaryStatusReceipt(input: {
         ? "ready-for-supervised-canary"
         : "blocked";
   const endpointParams = `source=${input.ignition.source}&account=${input.ignition.account}&scenario=${input.ignition.scenario}&cycles=0`;
+  const safeNextCommands = buildSafeNextCommands(input.canary, endpointParams);
   const receiptBase = {
     mode: "web3-canary-status" as const,
     status,
@@ -106,6 +122,7 @@ export function buildWeb3CanaryStatusReceipt(input: {
     next_required_input_id: nextRequiredInput?.id ?? null,
     next_required_input_label: nextRequiredInput?.label ?? null,
     next_action: input.ignition.next_action || input.canary.next_action,
+    safe_next_commands: safeNextCommands,
     blocker_count: Math.max(input.ignition.blocker_count, input.canary.blockers.length),
     signed_relay_status: input.canary.signed_relay_status,
     current_request_id: input.canary.current_request_id,
@@ -148,6 +165,111 @@ export function buildWeb3CanaryStatusReceipt(input: {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
   };
+}
+
+function buildSafeNextCommands(canary: Web3LiveTradeCanaryReceipt, endpointParams: string): Web3CanaryStatusSafeCommand[] {
+  const nextInput = canary.next_required_input;
+  const statusCommand = "npm run status-canary:web3 -- --base-url=http://localhost:4010 --json";
+  const common = {
+    live_execution_permission: "blocked" as const,
+    transaction_submission_permission: "blocked" as const,
+    wallet_mutation_permission: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
+  };
+  const commands: Web3CanaryStatusSafeCommand[] = [];
+
+  if (nextInput?.id === "dedicated-public-wallet") {
+    commands.push(
+      {
+        id: "validate-public-wallet",
+        label: "Validate public wallet",
+        command: "npm run validate-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json",
+        purpose: "Checks the public wallet and proof runway without saving state.",
+        safe_surface: "/api/web3-dedicated-wallet-intake-contract",
+        completion_signal: "The validation receipt reports valid-public-wallet and can_save_public_scope=true.",
+        uses_placeholder: true,
+        ...common,
+      },
+      {
+        id: "save-public-wallet-scope",
+        label: "Save public wallet scope",
+        command: "npm run scope-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --save --json",
+        purpose: "Saves only the dedicated public wallet and dry-run caps, then refreshes canary status.",
+        safe_surface: nextInput.safe_surface,
+        completion_signal: "The canary status next gate advances to wallet-ownership.",
+        uses_placeholder: true,
+        ...common,
+      },
+      {
+        id: "fetch-wallet-ownership-challenge",
+        label: "Fetch ownership challenge after scope",
+        command: "npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json",
+        purpose: "Fetches public text for browser-wallet ownership proof after the public wallet is scoped.",
+        safe_surface: "/api/web3-wallet-ownership",
+        completion_signal: "The command returns status=challenge-ready and message_base64 for external message signing.",
+        uses_placeholder: true,
+        ...common,
+      },
+    );
+  } else if (nextInput?.id === "wallet-ownership-proof") {
+    commands.push(
+      {
+        id: "fetch-wallet-ownership-challenge",
+        label: "Fetch ownership challenge",
+        command: "npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<scoped-public-solana-address> --json",
+        purpose: "Fetches the text-only challenge for the already scoped public wallet.",
+        safe_surface: "/api/web3-wallet-ownership",
+        completion_signal: "The command returns status=challenge-ready and message_base64 for external message signing.",
+        uses_placeholder: true,
+        ...common,
+      },
+      {
+        id: "submit-wallet-ownership-proof",
+        label: "Submit ownership signature",
+        command: "npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<scoped-public-solana-address> --message-base64=<challenge-text-base64> --signature-base64=<wallet-message-signature> --json",
+        purpose: "Submits an external browser-wallet message signature and stores hash-only proof.",
+        safe_surface: "/api/web3-wallet-ownership",
+        completion_signal: "The proof receipt reports proof-verified and the live canary sees wallet_ownership_current_for_canary=true.",
+        uses_placeholder: true,
+        ...common,
+      },
+    );
+  }
+
+  if (nextInput?.verifier_command) {
+    commands.push({
+      id: `${nextInput.id}-strict-verifier`,
+      label: `${nextInput.label} verifier`,
+      command: nextInput.verifier_command,
+      purpose: "Runs the strict verifier for the current required input without granting live authority.",
+      safe_surface: nextInput.safe_surface,
+      completion_signal: nextInput.completion_signal,
+      uses_placeholder: nextInput.verifier_command.includes("<"),
+      ...common,
+    });
+  }
+
+  commands.push({
+    id: "rerun-canary-status",
+    label: "Rerun canary status",
+    command: statusCommand,
+    purpose: "Confirms the running app's next gate after the safe input is handled.",
+    safe_surface: `/api/web3-canary-status?${endpointParams}`,
+    completion_signal: "The status receipt shows the next gate changed, or still names the active blocker.",
+    uses_placeholder: false,
+    ...common,
+  });
+
+  return dedupeCommands(commands).slice(0, 5);
+}
+
+function dedupeCommands(commands: Web3CanaryStatusSafeCommand[]) {
+  const seen = new Set<string>();
+  return commands.filter((command) => {
+    if (seen.has(command.command)) return false;
+    seen.add(command.command);
+    return true;
+  });
 }
 
 export function assertWeb3CanaryStatusSources(input: {
