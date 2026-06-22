@@ -171,10 +171,13 @@ wallet, or prove that a live trade happened.
 `/api/health` also exposes `web3_live_first_canary_drill`, a canonical
 live-dex persistent first-canary health summary for monitors that need the real live-trade
 blocker without inferring it from the default app state, plus `web3_live_canary_proof`
-for the compact post-signing proof chain after a signed canary exists. The drill health
-and Trading card also split the ordered canary lane from the broader credential-intake
-queue so a Jupiter order blocker and a wallet-proof intake step do not look like conflicting
-answers. `verify:web3` is a Node-only
+for the compact post-signing proof chain after a signed canary exists. Health now derives
+those live canary summaries and the first live-canary attempt summary from one shared
+canonical live-dex persistent state, reducing repeated provider work while preserving
+blocked live execution, transaction submission, signing, wallet mutation, and no-funded-trade
+truth. The drill health and Trading card also split the ordered canary lane from the
+broader credential-intake queue so a Jupiter order blocker and a wallet-proof intake step
+do not look like conflicting answers. `verify:web3` is a Node-only
 operator check for machines without Bun: against a running app, it snapshots the saved
 public wallet/risk scope, proves health receipts, execution input validation, public-wallet
 dry-run scope save, credential validate-only redaction, text-only `/api/web3-wallet-ownership`

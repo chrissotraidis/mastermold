@@ -38,10 +38,19 @@ import {
   buildWeb3SupervisedCanaryReadinessReceipt,
 } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
-import { getWeb3TradingStateAsync, type TradingStateInput } from "@/src/db/web3-trading";
+import { getWeb3TradingStateAsync, type TradingStateInput, type Web3TradingState } from "@/src/db/web3-trading";
 import { buildWeb3UsabilityStatus } from "@/src/db/web3-usability-status";
 
+const CANONICAL_LIVE_STATE_INPUT: TradingStateInput = {
+  advance: false,
+  source: "live-dex",
+  account: "persistent",
+  scenario: "breakout",
+  cycles: 0,
+};
+
 export async function GET() {
+  const canonicalLiveStatePromise = getWeb3TradingStateAsync(CANONICAL_LIVE_STATE_INPUT);
   const web3DaemonSupervisor = getWeb3DaemonSupervisorHealth();
   const web3PromotedPaperAutopilot = getWeb3PromotedPaperAutopilotHealth();
   const web3State = await getWeb3TradingStateAsync({ advance: false });
@@ -170,9 +179,11 @@ export async function GET() {
     unsignedPreflight: web3UnsignedPreflight,
     canary: web3Canary,
   });
-  const web3LiveFirstCanaryDrillHealth = await buildCanonicalLiveFirstCanaryDrillHealth();
-  const web3LiveCanaryProofHealth = await buildCanonicalLiveCanaryProofHealth();
-  const web3LiveCanaryAttemptHealth = await buildCanonicalLiveCanaryAttemptHealth();
+  const {
+    web3LiveFirstCanaryDrillHealth,
+    web3LiveCanaryProofHealth,
+    web3LiveCanaryAttemptHealth,
+  } = buildCanonicalLiveHealthBundle(await canonicalLiveStatePromise);
   return NextResponse.json({
     status: "ok",
     web3_daemon_supervisor: web3DaemonSupervisor,
@@ -194,32 +205,18 @@ export async function GET() {
   });
 }
 
-async function buildCanonicalLiveCanaryAttemptHealth() {
-  return buildWeb3SupervisedCanaryAttemptHealth(await buildCanonicalLiveCanaryReadinessReceipt());
-}
-
-async function buildCanonicalLiveCanaryProofHealth() {
-  const state = await getWeb3TradingStateAsync({
-    advance: false,
-    source: "live-dex",
-    account: "persistent",
-    scenario: "breakout",
-    cycles: 0,
-  });
-  return buildWeb3LiveTradeCanaryHealth(buildWeb3LiveTradeCanaryReceipt(state));
-}
-
-async function buildCanonicalLiveCanaryReadinessReceipt() {
-  const stateInput: TradingStateInput = {
-    advance: false,
-    source: "live-dex",
-    account: "persistent",
-    scenario: "breakout",
-    cycles: 0,
+function buildCanonicalLiveHealthBundle(state: Web3TradingState) {
+  const readiness = buildCanonicalLiveCanaryReadinessReceipt(state);
+  return {
+    web3LiveFirstCanaryDrillHealth: buildCanonicalLiveFirstCanaryDrillHealth(state),
+    web3LiveCanaryProofHealth: buildWeb3LiveTradeCanaryHealth(buildWeb3LiveTradeCanaryReceipt(state)),
+    web3LiveCanaryAttemptHealth: buildWeb3SupervisedCanaryAttemptHealth(readiness),
   };
+}
+
+function buildCanonicalLiveCanaryReadinessReceipt(state: Web3TradingState) {
   const daemonHealth = getWeb3DaemonSupervisorHealth();
   const promotedHealth = getWeb3PromotedPaperAutopilotHealth();
-  const state = await getWeb3TradingStateAsync(stateInput);
   const wallet = buildWeb3DedicatedWalletPacket(state);
   const jupiter = buildWeb3JupiterOrderPacket(state);
   const signer = buildWeb3SignerCredentialPacket(state);
@@ -310,17 +307,9 @@ async function buildCanonicalLiveCanaryReadinessReceipt() {
   });
 }
 
-async function buildCanonicalLiveFirstCanaryDrillHealth() {
-  const stateInput: TradingStateInput = {
-    advance: false,
-    source: "live-dex",
-    account: "persistent",
-    scenario: "breakout",
-    cycles: 0,
-  };
+function buildCanonicalLiveFirstCanaryDrillHealth(state: Web3TradingState) {
   const daemonHealth = getWeb3DaemonSupervisorHealth();
   const promotedHealth = getWeb3PromotedPaperAutopilotHealth();
-  const state = await getWeb3TradingStateAsync(stateInput);
   const wallet = buildWeb3DedicatedWalletPacket(state);
   const jupiter = buildWeb3JupiterOrderPacket(state);
   const signer = buildWeb3SignerCredentialPacket(state);

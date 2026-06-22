@@ -1905,6 +1905,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/health/route.ts")).toContain("web3_live_first_canary_drill");
     expect(source("app/api/health/route.ts")).toContain("web3_canary_proof");
     expect(source("app/api/health/route.ts")).toContain("web3_live_canary_proof");
+    expect(source("app/api/health/route.ts")).toContain("const canonicalLiveStatePromise = getWeb3TradingStateAsync(CANONICAL_LIVE_STATE_INPUT)");
+    expect(source("app/api/health/route.ts")).toContain("buildCanonicalLiveHealthBundle(await canonicalLiveStatePromise)");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("web3-live-canary-proof-health");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyCanaryProofHealth");
     expect(source("docs/web3-credentials-runbook.md")).toContain("canonical live-dex persistent monitor summary");
