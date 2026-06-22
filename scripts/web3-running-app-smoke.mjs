@@ -139,7 +139,11 @@ async function verifyTradingPage() {
     /private keys/,
     /seed phrases/,
   ];
-  const { response, text } = await requestTextUntil(`/trading?${LIVE_QUERY}`, requiredMarkers);
+  const { response, text } = await requestTextUntil(`/trading?${LIVE_QUERY}`, requiredMarkers, {
+    timeoutMs: 90_000,
+    readTimeoutMs: 75_000,
+    maxBytes: 900_000,
+  });
   assert(response.status === 200, "Trading page should return 200.", { status: response.status });
   assert(text.length > 50_000, "Trading page should return the real cockpit HTML, not a tiny fallback.", { length: text.length });
   assert(!text.includes("This site can't be reached"), "Trading page should not render the browser network error page.");

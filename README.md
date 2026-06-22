@@ -100,6 +100,7 @@ npm run credentials-local:web3 -- --base-url=http://localhost:4010 --json
 npm run status-canary:web3 -- --base-url=http://localhost:4010 --json
 npm run validate-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json
 npm run scope-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --save --json
+npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json
 npm run verify:web3 -- --base-url=http://localhost:4010
 npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet
 npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
