@@ -1,5 +1,6 @@
 import { Activity, ArrowRight, BarChart3, Database, ShieldCheck, Wallet } from "lucide-react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { AppShell } from "@/components/app-shell";
 import { CopyRedactedPacketButton } from "@/components/copy-redacted-packet-button";
 import { PageHeader } from "@/components/page-header";
@@ -9,6 +10,7 @@ import { Web3TradingWorkspaceLoader } from "@/components/web3-trading-workspace-
 import { buildWeb3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
 import { buildWeb3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { buildWeb3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
+import { buildWeb3CanaryStatusReceipt, type Web3CanaryStatusReceipt } from "@/src/db/web3-canary-status";
 import { buildWeb3CredentialRequirementsReceipt } from "@/src/db/web3-credential-requirements";
 import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
@@ -29,6 +31,7 @@ import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
 import { buildWeb3LiveTradeCanaryReceipt, type Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
 import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
+import { buildWeb3LocalCredentialInstallHealth } from "@/src/db/web3-local-credential-install";
 import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
@@ -54,6 +57,7 @@ function firstParam(value: string | string[] | undefined) {
 
 export default async function TradingPage({ searchParams }: TradingPageProps) {
   const params = await searchParams;
+  const requestHeaders = await headers();
   const accountParam = firstParam(params?.account);
   const sourceParam = firstParam(params?.source);
   const scenarioParam = firstParam(params?.scenario);
@@ -184,6 +188,12 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     drill: firstCanaryDrill,
     requirements: credentialRequirements,
   });
+  const localCredentialStatus = buildWeb3LocalCredentialInstallHealth(localCredentialStatusRequest(requestHeaders));
+  const canaryStatus = buildWeb3CanaryStatusReceipt({
+    canary: liveTradeCanary,
+    ignition: liveIgnition,
+    localCredentials: localCredentialStatus,
+  });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -202,6 +212,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
         <div className="w-full min-w-0 space-y-4">
           <TradingSourceSwitch source={source} account={account} scenario={initialState.scenario} />
           <LiveCanaryCommandCenter
+            status={canaryStatus}
             ignition={liveIgnition}
             readiness={supervisedCanaryReadiness}
             blockers={liveUsabilityBlockers}
@@ -255,6 +266,17 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
       </div>
     </AppShell>
   );
+}
+
+function localCredentialStatusRequest(requestHeaders: Headers) {
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:4010";
+  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
+  return new Request(`${protocol}://${host}/api/web3-local-credentials`, {
+    headers: {
+      host,
+      "x-forwarded-host": host,
+    },
+  });
 }
 
 function TradingOperatorInputPacket({
@@ -792,12 +814,14 @@ function tradingSourceHref(source: "sample" | "live-dex", account: "persistent" 
 }
 
 function LiveCanaryCommandCenter({
+  status,
   ignition,
   readiness,
   blockers,
   canary,
   drill,
 }: {
+  status: Web3CanaryStatusReceipt;
   ignition: Web3LiveIgnitionReceipt;
   readiness: Web3SupervisedCanaryReadinessReceipt;
   blockers: Web3LiveUsabilityBlockersReceipt;
@@ -814,6 +838,7 @@ function LiveCanaryCommandCenter({
   const drillHref = drill.live_review_source_endpoint;
   const liveTestLedgerHref = `/api/web3-live-test-ledger?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const liveUsabilitySummaryHref = `/api/web3-live-usability-summary?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
+  const canaryStatusHref = `/api/web3-canary-status?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const walletIntakeContractHref = `/api/web3-dedicated-wallet-intake-contract?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const canaryAttemptSummaryHref = `/api/web3-supervised-canary-readiness?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const attemptContract = readiness.canary_attempt_contract;
@@ -911,6 +936,35 @@ function LiveCanaryCommandCenter({
             <LiveUsabilityStat label="Unsigned order" value={drill.can_request_unsigned_order_now ? "ready" : "blocked"} tone={drill.can_request_unsigned_order_now ? "caution" : "critical"} />
             <LiveUsabilityStat label="Signed relay" value={drill.signed_relay_status.replaceAll("-", " ")} tone={drill.signed_relay_status === "ready" || drill.signed_relay_status === "relayed" ? "engine" : "critical"} />
             <LiveUsabilityStat label="Proof" value={`${drill.proof_pass_count}/${drill.proof_required_count}`} tone={canaryProven ? "engine" : "critical"} />
+          </div>
+
+          <div className="mt-3 rounded-md border border-outline/15 bg-surface-dim/40 p-3" aria-label="Running app canary status">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Running app canary status</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {status.actual_live_trade_tested
+                    ? "Funded canary proof exists"
+                    : "Running app tested, funded trade not proven"}
+                </p>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-on-surface-variant">{status.next_action}</p>
+              </div>
+              <Link
+                href={canaryStatusHref}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline/20 bg-surface/70 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+              >
+                Open status JSON
+              </Link>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <LiveUsabilityStat label="Autonomy" value={status.can_autonomously_trade_real_money_now ? "ready" : "blocked"} tone={status.can_autonomously_trade_real_money_now ? "engine" : "critical"} />
+              <LiveUsabilityStat label="Next gate" value={status.next_gate_id?.replaceAll("-", " ") ?? "unknown"} tone={status.next_gate_id ? "critical" : "caution"} />
+              <LiveUsabilityStat label="Credentials" value={`${status.local_credentials.configured_count}/${status.local_credentials.configured_count + status.local_credentials.missing_count}`} tone={status.local_credentials.missing_count === 0 ? "engine" : "caution"} />
+              <LiveUsabilityStat label="Alignment" value={status.alignment.status} tone="engine" />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              {status.alignment.detail} This panel is read-only and cannot sign, submit, store wallet authority, or move funds.
+            </p>
           </div>
 
           <div className="hidden gap-2 sm:mt-3 sm:grid sm:grid-cols-3">

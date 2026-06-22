@@ -126,6 +126,8 @@ async function verifyTradingPage() {
     /No real trade tested yet/,
     /Actual live trade test ledger/,
     /First canary attempt summary/,
+    /Running app canary status/,
+    /Open status JSON/,
     /Open attempt readiness JSON/,
     /Open wallet contract/,
     /Funded wallet trade/,
@@ -145,6 +147,7 @@ async function verifyTradingPage() {
   assert(text.includes("No real trade tested yet"), "Trading page should say no real live trade has been tested.", text);
   assert(text.includes("Actual live trade test ledger"), "Trading page should expose the actual live-trade test ledger.", text);
   assert(text.includes("First canary attempt summary"), "Trading page should expose the first canary attempt summary.", text);
+  assert(text.includes("Running app canary status") && text.includes("Open status JSON"), "Trading page should expose the reconciled running-app canary status.", text);
   assert(text.includes("Open attempt readiness JSON"), "Trading page should link the attempt readiness JSON.", text);
   assert(text.includes("Open wallet contract"), "Trading page should link the wallet intake contract.", text);
   assert(text.includes("Funded wallet trade") && text.includes("not attempted"), "Trading page should say the funded wallet trade was not attempted.", text);
@@ -154,6 +157,21 @@ async function verifyTradingPage() {
   assert(includesAny(text, ["Net worth", "wallet curve", "Wallet equity"]), "Trading page should expose a wallet/net-worth chart surface.", text);
   assert(text.includes("private keys") && text.includes("seed phrases"), "Trading page should repeat the never-provide wallet-secret boundary.", text);
   record("trading-page", "pass", "live DEX trading cockpit renders with live-test ledger, live block, wallet gate, canary console, and net-worth surface");
+}
+
+async function verifyCanaryStatus() {
+  const { response, json } = await requestJson(`/api/web3-canary-status?${LIVE_QUERY}`);
+  assert(response.status === 200, "Canary status should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-canary-status", "Canary status should expose the expected mode.", json);
+  assert(json.status === "blocked", "Canary status should stay blocked until live gates are proven.", json);
+  assert(json.actual_live_trade_tested === false, "Canary status should report no actual funded trade tested yet.", json);
+  assert(json.real_funds_moved_by_this_app === false, "Canary status should report no real funds moved by the app.", json);
+  assert(json.can_autonomously_trade_real_money_now === false, "Canary status should not grant autonomous real-money authority.", json);
+  assert(json.alignment?.status === "pass", "Canary status should reconcile canary and ignition guidance.", json.alignment);
+  assert(json.live_execution_permission === "blocked", "Canary status should keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Canary status should keep wallet mutation blocked.", json);
+  assert(json.secret_echo_permission === "blocked", "Canary status should keep secret echo blocked.", json);
+  record("canary-status", "pass", json.next_action || "canary status remains blocked and aligned");
 }
 
 async function verifySettingsCredentialsPage() {
@@ -259,6 +277,7 @@ async function main() {
   await verifyHealth();
   await verifyTradingPage();
   await verifySettingsCredentialsPage();
+  await verifyCanaryStatus();
   await verifyCanaryReceipt();
   await verifyLiveTestLedger();
   await verifyLiveUsabilitySummary();
