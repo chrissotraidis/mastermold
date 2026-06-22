@@ -2379,8 +2379,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("owner/phase implementation plan and queue");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run research:web3 command");
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run requirements:web3 command");
+    expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run credentials-local:web3 command");
     expect(source("package.json")).toContain("\"research:web3\": \"node scripts/web3-research-handoff.mjs\"");
     expect(source("package.json")).toContain("\"requirements:web3\": \"node scripts/web3-credential-requirements.mjs\"");
+    expect(source("package.json")).toContain("\"credentials-local:web3\": \"node scripts/web3-local-credentials-status.mjs\"");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("/api/web3-research-handoff-packet");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("packet.live_execution_permission === \"blocked\"");
@@ -2402,6 +2404,13 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.seed_phrase_storage === \"blocked\"");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.secret_echo_permission === \"blocked\"");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("api-key=");
+    expect(source("scripts/web3-local-credentials-status.mjs")).toContain("/api/web3-local-credentials");
+    expect(source("scripts/web3-local-credentials-status.mjs")).toContain("# Mastermind Local Web3 Credential Status");
+    expect(source("scripts/web3-local-credentials-status.mjs")).toContain("receipt.live_execution_permission === \"blocked\"");
+    expect(source("scripts/web3-local-credentials-status.mjs")).toContain("receipt.wallet_mutation_permission === \"blocked\"");
+    expect(source("scripts/web3-local-credentials-status.mjs")).toContain("receipt.secret_echo_permission === \"blocked\"");
+    expect(source("README.md")).toContain("credentials-local:web3");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("credentials-local:web3");
     expect(source("scripts/web3-state-lock.mjs")).toContain("withWeb3StateMutationLock");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("withWeb3StateMutationLock(\"web3-readiness-verify\"");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("withWeb3StateMutationLock(\"web3-trading-smoke\"");

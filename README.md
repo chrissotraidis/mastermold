@@ -96,6 +96,7 @@ npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
 npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
 npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json
 npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json
+npm run credentials-local:web3 -- --base-url=http://localhost:4010 --json
 npm run validate-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json
 npm run verify:web3 -- --base-url=http://localhost:4010
 npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet
@@ -436,6 +437,11 @@ and blocked live/signing/wallet/secret permissions only; it never returns provid
 private keys, seed phrases, raw transactions, signed payloads, or trading authority.
 `npm run --silent requirements:web3 -- --base-url=http://localhost:4010` prints the same
 credential-only packet as paste-ready Markdown, or add `--json` for the full redacted receipt.
+`npm run --silent credentials-local:web3 -- --base-url=http://localhost:4010` reads the
+localhost-only `/api/web3-local-credentials` status receipt with GET only, reports configured
+and missing local env target names, refuses unsafe secret-shaped flags, and verifies live
+execution, wallet mutation, and secret echo remain blocked. It never posts credentials, signs,
+submits, stores wallet authority, or moves funds.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.
