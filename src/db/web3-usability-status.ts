@@ -269,7 +269,7 @@ function buildOperatorUnlockSequence(
       label: "Scope dedicated wallet",
       status: operatorInputUnlockStatus(wallet?.status),
       storage: wallet?.storage ?? "browser-public-scope",
-      next_action: wallet?.next_action ?? "Save a dedicated public Solana trading wallet address in Settings.",
+      next_action: wallet?.next_action ?? "Save a dedicated public Solana trading wallet address in the Trading live canary console.",
       evidence: wallet?.detail ?? "Dedicated public wallet scope is missing.",
     },
     {

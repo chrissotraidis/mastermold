@@ -11,7 +11,7 @@ export type Web3LiveTradeCanaryEvidenceItem = {
 };
 
 export type Web3LiveTradeCanaryRequiredInput = {
-  id: "wallet-ownership-proof" | "jupiter-order-rail" | "first-canary-live-flags" | "unsigned-order-preflight" | "signed-payload-relay" | "post-signing-proof";
+  id: "dedicated-public-wallet" | "wallet-ownership-proof" | "jupiter-order-rail" | "first-canary-live-flags" | "unsigned-order-preflight" | "signed-payload-relay" | "post-signing-proof";
   label: string;
   status: "done" | "needed-now" | "blocked" | "external-signature" | "proof-watch";
   owner: "operator" | "external-wallet" | "system";
@@ -435,6 +435,7 @@ function buildLiveTradeCanaryRequiredInputs(input: {
     state.execution_readiness.config.wallet_public_key ??
     null;
   const walletScoped = Boolean(walletPublicKey);
+  const walletLooksLikePublicKey = typeof walletPublicKey === "string" && isLikelySolanaPublicKey(walletPublicKey);
   const dedicatedWalletScoped = typeof walletPublicKey === "string" &&
     isLikelySolanaPublicKey(walletPublicKey) &&
     walletPublicKey !== SAMPLE_SYSTEM_WALLET;
@@ -449,16 +450,29 @@ function buildLiveTradeCanaryRequiredInputs(input: {
 
   return [
     requiredInput({
+      id: "dedicated-public-wallet",
+      label: "Dedicated public wallet",
+      status: dedicatedWalletScoped ? "done" : "needed-now",
+      owner: "operator",
+      safe_value_type: "Dedicated public Solana wallet address only; never a private key, seed phrase, keypair JSON, transaction bytes, or signed payload.",
+      safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+      target_names: ["wallet_public_key"],
+      verifier_command: walletLooksLikePublicKey
+        ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${walletPublicKey} --require-operator-wallet`
+        : "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+      completion_signal: "A non-sample public Solana wallet is saved from Trading or Settings; the sample all-ones wallet is rejected.",
+    }),
+    requiredInput({
       id: "wallet-ownership-proof",
       label: "Wallet ownership proof",
-      status: dedicatedWalletScoped && walletOwnership.current_for_canary ? "done" : "needed-now",
+      status: dedicatedWalletScoped
+        ? walletOwnership.current_for_canary ? "done" : "needed-now"
+        : "blocked",
       owner: "external-wallet",
       safe_value_type: walletScoped
         ? "Hash-only browser-wallet text signature for the scoped public Solana wallet."
         : "Dedicated public Solana wallet address, then a hash-only browser-wallet text signature.",
-      safe_surface: dedicatedWalletScoped
-        ? "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console"
-        : "/settings/integrations#settings-web3-wallet-public-key",
+      safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
       target_names: ["wallet_public_key", "web3-wallet-ownership challenge hash"],
       verifier_command: dedicatedWalletScoped
         ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${walletPublicKey} --require-operator-wallet`

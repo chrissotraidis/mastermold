@@ -1430,7 +1430,7 @@ describe("Web3 autonomous trading subsystem", () => {
       label: "Dedicated public wallet",
       owner: "operator",
       priority: "needed-now",
-      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+      safe_collection_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
       storage_rule: "browser-public-scope",
       target_names: ["wallet_public_key"],
       live_execution_permission: "blocked",
@@ -1577,7 +1577,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.next_requirement).toMatchObject({
       id: "dedicated-public-wallet",
       target_names: ["wallet_public_key"],
-      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+      safe_collection_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
     });
     expect(packet.next_requirement?.completion_signal).toContain("--require-operator-wallet");
     expect(packet.next_action).toContain("public Solana trading wallet");
@@ -2538,7 +2538,7 @@ describe("Web3 autonomous trading subsystem", () => {
         id: "cutover:dedicated-trading-wallet",
         label: "Dedicated trading wallet",
         source: "cutover",
-        href: "/settings/integrations#settings-web3-wallet-public-key",
+        href: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
       });
     }
     expect(receipt.web3_live_usability.next_blocker?.safe_command).toContain("--require-operator-wallet");
@@ -2577,7 +2577,7 @@ describe("Web3 autonomous trading subsystem", () => {
     } else {
       expect(receipt.web3_live_usability.next_credential_request).toMatchObject({
         label: "Dedicated trading wallet",
-        fix_href: "/settings/integrations#settings-web3-wallet-public-key",
+        fix_href: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
       });
       expect(receipt.web3_live_usability.next_credential_request?.id).toContain("dedicated-trading-wallet");
       expect(receipt.web3_live_usability.next_credential_request?.safe_value_description).toContain("public Solana trading wallet address");
@@ -3160,6 +3160,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("wallet-ownership");
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("jupiter-order");
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("unsigned-order-preflight");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "dedicated-wallet")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "wallet-ownership")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "unsigned-order-preflight")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
@@ -3532,6 +3533,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.blockers.join(" ")).toContain("does not return unsigned transaction bytes");
     expect(receipt.blockers.join(" ")).toContain("one-shot Settings rehearsals are evidence only");
     expect(receipt.required_inputs.map((item) => item.id)).toEqual([
+      "dedicated-public-wallet",
       "wallet-ownership-proof",
       "jupiter-order-rail",
       "first-canary-live-flags",
@@ -3539,8 +3541,13 @@ describe("Web3 autonomous trading subsystem", () => {
       "signed-payload-relay",
       "post-signing-proof",
     ]);
-    expect(receipt.next_required_input?.id).toMatch(/wallet-ownership-proof|jupiter-order-rail/);
-    expect(receipt.required_inputs.find((item) => item.id === "wallet-ownership-proof")?.status).toMatch(/needed-now|done/);
+    expect(receipt.next_required_input?.id).toMatch(/dedicated-public-wallet|wallet-ownership-proof|jupiter-order-rail/);
+    expect(receipt.required_inputs.find((item) => item.id === "dedicated-public-wallet")).toMatchObject({
+      status: "needed-now",
+      safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+      target_names: ["wallet_public_key"],
+    });
+    expect(receipt.required_inputs.find((item) => item.id === "wallet-ownership-proof")?.status).toMatch(/blocked|needed-now|done/);
     expect(receipt.required_inputs.find((item) => item.id === "jupiter-order-rail")?.target_names).toContain("JUPITER_API_KEY");
     expect(receipt.required_inputs.find((item) => item.id === "jupiter-order-rail")?.safe_value_type).toContain("ignored local server env");
     expect(receipt.required_inputs.find((item) => item.id === "first-canary-live-flags")?.target_names).toEqual(expect.arrayContaining([
@@ -3571,7 +3578,7 @@ describe("Web3 autonomous trading subsystem", () => {
       next_action: string;
       blockers: string[];
       next_required_input: { id: string; status: string } | null;
-      required_inputs: Array<{ id: string; status: string; target_names: string[]; secret_echo_permission: string }>;
+      required_inputs: Array<{ id: string; status: string; target_names: string[]; safe_surface: string; secret_echo_permission: string }>;
       live_execution_permission: string;
       wallet_mutation_permission: string;
     }>(liveResponse);
@@ -3583,8 +3590,13 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(liveReceipt.blockers.join(" ")).not.toContain("Dry-run spend");
     expect(liveReceipt.blockers.join(" ")).not.toContain("dry-run daily cap");
     expect(liveReceipt.next_action).toBe(liveReceipt.blockers[0]);
+    expect(liveReceipt.required_inputs.map((item) => item.id)).toContain("dedicated-public-wallet");
     expect(liveReceipt.required_inputs.map((item) => item.id)).toContain("wallet-ownership-proof");
-    expect(liveReceipt.next_required_input?.id).toMatch(/wallet-ownership-proof|jupiter-order-rail|first-canary-live-flags/);
+    expect(liveReceipt.next_required_input?.id).toMatch(/dedicated-public-wallet|wallet-ownership-proof|jupiter-order-rail|first-canary-live-flags/);
+    if (liveReceipt.blockers[0].match(/Add a dedicated|Replace the scoped wallet|Replace the sample/)) {
+      expect(liveReceipt.next_required_input?.id).toBe("dedicated-public-wallet");
+      expect(liveReceipt.required_inputs.find((item) => item.id === "dedicated-public-wallet")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
+    }
     expect(liveReceipt.required_inputs.find((item) => item.id === "first-canary-live-flags")?.target_names).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
     expect(liveReceipt.required_inputs.every((item) => item.secret_echo_permission === "blocked")).toBe(true);
     expect(liveReceipt.live_execution_permission).toBe("blocked");
@@ -4305,7 +4317,7 @@ describe("Web3 autonomous trading subsystem", () => {
         id: receipt.missing_for_live_usability[0].id,
         label: receipt.missing_for_live_usability[0].label,
         source: "cutover",
-        href: "/settings/integrations#settings-web3-wallet-public-key",
+        href: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
       });
       expect(receipt.next_blocker?.next_action).toBe(receipt.missing_for_live_usability[0].next_action);
     }
@@ -4346,8 +4358,8 @@ describe("Web3 autonomous trading subsystem", () => {
       expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     } else {
       expect(receipt.next_credential_request).toMatchObject({
-        fix_href: "/settings/integrations#settings-web3-wallet-public-key",
-        safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+        fix_href: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+        safe_collection_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
         storage: "browser-public-scope",
         target_names: ["wallet_public_key"],
       });
@@ -4363,7 +4375,7 @@ describe("Web3 autonomous trading subsystem", () => {
         "prove-wallet-ownership",
         "refresh-live-usability",
       ]);
-      expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/settings/integrations#settings-web3-wallet-public-key");
+      expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     }
     expect(receipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
     if (receipt.operator_wallet_public_key) {

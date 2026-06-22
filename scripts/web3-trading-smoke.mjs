@@ -191,14 +191,14 @@ async function main() {
     health.web3_live_usability.next_blocker,
   );
   assert(
-    health.web3_live_usability.next_blocker?.href === (liveUsabilityProofIsNext ? liveUsabilityProofSurface : "/settings/integrations#settings-web3-wallet-public-key"),
+    health.web3_live_usability.next_blocker?.href === liveUsabilityProofSurface,
     "Live-usability health next blocker should expose the safe fix surface.",
     health.web3_live_usability.next_blocker,
   );
   assert(String(health.web3_live_usability.next_blocker?.safe_command ?? "").includes("--require-operator-wallet"), "Live-usability health next blocker should expose the strict safe verifier command.", health.web3_live_usability.next_blocker);
   assert(health.web3_live_usability.next_blocker?.blocks_live_capital === true, "Live-usability health next blocker should preserve live-capital blocking status.", health.web3_live_usability.next_blocker);
   assert(
-    health.web3_live_usability.next_credential_request?.fix_href === (liveUsabilityProofIsNext ? liveUsabilityProofSurface : "/settings/integrations#settings-web3-wallet-public-key"),
+    health.web3_live_usability.next_credential_request?.fix_href === liveUsabilityProofSurface,
     "Live-usability health should expose the next credential request fix surface.",
     health.web3_live_usability.next_credential_request,
   );

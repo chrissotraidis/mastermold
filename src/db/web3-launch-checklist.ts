@@ -534,7 +534,7 @@ function buildOperatorInputsNeeded({
           : "A dedicated non-sample public Solana trading wallet has not been scoped.",
       next_action: providerCredentials.dedicated_wallet_scoped
         ? "Keep this wallet isolated for Mastermind trading and continue ownership/accounting proof."
-        : "Save a dedicated public Solana trading wallet address in Settings; do not paste private keys or seed phrases.",
+        : "Save a dedicated public Solana trading wallet address in the Trading live canary console; do not paste private keys or seed phrases.",
       secret_handling: "Only the public address belongs here; private keys and seed phrases are never accepted.",
     },
     {

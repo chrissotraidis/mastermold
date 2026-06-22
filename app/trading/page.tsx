@@ -37,6 +37,9 @@ import { getLatestWeb3WalletOwnershipReceipt } from "@/src/db/web3-wallet-owners
 
 export const dynamic = "force-dynamic";
 
+const TRADING_LIVE_CANARY_CONSOLE_HREF = "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console";
+const SETTINGS_WEB3_RUNWAY_HREF = "/settings/integrations#settings-web3-credentials-runway";
+
 type TradingPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -909,8 +912,8 @@ function TradingCommandBoard({
   const nextBlocker = liveUsabilityBlockers.next_blocker;
   const nextCredentialRequest = liveUsabilityBlockers.next_credential_request;
   const settingsFixHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet" || nextUnlockStep?.id === "scope-wallet"
-    ? "/settings/integrations#settings-web3-wallet-public-key"
-    : "/settings/integrations#settings-web3-credentials-runway";
+    ? TRADING_LIVE_CANARY_CONSOLE_HREF
+    : SETTINGS_WEB3_RUNWAY_HREF;
   const settingsFixLabel = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet" || nextUnlockStep?.id === "scope-wallet" ? "Fix wallet gate" : "Fix gates";
   const leadMissingOwner = liveUsabilityBlockers.missing_owner_summary[0];
 
@@ -1813,8 +1816,8 @@ function LiveUsabilityBlockersPanel({
   const currentInput = receipt.current_input;
   const nextBlocker = receipt.next_blocker;
   const currentInputHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet"
-    ? "/settings/integrations#settings-web3-wallet-public-key"
-    : "/settings/integrations#settings-web3-credentials-runway";
+    ? TRADING_LIVE_CANARY_CONSOLE_HREF
+    : SETTINGS_WEB3_RUNWAY_HREF;
 
   return (
     <section
@@ -2148,8 +2151,8 @@ function OperatorRunbookPanel({
   const primary = runbook.primary_safe_action;
   const currentInput = runbook.current_input;
   const currentInputHref = currentInput?.id === "dedicated-trading-wallet" || currentInput?.unlock_step_id === "scope-wallet"
-    ? "/settings/integrations#settings-web3-wallet-public-key"
-    : "/settings/integrations#settings-web3-credentials-runway";
+    ? TRADING_LIVE_CANARY_CONSOLE_HREF
+    : SETTINGS_WEB3_RUNWAY_HREF;
   const visibleActions = runbook.run_now.slice(0, 6);
   const blockers = runbook.real_capital_blockers.slice(0, 4);
 

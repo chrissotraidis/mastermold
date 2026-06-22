@@ -86,7 +86,7 @@ export type Web3LiveUsabilityCredentialRequest = {
   verification_runway: Array<{
     id: string;
     label: string;
-    surface: "settings" | "browser-wallet" | "local-command" | "read-only-api" | "external-review";
+    surface: "settings" | "trading" | "browser-wallet" | "local-command" | "read-only-api" | "external-review";
     href: string | null;
     command: string | null;
     status: "next" | "after-input" | "gated" | "external";
@@ -440,7 +440,11 @@ function summarizeNextCredentialRequest(
     priority: useCurrentInput ? currentInput!.priority : "required-now",
     safe_collection_surface: useCurrentInput ? currentInput!.safe_collection_surface : fixHref,
     storage: useCurrentInput ? currentInput!.storage : credentialRequestStorageRule(id),
-    can_enter_in_app: useCurrentInput ? currentInput!.can_enter_in_app : Boolean(fixHref.includes("#settings-web3-wallet-public-key") || fixHref.includes("#web3-credential-action-console")),
+    can_enter_in_app: useCurrentInput ? currentInput!.can_enter_in_app : Boolean(
+      fixHref.includes("#settings-web3-wallet-public-key") ||
+      fixHref.includes("#web3-credential-action-console") ||
+      fixHref.includes("#web3-live-canary-console")
+    ),
     target_names: useCurrentInput ? currentInput!.target_names : credentialRequestTargetNames(id),
     fix_href: fixHref,
     safe_value_description: credentialRequestSafeValueDescription(id, currentInput, nextBlocker),
@@ -647,11 +651,11 @@ function credentialRequestVerificationRunway(
       verificationRunwayStep({
         id: "save-public-wallet",
         label: "Save public wallet scope",
-        surface: "settings",
+        surface: "trading",
         href: fixHref,
         command: null,
         status: "next",
-        next_action: "Save only the dedicated public Solana wallet address in Settings.",
+        next_action: "Save only the dedicated public Solana wallet address in the Trading live canary console.",
       }),
       verificationRunwayStep({
         id: "strict-wallet-verifier",
@@ -666,7 +670,7 @@ function credentialRequestVerificationRunway(
         id: "prove-wallet-ownership",
         label: "Prove wallet ownership",
         surface: "browser-wallet",
-        href: "/settings/integrations#web3-credential-action-console",
+        href: CANONICAL_LIVE_CANARY_SURFACE,
         command: null,
         status: "after-input",
         next_action: "Use the browser wallet to sign the text-only ownership challenge; this is not a transaction signature.",
@@ -837,7 +841,7 @@ function nextBlockerHref(item: Web3LiveUsabilityMissingItem) {
     item.id.includes("wallet-ownership") ||
     item.id === "runway:wallet"
   ) {
-    return "/settings/integrations#settings-web3-wallet-public-key";
+    return CANONICAL_LIVE_CANARY_SURFACE;
   }
   if (
     item.id.includes("jupiter") ||

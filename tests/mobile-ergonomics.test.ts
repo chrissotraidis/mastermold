@@ -836,7 +836,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("First-screen Web3 wallet net worth curve");
     expect(tradingPage).toContain('const settingsFixHref = currentInput?.id === "dedicated-trading-wallet"');
     expect(tradingPage).toContain('currentInput?.unlock_step_id === "scope-wallet"');
-    expect(tradingPage).toContain('"/settings/integrations#settings-web3-wallet-public-key"');
+    expect(tradingPage).toContain('"/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console"');
     expect(tradingPage).toContain('"/settings/integrations#settings-web3-credentials-runway"');
     expect(tradingPage).toContain("Fix wallet gate");
     expect(tradingPage).toContain("Open setup step");
@@ -2144,7 +2144,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("href: nextBlockerHref(item)");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("safe_command: nextBlockerSafeCommand(item, currentInput)");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("--require-operator-wallet");
-    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("/settings/integrations#settings-web3-wallet-public-key");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("currentInput?: Web3OperatorCurrentInput | null");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("operator_wallet_public_key: string | null");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("const currentInput = scopeCurrentInput(input.currentInput ?? null, operatorWalletPublicKey)");

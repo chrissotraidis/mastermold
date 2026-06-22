@@ -338,13 +338,13 @@ function buildCredentialRequirements(
     ? currentInput.next_action
     : walletOwnershipIsCurrent
       ? "A dedicated public wallet is scoped; keep it isolated and prove control with the browser wallet text-only challenge."
-      : "Save a dedicated public Solana trading wallet address in Settings; do not paste private keys or seed phrases.";
+      : "Save a dedicated public Solana trading wallet address in the Trading live canary console; do not paste private keys or seed phrases.";
   const walletOwnershipTargetNames = walletOwnershipIsCurrent && currentInput.target_names.length > 0
     ? currentInput.target_names
     : ["wallet_public_key", "wallet_ownership_signature_hash"];
   const walletOwnershipSurface = walletOwnershipIsCurrent
     ? CANONICAL_LIVE_CANARY_SURFACE
-    : "/settings/integrations#settings-web3-wallet-public-key";
+    : CANONICAL_LIVE_CANARY_SURFACE;
   const walletOwnershipAction = walletOwnershipIsCurrent
     ? currentInput.next_action
     : "Connect the browser wallet only for a public-address prompt, then sign the app's text-only ownership message.";
@@ -357,7 +357,7 @@ function buildCredentialRequirements(
       owner: "operator",
       priority: walletOwnershipIsCurrent ? "before-live" : "needed-now",
       safe_value_type: "Public Solana wallet address only",
-      safe_collection_surface: "/settings/integrations#settings-web3-wallet-public-key",
+      safe_collection_surface: CANONICAL_LIVE_CANARY_SURFACE,
       storage_rule: "browser-public-scope",
       target_names: ["wallet_public_key"],
       research_question_ids: linkedQuestions("credential-storage", "custody-architecture"),

@@ -417,14 +417,14 @@ async function verifyHealth() {
     json.web3_live_usability.next_blocker,
   );
   assert(
-    json.web3_live_usability.next_blocker?.href === (liveUsabilityProofIsNext ? liveUsabilityProofSurface : "/settings/integrations#settings-web3-wallet-public-key"),
+    json.web3_live_usability.next_blocker?.href === liveUsabilityProofSurface,
     "Live-usability health next blocker should expose the safe fix surface.",
     json.web3_live_usability.next_blocker,
   );
   assert(String(json.web3_live_usability.next_blocker?.safe_command ?? "").includes("--require-operator-wallet"), "Live-usability health next blocker should expose the strict safe verifier command.", json.web3_live_usability.next_blocker);
   assert(json.web3_live_usability.next_blocker?.blocks_live_capital === true, "Live-usability health next blocker should preserve live-capital blocking status.", json.web3_live_usability.next_blocker);
   assert(
-    json.web3_live_usability.next_credential_request?.fix_href === (liveUsabilityProofIsNext ? liveUsabilityProofSurface : "/settings/integrations#settings-web3-wallet-public-key"),
+    json.web3_live_usability.next_credential_request?.fix_href === liveUsabilityProofSurface,
     "Live-usability health should expose the next credential request fix surface.",
     json.web3_live_usability.next_credential_request,
   );
@@ -1548,9 +1548,10 @@ async function verifyLiveTradeCanary() {
   assert(json.blockers?.[0]?.includes("Open the live DEX trading cockpit"), "Sample live trade canary should order source scope before missing signature proof.", json.blockers);
   assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("No confirmed live transaction signature")), "Live trade canary should name missing live-trade evidence.", json.blockers);
   assert(Array.isArray(json.blockers) && json.blockers.some((blocker) => blocker.includes("does not return unsigned transaction bytes")), "Live trade canary should name the gated browser-signing handoff path.", json.blockers);
-  assert(Array.isArray(json.required_inputs) && json.required_inputs.length === 6, "Live trade canary should expose the six ordered inputs required for the first funded canary.", json);
-  assert(json.required_inputs.map((item) => item.id).join(",") === "wallet-ownership-proof,jupiter-order-rail,first-canary-live-flags,unsigned-order-preflight,signed-payload-relay,post-signing-proof", "Live trade canary required inputs should stay ordered.", json.required_inputs);
+  assert(Array.isArray(json.required_inputs) && json.required_inputs.length === 7, "Live trade canary should expose the seven ordered inputs required for the first funded canary.", json);
+  assert(json.required_inputs.map((item) => item.id).join(",") === "dedicated-public-wallet,wallet-ownership-proof,jupiter-order-rail,first-canary-live-flags,unsigned-order-preflight,signed-payload-relay,post-signing-proof", "Live trade canary required inputs should stay ordered.", json.required_inputs);
   assert(json.next_required_input && typeof json.next_required_input.id === "string", "Live trade canary should expose the next required input.", json);
+  assert(json.required_inputs.some((item) => item.id === "dedicated-public-wallet" && item.status === "done" && item.target_names?.includes("wallet_public_key")), "Sample live trade canary should mark the verifier public wallet scope done.", json.required_inputs);
   assert(json.required_inputs.some((item) => item.id === "wallet-ownership-proof" && item.status === "done"), "Sample live trade canary should mark the verifier wallet proof done.", json.required_inputs);
   assert(json.required_inputs.some((item) => item.id === "jupiter-order-rail" && item.target_names?.includes("JUPITER_API_KEY")), "Live trade canary should name the Jupiter env target without echoing a secret.", json.required_inputs);
   assert(json.required_inputs.some((item) => item.id === "first-canary-live-flags" && item.target_names?.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF")), "Live trade canary should name the exact unsigned handoff live flag.", json.required_inputs);
@@ -1606,7 +1607,8 @@ async function verifyLiveTradeCanary() {
   assert(live.response.status === 200, "Live-scoped canary receipt should return 200.", { status: live.response.status, json: live.json });
   assert(live.json.actual_live_trade_tested === false, "Live-scoped canary should not claim a funded trade in default verification.", live.json);
   assert(live.json.wallet_ownership_current_for_canary === true, "Live-scoped canary should see current wallet proof after verifier ownership proof.", live.json);
-  assert(Array.isArray(live.json.required_inputs) && live.json.required_inputs.some((item) => item.id === "wallet-ownership-proof"), "Live-scoped canary should expose wallet ownership as a structured input.", live.json);
+  assert(Array.isArray(live.json.required_inputs) && live.json.required_inputs.some((item) => item.id === "dedicated-public-wallet"), "Live-scoped canary should expose public wallet scope as the first structured input.", live.json);
+  assert(live.json.required_inputs.some((item) => item.id === "wallet-ownership-proof"), "Live-scoped canary should expose wallet ownership as a structured input.", live.json);
   assert(live.json.required_inputs.some((item) => item.id === "first-canary-live-flags" && item.target_names?.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF")), "Live-scoped canary should expose exact first-canary live flag targets.", live.json.required_inputs);
   assert(live.json.required_inputs.every((item) => item.secret_echo_permission === "blocked"), "Live-scoped canary required inputs must keep secret echo blocked.", live.json.required_inputs);
   assert(

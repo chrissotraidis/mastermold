@@ -2691,6 +2691,13 @@ function settingsCanaryRequiredInputAction(input: Web3LiveTradeCanaryReceipt["ne
     };
   }
   const sharedDetail = `Owner: ${input.owner.replaceAll("-", " ")}. Targets: ${input.target_names.join(", ")}.`;
+  if (input.id === "dedicated-public-wallet") {
+    return {
+      href: "#settings-web3-wallet-public-key",
+      label: "Save public wallet",
+      detail: `${sharedDetail} Save only a public Solana address; never paste a private key, seed phrase, or keypair JSON.`,
+    };
+  }
   if (input.id === "wallet-ownership-proof") {
     return {
       href: "#settings-web3-prove-wallet-ownership",

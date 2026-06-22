@@ -440,7 +440,7 @@ function firstCanarySafeSurface(
   },
 ) {
   const tradingCanarySurface = `/trading?source=live-dex&account=persistent&scenario=${input.readiness.scenario}#web3-live-canary-console`;
-  if (lane.id === "dedicated-wallet") return "/settings/integrations#settings-web3-wallet-public-key";
+  if (lane.id === "dedicated-wallet") return tradingCanarySurface;
   if (lane.id === "wallet-ownership") return tradingCanarySurface;
   if (lane.id === "jupiter-order") return "/settings/integrations#web3-credential-action-console";
   if (lane.id === "live-flags") return "/settings/integrations#web3-credential-action-console";

@@ -1518,6 +1518,15 @@ function buildPrimaryCanaryGateControl(input: {
       disabled: input.busy,
     };
   }
+  if (step.id === "dedicated-wallet") {
+    return {
+      label: "Save canary wallet",
+      detail: "Use the dedicated canary wallet panel in this console to save a public Solana address only; proof comes after the wallet is scoped.",
+      tone: "engine",
+      href: "#trading-web3-canary-wallet-public-key",
+      disabled: false,
+    };
+  }
   if (step.id === "wallet-ownership") {
     return {
       label: "Run wallet proof",
