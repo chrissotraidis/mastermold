@@ -94,6 +94,22 @@ function verifyPacket(packet) {
   assert(typeof packet.receipt_hash === "string" && /^[0-9a-f]{64}$/.test(packet.receipt_hash), "Credential requirements packet should include a receipt hash.", packet);
   assert(typeof packet.research_handoff_hash === "string" && /^[0-9a-f]{64}$/.test(packet.research_handoff_hash), "Credential requirements packet should include the source research handoff hash.", packet);
   assert(Array.isArray(packet.requirements) && packet.requirements.length >= 8, "Credential requirements packet should include the safe ask list.", packet);
+  assert(
+    packet.requirements.some((item) =>
+      item.id === "first-canary-live-flags" &&
+      item.target_names?.includes("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION") &&
+      item.target_names?.includes("MASTERMOLD_LIVE_OPERATOR_APPROVAL") &&
+      item.target_names?.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF")
+    ),
+    "Credential requirements packet should include the exact first-canary live flag targets.",
+    packet.requirements,
+  );
+  assert(
+    Array.isArray(packet.safe_to_share) &&
+      packet.safe_to_share.includes("Exact first-canary live flag values for ignored local env: MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true"),
+    "Credential requirements packet should list the exact first-canary live flag values as safe setup targets.",
+    packet.safe_to_share,
+  );
   assert(["dedicated-public-wallet", "wallet-ownership-proof"].includes(packet.next_requirement?.id), "Credential requirements packet should expose the current wallet ask.", packet);
   assert(
     packet.next_requirement?.target_names?.includes("wallet_public_key") ||
@@ -106,6 +122,8 @@ function verifyPacket(packet) {
   assert(typeof packet.text_packet === "string" && packet.text_packet.includes("# Mastermind Web3 Credential Requirements Packet"), "Credential requirements packet should include paste-ready markdown text.", packet);
   assert(packet.text_packet.includes("## Next Requirement"), "Credential requirements text should include the next requirement.", packet.text_packet);
   assert(packet.text_packet.includes("## Requirements"), "Credential requirements text should include the full ask list.", packet.text_packet);
+  assert(packet.text_packet.includes("First canary live flags"), "Credential requirements text should include the first-canary flag requirement.", packet.text_packet);
+  assert(packet.text_packet.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF"), "Credential requirements text should include the canary handoff flag target.", packet.text_packet);
   assert(packet.text_packet.includes("## Never Provide"), "Credential requirements text should include the never-provide boundary.", packet.text_packet);
   assert(packet.live_execution_permission === "blocked", "Credential requirements packet must keep live execution blocked.", packet);
   assert(packet.wallet_mutation_permission === "blocked", "Credential requirements packet must keep wallet mutation blocked.", packet);

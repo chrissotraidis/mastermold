@@ -1290,7 +1290,7 @@ async function verifyResearchHandoffPacket() {
   assert(Array.isArray(json.live_capital_blockers), "Research handoff packet should include live-capital blockers.", json.live_capital_blockers);
   assert(Array.isArray(json.credential_requirements) && json.credential_requirements.length >= 8, "Research handoff packet should include credential requirements.", json.credential_requirements);
   assert(
-    ["dedicated-public-wallet", "wallet-ownership-proof", "read-provider-rail", "jupiter-order-rail", "signer-policy", "ops-emergency-stop", "accounting-ledger", "risk-policy", "manual-live-review"].every((id) =>
+    ["dedicated-public-wallet", "wallet-ownership-proof", "read-provider-rail", "jupiter-order-rail", "first-canary-live-flags", "signer-policy", "ops-emergency-stop", "accounting-ledger", "risk-policy", "manual-live-review"].every((id) =>
       json.credential_requirements.some((item) =>
         item.id === id &&
         item.live_execution_permission === "blocked" &&
@@ -1303,6 +1303,7 @@ async function verifyResearchHandoffPacket() {
   );
   assert(json.credential_requirements.some((item) => item.id === "dedicated-public-wallet" && item.target_names?.includes("wallet_public_key")), "Research handoff credential requirements should point to the public wallet target.", json.credential_requirements);
   assert(json.credential_requirements.some((item) => item.id === "jupiter-order-rail" && item.target_names?.includes("JUPITER_API_KEY")), "Research handoff credential requirements should point to the Jupiter env target.", json.credential_requirements);
+  assert(json.credential_requirements.some((item) => item.id === "first-canary-live-flags" && item.target_names?.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF")), "Research handoff credential requirements should name the exact first-canary flag targets.", json.credential_requirements);
   assert(Array.isArray(json.research_questions) && json.research_questions.length >= 10, "Research handoff packet should include the research question set.", json.research_questions);
   assert(
     ["custody-architecture", "provider-stack", "moonshot-data-sources", "risk-gates", "credential-storage", "profit-proof"].every((id) =>
@@ -1312,6 +1313,7 @@ async function verifyResearchHandoffPacket() {
     json.research_questions,
   );
   assert(Array.isArray(json.safe_to_share) && json.safe_to_share.includes("Dedicated Solana public wallet address"), "Research handoff packet should list safe-to-share operator inputs.", json.safe_to_share);
+  assert(json.safe_to_share.includes("Exact first-canary live flag values for ignored local env: MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true"), "Research handoff packet should list exact canary flags as safe target values.", json.safe_to_share);
   assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Research handoff packet should keep seed phrases in never-provide list.", json.never_provide);
   assert(Array.isArray(json.source_endpoints) && json.source_endpoints.includes("/api/web3-operator-runbook?source=live-dex&account=persistent"), "Research handoff packet should link source endpoints.", json.source_endpoints);
   assert(json.source_endpoints.includes("/api/web3-credential-requirements?source=live-dex&account=persistent"), "Research handoff packet should link the standalone credential requirements endpoint.", json.source_endpoints);
@@ -1353,7 +1355,7 @@ async function verifyCredentialRequirementsPacket() {
     json.next_requirement,
   );
   assert(
-    ["dedicated-public-wallet", "wallet-ownership-proof", "read-provider-rail", "jupiter-order-rail", "signer-policy", "ops-emergency-stop", "accounting-ledger", "risk-policy", "manual-live-review"].every((id) =>
+    ["dedicated-public-wallet", "wallet-ownership-proof", "read-provider-rail", "jupiter-order-rail", "first-canary-live-flags", "signer-policy", "ops-emergency-stop", "accounting-ledger", "risk-policy", "manual-live-review"].every((id) =>
       json.requirements.some((item) =>
         item.id === id &&
         item.blocks_live_capital === true &&
@@ -1366,13 +1368,16 @@ async function verifyCredentialRequirementsPacket() {
     json.requirements,
   );
   assert(json.requirements.some((item) => item.id === "jupiter-order-rail" && item.target_names?.includes("JUPITER_API_KEY")), "Credential requirements packet should name the Jupiter target.", json.requirements);
+  assert(json.requirements.some((item) => item.id === "first-canary-live-flags" && item.target_names?.includes("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION") && item.target_names?.includes("MASTERMOLD_LIVE_OPERATOR_APPROVAL") && item.target_names?.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF")), "Credential requirements packet should name the first-canary flag targets.", json.requirements);
   assert(json.requirements.some((item) => item.id === "signer-policy" && item.research_question_ids?.includes("custody-architecture") && item.research_question_ids?.includes("risk-gates")), "Credential requirements packet should link signer asks to custody and risk research.", json.requirements);
   assert(Array.isArray(json.safe_to_share) && json.safe_to_share.includes("Dedicated Solana public wallet address"), "Credential requirements packet should list safe-to-share values.", json.safe_to_share);
+  assert(json.safe_to_share.includes("Exact first-canary live flag values for ignored local env: MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true"), "Credential requirements packet should list exact canary flags as safe target values.", json.safe_to_share);
   assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Credential requirements packet should keep seed phrase in never-provide list.", json.never_provide);
   assert(Array.isArray(json.safe_export_commands) && json.safe_export_commands.some((command) => command.includes("requirements:web3")), "Credential requirements packet should expose its safe export command.", json.safe_export_commands);
   assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind Web3 Credential Requirements Packet"), "Credential requirements packet should include paste-ready markdown.", json.text_packet);
   assert(json.text_packet.includes("## Next Requirement") && json.text_packet.includes("wallet_public_key"), "Credential requirements text should include the next public wallet ask.", json.text_packet);
-  assert(json.text_packet.includes("## Requirements") && json.text_packet.includes("Jupiter order rail"), "Credential requirements text should include the full requirements list.", json.text_packet);
+  assert(json.text_packet.includes("## Requirements") && json.text_packet.includes("Jupiter order rail") && json.text_packet.includes("First canary live flags"), "Credential requirements text should include the full requirements list.", json.text_packet);
+  assert(json.text_packet.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF"), "Credential requirements text should include the canary handoff flag target.", json.text_packet);
   assert(json.text_packet.includes("## Never Provide") && json.text_packet.includes("Seed phrase or mnemonic"), "Credential requirements text should include never-provide boundaries.", json.text_packet);
   assert(json.text_packet.includes("requirements:web3"), "Credential requirements text should include the local export command.", json.text_packet);
   assert(json.source_endpoint.includes("/api/web3-credential-requirements"), "Credential requirements packet should link itself.", json);

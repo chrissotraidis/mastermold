@@ -1363,6 +1363,7 @@ describe("Web3 autonomous trading subsystem", () => {
       "wallet-ownership-proof",
       "read-provider-rail",
       "jupiter-order-rail",
+      "first-canary-live-flags",
       "signer-policy",
       "ops-emergency-stop",
       "accounting-ledger",
@@ -1381,6 +1382,11 @@ describe("Web3 autonomous trading subsystem", () => {
       secret_echo_permission: "blocked",
     });
     expect(packet.credential_requirements.find((item) => item.id === "jupiter-order-rail")?.target_names).toContain("JUPITER_API_KEY");
+    expect(packet.credential_requirements.find((item) => item.id === "first-canary-live-flags")?.target_names).toEqual([
+      "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+      "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+      "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+    ]);
     expect(packet.credential_requirements.find((item) => item.id === "signer-policy")?.research_question_ids).toEqual(expect.arrayContaining(["custody-architecture", "risk-gates"]));
     expect(packet.credential_requirements.every((item) =>
       item.completion_signal.length > 0 &&
@@ -1396,6 +1402,7 @@ describe("Web3 autonomous trading subsystem", () => {
     ]));
     expect(packet.research_questions.find((item) => item.id === "credential-storage")?.expected_answer_format).toContain("credential names");
     expect(packet.safe_to_share).toContain("Dedicated Solana public wallet address");
+    expect(packet.safe_to_share).toContain("Exact first-canary live flag values for ignored local env: MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true");
     expect(packet.never_provide).toContain("Seed phrase or mnemonic");
     expect(packet.source_endpoints).toContain("/api/web3-research-handoff-packet?source=live-dex&account=persistent");
     expect(packet.source_endpoints).toContain("/api/web3-credential-requirements?source=live-dex&account=persistent");
@@ -1506,11 +1513,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.status).toBe("operator-input-needed");
     expect(packet.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(packet.research_handoff_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(packet.requirement_count).toBe(9);
+    expect(packet.requirement_count).toBe(10);
     expect(packet.needed_now_count).toBeGreaterThanOrEqual(4);
     expect(packet.before_live_count).toBeGreaterThanOrEqual(4);
     expect(packet.external_review_count).toBe(1);
-    expect(packet.blocker_count).toBe(9);
+    expect(packet.blocker_count).toBe(10);
     expect(packet.next_requirement).toMatchObject({
       id: "dedicated-public-wallet",
       target_names: ["wallet_public_key"],
@@ -1523,6 +1530,7 @@ describe("Web3 autonomous trading subsystem", () => {
       "wallet-ownership-proof",
       "read-provider-rail",
       "jupiter-order-rail",
+      "first-canary-live-flags",
       "signer-policy",
       "ops-emergency-stop",
       "accounting-ledger",
@@ -1530,6 +1538,11 @@ describe("Web3 autonomous trading subsystem", () => {
       "manual-live-review",
     ]);
     expect(packet.requirements.find((item) => item.id === "jupiter-order-rail")?.target_names).toContain("JUPITER_API_KEY");
+    expect(packet.requirements.find((item) => item.id === "first-canary-live-flags")?.target_names).toEqual([
+      "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+      "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+      "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+    ]);
     expect(packet.requirements.find((item) => item.id === "signer-policy")?.research_question_ids).toEqual(expect.arrayContaining(["custody-architecture", "risk-gates"]));
     expect(packet.requirements.every((item) =>
       item.blocks_live_capital === true &&
@@ -1538,6 +1551,7 @@ describe("Web3 autonomous trading subsystem", () => {
       item.secret_echo_permission === "blocked"
     )).toBe(true);
     expect(packet.safe_to_share).toContain("Dedicated Solana public wallet address");
+    expect(packet.safe_to_share).toContain("Exact first-canary live flag values for ignored local env: MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true");
     expect(packet.never_provide).toContain("Seed phrase or mnemonic");
     expect(packet.safe_export_commands).toEqual(expect.arrayContaining([
       "npm run --silent requirements:web3 -- --base-url=http://localhost:4010",
@@ -1548,6 +1562,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.text_packet).toContain("wallet_public_key");
     expect(packet.text_packet).toContain("## Requirements");
     expect(packet.text_packet).toContain("Jupiter order rail");
+    expect(packet.text_packet).toContain("First canary live flags");
+    expect(packet.text_packet).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
     expect(packet.text_packet).toContain("## Never Provide");
     expect(packet.text_packet).toContain("Seed phrase or mnemonic");
     expect(packet.text_packet).toContain("requirements:web3");
@@ -3253,7 +3269,7 @@ describe("Web3 autonomous trading subsystem", () => {
       expect.objectContaining({ id: "live-autonomy-final-gate", status: "external-review", blocks_live_capital: true }),
     ]));
     expect(safeReceipt.next_missing).not.toBeNull();
-    expect(["manual-live-review", "live-autonomy-final-gate"]).toContain(safeReceipt.next_missing?.id ?? "");
+    expect(["first-canary-live-flags", "manual-live-review", "live-autonomy-final-gate"]).toContain(safeReceipt.next_missing?.id ?? "");
     expect(safeReceipt.activation_permitted).toBe(false);
     expect(safeReceipt.can_trade_real_capital).toBe(false);
     expect(safeReceipt.live_execution_permitted).toBe(false);

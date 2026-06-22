@@ -38,6 +38,7 @@ export type Web3CredentialRequirement = {
     | "wallet-ownership-proof"
     | "read-provider-rail"
     | "jupiter-order-rail"
+    | "first-canary-live-flags"
     | "signer-policy"
     | "ops-emergency-stop"
     | "accounting-ledger"
@@ -235,7 +236,10 @@ export function buildWeb3ResearchHandoffPacket(input: {
     live_capital_blockers: liveCapitalBlockers,
     credential_requirements: credentialRequirements,
     research_questions: researchQuestions,
-    safe_to_share: input.requestPacket.safe_to_provide,
+    safe_to_share: [
+      ...input.requestPacket.safe_to_provide,
+      "Exact first-canary live flag values for ignored local env: MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true, MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS, MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true",
+    ],
     never_provide: input.requestPacket.never_provide,
     source_endpoints: [
       "/api/web3-research-handoff-packet?source=live-dex&account=persistent",
@@ -410,6 +414,27 @@ function buildCredentialRequirements(
       research_question_ids: linkedQuestions("provider-stack", "latency-budget", "credential-storage"),
       completion_signal: "Jupiter rehearsal records quote and unsigned-order readiness while withholding transaction bytes.",
       next_action: "Add JUPITER_API_KEY through ignored local env or a one-shot Settings rehearsal, then run the strict order verifier.",
+      blocks_live_capital: true,
+      live_execution_permission: "blocked",
+      wallet_mutation_permission: "blocked",
+      secret_echo_permission: "blocked",
+    },
+    {
+      id: "first-canary-live-flags",
+      label: "First canary live flags",
+      owner: "operator",
+      priority: "needed-now",
+      safe_value_type: "Reviewed tiny-canary env flag values only",
+      safe_collection_surface: "/settings/integrations#settings-web3-first-canary-live-flags",
+      storage_rule: "ignored-server-env-exact-values-only",
+      target_names: [
+        "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+        "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+        "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+      ],
+      research_question_ids: linkedQuestions("first-live-mode", "risk-gates", "go-live-checklist", "compliance-boundaries"),
+      completion_signal: "Ignored server env contains exactly true, I_UNDERSTAND_REAL_FUNDS, and true for the tiny unsigned canary handoff; signing and submission still require separate wallet proof and relay gates.",
+      next_action: "Set the three exact first-canary live flags in ignored local env only after wallet ownership and Jupiter order proof are ready, then rerun the strict wallet/order verifier.",
       blocks_live_capital: true,
       live_execution_permission: "blocked",
       wallet_mutation_permission: "blocked",

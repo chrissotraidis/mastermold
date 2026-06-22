@@ -4470,8 +4470,9 @@ async function main() {
   );
   const protectiveSellPlans = orderRehearsal.payload.execution_plans?.filter((plan) =>
     plan.side === "sell" &&
+    plan.input_mint !== plan.output_mint &&
     plan.output_mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" &&
-    ["watchlist", "solana-rpc"].includes(plan.input_amount_source) &&
+    ["watchlist", "solana-rpc", "assumed"].includes(plan.input_amount_source) &&
     Number.isInteger(plan.input_token_decimals) &&
     plan.input_token_decimals >= 5 &&
     plan.input_token_decimals <= 9

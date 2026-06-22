@@ -2246,6 +2246,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-research-handoff.mjs")).toContain("api-key=");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("/api/web3-credential-requirements");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("# Mastermind Web3 Credential Requirements Packet");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("first-canary-live-flags");
+    expect(source("scripts/web3-credential-requirements.mjs")).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.live_execution_permission === \"blocked\"");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.transaction_submission_permission === \"blocked\"");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.wallet_mutation_permission === \"blocked\"");
