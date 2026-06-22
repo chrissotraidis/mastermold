@@ -1,6 +1,7 @@
 import { Activity, ArrowRight, BarChart3, Database, ShieldCheck, Wallet } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { CopyRedactedPacketButton } from "@/components/copy-redacted-packet-button";
 import { PageHeader } from "@/components/page-header";
 import { Chip } from "@/components/sentinel";
 import { Web3LiveCanaryConsole } from "@/components/web3-live-canary-console";
@@ -8,11 +9,13 @@ import { Web3TradingWorkspaceLoader } from "@/components/web3-trading-workspace-
 import { buildWeb3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
 import { buildWeb3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { buildWeb3AccountingLedgerReceipt } from "@/src/db/web3-accounting-ledger";
+import { buildWeb3CredentialRequirementsReceipt } from "@/src/db/web3-credential-requirements";
 import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3FirstCanaryDrillReceipt, type Web3FirstCanaryDrillLane, type Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
+import { buildWeb3FirstCanaryHandoffReceipt, type Web3FirstCanaryHandoffReceipt } from "@/src/db/web3-first-canary-handoff";
 import { buildWeb3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { getWeb3MarketMonitorHistory, type Web3MarketMonitorHistory } from "@/src/db/web3-market-monitor-history";
 import { buildWeb3OperatorCredentialHandoffReceipt } from "@/src/db/web3-operator-credential-handoff";
@@ -29,6 +32,7 @@ import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersRe
 import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
 import { buildWeb3ProductionSupervisorReadiness } from "@/src/db/web3-production-supervisor";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
+import { buildWeb3ResearchHandoffPacket } from "@/src/db/web3-research-handoff-packet";
 import { buildWeb3SupervisedLiveRunway, type Web3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
 import { buildWeb3SupervisedCanaryReadinessReceipt, type Web3SupervisedCanaryReadinessLane, type Web3SupervisedCanaryReadinessReceipt } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3UsabilityStatus, type Web3UsabilityStatusReceipt } from "@/src/db/web3-usability-status";
@@ -164,6 +168,22 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
     unsignedPreflight: unsignedCanaryPreflight,
     canary: liveTradeCanary,
   });
+  const researchHandoff = buildWeb3ResearchHandoffPacket({
+    state: initialState,
+    usability: usabilityStatus,
+    handoff: operatorCredentialHandoff,
+    requestPacket: operatorRequestPacket,
+    cutover: cutoverBlockerBoard,
+    runbook: operatorRunbook,
+    preflight: liveCapitalPreflight,
+    runway: supervisedLiveRunway,
+    manualLiveReview,
+  });
+  const credentialRequirements = buildWeb3CredentialRequirementsReceipt(researchHandoff);
+  const firstCanaryHandoff = buildWeb3FirstCanaryHandoffReceipt({
+    drill: firstCanaryDrill,
+    requirements: credentialRequirements,
+  });
   const shellStatus = initialState.autonomous_edge_stack_execution.status === "blocked"
     ? "Edge action blocked"
     : initialState.autonomous_edge_stack_execution.selected_action.replace("-", " ");
@@ -188,7 +208,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
             canary={liveTradeCanary}
             drill={firstCanaryDrill}
           />
-          <TradingOperatorInputPacket receipt={liveTradeCanary} />
+          <TradingOperatorInputPacket receipt={liveTradeCanary} handoff={firstCanaryHandoff} />
           <Web3LiveCanaryConsole
             receipt={liveTradeCanary}
             firstCanaryDrill={firstCanaryDrill}
@@ -237,14 +257,22 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
   );
 }
 
-function TradingOperatorInputPacket({ receipt }: { receipt: Web3LiveTradeCanaryReceipt }) {
+function TradingOperatorInputPacket({
+  receipt,
+  handoff,
+}: {
+  receipt: Web3LiveTradeCanaryReceipt;
+  handoff: Web3FirstCanaryHandoffReceipt;
+}) {
   const nextInput = receipt.next_required_input;
   const openInputs = receipt.required_inputs
     .filter((input) => input.status !== "done")
     .slice(0, 4);
   const canaryEndpoint = `/api/web3-live-trade-canary?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`;
+  const handoffEndpoint = `/api/web3-first-canary-handoff?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`;
   const safeTargetLabel = nextInput?.target_names.join(", ") ?? "No open target";
   const ownerLabel = nextInput?.owner.replace("-", " ") ?? "system";
+  const contract = handoff.current_step_contract;
 
   return (
     <section
@@ -290,6 +318,13 @@ function TradingOperatorInputPacket({ receipt }: { receipt: Web3LiveTradeCanaryR
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
+            <CopyRedactedPacketButton
+              text={handoff.text_packet}
+              label="Copy handoff"
+              copiedLabel="Copied"
+              ariaLabel="Copy first funded canary handoff from Trading"
+              className="min-h-10 border-caution/35 bg-caution/10 px-3 py-2 text-caution hover:bg-caution/15"
+            />
             {nextInput ? (
               <Link
                 href={nextInput.safe_surface}
@@ -299,6 +334,12 @@ function TradingOperatorInputPacket({ receipt }: { receipt: Web3LiveTradeCanaryR
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
             ) : null}
+            <Link
+              href={handoffEndpoint}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open handoff JSON
+            </Link>
             <Link
               href={canaryEndpoint}
               className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
@@ -318,6 +359,27 @@ function TradingOperatorInputPacket({ receipt }: { receipt: Web3LiveTradeCanaryR
               {nextInput.verifier_command}
             </code>
           ) : null}
+
+          <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.035] p-3" aria-label="Trading first funded canary share packet">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Shareable canary handoff</p>
+                <p className="mt-1 text-xs font-semibold text-on-surface">{contract.label}</p>
+              </div>
+              <span className={tradingOperatorInputStatusClassName(contract.status)}>
+                {contract.status.replaceAll("-", " ")}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-on-surface-variant">{contract.action}</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <LiveUsabilityStat label="Proof" value={`${handoff.proof_pass_count}/${handoff.proof_required_count}`} tone={handoff.proof_pass_count === handoff.proof_required_count ? "engine" : "critical"} />
+              <LiveUsabilityStat label="Open steps" value={`${handoff.open_steps.length}`} tone={handoff.open_steps.length > 0 ? "critical" : "engine"} />
+              <LiveUsabilityStat label="Packet" value={handoff.status.replaceAll("-", " ")} tone={handoff.status === "canary-proven" ? "engine" : "caution"} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              Copying this packet gives a helper the redacted current-step contract, proof ledger, safe values, never-provide boundary, and strict commands. It still cannot sign, submit, store payloads, or prove a live trade.
+            </p>
+          </div>
         </div>
 
         <div className="grid min-w-0 gap-2" aria-label="Trading operator open canary inputs">
@@ -352,10 +414,10 @@ function TradingOperatorInputPacket({ receipt }: { receipt: Web3LiveTradeCanaryR
   );
 }
 
-function tradingOperatorInputStatusClassName(status: Web3LiveTradeCanaryReceipt["required_inputs"][number]["status"] | "done") {
+function tradingOperatorInputStatusClassName(status: Web3LiveTradeCanaryReceipt["required_inputs"][number]["status"] | "done" | "complete" | "next" | "watch") {
   const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
   if (status === "done") return `${base} border-engine/30 bg-engine/10 text-engine`;
-  if (status === "needed-now" || status === "external-signature" || status === "proof-watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  if (status === "needed-now" || status === "external-signature" || status === "proof-watch" || status === "next" || status === "watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
   return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
