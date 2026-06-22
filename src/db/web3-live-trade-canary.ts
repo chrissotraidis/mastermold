@@ -10,6 +10,22 @@ export type Web3LiveTradeCanaryEvidenceItem = {
   next_action: string;
 };
 
+export type Web3LiveTradeCanaryRequiredInput = {
+  id: "wallet-ownership-proof" | "jupiter-order-rail" | "first-canary-live-flags" | "unsigned-order-preflight" | "signed-payload-relay" | "post-signing-proof";
+  label: string;
+  status: "done" | "needed-now" | "blocked" | "external-signature" | "proof-watch";
+  owner: "operator" | "external-wallet" | "system";
+  safe_value_type: string;
+  safe_surface: string;
+  target_names: string[];
+  verifier_command: string | null;
+  completion_signal: string;
+  live_execution_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  secret_echo_permission: "blocked";
+};
+
 export type Web3LiveTradeCanaryReceipt = {
   mode: "web3-live-trade-canary";
   status: "blocked" | "ready-for-external-signed-payload" | "live-relay-evidence-recorded";
@@ -46,6 +62,8 @@ export type Web3LiveTradeCanaryReceipt = {
   post_signing_evidence: Web3LiveTradeCanaryEvidenceItem[];
   post_signing_next_action: string;
   blockers: string[];
+  next_required_input: Web3LiveTradeCanaryRequiredInput | null;
+  required_inputs: Web3LiveTradeCanaryRequiredInput[];
   required_for_real_canary: string[];
   next_action: string;
   transaction_submission_permission: "blocked" | "external-signed-payload-only";
@@ -253,6 +271,14 @@ export function buildWeb3LiveTradeCanaryReceipt(
   const postSigningEvidenceStatus = postSigningEvidenceStatusFrom(postSigningEvidence, signature);
   const postSigningNextAction = postSigningEvidence.find((item) => item.status !== "pass")?.next_action ??
     "Settlement is accounted for in the local mirror; review caps, PnL, and stop conditions before another canary.";
+  const requiredInputs = buildLiveTradeCanaryRequiredInputs({
+    state,
+    walletOwnership,
+    readyForExternalSignedPayload,
+    actualLiveTradeTested,
+    signature,
+    postSigningEvidenceStatus,
+  });
   const receiptBase = {
     mode: "web3-live-trade-canary" as const,
     status,
@@ -288,6 +314,8 @@ export function buildWeb3LiveTradeCanaryReceipt(
     post_signing_evidence: postSigningEvidence,
     post_signing_next_action: postSigningNextAction,
     blockers,
+    next_required_input: nextLiveTradeCanaryRequiredInput(requiredInputs),
+    required_inputs: requiredInputs,
     required_for_real_canary: [
       "Dedicated non-sample public wallet with explicit spend caps and kill switch cleared.",
       "Jupiter Swap V2 key and Solana RPC or Helius read/status rail configured in ignored server env.",
@@ -391,6 +419,136 @@ function liveTradeCanaryBlockers(
   ].filter((item): item is string => Boolean(item));
 
   return [...new Set(blockers)].slice(0, 12);
+}
+
+function buildLiveTradeCanaryRequiredInputs(input: {
+  state: Web3TradingState;
+  walletOwnership: ReturnType<typeof liveTradeCanaryWalletOwnershipStatus>;
+  readyForExternalSignedPayload: boolean;
+  actualLiveTradeTested: boolean;
+  signature: string | null;
+  postSigningEvidenceStatus: Web3LiveTradeCanaryReceipt["post_signing_evidence_status"];
+}): Web3LiveTradeCanaryRequiredInput[] {
+  const { state, walletOwnership, readyForExternalSignedPayload, actualLiveTradeTested, signature, postSigningEvidenceStatus } = input;
+  const walletPublicKey = state.autonomous_custody_mandate.wallet_public_key ??
+    state.live_wallet_accounting_readiness.wallet_public_key ??
+    state.execution_readiness.config.wallet_public_key ??
+    null;
+  const walletScoped = Boolean(walletPublicKey);
+  const dedicatedWalletScoped = typeof walletPublicKey === "string" &&
+    isLikelySolanaPublicKey(walletPublicKey) &&
+    walletPublicKey !== SAMPLE_SYSTEM_WALLET;
+  const liveScopeReady = state.market_source.mode === "live-dex" && state.paper_account.mode === "persistent";
+  const jupiterConfigured = Boolean(process.env.JUPITER_API_KEY);
+  const liveFlagsReady = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true" &&
+    process.env.MASTERMOLD_LIVE_OPERATOR_APPROVAL === "I_UNDERSTAND_REAL_FUNDS" &&
+    process.env.MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF === "true";
+  const canRequestUnsignedOrder = liveScopeReady && dedicatedWalletScoped && walletOwnership.current_for_canary && jupiterConfigured && liveFlagsReady;
+  const hasRequestId = Boolean(state.signed_transaction_relay.request_id);
+  const hasSignature = Boolean(signature);
+
+  return [
+    requiredInput({
+      id: "wallet-ownership-proof",
+      label: "Wallet ownership proof",
+      status: dedicatedWalletScoped && walletOwnership.current_for_canary ? "done" : "needed-now",
+      owner: "external-wallet",
+      safe_value_type: walletScoped
+        ? "Hash-only browser-wallet text signature for the scoped public Solana wallet."
+        : "Dedicated public Solana wallet address, then a hash-only browser-wallet text signature.",
+      safe_surface: dedicatedWalletScoped
+        ? "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console"
+        : "/settings/integrations#settings-web3-wallet-public-key",
+      target_names: ["wallet_public_key", "web3-wallet-ownership challenge hash"],
+      verifier_command: dedicatedWalletScoped
+        ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${walletPublicKey} --require-operator-wallet`
+        : null,
+      completion_signal: "wallet_ownership_current_for_canary=true on /api/web3-live-trade-canary.",
+    }),
+    requiredInput({
+      id: "jupiter-order-rail",
+      label: "Jupiter order rail",
+      status: jupiterConfigured ? "done" : "needed-now",
+      owner: "operator",
+      safe_value_type: "Jupiter API key installed only in ignored local server env; never paste it into chat or a client payload.",
+      safe_surface: "/settings/integrations#web3-credential-action-console",
+      target_names: ["JUPITER_API_KEY"],
+      verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+      completion_signal: "Jupiter rehearsal and live unsigned-order preflight no longer report missing JUPITER_API_KEY.",
+    }),
+    requiredInput({
+      id: "first-canary-live-flags",
+      label: "First canary live flags",
+      status: liveFlagsReady ? "done" : "needed-now",
+      owner: "operator",
+      safe_value_type: "Exact reviewed local env flag values for the one-shot tiny canary handoff.",
+      safe_surface: "/settings/integrations#settings-web3-first-canary-live-flags",
+      target_names: [
+        "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+        "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+        "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+      ],
+      verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary-flags",
+      completion_signal: "live_execution_gate_enabled=true and unsigned-order handoff no longer reports missing live canary flags.",
+    }),
+    requiredInput({
+      id: "unsigned-order-preflight",
+      label: "Unsigned order preflight",
+      status: hasRequestId ? "done" : canRequestUnsignedOrder ? "needed-now" : "blocked",
+      owner: "operator",
+      safe_value_type: "No-transaction preflight, then one-shot unsigned SOL-to-USDC canary order bytes returned only to the browser wallet flow.",
+      safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+      target_names: ["request_id", "route", "payload_hash", "amount_lamports", "slippage_bps"],
+      verifier_command: "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json",
+      completion_signal: "current_request_id is present and signed_relay_accepts_payload=true.",
+    }),
+    requiredInput({
+      id: "signed-payload-relay",
+      label: "Signed payload relay",
+      status: actualLiveTradeTested || hasSignature ? "done" : readyForExternalSignedPayload ? "external-signature" : "blocked",
+      owner: "external-wallet",
+      safe_value_type: "Externally signed browser-wallet transaction payload for the current one-shot request id only.",
+      safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+      target_names: ["request_id", "route", "signed_transaction"],
+      verifier_command: null,
+      completion_signal: "latest_signature_preview is present and signed_relay_status is relayed or confirmed.",
+    }),
+    requiredInput({
+      id: "post-signing-proof",
+      label: "Post-signing proof",
+      status: postSigningEvidenceStatus === "settlement-accounted"
+        ? "done"
+        : hasSignature
+          ? "proof-watch"
+          : "blocked",
+      owner: "system",
+      safe_value_type: "Chain confirmation, settlement reconciliation, and local portfolio mirror proof for the tiny canary.",
+      safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+      target_names: ["signature_confirmation_poll", "settlement_fill_reconciliation", "portfolio_mirror_apply"],
+      verifier_command: "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json",
+      completion_signal: "post_signing_evidence_status=settlement-accounted and actual_live_trade_tested=true.",
+    }),
+  ];
+}
+
+function requiredInput(
+  input: Omit<Web3LiveTradeCanaryRequiredInput, "live_execution_permission" | "transaction_submission_permission" | "wallet_mutation_permission" | "secret_echo_permission">,
+): Web3LiveTradeCanaryRequiredInput {
+  return {
+    ...input,
+    live_execution_permission: "blocked",
+    transaction_submission_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
+  };
+}
+
+function nextLiveTradeCanaryRequiredInput(inputs: Web3LiveTradeCanaryRequiredInput[]) {
+  return inputs.find((item) => item.status === "needed-now") ??
+    inputs.find((item) => item.status === "external-signature") ??
+    inputs.find((item) => item.status === "proof-watch") ??
+    inputs.find((item) => item.status === "blocked") ??
+    null;
 }
 
 function liveTradeCanaryWalletOwnershipStatus(state: Web3TradingState, now: Date) {

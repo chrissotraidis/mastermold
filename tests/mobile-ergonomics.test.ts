@@ -1995,6 +1995,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("signed_payload_echoed");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("post_signing_evidence_status");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("settlement-accounted");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("Web3LiveTradeCanaryRequiredInput");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("next_required_input");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("first-canary-live-flags");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
     expect(source("app/settings/integrations/page.tsx")).toContain("Settings post-signing proof chain");
     expect(source("app/settings/integrations/page.tsx")).toContain("receipt.post_signing_evidence.map");
     expect(source("app/settings/integrations/page.tsx")).toContain("receipt.post_signing_next_action");
@@ -2005,6 +2009,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading current canary gate action");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading first canary execution rail");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading canary execution rail steps");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary required inputs");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Next required input");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading ordered live canary required inputs");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("requiredInputStatusClassName");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Current canary step");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Action surface:");
     expect(source("components/web3-live-canary-console.tsx")).toContain("buildCanaryExecutionRail");

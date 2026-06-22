@@ -865,6 +865,58 @@ export function Web3LiveCanaryConsole({
             </p>
           </div>
 
+          <div className="rounded-md border border-caution/25 bg-caution/[0.045] p-3" aria-label="Trading live canary required inputs">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Next required input</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {canaryReceipt.next_required_input?.label ?? "All canary inputs accounted"}
+                </p>
+              </div>
+              {canaryReceipt.next_required_input ? (
+                <span className={requiredInputStatusClassName(canaryReceipt.next_required_input.status)}>
+                  {canaryReceipt.next_required_input.status.replaceAll("-", " ")}
+                </span>
+              ) : (
+                <span className={requiredInputStatusClassName("done")}>done</span>
+              )}
+            </div>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              {canaryReceipt.next_required_input?.safe_value_type ?? "Wallet proof, order rail, live flags, signed relay, and proof chain are represented in the receipt."}
+            </p>
+            {canaryReceipt.next_required_input ? (
+              <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                <Link
+                  href={canaryReceipt.next_required_input.safe_surface}
+                  className="inline-flex min-h-8 items-center rounded-md border border-outline/20 bg-surface-dim/55 px-2.5 py-1 font-semibold text-on-surface-variant transition hover:border-caution/35 hover:text-caution"
+                >
+                  Open safe surface
+                </Link>
+                {canaryReceipt.next_required_input.verifier_command ? (
+                  <span className="inline-flex min-h-8 max-w-full min-w-0 items-center overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-outline/15 bg-surface-dim/35 px-2.5 py-1 font-mono text-outline">
+                    {canaryReceipt.next_required_input.verifier_command}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="mt-2 grid gap-1.5" aria-label="Trading ordered live canary required inputs">
+              {canaryReceipt.required_inputs.map((item) => (
+                <div key={item.id} className="grid gap-1 rounded-md border border-outline/15 bg-surface-dim/35 p-2 sm:grid-cols-[13rem_minmax(0,1fr)]">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className={requiredInputStatusClassName(item.status)}>{item.status.replaceAll("-", " ")}</span>
+                    <span className="min-w-0 text-[11px] font-semibold text-on-surface">{item.label}</span>
+                  </div>
+                  <p className="min-w-0 text-[11px] leading-4 text-on-surface-variant">
+                    {item.completion_signal}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              Required inputs are setup/proof only: live execution, submission, wallet mutation, and secret echo remain blocked in each row.
+            </p>
+          </div>
+
           <div className="rounded-md border border-caution/25 bg-surface/60 p-3" aria-label="Trading live canary launch checklist">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
@@ -1217,6 +1269,13 @@ function postSigningStatusClassName(status: Web3LiveTradeCanaryReceipt["post_sig
   if (status === "settlement-accounted") return `${base} border-engine/30 bg-engine/10 text-engine`;
   if (status === "review-required") return `${base} border-critical/30 bg-critical/10 text-critical`;
   return `${base} border-caution/30 bg-caution/10 text-caution`;
+}
+
+function requiredInputStatusClassName(status: Web3LiveTradeCanaryReceipt["required_inputs"][number]["status"]) {
+  const base = "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "done") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "needed-now" || status === "external-signature" || status === "proof-watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
 function gateSnapshotStatus(status: Web3FirstCanaryDrillReceipt["operator_unblock_plan"][number]["status"] | undefined) {

@@ -3337,6 +3337,18 @@ describe("Web3 autonomous trading subsystem", () => {
       post_signing_evidence: Array<{ id: string; status: string; detail: string; next_action: string }>;
       post_signing_next_action: string;
       blockers: string[];
+      next_required_input: { id: string; status: string; safe_surface: string } | null;
+      required_inputs: Array<{
+        id: string;
+        status: string;
+        target_names: string[];
+        safe_surface: string;
+        verifier_command: string | null;
+        live_execution_permission: string;
+        transaction_submission_permission: string;
+        wallet_mutation_permission: string;
+        secret_echo_permission: string;
+      }>;
       next_action: string;
       required_for_real_canary: string[];
       transaction_submission_permission: string;
@@ -3378,6 +3390,27 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.blockers[0]).toContain("Open the live DEX trading cockpit");
     expect(receipt.blockers.join(" ")).toContain("No confirmed live transaction signature");
     expect(receipt.blockers.join(" ")).toContain("does not return unsigned transaction bytes");
+    expect(receipt.required_inputs.map((item) => item.id)).toEqual([
+      "wallet-ownership-proof",
+      "jupiter-order-rail",
+      "first-canary-live-flags",
+      "unsigned-order-preflight",
+      "signed-payload-relay",
+      "post-signing-proof",
+    ]);
+    expect(receipt.next_required_input?.id).toMatch(/wallet-ownership-proof|jupiter-order-rail/);
+    expect(receipt.required_inputs.find((item) => item.id === "wallet-ownership-proof")?.status).toMatch(/needed-now|done/);
+    expect(receipt.required_inputs.find((item) => item.id === "jupiter-order-rail")?.target_names).toContain("JUPITER_API_KEY");
+    expect(receipt.required_inputs.find((item) => item.id === "first-canary-live-flags")?.target_names).toEqual(expect.arrayContaining([
+      "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+      "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+      "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+    ]));
+    expect(receipt.required_inputs.find((item) => item.id === "post-signing-proof")?.verifier_command).toContain("prove-canary:web3");
+    expect(receipt.required_inputs.every((item) => item.live_execution_permission === "blocked")).toBe(true);
+    expect(receipt.required_inputs.every((item) => item.transaction_submission_permission === "blocked")).toBe(true);
+    expect(receipt.required_inputs.every((item) => item.wallet_mutation_permission === "blocked")).toBe(true);
+    expect(receipt.required_inputs.every((item) => item.secret_echo_permission === "blocked")).toBe(true);
     expect(receipt.required_for_real_canary.join(" ")).toContain("Dedicated non-sample public wallet");
     expect(receipt.required_for_real_canary.join(" ")).toContain("web3-live-unsigned-order-handoff");
     expect(receipt.transaction_submission_permission).toBe("blocked");
@@ -3395,6 +3428,8 @@ describe("Web3 autonomous trading subsystem", () => {
       actual_live_trade_tested: boolean;
       next_action: string;
       blockers: string[];
+      next_required_input: { id: string; status: string } | null;
+      required_inputs: Array<{ id: string; status: string; target_names: string[]; secret_echo_permission: string }>;
       live_execution_permission: string;
       wallet_mutation_permission: string;
     }>(liveResponse);
@@ -3406,6 +3441,10 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(liveReceipt.blockers.join(" ")).not.toContain("Dry-run spend");
     expect(liveReceipt.blockers.join(" ")).not.toContain("dry-run daily cap");
     expect(liveReceipt.next_action).toBe(liveReceipt.blockers[0]);
+    expect(liveReceipt.required_inputs.map((item) => item.id)).toContain("wallet-ownership-proof");
+    expect(liveReceipt.next_required_input?.id).toMatch(/wallet-ownership-proof|jupiter-order-rail|first-canary-live-flags/);
+    expect(liveReceipt.required_inputs.find((item) => item.id === "first-canary-live-flags")?.target_names).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
+    expect(liveReceipt.required_inputs.every((item) => item.secret_echo_permission === "blocked")).toBe(true);
     expect(liveReceipt.live_execution_permission).toBe("blocked");
     expect(liveReceipt.wallet_mutation_permission).toBe("blocked");
 
