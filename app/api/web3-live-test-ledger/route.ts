@@ -20,7 +20,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const LIVE_TEST_LEDGER_STATUS_TIMEOUT_MS = 6_000;
+const LIVE_TEST_LEDGER_STATUS_TIMEOUT_MS = 12_000;
 
 export async function GET(request: Request): Promise<NextResponse<Web3LiveTestLedgerReceipt | { error: string }>> {
   const parsed = parseLiveTestLedgerQuery(request.url);

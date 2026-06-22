@@ -3788,6 +3788,21 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(usabilitySummary.next_action).toContain("Save a dedicated public Solana trading wallet address");
     expect(usabilitySummary.controls.join(" ")).toContain("cannot sign");
 
+    const compactSummaryResponse = await LIVE_USABILITY_SUMMARY_GET(new Request("http://localhost/api/web3-live-usability-summary?scenario=breakout&source=live-dex&account=persistent&cycles=0&compact=1"));
+    const compactSummary = await json<{
+      current_input: { label: string; next_action: string } | null;
+      counts: { live_usability_rows: number; funded_proof_rows_ready: number };
+      next_action: string;
+      summary: string;
+    }>(compactSummaryResponse);
+    expect(compactSummaryResponse.status).toBe(200);
+    expect(compactSummary.current_input?.label).toBe("Dedicated public wallet");
+    expect(compactSummary.current_input?.next_action).toContain("Save a dedicated public Solana trading wallet address");
+    expect(compactSummary.next_action).toContain("Save a dedicated public Solana trading wallet address");
+    expect(compactSummary.next_action).not.toContain("timed out");
+    expect(compactSummary.counts.live_usability_rows).toBeGreaterThan(1);
+    expect(compactSummary.counts.funded_proof_rows_ready).toBe(0);
+
     const walletContractResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_GET(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0"));
     const walletContract = await json<{
       mode: string;

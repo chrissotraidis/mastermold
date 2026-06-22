@@ -14,7 +14,7 @@ import type { Web3LocalCredentialInstallReceipt } from "@/src/db/web3-local-cred
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const LIVE_USABILITY_SOURCE_TIMEOUT_MS = 8_000;
+const LIVE_USABILITY_SOURCE_TIMEOUT_MS = 14_000;
 
 export async function GET(request: Request): Promise<NextResponse<Web3LiveUsabilitySummaryReceipt | { error: string }>> {
   const searchParams = new URL(request.url).searchParams;

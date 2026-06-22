@@ -484,6 +484,10 @@ export function buildWeb3LiveTradeCanaryBlockedFallbackReceipt(input: {
       completion_signal: "post_signing_evidence_status=settlement-accounted and actual_live_trade_tested=true.",
     }),
   ];
+  const nextRequiredInput = nextLiveTradeCanaryRequiredInput(requiredInputs);
+  const fallbackNextAction = nextRequiredInput
+    ? fallbackNextActionForRequiredInput(nextRequiredInput)
+    : "Restore a fast live canary status receipt before attempting any external signed-payload canary.";
   const blockers = [
     input.reason,
     "The live canary status receipt failed closed before any signing, submission, wallet mutation, or real-money claim.",
@@ -525,7 +529,7 @@ export function buildWeb3LiveTradeCanaryBlockedFallbackReceipt(input: {
     post_signing_evidence: postSigningEvidence,
     post_signing_next_action: "Restore a fast live canary status receipt, then clear wallet, order, live-flag, unsigned-handoff, relay, confirmation, settlement, and mirror gates before claiming a live trade test.",
     blockers,
-    next_required_input: nextLiveTradeCanaryRequiredInput(requiredInputs),
+    next_required_input: nextRequiredInput,
     required_inputs: requiredInputs,
     required_for_real_canary: [
       "Dedicated non-sample public wallet with explicit spend caps and kill switch cleared.",
@@ -536,7 +540,7 @@ export function buildWeb3LiveTradeCanaryBlockedFallbackReceipt(input: {
       "A current hash-only wallet ownership proof recorded shortly before the first funded canary.",
       "Manual live review, accounting/export target, stop drill, and loss-limit signoff.",
     ],
-    next_action: blockers[0],
+    next_action: fallbackNextAction,
     transaction_submission_permission: "blocked" as const,
     live_execution_permission: "blocked" as const,
     wallet_mutation_permission: "blocked" as const,
@@ -555,6 +559,22 @@ export function buildWeb3LiveTradeCanaryBlockedFallbackReceipt(input: {
     ...receiptBase,
     receipt_hash: hashJson(receiptBase),
   };
+}
+
+function fallbackNextActionForRequiredInput(input: Web3LiveTradeCanaryRequiredInput) {
+  if (input.id === "dedicated-public-wallet") {
+    return "Save a dedicated public Solana trading wallet address in the Trading live canary console; do not paste private keys or seed phrases.";
+  }
+  if (input.id === "wallet-ownership-proof") {
+    return "Run wallet ownership proof from the Trading live canary console; it signs text only and cannot move funds.";
+  }
+  if (input.id === "jupiter-order-rail") {
+    return "Install the Jupiter order key only through ignored local env or the approved local credential installer.";
+  }
+  if (input.id === "first-canary-live-flags") {
+    return "Arm only the exact first-canary live flags in ignored local env after wallet and order proof are ready.";
+  }
+  return input.completion_signal;
 }
 
 export function buildWeb3LiveTradeCanaryHealth(receipt: Web3LiveTradeCanaryReceipt): Web3LiveTradeCanaryHealth {

@@ -221,6 +221,7 @@ async function verifyLiveUsabilitySummary() {
   assert(json.lanes?.find((lane) => lane.id === "autonomous-real-capital")?.status === "blocked", "Live-usability summary should block autonomous real capital.", json.lanes);
   assert(json.summary.includes("Not usable for funded autonomous trading yet"), "Live-usability summary should answer the usability question directly.", json);
   assert(!json.summary.includes("Compact summary"), "Default live-usability summary should not use the compact fallback when the blocker packet is available.", json.summary);
+  assert(!/timed out/i.test(json.next_action || ""), "Live-usability summary should keep next_action actionable even when a source is slow.", json.next_action);
   record("live-usability-summary", "pass", json.next_action || "funded autonomy remains unusable");
 }
 

@@ -173,7 +173,7 @@ export function buildWeb3LiveUsabilitySummaryFallbackReceipt(input: {
       safe_surface: input.liveTestLedger.next_required_input.safe_surface,
       storage: input.liveTestLedger.next_required_input.safe_value_type,
       verifier_command: input.liveTestLedger.next_required_input.verifier_command,
-      next_action: input.liveTestLedger.next_action,
+      next_action: fallbackInputNextAction(input.liveTestLedger.next_required_input, input.liveTestLedger.next_action),
     }
     : null;
   const lanes = [
@@ -228,7 +228,7 @@ export function buildWeb3LiveUsabilitySummaryFallbackReceipt(input: {
       real_capital_blockers: 1,
       open_operator_inputs: currentInput ? 1 : 0,
       credential_requirements_open: currentInput ? 1 : 0,
-      live_usability_rows: 0,
+      live_usability_rows: lanes.length,
       funded_proof_rows_ready: 0,
     },
     lanes,
@@ -288,6 +288,25 @@ function currentInputFrom(liveUsability: Web3LiveUsabilityBlockersReceipt): Web3
     verifier_command: input.verifier_command,
     next_action: input.next_action,
   };
+}
+
+function fallbackInputNextAction(
+  input: NonNullable<Web3LiveTestLedgerReceipt["next_required_input"]>,
+  fallback: string,
+) {
+  if (input.id === "dedicated-public-wallet") {
+    return "Save a dedicated public Solana trading wallet address in the Trading live canary console; do not paste private keys or seed phrases.";
+  }
+  if (input.id === "wallet-ownership-proof") {
+    return "Run wallet ownership proof from the Trading live canary console; it signs text only and cannot move funds.";
+  }
+  if (input.id === "jupiter-order-rail") {
+    return "Install the Jupiter order key only through ignored local env or the approved local credential installer.";
+  }
+  if (input.id === "first-canary-live-flags") {
+    return "Arm only the exact first-canary live flags in ignored local env after wallet and order proof are ready.";
+  }
+  return fallback;
 }
 
 function actionableSurface(fixHref: string | null | undefined, safeCollectionSurface: string) {
