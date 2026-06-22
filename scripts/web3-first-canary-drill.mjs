@@ -112,7 +112,9 @@ export function buildFirstCanaryDrillReport({
   const failed = lanes.filter((lane) => lane.status === "fail");
   const watched = lanes.filter((lane) => lane.status === "watch");
   const nextLane = lanes.find((lane) => lane.status === "fail") ?? lanes.find((lane) => lane.status === "watch") ?? null;
-  const operatorUnblockPlan = buildFirstCanaryUnblockPlan({ blockers, readiness, jupiter, unsignedPreflight, canary }, lanes);
+  const operatorWalletPublicKey = safeWalletCommandValue(walletPublicKey);
+  const operatorWalletStrictCommand = walletStrictVerifierCommand(operatorWalletPublicKey);
+  const operatorUnblockPlan = buildFirstCanaryUnblockPlan({ blockers, readiness, jupiter, unsignedPreflight, canary, operatorWalletPublicKey }, lanes);
   const nextUnblockStep = operatorUnblockPlan.find((step) => step.status === "next") ??
     operatorUnblockPlan.find((step) => step.status === "watch") ??
     null;
@@ -146,6 +148,8 @@ export function buildFirstCanaryDrillReport({
     scenario: config.scenario,
     wallet_public_key_present: typeof walletPublicKey === "string" && walletPublicKey.length > 0,
     wallet_public_key_preview: previewValue(walletPublicKey),
+    operator_wallet_public_key: operatorWalletPublicKey,
+    operator_wallet_strict_command: operatorWalletStrictCommand,
     amount_lamports: config.amountLamports,
     current_input_label: blockers?.current_input?.label ?? null,
     next_blocker_label: blockers?.next_blocker?.label ?? null,
@@ -173,8 +177,9 @@ export function buildFirstCanaryDrillReport({
     blockers: blockersText,
     safe_commands: uniqueText([
       "npm run verify:web3 -- --base-url=http://localhost:4010",
-      blockers?.next_credential_request?.verifier_command,
-      readiness?.strict_verifier_command,
+      operatorWalletStrictCommand,
+      walletScopedCommand(blockers?.next_credential_request?.verifier_command, operatorWalletPublicKey),
+      walletScopedCommand(readiness?.strict_verifier_command, operatorWalletPublicKey),
       "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json",
     ]),
     safe_surfaces: uniqueText([
@@ -314,11 +319,15 @@ function firstCanarySafeSurface(lane, input) {
 
 function firstCanaryUnblockCommand(lane, input) {
   if (lane.id === "dedicated-wallet" || lane.id === "wallet-ownership") {
-    return input.blockers?.next_credential_request?.verifier_command ??
+    return walletScopedCommand(input.blockers?.next_credential_request?.verifier_command, input.operatorWalletPublicKey) ??
+      walletStrictVerifierCommand(input.operatorWalletPublicKey) ??
       "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
   }
   if (lane.id === "jupiter-order") return input.jupiter?.strict_verifier_command ?? "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order";
-  if (lane.id === "live-flags" || lane.id === "unsigned-order-preflight") return input.readiness?.strict_verifier_command ?? "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready";
+  if (lane.id === "live-flags" || lane.id === "unsigned-order-preflight") {
+    return walletScopedCommand(input.readiness?.strict_verifier_command, input.operatorWalletPublicKey) ??
+      "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready";
+  }
   if (lane.id === "signer-relay" || lane.id === "manual-live-review") return "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready";
   if (lane.id === "funded-canary-proof" || lane.id === "post-signing-proof") return "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json";
   return input.unsignedPreflight?.status === "ready" ? input.readiness?.strict_verifier_command ?? null : null;
@@ -447,6 +456,33 @@ function positiveInteger(value, fallback, min, max) {
 function previewValue(value) {
   if (!value) return null;
   return value.length <= 12 ? value : `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function safeWalletCommandValue(walletPublicKey) {
+  if (typeof walletPublicKey !== "string") return null;
+  const trimmed = walletPublicKey.trim();
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function walletStrictVerifierCommand(walletPublicKey) {
+  const wallet = safeWalletCommandValue(walletPublicKey);
+  return wallet
+    ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${wallet} --require-operator-wallet`
+    : null;
+}
+
+function walletScopedCommand(command, walletPublicKey) {
+  if (!command) return null;
+  const wallet = safeWalletCommandValue(walletPublicKey);
+  if (!wallet) return command;
+  if (command.includes("--wallet=<public-solana-address>")) {
+    return command.replaceAll("--wallet=<public-solana-address>", `--wallet=${wallet}`);
+  }
+  if (command.includes("--require-operator-wallet") && !command.includes("--wallet=")) {
+    return command.replace("--require-operator-wallet", `--wallet=${wallet} --require-operator-wallet`);
+  }
+  return command;
 }
 
 function uniqueText(values) {

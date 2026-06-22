@@ -128,9 +128,10 @@ describe("Web3 first canary drill command", () => {
   });
 
   test("GIVEN readiness and unsigned preflight are clear WHEN the report is built THEN it only reaches unsigned-order request readiness", () => {
+    const walletPublicKey = "Q7QnmNNT5SZAMP8wfebiQsWq1bGACABryBxmrR2SJ4u";
     const report = buildFirstCanaryDrillReport({
       config,
-      walletPublicKey: "8M2zdYjJw4Z3p5HJ4Pbdt2YAz6zLx4hX8KdDEdicated111",
+      walletPublicKey,
       ...blockedReceipts,
       readiness: {
         ...blockedReceipts.readiness,
@@ -155,6 +156,11 @@ describe("Web3 first canary drill command", () => {
     expect(report.next_lane_action.length).toBeGreaterThan(0);
     expect(report.next_action).toContain("Request one tiny unsigned order");
     expect(report.wallet_public_key_present).toBe(true);
+    expect(report.operator_wallet_public_key).toBe(walletPublicKey);
+    expect(report.operator_wallet_strict_command).toBe(`npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${walletPublicKey} --require-operator-wallet`);
+    expect(report.safe_commands.join(" ")).toContain(`--wallet=${walletPublicKey}`);
+    expect(report.safe_commands.join(" ")).not.toContain("<public-solana-address>");
+    expect(report.next_unblock_step?.command ?? report.safe_commands.join(" ")).not.toContain("<public-solana-address>");
     expect(report.unsigned_order_handoff_ready).toBe(true);
     expect(report.actual_live_trade_tested).toBe(false);
     expect(report.live_execution_permission).toBe("blocked");
