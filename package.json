@@ -25,6 +25,7 @@
     "credentials-local:web3": "node scripts/web3-local-credentials-status.mjs",
     "status-canary:web3": "node scripts/web3-canary-status.mjs",
     "validate-wallet:web3": "node scripts/web3-wallet-intake-validate.mjs",
+    "scope-wallet:web3": "node scripts/web3-wallet-scope.mjs",
     "activate:web3": "node scripts/web3-live-activation-plan.mjs",
     "handoff-canary:web3": "node scripts/web3-first-canary-handoff.mjs",
     "drill-canary:web3": "node scripts/web3-first-canary-drill.mjs",

@@ -2386,10 +2386,12 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run credentials-local:web3 command");
     expect(source("components/review-readiness.tsx")).toContain("/api/web3-canary-status");
     expect(source("components/review-readiness.tsx")).toContain("Running app canary status panel");
+    expect(source("components/review-readiness.tsx")).toContain("A Node-only npm run scope-wallet:web3 command");
     expect(source("package.json")).toContain("\"research:web3\": \"node scripts/web3-research-handoff.mjs\"");
     expect(source("package.json")).toContain("\"requirements:web3\": \"node scripts/web3-credential-requirements.mjs\"");
     expect(source("package.json")).toContain("\"credentials-local:web3\": \"node scripts/web3-local-credentials-status.mjs\"");
     expect(source("package.json")).toContain("\"status-canary:web3\": \"node scripts/web3-canary-status.mjs\"");
+    expect(source("package.json")).toContain("\"scope-wallet:web3\": \"node scripts/web3-wallet-scope.mjs\"");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("/api/web3-research-handoff-packet");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("# Mastermind Web3 Research Handoff Packet");
     expect(source("scripts/web3-research-handoff.mjs")).toContain("packet.live_execution_permission === \"blocked\"");
@@ -2422,6 +2424,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-canary-status.mjs")).toContain("# Mastermind Web3 Canary Status");
     expect(source("scripts/web3-canary-status.mjs")).toContain("actual_live_trade_tested");
     expect(source("scripts/web3-canary-status.mjs")).toContain("Live canary and ignition disagree on the next gate");
+    expect(source("scripts/web3-wallet-scope.mjs")).toContain("/api/web3-dedicated-wallet-intake-contract");
+    expect(source("scripts/web3-wallet-scope.mjs")).toContain("/api/web3-trading");
+    expect(source("scripts/web3-wallet-scope.mjs")).toContain("/api/web3-canary-status");
+    expect(source("scripts/web3-wallet-scope.mjs")).toContain("# Mastermind Wallet Scope");
+    expect(source("scripts/web3-wallet-scope.mjs")).toContain("Validation is read-only unless --save is present.");
     expect(source("src/db/web3-canary-status.ts")).toContain("mode: \"web3-canary-status\"");
     expect(source("src/db/web3-canary-status.ts")).toContain("Live canary and ignition disagree on the next gate");
     expect(source("app/api/web3-canary-status/route.ts")).toContain("buildWeb3CanaryStatusReceipt");
@@ -2429,9 +2436,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-running-app-smoke.mjs")).toContain("/api/web3-canary-status");
     expect(source("README.md")).toContain("credentials-local:web3");
     expect(source("README.md")).toContain("status-canary:web3");
+    expect(source("README.md")).toContain("scope-wallet:web3");
     expect(source("docs/web3-credentials-runbook.md")).toContain("credentials-local:web3");
     expect(source("docs/web3-credentials-runbook.md")).toContain("status-canary:web3");
     expect(source("docs/web3-credentials-runbook.md")).toContain("GET /api/web3-canary-status");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("npm run scope-wallet:web3");
     expect(source("scripts/web3-state-lock.mjs")).toContain("withWeb3StateMutationLock");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("withWeb3StateMutationLock(\"web3-readiness-verify\"");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("withWeb3StateMutationLock(\"web3-trading-smoke\"");
