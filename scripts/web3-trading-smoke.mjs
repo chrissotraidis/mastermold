@@ -261,6 +261,19 @@ async function main() {
   assert(liveTestLedger.rows.filter((row) => row.id !== "funded-wallet-trade").every((row) => row.counts_as_funded_trade_proof === false), "Web3 live-test ledger should keep paper/read/rehearsal rows out of funded proof.", liveTestLedger.rows);
   assert(liveTestLedger.summary.includes("not funded-trade proof"), "Web3 live-test ledger should summarize the paper/read/rehearsal boundary.", liveTestLedger);
 
+  const liveUsabilitySummaryResponse = await request("/api/web3-live-usability-summary?scenario=breakout&source=live-dex&account=persistent&cycles=0");
+  const liveUsabilitySummary = await readJson(liveUsabilitySummaryResponse);
+  assert(liveUsabilitySummaryResponse.status === 200, "Web3 live-usability summary should return a compact usability receipt.", { status: liveUsabilitySummaryResponse.status, liveUsabilitySummary });
+  assert(liveUsabilitySummary.mode === "web3-live-usability-summary", "Web3 live-usability summary should expose the expected mode.", liveUsabilitySummary);
+  assert(liveUsabilitySummary.actual_live_trade_tested === false, "Web3 live-usability summary should not claim a funded trade in default smoke.", liveUsabilitySummary);
+  assert(liveUsabilitySummary.can_trade_real_capital_now === false, "Web3 live-usability summary should keep funded trading unusable.", liveUsabilitySummary);
+  assert(liveUsabilitySummary.can_run_unattended_now === false, "Web3 live-usability summary should keep unattended trading disabled.", liveUsabilitySummary);
+  assert(liveUsabilitySummary.live_execution_permission === "blocked", "Web3 live-usability summary should keep live execution blocked.", liveUsabilitySummary);
+  assert(liveUsabilitySummary.wallet_mutation_permission === "blocked", "Web3 live-usability summary should keep wallet mutation blocked.", liveUsabilitySummary);
+  assert(liveUsabilitySummary.lanes.find((lane) => lane.id === "funded-wallet-trade")?.status === "blocked", "Web3 live-usability summary should block funded wallet trading.", liveUsabilitySummary.lanes);
+  assert(liveUsabilitySummary.lanes.find((lane) => lane.id === "autonomous-real-capital")?.status === "blocked", "Web3 live-usability summary should block autonomous real capital.", liveUsabilitySummary.lanes);
+  assert(liveUsabilitySummary.summary.includes("Not usable for funded autonomous trading yet"), "Web3 live-usability summary should answer what is left.", liveUsabilitySummary);
+
   const launchChecklistResponse = await request("/api/web3-launch-checklist?scenario=breakout&source=sample&account=persistent");
   const launchChecklist = await readJson(launchChecklistResponse);
   assert(launchChecklistResponse.status === 200, "Web3 launch checklist endpoint should return a readiness contract.", { status: launchChecklistResponse.status, launchChecklist });

@@ -178,6 +178,21 @@ async function verifyLiveTestLedger() {
   record("live-test-ledger", "pass", json.summary || "paper/read/rehearsal evidence is separate from funded proof");
 }
 
+async function verifyLiveUsabilitySummary() {
+  const { response, json } = await requestJson(`/api/web3-live-usability-summary?${LIVE_QUERY}`);
+  assert(response.status === 200, "Live-usability summary should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-live-usability-summary", "Live-usability summary should expose the expected mode.", json);
+  assert(json.actual_live_trade_tested === false, "Live-usability summary should report no actual funded trade tested yet.", json);
+  assert(json.can_trade_real_capital_now === false, "Live-usability summary should keep real-capital trading unusable.", json);
+  assert(json.can_run_unattended_now === false, "Live-usability summary should keep unattended trading disabled.", json);
+  assert(json.live_execution_permission === "blocked", "Live-usability summary should keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Live-usability summary should keep wallet mutation blocked.", json);
+  assert(json.lanes?.find((lane) => lane.id === "funded-wallet-trade")?.status === "blocked", "Live-usability summary should block the funded wallet lane.", json.lanes);
+  assert(json.lanes?.find((lane) => lane.id === "autonomous-real-capital")?.status === "blocked", "Live-usability summary should block autonomous real capital.", json.lanes);
+  assert(json.summary.includes("Not usable for funded autonomous trading yet"), "Live-usability summary should answer the usability question directly.", json);
+  record("live-usability-summary", "pass", json.next_action || "funded autonomy remains unusable");
+}
+
 async function verifyCurrentBlocker() {
   const { response, json } = await requestJson(`/api/web3-live-usability-blockers?${LIVE_QUERY}&rows=all`);
   assert(response.status === 200, "Live-usability blockers should return 200.", { status: response.status, json });
@@ -194,6 +209,7 @@ async function main() {
   await verifyTradingPage();
   await verifyCanaryReceipt();
   await verifyLiveTestLedger();
+  await verifyLiveUsabilitySummary();
   await verifyCurrentBlocker();
 
   const summary = {

@@ -813,6 +813,7 @@ function LiveCanaryCommandCenter({
   const liveHref = `/trading?source=live-dex&account=persistent&scenario=${drill.scenario}#web3-live-canary-console`;
   const drillHref = drill.live_review_source_endpoint;
   const liveTestLedgerHref = `/api/web3-live-test-ledger?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
+  const liveUsabilitySummaryHref = `/api/web3-live-usability-summary?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const nextProof = canary.post_signing_evidence.find((item) => item.status !== "pass") ?? null;
   const proofPassCount = canary.post_signing_evidence.filter((item) => item.status === "pass").length;
   const latestAttempt = readiness.latest_attempt_receipt;
@@ -945,6 +946,12 @@ function LiveCanaryCommandCenter({
               className="mt-2 inline-flex min-h-8 items-center rounded-md border border-outline/20 bg-surface-dim/55 px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
             >
               Open ledger JSON
+            </Link>
+            <Link
+              href={liveUsabilitySummaryHref}
+              className="ml-2 mt-2 inline-flex min-h-8 items-center rounded-md border border-outline/20 bg-surface-dim/55 px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open usability JSON
             </Link>
           </div>
 

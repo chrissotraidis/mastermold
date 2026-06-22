@@ -37,6 +37,7 @@ import { GET as LIVE_ACTIVATION_PLAN_GET } from "@/app/api/web3-live-activation-
 import { GET as LIVE_TEST_LEDGER_GET } from "@/app/api/web3-live-test-ledger/route";
 import { GET as LIVE_TRADE_CANARY_GET, POST as LIVE_TRADE_CANARY_POST } from "@/app/api/web3-live-trade-canary/route";
 import { GET as LIVE_UNSIGNED_ORDER_HANDOFF_GET, POST as LIVE_UNSIGNED_ORDER_HANDOFF_POST } from "@/app/api/web3-live-unsigned-order-handoff/route";
+import { GET as LIVE_USABILITY_SUMMARY_GET } from "@/app/api/web3-live-usability-summary/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
 import { GET as RESEARCH_HANDOFF_PACKET_GET } from "@/app/api/web3-research-handoff-packet/route";
 import { GET as SIGNER_CREDENTIAL_PACKET_GET } from "@/app/api/web3-signer-credential-packet/route";
@@ -3702,6 +3703,69 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(ledgerReceipt.next_action).toBe(liveReceipt.next_action);
     expect(ledgerReceipt.controls.join(" ")).toContain("truth ledger only");
     expect(ledgerReceipt.controls.join(" ")).toContain("do not count as funded-trade proof");
+
+    const usabilitySummaryResponse = await LIVE_USABILITY_SUMMARY_GET(new Request("http://localhost/api/web3-live-usability-summary?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const usabilitySummary = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      actual_live_trade_tested: boolean;
+      real_funds_moved_by_this_app: boolean;
+      funded_trade_attempted_by_this_app: boolean;
+      can_trade_real_capital_now: boolean;
+      can_run_unattended_now: boolean;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      current_input: { id: string; safe_surface: string; verifier_command: string | null } | null;
+      local_credentials: { configured_count: number; missing_count: number; runtime_effective: boolean; next_action: string };
+      counts: { real_capital_blockers: number; open_operator_inputs: number; funded_proof_rows_ready: number };
+      lanes: Array<{ id: string; status: string; counts_as_funded_trade_proof: boolean }>;
+      evidence_endpoints: string[];
+      summary: string;
+      next_action: string;
+      controls: string[];
+    }>(usabilitySummaryResponse);
+    expect(usabilitySummaryResponse.status).toBe(200);
+    expect(usabilitySummary.mode).toBe("web3-live-usability-summary");
+    expect(usabilitySummary.status).toBe("operator-input-needed");
+    expect(usabilitySummary.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(usabilitySummary.actual_live_trade_tested).toBe(false);
+    expect(usabilitySummary.real_funds_moved_by_this_app).toBe(false);
+    expect(usabilitySummary.funded_trade_attempted_by_this_app).toBe(false);
+    expect(usabilitySummary.can_trade_real_capital_now).toBe(false);
+    expect(usabilitySummary.can_run_unattended_now).toBe(false);
+    expect(usabilitySummary.live_execution_permission).toBe("blocked");
+    expect(usabilitySummary.wallet_mutation_permission).toBe("blocked");
+    expect(usabilitySummary.transaction_submission_permission).toBe("blocked");
+    expect(usabilitySummary.signing_permission).toBe("blocked");
+    expect(usabilitySummary.private_key_storage).toBe("blocked");
+    expect(usabilitySummary.seed_phrase_storage).toBe("blocked");
+    expect(usabilitySummary.secret_echo_permission).toBe("blocked");
+    expect(usabilitySummary.current_input?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
+    expect(usabilitySummary.local_credentials.runtime_effective).toBe(true);
+    expect(usabilitySummary.counts.real_capital_blockers).toBeGreaterThan(0);
+    expect(usabilitySummary.counts.open_operator_inputs).toBeGreaterThan(0);
+    expect(usabilitySummary.counts.funded_proof_rows_ready).toBe(0);
+    expect(usabilitySummary.lanes.find((lane) => lane.id === "paper-autonomy")).toMatchObject({
+      status: "usable",
+      counts_as_funded_trade_proof: false,
+    });
+    expect(usabilitySummary.lanes.find((lane) => lane.id === "funded-wallet-trade")).toMatchObject({
+      status: "blocked",
+      counts_as_funded_trade_proof: true,
+    });
+    expect(usabilitySummary.lanes.find((lane) => lane.id === "autonomous-real-capital")).toMatchObject({
+      status: "blocked",
+      counts_as_funded_trade_proof: false,
+    });
+    expect(usabilitySummary.evidence_endpoints).toContain("/api/web3-live-test-ledger?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(usabilitySummary.summary).toContain("Not usable for funded autonomous trading yet");
+    expect(usabilitySummary.controls.join(" ")).toContain("cannot sign");
 
     const invalidLedgerResponse = await LIVE_TEST_LEDGER_GET(new Request("http://localhost/api/web3-live-test-ledger?account=hot-wallet"));
     const invalidLedgerReceipt = await json<{ error: string }>(invalidLedgerResponse);
