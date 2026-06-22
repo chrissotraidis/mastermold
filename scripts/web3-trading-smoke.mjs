@@ -248,6 +248,19 @@ async function main() {
   assert(health.web3_live_usability.seed_phrase_storage === "blocked", "Live-usability health should keep seed-phrase storage blocked.", health.web3_live_usability);
   assert(health.web3_live_usability.secret_echo_permission === "blocked", "Live-usability health should keep secret echo blocked.", health.web3_live_usability);
 
+  const liveTestLedgerResponse = await request("/api/web3-live-test-ledger?scenario=breakout&source=live-dex&account=persistent&cycles=0");
+  const liveTestLedger = await readJson(liveTestLedgerResponse);
+  assert(liveTestLedgerResponse.status === 200, "Web3 live-test ledger should return a truth receipt.", { status: liveTestLedgerResponse.status, liveTestLedger });
+  assert(liveTestLedger.mode === "web3-live-test-ledger", "Web3 live-test ledger should expose the expected mode.", liveTestLedger);
+  assert(liveTestLedger.actual_live_trade_tested === false, "Web3 live-test ledger should not claim a funded trade in default smoke.", liveTestLedger);
+  assert(liveTestLedger.funded_trade_attempted_by_this_app === false, "Web3 live-test ledger should not claim a funded attempt in default smoke.", liveTestLedger);
+  assert(liveTestLedger.live_execution_permission === "blocked", "Web3 live-test ledger should keep live execution blocked.", liveTestLedger);
+  assert(liveTestLedger.wallet_mutation_permission === "blocked", "Web3 live-test ledger should keep wallet mutation blocked.", liveTestLedger);
+  assert(liveTestLedger.rows?.length === 5, "Web3 live-test ledger should expose five evidence rows.", liveTestLedger);
+  assert(liveTestLedger.rows.find((row) => row.id === "funded-wallet-trade")?.value === "not attempted", "Web3 live-test ledger should show funded wallet trade as not attempted.", liveTestLedger.rows);
+  assert(liveTestLedger.rows.filter((row) => row.id !== "funded-wallet-trade").every((row) => row.counts_as_funded_trade_proof === false), "Web3 live-test ledger should keep paper/read/rehearsal rows out of funded proof.", liveTestLedger.rows);
+  assert(liveTestLedger.summary.includes("not funded-trade proof"), "Web3 live-test ledger should summarize the paper/read/rehearsal boundary.", liveTestLedger);
+
   const launchChecklistResponse = await request("/api/web3-launch-checklist?scenario=breakout&source=sample&account=persistent");
   const launchChecklist = await readJson(launchChecklistResponse);
   assert(launchChecklistResponse.status === 200, "Web3 launch checklist endpoint should return a readiness contract.", { status: launchChecklistResponse.status, launchChecklist });

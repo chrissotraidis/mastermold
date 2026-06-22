@@ -34,6 +34,7 @@ import { GET as CREDENTIAL_DOCTOR_GET, POST as CREDENTIAL_DOCTOR_POST } from "@/
 import { GET as CREDENTIAL_REQUIREMENTS_GET } from "@/app/api/web3-credential-requirements/route";
 import { GET as LIVE_ACTIVATION_INTAKE_GET, POST as LIVE_ACTIVATION_INTAKE_POST } from "@/app/api/web3-live-activation-intake/route";
 import { GET as LIVE_ACTIVATION_PLAN_GET } from "@/app/api/web3-live-activation-plan/route";
+import { GET as LIVE_TEST_LEDGER_GET } from "@/app/api/web3-live-test-ledger/route";
 import { GET as LIVE_TRADE_CANARY_GET, POST as LIVE_TRADE_CANARY_POST } from "@/app/api/web3-live-trade-canary/route";
 import { GET as LIVE_UNSIGNED_ORDER_HANDOFF_GET, POST as LIVE_UNSIGNED_ORDER_HANDOFF_POST } from "@/app/api/web3-live-unsigned-order-handoff/route";
 import { POST as RESEARCH_ANSWER_INTAKE_POST } from "@/app/api/web3-research-answer-intake/route";
@@ -48,7 +49,12 @@ import { GET as OHLCV_GET, POST as OHLCV_POST } from "@/app/api/web3-ohlcv/route
 import { buildAutonomousNextMoves, chooseAutoWatchPlan, shouldPauseAutoWatchForPlan } from "@/components/web3-trading-workspace-loader";
 import { buildWeb3CredentialsSetupReadiness } from "@/src/db/web3-credentials";
 import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
-import { buildWeb3LiveTradeCanaryReceipt, liveCanaryRequestContinuityBlockers, type Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
+import {
+  buildWeb3LiveTradeCanaryBlockedFallbackReceipt,
+  buildWeb3LiveTradeCanaryReceipt,
+  liveCanaryRequestContinuityBlockers,
+  type Web3LiveTradeCanaryReceipt,
+} from "@/src/db/web3-live-trade-canary";
 import { buildWeb3ProfitProofReadiness } from "@/src/db/web3-profit-proof";
 import {
   getWeb3PromotedPaperAutopilotHealth,
@@ -3619,6 +3625,109 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(liveReceipt.required_inputs.every((item) => item.secret_echo_permission === "blocked")).toBe(true);
     expect(liveReceipt.live_execution_permission).toBe("blocked");
     expect(liveReceipt.wallet_mutation_permission).toBe("blocked");
+
+    const ledgerResponse = await LIVE_TEST_LEDGER_GET(new Request("http://localhost/api/web3-live-test-ledger?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const ledgerReceipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      actual_live_trade_tested: boolean;
+      real_funds_moved_by_this_app: boolean;
+      funded_trade_attempted_by_this_app: boolean;
+      funded_trade_proof_row_id: string;
+      live_execution_permission: string;
+      transaction_submission_permission: string;
+      wallet_mutation_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      next_required_input: { id: string; safe_surface: string } | null;
+      rows: Array<{
+        id: string;
+        status: string;
+        value: string;
+        evidence_type: string;
+        counts_as_funded_trade_proof: boolean;
+        evidence_endpoint: string;
+      }>;
+      funded_trade_proof_requirements: string[];
+      summary: string;
+      next_action: string;
+      controls: string[];
+    }>(ledgerResponse);
+    expect(ledgerResponse.status).toBe(200);
+    expect(ledgerReceipt.mode).toBe("web3-live-test-ledger");
+    expect(ledgerReceipt.status).toBe("operator-input-needed");
+    expect(ledgerReceipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(ledgerReceipt.actual_live_trade_tested).toBe(false);
+    expect(ledgerReceipt.real_funds_moved_by_this_app).toBe(false);
+    expect(ledgerReceipt.funded_trade_attempted_by_this_app).toBe(false);
+    expect(ledgerReceipt.funded_trade_proof_row_id).toBe("funded-wallet-trade");
+    expect(ledgerReceipt.live_execution_permission).toBe("blocked");
+    expect(ledgerReceipt.transaction_submission_permission).toBe("blocked");
+    expect(ledgerReceipt.wallet_mutation_permission).toBe("blocked");
+    expect(ledgerReceipt.signing_permission).toBe("blocked");
+    expect(ledgerReceipt.private_key_storage).toBe("blocked");
+    expect(ledgerReceipt.seed_phrase_storage).toBe("blocked");
+    expect(ledgerReceipt.secret_echo_permission).toBe("blocked");
+    expect(ledgerReceipt.next_required_input?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
+    expect(ledgerReceipt.rows.map((row) => row.id)).toEqual([
+      "paper-autonomy",
+      "live-dex-read",
+      "order-rehearsal",
+      "live-flags",
+      "funded-wallet-trade",
+    ]);
+    expect(ledgerReceipt.rows.find((row) => row.id === "paper-autonomy")).toMatchObject({
+      status: "pass",
+      evidence_type: "paper",
+      counts_as_funded_trade_proof: false,
+    });
+    expect(ledgerReceipt.rows.find((row) => row.id === "live-dex-read")).toMatchObject({
+      status: "watch",
+      evidence_type: "read-only-live",
+      counts_as_funded_trade_proof: false,
+    });
+    expect(ledgerReceipt.rows.find((row) => row.id === "funded-wallet-trade")).toMatchObject({
+      status: "fail",
+      value: "not attempted",
+      evidence_type: "funded-proof",
+      counts_as_funded_trade_proof: true,
+      evidence_endpoint: "/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+    });
+    expect(ledgerReceipt.funded_trade_proof_requirements.join(" ")).toContain("Signed relay");
+    expect(ledgerReceipt.summary).toContain("No funded wallet trade has been attempted");
+    expect(ledgerReceipt.summary).toContain("not funded-trade proof");
+    expect(ledgerReceipt.next_action).toBe(liveReceipt.next_action);
+    expect(ledgerReceipt.controls.join(" ")).toContain("truth ledger only");
+    expect(ledgerReceipt.controls.join(" ")).toContain("do not count as funded-trade proof");
+
+    const invalidLedgerResponse = await LIVE_TEST_LEDGER_GET(new Request("http://localhost/api/web3-live-test-ledger?account=hot-wallet"));
+    const invalidLedgerReceipt = await json<{ error: string }>(invalidLedgerResponse);
+    expect(invalidLedgerResponse.status).toBe(422);
+    expect(invalidLedgerReceipt.error).toContain("account must be ephemeral or persistent");
+
+    const fallbackReceipt = buildWeb3LiveTradeCanaryBlockedFallbackReceipt({
+      source: "live-dex",
+      account: "persistent",
+      scenario: "breakout",
+      reason: "test timeout before any trade attempt",
+      now: new Date("2026-06-22T00:00:00.000Z"),
+    });
+    expect(fallbackReceipt.status).toBe("blocked");
+    expect(fallbackReceipt.actual_live_trade_tested).toBe(false);
+    expect(fallbackReceipt.real_funds_moved_by_this_app).toBe(false);
+    expect(fallbackReceipt.can_submit_from_app_now).toBe(false);
+    expect(fallbackReceipt.live_execution_permission).toBe("blocked");
+    expect(fallbackReceipt.transaction_submission_permission).toBe("blocked");
+    expect(fallbackReceipt.wallet_mutation_permission).toBe("blocked");
+    expect(fallbackReceipt.private_key_storage).toBe("blocked");
+    expect(fallbackReceipt.seed_phrase_storage).toBe("blocked");
+    expect(fallbackReceipt.secret_echo_permission).toBe("blocked");
+    expect(fallbackReceipt.next_required_input?.id).toBe("dedicated-public-wallet");
+    expect(fallbackReceipt.blockers.join(" ")).toContain("failed closed");
+    expect(fallbackReceipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
 
     const signedPayload = Buffer.from("signed-payload-canary-never-echo").toString("base64");
     const actionResponse = await LIVE_TRADE_CANARY_POST(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=sample&account=persistent&cycles=0", {

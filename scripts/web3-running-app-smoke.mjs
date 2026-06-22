@@ -162,6 +162,22 @@ async function verifyCanaryReceipt() {
   record("live-canary-receipt", "pass", json.next_action || "funded canary remains blocked");
 }
 
+async function verifyLiveTestLedger() {
+  const { response, json } = await requestJson(`/api/web3-live-test-ledger?${LIVE_QUERY}`);
+  assert(response.status === 200, "Live-test ledger should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-live-test-ledger", "Live-test ledger should expose the expected mode.", json);
+  assert(json.actual_live_trade_tested === false, "Live-test ledger should report no actual funded trade tested yet.", json);
+  assert(json.funded_trade_attempted_by_this_app === false, "Live-test ledger should report no funded trade attempted by the app.", json);
+  assert(json.live_execution_permission === "blocked", "Live-test ledger should keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Live-test ledger should keep wallet mutation blocked.", json);
+  assert(Array.isArray(json.rows) && json.rows.length === 5, "Live-test ledger should expose five evidence rows.", json);
+  const fundedRow = json.rows.find((row) => row.id === "funded-wallet-trade");
+  assert(fundedRow?.value === "not attempted", "Live-test ledger funded row should say not attempted.", fundedRow);
+  assert(fundedRow?.counts_as_funded_trade_proof === true, "Live-test ledger should mark only the funded row as funded proof.", fundedRow);
+  assert(json.rows.filter((row) => row.id !== "funded-wallet-trade").every((row) => row.counts_as_funded_trade_proof === false), "Live-test ledger should not count paper/read/rehearsal rows as funded proof.", json.rows);
+  record("live-test-ledger", "pass", json.summary || "paper/read/rehearsal evidence is separate from funded proof");
+}
+
 async function verifyCurrentBlocker() {
   const { response, json } = await requestJson(`/api/web3-live-usability-blockers?${LIVE_QUERY}&rows=all`);
   assert(response.status === 200, "Live-usability blockers should return 200.", { status: response.status, json });
@@ -177,6 +193,7 @@ async function main() {
   await verifyHealth();
   await verifyTradingPage();
   await verifyCanaryReceipt();
+  await verifyLiveTestLedger();
   await verifyCurrentBlocker();
 
   const summary = {

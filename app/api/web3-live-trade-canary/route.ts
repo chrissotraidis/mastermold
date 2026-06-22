@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import {
+  buildWeb3LiveTradeCanaryBlockedFallbackReceipt,
   buildWeb3LiveTradeCanaryActionReceipt,
   buildWeb3LiveTradeCanaryReceipt,
   liveCanaryRequestContinuityBlockers,
@@ -20,16 +21,28 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const LIVE_CANARY_STATUS_TIMEOUT_MS = 6_000;
+
 export async function GET(request: Request): Promise<NextResponse<Web3LiveTradeCanaryReceipt | { error: string }>> {
   const parsed = parseCanaryQuery(request.url);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
 
-  const state = await getWeb3TradingStateAsync({
-    ...parsed.value,
-    advance: false,
-  });
+  const state = await withStatusTimeout(
+    getWeb3TradingStateAsync({
+      ...parsed.value,
+      advance: false,
+    }),
+    LIVE_CANARY_STATUS_TIMEOUT_MS,
+  );
 
-  return NextResponse.json(buildWeb3LiveTradeCanaryReceipt(state));
+  if (!state.ok) {
+    return NextResponse.json(buildWeb3LiveTradeCanaryBlockedFallbackReceipt({
+      ...parsed.value,
+      reason: state.error,
+    }));
+  }
+
+  return NextResponse.json(buildWeb3LiveTradeCanaryReceipt(state.value));
 }
 
 export async function POST(request: Request): Promise<NextResponse<Web3LiveTradeCanaryActionReceipt | { error: string }>> {
@@ -210,4 +223,28 @@ function isBase64Payload(value: string) {
 
 function hashString(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+async function withStatusTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise.then((value) => ({ ok: true as const, value })),
+      new Promise<{ ok: false; error: string }>((resolve) => {
+        timeout = setTimeout(() => {
+          resolve({
+            ok: false,
+            error: `Live canary status timed out after ${timeoutMs}ms while building live market state; no live trade was attempted.`,
+          });
+        }, timeoutMs);
+      }),
+    ]);
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Live canary status failed before any live trade attempt: ${error instanceof Error ? error.message : "unknown error"}.`,
+    };
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
