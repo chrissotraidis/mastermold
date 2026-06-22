@@ -435,10 +435,10 @@ function buildLiveTradeCanaryRequiredInputs(input: {
     state.execution_readiness.config.wallet_public_key ??
     null;
   const walletScoped = Boolean(walletPublicKey);
-  const walletLooksLikePublicKey = typeof walletPublicKey === "string" && isLikelySolanaPublicKey(walletPublicKey);
   const dedicatedWalletScoped = typeof walletPublicKey === "string" &&
     isLikelySolanaPublicKey(walletPublicKey) &&
     walletPublicKey !== SAMPLE_SYSTEM_WALLET;
+  const verifierWalletPublicKey = dedicatedWalletScoped ? walletPublicKey : null;
   const liveScopeReady = state.market_source.mode === "live-dex" && state.paper_account.mode === "persistent";
   const jupiterConfigured = Boolean(process.env.JUPITER_API_KEY);
   const liveFlagsReady = process.env.MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION === "true" &&
@@ -457,10 +457,10 @@ function buildLiveTradeCanaryRequiredInputs(input: {
       safe_value_type: "Dedicated public Solana wallet address only; never a private key, seed phrase, keypair JSON, transaction bytes, or signed payload.",
       safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
       target_names: ["wallet_public_key"],
-      verifier_command: walletLooksLikePublicKey
-        ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${walletPublicKey} --require-operator-wallet`
+      verifier_command: verifierWalletPublicKey
+        ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${verifierWalletPublicKey} --require-operator-wallet`
         : "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
-      completion_signal: "A non-sample public Solana wallet is saved from Trading or Settings; the sample all-ones wallet is rejected.",
+      completion_signal: "A non-sample public Solana wallet is saved from the Trading live canary console; the sample all-ones wallet is rejected.",
     }),
     requiredInput({
       id: "wallet-ownership-proof",

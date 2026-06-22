@@ -2254,6 +2254,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyDexDiscoveryReceipt");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyStrictDexLiveReadiness");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-dex-live");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyStrictLiveCanaryFlags");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("strict_live_canary_flags_required");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-live-canary-flags");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("verifyStrictLiveCanaryProof");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("strict_live_canary_required");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("--require-live-canary");

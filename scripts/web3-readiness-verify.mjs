@@ -15,6 +15,7 @@ const requireJupiterOrder = config.requireJupiterOrder || process.env.WEB3_VERIF
 const requireOperatorWallet = config.requireOperatorWallet || process.env.WEB3_VERIFY_REQUIRE_OPERATOR_WALLET === "1";
 const requireDexLive = config.requireDexLive || process.env.WEB3_VERIFY_REQUIRE_DEX_LIVE === "1";
 const requireLiveCanary = config.requireLiveCanary || process.env.WEB3_VERIFY_REQUIRE_LIVE_CANARY === "1";
+const requireLiveCanaryFlags = config.requireLiveCanaryFlags || process.env.WEB3_VERIFY_REQUIRE_LIVE_CANARY_FLAGS === "1";
 const strictJupiterKey = process.env.WEB3_VERIFY_JUPITER_API_KEY || process.env.JUPITER_API_KEY || "";
 const secretValues = [
   { label: "jupiter canary", value: CANARY_JUPITER_KEY },
@@ -37,6 +38,7 @@ function parseArgs(args) {
     if (arg === "--require-operator-wallet") parsed.requireOperatorWallet = true;
     if (arg === "--require-dex-live") parsed.requireDexLive = true;
     if (arg === "--require-live-canary") parsed.requireLiveCanary = true;
+    if (arg === "--require-live-canary-flags") parsed.requireLiveCanaryFlags = true;
     if (arg === "--json") parsed.json = true;
   }
   return parsed;
@@ -1752,6 +1754,36 @@ async function verifyStrictLiveCanaryProof() {
   record("live-canary-strict", "pass", "confirmed funded canary, settlement reconciliation, and local portfolio mirror proof are accounted");
 }
 
+async function verifyStrictLiveCanaryFlags() {
+  if (!requireLiveCanaryFlags) {
+    record("live-canary-flags-strict", "skipped", "run with --require-live-canary-flags after installing the exact first-canary live env flags");
+    return;
+  }
+
+  const { response, json } = await requestJson("/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0");
+  assert(response.status === 200, "Strict live canary flags should read the canary receipt.", { status: response.status, json });
+  assert(json.mode === "web3-live-trade-canary", "Strict live canary flags should read the live canary receipt.", json);
+  const flagsInput = Array.isArray(json.required_inputs)
+    ? json.required_inputs.find((item) => item.id === "first-canary-live-flags")
+    : null;
+  assert(flagsInput, "Strict live canary flags should find the first-canary live flags input.", json.required_inputs);
+  assert(flagsInput.status === "done", "Strict live canary flags require all exact first-canary flags in the running server env.", flagsInput);
+  assert(
+    Array.isArray(flagsInput.target_names) &&
+      flagsInput.target_names.includes("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION") &&
+      flagsInput.target_names.includes("MASTERMOLD_LIVE_OPERATOR_APPROVAL") &&
+      flagsInput.target_names.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF"),
+    "Strict live canary flags should name the exact required env targets.",
+    flagsInput,
+  );
+  assert(json.live_execution_gate_enabled === true, "Strict live canary flags require the running canary execution gate to be enabled.", json);
+  assert(json.live_execution_permission === "blocked", "Strict live canary flags must not grant live execution permission by themselves.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Strict live canary flags must keep wallet mutation blocked.", json);
+  assert(json.transaction_submission_permission === "blocked", "Strict live canary flags must keep transaction submission blocked.", json);
+  assertNoLeak("strict live canary flags", json);
+  record("live-canary-flags-strict", "pass", "exact first-canary live env flags are active in the running server while live execution authority remains blocked");
+}
+
 async function verifyLiveIgnition() {
   const endpoint = "/api/web3-live-ignition?source=live-dex&account=persistent&scenario=breakout&cycles=0";
   const { response, json } = await requestJson(endpoint);
@@ -2233,6 +2265,7 @@ async function main() {
   await verifyLiveActivationPlanPacket();
   await verifyLiveActivationIntake();
   await verifyLiveTradeCanary();
+  await verifyStrictLiveCanaryFlags();
   await verifyStrictLiveCanaryProof();
   await verifyLiveIgnition();
   await verifySupervisedCanaryReadiness();
@@ -2253,6 +2286,7 @@ async function main() {
     strict_operator_wallet_required: requireOperatorWallet,
     strict_jupiter_order_required: requireJupiterOrder,
     strict_dex_live_required: requireDexLive,
+    strict_live_canary_flags_required: requireLiveCanaryFlags,
     strict_live_canary_required: requireLiveCanary,
     checked_at: new Date().toISOString(),
     result: "pass",

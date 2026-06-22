@@ -3547,6 +3547,9 @@ describe("Web3 autonomous trading subsystem", () => {
       safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
       target_names: ["wallet_public_key"],
     });
+    const dedicatedWalletInput = receipt.required_inputs.find((item) => item.id === "dedicated-public-wallet");
+    expect(dedicatedWalletInput?.verifier_command).toContain("--wallet=<public-solana-address>");
+    expect(dedicatedWalletInput?.verifier_command).not.toContain("--wallet=11111111111111111111111111111111");
     expect(receipt.required_inputs.find((item) => item.id === "wallet-ownership-proof")?.status).toMatch(/blocked|needed-now|done/);
     expect(receipt.required_inputs.find((item) => item.id === "jupiter-order-rail")?.target_names).toContain("JUPITER_API_KEY");
     expect(receipt.required_inputs.find((item) => item.id === "jupiter-order-rail")?.safe_value_type).toContain("ignored local server env");
@@ -3555,6 +3558,7 @@ describe("Web3 autonomous trading subsystem", () => {
       "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
       "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
     ]));
+    expect(receipt.required_inputs.find((item) => item.id === "first-canary-live-flags")?.verifier_command).toContain("--require-live-canary-flags");
     expect(receipt.required_inputs.find((item) => item.id === "post-signing-proof")?.verifier_command).toContain("prove-canary:web3");
     expect(receipt.required_inputs.every((item) => item.live_execution_permission === "blocked")).toBe(true);
     expect(receipt.required_inputs.every((item) => item.transaction_submission_permission === "blocked")).toBe(true);
@@ -3578,7 +3582,7 @@ describe("Web3 autonomous trading subsystem", () => {
       next_action: string;
       blockers: string[];
       next_required_input: { id: string; status: string } | null;
-      required_inputs: Array<{ id: string; status: string; target_names: string[]; safe_surface: string; secret_echo_permission: string }>;
+      required_inputs: Array<{ id: string; status: string; target_names: string[]; safe_surface: string; verifier_command: string | null; secret_echo_permission: string }>;
       live_execution_permission: string;
       wallet_mutation_permission: string;
     }>(liveResponse);
@@ -3597,7 +3601,11 @@ describe("Web3 autonomous trading subsystem", () => {
       expect(liveReceipt.next_required_input?.id).toBe("dedicated-public-wallet");
       expect(liveReceipt.required_inputs.find((item) => item.id === "dedicated-public-wallet")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     }
+    const liveDedicatedWalletInput = liveReceipt.required_inputs.find((item) => item.id === "dedicated-public-wallet");
+    expect(liveDedicatedWalletInput?.verifier_command).toContain("--wallet=<public-solana-address>");
+    expect(liveDedicatedWalletInput?.verifier_command).not.toContain("--wallet=11111111111111111111111111111111");
     expect(liveReceipt.required_inputs.find((item) => item.id === "first-canary-live-flags")?.target_names).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
+    expect(liveReceipt.required_inputs.find((item) => item.id === "first-canary-live-flags")?.verifier_command).toContain("--require-live-canary-flags");
     expect(liveReceipt.required_inputs.every((item) => item.secret_echo_permission === "blocked")).toBe(true);
     expect(liveReceipt.live_execution_permission).toBe("blocked");
     expect(liveReceipt.wallet_mutation_permission).toBe("blocked");
