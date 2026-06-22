@@ -366,7 +366,7 @@ function firstCanaryOperatorAction(
   if (lane.id === "live-scope") return "Keep the live canary on source=live-dex and account=persistent before any wallet or route proof.";
   if (lane.id === "dedicated-wallet") return "Save a dedicated public Solana trading wallet; never paste a private key, seed phrase, or keypair JSON.";
   if (lane.id === "wallet-ownership") return "Run Prove wallet with the matching browser wallet; this signs text only and cannot move funds.";
-  if (lane.id === "jupiter-order") return "Add JUPITER_API_KEY in ignored server env or run a one-shot Settings rehearsal until Jupiter order proof is ready.";
+  if (lane.id === "jupiter-order") return "Install JUPITER_API_KEY in ignored server env for the funded canary; one-shot Settings rehearsal is evidence only and cannot arm the unsigned handoff.";
   if (lane.id === "live-flags") return "Set the three exact first-canary live flags in ignored server env, then rerun the wallet/order verifier.";
   if (lane.id === "unsigned-order-preflight") return "Run Canary preflight in Trading to check the exact wallet, tiny amount, live flags, and Jupiter env before any transaction prompt.";
   if (lane.id === "signer-relay") {

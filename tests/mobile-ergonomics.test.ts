@@ -1365,7 +1365,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Live DEX scanner");
     expect(settingsPage).toContain("public market data: read-only");
     expect(settingsPage).toContain("Test DEX scanner or Web3 Live DEX read");
-    expect(settingsPage).toContain("JUPITER_API_KEY in ignored local env");
+    expect(settingsPage).toContain("Install JUPITER_API_KEY in ignored local env for funded canary order creation");
+    expect(settingsPage).toContain("one-shot Settings tests are evidence only");
     expect(settingsPage).toContain("signature evidence: hash-only");
     expect(settingsPage).toContain("signer secrets: never stored here");
     expect(settingsPage).toContain("private keys and seed phrases stay out of the app");
@@ -1699,6 +1700,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/api/web3-dedicated-wallet-packet/route.ts")).toContain("buildWeb3DedicatedWalletPacket");
     expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("web3-jupiter-order-packet");
     expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("server-env-or-one-shot-only");
+    expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("one-shot Settings rehearsal is evidence only and cannot arm the unsigned handoff");
     expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("--require-jupiter-order");
     expect(source("src/db/web3-jupiter-order-packet.ts")).toContain("transaction_body_storage: \"blocked\"");
     expect(source("app/api/web3-jupiter-order-packet/route.ts")).toContain("buildWeb3JupiterOrderPacket");
@@ -2181,6 +2183,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors that same first-canary drill receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now refreshes that first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now includes the same no-transaction Canary preflight as Trading");
+    expect(source("components/review-readiness.tsx")).toContain("session-only Jupiter tests can prove route/order evidence");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("Session-only rehearsal is evidence only");
     expect(source("components/review-readiness.tsx")).toContain("without connecting a browser wallet for preflight");
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now refreshes the first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now includes a no-signature Check wallet action");

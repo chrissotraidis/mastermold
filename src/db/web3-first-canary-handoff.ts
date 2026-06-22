@@ -180,7 +180,8 @@ function buildSafeToProvideNow(
   }
   if (nextOperatorStep?.id === "jupiter-order") {
     return [
-      "JUPITER_API_KEY target in ignored server env or one-shot Settings rehearsal",
+      "JUPITER_API_KEY target in ignored server env for funded canary unsigned handoff",
+      "one-shot Settings rehearsal as evidence only",
       "Jupiter Swap V2 quote/order proof without transaction bytes",
     ];
   }

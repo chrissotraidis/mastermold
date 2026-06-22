@@ -560,7 +560,7 @@ function credentialRequestCompletionCriteria(id: string) {
   }
   if (normalized.includes("jupiter")) {
     return [
-      "JUPITER_API_KEY is available through ignored server env or a session-only Settings test.",
+      "JUPITER_API_KEY is available through ignored server env for funded canary order creation; session-only Settings tests are evidence only.",
       "The strict Jupiter verifier passes with --require-jupiter-order.",
       "Quote and unsigned order readiness are recorded without returning transaction bytes.",
       "The refreshed live-usability receipt advances to the next non-Jupiter blocker while live execution, signing, submission, wallet mutation, and secret echo stay blocked.",
@@ -691,7 +691,7 @@ function credentialRequestVerificationRunway(
         href: fixHref,
         command: null,
         status: "next",
-        next_action: "Add JUPITER_API_KEY through ignored local env or a session-only Settings test.",
+        next_action: "Install JUPITER_API_KEY through ignored local env for funded canary order creation; session-only Settings tests are evidence only.",
       }),
       verificationRunwayStep({
         id: "strict-jupiter-verifier",
@@ -792,7 +792,7 @@ function credentialRequestSafeValueDescription(
     return "Browser-wallet text-message ownership proof only; never a private key, seed phrase, keypair JSON, transaction signature, signed payload, or transaction body.";
   }
   if (normalized.includes("wallet")) return "Dedicated public Solana trading wallet address only; never a private key, seed phrase, keypair JSON, signed payload, or transaction body.";
-  if (normalized.includes("jupiter")) return "Jupiter provider key in ignored server env or a session-only Settings test; never wallet authority or signed transaction data.";
+  if (normalized.includes("jupiter")) return "Jupiter provider key in ignored server env for funded canary order creation; session-only Settings tests are evidence only, never wallet authority or signed transaction data.";
   if (normalized.includes("signer") || normalized.includes("custody")) return "Signer provider choice, policy identifier, and provider target names only; custody credentials stay in the external provider surface.";
   if (normalized.includes("accounting") || normalized.includes("settlement")) return "Accounting/export target name and review decision only; no wallet secrets or raw private ledger credentials.";
   if (normalized.includes("production") || normalized.includes("emergency") || normalized.includes("ops")) return "Ops target names, process owner, restart policy, or emergency-stop contact route only; no webhook secret echo or live execution authority.";
@@ -1112,7 +1112,7 @@ function liveUsabilityRunwayNextAction(lane: Web3SupervisedLiveRunway["lanes"][n
     return "Run Prove ownership with the connected browser wallet; this signs text only and cannot move funds.";
   }
   if (lane.id === "jupiter") {
-    return "Add JUPITER_API_KEY in ignored server env or use a one-shot Settings rehearsal test.";
+    return "Install JUPITER_API_KEY in ignored server env for the funded canary; one-shot Settings rehearsal is evidence only and cannot arm the unsigned handoff.";
   }
   if (lane.id === "signer") {
     return "Choose manual external wallet custody or a reviewed policy signer after wallet proof and Jupiter order proof are ready.";

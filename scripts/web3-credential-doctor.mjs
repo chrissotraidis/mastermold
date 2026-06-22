@@ -178,7 +178,7 @@ function buildCredentialDoctorChecks({ accountSetup, providerHealth, launchCheck
         : "JUPITER_API_KEY is not configured, so unsigned order rehearsal remains gated.",
       next_action: env.jupiter_configured
         ? "Run Rehearse Jupiter order and strict order verifier after wallet scope is ready."
-        : "Add JUPITER_API_KEY in ignored server env or use one-shot session testing.",
+        : "Install JUPITER_API_KEY in ignored server env for funded canary order creation; one-shot session testing is evidence only.",
       storage: "server-env-or-session-only",
     },
     {

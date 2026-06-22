@@ -3085,6 +3085,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.operator_unblock_plan.find((step) => step.id === "signer-relay")?.action).toContain("external wallet transaction prompt");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "manual-live-review")?.action).toContain("external live review");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.action).toContain("signed tiny-canary relay");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "jupiter-order")?.action).toContain("one-shot Settings rehearsal is evidence only");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "jupiter-order")?.action).toContain("cannot arm the unsigned handoff");
     expect(receipt.operator_unblock_plan.map((step) => step.action).join(" ")).not.toContain("Hash-only wallet ownership proof");
     expect(receipt.operator_unblock_plan.map((step) => step.action).join(" ")).not.toContain("Spend: $0 remains");
     expect(receipt.operator_unblock_plan.some((step) => step.safe_surface.includes("/settings/integrations"))).toBe(true);
@@ -3397,6 +3399,7 @@ describe("Web3 autonomous trading subsystem", () => {
       required_inputs: Array<{
         id: string;
         status: string;
+        safe_value_type: string;
         target_names: string[];
         safe_surface: string;
         verifier_command: string | null;
@@ -3446,6 +3449,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.blockers[0]).toContain("Open the live DEX trading cockpit");
     expect(receipt.blockers.join(" ")).toContain("No confirmed live transaction signature");
     expect(receipt.blockers.join(" ")).toContain("does not return unsigned transaction bytes");
+    expect(receipt.blockers.join(" ")).toContain("one-shot Settings rehearsals are evidence only");
     expect(receipt.required_inputs.map((item) => item.id)).toEqual([
       "wallet-ownership-proof",
       "jupiter-order-rail",
@@ -3457,6 +3461,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.next_required_input?.id).toMatch(/wallet-ownership-proof|jupiter-order-rail/);
     expect(receipt.required_inputs.find((item) => item.id === "wallet-ownership-proof")?.status).toMatch(/needed-now|done/);
     expect(receipt.required_inputs.find((item) => item.id === "jupiter-order-rail")?.target_names).toContain("JUPITER_API_KEY");
+    expect(receipt.required_inputs.find((item) => item.id === "jupiter-order-rail")?.safe_value_type).toContain("ignored local server env");
     expect(receipt.required_inputs.find((item) => item.id === "first-canary-live-flags")?.target_names).toEqual(expect.arrayContaining([
       "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
       "MASTERMOLD_LIVE_OPERATOR_APPROVAL",

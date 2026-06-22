@@ -3918,8 +3918,8 @@ function buildWeb3CredentialActionQueue(
       label: "Jupiter order rehearsal",
       status: jupiter ? "ready" : "missing",
       detail: jupiter ? "Jupiter server key is configured for quote/order rehearsal." : "Order rehearsal cannot prove route readiness without Jupiter access.",
-      action: jupiter ? "Run Rehearse Jupiter and strict order verifier." : "Add JUPITER_API_KEY in ignored local env or use a one-shot Settings test.",
-      storage: "secret: server env or one-shot",
+      action: jupiter ? "Run Rehearse Jupiter and strict order verifier." : "Install JUPITER_API_KEY in ignored local env for funded canary order creation; one-shot Settings tests are evidence only.",
+      storage: "secret: server env for canary; one-shot evidence only",
     },
     {
       id: "dedicated-wallet",

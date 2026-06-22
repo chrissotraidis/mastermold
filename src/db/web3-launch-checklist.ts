@@ -572,7 +572,7 @@ function buildOperatorInputsNeeded({
         : "Jupiter route/order rehearsal needs JUPITER_API_KEY before Swap V2 order evidence can pass.",
       next_action: jupiterConfigured
         ? "Run Jupiter rehearsal and landing drill until quote and unsigned order proof pass with transaction bytes withheld."
-        : "Add JUPITER_API_KEY to ignored server environment or use a one-shot session test; never save it in browser storage.",
+        : "Add JUPITER_API_KEY to ignored server environment for funded canary order creation; one-shot session tests are evidence only and never saved in browser storage.",
       secret_handling: "Jupiter keys stay in server env or a one-shot request; receipts show configured/missing status only.",
     },
     {

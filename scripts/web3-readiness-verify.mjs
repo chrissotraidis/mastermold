@@ -1610,10 +1610,11 @@ async function verifyLiveTradeCanary() {
   assert(live.json.required_inputs.some((item) => item.id === "first-canary-live-flags" && item.target_names?.includes("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF")), "Live-scoped canary should expose exact first-canary live flag targets.", live.json.required_inputs);
   assert(live.json.required_inputs.every((item) => item.secret_echo_permission === "blocked"), "Live-scoped canary required inputs must keep secret echo blocked.", live.json.required_inputs);
   assert(
-    /Add a dedicated|Replace the scoped wallet|Replace the sample|Run Prove ownership|Add JUPITER_API_KEY|Set the exact live canary flags/.test(String(live.json.blockers?.[0] ?? "")),
+    /Add a dedicated|Replace the scoped wallet|Replace the sample|Run Prove ownership|Add JUPITER_API_KEY|Install JUPITER_API_KEY|Set the exact live canary flags/.test(String(live.json.blockers?.[0] ?? "")),
     "Live-scoped canary should put the next prerequisite before the missing signature proof.",
     live.json.blockers,
   );
+  assert(String(live.json.blockers?.join(" ") ?? "").includes("evidence only") || Boolean(process.env.JUPITER_API_KEY), "Live-scoped canary should distinguish session-only Jupiter rehearsal from funded canary env readiness.", live.json.blockers);
   assert(!String(live.json.blockers?.[0] ?? "").includes("No confirmed live transaction signature"), "Live-scoped canary should not lead with the final proof blocker before prerequisite gates.", live.json.blockers);
   assert(!String(live.json.blockers?.join(" ") ?? "").includes("Dry-run spend"), "Live-scoped canary proof should not mix paper dry-run cap repair into first funded canary blockers.", live.json.blockers);
   assert(!String(live.json.blockers?.join(" ") ?? "").includes("dry-run daily cap"), "Live-scoped canary proof should keep dry-run cap repair in paper/runway receipts.", live.json.blockers);

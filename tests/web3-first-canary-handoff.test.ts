@@ -73,7 +73,7 @@ const drill = {
       phase: "route-readiness",
       label: "Jupiter route/order proof",
       status: "blocked",
-      action: "Add JUPITER_API_KEY in ignored server env or use a one-shot Settings rehearsal test.",
+      action: "Install JUPITER_API_KEY in ignored server env for the funded canary; one-shot Settings rehearsal is evidence only and cannot arm the unsigned handoff.",
       safe_surface: "/settings/integrations#web3-credential-action-console",
       command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
       completion_signal: "Jupiter Swap V2 order proof is ready without exposing transaction bytes or API-key values.",

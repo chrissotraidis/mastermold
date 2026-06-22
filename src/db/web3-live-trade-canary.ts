@@ -410,7 +410,7 @@ function liveTradeCanaryBlockers(
     walletIsSample ? "Replace the sample all-ones wallet with a dedicated public Solana address before canary review." : null,
     dedicatedWalletScoped && !walletOwnershipProved ? "Run Prove ownership with the connected browser wallet; this signs text only and cannot move funds." : null,
     dedicatedWalletScoped && walletOwnershipProved && !walletOwnershipCurrentForCanary ? "Re-run Prove ownership with the connected browser wallet; the hash-only wallet proof is too old for the first funded canary." : null,
-    !jupiterConfigured ? "Add JUPITER_API_KEY in ignored server env or use a one-shot Settings rehearsal test." : null,
+    !jupiterConfigured ? "Install JUPITER_API_KEY in ignored server env for the funded canary; one-shot Settings rehearsals are evidence only and cannot arm the unsigned handoff." : null,
     !liveFlagsReady ? "Set the exact live canary flags in ignored server env before requesting the one-shot unsigned order." : null,
     !state.signed_transaction_relay.request_id ? "No active signed-relay request id is ready for a canary trade." : null,
     !readyForExternalSignedPayload ? "Signed relay is not currently ready to accept an external signed payload." : null,

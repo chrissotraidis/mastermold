@@ -243,7 +243,7 @@ function jupiterOrderNextAction(status: Web3JupiterOrderPacketStatus) {
   if (status === "review-ready") return "Run landing drill, signer handoff, settlement checks, and manual live review while execution stays blocked.";
   if (status === "rehearsal-needed") return "Run Rehearse Jupiter, then run strict Jupiter order verification.";
   if (status === "wallet-needed") return "Scope a dedicated public Solana wallet before strict order proof.";
-  return "Add JUPITER_API_KEY in ignored server env or use a one-shot Settings rehearsal test.";
+  return "Install JUPITER_API_KEY in ignored server env for funded canary order creation; one-shot Settings rehearsal is evidence only and cannot arm the unsigned handoff.";
 }
 
 function hasEnv(name: string) {
