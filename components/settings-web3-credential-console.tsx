@@ -947,6 +947,7 @@ export function SettingsWeb3CredentialConsole({
   const firstCanaryRequiredInput = liveTradeCanaryReceipt.next_required_input;
   const firstCanaryRequiredReadyCount = liveTradeCanaryReceipt.required_inputs.filter((item) => item.status === "done").length;
   const firstCanaryRequiredActiveCount = liveTradeCanaryReceipt.required_inputs.filter((item) => item.status === "needed-now" || item.status === "external-signature" || item.status === "proof-watch").length;
+  const firstCanarySettingsAction = settingsCanaryRequiredInputAction(firstCanaryRequiredInput);
 
   return (
     <section className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Settings Web3 credential action console">
@@ -1024,16 +1025,24 @@ export function SettingsWeb3CredentialConsole({
         {firstCanaryRequiredInput ? (
           <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
-              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe surface</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Settings action</p>
               <a
-                href={firstCanaryRequiredInput.safe_surface}
+                href={firstCanarySettingsAction.href}
                 className="mt-1 inline-flex min-h-9 max-w-full items-center rounded-md border border-caution/30 bg-caution/10 px-2 text-xs font-semibold text-caution transition hover:bg-caution/15"
               >
-                Open required control
+                {firstCanarySettingsAction.label}
               </a>
               <p className="mt-2 text-[11px] leading-4 text-outline">
-                Owner: {firstCanaryRequiredInput.owner.replaceAll("-", " ")}. Targets: {firstCanaryRequiredInput.target_names.join(", ")}.
+                {firstCanarySettingsAction.detail}
               </p>
+              {firstCanarySettingsAction.href !== firstCanaryRequiredInput.safe_surface ? (
+                <a
+                  href={firstCanaryRequiredInput.safe_surface}
+                  className="mt-2 inline-flex min-h-8 items-center rounded-md px-1 text-[10px] font-semibold text-outline transition hover:text-engine"
+                >
+                  Open receipt surface
+                </a>
+              ) : null}
             </div>
             <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
               <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Completion signal</p>
@@ -1389,6 +1398,7 @@ export function SettingsWeb3CredentialConsole({
           onChange={(value) => updateDraft("ws_url", value)}
         />
         <ConsoleInput
+          id="settings-web3-jupiter-api-key"
           label="Jupiter API key"
           type="password"
           value={draft.jupiter_api_key}
@@ -1622,6 +1632,7 @@ export function SettingsWeb3CredentialConsole({
             Connect wallet
           </button>
           <button
+            id="settings-web3-prove-wallet-ownership"
             type="button"
             onClick={() => void proveWalletOwnership()}
             disabled={disabled}
@@ -1667,6 +1678,7 @@ export function SettingsWeb3CredentialConsole({
             {busy === "preflight" ? "Checking" : "Run live preflight"}
           </button>
           <button
+            id="settings-web3-canary-preflight-control"
             type="button"
             onClick={() => void runUnsignedCanaryPreflight()}
             disabled={disabled}
@@ -1689,6 +1701,7 @@ export function SettingsWeb3CredentialConsole({
             <span className="leading-4">I understand this can move real funds</span>
           </label>
           <button
+            id="settings-web3-sign-tiny-canary-control"
             type="button"
             onClick={() => void signAndRelayLiveCanary()}
             disabled={disabled || !liveCanaryConsentArmed}
@@ -2536,6 +2549,57 @@ function FirstCanaryRequiredInputBadge({ status }: { status: Web3LiveTradeCanary
       {status.replaceAll("-", " ")}
     </Badge>
   );
+}
+
+function settingsCanaryRequiredInputAction(input: Web3LiveTradeCanaryReceipt["next_required_input"]) {
+  if (!input) {
+    return {
+      href: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+      label: "Open live canary cockpit",
+      detail: "All structured inputs are accounted; review Trading before any next canary attempt.",
+    };
+  }
+  const sharedDetail = `Owner: ${input.owner.replaceAll("-", " ")}. Targets: ${input.target_names.join(", ")}.`;
+  if (input.id === "wallet-ownership-proof") {
+    return {
+      href: "#settings-web3-prove-wallet-ownership",
+      label: "Run wallet proof",
+      detail: `${sharedDetail} Use the text-only browser-wallet proof control in Settings; it cannot move funds.`,
+    };
+  }
+  if (input.id === "jupiter-order-rail") {
+    return {
+      href: "#settings-web3-jupiter-api-key",
+      label: "Enter Jupiter key",
+      detail: `${sharedDetail} Enter or install the Jupiter key through the session-only credential fields.`,
+    };
+  }
+  if (input.id === "first-canary-live-flags") {
+    return {
+      href: "#settings-web3-first-canary-live-flags",
+      label: "Review live flags",
+      detail: `${sharedDetail} Select and install only the exact first-canary flag values.`,
+    };
+  }
+  if (input.id === "unsigned-order-preflight") {
+    return {
+      href: "#settings-web3-canary-preflight-control",
+      label: "Run canary preflight",
+      detail: `${sharedDetail} This checks the tiny order gate without opening a wallet transaction prompt.`,
+    };
+  }
+  if (input.id === "signed-payload-relay") {
+    return {
+      href: "#settings-web3-sign-tiny-canary-control",
+      label: "Open signing control",
+      detail: `${sharedDetail} Requires final acknowledgement and an external browser-wallet signature for the tiny canary.`,
+    };
+  }
+  return {
+    href: input.safe_surface,
+    label: "Open proof surface",
+    detail: `${sharedDetail} Use the canary proof surface to confirm relay, settlement, and portfolio mirror evidence.`,
+  };
 }
 
 function isSessionSensitiveDraftField(field: keyof Draft) {

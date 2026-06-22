@@ -2017,6 +2017,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/settings-web3-credential-console.tsx")).toContain("Settings ordered live canary required inputs");
     expect(source("components/settings-web3-credential-console.tsx")).toContain("fetchLiveTradeCanary");
     expect(source("components/settings-web3-credential-console.tsx")).toContain("FirstCanaryRequiredInputBadge");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("settingsCanaryRequiredInputAction");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("settings-web3-prove-wallet-ownership");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("settings-web3-jupiter-api-key");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("settings-web3-canary-preflight-control");
+    expect(source("components/settings-web3-credential-console.tsx")).toContain("settings-web3-sign-tiny-canary-control");
     expect(source("app/settings/integrations/page.tsx")).toContain("initialLiveTradeCanary={liveTradeCanary}");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Current canary step");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Action surface:");
