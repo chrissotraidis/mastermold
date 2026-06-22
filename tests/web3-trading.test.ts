@@ -6004,6 +6004,9 @@ describe("Web3 autonomous trading subsystem", () => {
       read_provider_configured: boolean;
       jupiter_configured: boolean;
       strict_verifier_command: string;
+      safe_collection_surface: string;
+      safe_collection_label: string;
+      safe_collection_href: string;
       missing_required: string[];
       steps: Array<{ id: string; label: string; status: string; detail: string; next_action: string }>;
       setup_links: Array<{ label: string; url: string; detail: string }>;
@@ -6034,6 +6037,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.strict_verifier_command).not.toContain("test-helius-secret");
     expect(packet.strict_verifier_command).not.toContain("test-jupiter-secret");
     expect(packet.strict_verifier_command).toContain("--require-operator-wallet");
+    expect(packet.safe_collection_surface).toBe("trading-live-canary-console");
+    expect(packet.safe_collection_label).toBe("Trading live canary console");
+    expect(packet.safe_collection_href).toBe("/trading?source=live-dex&account=persistent&scenario=base#web3-live-canary-console");
     expect(packet.missing_required).toContain("Dedicated public Solana trading wallet");
     expect(packet.steps.map((step) => step.id)).toEqual([
       "create-wallet",
@@ -6043,6 +6049,7 @@ describe("Web3 autonomous trading subsystem", () => {
       "run-strict-verifier",
       "keep-secrets-out",
     ]);
+    expect(packet.steps.find((step) => step.id === "enter-public-address")?.next_action).toContain("Trading live canary console");
     expect(["blocked", "pending", "review"]).toContain(packet.steps.find((step) => step.id === "reject-sample-wallet")?.status ?? "");
     expect(packet.setup_links.some((link) => link.url === "https://solana.com/wallets")).toBe(true);
     expect(packet.public_address_storage).toBe("browser-safe-public-scope");
@@ -6054,6 +6061,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.transaction_submission_permission).toBe("blocked");
     expect(packet.live_execution_permission).toBe("blocked");
     expect(packet.wallet_mutation_permission).toBe("blocked");
+    expect(packet.controls.join(" ")).toContain("Trading live canary console");
     expect(packet.controls.some((control) => /private keys|seed phrases|sample all-ones wallet/i.test(control))).toBe(true);
     expect(JSON.stringify(packet)).not.toContain("test-helius-secret");
     expect(JSON.stringify(packet)).not.toContain("test-jupiter-secret");

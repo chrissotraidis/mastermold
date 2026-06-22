@@ -1386,6 +1386,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Dedicated wallet packet");
     expect(settingsPage).toContain("Sample wallet rejected");
     expect(settingsPage).toContain("Public address only");
+    expect(settingsPage).toContain("Open wallet gate");
     expect(settingsConsole).toContain("--require-operator-wallet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--require-operator-wallet");
     expect(settingsPage).toContain("SettingsCredentialDoctorPanel");
@@ -1745,6 +1746,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-account-setup.ts")).toContain("sample all-ones wallet is allowed for demos");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("web3-dedicated-wallet-packet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("sample all-ones wallet");
+    expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("safe_collection_href");
+    expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("Trading live canary console");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--wallet=<public-solana-address> --require-operator-wallet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--require-operator-wallet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("private_key_storage: \"blocked\"");

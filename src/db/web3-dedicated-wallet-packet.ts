@@ -40,6 +40,9 @@ export type Web3DedicatedWalletPacket = {
   read_provider_configured: boolean;
   jupiter_configured: boolean;
   strict_verifier_command: string;
+  safe_collection_surface: "trading-live-canary-console";
+  safe_collection_label: "Trading live canary console";
+  safe_collection_href: string;
   missing_required: string[];
   setup_links: Array<{
     label: string;
@@ -75,6 +78,7 @@ export function buildWeb3DedicatedWalletPacket(state: Web3TradingState): Web3Ded
   const walletOwnershipProved = dedicatedWalletScoped && Boolean(walletOwnership);
   const readProviderConfigured = hasEnv("HELIUS_API_KEY") || hasEnv("SOLANA_RPC_URL") || hasEnv("NEXT_PUBLIC_SOLANA_RPC_URL");
   const jupiterConfigured = hasEnv("JUPITER_API_KEY");
+  const safeCollectionHref = `/trading?source=live-dex&account=persistent&scenario=${state.scenario}#web3-live-canary-console`;
   const status = dedicatedWalletPacketStatus({
     walletScoped,
     walletIsSample,
@@ -113,6 +117,9 @@ export function buildWeb3DedicatedWalletPacket(state: Web3TradingState): Web3Ded
     read_provider_configured: readProviderConfigured,
     jupiter_configured: jupiterConfigured,
     strict_verifier_command: strictVerifierCommand,
+    safe_collection_surface: "trading-live-canary-console" as const,
+    safe_collection_label: "Trading live canary console" as const,
+    safe_collection_href: safeCollectionHref,
     missing_required: missingRequired,
     setup_links: [
       {
@@ -137,7 +144,7 @@ export function buildWeb3DedicatedWalletPacket(state: Web3TradingState): Web3Ded
     live_execution_permission: "blocked" as const,
     wallet_mutation_permission: "blocked" as const,
     controls: [
-      "Use a dedicated Solana wallet created outside Mastermind; paste only its public address.",
+      "Use a dedicated Solana wallet created outside Mastermind; paste only its public address in the Trading live canary console.",
       "The sample all-ones wallet is rejected for operator-wallet readiness and can only exercise demo paths.",
       "Wallet ownership proof is a text-only browser-wallet signature stored as hashes; it is not a transaction signature.",
       "Private keys, seed phrases, raw transactions, signed payloads, live execution, and wallet mutation remain blocked.",
@@ -188,14 +195,14 @@ function buildDedicatedWalletSteps(input: {
       label: "Enter public address only",
       status: input.walletScoped ? "done" : "active",
       detail: "Mastermind stores only public wallet scope and non-secret risk preferences.",
-      next_action: input.walletScoped ? "Confirm the preview matches the wallet you intend to review." : "Paste only the Solana public address in Settings.",
+      next_action: input.walletScoped ? "Confirm the preview matches the wallet you intend to review." : "Paste only the Solana public address in the Trading live canary console.",
     },
     {
       id: "reject-sample-wallet",
       label: "Reject sample wallet",
       status: input.walletIsSample ? "blocked" : input.dedicatedWalletScoped ? "done" : "review",
       detail: "The demo all-ones wallet never satisfies live operator-wallet scope.",
-      next_action: input.walletIsSample ? "Replace the sample all-ones wallet with a dedicated public address." : "Keep demo wallet use isolated from readiness review.",
+      next_action: input.walletIsSample ? "Replace the sample all-ones wallet with a dedicated public address in the Trading live canary console." : "Keep demo wallet use isolated from readiness review.",
     },
     {
       id: "prove-ownership",
@@ -236,8 +243,8 @@ function dedicatedWalletNextAction(status: Web3DedicatedWalletPacketStatus, read
     ? "Run the strict operator-wallet verifier, then continue Jupiter order and signer review."
     : "Configure Helius or Solana RPC before running strict operator-wallet verification.";
   if (status === "ownership-needed") return "Run Prove ownership with the connected browser wallet; do not sign a transaction.";
-  if (status === "sample-wallet") return "Replace the sample all-ones wallet with a dedicated Solana public address.";
-  return "Create a dedicated Solana wallet externally and enter only its public address in Settings.";
+  if (status === "sample-wallet") return "Replace the sample all-ones wallet with a dedicated Solana public address in the Trading live canary console.";
+  return "Create a dedicated Solana wallet externally and enter only its public address in the Trading live canary console.";
 }
 
 function hasEnv(name: string) {

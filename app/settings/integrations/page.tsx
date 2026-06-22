@@ -3294,7 +3294,7 @@ function SettingsDedicatedWalletPacketPanel({ packet }: { packet: Web3DedicatedW
         <LaunchQueueBadge status={primaryTone} label={openCount > 0 ? `${openCount} open` : "ready"} />
       </div>
 
-      <div className="mt-3 grid gap-2 md:grid-cols-3">
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Public address</p>
           <p className="mt-1 text-xs font-semibold text-on-surface">
@@ -3312,6 +3312,17 @@ function SettingsDedicatedWalletPacketPanel({ packet }: { packet: Web3DedicatedW
           <p className="mt-1 text-[11px] leading-4 text-outline">
             Text-only browser wallet signature; receipt {packet.wallet_ownership_receipt_hash ? packet.wallet_ownership_receipt_hash.slice(0, 10) : "not recorded"}.
           </p>
+        </div>
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Action surface</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface">{packet.safe_collection_label}</p>
+          <Link
+            href={packet.safe_collection_href}
+            className="mt-2 inline-flex min-h-10 items-center gap-1 rounded-md px-1 text-xs font-semibold text-engine hover:text-engine/80"
+          >
+            Open wallet gate
+            <ExternalLink aria-hidden="true" className="size-3" />
+          </Link>
         </div>
         <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
           <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Strict verifier</p>
