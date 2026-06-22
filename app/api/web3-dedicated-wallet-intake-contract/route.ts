@@ -7,8 +7,10 @@ import {
 import {
   getWeb3TradingStateAsync,
   isTradingAccountMode,
+  isTradingMarketSource,
   isTradingScenario,
   type TradingAccountMode,
+  type TradingMarketSource,
   type TradingScenario,
 } from "@/src/db/web3-trading";
 
@@ -21,7 +23,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3DedicatedW
 
   const state = await getWeb3TradingStateAsync({
     scenario: parsed.value.scenario,
-    source: "sample",
+    source: parsed.value.source,
     account: parsed.value.account,
     cycles: parsed.value.cycles,
     advance: false,
@@ -34,15 +36,19 @@ export async function GET(request: Request): Promise<NextResponse<Web3DedicatedW
 }
 
 function parseWalletIntakeQuery(url: string):
-  | { ok: true; value: { scenario: TradingScenario; account: TradingAccountMode; cycles: number } }
+  | { ok: true; value: { scenario: TradingScenario; source: TradingMarketSource; account: TradingAccountMode; cycles: number } }
   | { ok: false; error: string } {
   const search = new URL(url).searchParams;
   const scenario = search.get("scenario") ?? "breakout";
+  const source = search.get("source") ?? "live-dex";
   const account = search.get("account") ?? "persistent";
   const cycles = Number(search.get("cycles") ?? "0");
 
   if (!isTradingScenario(scenario)) {
     return { ok: false, error: "scenario must be base, breakout, or rug-risk." };
+  }
+  if (!isTradingMarketSource(source)) {
+    return { ok: false, error: "source must be sample or live-dex." };
   }
   if (!isTradingAccountMode(account)) {
     return { ok: false, error: "account must be ephemeral or persistent." };
@@ -55,6 +61,7 @@ function parseWalletIntakeQuery(url: string):
     ok: true,
     value: {
       scenario: scenario as TradingScenario,
+      source: source as TradingMarketSource,
       account: account as TradingAccountMode,
       cycles,
     },

@@ -814,7 +814,7 @@ function LiveCanaryCommandCenter({
   const drillHref = drill.live_review_source_endpoint;
   const liveTestLedgerHref = `/api/web3-live-test-ledger?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const liveUsabilitySummaryHref = `/api/web3-live-usability-summary?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
-  const walletIntakeContractHref = `/api/web3-dedicated-wallet-intake-contract?account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
+  const walletIntakeContractHref = `/api/web3-dedicated-wallet-intake-contract?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const canaryAttemptSummaryHref = `/api/web3-supervised-canary-readiness?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const attemptContract = readiness.canary_attempt_contract;
   const attemptMissingInputs = attemptContract.missing_inputs.slice(0, 4);

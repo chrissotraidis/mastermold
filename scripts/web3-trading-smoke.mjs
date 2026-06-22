@@ -274,10 +274,11 @@ async function main() {
   assert(liveUsabilitySummary.lanes.find((lane) => lane.id === "autonomous-real-capital")?.status === "blocked", "Web3 live-usability summary should block autonomous real capital.", liveUsabilitySummary.lanes);
   assert(liveUsabilitySummary.summary.includes("Not usable for funded autonomous trading yet"), "Web3 live-usability summary should answer what is left.", liveUsabilitySummary);
 
-  const walletIntakeContractResponse = await request("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
+  const walletIntakeContractResponse = await request("/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0");
   const walletIntakeContract = await readJson(walletIntakeContractResponse);
   assert(walletIntakeContractResponse.status === 200, "Web3 wallet intake contract should return a contract receipt.", { status: walletIntakeContractResponse.status, walletIntakeContract });
   assert(walletIntakeContract.mode === "web3-dedicated-wallet-intake-contract", "Web3 wallet intake contract should expose the expected mode.", walletIntakeContract);
+  assert(walletIntakeContract.source === "live-dex", "Web3 wallet intake contract should stay scoped to live DEX.", walletIntakeContract);
   assert(walletIntakeContract.can_enter_in_app === true, "Web3 wallet intake contract should be app-enterable.", walletIntakeContract);
   assert(walletIntakeContract.existing_save_endpoint === "/api/web3-trading", "Web3 wallet intake contract should use the existing dry-run save endpoint.", walletIntakeContract);
   assert(walletIntakeContract.existing_save_body_template?.execution?.wallet_public_key === "<public-solana-address>", "Web3 wallet intake contract should name only the public wallet placeholder.", walletIntakeContract);

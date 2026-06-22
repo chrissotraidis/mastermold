@@ -3497,7 +3497,7 @@ function SettingsDedicatedWalletIntakeContractPanel({ contract }: { contract: We
 
       <div className="mt-3 flex flex-wrap gap-2">
         <Link
-          href="/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0"
+          href="/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0"
           className="inline-flex min-h-10 items-center rounded-md border border-engine/30 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
         >
           Open contract JSON

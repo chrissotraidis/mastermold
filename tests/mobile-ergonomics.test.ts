@@ -1403,7 +1403,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Accepted fields");
     expect(settingsPage).toContain("Rejected fields");
     expect(settingsPage).toContain("Open contract JSON");
-    expect(settingsPage).toContain("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
+    expect(settingsPage).toContain("/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0");
     expect(settingsPage).toContain("Private keys, seed phrases, keypairs, transaction bodies, signed payloads, and API keys are not part of wallet scope.");
     expect(settingsPage.indexOf("<SettingsDedicatedWalletPacketPanel")).toBeLessThan(
       settingsPage.indexOf("<SettingsDedicatedWalletIntakeContractPanel"),

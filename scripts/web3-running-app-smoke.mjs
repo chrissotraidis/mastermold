@@ -226,9 +226,10 @@ async function verifyLiveUsabilitySummary() {
 }
 
 async function verifyWalletIntakeContract() {
-  const { response, json } = await requestJson("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
+  const { response, json } = await requestJson("/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0");
   assert(response.status === 200, "Wallet intake contract should return 200.", { status: response.status, json });
   assert(json.mode === "web3-dedicated-wallet-intake-contract", "Wallet intake contract should expose the expected mode.", json);
+  assert(json.source === "live-dex", "Wallet intake contract should stay scoped to the live DEX setup path.", json);
   assert(json.can_enter_in_app === true, "Wallet intake contract should be enterable in app.", json);
   assert(json.existing_save_endpoint === "/api/web3-trading", "Wallet intake contract should point at the existing dry-run scope save endpoint.", json);
   assert(json.existing_save_body_template?.execution?.wallet_public_key === "<public-solana-address>", "Wallet intake contract should use a public wallet placeholder.", json);

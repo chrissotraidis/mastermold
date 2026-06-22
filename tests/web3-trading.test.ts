@@ -3780,7 +3780,7 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "blocked",
       counts_as_funded_trade_proof: false,
     });
-    expect(usabilitySummary.evidence_endpoints).toContain("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
+    expect(usabilitySummary.evidence_endpoints).toContain("/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0");
     expect(usabilitySummary.evidence_endpoints).toContain("GET /api/web3-live-capital-preflight");
     expect(usabilitySummary.evidence_endpoints).toContain("/api/web3-live-test-ledger?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(usabilitySummary.summary).toContain("Not usable for funded autonomous trading yet");
@@ -3803,10 +3803,11 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(compactSummary.counts.live_usability_rows).toBeGreaterThan(1);
     expect(compactSummary.counts.funded_proof_rows_ready).toBe(0);
 
-    const walletContractResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_GET(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0"));
+    const walletContractResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_GET(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0"));
     const walletContract = await json<{
       mode: string;
       status: string;
+      source: string;
       receipt_hash: string;
       can_enter_in_app: boolean;
       existing_save_endpoint: string;
@@ -3834,6 +3835,7 @@ describe("Web3 autonomous trading subsystem", () => {
     }>(walletContractResponse);
     expect(walletContractResponse.status).toBe(200);
     expect(walletContract.mode).toBe("web3-dedicated-wallet-intake-contract");
+    expect(walletContract.source).toBe("live-dex");
     expect(walletContract.status).toBe("public-wallet-needed");
     expect(walletContract.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(walletContract.can_enter_in_app).toBe(true);

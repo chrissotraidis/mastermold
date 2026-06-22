@@ -132,7 +132,7 @@ export function buildWeb3LiveUsabilitySummaryReceipt(input: {
     },
     lanes,
     evidence_endpoints: Array.from(new Set([
-      "/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0",
+      "/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0",
       "/api/web3-live-usability-blockers?source=live-dex&account=persistent&scenario=breakout&cycles=0&rows=all",
       "/api/web3-live-test-ledger?source=live-dex&account=persistent&scenario=breakout&cycles=0",
       "/api/web3-local-credentials",
@@ -233,7 +233,7 @@ export function buildWeb3LiveUsabilitySummaryFallbackReceipt(input: {
     },
     lanes,
     evidence_endpoints: [
-      "/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0",
+      "/api/web3-dedicated-wallet-intake-contract?source=live-dex&scenario=breakout&account=persistent&cycles=0",
       "/api/web3-live-usability-summary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
       "/api/web3-live-test-ledger?source=live-dex&account=persistent&scenario=breakout&cycles=0",
       "/api/web3-local-credentials",
