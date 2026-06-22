@@ -815,6 +815,9 @@ function LiveCanaryCommandCenter({
   const liveTestLedgerHref = `/api/web3-live-test-ledger?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const liveUsabilitySummaryHref = `/api/web3-live-usability-summary?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
   const walletIntakeContractHref = `/api/web3-dedicated-wallet-intake-contract?account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
+  const canaryAttemptSummaryHref = `/api/web3-supervised-canary-readiness?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0`;
+  const attemptContract = readiness.canary_attempt_contract;
+  const attemptMissingInputs = attemptContract.missing_inputs.slice(0, 4);
   const nextProof = canary.post_signing_evidence.find((item) => item.status !== "pass") ?? null;
   const proofPassCount = canary.post_signing_evidence.filter((item) => item.status === "pass").length;
   const latestAttempt = readiness.latest_attempt_receipt;
@@ -914,6 +917,62 @@ function LiveCanaryCommandCenter({
             <LiveUsabilityContractStat label="Drill source" value={drill.source === "live-dex" ? "Live DEX" : "sample"} />
             <LiveUsabilityContractStat label="Hard fails" value={`${drill.hard_fail_count}`} />
             <LiveUsabilityContractStat label="Drill hash" value={drill.receipt_hash.slice(0, 12)} />
+          </div>
+
+          <div className="mt-3 rounded-md border border-caution/25 bg-caution/[0.035] p-3" aria-label="Trading first canary attempt summary">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">First canary attempt summary</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{attemptContract.operator_action_label}</p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-on-surface-variant">
+                  {attemptContract.runnable_now
+                    ? "The next tiny canary action is runnable only through the guarded external-wallet path below."
+                    : attemptMissingInputs[0] ?? readiness.next_action}
+                </p>
+              </div>
+              <span className={canaryAttemptStageClassName(attemptContract.stage, attemptContract.runnable_now)}>
+                {attemptContract.runnable_now ? "runnable" : "blocked"}
+              </span>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              <LiveUsabilityContractStat label="Stage" value={attemptContract.stage.replaceAll("-", " ")} />
+              <LiveUsabilityContractStat label="Missing" value={`${attemptContract.missing_inputs.length}`} />
+              <LiveUsabilityContractStat label="Acknowledgements" value={`${attemptContract.required_acknowledgements.length}`} />
+            </div>
+            <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.62fr)]">
+              <code className="block overflow-x-auto whitespace-nowrap rounded-md border border-outline/15 bg-black/20 px-2 py-1.5 text-[11px] leading-5 text-outline">
+                {attemptContract.exact_next_command}
+              </code>
+              <Link
+                href={attemptContract.primary_endpoint}
+                className="inline-flex min-h-10 items-center justify-center rounded-md border border-caution/30 bg-caution/10 px-2 py-1.5 text-xs font-semibold text-caution transition hover:bg-caution/15"
+              >
+                Open next endpoint
+              </Link>
+            </div>
+            {attemptMissingInputs.length > 0 ? (
+              <div className="mt-2 grid gap-1.5" aria-label="Trading first canary attempt missing inputs">
+                {attemptMissingInputs.map((item) => (
+                  <p key={item} className="line-clamp-2 rounded-md border border-outline/15 bg-surface-dim/35 px-2 py-1 text-[11px] leading-4 text-outline">
+                    {item}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Link
+                href={canaryAttemptSummaryHref}
+                className="inline-flex min-h-8 items-center rounded-md border border-outline/20 bg-surface-dim/55 px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+              >
+                Open attempt readiness JSON
+              </Link>
+              <Link
+                href="/settings/integrations#settings-web3-credentials-runway"
+                className="inline-flex min-h-8 items-center rounded-md border border-outline/20 bg-surface-dim/55 px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+              >
+                Open setup runway
+              </Link>
+            </div>
           </div>
 
           <div className="mt-3 rounded-md border border-critical/20 bg-critical/[0.025] p-3" aria-label="Actual live trade test ledger">

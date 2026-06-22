@@ -125,6 +125,8 @@ async function verifyTradingPage() {
   const requiredMarkers = [
     /No real trade tested yet/,
     /Actual live trade test ledger/,
+    /First canary attempt summary/,
+    /Open attempt readiness JSON/,
     /Open wallet contract/,
     /Funded wallet trade/,
     /not attempted/,
@@ -142,6 +144,8 @@ async function verifyTradingPage() {
   assert(!text.includes("This page did not load"), "Trading page should not render the route-error fallback.");
   assert(text.includes("No real trade tested yet"), "Trading page should say no real live trade has been tested.", text);
   assert(text.includes("Actual live trade test ledger"), "Trading page should expose the actual live-trade test ledger.", text);
+  assert(text.includes("First canary attempt summary"), "Trading page should expose the first canary attempt summary.", text);
+  assert(text.includes("Open attempt readiness JSON"), "Trading page should link the attempt readiness JSON.", text);
   assert(text.includes("Open wallet contract"), "Trading page should link the wallet intake contract.", text);
   assert(text.includes("Funded wallet trade") && text.includes("not attempted"), "Trading page should say the funded wallet trade was not attempted.", text);
   assert(text.includes("Trading live canary console"), "Trading page should render the live canary console.", text);

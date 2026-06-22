@@ -854,6 +854,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Trading first canary drill lanes");
     expect(tradingPage).toContain("Trading first canary operator unblock plan");
     expect(tradingPage).toContain("Trading ordered first canary unblock steps");
+    expect(tradingPage).toContain("Trading first canary attempt summary");
+    expect(tradingPage).toContain("First canary attempt summary");
+    expect(tradingPage).toContain("Open attempt readiness JSON");
+    expect(tradingPage).toContain("canaryAttemptSummaryHref");
+    expect(tradingPage).toContain("readiness.canary_attempt_contract");
+    expect(tradingPage).toContain("/api/web3-supervised-canary-readiness?source=${canary.source}&account=${canary.account}&scenario=${canary.scenario}&cycles=0");
+    expect(tradingPage.indexOf("Trading first canary attempt summary")).toBeLessThan(
+      tradingPage.indexOf("Actual live trade test ledger")
+    );
     expect(tradingPage).toContain("drill.operator_unblock_plan");
     expect(tradingPage).toContain("drill.next_unblock_step");
     expect(tradingPage).toContain("firstCanaryUnblockStepClassName");
