@@ -1057,6 +1057,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Web3 setup priority");
     expect(settingsPage).toContain("Settings first funded canary handoff");
     expect(settingsPage).toContain("First funded canary handoff");
+    expect(settingsPage).toContain("firstCanaryHandoff={web3FirstCanaryHandoff}");
+    expect(settingsPage).toContain("Current canary contract");
+    expect(settingsPage).toContain("Settings first funded canary current step contract");
+    expect(settingsPage).toContain("Settings first funded canary proof ledger");
+    expect(settingsPage).toContain("Copy first funded canary handoff");
     expect(settingsPage).toContain("Safe to provide next");
     expect(settingsPage).toContain("Never paste");
     expect(settingsPage).toContain("Open canary step");
@@ -2183,6 +2188,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Settings now mirrors that same first-canary drill receipt");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now refreshes that first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("Settings credential console now includes the same no-transaction Canary preflight as Trading");
+    expect(source("src/db/web3-first-canary-handoff.ts")).toContain("web3-first-canary-current-step-contract");
+    expect(source("src/db/web3-first-canary-handoff.ts")).toContain("proof_ledger");
     expect(source("components/review-readiness.tsx")).toContain("session-only Jupiter tests can prove route/order evidence");
     expect(source("docs/web3-credentials-runbook.md")).toContain("Session-only rehearsal is evidence only");
     expect(source("components/review-readiness.tsx")).toContain("without connecting a browser wallet for preflight");

@@ -24,6 +24,8 @@ export type Web3FirstCanaryHandoffReceipt = {
   proof_pass_count: number;
   proof_required_count: 4;
   next_operator_step: Web3FirstCanaryUnblockStep | null;
+  current_step_contract: Web3FirstCanaryCurrentStepContract;
+  proof_ledger: Web3FirstCanaryProofLedgerItem[];
   done_steps: Web3FirstCanaryUnblockStep[];
   open_steps: Web3FirstCanaryUnblockStep[];
   safe_to_provide_now: string[];
@@ -44,6 +46,36 @@ export type Web3FirstCanaryHandoffReceipt = {
   signed_payload_storage: "blocked";
   secret_echo_permission: "blocked";
   controls: string[];
+};
+
+export type Web3FirstCanaryCurrentStepContract = {
+  mode: "web3-first-canary-current-step-contract";
+  step_id: Web3FirstCanaryUnblockStep["id"] | null;
+  label: string;
+  phase: Web3FirstCanaryUnblockStep["phase"] | "complete";
+  status: Web3FirstCanaryUnblockStep["status"] | "complete";
+  action: string;
+  safe_surface: string | null;
+  command: string | null;
+  safe_to_provide_now: string[];
+  never_provide: string[];
+  completion_signal: string;
+  can_complete_in_app: boolean;
+  next_verification_command: string | null;
+  live_execution_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  secret_echo_permission: "blocked";
+};
+
+export type Web3FirstCanaryProofLedgerItem = {
+  id: Web3FirstCanaryUnblockStep["id"];
+  label: string;
+  status: Web3FirstCanaryUnblockStep["status"];
+  phase: Web3FirstCanaryUnblockStep["phase"];
+  done: boolean;
+  blocks_funded_canary: boolean;
+  completion_signal: string;
 };
 
 export function buildWeb3FirstCanaryHandoffReceipt(input: {
@@ -70,6 +102,22 @@ export function buildWeb3FirstCanaryHandoffReceipt(input: {
   ]);
   const status = firstCanaryHandoffStatus(input.drill, input.requirements);
   const summary = firstCanaryHandoffSummary(input.drill, openSteps);
+  const currentStepContract = buildCurrentStepContract({
+    nextOperatorStep,
+    safeToProvideNow,
+    neverProvide: input.requirements.never_provide,
+    fallbackAction: input.drill.next_action,
+    fallbackCommand: input.drill.strict_ready_command,
+  });
+  const proofLedger = input.drill.operator_unblock_plan.map((step) => ({
+    id: step.id,
+    label: step.label,
+    status: step.status,
+    phase: step.phase,
+    done: step.status === "done",
+    blocks_funded_canary: step.blocks_funded_canary,
+    completion_signal: step.completion_signal,
+  }));
   const receiptBase = {
     mode: "web3-first-canary-handoff" as const,
     status,
@@ -86,6 +134,8 @@ export function buildWeb3FirstCanaryHandoffReceipt(input: {
     proof_pass_count: input.drill.proof_pass_count,
     proof_required_count: input.drill.proof_required_count,
     next_operator_step: nextOperatorStep,
+    current_step_contract: currentStepContract,
+    proof_ledger: proofLedger,
     done_steps: doneSteps,
     open_steps: openSteps,
     safe_to_provide_now: safeToProvideNow,
@@ -128,6 +178,36 @@ export function buildWeb3FirstCanaryHandoffReceipt(input: {
   return {
     ...receiptWithText,
     receipt_hash: hashJson(receiptWithText),
+  };
+}
+
+function buildCurrentStepContract(input: {
+  nextOperatorStep: Web3FirstCanaryUnblockStep | null;
+  safeToProvideNow: string[];
+  neverProvide: string[];
+  fallbackAction: string;
+  fallbackCommand: string;
+}): Web3FirstCanaryCurrentStepContract {
+  const step = input.nextOperatorStep;
+  const safeSurface = step?.safe_surface ?? null;
+  return {
+    mode: "web3-first-canary-current-step-contract",
+    step_id: step?.id ?? null,
+    label: step?.label ?? "First funded canary proof complete",
+    phase: step?.phase ?? "complete",
+    status: step?.status ?? "complete",
+    action: step?.action ?? input.fallbackAction,
+    safe_surface: safeSurface,
+    command: step?.command ?? input.fallbackCommand,
+    safe_to_provide_now: input.safeToProvideNow,
+    never_provide: input.neverProvide,
+    completion_signal: step?.completion_signal ?? "Strict live-canary proof passes with signed relay, chain confirmation, settlement reconciliation, and local portfolio mirror evidence.",
+    can_complete_in_app: typeof safeSurface === "string" && safeSurface.startsWith("/") && !safeSurface.startsWith("/api/"),
+    next_verification_command: step?.command ?? input.fallbackCommand,
+    live_execution_permission: "blocked",
+    transaction_submission_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
   };
 }
 
@@ -271,6 +351,13 @@ function renderFirstCanaryHandoffText(
     "",
     "## Next Operator Step",
     next,
+    "",
+    "## Current Step Contract",
+    `- Step id: ${receipt.current_step_contract.step_id ?? "complete"}`,
+    `- Phase: ${receipt.current_step_contract.phase}`,
+    `- Status: ${receipt.current_step_contract.status}`,
+    `- Can complete in app: ${receipt.current_step_contract.can_complete_in_app ? "true" : "false"}`,
+    receipt.current_step_contract.next_verification_command ? `- Verification: ${receipt.current_step_contract.next_verification_command}` : null,
     "",
     "## Open First-Canary Steps",
     ...(openSteps.length > 0 ? openSteps : ["- No open first-canary steps are listed."]),

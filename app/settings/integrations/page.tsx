@@ -27,6 +27,7 @@ import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3FirstCanaryDrillReceipt, type Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
+import { buildWeb3FirstCanaryHandoffReceipt, type Web3FirstCanaryHandoffReceipt } from "@/src/db/web3-first-canary-handoff";
 import { buildWeb3JupiterOrderPacket, type Web3JupiterOrderPacket } from "@/src/db/web3-jupiter-order-packet";
 import { getWeb3JupiterRehearsalHistory, type Web3JupiterRehearsalHistory } from "@/src/db/web3-jupiter-rehearsal-history";
 import { buildWeb3AutonomyLaunchChecklist, type Web3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist";
@@ -212,6 +213,10 @@ export default async function IntegrationsSettingsPage() {
     unsignedPreflight: web3UnsignedCanaryPreflight,
     canary: web3LiveTradeCanary,
   });
+  const web3FirstCanaryHandoff = buildWeb3FirstCanaryHandoffReceipt({
+    drill: web3FirstCanaryDrill,
+    requirements: web3CredentialRequirements,
+  });
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
 
   return (
@@ -230,6 +235,7 @@ export default async function IntegrationsSettingsPage() {
             researchPacket={web3ResearchHandoffPacket}
             credentialRequirements={web3CredentialRequirements}
             firstCanaryDrill={web3FirstCanaryDrill}
+            firstCanaryHandoff={web3FirstCanaryHandoff}
           />
         </div>
 
@@ -1058,18 +1064,22 @@ function SettingsWeb3SetupPriorityCard({
   researchPacket,
   credentialRequirements,
   firstCanaryDrill,
+  firstCanaryHandoff,
 }: {
   liveUsability: Web3LiveUsabilityBlockersReceipt;
   requestPacket: Web3OperatorRequestPacket;
   researchPacket: Web3ResearchHandoffPacket;
   credentialRequirements: Web3CredentialRequirementsReceipt;
   firstCanaryDrill: Web3FirstCanaryDrillReceipt;
+  firstCanaryHandoff: Web3FirstCanaryHandoffReceipt;
 }) {
   const nextInput = requestPacket.next_input;
   const nextUnlock = liveUsability.next_unlock_step ?? requestPacket.next_unlock_step;
   const nextBlocker = liveUsability.next_blocker;
   const nextCredentialRequest = liveUsability.next_credential_request;
   const nextCanaryStep = firstCanaryDrill.next_unblock_step;
+  const canaryContract = firstCanaryHandoff.current_step_contract;
+  const canaryProofLedger = firstCanaryHandoff.proof_ledger.slice(0, 6);
   const canarySurface = nextCanaryStep?.safe_surface ?? nextCredentialRequest?.fix_href ?? "/trading?source=live-dex&account=persistent";
   const canarySurfaceHref = canarySurface.startsWith("/") ? canarySurface : "/settings/integrations#settings-web3-credentials-runway";
   const canaryCommand = nextCanaryStep?.command ?? nextCredentialRequest?.verifier_command ?? firstCanaryDrill.strict_ready_command;
@@ -1114,19 +1124,54 @@ function SettingsWeb3SetupPriorityCard({
           <div className="min-w-0">
             <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">First funded canary handoff</p>
             <p className="mt-1 text-sm font-semibold text-on-surface">
-              {nextCanaryStep ? nextCanaryStep.label : firstCanaryDrill.status.replaceAll("-", " ")}
+              {canaryContract.label}
             </p>
             <p className="mt-1 text-xs leading-5 text-on-surface-variant">
-              {nextCanaryStep?.action ?? firstCanaryDrill.next_action}
+              {canaryContract.action}
             </p>
           </div>
-          <LaunchQueueBadge status={firstCanaryDrill.actual_live_trade_tested ? "pass" : "fail"} label={firstCanaryDrill.actual_live_trade_tested ? "live proven" : "not proven"} />
+          <div className="flex flex-wrap justify-end gap-1.5">
+            <LaunchQueueBadge status={firstCanaryDrill.actual_live_trade_tested ? "pass" : "fail"} label={firstCanaryDrill.actual_live_trade_tested ? "live proven" : "not proven"} />
+            <CopyRedactedPacketButton
+              text={firstCanaryHandoff.text_packet}
+              label="Copy handoff"
+              copiedLabel="Copied"
+              ariaLabel="Copy first funded canary handoff"
+              className="min-h-8 border-caution/35 bg-caution/10 text-caution hover:bg-caution/15"
+            />
+          </div>
         </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-4">
           <SettingsMetric label="Stage" value={firstCanaryDrill.status.replaceAll("-", " ")} />
           <SettingsMetric label="Proof" value={`${firstCanaryDrill.proof_pass_count}/${firstCanaryDrill.proof_required_count}`} />
           <SettingsMetric label="Hard fails" value={`${firstCanaryDrill.hard_fail_count}`} />
           <SettingsMetric label="Needed now" value={`${credentialRequirements.needed_now_count}`} />
+        </div>
+        <div className="mt-2 rounded-md border border-caution/25 bg-black/10 p-2" aria-label="Settings first funded canary current step contract">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">Current canary contract</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">{canaryContract.step_id ?? "complete"} · {canaryContract.phase} · {canaryContract.status}</p>
+            </div>
+            <LaunchQueueBadge status={canaryContract.can_complete_in_app ? "watch" : "fail"} label={canaryContract.can_complete_in_app ? "in app" : "external"} />
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-outline">{canaryContract.completion_signal}</p>
+          {canaryContract.next_verification_command ? (
+            <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[10px] leading-5 text-on-surface-variant">
+              {canaryContract.next_verification_command}
+            </code>
+          ) : null}
+        </div>
+        <div className="mt-2 grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3" aria-label="Settings first funded canary proof ledger">
+          {canaryProofLedger.map((item) => (
+            <div key={item.id} className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate text-[11px] font-semibold text-on-surface">{item.label}</p>
+                <LaunchQueueBadge status={item.done ? "pass" : item.status === "next" || item.status === "watch" ? "watch" : "fail"} label={item.status} />
+              </div>
+              <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-outline">{item.completion_signal}</p>
+            </div>
+          ))}
         </div>
         <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,0.58fr)]">
           <div className="rounded-md border border-outline-variant/20 bg-void/20 p-2">
