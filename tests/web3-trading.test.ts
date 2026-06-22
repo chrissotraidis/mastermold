@@ -649,6 +649,10 @@ describe("Web3 autonomous trading subsystem", () => {
       status: string;
       installed_keys: string[];
       configured_keys: string[];
+      runtime_applied_keys: string[];
+      runtime_restart_required_keys: string[];
+      runtime_effective: boolean;
+      runtime_effective_next_action: string;
       missing_keys: string[];
       live_execution_permission: string;
       wallet_mutation_permission: string;
@@ -679,6 +683,18 @@ describe("Web3 autonomous trading subsystem", () => {
       "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
       "MASTERMOLD_WEB3_RESTART_POLICY_URL",
     ]));
+    expect(receipt.runtime_applied_keys).toEqual(expect.arrayContaining([
+      "MASTERMOLD_EMERGENCY_STOP_WEBHOOK_URL",
+      "MASTERMOLD_EMERGENCY_STOP_CONTACT",
+      "MASTERMOLD_TAX_LEDGER_EXPORT_PATH",
+      "MASTERMOLD_WEB3_PROCESS_MANAGER",
+      "MASTERMOLD_WEB3_WORKER_OWNER",
+      "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
+      "MASTERMOLD_WEB3_RESTART_POLICY_URL",
+    ]));
+    expect(receipt.runtime_restart_required_keys).toEqual([]);
+    expect(receipt.runtime_effective).toBe(true);
+    expect(receipt.runtime_effective_next_action).toContain("visible to this running server now");
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");
     expect(receipt.secret_echo_permission).toBe("blocked");
@@ -699,7 +715,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receiptText).not.toContain("restart-canary");
   });
 
-  test("GIVEN first-canary live flags WHEN the local installer runs THEN it accepts only exact values without granting wallet authority", async () => {
+  test("GIVEN first-canary live flags WHEN the local installer runs THEN the running canary gate sees them without granting wallet authority", async () => {
     const envPath = join(mkdtempSync(join(tmpdir(), "mm-web3-canary-env-")), ".env.local");
     process.env.WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH = envPath;
 
@@ -726,6 +742,7 @@ describe("Web3 autonomous trading subsystem", () => {
       method: "POST",
       headers: { "content-type": "application/json", host: "localhost" },
       body: JSON.stringify({
+        jupiter_api_key: "test-jupiter-canary-runtime-key",
         enable_live_web3_execution: "true",
         live_operator_approval: "I_UNDERSTAND_REAL_FUNDS",
         allow_live_unsigned_canary_handoff: "true",
@@ -735,6 +752,9 @@ describe("Web3 autonomous trading subsystem", () => {
       status: string;
       installed_keys: string[];
       configured_keys: string[];
+      runtime_applied_keys: string[];
+      runtime_restart_required_keys: string[];
+      runtime_effective: boolean;
       live_execution_permission: string;
       wallet_mutation_permission: string;
       secret_echo_permission: string;
@@ -745,23 +765,50 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(response.status).toBe(200);
     expect(receipt.status).toBe("installed");
     expect(receipt.installed_keys).toEqual(expect.arrayContaining([
+      "JUPITER_API_KEY",
       "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
       "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
       "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
     ]));
     expect(receipt.configured_keys).toEqual(expect.arrayContaining([
+      "JUPITER_API_KEY",
       "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
       "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
       "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
     ]));
+    expect(receipt.runtime_applied_keys).toEqual(expect.arrayContaining([
+      "JUPITER_API_KEY",
+      "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+      "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+      "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+    ]));
+    expect(receipt.runtime_restart_required_keys).toEqual([]);
+    expect(receipt.runtime_effective).toBe(true);
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");
     expect(receipt.secret_echo_permission).toBe("blocked");
-    expect(receipt.next_action).toContain("JUPITER_API_KEY");
+    expect(receipt.next_action).not.toContain("JUPITER_API_KEY");
+    expect(envText).toContain("JUPITER_API_KEY=test-jupiter-canary-runtime-key");
     expect(envText).toContain("MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION=true");
     expect(envText).toContain("MASTERMOLD_LIVE_OPERATOR_APPROVAL=I_UNDERSTAND_REAL_FUNDS");
     expect(envText).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF=true");
     expect(JSON.stringify(receipt)).not.toContain("I_UNDERSTAND_REAL_FUNDS");
+    expect(JSON.stringify(receipt)).not.toContain("test-jupiter-canary-runtime-key");
+
+    const canaryResponse = await LIVE_TRADE_CANARY_GET(new Request("http://localhost/api/web3-live-trade-canary?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const canary = await json<{
+      can_submit_from_app_now: boolean;
+      actual_live_trade_tested: boolean;
+      real_funds_moved_by_this_app: boolean;
+      required_inputs: Array<{ id: string; status: string; target_names: string[] }>;
+      blockers: string[];
+    }>(canaryResponse);
+    expect(canary.required_inputs.find((item) => item.id === "jupiter-order-rail")?.status).toBe("done");
+    expect(canary.required_inputs.find((item) => item.id === "first-canary-live-flags")?.status).toBe("done");
+    expect(canary.can_submit_from_app_now).toBe(false);
+    expect(canary.actual_live_trade_tested).toBe(false);
+    expect(canary.real_funds_moved_by_this_app).toBe(false);
+    expect(JSON.stringify(canary)).not.toContain("test-jupiter-canary-runtime-key");
   });
 
   test("GIVEN signer provider targets WHEN the local installer runs THEN it allowlists provider credentials but rejects wallet secrets", async () => {
@@ -806,6 +853,9 @@ describe("Web3 autonomous trading subsystem", () => {
       status: string;
       installed_keys: string[];
       configured_keys: string[];
+      runtime_applied_keys: string[];
+      runtime_restart_required_keys: string[];
+      runtime_effective: boolean;
       secret_echo_permission: string;
       live_execution_permission: string;
       wallet_mutation_permission: string;
@@ -827,6 +877,12 @@ describe("Web3 autonomous trading subsystem", () => {
       "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
       "TURNKEY_API_PRIVATE_KEY",
     ]));
+    expect(receipt.runtime_applied_keys).toEqual(expect.arrayContaining([
+      "MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER",
+      "TURNKEY_API_PRIVATE_KEY",
+    ]));
+    expect(receipt.runtime_restart_required_keys).toEqual([]);
+    expect(receipt.runtime_effective).toBe(true);
     expect(receipt.secret_echo_permission).toBe("blocked");
     expect(receipt.live_execution_permission).toBe("blocked");
     expect(receipt.wallet_mutation_permission).toBe("blocked");

@@ -19,6 +19,10 @@ export type Web3LocalCredentialInstallReceipt = {
   installed_keys: string[];
   configured_keys: string[];
   missing_keys: string[];
+  runtime_applied_keys: string[];
+  runtime_restart_required_keys: string[];
+  runtime_effective: boolean;
+  runtime_effective_next_action: string;
   rejected_fields: string[];
   local_install_allowed: boolean;
   storage: "ignored-local-env";
@@ -126,6 +130,12 @@ export function buildWeb3LocalCredentialInstallHealth(request?: Request): Web3Lo
     installed_keys: [],
     configured_keys: configured,
     missing_keys: missing,
+    runtime_applied_keys: [],
+    runtime_restart_required_keys: [],
+    runtime_effective: true,
+    runtime_effective_next_action: allowed
+      ? "Already configured local credential targets are visible to this running server process."
+      : "Open trusted localhost before checking runtime local credential visibility.",
     rejected_fields: [],
     local_install_allowed: allowed,
     storage: "ignored-local-env",
@@ -191,6 +201,10 @@ export function installWeb3LocalCredentials(input: unknown, request?: Request): 
   for (const [key, value] of updates) {
     process.env[key] = value;
   }
+  const runtimeApplied = Array.from(updates.entries())
+    .filter(([key, value]) => process.env[key] === value)
+    .map(([key]) => key);
+  const runtimeRestartRequired = Array.from(updates.keys()).filter((key) => !runtimeApplied.includes(key));
   const configured = configuredLocalCredentialKeys();
   const missing = CREDENTIAL_TARGETS
     .map((target) => target.env)
@@ -202,6 +216,12 @@ export function installWeb3LocalCredentials(input: unknown, request?: Request): 
     installed_keys: installed,
     configured_keys: configured,
     missing_keys: missing,
+    runtime_applied_keys: runtimeApplied,
+    runtime_restart_required_keys: runtimeRestartRequired,
+    runtime_effective: runtimeRestartRequired.length === 0,
+    runtime_effective_next_action: runtimeRestartRequired.length === 0
+      ? "The installed keys are visible to this running server now; rerun the credential test, Jupiter rehearsal, and first-canary verifier."
+      : "Restart the local server so the listed keys can be read before rerunning live canary checks.",
     rejected_fields: [],
     local_install_allowed: true,
     storage: "ignored-local-env",
@@ -225,6 +245,10 @@ function invalidReceipt(rejectedFields: string[], summary: string): Web3LocalCre
     installed_keys: [],
     configured_keys: configured,
     missing_keys: missing,
+    runtime_applied_keys: [],
+    runtime_restart_required_keys: [],
+    runtime_effective: true,
+    runtime_effective_next_action: "No new values were installed; existing configured targets are already read from the running server environment.",
     rejected_fields: rejectedFields,
     local_install_allowed: true,
     storage: "ignored-local-env",

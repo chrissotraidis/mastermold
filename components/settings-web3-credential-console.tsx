@@ -856,6 +856,15 @@ export function SettingsWeb3CredentialConsole({
     "MASTERMOLD_WEB3_ALERT_WEBHOOK_URL",
     "MASTERMOLD_WEB3_RESTART_POLICY_URL",
   ].filter((key) => localInstallReceipt?.configured_keys.includes(key) === true).length;
+  const runtimeAppliedCount = localInstallReceipt?.runtime_applied_keys.length ?? 0;
+  const runtimeRestartRequiredCount = localInstallReceipt?.runtime_restart_required_keys.length ?? 0;
+  const runtimeInstallStatus = localInstallReceipt
+    ? localInstallReceipt.runtime_effective
+      ? runtimeAppliedCount > 0
+        ? `active now ${runtimeAppliedCount}`
+        : "visible now"
+      : `restart ${runtimeRestartRequiredCount}`
+    : "not checked";
   const dexLiveReady = dexReceipt?.status === "live-ready" || dexReceipt?.status === "live-watch";
   const commandWallet = operatorWalletReady ? trimmedWallet : "<public-solana-address>";
   const operatorWalletCommand = `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${commandWallet} --require-operator-wallet`;
@@ -1588,14 +1597,20 @@ export function SettingsWeb3CredentialConsole({
           Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, exact first-canary flags, signer-provider, emergency-stop, production-worker, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps wallet mutation blocked.
         </p>
         {localInstallReceipt ? (
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-6" aria-label="Local Web3 credential install receipt">
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-7" aria-label="Local Web3 credential install receipt">
             <ConsoleMetric label="Install" value={localInstallReceipt.status} tone={localInstallReceipt.status === "installed" ? "engine" : localInstallReceipt.status === "invalid" || localInstallReceipt.status === "blocked" ? "critical" : "neutral"} />
+            <ConsoleMetric label="Runtime" value={runtimeInstallStatus} tone={localInstallReceipt.runtime_effective ? "engine" : "critical"} />
             <ConsoleMetric label="Configured" value={String(localInstallReceipt.configured_keys.length)} tone={localInstallReceipt.configured_keys.length >= 4 ? "engine" : "caution"} />
             <ConsoleMetric label="Canary flags" value={`${liveCanaryFlagCount}/3`} tone={liveCanaryFlagCount === 3 ? "engine" : liveCanaryFlagCount > 0 ? "caution" : "neutral"} />
             <ConsoleMetric label="Signer targets" value={`${signerTargetCount}/10`} tone={signerTargetCount > 0 ? "engine" : "neutral"} />
             <ConsoleMetric label="Worker targets" value={`${productionOpsTargetCount}/4`} tone={productionOpsTargetCount === 4 ? "engine" : productionOpsTargetCount > 0 ? "caution" : "neutral"} />
             <ConsoleMetric label="Missing" value={formatMissingTargets(localInstallReceipt.missing_keys)} tone={localInstallReceipt.missing_keys.length === 0 ? "engine" : "caution"} />
           </div>
+        ) : null}
+        {localInstallReceipt ? (
+          <p className="mt-2 text-[11px] leading-4 text-outline">
+            Runtime check: {localInstallReceipt.runtime_effective_next_action} Active targets {localInstallReceipt.runtime_applied_keys.join(", ") || "none"}; restart-required targets {localInstallReceipt.runtime_restart_required_keys.join(", ") || "none"}.
+          </p>
         ) : null}
       </div>
 
@@ -2250,7 +2265,7 @@ export function SettingsWeb3CredentialConsole({
 
       <p className="sr-only" aria-label="Settings Web3 credential console security boundary">
         Settings Web3 credential console keeps API keys session only; no browser storage for Helius, Jupiter, Privy, Turnkey, signer-provider, or production alert keys; browser wallet detection requests public address only; wallet ownership proof signs text only; private key storage blocked; seed phrase storage blocked; Jupiter rehearsal withholds unsigned transaction bodies; tiny live canary signing uses a gated one-shot unsigned handoff and browser wallet prompt only after live flags; DEX scanner receipt is read-only paper evidence; live-capital preflight receipt is review evidence only; wallet mutation blocked.
-        Local credential installer can write known provider, signer-provider, emergency-stop, production-worker, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
+        Local credential installer can write known provider, signer-provider, emergency-stop, production-worker, and accounting values to ignored local env on trusted localhost only; install receipt configured keys {localInstallReceipt?.configured_keys.join(", ") ?? "none"}; installed keys {localInstallReceipt?.installed_keys.join(", ") ?? "none"}; runtime applied keys {localInstallReceipt?.runtime_applied_keys.join(", ") ?? "none"}; restart required keys {localInstallReceipt?.runtime_restart_required_keys.join(", ") ?? "none"}; missing keys {localInstallReceipt?.missing_keys.join(", ") ?? "unknown"}; secret echo permission {localInstallReceipt?.secret_echo_permission ?? "blocked"}.
       </p>
     </section>
   );

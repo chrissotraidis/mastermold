@@ -1584,6 +1584,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Session-only provider tests");
     expect(settingsConsole).toContain("Local credential installer");
     expect(settingsConsole).toContain("Install local env");
+    expect(settingsConsole).toContain("Runtime");
+    expect(settingsConsole).toContain("runtime_effective_next_action");
+    expect(settingsConsole).toContain("runtime_applied_keys");
+    expect(settingsConsole).toContain("runtime_restart_required_keys");
     expect(settingsConsole).toContain("/api/web3-local-credentials");
     expect(settingsConsole).toContain("ignored local env on trusted localhost");
     expect(settingsConsole).toContain("clears page-sensitive fields after success");
@@ -1624,6 +1628,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-local-credential-install.ts")).toContain("MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("live-operator-approval");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("WEB3_LOCAL_CREDENTIAL_INSTALL_ENV_PATH");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("runtime_applied_keys");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("runtime_restart_required_keys");
+    expect(source("src/db/web3-local-credential-install.ts")).toContain("runtime_effective_next_action");
     expect(source("src/db/web3-local-credential-install.ts")).toContain("private-key, seed-phrase");
     expect(settingsConsole).toContain("DEX scanner evidence");
     expect(settingsConsole).toContain("Save public scope");
