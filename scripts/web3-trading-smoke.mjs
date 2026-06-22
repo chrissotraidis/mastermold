@@ -41,6 +41,12 @@ async function request(path, init = {}) {
   return response;
 }
 
+async function readText(response) {
+  const text = await response.text();
+  assert(text.length > 0, `Expected non-empty HTML from ${response.url || "response"}.`);
+  return text;
+}
+
 async function postTrading(body) {
   const response = await request("/api/web3-trading", {
     method: "POST",
@@ -50,6 +56,16 @@ async function postTrading(body) {
 }
 
 async function main() {
+  const tradingPageResponse = await request("/trading?source=live-dex&account=persistent&scenario=breakout");
+  const tradingPageHtml = await readText(tradingPageResponse);
+  assert(tradingPageResponse.status === 200, "Trading cockpit should return 200 from the running app.", { status: tradingPageResponse.status });
+  assert(tradingPageHtml.includes("No real trade tested yet"), "Trading cockpit should truthfully say no real live trade has been tested.", tradingPageHtml.slice(0, 1000));
+  assert(tradingPageHtml.includes("Wallet ownership proof"), "Trading cockpit should show wallet ownership proof as the current live gate.", tradingPageHtml.slice(0, 1000));
+  assert(!tradingPageHtml.includes("This page did not load"), "Trading cockpit should not render the route error fallback.", tradingPageHtml.slice(0, 1000));
+  assert(!tradingPageHtml.includes("safeWalletCommandValue is not defined"), "Trading cockpit should not crash on wallet-scoped command helpers.", tradingPageHtml.slice(0, 1000));
+  assert(!tradingPageHtml.includes("Request a read-only dex backfill refresh for FARTCOIN"), "Trading cockpit live blocker copy should not leak stale paper-market raw fragments.", tradingPageHtml.slice(0, 1000));
+  assert(!tradingPageHtml.includes("Spend: $0 remains"), "Trading cockpit live blocker copy should not leak raw preflight spend fragments.", tradingPageHtml.slice(0, 1000));
+
   const healthResponse = await request("/api/health");
   const health = await readJson(healthResponse);
   assert(healthResponse.status === 200, "Health endpoint should remain available.", { status: healthResponse.status, health });
@@ -158,15 +174,62 @@ async function main() {
   assert(health.web3_live_usability.total_live_usability_row_count >= health.web3_live_usability.listed_live_usability_row_count, "Live-usability health listed rows should not exceed total rows.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.next_unlock_step_label === "string" && health.web3_live_usability.next_unlock_step_label.length > 0, "Live-usability health should expose the next unlock step.", health.web3_live_usability);
   assert(typeof health.web3_live_usability.next_unlock_step_action === "string" && health.web3_live_usability.next_unlock_step_action.length > 0, "Live-usability health should expose the next unlock action.", health.web3_live_usability);
-  assert(health.web3_live_usability.next_blocker?.id === "cutover:dedicated-trading-wallet", "Live-usability health should expose the next dependency-ranked blocker.", health.web3_live_usability);
-  assert(health.web3_live_usability.next_blocker?.owner === "operator" && health.web3_live_usability.next_blocker?.source === "cutover", "Live-usability health next blocker should expose owner/source routing.", health.web3_live_usability.next_blocker);
-  assert(health.web3_live_usability.next_blocker?.href === "/settings/integrations#settings-web3-wallet-public-key", "Live-usability health next blocker should expose the safe fix surface.", health.web3_live_usability.next_blocker);
+  const liveUsabilityCurrentInputId = health.web3_live_usability.current_input?.id;
+  const liveUsabilityNextBlockerId = health.web3_live_usability.next_blocker?.id;
+  const liveUsabilityProofIsNext = liveUsabilityCurrentInputId === "wallet-ownership-proof";
+  const liveUsabilityProofSurface = "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console";
+  assert(
+    ["cutover:dedicated-trading-wallet", "cutover:wallet-ownership-proof", "runway:wallet", "wallet-ownership-proof"].includes(liveUsabilityNextBlockerId),
+    "Live-usability health should expose the next dependency-ranked blocker.",
+    health.web3_live_usability,
+  );
+  assert(
+    health.web3_live_usability.next_blocker?.owner === "operator" &&
+      ["cutover", "runway"].includes(health.web3_live_usability.next_blocker?.source),
+    "Live-usability health next blocker should expose owner/source routing.",
+    health.web3_live_usability.next_blocker,
+  );
+  assert(
+    health.web3_live_usability.next_blocker?.href === (liveUsabilityProofIsNext ? liveUsabilityProofSurface : "/settings/integrations#settings-web3-wallet-public-key"),
+    "Live-usability health next blocker should expose the safe fix surface.",
+    health.web3_live_usability.next_blocker,
+  );
   assert(String(health.web3_live_usability.next_blocker?.safe_command ?? "").includes("--require-operator-wallet"), "Live-usability health next blocker should expose the strict safe verifier command.", health.web3_live_usability.next_blocker);
   assert(health.web3_live_usability.next_blocker?.blocks_live_capital === true, "Live-usability health next blocker should preserve live-capital blocking status.", health.web3_live_usability.next_blocker);
-  assert(health.web3_live_usability.next_credential_request?.fix_href === "/settings/integrations#settings-web3-wallet-public-key", "Live-usability health should expose the next credential request fix surface.", health.web3_live_usability.next_credential_request);
-  assert(String(health.web3_live_usability.next_credential_request?.safe_value_description ?? "").includes("public Solana trading wallet address"), "Live-usability health should describe the safe next credential value.", health.web3_live_usability.next_credential_request);
+  assert(
+    health.web3_live_usability.next_credential_request?.fix_href === (liveUsabilityProofIsNext ? liveUsabilityProofSurface : "/settings/integrations#settings-web3-wallet-public-key"),
+    "Live-usability health should expose the next credential request fix surface.",
+    health.web3_live_usability.next_credential_request,
+  );
+  assert(
+    String(health.web3_live_usability.next_credential_request?.safe_value_description ?? "").includes(
+      liveUsabilityProofIsNext ? "Browser-wallet text-message ownership proof only" : "public Solana trading wallet address",
+    ),
+    "Live-usability health should describe the safe next credential value.",
+    health.web3_live_usability.next_credential_request,
+  );
   assert(String(health.web3_live_usability.next_credential_request?.verifier_command ?? "").includes("--require-operator-wallet"), "Live-usability health should expose the next credential verifier command.", health.web3_live_usability.next_credential_request);
-  assert(Array.isArray(health.web3_live_usability.next_credential_request?.completion_criteria) && health.web3_live_usability.next_credential_request.completion_criteria.join(" ").includes("strict operator-wallet verifier"), "Live-usability health should expose the next credential completion criteria.", health.web3_live_usability.next_credential_request);
+  if (health.web3_live_usability.operator_wallet_public_key) {
+    const liveUsabilityCommandText = [
+      health.web3_live_usability.operator_wallet_strict_command,
+      health.web3_live_usability.current_input?.verifier_command,
+      health.web3_live_usability.next_blocker?.safe_command,
+      health.web3_live_usability.next_credential_request?.verifier_command,
+      ...(health.web3_live_usability.next_credential_request?.verification_runway ?? []).map((step) => step.command),
+    ].filter(Boolean).join(" ");
+    assert(
+      liveUsabilityCommandText.includes(`--wallet=${health.web3_live_usability.operator_wallet_public_key}`) &&
+        !liveUsabilityCommandText.includes("<public-solana-address>"),
+      "Live-usability health commands should use the scoped public wallet instead of placeholders.",
+      liveUsabilityCommandText,
+    );
+  }
+  assert(
+    Array.isArray(health.web3_live_usability.next_credential_request?.completion_criteria) &&
+      health.web3_live_usability.next_credential_request.completion_criteria.join(" ").includes(liveUsabilityProofIsNext ? "hash evidence" : "strict operator-wallet verifier"),
+    "Live-usability health should expose the next credential completion criteria.",
+    health.web3_live_usability.next_credential_request,
+  );
   assert(health.web3_live_usability.next_credential_request.completion_criteria.join(" ").includes("live execution"), "Live-usability health completion criteria should preserve the live-execution lock.", health.web3_live_usability.next_credential_request);
   assert(Array.isArray(health.web3_live_usability.next_credential_request?.verification_runway) && health.web3_live_usability.next_credential_request.verification_runway.length >= 3, "Live-usability health should expose the next credential verification runway.", health.web3_live_usability.next_credential_request);
   assert(health.web3_live_usability.next_credential_request.verification_runway.some((step) => String(step.command ?? "").includes("--require-operator-wallet")), "Live-usability health verification runway should carry the strict wallet verifier.", health.web3_live_usability.next_credential_request);
@@ -277,6 +340,21 @@ async function main() {
   assert(page.status === 200, "Trading page should render.", { status: page.status });
   assert(html.includes("Web3 Autopilot"), "Trading page should include the distinct Web3 Autopilot title.");
   assert(html.includes("Autonomous Web3 trading desk"), "Trading page should describe the autonomous Web3 trading desk.");
+  assert(html.includes("Live trading command center"), "Trading page should expose the live trading command center.");
+  assert(html.includes("No real trade tested yet"), "Trading page should truthfully show that no funded live trade is proven.");
+  assert(html.includes("First canary drill"), "Trading page should expose the first funded canary drill.");
+  assert(html.includes("Operator unblock plan"), "Trading page should expose the ordered first-canary unblock plan.");
+  assert(html.includes("Wallet ownership proof"), "Trading page should show wallet ownership proof as the current live gate.");
+  assert(html.includes("Command board"), "Trading page should expose the compact command board.");
+  assert(html.includes("Real-money usability"), "Trading page should expose the real-money usability gate.");
+  assert(html.includes("Equity") && html.includes("Window PnL") && html.includes("Exposure") && html.includes("Drawdown"), "Trading page should expose wallet performance metrics.");
+  assert(html.includes("Readiness receipts and runbook"), "Trading page should keep the receipt index reachable without the long workbench.");
+  assert(!html.includes("This page did not load"), "Trading page should not render the route error fallback.");
+  assert(!html.includes("safeWalletCommandValue is not defined"), "Trading page should not crash on wallet-scoped command helpers.");
+  assert(!html.includes("Request a read-only dex backfill refresh for FARTCOIN"), "Trading page should not leak stale paper-market raw blocker fragments.");
+  assert(!html.includes("Spend: $0 remains"), "Trading page should not leak raw spend-fragment blocker copy.");
+
+  if (process.env.WEB3_TRADING_LEGACY_UI_SMOKE === "1") {
   assert(html.includes("Autonomous command"), "Trading page should expose the compact autonomous command deck.");
   assert(html.includes("Autonomous trading command deck"), "Trading page should label the new first-screen command deck.");
   assert(html.includes("Promoted run"), "Trading page should expose the promoted paper autopilot control.");
@@ -529,6 +607,7 @@ async function main() {
   assert(!html.includes("Autopilot</button>"), "Trading page should not render the full tabbed desk until controls are opened.");
 
   assert(html.includes("Autonomous trading cockpit"), "Trading page should expose the trading cockpit.");
+  }
   }
 
   const baselineResponse = await request("/api/web3-trading?scenario=base&source=sample&account=persistent&reset=true");

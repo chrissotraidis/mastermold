@@ -2033,6 +2033,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("account=${packet.account}");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("scenario=${packet.scenario}");
     expect(source("src/db/web3-research-handoff-packet.ts")).toContain("source=live-dex&account=persistent&scenario=breakout&cycles=0");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("/trading?source=live-dex&account=persistent&scenario=breakout");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("No real trade tested yet");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("Trading cockpit should not render the route error fallback");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("safeWalletCommandValue is not defined");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("Request a read-only dex backfill refresh for FARTCOIN");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_research_handoff");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_operator_runbook?.mode === \"web3-operator-runbook-health\"");
     expect(source("scripts/web3-trading-smoke.mjs")).toContain("web3_operator_runbook.live_review_source_endpoint");
