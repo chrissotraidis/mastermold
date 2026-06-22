@@ -29,6 +29,8 @@ type Web3LiveCanaryConsoleProps = {
   account: TradingAccountMode;
   scenario: TradingScenario;
   cycles: number;
+  maxTradeUsd: number;
+  dailySpendCapUsd: number;
   maxSlippageBps: number;
   defaultWalletPublicKey: string | null;
 };
@@ -76,6 +78,8 @@ export function Web3LiveCanaryConsole({
   account,
   scenario,
   cycles,
+  maxTradeUsd,
+  dailySpendCapUsd,
   maxSlippageBps,
   defaultWalletPublicKey,
 }: Web3LiveCanaryConsoleProps) {
@@ -98,6 +102,10 @@ export function Web3LiveCanaryConsole({
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(initialWalletOwnershipReceipt);
   const [ownershipCheckBusy, setOwnershipCheckBusy] = useState(false);
   const [liveCanaryConsentArmed, setLiveCanaryConsentArmed] = useState(false);
+  const [currentWalletPublicKey, setCurrentWalletPublicKey] = useState(defaultWalletPublicKey);
+  const [walletScopeDraft, setWalletScopeDraft] = useState(defaultWalletPublicKey ?? "");
+  const [walletScopeBusy, setWalletScopeBusy] = useState(false);
+  const [walletScopeSavedAt, setWalletScopeSavedAt] = useState<string | null>(null);
   const [walletPreview, setWalletPreview] = useState(previewValue(defaultWalletPublicKey));
 
   const params = new URLSearchParams({
@@ -119,6 +127,8 @@ export function Web3LiveCanaryConsole({
   const latestStatus = actionReceipt?.status ?? unsignedReceipt?.status ?? preflightReceipt?.status ?? canaryReceipt.status;
   const actualTradeTested = actionReceipt?.actual_live_trade_tested ?? canaryReceipt.actual_live_trade_tested;
   const sourceReady = source === "live-dex" && account === "persistent";
+  const canaryWalletScoped = Boolean(currentWalletPublicKey && isLikelySolanaPublicKey(currentWalletPublicKey) && !isSampleSolanaPublicKey(currentWalletPublicKey));
+  const walletScopeDraftValid = isLikelySolanaPublicKey(walletScopeDraft.trim()) && !isSampleSolanaPublicKey(walletScopeDraft.trim());
   const autoProofTerminal = AUTO_PROOF_TERMINAL_STATUSES.includes(canaryReceipt.post_signing_evidence_status);
   const autoProofExhausted = autoProofAttempt >= AUTO_PROOF_MAX_ATTEMPTS;
   const autoProofStatus = autoProofTerminal
@@ -189,7 +199,7 @@ export function Web3LiveCanaryConsole({
   });
   const primaryGateControl = buildPrimaryCanaryGateControl({
     step: activeCanaryStep,
-    busy: busy || ownershipBusy || ownershipCheckBusy || preflightBusy || proofBusy !== null || drillBusy,
+    busy: busy || ownershipBusy || ownershipCheckBusy || preflightBusy || proofBusy !== null || drillBusy || walletScopeBusy,
     sourceReady,
     proveWalletOwnership,
     runCanaryPreflight,
@@ -348,7 +358,7 @@ export function Web3LiveCanaryConsole({
       if (!sourceReady) {
         throw new Error("Open the live DEX canary view before running canary preflight.");
       }
-      setWalletPreview(previewValue(defaultWalletPublicKey));
+      setWalletPreview(previewValue(currentWalletPublicKey));
       const preflightParams = new URLSearchParams(params);
       preflightParams.set("operator_ack", "true");
       preflightParams.set("canary_ack", "I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED");
@@ -406,8 +416,8 @@ export function Web3LiveCanaryConsole({
         throw new Error("Open the live DEX canary view before checking wallet ownership proof.");
       }
       const trustedPublicKey = await getTrustedBrowserWalletPublicKey();
-      const savedPublicKey = defaultWalletPublicKey && isLikelySolanaPublicKey(defaultWalletPublicKey)
-        ? defaultWalletPublicKey
+      const savedPublicKey = currentWalletPublicKey && isLikelySolanaPublicKey(currentWalletPublicKey)
+        ? currentWalletPublicKey
         : null;
       if (trustedPublicKey && savedPublicKey && trustedPublicKey !== savedPublicKey) {
         throw new Error("Connected browser wallet does not match the saved dedicated trading wallet. Switch wallets or update the public wallet scope first.");
@@ -444,7 +454,7 @@ export function Web3LiveCanaryConsole({
       if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
         throw new Error("Connect a valid public Solana wallet before proving ownership.");
       }
-      if (defaultWalletPublicKey && isLikelySolanaPublicKey(defaultWalletPublicKey) && publicKey !== defaultWalletPublicKey) {
+      if (currentWalletPublicKey && isLikelySolanaPublicKey(currentWalletPublicKey) && publicKey !== currentWalletPublicKey) {
         throw new Error("Connected browser wallet does not match the saved dedicated trading wallet. Switch wallets or update the public wallet scope first.");
       }
       setWalletPreview(previewValue(publicKey));
@@ -566,6 +576,92 @@ export function Web3LiveCanaryConsole({
     }
   }
 
+  async function useConnectedWalletForScope() {
+    setWalletScopeBusy(true);
+    setMessage("Reading only the connected browser wallet public address...");
+    try {
+      const provider = getBrowserSolanaProvider();
+      if (!provider) throw new Error("No Solana browser wallet is available.");
+      let publicKey = provider.publicKey?.toString() ?? null;
+      if ((!publicKey || !isLikelySolanaPublicKey(publicKey)) && typeof provider.connect === "function") {
+        const result = await provider.connect();
+        publicKey = result?.publicKey?.toString() ?? provider.publicKey?.toString() ?? null;
+      }
+      if (!publicKey || !isLikelySolanaPublicKey(publicKey)) {
+        throw new Error("Browser wallet did not return a valid public Solana address.");
+      }
+      if (isSampleSolanaPublicKey(publicKey)) {
+        throw new Error("The sample all-ones wallet cannot be used as a dedicated live canary wallet.");
+      }
+      setWalletScopeDraft(publicKey);
+      setMessage("Browser wallet public address loaded. Save the canary wallet before proving ownership.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Browser wallet public address could not be loaded.");
+    } finally {
+      setWalletScopeBusy(false);
+    }
+  }
+
+  async function saveCanaryWalletScope() {
+    const wallet = walletScopeDraft.trim();
+    if (!sourceReady) {
+      setMessage("Open the live DEX persistent canary view before saving canary wallet scope.");
+      return;
+    }
+    if (!wallet || !isLikelySolanaPublicKey(wallet)) {
+      setMessage("Enter a valid public Solana wallet address. Never paste a private key or seed phrase.");
+      return;
+    }
+    if (isSampleSolanaPublicKey(wallet)) {
+      setMessage("The sample all-ones wallet cannot unlock a funded canary. Save a dedicated public wallet address.");
+      return;
+    }
+    setWalletScopeBusy(true);
+    setMessage("Saving public canary wallet scope and dry-run caps. No secret keys or signing authority are sent...");
+    try {
+      const maxTrade = Math.max(1, Number(maxTradeUsd) || 25);
+      const dailyCap = Math.max(maxTrade, Number(dailySpendCapUsd) || Math.max(100, maxTrade));
+      const slippage = Math.max(1, Math.min(2_000, Math.trunc(Number(maxSlippageBps) || 50)));
+      const response = await fetch("/api/web3-trading", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenario,
+          source: "live-dex",
+          account: "persistent",
+          cycles,
+          advance: false,
+          execution: {
+            mode: "dry-run",
+            kill_switch: false,
+            wallet_public_key: wallet,
+            signer_simulation_enabled: true,
+            signer_session_label: "trading-live-canary",
+            signer_network: "devnet",
+            max_trade_usd: maxTrade,
+            daily_spend_cap_usd: dailyCap,
+            max_slippage_bps: slippage,
+          },
+        }),
+      });
+      const payload = await response.json().catch(() => null) as Web3TradingState | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Canary wallet scope could not be saved.");
+      }
+      const savedWallet = payload.execution_readiness.config.wallet_public_key ?? wallet;
+      setCurrentWalletPublicKey(savedWallet);
+      setWalletScopeDraft(savedWallet);
+      setWalletPreview(previewValue(savedWallet));
+      setWalletScopeSavedAt(payload.execution_readiness.config.updated_at);
+      const refreshed = await refreshCanaryConsoleReceipts("auto");
+      setMessage(`Dedicated public wallet saved. Next live canary gate: ${refreshed.next_required_input?.label ?? refreshed.next_action}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Canary wallet scope could not be saved.");
+    } finally {
+      setWalletScopeBusy(false);
+    }
+  }
+
   return (
     <section
       id="web3-live-canary-console"
@@ -597,6 +693,58 @@ export function Web3LiveCanaryConsole({
             <CanaryMetric label="Browser sign" value={canaryReceipt.browser_wallet_signature_flow.replaceAll("-", " ")} tone="caution" />
             <CanaryMetric label="Submit path" value={canaryReceipt.transaction_submission_permission.replaceAll("-", " ")} tone={canaryReceipt.can_submit_from_app_now ? "caution" : "neutral"} />
             <CanaryMetric label="Wallet" value={walletPreview ?? "not connected"} tone={walletPreview ? "caution" : "neutral"} />
+          </div>
+
+          <div className="mt-3 rounded-md border border-engine/20 bg-surface/60 p-3" aria-label="Trading dedicated canary wallet scope">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Dedicated canary wallet</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {canaryWalletScoped ? "Public wallet scoped" : "Public wallet needed"}
+                </p>
+              </div>
+              <span className={evidenceStatusClassName(canaryWalletScoped ? "pass" : "fail")}>
+                {canaryWalletScoped ? "scoped" : "blocked"}
+              </span>
+            </div>
+            <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <input
+                id="trading-web3-canary-wallet-public-key"
+                value={walletScopeDraft}
+                onChange={(event) => setWalletScopeDraft(event.currentTarget.value)}
+                placeholder="Public Solana wallet address only"
+                autoComplete="off"
+                spellCheck={false}
+                className="min-h-11 min-w-0 rounded-md border border-outline/20 bg-surface px-3 py-2 font-mono text-sm text-on-surface outline-none transition placeholder:text-outline focus:border-engine/55"
+              />
+              <button
+                type="button"
+                onClick={() => void useConnectedWalletForScope()}
+                disabled={!sourceReady || walletScopeBusy || busy || ownershipBusy || preflightBusy}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-outline/25 bg-surface-dim/55 px-3 py-2 text-sm font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
+              >
+                <Wallet aria-hidden="true" className={walletScopeBusy ? "size-4 animate-pulse" : "size-4"} />
+                Use browser wallet
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveCanaryWalletScope()}
+                disabled={!sourceReady || walletScopeBusy || busy || ownershipBusy || preflightBusy || !walletScopeDraftValid}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
+              >
+                <ShieldCheck aria-hidden="true" className={walletScopeBusy ? "size-4 animate-pulse" : "size-4"} />
+                {walletScopeBusy ? "Saving scope" : "Save canary wallet"}
+              </button>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+              <CanaryMetric label="Scoped wallet" value={previewValue(currentWalletPublicKey) ?? "none"} tone={canaryWalletScoped ? "engine" : "critical"} />
+              <CanaryMetric label="Draft" value={walletScopeDraftValid ? "valid public key" : "needs public key"} tone={walletScopeDraftValid ? "engine" : "critical"} />
+              <CanaryMetric label="Caps" value={`$${Math.round(maxTradeUsd)}/$${Math.round(dailySpendCapUsd)}`} tone="neutral" />
+              <CanaryMetric label="Saved" value={walletScopeSavedAt ? formatWalletScopeSavedAt(walletScopeSavedAt) : "not this session"} tone={walletScopeSavedAt ? "engine" : "neutral"} />
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              This saves only public wallet scope and dry-run caps for the first canary. It rejects the demo all-ones wallet and still cannot sign, submit, custody funds, store secrets, or move money.
+            </p>
           </div>
 
           <div className="mt-3 rounded-md border border-critical/20 bg-surface/55 p-3" aria-label="Trading canary gate snapshot">
@@ -1270,6 +1418,15 @@ function formatWalletProofExpiry(value: string | null) {
   }).format(parsed);
 }
 
+function formatWalletScopeSavedAt(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "saved";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
 function CanaryMetric({
   label,
   value,
@@ -1572,6 +1729,10 @@ async function getTrustedBrowserWalletPublicKey() {
 
 function isLikelySolanaPublicKey(value: string) {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+function isSampleSolanaPublicKey(value: string) {
+  return value === "11111111111111111111111111111111";
 }
 
 function base64ToBytes(value: string) {

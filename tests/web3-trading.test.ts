@@ -4823,6 +4823,73 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(JSON.stringify(receipt)).not.toContain("never-accept-this");
   });
 
+  test("GIVEN Trading saves a dedicated canary wallet WHEN account setup is rebuilt THEN the wallet gate advances without live authority", async () => {
+    process.env.HELIUS_API_KEY = "test-helius-secret";
+    process.env.JUPITER_API_KEY = "test-jupiter-secret";
+
+    const walletPublicKey = "7YWHmMjUwvQJwHqZzsYvg59WKAVAHwiUL1b5LrsULv2C";
+    const saveScope = await POST(new Request("http://localhost/api/web3-trading", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        scenario: "breakout",
+        source: "live-dex",
+        account: "persistent",
+        cycles: 0,
+        advance: false,
+        execution: {
+          mode: "dry-run",
+          kill_switch: false,
+          wallet_public_key: walletPublicKey,
+          signer_simulation_enabled: true,
+          signer_session_label: "trading-live-canary",
+          signer_network: "devnet",
+          max_trade_usd: 25,
+          daily_spend_cap_usd: 100,
+          max_slippage_bps: 50,
+        },
+      }),
+    }));
+    const state = await json<Web3TradingState>(saveScope);
+    expect(saveScope.status).toBe(200);
+    expect(state.execution_readiness.config.wallet_public_key).toBe(walletPublicKey);
+    expect(state.execution_gate.live_execution_enabled).toBe(false);
+
+    const accountSetup = await ACCOUNT_SETUP_GET(new Request("http://localhost/api/web3-account-setup?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const receipt = await json<{
+      wallet_summary: {
+        wallet_scoped: boolean;
+        wallet_is_sample: boolean;
+        dedicated_wallet_scoped: boolean;
+        wallet_ownership_proved: boolean;
+        wallet_public_key_preview: string | null;
+      };
+      environment_summary: {
+        missing_required: string[];
+      };
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+    }>(accountSetup);
+
+    expect(accountSetup.status).toBe(200);
+    expect(receipt.wallet_summary.wallet_scoped).toBe(true);
+    expect(receipt.wallet_summary.wallet_is_sample).toBe(false);
+    expect(receipt.wallet_summary.dedicated_wallet_scoped).toBe(true);
+    expect(receipt.wallet_summary.wallet_ownership_proved).toBe(false);
+    expect(receipt.wallet_summary.wallet_public_key_preview).toBe("7YWHmMjU...Lv2C");
+    expect(receipt.environment_summary.missing_required).not.toContain("Dedicated public trading wallet");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.seed_phrase_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+    expect(JSON.stringify(receipt)).not.toContain("test-helius-secret");
+    expect(JSON.stringify(receipt)).not.toContain("test-jupiter-secret");
+  });
+
   test("GIVEN missing Jupiter setup WHEN account acquisition runs THEN it returns external-only setup actions without leaking secrets", async () => {
     process.env.HELIUS_API_KEY = "test-helius-secret";
     process.env.MASTERMOLD_AUTONOMOUS_SIGNER_PROVIDER = "external-wallet";

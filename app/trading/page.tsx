@@ -193,6 +193,8 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
             account={account}
             scenario={initialState.scenario}
             cycles={0}
+            maxTradeUsd={initialState.execution_readiness.config.max_trade_usd}
+            dailySpendCapUsd={initialState.execution_readiness.config.daily_spend_cap_usd}
             maxSlippageBps={initialState.execution_readiness.config.max_slippage_bps}
             defaultWalletPublicKey={initialState.execution_readiness.config.wallet_public_key}
           />

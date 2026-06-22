@@ -334,6 +334,10 @@ That snapshot includes one current-gate action driven by the drill receipt: wall
 text-only proof, preflight runs the no-transaction check, signer relay opens the tiny canary signing
 flow, proof gates run the proof watcher, and external credential gates link to the exact safe setup
 surface.
+The same canary console can now save the dedicated public wallet scope directly from Trading. It
+accepts only a public Solana address plus dry-run caps, rejects the demo all-ones wallet for funded
+canary scope, refreshes the canary receipts after saving, and still cannot prove ownership, sign,
+submit, store wallet authority, move funds, or count as a live trade.
 It now also includes a compact first-canary execution rail under the gate snapshot. The rail starts
 at the current drill step, labels the next few canary gates as now/next/queued/done, shows whether
 the action lives in Trading, Settings, a read-only receipt, or a verifier, and keeps live execution,

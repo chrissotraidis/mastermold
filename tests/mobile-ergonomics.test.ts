@@ -1782,7 +1782,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("formatWalletProofAge");
     expect(source("components/web3-live-canary-console.tsx")).toContain("getTrustedBrowserWalletPublicKey");
     expect(source("components/web3-live-canary-console.tsx")).not.toContain("preflightParams.set(\"wallet_public_key\"");
-    expect(source("components/web3-live-canary-console.tsx")).toContain("setWalletPreview(previewValue(defaultWalletPublicKey))");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("setWalletPreview(previewValue(currentWalletPublicKey))");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Dedicated canary wallet");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Save canary wallet");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Use browser wallet");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("isSampleSolanaPublicKey");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("The sample all-ones wallet cannot unlock a funded canary");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("No secret keys or signing authority are sent");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("wallet_public_key: wallet");
+    expect(source("app/trading/page.tsx")).toContain("maxTradeUsd={initialState.execution_readiness.config.max_trade_usd}");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Web3FirstCanaryDrillReceipt");
     expect(source("app/trading/page.tsx")).toContain("firstCanaryDrill={firstCanaryDrill}");
     expect(source("components/web3-live-canary-console.tsx")).toContain("refreshFirstCanaryDrill");
