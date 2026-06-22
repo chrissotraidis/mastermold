@@ -1653,6 +1653,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Canary use");
     expect(settingsConsole).toContain("Proof age");
     expect(settingsConsole).toContain("First funded canary signing requires this hash-only proof to still be fresh");
+    expect(settingsConsole).toContain("Settings first canary safe prep queue");
+    expect(settingsConsole).toContain("Safe prep queue");
+    expect(settingsConsole).toContain("Prepare non-secret canary lanes without skipping the current gate");
+    expect(settingsConsole).toContain("buildFirstCanarySafePrepQueue");
+    expect(settingsConsole).toContain("Do-now prep is limited to public/env targets and redacted receipts.");
     expect(settingsConsole).toContain("wallet ownership proof signs text only");
     expect(settingsConsole).toContain("Browser wallet receipt");
     expect(settingsConsole).toContain("Settings browser wallet readiness receipt");
@@ -2206,6 +2211,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now includes a no-signature Check wallet action");
     expect(source("components/review-readiness.tsx")).toContain("Trading now server-renders the latest hash-only wallet ownership receipt");
     expect(source("components/review-readiness.tsx")).toContain("Trading and Settings now surface wallet proof freshness");
+    expect(source("components/review-readiness.tsx")).toContain("Settings now adds a first-canary safe prep queue");
     expect(source("components/review-readiness.tsx")).toContain("live-usability blocker receipt now promotes the active current input");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");

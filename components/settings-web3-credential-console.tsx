@@ -957,6 +957,7 @@ export function SettingsWeb3CredentialConsole({
   const firstCanaryRequiredReadyCount = liveTradeCanaryReceipt.required_inputs.filter((item) => item.status === "done").length;
   const firstCanaryRequiredActiveCount = liveTradeCanaryReceipt.required_inputs.filter((item) => item.status === "needed-now" || item.status === "external-signature" || item.status === "proof-watch").length;
   const firstCanarySettingsAction = settingsCanaryRequiredInputAction(firstCanaryRequiredInput);
+  const firstCanarySafePrepQueue = buildFirstCanarySafePrepQueue(liveTradeCanaryReceipt.required_inputs, firstCanaryRequiredInput?.id ?? null);
 
   return (
     <section className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Settings Web3 credential action console">
@@ -1074,6 +1075,40 @@ export function SettingsWeb3CredentialConsole({
               <p className="min-w-0 text-[11px] leading-4 text-on-surface-variant">{item.completion_signal}</p>
             </div>
           ))}
+        </div>
+        <div className="mt-3 rounded-md border border-engine/20 bg-engine/[0.035] p-2" aria-label="Settings first canary safe prep queue">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Safe prep queue</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">Prepare non-secret canary lanes without skipping the current gate</p>
+            </div>
+            <Badge variant="outline" className="border-engine/35 bg-engine/10 text-engine">
+              ordered
+            </Badge>
+          </div>
+          <div className="mt-2 grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
+            {firstCanarySafePrepQueue.map((item) => (
+              <div key={item.id} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-semibold text-on-surface">{item.label}</p>
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{item.surfaceLabel}</p>
+                  </div>
+                  <FirstCanaryPrepQueueBadge status={item.status} />
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{item.detail}</p>
+                <a
+                  href={item.href}
+                  className="mt-2 inline-flex min-h-8 items-center rounded-md border border-outline-variant/25 bg-surface-dim/30 px-2 text-[10px] font-semibold text-outline transition hover:border-engine/35 hover:text-engine"
+                >
+                  {item.actionLabel}
+                </a>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-outline">
+            Do-now prep is limited to public/env targets and redacted receipts. External wallet signature, signed relay, wallet mutation, and live execution remain blocked until their own gates become current.
+          </p>
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-4">
           <ConsoleMetric label="Inputs active" value={`${firstCanaryRequiredActiveCount}`} tone={firstCanaryRequiredActiveCount > 0 ? "caution" : "engine"} />
@@ -2304,6 +2339,16 @@ type FirstCanaryFlagItem = {
   detail: string;
 };
 
+type FirstCanaryPrepQueueItem = {
+  id: Web3LiveTradeCanaryReceipt["required_inputs"][number]["id"];
+  label: string;
+  status: "ready" | "do-now" | "wait" | "external" | "proof";
+  surfaceLabel: string;
+  actionLabel: string;
+  href: string;
+  detail: string;
+};
+
 function buildConsoleActionChecklist(input: {
   hasProviderInput: boolean;
   providerTested: boolean;
@@ -2374,6 +2419,54 @@ function buildConsoleActionChecklist(input: {
       boundary: "Review receipt only; real capital, signing, submission, and wallet mutation remain blocked.",
     },
   ];
+}
+
+function buildFirstCanarySafePrepQueue(
+  inputs: Web3LiveTradeCanaryReceipt["required_inputs"],
+  currentInputId: Web3LiveTradeCanaryReceipt["required_inputs"][number]["id"] | null,
+): FirstCanaryPrepQueueItem[] {
+  return inputs.map((input) => {
+    const action = settingsCanaryRequiredInputAction(input);
+    const status = firstCanaryPrepQueueStatus(input, currentInputId);
+    return {
+      id: input.id,
+      label: input.label,
+      status,
+      surfaceLabel: firstCanaryPrepSurfaceLabel(input),
+      actionLabel: action.label,
+      href: action.href,
+      detail: firstCanaryPrepQueueDetail(input, status),
+    };
+  });
+}
+
+function firstCanaryPrepQueueStatus(
+  input: Web3LiveTradeCanaryReceipt["required_inputs"][number],
+  currentInputId: Web3LiveTradeCanaryReceipt["required_inputs"][number]["id"] | null,
+): FirstCanaryPrepQueueItem["status"] {
+  if (input.status === "done") return "ready";
+  if (input.status === "proof-watch") return "proof";
+  if (input.status === "external-signature" || input.owner === "external-wallet") return "external";
+  if (input.id === currentInputId || input.status === "needed-now") return "do-now";
+  return "wait";
+}
+
+function firstCanaryPrepSurfaceLabel(input: Web3LiveTradeCanaryReceipt["required_inputs"][number]) {
+  if (input.safe_surface.includes("#web3-live-canary-console")) return "Trading";
+  if (input.safe_surface.startsWith("/settings")) return "Settings";
+  if (input.safe_surface.startsWith("/api/")) return "Receipt";
+  return input.owner.replaceAll("-", " ");
+}
+
+function firstCanaryPrepQueueDetail(
+  input: Web3LiveTradeCanaryReceipt["required_inputs"][number],
+  status: FirstCanaryPrepQueueItem["status"],
+) {
+  if (status === "ready") return `${input.completion_signal} This lane is already represented as proof.`;
+  if (status === "do-now") return `${input.safe_value_type} can be prepared now without private keys, transaction bytes, or wallet mutation.`;
+  if (status === "external") return `${input.safe_value_type} waits for the external wallet step; Mastermind cannot sign or hold wallet authority.`;
+  if (status === "proof") return `${input.safe_value_type} runs only after a signed relay exists and stays bounded to confirmation, settlement, and mirror proof.`;
+  return `${input.safe_value_type} waits until earlier gates clear; keep this as review-only context for now.`;
 }
 
 function buildSafeCredentialProfile(input: {
@@ -2565,6 +2658,23 @@ function FirstCanaryRequiredInputBadge({ status }: { status: Web3LiveTradeCanary
         status === "done" && "border-engine/35 bg-engine/10 text-engine",
         (status === "needed-now" || status === "external-signature" || status === "proof-watch") && "border-caution/35 bg-caution/10 text-caution",
         status === "blocked" && "border-critical/35 bg-critical/10 text-critical",
+      )}
+    >
+      {status.replaceAll("-", " ")}
+    </Badge>
+  );
+}
+
+function FirstCanaryPrepQueueBadge({ status }: { status: FirstCanaryPrepQueueItem["status"] }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "shrink-0 border-outline-variant/35 bg-surface-dim/35 text-outline",
+        status === "ready" && "border-engine/35 bg-engine/10 text-engine",
+        status === "do-now" && "border-caution/35 bg-caution/10 text-caution",
+        status === "external" && "border-critical/35 bg-critical/10 text-critical",
+        status === "proof" && "border-violet/35 bg-violet/10 text-violet",
       )}
     >
       {status.replaceAll("-", " ")}
