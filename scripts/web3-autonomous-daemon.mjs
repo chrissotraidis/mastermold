@@ -39,6 +39,7 @@ export async function runWeb3AutonomousDaemon(input = {}) {
     heartbeatWhenGated: Boolean(input.heartbeatWhenGated),
     exitOnBlocked: input.exitOnBlocked !== false,
     dryRun: Boolean(input.dryRun),
+    signal: input.signal,
   };
   const startedAt = new Date().toISOString();
   const events = [];
@@ -199,7 +200,7 @@ async function fetchTradingState(config) {
   url.searchParams.set("source", config.source);
   url.searchParams.set("account", "persistent");
   url.searchParams.set("reset", "false");
-  const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  const response = await fetch(url, { signal: requestSignal(config.signal, 15_000) });
   return readDaemonJson(response, "fetch trading state");
 }
 
@@ -208,7 +209,7 @@ async function postTradingState(config, body) {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(20_000),
+    signal: requestSignal(config.signal, 20_000),
   });
   return readDaemonJson(response, "post daemon tick");
 }
@@ -229,11 +230,16 @@ async function readDaemonJson(response, label) {
 
 async function waitForNextTick(config, handoff) {
   const waitMs = config.intervalMs || Math.max(0, Math.min(120_000, (handoff?.next_wake_seconds ?? 0) * 1000));
-  if (waitMs > 0) await delay(waitMs);
+  if (waitMs > 0) await delay(waitMs, undefined, config.signal ? { signal: config.signal } : undefined);
 }
 
 function normalizeBaseUrl(value) {
   return String(value || DEFAULT_BASE_URL).replace(/\/$/, "");
+}
+
+function requestSignal(parentSignal, timeoutMs) {
+  if (!parentSignal) return AbortSignal.timeout(timeoutMs);
+  return AbortSignal.any([parentSignal, AbortSignal.timeout(timeoutMs)]);
 }
 
 function normalizeChoice(value, allowed, fallback) {

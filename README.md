@@ -126,12 +126,15 @@ repeat deployed-capital alpha so a single lucky tape is harder to mistake for du
 When `--fail-under-target` is set on repeat proof, net PnL, hit rate, drawdown, deployed
 alpha, and consistency thresholds all have to pass before the report grants paper-promotion
 permission. The live-capital preflight then combines the live-readiness audit, daemon
-handoff boundary, and repeat proof gate; by default it fails closed if real-capital readiness
-appears without explicit `--allow-live-ready` review, and it never signs, submits, or moves
-funds. The live canary proof command reads the canary receipt and can optionally run the
-guarded settlement watchdog for the latest stored signature; it exits nonzero until signed
-relay, chain confirmation, settlement reconciliation, and local portfolio mirror proof all
-pass. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
+handoff boundary, and repeat proof gate; by default it returns the current live blocker
+quickly when wallet/signing gates are already closed, and `--always-run-repeat-proof`
+forces the slower paper repeat proof when a reviewer needs fresh proof evidence anyway.
+`--repeat-proof-timeout-ms=<ms>` bounds that forced repeat phase. The preflight still fails
+closed if real-capital readiness appears without explicit `--allow-live-ready` review, and
+it never signs, submits, or moves funds. The live canary proof command reads the canary
+receipt and can optionally run the guarded settlement watchdog for the latest stored
+signature; it exits nonzero until signed relay, chain confirmation, settlement
+reconciliation, and local portfolio mirror proof all pass. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
 metadata; it requires relayed transactions to keep signature/request/payload evidence and
 can poll the latest audited relayed signature with Solana `getSignatureStatuses` through
 the guarded `confirmation_poll` API path. Confirmed transactions must map to a landed

@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { runWeb3AutonomousForwardRun } from "./web3-autonomous-forward-run.mjs";
 
 const DEFAULT_BASE_URL = "http://localhost:4010";
+const DEFAULT_REPEAT_PROOF_TIMEOUT_MS = 45_000;
 
 export function parseLiveCapitalPreflightArgs(argv = [], env = process.env) {
   const flags = new Map();
@@ -28,6 +29,8 @@ export function parseLiveCapitalPreflightArgs(argv = [], env = process.env) {
     allowLiveReady: booleanFlag(flags.get("allow-live-ready") ?? env.WEB3_PREFLIGHT_ALLOW_LIVE_READY, false),
     requireLiveReady: booleanFlag(flags.get("require-live-ready") ?? env.WEB3_PREFLIGHT_REQUIRE_LIVE_READY, false),
     requireRepeatProof: booleanFlag(flags.get("require-repeat-proof") ?? env.WEB3_PREFLIGHT_REQUIRE_REPEAT_PROOF, true),
+    skipRepeatWhenLiveBlocked: !booleanFlag(flags.get("always-run-repeat-proof") ?? env.WEB3_PREFLIGHT_ALWAYS_RUN_REPEAT_PROOF, false),
+    repeatProofTimeoutMs: boundedInteger(flags.get("repeat-proof-timeout-ms") ?? env.WEB3_PREFLIGHT_REPEAT_PROOF_TIMEOUT_MS, DEFAULT_REPEAT_PROOF_TIMEOUT_MS, 1_000, 600_000),
     failOnUnsafe: booleanFlag(flags.get("fail-on-unsafe") ?? env.WEB3_PREFLIGHT_FAIL_ON_UNSAFE, true),
     json: booleanFlag(flags.get("json") ?? env.WEB3_PREFLIGHT_JSON, false),
   };
@@ -52,11 +55,36 @@ export async function runWeb3LiveCapitalPreflight(input = {}) {
     allowLiveReady: Boolean(input.allowLiveReady),
     requireLiveReady: Boolean(input.requireLiveReady),
     requireRepeatProof: input.requireRepeatProof !== false,
+    skipRepeatWhenLiveBlocked: input.skipRepeatWhenLiveBlocked !== false,
+    repeatProofTimeoutMs: boundedInteger(input.repeatProofTimeoutMs, DEFAULT_REPEAT_PROOF_TIMEOUT_MS, 1_000, 600_000),
     failOnUnsafe: input.failOnUnsafe !== false,
   };
   const state = input.state ?? await fetchTradingState(config);
-  const repeatProof = input.repeatProof ?? (config.requireRepeatProof
-    ? await runWeb3AutonomousForwardRun({
+  const repeatProof = input.repeatProof ?? await resolveRepeatProof(config, state);
+
+  const report = buildLiveCapitalPreflightReport({ config, state, repeatProof });
+  if (config.failOnUnsafe && report.exit_code !== 0) {
+    const error = new Error(report.blockers[0] ?? "Live-capital preflight failed.");
+    error.report = report;
+    throw error;
+  }
+  return report;
+}
+
+async function resolveRepeatProof(config, state) {
+  if (!config.requireRepeatProof) return null;
+  if (shouldSkipLiveCapitalRepeatProof(config, state)) {
+    return buildSkippedRepeatProof(state);
+  }
+
+  return runRepeatProofWithTimeout(config);
+}
+
+async function runRepeatProofWithTimeout(config) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("repeat proof timeout")), config.repeatProofTimeoutMs);
+  try {
+    return await runWeb3AutonomousForwardRun({
       baseUrl: config.baseUrl,
       scenario: "all",
       source: config.source,
@@ -71,16 +99,26 @@ export async function runWeb3LiveCapitalPreflight(input = {}) {
       minConsistencyScore: config.minConsistencyScore,
       heartbeatWhenGated: true,
       failUnderTarget: false,
-    })
-    : null);
-
-  const report = buildLiveCapitalPreflightReport({ config, state, repeatProof });
-  if (config.failOnUnsafe && report.exit_code !== 0) {
-    const error = new Error(report.blockers[0] ?? "Live-capital preflight failed.");
-    error.report = report;
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted || error?.name === "AbortError") {
+      return buildTimedOutRepeatProof(config.repeatProofTimeoutMs);
+    }
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
-  return report;
+}
+
+export function shouldSkipLiveCapitalRepeatProof(config, state) {
+  const liveReadiness = state?.autonomous_live_autonomy_readiness ?? null;
+  const daemonHandoff = state?.autonomous_daemon_handoff ?? null;
+  if (!config.requireRepeatProof || !config.skipRepeatWhenLiveBlocked) return false;
+  if (config.requireLiveReady) return false;
+  if (liveReadiness?.can_trade_real_capital === true) return false;
+  if (daemonHandoff?.can_trade_real_capital === true) return false;
+  return Boolean(liveReadiness);
 }
 
 export function buildLiveCapitalPreflightReport({ config, state, repeatProof }) {
@@ -92,7 +130,9 @@ export function buildLiveCapitalPreflightReport({ config, state, repeatProof }) 
     .filter((item) => item.status === "fail")
     .map((item) => item.blocker ?? item.detail)
     .filter(Boolean);
-  const repeatGatePassed = !config.requireRepeatProof || repeatProof?.proof_gate_status === "passed";
+  const repeatProofStatus = repeatProof?.proof_gate_status ?? (config.requireRepeatProof ? "missing" : "not-required");
+  const repeatProofSkipped = repeatProofStatus === "skipped-live-blocked";
+  const repeatGatePassed = !config.requireRepeatProof || repeatProof?.proof_gate_status === "passed" || repeatProofSkipped;
   const liveReady = liveReadiness?.can_trade_real_capital === true;
   const daemonRealCapital = daemonHandoff?.can_trade_real_capital === true;
   const repeatBlockers = config.requireRepeatProof && !repeatGatePassed
@@ -132,7 +172,9 @@ export function buildLiveCapitalPreflightReport({ config, state, repeatProof }) 
     execution_mode: executionReadiness?.config?.mode ?? "missing",
     kill_switch: executionReadiness?.config?.kill_switch ?? null,
     repeat_proof_required: Boolean(config.requireRepeatProof),
-    repeat_proof_status: repeatProof?.proof_gate_status ?? (config.requireRepeatProof ? "missing" : "not-required"),
+    repeat_proof_status: repeatProofStatus,
+    repeat_proof_skipped: repeatProofSkipped,
+    repeat_proof_timeout_ms: config.repeatProofTimeoutMs ?? DEFAULT_REPEAT_PROOF_TIMEOUT_MS,
     repeat_promotion_permission: repeatProof?.promotion_permission ?? (config.requireRepeatProof ? "missing" : "not-required"),
     repeat_hit_rate_pct: repeatProof?.hit_rate_pct ?? null,
     repeat_deployed_alpha_usd: repeatProof?.deployed_hot_coin_alpha_usd ?? null,
@@ -150,7 +192,8 @@ export function buildLiveCapitalPreflightReport({ config, state, repeatProof }) 
       "This preflight never signs, submits, broadcasts, or moves funds.",
       "Default mode succeeds only when real-capital autonomy is blocked or paper-only; use --allow-live-ready for an explicit manual review of a future live-ready state.",
       "Daemon handoff real-capital authority is always treated as unsafe in this drill.",
-      "Repeat proof must pass promotion gates before any live-ready state can move to manual executor review.",
+      "Repeat proof must pass promotion gates before any live-ready state can move to manual executor review; when live gates are already blocked, the command skips that slow proof by default.",
+      "Use --always-run-repeat-proof to force the paper repeat proof even when the live-capital gate is already blocked.",
     ],
   };
 }
@@ -180,6 +223,43 @@ function liveCapitalPreflightSummary({ status, liveReadiness, repeatProof, block
   if (status === "manual-live-review") return "Live-readiness and repeat proof passed, but real execution still requires a separate manual live executor review.";
   if (status === "blocked-as-expected") return `Real-capital autonomy is blocked as expected; live-readiness is ${liveReadiness?.status ?? "missing"} and repeat proof is ${repeatProof?.proof_gate_status ?? "not-required"}.`;
   return "Preflight remains paper-only; no live-capital permission is granted.";
+}
+
+function buildSkippedRepeatProof(state) {
+  return {
+    mode: "web3-autonomous-forward-repeat",
+    paper_only: true,
+    proof_gate_status: "skipped-live-blocked",
+    promotion_permission: "blocked",
+    proof_gate_blockers: [],
+    hit_rate_pct: null,
+    deployed_hot_coin_alpha_usd: null,
+    max_cumulative_drawdown_usd: null,
+    consistency_score: null,
+    next_action: state?.autonomous_live_autonomy_readiness?.next_action ?? "Clear live-capital blockers before rerunning repeat paper proof.",
+    controls: [
+      "Repeat proof was skipped because live-capital readiness is already blocked.",
+      "No live execution, signing, transaction relay, or wallet mutation was attempted.",
+    ],
+  };
+}
+
+function buildTimedOutRepeatProof(timeoutMs) {
+  return {
+    mode: "web3-autonomous-forward-repeat",
+    paper_only: true,
+    proof_gate_status: "timeout",
+    promotion_permission: "blocked",
+    proof_gate_blockers: [`Repeat forward proof did not finish within ${timeoutMs}ms; rerun with --repeat-proof-timeout-ms=<ms> or --require-repeat-proof=false for a live-blocker-only check.`],
+    hit_rate_pct: null,
+    deployed_hot_coin_alpha_usd: null,
+    max_cumulative_drawdown_usd: null,
+    consistency_score: null,
+    controls: [
+      "Repeat proof timed out without granting live-capital authority.",
+      "No live execution, signing, transaction relay, or wallet mutation was attempted.",
+    ],
+  };
 }
 
 function normalizeBaseUrl(value) {

@@ -50,6 +50,7 @@ export async function runWeb3AutonomousForwardRun(input = {}) {
     minConsistencyScore: boundedNumber(input.minConsistencyScore, 80, 0, 100),
     heartbeatWhenGated: input.heartbeatWhenGated !== false,
     failUnderTarget: Boolean(input.failUnderTarget),
+    signal: input.signal,
   };
 
   if (config.runs > 1) {
@@ -89,6 +90,7 @@ export async function runWeb3AutonomousForwardRun(input = {}) {
     intervalMs: config.intervalMs,
     heartbeatWhenGated: config.heartbeatWhenGated,
     exitOnBlocked: false,
+    signal: config.signal,
   });
   const final = await fetchTradingState(config, latestPaperCycle(daemonRun));
   const report = buildForwardRunReport({
@@ -124,6 +126,7 @@ export async function runWeb3AutonomousForwardRepeat(input = {}) {
     minConsistencyScore: boundedNumber(input.minConsistencyScore, 80, 0, 100),
     heartbeatWhenGated: input.heartbeatWhenGated !== false,
     failUnderTarget: Boolean(input.failUnderTarget),
+    signal: input.signal,
   };
   const startedAt = new Date().toISOString();
   const runs = [];
@@ -163,6 +166,7 @@ export async function runWeb3AutonomousForwardSuite(input = {}) {
     minNetPnlUsd: boundedNumber(input.minNetPnlUsd, 0, -1_000_000, 1_000_000),
     heartbeatWhenGated: input.heartbeatWhenGated !== false,
     failUnderTarget: Boolean(input.failUnderTarget),
+    signal: input.signal,
   };
   const startedAt = new Date().toISOString();
   const scenarioReports = [];
@@ -588,7 +592,7 @@ async function fetchTradingState(config, cycles = 0) {
   url.searchParams.set("source", config.source);
   url.searchParams.set("account", "persistent");
   url.searchParams.set("advance", "false");
-  const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  const response = await fetch(url, { signal: requestSignal(config.signal, 15_000) });
   return readJson(response, "fetch final trading state");
 }
 
@@ -597,7 +601,7 @@ async function postTrading(config, body) {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(20_000),
+    signal: requestSignal(config.signal, 20_000),
   });
   return readJson(response, "reset paper ledger");
 }
@@ -618,6 +622,11 @@ async function readJson(response, label) {
 
 function normalizeBaseUrl(value) {
   return String(value || DEFAULT_BASE_URL).replace(/\/$/, "");
+}
+
+function requestSignal(parentSignal, timeoutMs) {
+  if (!parentSignal) return AbortSignal.timeout(timeoutMs);
+  return AbortSignal.any([parentSignal, AbortSignal.timeout(timeoutMs)]);
 }
 
 function normalizeChoice(value, allowed, fallback) {
