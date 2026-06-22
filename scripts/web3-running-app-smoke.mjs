@@ -125,6 +125,7 @@ async function verifyTradingPage() {
   const requiredMarkers = [
     /No real trade tested yet/,
     /Actual live trade test ledger/,
+    /Open wallet contract/,
     /Funded wallet trade/,
     /not attempted/,
     /Trading live canary console/,
@@ -141,6 +142,7 @@ async function verifyTradingPage() {
   assert(!text.includes("This page did not load"), "Trading page should not render the route-error fallback.");
   assert(text.includes("No real trade tested yet"), "Trading page should say no real live trade has been tested.", text);
   assert(text.includes("Actual live trade test ledger"), "Trading page should expose the actual live-trade test ledger.", text);
+  assert(text.includes("Open wallet contract"), "Trading page should link the wallet intake contract.", text);
   assert(text.includes("Funded wallet trade") && text.includes("not attempted"), "Trading page should say the funded wallet trade was not attempted.", text);
   assert(text.includes("Trading live canary console"), "Trading page should render the live canary console.", text);
   assert(text.includes("Dedicated trading wallet"), "Trading page should show the dedicated wallet gate.", text);
@@ -193,6 +195,20 @@ async function verifyLiveUsabilitySummary() {
   record("live-usability-summary", "pass", json.next_action || "funded autonomy remains unusable");
 }
 
+async function verifyWalletIntakeContract() {
+  const { response, json } = await requestJson("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
+  assert(response.status === 200, "Wallet intake contract should return 200.", { status: response.status, json });
+  assert(json.mode === "web3-dedicated-wallet-intake-contract", "Wallet intake contract should expose the expected mode.", json);
+  assert(json.can_enter_in_app === true, "Wallet intake contract should be enterable in app.", json);
+  assert(json.existing_save_endpoint === "/api/web3-trading", "Wallet intake contract should point at the existing dry-run scope save endpoint.", json);
+  assert(json.existing_save_body_template?.execution?.wallet_public_key === "<public-solana-address>", "Wallet intake contract should use a public wallet placeholder.", json);
+  assert(json.accepted_fields?.some((field) => field.path === "execution.wallet_public_key"), "Wallet intake contract should name the public wallet field.", json.accepted_fields);
+  assert(json.rejected_fields?.includes("private_key") && json.rejected_fields?.includes("seed_phrase"), "Wallet intake contract should reject wallet secrets.", json.rejected_fields);
+  assert(json.live_execution_permission === "blocked", "Wallet intake contract should keep live execution blocked.", json);
+  assert(json.wallet_mutation_permission === "blocked", "Wallet intake contract should keep wallet mutation blocked.", json);
+  record("wallet-intake-contract", "pass", json.next_action || "public wallet intake is documented");
+}
+
 async function verifyCurrentBlocker() {
   const { response, json } = await requestJson(`/api/web3-live-usability-blockers?${LIVE_QUERY}&rows=all`);
   assert(response.status === 200, "Live-usability blockers should return 200.", { status: response.status, json });
@@ -210,6 +226,7 @@ async function main() {
   await verifyCanaryReceipt();
   await verifyLiveTestLedger();
   await verifyLiveUsabilitySummary();
+  await verifyWalletIntakeContract();
   await verifyCurrentBlocker();
 
   const summary = {

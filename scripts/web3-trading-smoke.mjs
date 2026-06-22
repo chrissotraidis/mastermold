@@ -274,6 +274,18 @@ async function main() {
   assert(liveUsabilitySummary.lanes.find((lane) => lane.id === "autonomous-real-capital")?.status === "blocked", "Web3 live-usability summary should block autonomous real capital.", liveUsabilitySummary.lanes);
   assert(liveUsabilitySummary.summary.includes("Not usable for funded autonomous trading yet"), "Web3 live-usability summary should answer what is left.", liveUsabilitySummary);
 
+  const walletIntakeContractResponse = await request("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
+  const walletIntakeContract = await readJson(walletIntakeContractResponse);
+  assert(walletIntakeContractResponse.status === 200, "Web3 wallet intake contract should return a contract receipt.", { status: walletIntakeContractResponse.status, walletIntakeContract });
+  assert(walletIntakeContract.mode === "web3-dedicated-wallet-intake-contract", "Web3 wallet intake contract should expose the expected mode.", walletIntakeContract);
+  assert(walletIntakeContract.can_enter_in_app === true, "Web3 wallet intake contract should be app-enterable.", walletIntakeContract);
+  assert(walletIntakeContract.existing_save_endpoint === "/api/web3-trading", "Web3 wallet intake contract should use the existing dry-run save endpoint.", walletIntakeContract);
+  assert(walletIntakeContract.existing_save_body_template?.execution?.wallet_public_key === "<public-solana-address>", "Web3 wallet intake contract should name only the public wallet placeholder.", walletIntakeContract);
+  assert(walletIntakeContract.accepted_fields.some((field) => field.path === "execution.wallet_public_key"), "Web3 wallet intake contract should include the wallet public key field.", walletIntakeContract.accepted_fields);
+  assert(walletIntakeContract.rejected_fields.includes("private_key") && walletIntakeContract.rejected_fields.includes("seed_phrase"), "Web3 wallet intake contract should reject wallet secrets.", walletIntakeContract.rejected_fields);
+  assert(walletIntakeContract.live_execution_permission === "blocked", "Web3 wallet intake contract should keep live execution blocked.", walletIntakeContract);
+  assert(walletIntakeContract.wallet_mutation_permission === "blocked", "Web3 wallet intake contract should keep wallet mutation blocked.", walletIntakeContract);
+
   const launchChecklistResponse = await request("/api/web3-launch-checklist?scenario=breakout&source=sample&account=persistent");
   const launchChecklist = await readJson(launchChecklistResponse);
   assert(launchChecklistResponse.status === 200, "Web3 launch checklist endpoint should return a readiness contract.", { status: launchChecklistResponse.status, launchChecklist });

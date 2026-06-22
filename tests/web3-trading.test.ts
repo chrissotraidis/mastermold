@@ -10,6 +10,7 @@ import { GET as ACCOUNT_ACQUISITION_GET } from "@/app/api/web3-account-acquisiti
 import { GET as ACCOUNT_SETUP_GET } from "@/app/api/web3-account-setup/route";
 import { GET as ACCOUNTING_LEDGER_GET } from "@/app/api/web3-accounting-ledger/route";
 import { GET as CUTOVER_BLOCKER_BOARD_GET } from "@/app/api/web3-cutover-blocker-board/route";
+import { GET as DEDICATED_WALLET_INTAKE_CONTRACT_GET } from "@/app/api/web3-dedicated-wallet-intake-contract/route";
 import { GET as EMERGENCY_STOP_GET, POST as EMERGENCY_STOP_POST } from "@/app/api/web3-emergency-stop/drill/route";
 import { POST as JUPITER_REHEARSAL_POST } from "@/app/api/web3-jupiter-rehearsal/route";
 import { GET as JUPITER_REHEARSAL_HISTORY_GET } from "@/app/api/web3-jupiter-rehearsal-history/route";
@@ -3763,9 +3764,70 @@ describe("Web3 autonomous trading subsystem", () => {
       status: "blocked",
       counts_as_funded_trade_proof: false,
     });
+    expect(usabilitySummary.evidence_endpoints).toContain("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
     expect(usabilitySummary.evidence_endpoints).toContain("/api/web3-live-test-ledger?source=live-dex&account=persistent&scenario=breakout&cycles=0");
     expect(usabilitySummary.summary).toContain("Not usable for funded autonomous trading yet");
     expect(usabilitySummary.controls.join(" ")).toContain("cannot sign");
+
+    const walletContractResponse = await DEDICATED_WALLET_INTAKE_CONTRACT_GET(new Request("http://localhost/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0"));
+    const walletContract = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      can_enter_in_app: boolean;
+      existing_save_endpoint: string;
+      existing_save_method: string;
+      existing_save_body_template: {
+        execution: {
+          mode: string;
+          wallet_public_key: string;
+          kill_switch: boolean;
+          signer_simulation_enabled: boolean;
+        };
+      };
+      accepted_fields: Array<{ path: string; storage: string; validation: string }>;
+      rejected_fields: string[];
+      after_save_steps: Array<{ id: string; command_or_href: string }>;
+      verifier_command: string;
+      live_execution_permission: string;
+      wallet_mutation_permission: string;
+      transaction_submission_permission: string;
+      signing_permission: string;
+      private_key_storage: string;
+      seed_phrase_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(walletContractResponse);
+    expect(walletContractResponse.status).toBe(200);
+    expect(walletContract.mode).toBe("web3-dedicated-wallet-intake-contract");
+    expect(walletContract.status).toBe("public-wallet-needed");
+    expect(walletContract.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(walletContract.can_enter_in_app).toBe(true);
+    expect(walletContract.existing_save_endpoint).toBe("/api/web3-trading");
+    expect(walletContract.existing_save_method).toBe("POST");
+    expect(walletContract.existing_save_body_template.execution.mode).toBe("dry-run");
+    expect(walletContract.existing_save_body_template.execution.wallet_public_key).toBe("<public-solana-address>");
+    expect(walletContract.existing_save_body_template.execution.kill_switch).toBe(false);
+    expect(walletContract.existing_save_body_template.execution.signer_simulation_enabled).toBe(true);
+    expect(walletContract.accepted_fields.map((field) => field.path)).toContain("execution.wallet_public_key");
+    expect(walletContract.accepted_fields.find((field) => field.path === "execution.wallet_public_key")?.storage).toContain("public scope");
+    expect(walletContract.accepted_fields.find((field) => field.path === "execution.wallet_public_key")?.validation).toContain("never the sample all-ones");
+    expect(walletContract.rejected_fields).toEqual(expect.arrayContaining(["private_key", "seed_phrase", "signed_transaction", "api_key"]));
+    expect(walletContract.after_save_steps.map((step) => step.id)).toEqual([
+      "strict-wallet-verifier",
+      "wallet-ownership-proof",
+      "jupiter-order-rail",
+      "live-canary-summary",
+    ]);
+    expect(walletContract.verifier_command).toContain("--wallet=<public-solana-address>");
+    expect(walletContract.live_execution_permission).toBe("blocked");
+    expect(walletContract.wallet_mutation_permission).toBe("blocked");
+    expect(walletContract.transaction_submission_permission).toBe("blocked");
+    expect(walletContract.signing_permission).toBe("blocked");
+    expect(walletContract.private_key_storage).toBe("blocked");
+    expect(walletContract.seed_phrase_storage).toBe("blocked");
+    expect(walletContract.secret_echo_permission).toBe("blocked");
+    expect(walletContract.controls.join(" ")).toContain("intake map only");
 
     const invalidLedgerResponse = await LIVE_TEST_LEDGER_GET(new Request("http://localhost/api/web3-live-test-ledger?account=hot-wallet"));
     const invalidLedgerReceipt = await json<{ error: string }>(invalidLedgerResponse);
