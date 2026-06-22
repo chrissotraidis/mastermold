@@ -447,7 +447,7 @@ function canaryAttemptOperatorAction(
   if (stage === "unsigned-order-request") return "Request one tiny unsigned canary order";
   const lane = firstBlockingCanaryLane(lanes);
   if (lane?.id === "live-scope") return "Open live DEX trading scope";
-  if (lane?.id === "dedicated-wallet") return "Save the dedicated public wallet";
+  if (lane?.id === "dedicated-wallet") return "Save the dedicated public wallet in Trading";
   if (lane?.id === "wallet-ownership") return "Prove wallet ownership";
   if (lane?.id === "jupiter-order") return "Configure Jupiter and rehearse the order";
   if (lane?.id === "live-flags") return "Arm exact live canary flags";
@@ -489,7 +489,7 @@ function canaryAttemptCommand(stage: Web3SupervisedCanaryAttemptContract["stage"
   if (stage === "unsigned-order-request") return `POST ${input.unsignedHandoffEndpoint} with operator_ack=true, canary_ack, return_unsigned_transaction_ack=true, wallet_public_key, amount_lamports<=1000000.`;
   const lane = firstBlockingCanaryLane(input.lanes);
   if (lane?.id === "live-scope") return "Open /trading?source=live-dex&account=persistent and refresh the first-canary readiness receipt.";
-  if (lane?.id === "dedicated-wallet") return "Save only the dedicated public Solana wallet address in Settings, then run npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet.";
+  if (lane?.id === "dedicated-wallet") return "Save only the dedicated public Solana wallet address in the Trading live canary console, then run npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet.";
   if (lane?.id === "wallet-ownership") return "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
   if (lane?.id === "jupiter-order") return "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order";
   if (lane?.id === "live-flags") return "Set the exact live canary env flags, then rerun npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready.";
@@ -549,7 +549,7 @@ function buildSupervisedCanaryReadinessLanes(input: {
       label: "Dedicated public wallet",
       status: input.wallet.dedicated_wallet_scoped ? "pass" : "fail",
       detail: input.wallet.dedicated_wallet_scoped ? "A non-sample public Solana wallet is scoped." : input.wallet.next_action,
-      next_action: input.wallet.dedicated_wallet_scoped ? "Use the scoped public wallet for ownership proof and the tiny canary." : "Save only a dedicated public Solana wallet address in Settings.",
+      next_action: input.wallet.dedicated_wallet_scoped ? "Use the scoped public wallet for ownership proof and the tiny canary." : "Save only a dedicated public Solana wallet address in the Trading live canary console.",
       evidence_endpoint: "/api/web3-dedicated-wallet-packet?source=live-dex&account=persistent&scenario=breakout&cycles=0",
       blocks_first_canary: true,
     },

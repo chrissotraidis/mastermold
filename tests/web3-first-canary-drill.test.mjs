@@ -111,6 +111,8 @@ describe("Web3 first canary drill command", () => {
     expect(report.next_lane_label).toBe("Dedicated wallet");
     expect(report.next_lane_status).toBe("fail");
     expect(report.next_lane_action).toBe(report.next_action);
+    expect(report.next_action).toContain("Trading live canary console");
+    expect(report.next_unblock_step?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(report.live_execution_permission).toBe("blocked");
     expect(report.transaction_submission_permission).toBe("blocked");
     expect(report.wallet_mutation_permission).toBe("blocked");

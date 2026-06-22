@@ -2943,6 +2943,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.blocker_count).toBeGreaterThan(0);
     expect(receipt.next_lane_id).toBeTruthy();
     expect(receipt.next_action.length).toBeGreaterThan(10);
+    if (receipt.next_lane_id === "dedicated-wallet") {
+      expect(receipt.next_action).toContain("Trading live canary console");
+    }
     expect(receipt.canary_attempt_contract.mode).toBe("web3-first-live-canary-attempt-contract");
     expect(receipt.canary_attempt_contract.stage).toBe("credential-intake");
     expect(receipt.canary_attempt_contract.runnable_now).toBe(false);
@@ -2956,6 +2959,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.canary_endpoint).toContain("/api/web3-live-trade-canary");
     expect(receipt.lanes.map((lane) => lane.id).join(",")).toBe("live-scope,dedicated-wallet,wallet-ownership,jupiter-order,live-flags,unsigned-order-preflight,signer-relay,manual-live-review,funded-canary-proof");
     expect(receipt.lanes.every((lane) => ["pass", "watch", "fail"].includes(lane.status) && lane.detail && lane.next_action && lane.evidence_endpoint)).toBe(true);
+    expect(receipt.lanes.find((lane) => lane.id === "dedicated-wallet")?.next_action).toContain("Trading live canary console");
     expect(receipt.lanes.some((lane) => lane.id === "funded-canary-proof" && lane.status === "fail" && lane.blocks_first_canary === false)).toBe(true);
     expect(receipt.lanes.find((lane) => lane.id === "signer-relay")?.next_action).toContain("external wallet transaction prompt");
     expect(receipt.lanes.find((lane) => lane.id === "manual-live-review")?.next_action).toContain("Complete manual live review");
@@ -3151,6 +3155,9 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(["fail", "watch"]).toContain(String(receipt.next_lane_status));
     expect(receipt.next_action).toBe(String(receipt.next_lane_action));
     expect(receipt.next_action.length).toBeGreaterThan(10);
+    if (receipt.next_lane_id === "dedicated-wallet") {
+      expect(receipt.next_action).toContain("Trading live canary console");
+    }
     expect(receipt.next_unblock_step).not.toBeNull();
     expect(["next", "watch"]).toContain(String(receipt.next_unblock_step?.status));
     expect(receipt.next_unblock_step?.action.length).toBeGreaterThan(10);
@@ -3161,6 +3168,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("jupiter-order");
     expect(receipt.operator_unblock_plan.map((step) => step.id)).toContain("unsigned-order-preflight");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "dedicated-wallet")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
+    expect(receipt.operator_unblock_plan.find((step) => step.id === "dedicated-wallet")?.action).toContain("dedicated public Solana trading wallet");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "wallet-ownership")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "unsigned-order-preflight")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");
     expect(receipt.operator_unblock_plan.find((step) => step.id === "post-signing-proof")?.safe_surface).toBe("/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console");

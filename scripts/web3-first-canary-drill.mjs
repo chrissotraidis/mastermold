@@ -252,7 +252,7 @@ function buildCanaryDrillLanes({ tradingState, walletPublicKey, blockers, readin
       fallbackStatus: walletConfigured ? "watch" : "fail",
       label: "Dedicated wallet",
       detail: walletConfigured ? `A public wallet value is scoped in ${configuredMode} mode; kill switch ${killSwitch ? "on" : "off"}.` : "No public wallet is scoped for the drill.",
-      next_action: walletConfigured ? "Reject sample scope and prove wallet ownership before live review." : "Save only a dedicated public Solana wallet address.",
+      next_action: walletConfigured ? "Reject sample scope and prove wallet ownership before live review." : "Save only a dedicated public Solana wallet address in the Trading live canary console.",
     }),
     drillLaneFromReadiness("wallet-ownership", laneById, {
       fallbackStatus: blockers?.current_input?.id === "wallet-ownership-proof" ? "fail" : "watch",
