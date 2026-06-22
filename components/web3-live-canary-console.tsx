@@ -178,6 +178,13 @@ export function Web3LiveCanaryConsole({
       status: canaryReceipt.post_signing_evidence_status === "settlement-accounted" ? "pass" as const : canaryReceipt.latest_signature_preview ? "watch" as const : "fail" as const,
     },
   ];
+  const walletProofFreshness = walletProofFreshnessStatus({
+    proved: canaryReceipt.wallet_ownership_proved,
+    current: canaryReceipt.wallet_ownership_current_for_canary,
+    ageSeconds: canaryReceipt.wallet_ownership_age_seconds,
+    maxAgeSeconds: canaryReceipt.wallet_ownership_max_age_seconds,
+    expiresAt: canaryReceipt.wallet_ownership_expires_at,
+  });
   const primaryGateControl = buildPrimaryCanaryGateControl({
     step: activeCanaryStep,
     busy: busy || ownershipBusy || ownershipCheckBusy || preflightBusy || proofBusy !== null || drillBusy,
@@ -587,6 +594,26 @@ export function Web3LiveCanaryConsole({
             <p className="mt-2 text-[11px] leading-4 text-outline">
               Current blocker count {primaryCanaryBlockers.length}; the app stays unable to move funds until wallet proof, live flags, unsigned handoff, signed relay, and proof accounting all clear.
             </p>
+            <div className="mt-3 rounded-md border border-engine/20 bg-surface-dim/35 p-2" aria-label="Trading wallet proof freshness for canary">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Wallet proof freshness</p>
+                  <p className="mt-1 text-xs font-semibold text-on-surface">{walletProofFreshness.summary}</p>
+                </div>
+                <span className={evidenceStatusClassName(walletProofFreshness.status)}>
+                  {walletProofFreshness.badge}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                <CanaryMetric label="Age" value={walletProofFreshness.ageLabel} tone={walletProofFreshness.tone} />
+                <CanaryMetric label="Expires" value={walletProofFreshness.expiryLabel} tone={walletProofFreshness.tone} />
+                <CanaryMetric label="Fresh window" value={walletProofFreshness.maxAgeLabel} tone="neutral" />
+                <CanaryMetric label="Canary use" value={canaryReceipt.wallet_ownership_current_for_canary ? "allowed" : "rerun proof"} tone={canaryReceipt.wallet_ownership_current_for_canary ? "engine" : "critical"} />
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-outline">
+                The first funded canary requires a recent hash-only wallet proof; stale ownership receipts are review evidence only and cannot unlock the unsigned transaction handoff.
+              </p>
+            </div>
             <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Trading current canary gate action">
               {primaryGateControl.href ? (
                 <Link
@@ -1012,6 +1039,8 @@ export function Web3LiveCanaryConsole({
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <CanaryMetric label="Wallet" value={ownershipReceipt.wallet_public_key_preview} tone={ownershipReceipt.signature_verified ? "engine" : "caution"} />
                 <CanaryMetric label="Message" value={ownershipReceipt.message_storage} tone="neutral" />
+                <CanaryMetric label="Age" value={formatWalletProofAge(ownershipReceipt.challenge_age_seconds)} tone={ownershipReceipt.challenge_fresh ? "engine" : "critical"} />
+                <CanaryMetric label="Expires" value={formatWalletProofExpiry(ownershipReceipt.challenge_expires_at)} tone={ownershipReceipt.challenge_fresh ? "engine" : "critical"} />
                 <CanaryMetric label="Tx signing" value={ownershipReceipt.transaction_signing_permission} tone="neutral" />
                 <CanaryMetric label="Submit" value={ownershipReceipt.transaction_submission_permission} tone="neutral" />
               </div>
@@ -1056,6 +1085,8 @@ export function Web3LiveCanaryConsole({
                 <CanaryMetric label="Jupiter" value={preflightReceipt.jupiter_key_configured ? "ready" : "missing"} tone={preflightReceipt.jupiter_key_configured ? "engine" : "neutral"} />
                 <CanaryMetric label="Live flags" value={preflightReceipt.live_flags_ready ? "ready" : "missing"} tone={preflightReceipt.live_flags_ready ? "engine" : "critical"} />
                 <CanaryMetric label="Wallet" value={preflightReceipt.wallet_ready ? "ready" : "blocked"} tone={preflightReceipt.wallet_ready ? "engine" : "critical"} />
+                <CanaryMetric label="Wallet proof" value={preflightReceipt.wallet_ownership_current_for_canary ? "fresh" : preflightReceipt.wallet_ownership_proved ? "stale" : "missing"} tone={preflightReceipt.wallet_ownership_current_for_canary ? "engine" : "critical"} />
+                <CanaryMetric label="Proof expires" value={formatWalletProofExpiry(preflightReceipt.wallet_ownership_expires_at)} tone={preflightReceipt.wallet_ownership_current_for_canary ? "engine" : "critical"} />
                 <CanaryMetric label="Tx bytes" value={preflightReceipt.unsigned_transaction_return} tone="neutral" />
               </div>
               <p className="mt-2 text-[11px] leading-4 text-outline">{preflightReceipt.next_action}</p>
@@ -1103,6 +1134,76 @@ export function Web3LiveCanaryConsole({
       </div>
     </section>
   );
+}
+
+function walletProofFreshnessStatus({
+  proved,
+  current,
+  ageSeconds,
+  maxAgeSeconds,
+  expiresAt,
+}: {
+  proved: boolean;
+  current: boolean;
+  ageSeconds: number | null;
+  maxAgeSeconds: number;
+  expiresAt: string | null;
+}) {
+  const maxAgeLabel = formatWalletProofAge(maxAgeSeconds);
+  if (!proved) {
+    return {
+      status: "fail" as const,
+      tone: "critical" as const,
+      badge: "missing",
+      summary: "No hash-only wallet proof is recorded for this canary wallet.",
+      ageLabel: "not proven",
+      expiryLabel: "not set",
+      maxAgeLabel,
+    };
+  }
+  if (!current) {
+    return {
+      status: "fail" as const,
+      tone: "critical" as const,
+      badge: "stale",
+      summary: "Wallet proof exists, but it is too old for the first funded canary.",
+      ageLabel: formatWalletProofAge(ageSeconds),
+      expiryLabel: formatWalletProofExpiry(expiresAt),
+      maxAgeLabel,
+    };
+  }
+  return {
+    status: "pass" as const,
+    tone: "engine" as const,
+    badge: "fresh",
+    summary: "Wallet proof is fresh enough for the tiny canary handoff.",
+    ageLabel: formatWalletProofAge(ageSeconds),
+    expiryLabel: formatWalletProofExpiry(expiresAt),
+    maxAgeLabel,
+  };
+}
+
+function formatWalletProofAge(seconds: number | null) {
+  if (seconds === null || !Number.isFinite(seconds)) return "unknown";
+  if (seconds < 0) return "future";
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  if (minutes < 60) return remainder > 0 ? `${minutes}m ${remainder}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
+function formatWalletProofExpiry(value: string | null) {
+  if (!value) return "not set";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "unknown";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(parsed);
 }
 
 function CanaryMetric({

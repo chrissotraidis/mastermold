@@ -1650,6 +1650,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("requestWalletOwnershipChallenge");
     expect(settingsConsole).toContain("Wallet ownership receipt");
     expect(settingsConsole).toContain("Settings wallet ownership receipt");
+    expect(settingsConsole).toContain("Canary use");
+    expect(settingsConsole).toContain("Proof age");
+    expect(settingsConsole).toContain("First funded canary signing requires this hash-only proof to still be fresh");
     expect(settingsConsole).toContain("wallet ownership proof signs text only");
     expect(settingsConsole).toContain("Browser wallet receipt");
     expect(settingsConsole).toContain("Settings browser wallet readiness receipt");
@@ -1755,8 +1758,14 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading wallet ownership challenge receipt");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Connected browser wallet does not match the saved dedicated trading wallet");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading wallet ownership receipt");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading wallet proof freshness for canary");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("walletProofFreshnessStatus");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("The first funded canary requires a recent hash-only wallet proof");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("stale ownership receipts are review evidence only");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary preflight");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary preflight receipt");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Proof expires");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("formatWalletProofAge");
     expect(source("components/web3-live-canary-console.tsx")).toContain("getTrustedBrowserWalletPublicKey");
     expect(source("components/web3-live-canary-console.tsx")).not.toContain("preflightParams.set(\"wallet_public_key\"");
     expect(source("components/web3-live-canary-console.tsx")).toContain("setWalletPreview(previewValue(defaultWalletPublicKey))");
@@ -2196,6 +2205,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now refreshes the first-canary drill");
     expect(source("components/review-readiness.tsx")).toContain("Trading live canary console now includes a no-signature Check wallet action");
     expect(source("components/review-readiness.tsx")).toContain("Trading now server-renders the latest hash-only wallet ownership receipt");
+    expect(source("components/review-readiness.tsx")).toContain("Trading and Settings now surface wallet proof freshness");
     expect(source("components/review-readiness.tsx")).toContain("live-usability blocker receipt now promotes the active current input");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("Health live usability");
     expect(source("scripts/web3-readiness-verify.mjs")).toContain("/api/web3-ohlcv?auto=true&source=live-dex");

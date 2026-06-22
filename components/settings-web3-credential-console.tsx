@@ -2056,11 +2056,17 @@ export function SettingsWeb3CredentialConsole({
           </div>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <ConsoleMetric label="Wallet" value={ownershipReceipt.wallet_public_key_preview} tone={ownershipReceipt.signature_verified ? "engine" : "caution"} />
+            <ConsoleMetric label="Canary use" value={ownershipReceipt.challenge_fresh ? "fresh" : "expired"} tone={ownershipReceipt.challenge_fresh ? "engine" : "critical"} />
+            <ConsoleMetric label="Proof age" value={formatWalletProofAge(ownershipReceipt.challenge_age_seconds)} tone={ownershipReceipt.challenge_fresh ? "engine" : "critical"} />
+            <ConsoleMetric label="Expires" value={formatConsoleTimeOrFallback(ownershipReceipt.challenge_expires_at)} tone={ownershipReceipt.challenge_fresh ? "engine" : "critical"} />
             <ConsoleMetric label="Message" value={ownershipReceipt.message_storage} tone="neutral" />
             <ConsoleMetric label="Tx signing" value={ownershipReceipt.transaction_signing_permission} tone="neutral" />
             <ConsoleMetric label="Submit" value={ownershipReceipt.transaction_submission_permission} tone="neutral" />
           </div>
           <p className="mt-2 text-xs leading-5 text-on-surface-variant">{ownershipReceipt.next_action}</p>
+          <p className="mt-1 text-[11px] leading-4 text-outline">
+            First funded canary signing requires this hash-only proof to still be fresh; rerun Prove ownership if this receipt has expired.
+          </p>
           <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
             receipt {ownershipReceipt.receipt_hash.slice(0, 10)} · challenge {ownershipReceipt.challenge_hash.slice(0, 10)} · signature {ownershipReceipt.signature_hash.slice(0, 10)}
           </p>
@@ -2831,4 +2837,20 @@ function formatConsoleTime(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(parsed);
+}
+
+function formatConsoleTimeOrFallback(value: string | null) {
+  return value ? formatConsoleTime(value) : "not set";
+}
+
+function formatWalletProofAge(seconds: number | null) {
+  if (seconds === null || !Number.isFinite(seconds)) return "unknown";
+  if (seconds < 0) return "future";
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  if (minutes < 60) return remainder > 0 ? `${minutes}m ${remainder}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
