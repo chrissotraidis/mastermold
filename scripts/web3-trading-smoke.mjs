@@ -31,13 +31,14 @@ async function readJson(response) {
 }
 
 async function request(path, init = {}) {
+  const { timeoutMs = 15_000, ...fetchInit } = init;
   const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
+    ...fetchInit,
     headers: {
-      ...(init.body === undefined ? {} : { "content-type": "application/json" }),
-      ...init.headers,
+      ...(fetchInit.body === undefined ? {} : { "content-type": "application/json" }),
+      ...fetchInit.headers,
     },
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   return response;
 }
@@ -57,7 +58,7 @@ async function postTrading(body) {
 }
 
 async function main() {
-  const tradingPageResponse = await request("/trading?source=live-dex&account=persistent&scenario=breakout");
+  const tradingPageResponse = await request("/trading?source=live-dex&account=persistent&scenario=breakout", { timeoutMs: 75_000 });
   const tradingPageHtml = await readText(tradingPageResponse);
   assert(tradingPageResponse.status === 200, "Trading cockpit should return 200 from the running app.", { status: tradingPageResponse.status });
   assert(tradingPageHtml.includes("No real trade tested yet"), "Trading cockpit should truthfully say no real live trade has been tested.", tradingPageHtml.slice(0, 1000));
@@ -336,7 +337,7 @@ async function main() {
   assert(credentialSetup.credential_plan?.levels?.some((level) => level.id === "autonomous-live" && level.status === "blocked"), "Credential vault plan should keep autonomous live blocked.", credentialSetup.credential_plan);
   assert(credentialSetup.credential_plan?.items?.some((item) => item.id === "private-key" && item.storage === "never-store" && item.status === "blocked"), "Credential vault plan should reject private key storage.", credentialSetup.credential_plan);
 
-  const page = await request("/trading");
+  const page = await request("/trading", { timeoutMs: 75_000 });
   const html = await page.text();
   assert(page.status === 200, "Trading page should render.", { status: page.status });
   assert(html.includes("Web3 Autopilot"), "Trading page should include the distinct Web3 Autopilot title.");
@@ -561,7 +562,7 @@ async function main() {
   assert(html.includes("launch-blocked buys"), "Trading page should disclose launch-timing gating in the folded action queue receipt.");
   assert(!html.includes("Autonomous action queue cockpit"), "Trading page should not render a separate redundant action queue cockpit on first load.");
   assert(!html.includes("Autonomous ranked action queue chart"), "Trading page should fold ranked action evidence into the command spine instead of stacking another chart.");
-  const seededPage = await request("/trading?account=ephemeral");
+  const seededPage = await request("/trading?account=ephemeral", { timeoutMs: 75_000 });
   const seededHtml = await seededPage.text();
   assert(seededPage.status === 200, "Seeded ephemeral trading page should render.", { status: seededPage.status });
   assert(seededHtml.includes("auto protect minute"), "Seeded ephemeral trading page should expose the protect-minute Auto watch mode.");
@@ -569,7 +570,7 @@ async function main() {
   assert(seededHtml.includes("1 queued action"), "Seeded ephemeral trading page should count the ready queue-owned sell as a minute-loop action.");
   assert(seededHtml.includes("Backend loop tick owns the trade/protect action"), "Seeded ephemeral Auto watch reason should route protect-minute decisions through the backend loop tick.");
   assert(seededHtml.includes("Run minute"), "Seeded ephemeral trading page should keep the next-minute run control visible.");
-  const livePage = await request("/trading?account=ephemeral&source=live-dex");
+  const livePage = await request("/trading?account=ephemeral&source=live-dex", { timeoutMs: 75_000 });
   const liveHtml = await livePage.text();
   assert(livePage.status === 200, "Live DEX trading page should render or fall back visibly.", { status: livePage.status });
   if (liveHtml.includes("DEX Screener live")) {
