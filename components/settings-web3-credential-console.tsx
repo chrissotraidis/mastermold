@@ -10,7 +10,7 @@ import type { Web3CredentialDoctorHealth } from "@/src/db/web3-credential-doctor
 import type { Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
 import type { Web3JupiterRehearsalReceipt } from "@/src/db/web3-jupiter-rehearsal";
 import type { Web3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
-import type { Web3LiveTradeCanaryActionReceipt } from "@/src/db/web3-live-trade-canary";
+import type { Web3LiveTradeCanaryActionReceipt, Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import type {
   Web3LiveUnsignedOrderHandoffReceipt,
   Web3LiveUnsignedOrderPreflightReceipt,
@@ -33,6 +33,7 @@ type SettingsWeb3CredentialConsoleProps = {
   jupiterConfigured: boolean;
   initialLiveUsability: Web3LiveUsabilityBlockersReceipt;
   initialFirstCanaryDrill: Web3FirstCanaryDrillReceipt;
+  initialLiveTradeCanary: Web3LiveTradeCanaryReceipt;
   scenario: string;
   source: string;
   account: string;
@@ -123,6 +124,7 @@ export function SettingsWeb3CredentialConsole({
   jupiterConfigured,
   initialLiveUsability,
   initialFirstCanaryDrill,
+  initialLiveTradeCanary,
   scenario,
   source,
   account,
@@ -173,6 +175,7 @@ export function SettingsWeb3CredentialConsole({
   const [liveCanaryActionReceipt, setLiveCanaryActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
   const [liveUsabilityReceipt, setLiveUsabilityReceipt] = useState<Web3LiveUsabilityBlockersReceipt>(initialLiveUsability);
   const [firstCanaryDrillReceipt, setFirstCanaryDrillReceipt] = useState<Web3FirstCanaryDrillReceipt>(initialFirstCanaryDrill);
+  const [liveTradeCanaryReceipt, setLiveTradeCanaryReceipt] = useState<Web3LiveTradeCanaryReceipt>(initialLiveTradeCanary);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(null);
   const [savedScope, setSavedScope] = useState<{ walletPreview: string | null; updatedAt: string } | null>(null);
   const [liveCanaryConsentArmed, setLiveCanaryConsentArmed] = useState(false);
@@ -722,17 +725,34 @@ export function SettingsWeb3CredentialConsole({
     return payload;
   }
 
+  async function fetchLiveTradeCanary() {
+    const params = new URLSearchParams({
+      scenario,
+      source: "live-dex",
+      account: "persistent",
+      cycles: String(cycles),
+    });
+    const response = await fetch(`/api/web3-live-trade-canary?${params.toString()}`);
+    const payload = (await response.json().catch(() => null)) as Web3LiveTradeCanaryReceipt | { error: string } | null;
+    if (!response.ok || !payload || "error" in payload) {
+      throw new Error(payload && "error" in payload ? payload.error : "Live canary receipt refresh failed.");
+    }
+    return payload;
+  }
+
   async function refreshCredentialAndCanaryState({ announce = true }: { announce?: boolean } = {}) {
-    const [liveUsability, firstCanaryDrill] = await Promise.all([
+    const [liveUsability, firstCanaryDrill, liveTradeCanary] = await Promise.all([
       fetchLiveUsabilityBlockers(),
       fetchFirstCanaryDrill(),
+      fetchLiveTradeCanary(),
     ]);
     setLiveUsabilityReceipt(liveUsability);
     setFirstCanaryDrillReceipt(firstCanaryDrill);
+    setLiveTradeCanaryReceipt(liveTradeCanary);
     if (announce) {
-      setMessage(`First canary refreshed: ${firstCanaryDrill.next_unblock_step?.label ?? firstCanaryDrill.status.replaceAll("-", " ")}.`);
+      setMessage(`First canary refreshed: ${liveTradeCanary.next_required_input?.label ?? firstCanaryDrill.next_unblock_step?.label ?? firstCanaryDrill.status.replaceAll("-", " ")}.`);
     }
-    return { liveUsability, firstCanaryDrill };
+    return { liveUsability, firstCanaryDrill, liveTradeCanary };
   }
 
   async function refreshLiveUsabilityBlockers({ announce = true }: { announce?: boolean } = {}) {
@@ -924,6 +944,9 @@ export function SettingsWeb3CredentialConsole({
   const firstCanaryFlagItems = buildFirstCanaryFlagItems({ draft, localInstallReceipt });
   const firstCanaryFlagReadyCount = firstCanaryFlagItems.filter((item) => item.status === "ready").length;
   const firstCanaryFlagSelectedCount = firstCanaryFlagItems.filter((item) => item.status === "ready" || item.status === "selected").length;
+  const firstCanaryRequiredInput = liveTradeCanaryReceipt.next_required_input;
+  const firstCanaryRequiredReadyCount = liveTradeCanaryReceipt.required_inputs.filter((item) => item.status === "done").length;
+  const firstCanaryRequiredActiveCount = liveTradeCanaryReceipt.required_inputs.filter((item) => item.status === "needed-now" || item.status === "external-signature" || item.status === "proof-watch").length;
 
   return (
     <section className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Settings Web3 credential action console">
@@ -973,6 +996,94 @@ export function SettingsWeb3CredentialConsole({
         </div>
         <p className="mt-2 text-xs leading-5 text-outline">
           Checklist actions use the controls below. They can save public scope, install allowed local env targets, or build redacted receipts; they cannot sign, submit, mutate wallets, store seed phrases, or unlock live trading.
+        </p>
+      </div>
+
+      <div
+        id="settings-web3-first-canary-input-resolver"
+        className="mt-3 scroll-mt-24 rounded-md border border-caution/30 bg-caution/[0.04] p-3"
+        aria-label="Settings live canary required input resolver"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">First canary input resolver</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">
+              {firstCanaryRequiredInput?.label ?? "All first-canary inputs accounted"}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              {firstCanaryRequiredInput?.safe_value_type ?? "Wallet proof, Jupiter rail, live flags, unsigned preflight, signed relay, and proof chain are present in the canary receipt."}
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-1.5">
+            <FirstCanaryRequiredInputBadge status={firstCanaryRequiredInput?.status ?? "done"} />
+            <Badge variant="outline" className="border-outline-variant/35 bg-void/25 text-outline">
+              {firstCanaryRequiredReadyCount}/{liveTradeCanaryReceipt.required_inputs.length} done
+            </Badge>
+          </div>
+        </div>
+        {firstCanaryRequiredInput ? (
+          <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe surface</p>
+              <a
+                href={firstCanaryRequiredInput.safe_surface}
+                className="mt-1 inline-flex min-h-9 max-w-full items-center rounded-md border border-caution/30 bg-caution/10 px-2 text-xs font-semibold text-caution transition hover:bg-caution/15"
+              >
+                Open required control
+              </a>
+              <p className="mt-2 text-[11px] leading-4 text-outline">
+                Owner: {firstCanaryRequiredInput.owner.replaceAll("-", " ")}. Targets: {firstCanaryRequiredInput.target_names.join(", ")}.
+              </p>
+            </div>
+            <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Completion signal</p>
+              <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{firstCanaryRequiredInput.completion_signal}</p>
+              {firstCanaryRequiredInput.verifier_command ? (
+                <code className="mt-2 block break-all rounded-md border border-outline-variant/20 bg-black/20 px-2 py-1 text-[10px] leading-4 text-outline">
+                  {firstCanaryRequiredInput.verifier_command}
+                </code>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        <div className="mt-3 grid gap-1.5" aria-label="Settings ordered live canary required inputs">
+          {liveTradeCanaryReceipt.required_inputs.map((item) => (
+            <div key={item.id} className="grid gap-2 rounded-md border border-outline-variant/25 bg-void/20 p-2 sm:grid-cols-[13rem_minmax(0,1fr)]">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <FirstCanaryRequiredInputBadge status={item.status} />
+                <span className="min-w-0 text-[11px] font-semibold text-on-surface">{item.label}</span>
+              </div>
+              <p className="min-w-0 text-[11px] leading-4 text-on-surface-variant">{item.completion_signal}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+          <ConsoleMetric label="Inputs active" value={`${firstCanaryRequiredActiveCount}`} tone={firstCanaryRequiredActiveCount > 0 ? "caution" : "engine"} />
+          <ConsoleMetric label="Actual trade" value={liveTradeCanaryReceipt.actual_live_trade_tested ? "yes" : "no"} tone={liveTradeCanaryReceipt.actual_live_trade_tested ? "engine" : "critical"} />
+          <ConsoleMetric label="Can submit" value={liveTradeCanaryReceipt.can_submit_from_app_now ? "yes" : "no"} tone={liveTradeCanaryReceipt.can_submit_from_app_now ? "caution" : "neutral"} />
+          <ConsoleMetric label="Proof chain" value={liveTradeCanaryReceipt.post_signing_evidence_status.replaceAll("-", " ")} tone={liveTradeCanaryReceipt.post_signing_evidence_status === "settlement-accounted" ? "engine" : "caution"} />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void refreshLiveUsabilityBlockers()}
+            disabled={disabled}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-caution/40 bg-caution/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-caution transition hover:bg-caution/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <RefreshCw className={cn("size-3.5 shrink-0", busy === "canary-drill" && "animate-spin")} aria-hidden="true" />
+            Refresh canary inputs
+          </button>
+          <a
+            href={`/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=${scenario}&cycles=0`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline-variant/35 bg-void/20 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+          >
+            Open canary receipt
+          </a>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-outline">
+          This resolver is proof/setup only. Each required-input row still blocks live execution, transaction submission, wallet mutation, and secret echo until the funded canary proof chain is real.
         </p>
       </div>
 
@@ -2407,6 +2518,22 @@ function ConsoleActionBadge({ status }: { status: ConsoleActionChecklistItem["st
       )}
     >
       {status}
+    </Badge>
+  );
+}
+
+function FirstCanaryRequiredInputBadge({ status }: { status: Web3LiveTradeCanaryReceipt["required_inputs"][number]["status"] }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "shrink-0 border-outline-variant/35 bg-surface-dim/35 text-outline",
+        status === "done" && "border-engine/35 bg-engine/10 text-engine",
+        (status === "needed-now" || status === "external-signature" || status === "proof-watch") && "border-caution/35 bg-caution/10 text-caution",
+        status === "blocked" && "border-critical/35 bg-critical/10 text-critical",
+      )}
+    >
+      {status.replaceAll("-", " ")}
     </Badge>
   );
 }

@@ -663,6 +663,7 @@ function Web3CredentialsRunwayCard({
               jupiterConfigured={receipt.environment_summary.jupiter_configured}
               initialLiveUsability={liveUsabilityBlockers}
               initialFirstCanaryDrill={firstCanaryDrill}
+              initialLiveTradeCanary={liveTradeCanary}
               scenario={state.scenario}
               source={state.market_source.mode}
               account={state.paper_account.mode}
