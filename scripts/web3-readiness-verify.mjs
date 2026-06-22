@@ -1797,6 +1797,13 @@ async function verifyFirstCanaryDrill() {
   assert(String(json.strict_ready_command ?? "").includes("drill-canary:web3"), "First canary drill should expose its strict command.", json);
   assert(String(json.strict_proof_command ?? "").includes("prove-canary:web3"), "First canary drill should expose the canary proof command.", json);
   assert(Array.isArray(json.safe_commands) && json.safe_commands.some((command) => command.includes("drill-canary:web3")), "First canary drill should expose safe command-line verification.", json.safe_commands);
+  if (json.operator_wallet_public_key) {
+    const joinedCommands = json.safe_commands.join(" ");
+    assert(String(json.operator_wallet_strict_command ?? "").includes(`--wallet=${json.operator_wallet_public_key}`), "First canary drill should expose a wallet-bound strict verifier when the public wallet is scoped.", json);
+    assert(joinedCommands.includes(`--wallet=${json.operator_wallet_public_key}`), "First canary drill safe commands should include the scoped public wallet verifier.", json.safe_commands);
+    assert(!joinedCommands.includes("<public-solana-address>"), "First canary drill safe commands should not keep the placeholder when a scoped public wallet is known.", json.safe_commands);
+    assert(!String(json.next_unblock_step?.command ?? "").includes("<public-solana-address>"), "First canary drill next unblock command should not keep the placeholder when a scoped public wallet is known.", json.next_unblock_step);
+  }
   assert(Array.isArray(json.safe_surfaces) && json.safe_surfaces.some((surface) => surface.includes("/trading?source=live-dex")), "First canary drill should expose safe operator surfaces.", json.safe_surfaces);
   assert(!String(json.blockers?.join(" ") ?? "").includes("FARTCOIN"), "First canary drill should not mix paper market backfill into first funded canary blockers.", json.blockers);
   assert(!String(json.blockers?.join(" ") ?? "").includes("paper sizing"), "First canary drill should keep paper sizing repair outside first funded canary blockers.", json.blockers);
@@ -1848,6 +1855,13 @@ async function verifyFirstCanaryHandoff() {
   assert(Array.isArray(json.proof_completion_criteria) && json.proof_completion_criteria.length === 4, "First canary handoff should expose proof completion criteria.", json.proof_completion_criteria);
   assert(Array.isArray(json.source_endpoints) && json.source_endpoints.some((endpoint) => endpoint.includes("/api/web3-first-canary-drill")) && json.source_endpoints.some((endpoint) => endpoint.includes("/api/web3-credential-requirements")), "First canary handoff should link its source packets.", json.source_endpoints);
   assert(Array.isArray(json.safe_commands) && json.safe_commands.some((command) => command.includes("drill-canary:web3")) && json.safe_commands.some((command) => command.includes("prove-canary:web3")), "First canary handoff should expose canary commands.", json.safe_commands);
+  if (json.operator_wallet_public_key) {
+    const joinedCommands = json.safe_commands.join(" ");
+    assert(String(json.operator_wallet_strict_command ?? "").includes(`--wallet=${json.operator_wallet_public_key}`), "First canary handoff should expose a wallet-bound strict verifier when the public wallet is scoped.", json);
+    assert(joinedCommands.includes(`--wallet=${json.operator_wallet_public_key}`), "First canary handoff safe commands should include the scoped public wallet verifier.", json.safe_commands);
+    assert(!joinedCommands.includes("<public-solana-address>"), "First canary handoff safe commands should not keep the placeholder when a scoped public wallet is known.", json.safe_commands);
+    assert(!String(json.next_operator_step?.command ?? "").includes("<public-solana-address>"), "First canary handoff next step command should not keep the placeholder when a scoped public wallet is known.", json.next_operator_step);
+  }
   assert(typeof json.text_packet === "string" && json.text_packet.includes("# Mastermind First Funded Canary Handoff"), "First canary handoff should include paste-ready markdown.", json.text_packet);
   assert(json.text_packet.includes("Actual live trade tested: false"), "First canary handoff markdown should state that live proof is not complete.", json.text_packet);
   assert(json.text_packet.includes("## Next Operator Step"), "First canary handoff markdown should include the next operator step.", json.text_packet);

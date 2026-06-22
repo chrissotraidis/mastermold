@@ -2898,6 +2898,8 @@ describe("Web3 autonomous trading subsystem", () => {
       mode: string;
       status: string;
       receipt_hash: string;
+      operator_wallet_public_key: string | null;
+      operator_wallet_strict_command: string | null;
       supervised_canary_status: string;
       can_request_unsigned_order_now: boolean;
       unsigned_preflight_status: string;
@@ -2959,6 +2961,12 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.mode).toBe("web3-first-canary-drill");
     expect(receipt.status).toBe("blocked");
     expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    if (receipt.operator_wallet_public_key) {
+      expect(receipt.operator_wallet_strict_command).toBe(`npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${receipt.operator_wallet_public_key} --require-operator-wallet`);
+      expect(receipt.safe_commands.join(" ")).toContain(`--wallet=${receipt.operator_wallet_public_key}`);
+      expect(receipt.next_unblock_step?.command ?? receipt.safe_commands.join(" ")).not.toContain("<public-solana-address>");
+      expect(receipt.safe_commands.join(" ")).not.toContain("<public-solana-address>");
+    }
     expect(receipt.supervised_canary_status).toBe("blocked");
     expect(receipt.can_request_unsigned_order_now).toBe(false);
     expect(receipt.unsigned_preflight_status).toBe("blocked");

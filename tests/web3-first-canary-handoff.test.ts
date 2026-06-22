@@ -5,7 +5,7 @@ import { buildWeb3FirstCanaryHandoffReceipt } from "@/src/db/web3-first-canary-h
 const baseStep = {
   phase: "credential-intake",
   safe_surface: "/trading?source=live-dex&account=persistent",
-  command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+  command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=Q7QnmNVtS8AFaW2x9j7pYq3Na1bC4dE5fG6hHJKSJ4u --require-operator-wallet",
   completion_signal: "A browser wallet signs the text-only ownership challenge and the app stores hash-only proof.",
   blocks_funded_canary: true,
 } as const;
@@ -20,6 +20,8 @@ const drill = {
   scenario: "breakout",
   wallet_public_key_present: true,
   wallet_public_key_preview: "Q7QnmN...SJ4u",
+  operator_wallet_public_key: "Q7QnmNVtS8AFaW2x9j7pYq3Na1bC4dE5fG6hHJKSJ4u",
+  operator_wallet_strict_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=Q7QnmNVtS8AFaW2x9j7pYq3Na1bC4dE5fG6hHJKSJ4u --require-operator-wallet",
   amount_lamports: 100_000,
   current_input_label: "Wallet ownership proof",
   next_blocker_label: "Wallet ownership proof",
@@ -78,7 +80,10 @@ const drill = {
     },
   ],
   blockers: ["Run Prove ownership; this signs text only and cannot move funds."],
-  safe_commands: ["npm run verify:web3 -- --base-url=http://localhost:4010"],
+  safe_commands: [
+    "npm run verify:web3 -- --base-url=http://localhost:4010",
+    "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=Q7QnmNVtS8AFaW2x9j7pYq3Na1bC4dE5fG6hHJKSJ4u --require-operator-wallet",
+  ],
   safe_surfaces: ["/trading?source=live-dex&account=persistent"],
   source_endpoint: "/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0",
   live_review_source_endpoint: "/api/web3-first-canary-drill?source=live-dex&account=persistent&scenario=breakout&cycles=0",
@@ -155,6 +160,8 @@ describe("Web3 first canary handoff", () => {
     expect(receipt.status).toBe("operator-input-needed");
     expect(receipt.first_canary_drill_hash).toBe(drill.receipt_hash);
     expect(receipt.credential_requirements_hash).toBe(requirements.receipt_hash);
+    expect(receipt.operator_wallet_public_key).toBe(drill.operator_wallet_public_key);
+    expect(receipt.operator_wallet_strict_command).toBe(drill.operator_wallet_strict_command);
     expect(receipt.actual_live_trade_tested).toBe(false);
     expect(receipt.real_funds_moved_by_this_app).toBe(false);
     expect(receipt.next_operator_step?.id).toBe("wallet-ownership");
@@ -164,6 +171,9 @@ describe("Web3 first canary handoff", () => {
     expect(receipt.never_provide).toContain("private keys");
     expect(receipt.proof_completion_criteria).toHaveLength(4);
     expect(receipt.text_packet).toContain("# Mastermind First Funded Canary Handoff");
+    expect(receipt.text_packet).toContain(`Operator wallet verifier: ${drill.operator_wallet_strict_command}`);
+    expect(receipt.text_packet).not.toContain("<public-solana-address>");
+    expect(receipt.safe_commands.join(" ")).not.toContain("<public-solana-address>");
     expect(receipt.text_packet).toContain("Actual live trade tested: false");
     expect(receipt.text_packet).toContain("Real funds moved by this app: false");
     expect(receipt.live_execution_permission).toBe("blocked");
@@ -189,6 +199,11 @@ describe("Web3 first canary handoff", () => {
       expect(receipt.safe_to_provide_now.join(" ")).toContain("wallet ownership");
       expect(receipt.safe_to_provide_now.join(" ")).not.toContain("JUPITER_API_KEY");
       expect(receipt.safe_to_provide_now.join(" ")).not.toContain("Emergency-stop");
+      if (receipt.operator_wallet_public_key) {
+        expect(receipt.operator_wallet_strict_command).toContain(`--wallet=${receipt.operator_wallet_public_key}`);
+        expect(receipt.text_packet).not.toContain("<public-solana-address>");
+        expect(receipt.safe_commands.join(" ")).not.toContain("<public-solana-address>");
+      }
     }
     expect(receipt.safe_commands.join(" ")).toContain("drill-canary:web3");
     expect(receipt.safe_commands.join(" ")).toContain("prove-canary:web3");

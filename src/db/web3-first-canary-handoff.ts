@@ -17,6 +17,8 @@ export type Web3FirstCanaryHandoffReceipt = {
   source: Web3FirstCanaryDrillReceipt["source"];
   account: Web3FirstCanaryDrillReceipt["account"];
   scenario: Web3FirstCanaryDrillReceipt["scenario"];
+  operator_wallet_public_key: string | null;
+  operator_wallet_strict_command: string | null;
   actual_live_trade_tested: boolean;
   real_funds_moved_by_this_app: boolean;
   proof_pass_count: number;
@@ -77,6 +79,8 @@ export function buildWeb3FirstCanaryHandoffReceipt(input: {
     source: input.drill.source,
     account: input.drill.account,
     scenario: input.drill.scenario,
+    operator_wallet_public_key: input.drill.operator_wallet_public_key,
+    operator_wallet_strict_command: input.drill.operator_wallet_strict_command,
     actual_live_trade_tested: input.drill.actual_live_trade_tested,
     real_funds_moved_by_this_app: input.drill.real_funds_moved_by_this_app,
     proof_pass_count: input.drill.proof_pass_count,
@@ -255,6 +259,8 @@ function renderFirstCanaryHandoffText(
     `Generated: ${receipt.generated_at}`,
     `Status: ${receipt.status}`,
     `Source/account/scenario: ${receipt.source}/${receipt.account}/${receipt.scenario}`,
+    `Operator wallet: ${receipt.operator_wallet_public_key ?? "not scoped"}`,
+    receipt.operator_wallet_strict_command ? `Operator wallet verifier: ${receipt.operator_wallet_strict_command}` : null,
     `Actual live trade tested: ${receipt.actual_live_trade_tested ? "true" : "false"}`,
     `Real funds moved by this app: ${receipt.real_funds_moved_by_this_app ? "true" : "false"}`,
     `Proof: ${receipt.proof_pass_count}/${receipt.proof_required_count}`,

@@ -54,6 +54,8 @@ export type Web3FirstCanaryDrillReceipt = {
   scenario: Web3TradingState["scenario"];
   wallet_public_key_present: boolean;
   wallet_public_key_preview: string | null;
+  operator_wallet_public_key: string | null;
+  operator_wallet_strict_command: string | null;
   amount_lamports: number;
   current_input_label: string | null;
   next_blocker_label: string | null;
@@ -120,6 +122,7 @@ export type Web3FirstCanaryDrillHealth = {
   next_lane_action: string | null;
   next_action: string;
   next_unblock_step: Web3FirstCanaryUnblockStep | null;
+  operator_wallet_strict_command: string | null;
   operator_unblock_step_count: number;
   live_execution_permission: "blocked";
   transaction_submission_permission: "blocked";
@@ -143,6 +146,8 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
 }): Web3FirstCanaryDrillReceipt {
   const generatedAt = (input.now ?? new Date()).toISOString();
   const walletPublicKey = input.state.execution_readiness.config.wallet_public_key;
+  const operatorWalletPublicKey = safeWalletCommandValue(walletPublicKey);
+  const operatorWalletStrictCommand = walletStrictVerifierCommand(operatorWalletPublicKey);
   const amountLamports = input.amountLamports ?? input.unsignedPreflight.amount_lamports;
   const proofPassCount = input.canary.post_signing_evidence.filter((item) => item.status === "pass").length;
   const permissionDrift = [
@@ -165,7 +170,7 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
   const failed = lanes.filter((lane) => lane.status === "fail");
   const watched = lanes.filter((lane) => lane.status === "watch");
   const nextLane = lanes.find((lane) => lane.status === "fail") ?? lanes.find((lane) => lane.status === "watch") ?? null;
-  const operatorUnblockPlan = buildFirstCanaryUnblockPlan(input, lanes);
+  const operatorUnblockPlan = buildFirstCanaryUnblockPlan(input, lanes, operatorWalletPublicKey);
   const nextUnblockStep = operatorUnblockPlan.find((step) => step.status === "next") ??
     operatorUnblockPlan.find((step) => step.status === "watch") ??
     null;
@@ -184,6 +189,8 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
     scenario: input.state.scenario,
     wallet_public_key_present: Boolean(walletPublicKey),
     wallet_public_key_preview: previewValue(walletPublicKey),
+    operator_wallet_public_key: operatorWalletPublicKey,
+    operator_wallet_strict_command: operatorWalletStrictCommand,
     amount_lamports: amountLamports,
     current_input_label: input.liveUsability.current_input?.label ?? null,
     next_blocker_label: input.liveUsability.next_blocker?.label ?? null,
@@ -218,8 +225,9 @@ export function buildWeb3FirstCanaryDrillReceipt(input: {
     safe_commands: uniqueText([
       "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready",
       "npm run verify:web3 -- --base-url=http://localhost:4010",
-      input.liveUsability.next_credential_request?.verifier_command,
-      input.readiness.strict_verifier_command,
+      operatorWalletStrictCommand,
+      walletScopedCommand(input.liveUsability.next_credential_request?.verifier_command, operatorWalletPublicKey),
+      walletScopedCommand(input.readiness.strict_verifier_command, operatorWalletPublicKey),
       "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json",
     ]),
     safe_surfaces: uniqueText([
@@ -281,6 +289,7 @@ export function buildWeb3FirstCanaryDrillHealth(receipt: Web3FirstCanaryDrillRec
     next_lane_action: receipt.next_lane_action,
     next_action: receipt.next_action,
     next_unblock_step: receipt.next_unblock_step,
+    operator_wallet_strict_command: receipt.operator_wallet_strict_command,
     operator_unblock_step_count: receipt.operator_unblock_plan.length,
     live_execution_permission: "blocked",
     transaction_submission_permission: "blocked",
@@ -302,10 +311,11 @@ function buildFirstCanaryUnblockPlan(
     canary: Web3LiveTradeCanaryReceipt;
   },
   lanes: Web3FirstCanaryDrillLane[],
+  operatorWalletPublicKey: string | null,
 ): Web3FirstCanaryUnblockStep[] {
   const steps = lanes
     .filter((lane) => lane.id !== "live-boundary")
-    .map((lane) => buildFirstCanaryUnblockStep(lane, input));
+    .map((lane) => buildFirstCanaryUnblockStep(lane, input, operatorWalletPublicKey));
   let nextAssigned = false;
 
   return steps.map((step) => {
@@ -327,6 +337,7 @@ function buildFirstCanaryUnblockStep(
     unsignedPreflight: Web3LiveUnsignedOrderPreflightReceipt;
     canary: Web3LiveTradeCanaryReceipt;
   },
+  operatorWalletPublicKey: string | null,
 ): Web3FirstCanaryUnblockStep {
   const safeSurface = firstCanarySafeSurface(lane, input);
   return {
@@ -336,7 +347,7 @@ function buildFirstCanaryUnblockStep(
     status: lane.status === "pass" ? "done" : lane.status === "watch" ? "watch" : "blocked",
     action: firstCanaryOperatorAction(lane, input),
     safe_surface: safeSurface,
-    command: firstCanaryUnblockCommand(lane, input),
+    command: firstCanaryUnblockCommand(lane, input, operatorWalletPublicKey),
     completion_signal: firstCanaryCompletionSignal(lane.id),
     blocks_funded_canary: lane.status !== "pass" && lane.id !== "post-signing-proof",
   };
@@ -449,13 +460,17 @@ function firstCanaryUnblockCommand(
     jupiter: Web3JupiterOrderPacket;
     unsignedPreflight: Web3LiveUnsignedOrderPreflightReceipt;
   },
+  operatorWalletPublicKey: string | null,
 ) {
   if (lane.id === "dedicated-wallet" || lane.id === "wallet-ownership") {
-    return input.liveUsability.next_credential_request?.verifier_command ??
+    return walletScopedCommand(input.liveUsability.next_credential_request?.verifier_command, operatorWalletPublicKey) ??
+      walletStrictVerifierCommand(operatorWalletPublicKey) ??
       "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
   }
   if (lane.id === "jupiter-order") return input.jupiter.strict_verifier_command;
-  if (lane.id === "live-flags" || lane.id === "unsigned-order-preflight") return input.readiness.strict_verifier_command;
+  if (lane.id === "live-flags" || lane.id === "unsigned-order-preflight") {
+    return walletScopedCommand(input.readiness.strict_verifier_command, operatorWalletPublicKey);
+  }
   if (lane.id === "signer-relay" || lane.id === "manual-live-review") return "npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json --require-ready";
   if (lane.id === "funded-canary-proof" || lane.id === "post-signing-proof") return "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json";
   return input.unsignedPreflight.status === "ready" ? input.readiness.strict_verifier_command : null;
@@ -504,6 +519,33 @@ function isFirstCanaryScopedLiveUsabilityBlocker(
 function previewValue(value: string | null | undefined) {
   if (!value) return null;
   return value.length <= 12 ? value : `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function safeWalletCommandValue(walletPublicKey: string | null | undefined) {
+  if (typeof walletPublicKey !== "string") return null;
+  const trimmed = walletPublicKey.trim();
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function walletStrictVerifierCommand(walletPublicKey: string | null | undefined) {
+  const wallet = safeWalletCommandValue(walletPublicKey);
+  return wallet
+    ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${wallet} --require-operator-wallet`
+    : null;
+}
+
+function walletScopedCommand(command: string | null | undefined, walletPublicKey: string | null | undefined) {
+  if (!command) return null;
+  const wallet = safeWalletCommandValue(walletPublicKey);
+  if (!wallet) return command;
+  if (command.includes("--wallet=<public-solana-address>")) {
+    return command.replaceAll("--wallet=<public-solana-address>", `--wallet=${wallet}`);
+  }
+  if (command.includes("--require-operator-wallet") && !command.includes("--wallet=")) {
+    return command.replace("--require-operator-wallet", `--wallet=${wallet} --require-operator-wallet`);
+  }
+  return command;
 }
 
 function uniqueText(values: Array<string | null | undefined>) {
