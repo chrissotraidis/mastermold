@@ -24,6 +24,10 @@ import { getWeb3CredentialDoctorHealth, type Web3CredentialDoctorHealth } from "
 import { buildWeb3CredentialRequirementsReceipt, type Web3CredentialRequirementsReceipt } from "@/src/db/web3-credential-requirements";
 import { buildWeb3CutoverBlockerBoard, type Web3CutoverBlockerBoard } from "@/src/db/web3-cutover-blocker-board";
 import { getWeb3DaemonSupervisorHealth } from "@/src/db/web3-daemon-supervisor";
+import {
+  buildWeb3DedicatedWalletIntakeContract,
+  type Web3DedicatedWalletIntakeContract,
+} from "@/src/db/web3-dedicated-wallet-intake-contract";
 import { buildWeb3DedicatedWalletPacket, type Web3DedicatedWalletPacket } from "@/src/db/web3-dedicated-wallet-packet";
 import { buildWeb3EmergencyStopDrillReceipt } from "@/src/db/web3-emergency-stop";
 import { buildWeb3FirstCanaryDrillReceipt, type Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
@@ -82,6 +86,10 @@ export default async function IntegrationsSettingsPage() {
   const web3AccountReceipt = buildWeb3AccountSetupReceipt(web3State);
   const web3AcquisitionReceipt = buildWeb3AccountAcquisitionReceipt(web3State);
   const web3DedicatedWalletPacket = buildWeb3DedicatedWalletPacket(web3State);
+  const web3DedicatedWalletIntakeContract = buildWeb3DedicatedWalletIntakeContract({
+    state: web3State,
+    wallet: web3DedicatedWalletPacket,
+  });
   const web3JupiterOrderPacket = buildWeb3JupiterOrderPacket(web3State);
   const web3JupiterRehearsalHistory = getWeb3JupiterRehearsalHistory();
   const web3SignerPacket = buildWeb3SignerCredentialPacket(web3State);
@@ -256,6 +264,7 @@ export default async function IntegrationsSettingsPage() {
             receipt={web3AccountReceipt}
             acquisition={web3AcquisitionReceipt}
             dedicatedWalletPacket={web3DedicatedWalletPacket}
+            dedicatedWalletIntakeContract={web3DedicatedWalletIntakeContract}
             jupiterOrderPacket={web3JupiterOrderPacket}
             jupiterRehearsalHistory={web3JupiterRehearsalHistory}
             signerPacket={web3SignerPacket}
@@ -315,6 +324,7 @@ function Web3CredentialsRunwayCard({
   receipt,
   acquisition,
   dedicatedWalletPacket,
+  dedicatedWalletIntakeContract,
   jupiterOrderPacket,
   jupiterRehearsalHistory,
   signerPacket,
@@ -338,6 +348,7 @@ function Web3CredentialsRunwayCard({
   receipt: Web3AccountSetupReceipt;
   acquisition: Web3AccountAcquisitionReceipt;
   dedicatedWalletPacket: Web3DedicatedWalletPacket;
+  dedicatedWalletIntakeContract: Web3DedicatedWalletIntakeContract;
   jupiterOrderPacket: Web3JupiterOrderPacket;
   jupiterRehearsalHistory: Web3JupiterRehearsalHistory;
   signerPacket: Web3SignerCredentialPacket;
@@ -524,6 +535,8 @@ function Web3CredentialsRunwayCard({
           ) : null}
 
           <SettingsDedicatedWalletPacketPanel packet={dedicatedWalletPacket} />
+
+          <SettingsDedicatedWalletIntakeContractPanel contract={dedicatedWalletIntakeContract} />
 
           <SettingsJupiterOrderPacketPanel packet={jupiterOrderPacket} rehearsalHistory={jupiterRehearsalHistory} />
 
@@ -3378,6 +3391,127 @@ function SettingsDedicatedWalletPacketPanel({ packet }: { packet: Web3DedicatedW
       </div>
       <p className="mt-2 text-xs leading-5 text-outline">
         Dedicated wallet packet receipts are setup evidence only; signing, submission, live execution, and wallet mutation stay blocked.
+      </p>
+    </div>
+  );
+}
+
+function SettingsDedicatedWalletIntakeContractPanel({ contract }: { contract: Web3DedicatedWalletIntakeContract }) {
+  const acceptedPreview = contract.accepted_fields.slice(0, 4);
+  const rejectedPreview = contract.rejected_fields.slice(0, 8);
+  const nextSteps = contract.after_save_steps.slice(0, 4);
+  const primaryTone = contract.status === "strict-verifier-ready"
+    ? "pass"
+    : contract.status === "sample-wallet-rejected"
+      ? "fail"
+      : "watch";
+
+  return (
+    <div className="rounded-md border border-engine/25 bg-surface-dim/35 p-3" aria-label="Settings Web3 wallet intake contract">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Wallet intake contract</p>
+          <p className="mt-1 text-sm font-semibold text-on-surface">
+            {contract.status.replaceAll("-", " ")} · {contract.wallet_public_key_preview ?? "public address needed"}
+          </p>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">{contract.summary}</p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          <LaunchQueueBadge status={primaryTone} label={contract.can_enter_in_app ? "safe in app" : "external"} />
+          <LaunchQueueBadge status="fail" label="live blocked" />
+          <LaunchQueueBadge status="fail" label="secrets rejected" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <SettingsMetric label="Save endpoint" value={contract.existing_save_endpoint} />
+        <SettingsMetric label="Method" value={contract.existing_save_method} />
+        <SettingsMetric label="Mode" value={contract.existing_save_body_template.execution.mode} />
+        <SettingsMetric label="Signer" value={contract.existing_save_body_template.execution.signer_session_label.replaceAll("-", " ")} />
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.72fr)]">
+        <div className="rounded-md border border-engine/25 bg-engine/[0.035] p-2" aria-label="Settings Web3 wallet accepted fields">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Accepted fields</p>
+              <p className="mt-1 text-xs font-semibold text-on-surface">Public scope and dry-run caps only</p>
+            </div>
+            <Link
+              href="/settings/integrations#web3-credential-action-console"
+              className="inline-flex min-h-8 items-center rounded-md px-2 text-[11px] font-semibold text-engine hover:text-engine/80"
+            >
+              Open input
+            </Link>
+          </div>
+          <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            {acceptedPreview.map((field) => (
+              <div key={field.path} className="min-w-0 rounded-md border border-outline-variant/20 bg-void/20 p-2">
+                <p className="break-words font-mono text-[10px] leading-4 text-on-surface">{field.path}</p>
+                <p className="mt-1 text-[10px] leading-4 text-outline">{field.validation}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-critical/25 bg-critical/[0.025] p-2" aria-label="Settings Web3 wallet rejected fields">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Rejected fields</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {rejectedPreview.map((field) => (
+              <span key={field} className="max-w-full break-all rounded-md border border-critical/25 bg-critical/10 px-2 py-1 font-mono text-[10px] leading-4 text-critical">
+                {field}
+              </span>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">
+            Private keys, seed phrases, keypairs, transaction bodies, signed payloads, and API keys are not part of wallet scope.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,0.68fr)_minmax(0,1fr)]">
+        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-2" aria-label="Settings Web3 wallet save body template">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Dry-run save body</p>
+          <code className="mt-2 block overflow-x-auto whitespace-pre rounded-md border border-outline-variant/20 bg-black/20 px-2 py-2 text-[10px] leading-5 text-on-surface-variant">
+            {JSON.stringify(contract.existing_save_body_template.execution, null, 2)}
+          </code>
+        </div>
+        <div className="rounded-md border border-caution/25 bg-caution/[0.035] p-2" aria-label="Settings Web3 wallet after-save steps">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-caution">After save</p>
+          <div className="mt-2 grid gap-1.5">
+            {nextSteps.map((step, index) => (
+              <div key={step.id} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-2 rounded-md border border-outline-variant/20 bg-black/10 p-2">
+                <span className="flex size-5 items-center justify-center rounded-md border border-outline-variant/25 bg-surface text-[10px] font-semibold text-outline">
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-on-surface">{step.label}</p>
+                  <p className="mt-0.5 text-[10px] leading-4 text-outline">{step.next_action}</p>
+                  <code className="mt-1 block break-all text-[10px] leading-4 text-outline">{step.command_or_href}</code>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link
+          href="/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0"
+          className="inline-flex min-h-10 items-center rounded-md border border-engine/30 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+        >
+          Open contract JSON
+        </Link>
+        <Link
+          href="/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console"
+          className="inline-flex min-h-10 items-center rounded-md border border-outline-variant/25 bg-surface-dim/45 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+        >
+          Open Trading gate
+        </Link>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-outline">
+        Contract receipt {contract.receipt_hash.slice(0, 12)} is setup guidance only. Live execution, signing, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.
       </p>
     </div>
   );

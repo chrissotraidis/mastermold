@@ -152,6 +152,28 @@ async function verifyTradingPage() {
   record("trading-page", "pass", "live DEX trading cockpit renders with live-test ledger, live block, wallet gate, canary console, and net-worth surface");
 }
 
+async function verifySettingsCredentialsPage() {
+  const requiredMarkers = [
+    /Web3 trading credentials/,
+    /Wallet intake contract/,
+    /Accepted fields/,
+    /Rejected fields/,
+    /Open contract JSON/,
+    /\/api\/web3-dedicated-wallet-intake-contract/,
+    /live blocked/,
+    /secrets rejected/,
+  ];
+  const { response, text } = await requestTextUntil("/settings/integrations", requiredMarkers, { timeoutMs: 75_000, maxBytes: 900_000 });
+  assert(response.status === 200, "Settings integrations page should return 200.", { status: response.status });
+  assert(text.includes("Web3 trading credentials"), "Settings should render the Web3 credential runway.", text);
+  assert(text.includes("Wallet intake contract"), "Settings should expose the wallet intake contract.", text);
+  assert(text.includes("Accepted fields") && text.includes("Rejected fields"), "Settings should show safe and rejected wallet intake fields.", text);
+  assert(text.includes("Open contract JSON"), "Settings should link the wallet intake contract JSON.", text);
+  assert(text.includes("/api/web3-dedicated-wallet-intake-contract"), "Settings should include the wallet intake contract endpoint.", text);
+  assert(text.includes("live blocked") && text.includes("secrets rejected"), "Settings should keep the wallet intake safety boundary visible.", text);
+  record("settings-credentials-page", "pass", "Settings renders the wallet intake contract with accepted/rejected fields and live authority blocked");
+}
+
 async function verifyCanaryReceipt() {
   const { response, json } = await requestJson(`/api/web3-live-trade-canary?${LIVE_QUERY}`);
   assert(response.status === 200, "Live canary receipt should return 200.", { status: response.status, json });
@@ -223,6 +245,7 @@ async function verifyCurrentBlocker() {
 async function main() {
   await verifyHealth();
   await verifyTradingPage();
+  await verifySettingsCredentialsPage();
   await verifyCanaryReceipt();
   await verifyLiveTestLedger();
   await verifyLiveUsabilitySummary();

@@ -1382,11 +1382,26 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("signing remains external-wallet-prompt-only");
     expect(settingsPage).toContain("npm run verify:web3 -- --base-url=http://localhost:4010");
     expect(settingsPage).toContain("buildWeb3DedicatedWalletPacket");
+    expect(settingsPage).toContain("buildWeb3DedicatedWalletIntakeContract");
     expect(settingsPage).toContain("SettingsDedicatedWalletPacketPanel");
     expect(settingsPage).toContain("Dedicated wallet packet");
     expect(settingsPage).toContain("Sample wallet rejected");
     expect(settingsPage).toContain("Public address only");
     expect(settingsPage).toContain("Open wallet gate");
+    expect(settingsPage).toContain("SettingsDedicatedWalletIntakeContractPanel");
+    expect(settingsPage).toContain("Settings Web3 wallet intake contract");
+    expect(settingsPage).toContain("Wallet intake contract");
+    expect(settingsPage).toContain("Accepted fields");
+    expect(settingsPage).toContain("Rejected fields");
+    expect(settingsPage).toContain("Open contract JSON");
+    expect(settingsPage).toContain("/api/web3-dedicated-wallet-intake-contract?scenario=breakout&account=persistent&cycles=0");
+    expect(settingsPage).toContain("Private keys, seed phrases, keypairs, transaction bodies, signed payloads, and API keys are not part of wallet scope.");
+    expect(settingsPage.indexOf("<SettingsDedicatedWalletPacketPanel")).toBeLessThan(
+      settingsPage.indexOf("<SettingsDedicatedWalletIntakeContractPanel"),
+    );
+    expect(settingsPage.indexOf("<SettingsDedicatedWalletIntakeContractPanel")).toBeLessThan(
+      settingsPage.indexOf("<SettingsJupiterOrderPacketPanel"),
+    );
     expect(settingsConsole).toContain("--require-operator-wallet");
     expect(source("src/db/web3-dedicated-wallet-packet.ts")).toContain("--require-operator-wallet");
     expect(settingsPage).toContain("SettingsCredentialDoctorPanel");
