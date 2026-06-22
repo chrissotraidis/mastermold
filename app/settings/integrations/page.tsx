@@ -3437,6 +3437,9 @@ function SettingsDedicatedWalletIntakeContractPanel({ contract }: { contract: We
             <p className="mt-1 text-xs leading-5 text-on-surface-variant">
               POST the public wallet scope here first to check wallet shape, sample-wallet rejection, dry-run caps, and secret-field rejection without saving state.
             </p>
+            <p className="mt-1 text-[11px] leading-4 text-outline">
+              A valid receipt returns the next proof runway: save public scope, text-only ownership proof, strict verifier, Jupiter order, live flags, unsigned preflight, signed relay, and funded proof watch.
+            </p>
           </div>
           <code className="max-w-full break-all rounded-md border border-engine/20 bg-void/25 px-2 py-1 text-[10px] leading-4 text-engine">
             POST /api/web3-dedicated-wallet-intake-contract

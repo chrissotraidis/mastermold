@@ -93,6 +93,7 @@ export type Web3DedicatedWalletIntakeValidationReceipt = {
     valid: boolean;
     blockers: string[];
   };
+  next_proof_runway: Web3DedicatedWalletIntakeProofStep[];
   existing_save_endpoint: "/api/web3-trading";
   existing_save_method: "POST";
   save_body_template: Web3DedicatedWalletIntakeContract["existing_save_body_template"];
@@ -107,6 +108,30 @@ export type Web3DedicatedWalletIntakeValidationReceipt = {
   seed_phrase_storage: "blocked";
   secret_echo_permission: "blocked";
   controls: string[];
+};
+
+export type Web3DedicatedWalletIntakeProofStep = {
+  id:
+    | "validate-public-wallet"
+    | "save-public-scope"
+    | "request-ownership-challenge"
+    | "prove-wallet-ownership"
+    | "run-strict-wallet-verifier"
+    | "prepare-jupiter-order"
+    | "arm-live-canary-flags"
+    | "run-unsigned-order-preflight"
+    | "relay-signed-canary"
+    | "watch-funded-proof";
+  label: string;
+  status: "done" | "next" | "after-input" | "blocked";
+  surface: "settings" | "trading" | "browser-wallet" | "local-command" | "read-only-api";
+  command_or_href: string | null;
+  next_action: string;
+  completion_signal: string;
+  live_execution_permission: "blocked";
+  wallet_mutation_permission: "blocked";
+  transaction_submission_permission: "blocked";
+  secret_echo_permission: "blocked";
 };
 
 export function buildWeb3DedicatedWalletIntakeContract(input: {
@@ -278,6 +303,7 @@ export function validateWeb3DedicatedWalletIntake(input: {
           : "valid-public-wallet";
   const canSavePublicScope = status === "valid-public-wallet";
   const saveBodyTemplate = buildSaveBodyTemplate(input.state, riskCaps);
+  const nextProofRunway = buildValidationProofRunway({ state: input.state, walletValue, status, riskCaps });
   const receiptBase = {
     mode: "web3-dedicated-wallet-intake-validation" as const,
     status,
@@ -304,6 +330,7 @@ export function validateWeb3DedicatedWalletIntake(input: {
     ],
     unsafe_field_paths: unsafeFieldPaths,
     risk_caps: riskCaps,
+    next_proof_runway: nextProofRunway,
     existing_save_endpoint: "/api/web3-trading" as const,
     existing_save_method: "POST" as const,
     save_body_template: saveBodyTemplate,
@@ -343,6 +370,128 @@ function intakeSummary(status: Web3DedicatedWalletIntakeContract["status"]) {
   if (status === "ownership-proof-needed") return "Dedicated public wallet scope exists, but the text-only wallet ownership proof is still required.";
   if (status === "sample-wallet-rejected") return "The sample all-ones wallet is rejected for funded canary readiness; replace it with a dedicated public wallet.";
   return "A dedicated public Solana wallet address is the next safe operator input.";
+}
+
+function buildValidationProofRunway(input: {
+  state: Web3TradingState;
+  walletValue: string | null;
+  status: Web3DedicatedWalletIntakeValidationStatus;
+  riskCaps: Web3DedicatedWalletIntakeValidationReceipt["risk_caps"];
+}): Web3DedicatedWalletIntakeProofStep[] {
+  const walletReady = input.status === "valid-public-wallet";
+  const walletPlaceholder = walletReady && input.walletValue ? "<validated-public-solana-address>" : "<public-solana-address>";
+  const tradingSurface = `/trading?source=live-dex&account=persistent&scenario=${input.state.scenario}#web3-live-canary-console`;
+  const ownershipChallengeHref = `/api/web3-wallet-ownership?wallet_public_key=${walletPlaceholder}`;
+  const unsignedPreflightHref = `/api/web3-live-unsigned-order-handoff?source=live-dex&account=persistent&scenario=${input.state.scenario}&cycles=0&operator_ack=true&canary_ack=I_UNDERSTAND_THIS_UNSIGNED_ORDER_CAN_MOVE_REAL_FUNDS_IF_SIGNED&wallet_public_key=${walletPlaceholder}&amount_lamports=100000&max_slippage_bps=${input.riskCaps.max_slippage_bps ?? 150}`;
+  const canaryReceiptHref = `/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=${input.state.scenario}&cycles=0`;
+  const base = {
+    live_execution_permission: "blocked" as const,
+    wallet_mutation_permission: "blocked" as const,
+    transaction_submission_permission: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
+  };
+  return [
+    {
+      id: "validate-public-wallet" as const,
+      label: "Validate public wallet",
+      status: walletReady ? "done" as const : "next" as const,
+      surface: "settings" as const,
+      command_or_href: "POST /api/web3-dedicated-wallet-intake-contract",
+      next_action: walletReady ? "Use the validated public wallet preview for the dry-run save body." : validationNextAction(input.status),
+      completion_signal: "Receipt status is valid-public-wallet and can_save_public_scope is true.",
+      ...base,
+    },
+    {
+      id: "save-public-scope" as const,
+      label: "Save public scope",
+      status: walletReady ? "next" as const : "blocked" as const,
+      surface: "trading" as const,
+      command_or_href: tradingSurface,
+      next_action: "Save only the public wallet and dry-run caps through the existing /api/web3-trading scope path.",
+      completion_signal: "The scoped wallet is a non-sample public Solana address in live-dex persistent scope.",
+      ...base,
+    },
+    {
+      id: "request-ownership-challenge" as const,
+      label: "Request ownership challenge",
+      status: walletReady ? "after-input" as const : "blocked" as const,
+      surface: "read-only-api" as const,
+      command_or_href: ownershipChallengeHref,
+      next_action: "Request the text-only ownership challenge after saving the matching public wallet scope.",
+      completion_signal: "The challenge receipt returns message_return=returned-for-signing and no transaction permission.",
+      ...base,
+    },
+    {
+      id: "prove-wallet-ownership" as const,
+      label: "Prove wallet ownership",
+      status: walletReady ? "after-input" as const : "blocked" as const,
+      surface: "browser-wallet" as const,
+      command_or_href: tradingSurface,
+      next_action: "Use the browser wallet to sign the text-only challenge; never sign a transaction for this proof.",
+      completion_signal: "A hash-only wallet ownership receipt is stored for the same public wallet.",
+      ...base,
+    },
+    {
+      id: "run-strict-wallet-verifier" as const,
+      label: "Run strict wallet verifier",
+      status: walletReady ? "after-input" as const : "blocked" as const,
+      surface: "local-command" as const,
+      command_or_href: `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${walletPlaceholder} --require-operator-wallet`,
+      next_action: "Run the strict wallet verifier after scope and ownership proof are both present.",
+      completion_signal: "The verifier accepts the dedicated wallet and keeps live execution blocked.",
+      ...base,
+    },
+    {
+      id: "prepare-jupiter-order" as const,
+      label: "Prepare Jupiter order",
+      status: "after-input" as const,
+      surface: "settings" as const,
+      command_or_href: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+      next_action: "Configure or rehearse the Jupiter order rail without returning transaction bytes.",
+      completion_signal: "Jupiter quote and Swap V2 order readiness pass while unsigned bytes remain withheld.",
+      ...base,
+    },
+    {
+      id: "arm-live-canary-flags" as const,
+      label: "Arm live canary flags",
+      status: "after-input" as const,
+      surface: "settings" as const,
+      command_or_href: "/settings/integrations#settings-web3-first-canary-live-flags",
+      next_action: "Set only the exact reviewed first-canary flags in ignored local env.",
+      completion_signal: "The running server reports the exact first-canary flags active.",
+      ...base,
+    },
+    {
+      id: "run-unsigned-order-preflight" as const,
+      label: "Run unsigned order preflight",
+      status: "after-input" as const,
+      surface: "read-only-api" as const,
+      command_or_href: unsignedPreflightHref,
+      next_action: "Check the exact wallet, tiny amount, caps, live flags, and Jupiter readiness before any wallet prompt.",
+      completion_signal: "Unsigned order preflight returns ready for the one-shot browser-wallet handoff.",
+      ...base,
+    },
+    {
+      id: "relay-signed-canary" as const,
+      label: "Relay signed canary",
+      status: "after-input" as const,
+      surface: "trading" as const,
+      command_or_href: canaryReceiptHref,
+      next_action: "Relay only the matching externally signed tiny canary payload through the guarded canary endpoint.",
+      completion_signal: "A signed relay receipt exists with request-id continuity and no stored signed payload.",
+      ...base,
+    },
+    {
+      id: "watch-funded-proof" as const,
+      label: "Watch funded proof",
+      status: "after-input" as const,
+      surface: "local-command" as const,
+      command_or_href: "npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json",
+      next_action: "After signed relay, watch confirmation, settlement reconciliation, and portfolio mirror proof.",
+      completion_signal: "Signed relay, chain confirmation, settlement reconciliation, and local portfolio mirror all pass.",
+      ...base,
+    },
+  ];
 }
 
 function buildSaveBodyTemplate(

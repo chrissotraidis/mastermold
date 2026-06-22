@@ -3889,6 +3889,15 @@ describe("Web3 autonomous trading subsystem", () => {
       can_save_public_scope: boolean;
       accepted_field_paths: string[];
       unsafe_field_paths: string[];
+      next_proof_runway: Array<{
+        id: string;
+        status: string;
+        surface: string;
+        command_or_href: string | null;
+        live_execution_permission: string;
+        wallet_mutation_permission: string;
+        transaction_submission_permission: string;
+      }>;
       risk_caps: { valid: boolean; max_trade_usd: number; daily_spend_cap_usd: number; max_slippage_bps: number };
       save_body_template: { execution: { wallet_public_key: string } };
       verifier_command: string;
@@ -3912,6 +3921,36 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(validWalletValidation.can_save_public_scope).toBe(true);
     expect(validWalletValidation.accepted_field_paths).toEqual(expect.arrayContaining(["execution.wallet_public_key", "execution.max_trade_usd", "execution.daily_spend_cap_usd", "execution.max_slippage_bps"]));
     expect(validWalletValidation.unsafe_field_paths).toEqual([]);
+    expect(validWalletValidation.next_proof_runway.map((step) => step.id)).toEqual([
+      "validate-public-wallet",
+      "save-public-scope",
+      "request-ownership-challenge",
+      "prove-wallet-ownership",
+      "run-strict-wallet-verifier",
+      "prepare-jupiter-order",
+      "arm-live-canary-flags",
+      "run-unsigned-order-preflight",
+      "relay-signed-canary",
+      "watch-funded-proof",
+    ]);
+    expect(validWalletValidation.next_proof_runway[0]).toMatchObject({
+      id: "validate-public-wallet",
+      status: "done",
+      command_or_href: "POST /api/web3-dedicated-wallet-intake-contract",
+    });
+    expect(validWalletValidation.next_proof_runway[1]).toMatchObject({
+      id: "save-public-scope",
+      status: "next",
+      surface: "trading",
+    });
+    expect(validWalletValidation.next_proof_runway.find((step) => step.id === "request-ownership-challenge")?.command_or_href).toContain("/api/web3-wallet-ownership?wallet_public_key=<validated-public-solana-address>");
+    expect(validWalletValidation.next_proof_runway.find((step) => step.id === "run-unsigned-order-preflight")?.command_or_href).toContain("/api/web3-live-unsigned-order-handoff?");
+    expect(validWalletValidation.next_proof_runway.find((step) => step.id === "watch-funded-proof")?.command_or_href).toContain("prove-canary:web3");
+    expect(validWalletValidation.next_proof_runway.every((step) =>
+      step.live_execution_permission === "blocked" &&
+      step.wallet_mutation_permission === "blocked" &&
+      step.transaction_submission_permission === "blocked"
+    )).toBe(true);
     expect(validWalletValidation.risk_caps).toMatchObject({ valid: true, max_trade_usd: 25, daily_spend_cap_usd: 100, max_slippage_bps: 150 });
     expect(validWalletValidation.save_body_template.execution.wallet_public_key).toBe("<public-solana-address>");
     expect(validWalletValidation.verifier_command).toContain("--wallet=<public-solana-address>");
