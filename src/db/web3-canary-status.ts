@@ -236,6 +236,28 @@ function buildSafeNextCommands(canary: Web3LiveTradeCanaryReceipt, endpointParam
         ...common,
       },
     );
+  } else if (nextInput?.id === "jupiter-order-rail") {
+    commands.push({
+      id: "print-jupiter-requirements",
+      label: "Print Jupiter requirements",
+      command: "npm run requirements:web3 -- --base-url=http://localhost:4010 --json",
+      purpose: "Prints the safe JUPITER_API_KEY target, storage rule, and current wallet/order gate without exposing secret values.",
+      safe_surface: nextInput.safe_surface,
+      completion_signal: "The requirements packet names JUPITER_API_KEY as the active order-rail target and keeps live authority blocked.",
+      uses_placeholder: false,
+      ...common,
+    });
+  } else if (nextInput?.id === "first-canary-live-flags") {
+    commands.push({
+      id: "print-live-flag-requirements",
+      label: "Print live-flag requirements",
+      command: "npm run requirements:web3 -- --base-url=http://localhost:4010 --json",
+      purpose: "Prints the exact first-canary live flag target names and accepted values for ignored local env.",
+      safe_surface: nextInput.safe_surface,
+      completion_signal: "The requirements packet names the three first-canary live flags while signing, submission, and wallet mutation remain blocked.",
+      uses_placeholder: false,
+      ...common,
+    });
   }
 
   if (nextInput?.verifier_command) {

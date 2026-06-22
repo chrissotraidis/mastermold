@@ -179,6 +179,90 @@ describe("web3 canary status command", () => {
     expect(JSON.stringify(packet)).not.toContain("private-key");
   });
 
+  test("GIVEN Jupiter order rail is next WHEN packet is built THEN safe commands print requirements before strict verification", () => {
+    const packet = buildCanaryStatusPacket({
+      canary: canaryReceipt({
+        blockers: ["Install JUPITER_API_KEY in ignored server env."],
+        next_required_input: {
+          id: "jupiter-order-rail",
+          label: "Jupiter order rail",
+          status: "needed-now",
+          owner: "operator",
+          safe_value_type: "Jupiter API key installed only in ignored local server env.",
+          safe_surface: "/settings/integrations#web3-credential-action-console",
+          target_names: ["JUPITER_API_KEY"],
+          verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order",
+          completion_signal: "Jupiter rehearsal and live unsigned-order preflight no longer report missing JUPITER_API_KEY.",
+          live_execution_permission: "blocked",
+          transaction_submission_permission: "blocked",
+          wallet_mutation_permission: "blocked",
+          secret_echo_permission: "blocked",
+        },
+      }),
+      ignition: ignitionReceipt({
+        next_gate_id: "route-order",
+        next_gate_label: "Route/order",
+        next_action: "Install Jupiter order rail evidence.",
+      }),
+      local: localReceipt(),
+      http: { canary: 200, ignition: 200, local: 200 },
+    });
+
+    expect(packet.safe_next_commands.map((command) => command.id)).toEqual([
+      "print-jupiter-requirements",
+      "jupiter-order-rail-strict-verifier",
+      "rerun-canary-status",
+    ]);
+    expect(packet.safe_next_commands[0].command).toContain("requirements:web3");
+    expect(packet.safe_next_commands[0].purpose).toContain("JUPITER_API_KEY");
+    expect(packet.safe_next_commands[1].command).toContain("--require-jupiter-order");
+    expect(packet.safe_next_commands.every((command) => command.live_execution_permission === "blocked")).toBe(true);
+  });
+
+  test("GIVEN first canary live flags are next WHEN packet is built THEN safe commands print exact flag requirements", () => {
+    const packet = buildCanaryStatusPacket({
+      canary: canaryReceipt({
+        blockers: ["Set first canary live flags in ignored local env."],
+        next_required_input: {
+          id: "first-canary-live-flags",
+          label: "First canary live flags",
+          status: "needed-now",
+          owner: "operator",
+          safe_value_type: "Exact reviewed local env flag values for the one-shot tiny canary handoff.",
+          safe_surface: "/settings/integrations#settings-web3-first-canary-live-flags",
+          target_names: [
+            "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION",
+            "MASTERMOLD_LIVE_OPERATOR_APPROVAL",
+            "MASTERMOLD_ALLOW_LIVE_UNSIGNED_CANARY_HANDOFF",
+          ],
+          verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-live-canary-flags",
+          completion_signal: "live_execution_gate_enabled=true and unsigned-order handoff no longer reports missing live canary flags.",
+          live_execution_permission: "blocked",
+          transaction_submission_permission: "blocked",
+          wallet_mutation_permission: "blocked",
+          secret_echo_permission: "blocked",
+        },
+      }),
+      ignition: ignitionReceipt({
+        next_gate_id: "route-order",
+        next_gate_label: "Route/order",
+        next_action: "Set first canary live flags.",
+      }),
+      local: localReceipt(),
+      http: { canary: 200, ignition: 200, local: 200 },
+    });
+
+    expect(packet.safe_next_commands.map((command) => command.id)).toEqual([
+      "print-live-flag-requirements",
+      "first-canary-live-flags-strict-verifier",
+      "rerun-canary-status",
+    ]);
+    expect(packet.safe_next_commands[0].command).toContain("requirements:web3");
+    expect(packet.safe_next_commands[0].purpose).toContain("first-canary live flag");
+    expect(packet.safe_next_commands[1].command).toContain("--require-live-canary-flags");
+    expect(packet.safe_next_commands.every((command) => command.wallet_mutation_permission === "blocked")).toBe(true);
+  });
+
   test("GIVEN canary and ignition disagree on the active gate WHEN packet is built THEN it fails closed", () => {
     expect(() => buildCanaryStatusPacket({
       canary: canaryReceipt(),
