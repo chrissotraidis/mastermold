@@ -2077,7 +2077,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("--require-operator-wallet");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("/settings/integrations#settings-web3-wallet-public-key");
     expect(source("src/db/web3-live-usability-blockers.ts")).toContain("currentInput?: Web3OperatorCurrentInput | null");
-    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("current_input: input.currentInput ?? null");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("operator_wallet_public_key: string | null");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("const currentInput = scopeCurrentInput(input.currentInput ?? null, operatorWalletPublicKey)");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("current_input: currentInput");
+    expect(source("src/db/web3-live-usability-blockers.ts")).toContain("walletScopedCommand");
     expect(source("app/api/web3-live-usability-blockers/route.ts")).toContain("currentInput: requestPacket.current_input");
     expect(source("app/trading/page.tsx")).toContain("currentInput: operatorRequestPacket.current_input");
     expect(source("app/trading/page.tsx")).toContain("LiveAutonomyReadinessPanel");

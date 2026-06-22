@@ -2116,12 +2116,15 @@ describe("Web3 autonomous trading subsystem", () => {
       };
       web3_live_usability: {
         mode: string;
+        operator_wallet_public_key: string | null;
+        operator_wallet_strict_command: string | null;
         current_input: {
           id: string;
           label: string;
           safe_collection_surface: string;
           storage: string;
           target_names: string[];
+          verifier_command: string | null;
           live_execution_permission: string;
           wallet_mutation_permission: string;
           transaction_submission_permission: string;
@@ -2519,6 +2522,18 @@ describe("Web3 autonomous trading subsystem", () => {
       ]);
     }
     expect(receipt.web3_live_usability.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
+    if (receipt.web3_live_usability.operator_wallet_public_key) {
+      const commandText = [
+        receipt.web3_live_usability.operator_wallet_strict_command,
+        receipt.web3_live_usability.current_input?.verifier_command,
+        receipt.web3_live_usability.next_blocker?.safe_command,
+        receipt.web3_live_usability.next_credential_request?.verifier_command,
+        ...(receipt.web3_live_usability.next_credential_request?.verification_runway.map((step) => step.command) ?? []),
+      ].filter(Boolean).join(" ");
+      expect(receipt.web3_live_usability.operator_wallet_strict_command).toBe(`npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${receipt.web3_live_usability.operator_wallet_public_key} --require-operator-wallet`);
+      expect(commandText).toContain(`--wallet=${receipt.web3_live_usability.operator_wallet_public_key}`);
+      expect(commandText).not.toContain("<public-solana-address>");
+    }
     expect(receipt.web3_live_usability.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.web3_live_usability.next_credential_request?.never_provide.join(" ")).toContain("private key");
     expect(receipt.web3_live_usability.next_credential_request?.completion_criteria.join(" ")).toContain("live execution");
@@ -3938,6 +3953,8 @@ describe("Web3 autonomous trading subsystem", () => {
       total_live_usability_row_count: number;
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
+      operator_wallet_public_key: string | null;
+      operator_wallet_strict_command: string | null;
       current_input: {
         id: string;
         label: string;
@@ -4009,6 +4026,7 @@ describe("Web3 autonomous trading subsystem", () => {
         safe_command: string;
         receipt_hash: string | null;
       };
+      verifier_commands: string[];
       live_execution_permission: string;
       wallet_mutation_permission: string;
       transaction_submission_permission: string;
@@ -4151,6 +4169,19 @@ describe("Web3 autonomous trading subsystem", () => {
       expect(receipt.next_credential_request?.verification_runway[0]?.href).toBe("/settings/integrations#settings-web3-wallet-public-key");
     }
     expect(receipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
+    if (receipt.operator_wallet_public_key) {
+      const commandText = [
+        receipt.operator_wallet_strict_command,
+        receipt.current_input?.verifier_command,
+        receipt.next_blocker?.safe_command,
+        receipt.next_credential_request?.verifier_command,
+        ...(receipt.next_credential_request?.verification_runway.map((step) => step.command) ?? []),
+        ...receipt.verifier_commands,
+      ].filter(Boolean).join(" ");
+      expect(receipt.operator_wallet_strict_command).toBe(`npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${receipt.operator_wallet_public_key} --require-operator-wallet`);
+      expect(commandText).toContain(`--wallet=${receipt.operator_wallet_public_key}`);
+      expect(commandText).not.toContain("<public-solana-address>");
+    }
     expect(receipt.next_credential_request?.safe_to_provide.length).toBeGreaterThan(0);
     expect(receipt.next_credential_request?.never_provide.join(" ")).toContain("private key");
     expect(receipt.next_credential_request?.completion_criteria.join(" ")).toContain("live execution");
@@ -4189,8 +4220,11 @@ describe("Web3 autonomous trading subsystem", () => {
       total_live_usability_row_count: number;
       listed_live_usability_row_count: number;
       live_usability_row_scope: string;
+      operator_wallet_public_key: string | null;
+      operator_wallet_strict_command: string | null;
       next_blocker: { id: string; label: string; owner: string; source: string; status: string; next_action: string; href: string; safe_command: string | null; blocks_live_capital: boolean } | null;
       next_credential_request: { id: string; label: string; fix_href: string; verifier_command: string | null; safe_value_description: string; completion_criteria: string[]; verification_runway: Array<{ id: string; command: string | null }>; secret_echo_permission: string } | null;
+      verifier_commands: string[];
       missing_for_live_usability: Array<{ id: string; label: string; status: string; next_action: string }>;
       missing_owner_summary: Array<{ owner: string; missing_count: number; first_label: string; next_action: string }>;
       missing_source_summary: Array<{ source: string; missing_count: number; first_label: string; next_action: string }>;
@@ -4220,6 +4254,18 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(allRowsReceipt.next_blocker?.safe_command).toContain("--require-operator-wallet");
     expect(allRowsReceipt.next_credential_request?.fix_href).toBe(receipt.next_credential_request?.fix_href);
     expect(allRowsReceipt.next_credential_request?.verifier_command).toContain("--require-operator-wallet");
+    if (allRowsReceipt.operator_wallet_public_key) {
+      const allRowsCommandText = [
+        allRowsReceipt.operator_wallet_strict_command,
+        allRowsReceipt.next_blocker?.safe_command,
+        allRowsReceipt.next_credential_request?.verifier_command,
+        ...(allRowsReceipt.next_credential_request?.verification_runway.map((step) => step.command) ?? []),
+        ...allRowsReceipt.verifier_commands,
+      ].filter(Boolean).join(" ");
+      expect(allRowsReceipt.operator_wallet_strict_command).toBe(`npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${allRowsReceipt.operator_wallet_public_key} --require-operator-wallet`);
+      expect(allRowsCommandText).toContain(`--wallet=${allRowsReceipt.operator_wallet_public_key}`);
+      expect(allRowsCommandText).not.toContain("<public-solana-address>");
+    }
     expect(allRowsReceipt.next_credential_request?.safe_value_description.length).toBeGreaterThan(20);
     expect(allRowsReceipt.next_credential_request?.completion_criteria.join(" ")).toContain("live execution");
     expect(allRowsReceipt.next_credential_request?.verification_runway.some((step) => step.command?.includes("--require-operator-wallet"))).toBe(true);

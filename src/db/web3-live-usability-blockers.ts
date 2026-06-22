@@ -138,6 +138,8 @@ export type Web3LiveUsabilityBlockersReceipt = {
   total_live_lane_count: number;
   safe_action_count: number;
   gated_action_count: number;
+  operator_wallet_public_key: string | null;
+  operator_wallet_strict_command: string | null;
   current_input: Web3OperatorCurrentInput | null;
   next_operator_input: {
     label: string;
@@ -194,6 +196,8 @@ export type Web3LiveUsabilityBlockersHealth = {
   ready_live_lane_count: number;
   total_live_lane_count: number;
   safe_action_count: number;
+  operator_wallet_public_key: string | null;
+  operator_wallet_strict_command: string | null;
   current_input: Web3OperatorCurrentInput | null;
   next_operator_input_label: string | null;
   next_unlock_step_label: string | null;
@@ -229,6 +233,9 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   rowScope?: "compact" | "all";
 }): Web3LiveUsabilityBlockersReceipt {
   const generatedAt = (input.now ?? new Date()).toISOString();
+  const operatorWalletPublicKey = safeWalletCommandValue(input.state.execution_readiness.config.wallet_public_key);
+  const operatorWalletStrictCommand = walletStrictVerifierCommand(operatorWalletPublicKey);
+  const currentInput = scopeCurrentInput(input.currentInput ?? null, operatorWalletPublicKey);
   const missing = buildMissingItems(input);
   const paper = input.usability.capabilities.find((item) => item.id === "paper-autonomy");
   const dryRun = input.usability.capabilities.find((item) => item.id === "jupiter-dry-run");
@@ -250,7 +257,7 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
       status: action.status,
       surface: action.surface,
       href: action.href,
-      command: action.command,
+      command: walletScopedCommand(action.command, operatorWalletPublicKey),
       next_action: action.next_action,
     }))
     .slice(0, 6);
@@ -259,18 +266,22 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
   const ownerSummary = summarizeMissingByOwner(missing);
   const sourceSummary = summarizeMissingBySource(missing);
   const credentialDoctor = summarizeCredentialDoctor(input.credentialDoctor ?? getWeb3CredentialDoctorHealth());
-  const nextBlocker = summarizeNextBlocker(missing[0], input.currentInput ?? null);
+  const nextBlocker = scopeNextBlocker(summarizeNextBlocker(missing[0], currentInput), operatorWalletPublicKey);
   const nextCredentialRequest = summarizeNextCredentialRequest(
-    input.currentInput ?? null,
+    currentInput,
     nextBlocker,
     input.cutover.safe_to_provide,
     input.cutover.never_provide,
+    operatorWalletPublicKey,
   );
   const verifierCommands = Array.from(new Set([
+    operatorWalletStrictCommand,
     ...input.runbook.verifier_commands,
     ...input.manualLiveReview.safe_commands,
     ...input.cutover.verifier_commands,
-  ])).slice(0, 8);
+  ]
+    .map((command) => walletScopedCommand(command, operatorWalletPublicKey))
+    .filter((command): command is string => Boolean(command)))).slice(0, 8);
   const receiptBase = {
     mode: "web3-live-usability-blockers" as const,
     status,
@@ -300,7 +311,9 @@ export function buildWeb3LiveUsabilityBlockersReceipt(input: {
     total_live_lane_count: input.runway.total_lane_count,
     safe_action_count: input.runbook.allowed_now_count,
     gated_action_count: input.runbook.gated_count,
-    current_input: input.currentInput ?? null,
+    operator_wallet_public_key: operatorWalletPublicKey,
+    operator_wallet_strict_command: operatorWalletStrictCommand,
+    current_input: currentInput,
     next_operator_input: input.cutover.next_safe_input
       ? {
         label: input.cutover.next_safe_input.label,
@@ -358,12 +371,13 @@ export function buildWeb3LiveUsabilityBlockersHealth(
   receipt: Web3LiveUsabilityBlockersReceipt,
   currentInput: Web3OperatorCurrentInput | null = null,
 ): Web3LiveUsabilityBlockersHealth {
-  const healthCurrentInput = currentInput ?? receipt.current_input;
+  const healthCurrentInput = scopeCurrentInput(currentInput ?? receipt.current_input, receipt.operator_wallet_public_key);
   const healthCredentialRequest = summarizeNextCredentialRequest(
     healthCurrentInput,
     receipt.next_blocker,
     receipt.safe_to_provide,
     receipt.never_provide,
+    receipt.operator_wallet_public_key,
   );
   return {
     mode: "web3-live-usability-health",
@@ -381,6 +395,8 @@ export function buildWeb3LiveUsabilityBlockersHealth(
     ready_live_lane_count: receipt.ready_live_lane_count,
     total_live_lane_count: receipt.total_live_lane_count,
     safe_action_count: receipt.safe_action_count,
+    operator_wallet_public_key: receipt.operator_wallet_public_key,
+    operator_wallet_strict_command: receipt.operator_wallet_strict_command,
     current_input: healthCurrentInput,
     next_operator_input_label: receipt.next_operator_input?.label ?? null,
     next_unlock_step_label: receipt.next_unlock_step?.label ?? null,
@@ -408,12 +424,13 @@ function summarizeNextCredentialRequest(
   nextBlocker: Web3LiveUsabilityNextBlocker | null,
   safeToProvide: string[],
   neverProvide: string[],
+  operatorWalletPublicKey: string | null = null,
 ): Web3LiveUsabilityCredentialRequest | null {
   if (!currentInput && !nextBlocker) return null;
   const useCurrentInput = shouldUseCurrentInputForCredentialRequest(currentInput, nextBlocker);
   const id = useCurrentInput ? currentInput!.id : nextBlocker?.id ?? currentInput?.id ?? "next-web3-credential";
   const label = useCurrentInput ? currentInput!.label : nextBlocker?.label ?? currentInput?.label ?? "Next Web3 setup input";
-  const verifierCommand = nextBlocker?.safe_command ?? currentInput?.verifier_command ?? null;
+  const verifierCommand = walletScopedCommand(nextBlocker?.safe_command ?? currentInput?.verifier_command ?? null, operatorWalletPublicKey);
   const fixHref = credentialRequestFixHref(currentInput, nextBlocker, useCurrentInput);
   return {
     id,
@@ -435,7 +452,7 @@ function summarizeNextCredentialRequest(
     safe_to_provide: credentialRequestSafeToProvide(id, currentInput, nextBlocker, safeToProvide),
     never_provide: neverProvide.slice(0, 6),
     completion_criteria: credentialRequestCompletionCriteria(id),
-    verification_runway: credentialRequestVerificationRunway(id, verifierCommand, fixHref),
+    verification_runway: credentialRequestVerificationRunway(id, verifierCommand, fixHref, operatorWalletPublicKey),
     live_execution_permission: "blocked",
     wallet_mutation_permission: "blocked",
     transaction_submission_permission: "blocked",
@@ -582,6 +599,7 @@ function credentialRequestVerificationRunway(
   id: string,
   verifierCommand: string | null,
   fixHref: string,
+  operatorWalletPublicKey: string | null = null,
 ): Web3LiveUsabilityCredentialRequest["verification_runway"] {
   const normalized = id.toLowerCase();
   if (normalized.includes("wallet-ownership")) {
@@ -618,7 +636,7 @@ function credentialRequestVerificationRunway(
         label: "Refresh what is left",
         surface: "read-only-api",
         href: "/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all",
-        command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+        command: walletScopedCommand("npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet", operatorWalletPublicKey),
         status: "after-input",
         next_action: "Refresh the live-usability receipt so the next blocker advances only after the proof is recorded.",
       }),
@@ -658,7 +676,7 @@ function credentialRequestVerificationRunway(
         label: "Refresh what is left",
         surface: "read-only-api",
         href: "/api/web3-live-usability-blockers?source=live-dex&account=persistent&rows=all",
-        command: "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+        command: walletScopedCommand("npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet", operatorWalletPublicKey),
         status: "after-input",
         next_action: "Refresh the live-usability receipt so the next blocker advances only after the wallet gate proves out.",
       }),
@@ -856,6 +874,28 @@ function nextBlockerSafeCommand(
     return "npm run doctor:web3 -- --json";
   }
   return null;
+}
+
+function scopeCurrentInput(
+  currentInput: Web3OperatorCurrentInput | null,
+  walletPublicKey: string | null | undefined,
+): Web3OperatorCurrentInput | null {
+  if (!currentInput) return null;
+  return {
+    ...currentInput,
+    verifier_command: walletScopedCommand(currentInput.verifier_command, walletPublicKey),
+  };
+}
+
+function scopeNextBlocker(
+  nextBlocker: Web3LiveUsabilityNextBlocker | null,
+  walletPublicKey: string | null | undefined,
+): Web3LiveUsabilityNextBlocker | null {
+  if (!nextBlocker) return null;
+  return {
+    ...nextBlocker,
+    safe_command: walletScopedCommand(nextBlocker.safe_command, walletPublicKey),
+  };
 }
 
 function summarizeCredentialDoctor(health: Web3CredentialDoctorHealth): Web3LiveUsabilityCredentialDoctorSummary {
@@ -1168,6 +1208,33 @@ function liveUsabilitySummary(
     return `${input.manualLiveReview.failed_signoff_count + input.manualLiveReview.watch_signoff_count} live-review signoff${input.manualLiveReview.failed_signoff_count + input.manualLiveReview.watch_signoff_count === 1 ? "" : "s"} still need review; ${input.runway.ready_lane_count}/${input.runway.total_lane_count} supervised lanes are ready.`;
   }
   return autonomousLiveDetail ?? `${missing.length} blockers remain and autonomous live trading is locked inside the app.`;
+}
+
+function safeWalletCommandValue(walletPublicKey: string | null | undefined) {
+  if (typeof walletPublicKey !== "string") return null;
+  const trimmed = walletPublicKey.trim();
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function walletStrictVerifierCommand(walletPublicKey: string | null | undefined) {
+  const wallet = safeWalletCommandValue(walletPublicKey);
+  return wallet
+    ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${wallet} --require-operator-wallet`
+    : null;
+}
+
+function walletScopedCommand(command: string | null | undefined, walletPublicKey: string | null | undefined) {
+  if (!command) return null;
+  const wallet = safeWalletCommandValue(walletPublicKey);
+  if (!wallet) return command;
+  if (command.includes("--wallet=<public-solana-address>")) {
+    return command.replaceAll("--wallet=<public-solana-address>", `--wallet=${wallet}`);
+  }
+  if (command.includes("--require-operator-wallet") && !command.includes("--wallet=")) {
+    return command.replace("--require-operator-wallet", `--wallet=${wallet} --require-operator-wallet`);
+  }
+  return command;
 }
 
 function hashJson(value: unknown) {

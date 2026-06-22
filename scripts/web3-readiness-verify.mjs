@@ -435,6 +435,25 @@ async function verifyHealth() {
     json.web3_live_usability.next_credential_request,
   );
   assert(String(json.web3_live_usability.next_credential_request?.verifier_command ?? "").includes("--require-operator-wallet"), "Live-usability health should expose the next credential verifier command.", json.web3_live_usability.next_credential_request);
+  if (json.web3_live_usability.operator_wallet_public_key) {
+    const commandText = [
+      json.web3_live_usability.operator_wallet_strict_command,
+      json.web3_live_usability.current_input?.verifier_command,
+      json.web3_live_usability.next_blocker?.safe_command,
+      json.web3_live_usability.next_credential_request?.verifier_command,
+      ...(json.web3_live_usability.next_credential_request?.verification_runway ?? []).map((step) => step.command),
+    ].filter(Boolean).join(" ");
+    assert(
+      json.web3_live_usability.operator_wallet_strict_command === `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${json.web3_live_usability.operator_wallet_public_key} --require-operator-wallet`,
+      "Live-usability health should expose the wallet-bound strict verifier command.",
+      json.web3_live_usability,
+    );
+    assert(
+      commandText.includes(`--wallet=${json.web3_live_usability.operator_wallet_public_key}`) && !commandText.includes("<public-solana-address>"),
+      "Live-usability health commands should use the scoped public wallet instead of placeholders.",
+      commandText,
+    );
+  }
   assert(
     Array.isArray(json.web3_live_usability.next_credential_request?.completion_criteria) &&
       json.web3_live_usability.next_credential_request.completion_criteria.join(" ").includes(liveUsabilityProofIsNext ? "hash evidence" : "strict operator-wallet verifier"),
@@ -825,6 +844,26 @@ async function verifyLiveUsabilityBlockersReceipt() {
   assert(json.missing_for_live_usability.every((item) => typeof item.next_action === "string" && item.next_action.length > 0), "Live usability blocker rows should name next actions.", json.missing_for_live_usability);
   assert(Array.isArray(json.safe_next_actions) && json.safe_next_actions.length > 0, "Live usability blockers should include safe next actions.", json.safe_next_actions);
   assert(Array.isArray(json.verifier_commands) && json.verifier_commands.some((command) => command.includes("verify:web3")), "Live usability blockers should include verifier commands.", json.verifier_commands);
+  if (json.operator_wallet_public_key) {
+    const commandText = [
+      json.operator_wallet_strict_command,
+      json.current_input?.verifier_command,
+      json.next_blocker?.safe_command,
+      json.next_credential_request?.verifier_command,
+      ...(json.next_credential_request?.verification_runway ?? []).map((step) => step.command),
+      ...json.verifier_commands,
+    ].filter(Boolean).join(" ");
+    assert(
+      json.operator_wallet_strict_command === `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${json.operator_wallet_public_key} --require-operator-wallet`,
+      "Live usability blockers should expose the wallet-bound strict verifier command.",
+      json,
+    );
+    assert(
+      commandText.includes(`--wallet=${json.operator_wallet_public_key}`) && !commandText.includes("<public-solana-address>"),
+      "Live usability blocker commands should use the scoped public wallet instead of placeholders.",
+      commandText,
+    );
+  }
   assert(Array.isArray(json.evidence_endpoints) && json.evidence_endpoints.includes("GET /api/web3-manual-live-review-packet"), "Live usability blockers should link manual live review evidence.", json.evidence_endpoints);
   assert(Array.isArray(json.safe_to_provide) && json.safe_to_provide.includes("Dedicated Solana public wallet address"), "Live usability blockers should list safe operator inputs.", json.safe_to_provide);
   assert(Array.isArray(json.never_provide) && json.never_provide.includes("Seed phrase or mnemonic"), "Live usability blockers should keep seed phrases in never-provide list.", json.never_provide);
@@ -863,6 +902,20 @@ async function verifyLiveUsabilityBlockersReceipt() {
     allRows.json.missing_source_summary,
   );
   assert(allRows.json.credential_doctor?.status === json.credential_doctor.status, "Live usability blockers rows=all should keep the same credential doctor status.", allRows.json.credential_doctor);
+  if (allRows.json.operator_wallet_public_key) {
+    const allRowsCommandText = [
+      allRows.json.operator_wallet_strict_command,
+      allRows.json.next_blocker?.safe_command,
+      allRows.json.next_credential_request?.verifier_command,
+      ...(allRows.json.next_credential_request?.verification_runway ?? []).map((step) => step.command),
+      ...(allRows.json.verifier_commands ?? []),
+    ].filter(Boolean).join(" ");
+    assert(
+      allRowsCommandText.includes(`--wallet=${allRows.json.operator_wallet_public_key}`) && !allRowsCommandText.includes("<public-solana-address>"),
+      "Live usability blockers rows=all commands should use the scoped public wallet instead of placeholders.",
+      allRowsCommandText,
+    );
+  }
   assert(
     typeof allRows.json.summary === "string" && allRows.json.summary.includes("all dependency-ranked rows are listed"),
     "Live usability blockers rows=all summary should say all rows are listed.",
