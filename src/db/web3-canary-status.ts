@@ -212,21 +212,23 @@ function buildSafeNextCommands(canary: Web3LiveTradeCanaryReceipt, endpointParam
       },
     );
   } else if (nextInput?.id === "wallet-ownership-proof") {
+    const scopedWallet = extractPublicWalletFromVerifierCommand(nextInput.verifier_command);
+    const walletArg = scopedWallet ?? "<scoped-public-solana-address>";
     commands.push(
       {
         id: "fetch-wallet-ownership-challenge",
         label: "Fetch ownership challenge",
-        command: "npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<scoped-public-solana-address> --json",
+        command: `npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=${walletArg} --json`,
         purpose: "Fetches the text-only challenge for the already scoped public wallet.",
         safe_surface: "/api/web3-wallet-ownership",
         completion_signal: "The command returns status=challenge-ready and message_base64 for external message signing.",
-        uses_placeholder: true,
+        uses_placeholder: scopedWallet === null,
         ...common,
       },
       {
         id: "submit-wallet-ownership-proof",
         label: "Submit ownership signature",
-        command: "npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<scoped-public-solana-address> --message-base64=<challenge-text-base64> --signature-base64=<wallet-message-signature> --json",
+        command: `npm run prove-wallet:web3 -- --base-url=http://localhost:4010 --wallet=${walletArg} --message-base64=<challenge-text-base64> --signature-base64=<wallet-message-signature> --json`,
         purpose: "Submits an external browser-wallet message signature and stores hash-only proof.",
         safe_surface: "/api/web3-wallet-ownership",
         completion_signal: "The proof receipt reports proof-verified and the live canary sees wallet_ownership_current_for_canary=true.",
@@ -261,6 +263,11 @@ function buildSafeNextCommands(canary: Web3LiveTradeCanaryReceipt, endpointParam
   });
 
   return dedupeCommands(commands).slice(0, 5);
+}
+
+function extractPublicWalletFromVerifierCommand(command: string | null) {
+  const match = command?.match(/--wallet=([1-9A-HJ-NP-Za-km-z]{32,44})(?:\s|$)/);
+  return match?.[1] ?? null;
 }
 
 function dedupeCommands(commands: Web3CanaryStatusSafeCommand[]) {

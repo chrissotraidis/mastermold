@@ -84,6 +84,8 @@ function localReceipt(overrides = {}) {
   };
 }
 
+const scopedWalletPublicKey = "So11111111111111111111111111111111111111112";
+
 describe("web3 canary status command", () => {
   test("GIVEN running-app receipts WHEN command runs THEN it performs GET only and returns the real funded-trade status", async () => {
     const requested = [];
@@ -135,6 +137,46 @@ describe("web3 canary status command", () => {
         throw new Error("fetch should not be called");
       },
     })).rejects.toThrow("Unsafe canary status flags");
+  });
+
+  test("GIVEN public wallet scope is saved WHEN ownership proof is next THEN safe commands use the scoped public wallet", async () => {
+    const packet = buildCanaryStatusPacket({
+      canary: canaryReceipt({
+        blockers: ["Prove wallet ownership."],
+        next_required_input: {
+          id: "wallet-ownership-proof",
+          label: "Wallet ownership proof",
+          status: "needed-now",
+          owner: "external-wallet",
+          safe_value_type: "Hash-only browser-wallet text signature for the scoped public Solana wallet.",
+          safe_surface: "/trading?source=live-dex&account=persistent&scenario=breakout#web3-live-canary-console",
+          target_names: ["wallet_public_key", "web3-wallet-ownership challenge hash"],
+          verifier_command: `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${scopedWalletPublicKey} --require-operator-wallet`,
+          completion_signal: "wallet_ownership_current_for_canary=true on /api/web3-live-trade-canary.",
+          live_execution_permission: "blocked",
+          transaction_submission_permission: "blocked",
+          wallet_mutation_permission: "blocked",
+          secret_echo_permission: "blocked",
+        },
+      }),
+      ignition: ignitionReceipt({
+        next_gate_id: "wallet-ownership",
+        next_gate_label: "Wallet ownership",
+        next_action: "Prove wallet ownership before the canary.",
+      }),
+      local: localReceipt(),
+      http: { canary: 200, ignition: 200, local: 200 },
+    });
+
+    const challengeCommand = packet.safe_next_commands.find((command) => command.id === "fetch-wallet-ownership-challenge");
+    const proofCommand = packet.safe_next_commands.find((command) => command.id === "submit-wallet-ownership-proof");
+    expect(challengeCommand?.command).toContain(`--wallet=${scopedWalletPublicKey}`);
+    expect(challengeCommand?.uses_placeholder).toBe(false);
+    expect(proofCommand?.command).toContain(`--wallet=${scopedWalletPublicKey}`);
+    expect(proofCommand?.command).toContain("--message-base64=<challenge-text-base64>");
+    expect(proofCommand?.uses_placeholder).toBe(true);
+    expect(packet.safe_next_commands.every((command) => command.live_execution_permission === "blocked")).toBe(true);
+    expect(JSON.stringify(packet)).not.toContain("private-key");
   });
 
   test("GIVEN canary and ignition disagree on the active gate WHEN packet is built THEN it fails closed", () => {
