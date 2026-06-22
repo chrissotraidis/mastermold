@@ -696,6 +696,9 @@ describe("mobile ergonomics source contracts", () => {
       tradingPage.indexOf("<LiveCanaryCommandCenter"),
     );
     expect(tradingPage.indexOf("<LiveCanaryCommandCenter")).toBeLessThan(
+      tradingPage.indexOf("<TradingOperatorInputPacket"),
+    );
+    expect(tradingPage.indexOf("<TradingOperatorInputPacket")).toBeLessThan(
       tradingPage.indexOf("<Web3LiveCanaryConsole"),
     );
     expect(tradingPage.indexOf("<Web3LiveCanaryConsole")).toBeLessThan(
@@ -817,6 +820,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("TradingCommandBoard");
     expect(tradingPage).toContain("LiveCanaryCommandCenter");
     expect(tradingPage).toContain("Live trading command center");
+    expect(tradingPage).toContain("TradingOperatorInputPacket");
+    expect(tradingPage).toContain("Trading operator live canary input packet");
+    expect(tradingPage).toContain("Operator inputs needed");
+    expect(tradingPage).toContain("Trading operator open canary inputs");
+    expect(tradingPage).toContain("Trading operator canary safe boundaries");
+    expect(tradingPage).toContain("Open next input");
+    expect(tradingPage).toContain("Open canary receipt");
+    expect(tradingPage).toContain("Open credential runway");
+    expect(tradingPage).toContain("Private keys, seed phrases, keypair JSON, raw transaction bytes, API keys, or signed payload text.");
     expect(tradingPage).toContain("No real trade tested yet");
     expect(tradingPage).toContain("Open live cockpit");
     expect(tradingPage).toContain("Canary drill commands");

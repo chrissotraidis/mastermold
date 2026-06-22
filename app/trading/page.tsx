@@ -23,7 +23,7 @@ import { buildWeb3AutonomyLaunchChecklist } from "@/src/db/web3-launch-checklist
 import { buildWeb3LiveCapitalPreflightReceipt } from "@/src/db/web3-live-capital-preflight";
 import { buildWeb3LiveIgnitionReceipt, type Web3LiveIgnitionCheck, type Web3LiveIgnitionReceipt } from "@/src/db/web3-live-ignition";
 import { buildWeb3LiveOpsPacket } from "@/src/db/web3-live-ops-packet";
-import { buildWeb3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
+import { buildWeb3LiveTradeCanaryReceipt, type Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import { buildWeb3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
 import { buildWeb3LiveUsabilityBlockersReceipt, type Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
 import { buildWeb3ManualLiveReviewPacket } from "@/src/db/web3-manual-live-review-packet";
@@ -188,6 +188,7 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
             canary={liveTradeCanary}
             drill={firstCanaryDrill}
           />
+          <TradingOperatorInputPacket receipt={liveTradeCanary} />
           <Web3LiveCanaryConsole
             receipt={liveTradeCanary}
             firstCanaryDrill={firstCanaryDrill}
@@ -234,6 +235,128 @@ export default async function TradingPage({ searchParams }: TradingPageProps) {
       </div>
     </AppShell>
   );
+}
+
+function TradingOperatorInputPacket({ receipt }: { receipt: Web3LiveTradeCanaryReceipt }) {
+  const nextInput = receipt.next_required_input;
+  const openInputs = receipt.required_inputs
+    .filter((input) => input.status !== "done")
+    .slice(0, 4);
+  const canaryEndpoint = `/api/web3-live-trade-canary?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0`;
+  const safeTargetLabel = nextInput?.target_names.join(", ") ?? "No open target";
+  const ownerLabel = nextInput?.owner.replace("-", " ") ?? "system";
+
+  return (
+    <section
+      aria-label="Trading operator live canary input packet"
+      className="rounded-md border border-engine/25 bg-engine/[0.035] p-4 sm:p-5"
+    >
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.88fr)_minmax(18rem,0.62fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-engine">Operator inputs needed</p>
+              <h2 className="mt-1 font-display text-xl font-semibold text-on-surface">
+                {nextInput ? nextInput.label : "First canary inputs are accounted"}
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
+                {nextInput?.completion_signal ?? "Run the strict proof command before any autonomy review."}
+              </p>
+            </div>
+            <span className={tradingOperatorInputStatusClassName(nextInput?.status ?? "done")}>
+              {(nextInput?.status ?? "done").replaceAll("-", " ")}
+            </span>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <LiveUsabilityStat label="Safe value" value={safeTargetLabel} tone={nextInput ? "caution" : "engine"} />
+            <LiveUsabilityStat label="Owner" value={ownerLabel} tone={nextInput?.owner === "external-wallet" ? "caution" : "engine"} />
+            <LiveUsabilityStat label="Live trade" value={receipt.actual_live_trade_tested ? "tested" : "not tested"} tone={receipt.actual_live_trade_tested ? "engine" : "critical"} />
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Trading operator canary safe boundaries">
+            <div className="rounded-md border border-outline/15 bg-surface/55 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">Safe to provide here</p>
+              <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                {nextInput?.safe_value_type ?? "Receipt hashes, public wallet addresses, verifier output summaries, and external review status."}
+              </p>
+            </div>
+            <div className="rounded-md border border-critical/25 bg-critical/[0.035] p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Never provide here</p>
+              <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+                Private keys, seed phrases, keypair JSON, raw transaction bytes, API keys, or signed payload text.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {nextInput ? (
+              <Link
+                href={nextInput.safe_surface}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-xs font-semibold text-engine transition hover:bg-engine/15"
+              >
+                Open next input
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+            ) : null}
+            <Link
+              href={canaryEndpoint}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open canary receipt
+            </Link>
+            <Link
+              href={SETTINGS_WEB3_RUNWAY_HREF}
+              className="inline-flex min-h-10 items-center justify-center rounded-md border border-outline/20 bg-surface-dim/55 px-3 py-2 text-xs font-semibold text-on-surface-variant transition hover:border-engine/35 hover:text-engine"
+            >
+              Open credential runway
+            </Link>
+          </div>
+
+          {nextInput?.verifier_command ? (
+            <code className="mt-3 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+              {nextInput.verifier_command}
+            </code>
+          ) : null}
+        </div>
+
+        <div className="grid min-w-0 gap-2" aria-label="Trading operator open canary inputs">
+          {openInputs.length > 0 ? openInputs.map((input) => (
+            <Link
+              key={input.id}
+              href={input.safe_surface}
+              className="grid min-w-0 gap-2 rounded-md border border-outline/15 bg-surface/55 p-2.5 transition hover:border-engine/35"
+            >
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <span className="min-w-0 text-xs font-semibold text-on-surface">{input.label}</span>
+                <span className={tradingOperatorInputStatusClassName(input.status)}>
+                  {input.status.replaceAll("-", " ")}
+                </span>
+              </div>
+              <p className="line-clamp-2 text-[11px] leading-4 text-on-surface-variant">{input.completion_signal}</p>
+              {input.verifier_command ? (
+                <code className="block truncate text-[10px] leading-4 text-outline">{input.verifier_command}</code>
+              ) : null}
+            </Link>
+          )) : (
+            <div className="rounded-md border border-engine/20 bg-engine/[0.035] p-3">
+              <p className="text-xs font-semibold text-on-surface">No open input rows</p>
+              <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">
+                Keep live execution blocked until the signed canary, confirmation, settlement, and mirror proof are complete.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function tradingOperatorInputStatusClassName(status: Web3LiveTradeCanaryReceipt["required_inputs"][number]["status"] | "done") {
+  const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (status === "done") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (status === "needed-now" || status === "external-signature" || status === "proof-watch") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
 function TradingSourceSwitch({
