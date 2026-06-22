@@ -2429,6 +2429,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-canary-status.mjs")).toContain("safe_next_commands");
     expect(source("src/db/web3-canary-status.ts")).toContain("safe_next_commands");
     expect(source("app/trading/page.tsx")).toContain("Running app safe next commands");
+    expect(source("app/trading/page.tsx")).toContain("Copy ${command.label} command");
+    expect(source("app/trading/page.tsx")).toContain("command.purpose");
     expect(source("scripts/web3-canary-status.mjs")).toContain("Live canary and ignition disagree on the next gate");
     expect(source("scripts/web3-wallet-scope.mjs")).toContain("/api/web3-dedicated-wallet-intake-contract");
     expect(source("scripts/web3-wallet-scope.mjs")).toContain("/api/web3-trading");

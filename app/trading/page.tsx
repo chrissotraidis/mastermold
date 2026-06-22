@@ -963,13 +963,25 @@ function LiveCanaryCommandCenter({
               <LiveUsabilityStat label="Alignment" value={status.alignment.status} tone="engine" />
             </div>
             <div className="mt-3 grid gap-2" aria-label="Running app safe next commands">
-              {status.safe_next_commands.slice(0, 3).map((command) => (
+              {status.safe_next_commands.slice(0, 5).map((command) => (
                 <div key={command.id} className="rounded-md border border-outline/15 bg-surface/60 p-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-on-surface">{command.label}</p>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
-                      {command.uses_placeholder ? "needs public value" : "ready"}
-                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-on-surface">{command.label}</p>
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-outline">{command.purpose}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-outline">
+                        {command.uses_placeholder ? "needs public value" : "ready"}
+                      </span>
+                      <CopyRedactedPacketButton
+                        text={command.command}
+                        label="Copy"
+                        copiedLabel="Copied"
+                        ariaLabel={`Copy ${command.label} command`}
+                        className="min-h-8 border-outline/25 bg-surface px-2 text-[11px] text-on-surface-variant hover:border-engine/35 hover:bg-engine/10 hover:text-engine"
+                      />
+                    </div>
                   </div>
                   <code className="mt-1 block overflow-x-auto whitespace-nowrap rounded border border-outline/10 bg-black/20 px-2 py-1 text-[10px] leading-5 text-outline">
                     {command.command}
