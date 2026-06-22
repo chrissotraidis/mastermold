@@ -746,6 +746,13 @@ function firstCanaryUnblockStepClassName(status: "done" | "next" | "blocked" | "
   return `${base} border-critical/30 bg-critical/10 text-critical`;
 }
 
+function liveTestLedgerStatusClassName(tone: "engine" | "caution" | "critical") {
+  const base = "shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
+  if (tone === "engine") return `${base} border-engine/30 bg-engine/10 text-engine`;
+  if (tone === "caution") return `${base} border-caution/30 bg-caution/10 text-caution`;
+  return `${base} border-critical/30 bg-critical/10 text-critical`;
+}
+
 function canaryProofStageClassName(status: "pass" | "watch" | "fail") {
   const base = "shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]";
   if (status === "pass") return `${base} border-engine/30 bg-engine/10 text-engine`;
@@ -818,6 +825,47 @@ function LiveCanaryCommandCenter({
     ...drill.operator_unblock_plan.filter((step) => step.status === "blocked"),
     ...drill.operator_unblock_plan.filter((step) => step.status === "done"),
   ].slice(0, 5);
+  const jupiterOrderInput = canary.required_inputs.find((input) => input.id === "jupiter-order-rail");
+  const liveFlagInput = canary.required_inputs.find((input) => input.id === "first-canary-live-flags");
+  const liveTestLedgerRows = [
+    {
+      id: "paper-loop",
+      label: "Paper autonomy",
+      value: "tested",
+      detail: "Backend loop, daemon, forward replay, and promoted-paper proof are simulator evidence only.",
+      tone: "engine" as const,
+    },
+    {
+      id: "live-dex-read",
+      label: "Live DEX read",
+      value: canary.source === "live-dex" ? "read-only" : "sample",
+      detail: "Market and route reads can refresh public DEX evidence, but they cannot sign or move funds.",
+      tone: canary.source === "live-dex" ? "caution" as const : "critical" as const,
+    },
+    {
+      id: "order-rehearsal",
+      label: "Order rehearsal",
+      value: jupiterOrderInput?.status === "done" ? "ready" : "blocked",
+      detail: jupiterOrderInput?.completion_signal ?? "Jupiter order proof is still required before an unsigned canary can be requested.",
+      tone: jupiterOrderInput?.status === "done" ? "engine" as const : "critical" as const,
+    },
+    {
+      id: "live-flags",
+      label: "Live flags",
+      value: liveFlagInput?.status === "done" ? "armed" : "missing",
+      detail: liveFlagInput?.completion_signal ?? "Exact first-canary flags stay in ignored local env and do not grant live authority by themselves.",
+      tone: liveFlagInput?.status === "done" ? "caution" as const : "critical" as const,
+    },
+    {
+      id: "funded-trade",
+      label: "Funded wallet trade",
+      value: canary.actual_live_trade_tested ? "tested" : "not attempted",
+      detail: canary.actual_live_trade_tested
+        ? "A signed canary has proof; inspect settlement and portfolio mirror status before any autonomy review."
+        : "No funded trade counts until the signed relay confirms, settlement reconciles, and the portfolio mirror is accounted.",
+      tone: canary.actual_live_trade_tested ? "engine" as const : "critical" as const,
+    },
+  ];
 
   return (
     <section
@@ -863,6 +911,34 @@ function LiveCanaryCommandCenter({
             <LiveUsabilityContractStat label="Drill source" value={drill.source === "live-dex" ? "Live DEX" : "sample"} />
             <LiveUsabilityContractStat label="Hard fails" value={`${drill.hard_fail_count}`} />
             <LiveUsabilityContractStat label="Drill hash" value={drill.receipt_hash.slice(0, 12)} />
+          </div>
+
+          <div className="mt-3 rounded-md border border-critical/20 bg-critical/[0.025] p-3" aria-label="Actual live trade test ledger">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-critical">Actual live trade test ledger</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {canary.actual_live_trade_tested ? "Funded canary evidence exists" : "Funded wallet trade not attempted"}
+                </p>
+              </div>
+              <span className={firstCanaryDrillStatusClassName(drill.status)}>
+                {canary.real_funds_moved_by_this_app ? "funds moved" : "no funds moved"}
+              </span>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              {liveTestLedgerRows.map((row) => (
+                <div key={row.id} className="min-w-0 rounded-md border border-outline/15 bg-surface-dim/40 p-2">
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <p className="truncate font-mono text-[10px] uppercase tracking-[0.08em] text-outline">{row.label}</p>
+                    <span className={liveTestLedgerStatusClassName(row.tone)}>{row.value}</span>
+                  </div>
+                  <p className="mt-1 line-clamp-3 text-[11px] leading-4 text-on-surface-variant">{row.detail}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-outline">
+              This ledger is the first-screen answer to what has actually run. Paper profit, live reads, and order rehearsal are not funded-trade proof.
+            </p>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">

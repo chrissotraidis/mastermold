@@ -344,6 +344,9 @@ async function main() {
   assert(html.includes("Autonomous Web3 trading desk"), "Trading page should describe the autonomous Web3 trading desk.");
   assert(html.includes("Live trading command center"), "Trading page should expose the live trading command center.");
   assert(html.includes("No real trade tested yet"), "Trading page should truthfully show that no funded live trade is proven.");
+  assert(html.includes("Actual live trade test ledger"), "Trading page should expose a first-screen ledger for what has actually been tested live.");
+  assert(html.includes("Funded wallet trade") && html.includes("not attempted"), "Trading page should say funded wallet trading has not been attempted.");
+  assert(html.includes("Paper profit, live reads, and order rehearsal are not funded-trade proof."), "Trading page should separate paper/read-only/rehearsal evidence from funded-trade proof.");
   assert(html.includes("First canary drill"), "Trading page should expose the first funded canary drill.");
   assert(html.includes("Operator unblock plan"), "Trading page should expose the ordered first-canary unblock plan.");
   assert(html.includes("Wallet ownership proof"), "Trading page should show wallet ownership proof as the current live gate.");

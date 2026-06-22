@@ -124,6 +124,9 @@ async function verifyHealth() {
 async function verifyTradingPage() {
   const requiredMarkers = [
     /No real trade tested yet/,
+    /Actual live trade test ledger/,
+    /Funded wallet trade/,
+    /not attempted/,
     /Trading live canary console/,
     /Dedicated trading wallet/,
     /live blocked/,
@@ -137,12 +140,14 @@ async function verifyTradingPage() {
   assert(!text.includes("This site can't be reached"), "Trading page should not render the browser network error page.");
   assert(!text.includes("This page did not load"), "Trading page should not render the route-error fallback.");
   assert(text.includes("No real trade tested yet"), "Trading page should say no real live trade has been tested.", text);
+  assert(text.includes("Actual live trade test ledger"), "Trading page should expose the actual live-trade test ledger.", text);
+  assert(text.includes("Funded wallet trade") && text.includes("not attempted"), "Trading page should say the funded wallet trade was not attempted.", text);
   assert(text.includes("Trading live canary console"), "Trading page should render the live canary console.", text);
   assert(text.includes("Dedicated trading wallet"), "Trading page should show the dedicated wallet gate.", text);
   assert(text.includes("live blocked"), "Trading page should make the live-money block visible.", text);
   assert(includesAny(text, ["Net worth", "wallet curve", "Wallet equity"]), "Trading page should expose a wallet/net-worth chart surface.", text);
   assert(text.includes("private keys") && text.includes("seed phrases"), "Trading page should repeat the never-provide wallet-secret boundary.", text);
-  record("trading-page", "pass", "live DEX trading cockpit renders with live block, wallet gate, canary console, and net-worth surface");
+  record("trading-page", "pass", "live DEX trading cockpit renders with live-test ledger, live block, wallet gate, canary console, and net-worth surface");
 }
 
 async function verifyCanaryReceipt() {
