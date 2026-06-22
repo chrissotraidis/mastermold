@@ -1659,6 +1659,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsConsole).toContain("Session-only provider tests");
     expect(settingsConsole).toContain("Local credential installer");
     expect(settingsConsole).toContain("Install local env");
+    expect(settingsConsole).toContain("Check server status");
+    expect(settingsConsole).toContain("refreshLocalCredentialStatus");
+    expect(settingsConsole).toContain("fetch(\"/api/web3-local-credentials\", { method: \"GET\" })");
+    expect(settingsConsole).toContain("Check server status performs a read-only GET");
     expect(settingsConsole).toContain("Runtime");
     expect(settingsConsole).toContain("runtime_effective_next_action");
     expect(settingsConsole).toContain("runtime_applied_keys");

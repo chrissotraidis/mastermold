@@ -164,6 +164,8 @@ async function verifySettingsCredentialsPage() {
     /Rejected fields/,
     /Open contract JSON/,
     /\/api\/web3-dedicated-wallet-intake-contract/,
+    /Check server status/,
+    /Local credential installer/,
     /live blocked/,
     /secrets rejected/,
   ];
@@ -175,6 +177,7 @@ async function verifySettingsCredentialsPage() {
   assert(text.includes("Validate-only wallet intake") && text.includes("POST /api/web3-dedicated-wallet-intake-contract"), "Settings should expose validate-only wallet intake before saving.", text);
   assert(text.includes("Open contract JSON"), "Settings should link the wallet intake contract JSON.", text);
   assert(text.includes("/api/web3-dedicated-wallet-intake-contract"), "Settings should include the wallet intake contract endpoint.", text);
+  assert(text.includes("Check server status") && text.includes("Local credential installer"), "Settings should expose read-only local credential status next to the installer.", text);
   assert(text.includes("live blocked") && text.includes("secrets rejected"), "Settings should keep the wallet intake safety boundary visible.", text);
   record("settings-credentials-page", "pass", "Settings renders the wallet intake contract with validate-only POST, accepted/rejected fields, and live authority blocked");
 }

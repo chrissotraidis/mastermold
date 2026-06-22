@@ -442,6 +442,10 @@ localhost-only `/api/web3-local-credentials` status receipt with GET only, repor
 and missing local env target names, refuses unsafe secret-shaped flags, and verifies live
 execution, wallet mutation, and secret echo remain blocked. It never posts credentials, signs,
 submits, stores wallet authority, or moves funds.
+Settings loads the same redacted local credential status on the Web3 credential console and
+the `Check server status` button refreshes it without posting values, so the operator can see
+what the running server can actually read before installing Jupiter, canary flags, signer,
+ops, accounting, or worker targets.
 The Settings credential console can also detect or connect a browser Solana wallet only
 far enough to read the public address into the dry-run scope, then optionally prove wallet
 ownership with a text-only signature whose local audit receipt stores only challenge and signature hashes.

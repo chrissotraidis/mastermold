@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Activity, RefreshCw, Save, ShieldCheck, Terminal, Wallet, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -169,6 +169,7 @@ export function SettingsWeb3CredentialConsole({
   const [jupiterReceipt, setJupiterReceipt] = useState<Web3JupiterRehearsalReceipt | null>(null);
   const [doctorRefreshReceipt, setDoctorRefreshReceipt] = useState<Web3CredentialDoctorRefreshReceipt | null>(null);
   const [localInstallReceipt, setLocalInstallReceipt] = useState<Web3LocalCredentialInstallReceipt | null>(null);
+  const [localStatusRefreshing, setLocalStatusRefreshing] = useState(false);
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveCapitalPreflightReceipt | null>(null);
   const [unsignedCanaryPreflightReceipt, setUnsignedCanaryPreflightReceipt] = useState<Web3LiveUnsignedOrderPreflightReceipt | null>(null);
   const [unsignedCanaryReceipt, setUnsignedCanaryReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
@@ -188,6 +189,30 @@ export function SettingsWeb3CredentialConsole({
         ? "Session value updated. Use a public wallet address only."
         : "Session value updated.");
   }
+
+  const refreshLocalCredentialStatus = useCallback(async ({ announce = true }: { announce?: boolean } = {}) => {
+    setLocalStatusRefreshing(true);
+    if (announce) setMessage("Checking redacted local Web3 credential status from the running server...");
+    try {
+      const response = await fetch("/api/web3-local-credentials", { method: "GET" });
+      const payload = (await response.json().catch(() => null)) as Web3LocalCredentialInstallReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Local credential status check failed.");
+      }
+      setLocalInstallReceipt(payload);
+      if (announce) setMessage(`Local credential status: ${payload.summary} Next: ${payload.next_action}`);
+      return payload;
+    } catch (error) {
+      if (announce) setMessage(error instanceof Error ? error.message : "Local credential status check failed.");
+      return null;
+    } finally {
+      setLocalStatusRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshLocalCredentialStatus({ announce: false });
+  }, [refreshLocalCredentialStatus]);
 
   async function testCredentials() {
     setBusy("credentials");
@@ -1627,9 +1652,18 @@ export function SettingsWeb3CredentialConsole({
             <Terminal className={cn("size-3.5 shrink-0", busy === "install" && "animate-pulse")} aria-hidden="true" />
             {busy === "install" ? "Installing" : "Install local env"}
           </button>
+          <button
+            type="button"
+            onClick={() => void refreshLocalCredentialStatus()}
+            disabled={disabled || localStatusRefreshing}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-engine/45 bg-engine/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-engine transition hover:bg-engine/15 disabled:cursor-not-allowed disabled:border-outline-variant/40 disabled:bg-void/20 disabled:text-outline"
+          >
+            <RefreshCw className={cn("size-3.5 shrink-0", localStatusRefreshing && "animate-spin")} aria-hidden="true" />
+            {localStatusRefreshing ? "Checking" : "Check server status"}
+          </button>
         </div>
         <p className="mt-2 text-[11px] leading-4 text-outline">
-          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, exact first-canary flags, signer-provider, emergency-stop, production-worker, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps wallet mutation blocked.
+          Local install accepts only Helius, Solana RPC/WebSocket, Jupiter, exact first-canary flags, signer-provider, emergency-stop, production-worker, and accounting fields, writes to ignored local env on trusted localhost, clears page-sensitive fields after success, and keeps wallet mutation blocked. Check server status performs a read-only GET and never posts credentials.
         </p>
         {localInstallReceipt ? (
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-7" aria-label="Local Web3 credential install receipt">
