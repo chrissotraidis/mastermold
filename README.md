@@ -96,6 +96,7 @@ npm run reconcile-settlement:web3 -- --base-url=http://localhost:4010 --json
 npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
 npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json
 npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json
+npm run validate-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json
 npm run verify:web3 -- --base-url=http://localhost:4010
 npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet
 npm run verify:web3 -- --base-url=http://localhost:4010 --require-jupiter-order
@@ -134,7 +135,7 @@ closed if real-capital readiness appears without explicit `--allow-live-ready` r
 it never signs, submits, or moves funds. The live canary proof command reads the canary
 receipt and can optionally run the guarded settlement watchdog for the latest stored
 signature; it exits nonzero until signed relay, chain confirmation, settlement
-reconciliation, and local portfolio mirror proof all pass. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
+reconciliation, and local portfolio mirror proof all pass. The wallet intake validator posts only a public wallet and optional dry-run caps to the validate-only intake endpoint, fails if the full wallet is echoed, prints the next proof runway, and never saves state, signs, submits, or accepts wallet secrets. The settlement reconciliation drill inspects only local relay, lifecycle, and audit
 metadata; it requires relayed transactions to keep signature/request/payload evidence and
 can poll the latest audited relayed signature with Solana `getSignatureStatuses` through
 the guarded `confirmation_poll` API path. Confirmed transactions must map to a landed
