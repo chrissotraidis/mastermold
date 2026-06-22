@@ -137,6 +137,7 @@ export async function GET() {
     requirements: web3CredentialRequirements,
     liveUsability: web3LiveUsability,
     liveAutonomy: web3State.autonomous_live_autonomy_readiness,
+    operatorWalletPublicKey: web3State.execution_readiness.config.wallet_public_key,
   });
   const web3Canary = buildWeb3LiveTradeCanaryReceipt(web3State);
   const web3LiveIgnition = buildWeb3LiveIgnitionReceipt({

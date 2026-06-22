@@ -3047,6 +3047,8 @@ describe("Web3 autonomous trading subsystem", () => {
       receipt_hash: string;
       summary: string;
       readiness_score: number;
+      operator_wallet_public_key: string | null;
+      operator_wallet_strict_command: string | null;
       can_run_unattended: boolean;
       can_trade_real_capital: boolean;
       live_execution_permitted: boolean;
@@ -3092,6 +3094,13 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.readiness_score).toBeGreaterThanOrEqual(0);
     expect(receipt.readiness_score).toBeLessThanOrEqual(100);
+    if (receipt.operator_wallet_public_key) {
+      expect(receipt.operator_wallet_strict_command).toBe(`npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${receipt.operator_wallet_public_key} --require-operator-wallet`);
+      expect(receipt.activation_commands.join(" ")).toContain(`--wallet=${receipt.operator_wallet_public_key}`);
+      expect(receipt.activation_commands.join(" ")).not.toContain("<public-solana-address>");
+      expect(receipt.text_packet).not.toContain("<public-solana-address>");
+      expect(receipt.milestones.map((item) => item.verifier_command ?? "").join(" ")).not.toContain("<public-solana-address>");
+    }
     expect(receipt.activation_permitted).toBe(false);
     expect(receipt.can_trade_real_capital).toBe(false);
     expect(receipt.live_execution_permitted).toBe(false);

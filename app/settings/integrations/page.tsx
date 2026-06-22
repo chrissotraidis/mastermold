@@ -179,6 +179,7 @@ export default async function IntegrationsSettingsPage() {
     requirements: web3CredentialRequirements,
     liveUsability: web3LiveUsabilityBlockers,
     liveAutonomy: web3State.autonomous_live_autonomy_readiness,
+    operatorWalletPublicKey: web3State.execution_readiness.config.wallet_public_key,
   });
   const web3LiveTradeCanary = buildWeb3LiveTradeCanaryReceipt(web3State);
   const web3LiveIgnition = buildWeb3LiveIgnitionReceipt({

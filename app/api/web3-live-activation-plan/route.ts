@@ -5,7 +5,16 @@ import { GET as LIVE_USABILITY_BLOCKERS_GET } from "@/app/api/web3-live-usabilit
 import { buildWeb3LiveActivationPlan, type Web3LiveActivationPlan } from "@/src/db/web3-live-activation-plan";
 import type { Web3CredentialRequirementsReceipt } from "@/src/db/web3-credential-requirements";
 import type { Web3LiveUsabilityBlockersReceipt } from "@/src/db/web3-live-usability-blockers";
-import type { Web3TradingState } from "@/src/db/web3-trading";
+import {
+  getWeb3TradingStateAsync,
+  isTradingAccountMode,
+  isTradingMarketSource,
+  isTradingScenario,
+  type TradingAccountMode,
+  type TradingMarketSource,
+  type TradingScenario,
+  type Web3TradingState,
+} from "@/src/db/web3-trading";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,12 +46,34 @@ export async function GET(request: Request): Promise<NextResponse<Web3LiveActiva
       status: liveAutonomyResponse.status,
     });
   }
+  const state = await getActivationTradingState(request.url);
 
   return NextResponse.json(buildWeb3LiveActivationPlan({
     requirements: requirementsPayload,
     liveUsability: liveUsabilityPayload,
     liveAutonomy: liveAutonomyPayload,
+    operatorWalletPublicKey: state.execution_readiness.config.wallet_public_key,
   }));
+}
+
+async function getActivationTradingState(url: string) {
+  const search = new URL(url).searchParams;
+  const scenario = search.get("scenario") ?? "breakout";
+  const source = search.get("source") ?? "live-dex";
+  const account = search.get("account") ?? "persistent";
+  const cycles = Number(search.get("cycles") ?? "0");
+
+  if (!isTradingScenario(scenario) || !isTradingMarketSource(source) || !isTradingAccountMode(account)) {
+    throw new Error("Live activation source parameters were not validated by source packets.");
+  }
+
+  return getWeb3TradingStateAsync({
+    scenario: scenario as TradingScenario,
+    source: source as TradingMarketSource,
+    account: account as TradingAccountMode,
+    cycles,
+    advance: false,
+  });
 }
 
 function withRowsAll(url: string) {

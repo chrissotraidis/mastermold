@@ -1351,6 +1351,15 @@ async function verifyLiveActivationPlanPacket() {
   assert(json.live_execution_permitted === false, "Live activation plan must keep live execution disabled.", json);
   assert(["dedicated-public-wallet", "wallet-ownership-proof"].includes(json.next_milestone?.id), "Live activation plan should expose the current wallet gate as the next milestone.", json.next_milestone);
   assert(String(json.next_milestone?.verifier_command ?? "").includes("--require-operator-wallet"), "Live activation plan next milestone should expose the strict wallet verifier.", json.next_milestone);
+  if (json.operator_wallet_public_key) {
+    const joinedCommands = json.activation_commands.join(" ");
+    const joinedMilestoneCommands = json.milestones.map((item) => item.verifier_command ?? "").join(" ");
+    assert(String(json.operator_wallet_strict_command ?? "").includes(`--wallet=${json.operator_wallet_public_key}`), "Live activation plan should expose a wallet-bound strict verifier when the public wallet is scoped.", json);
+    assert(joinedCommands.includes(`--wallet=${json.operator_wallet_public_key}`), "Live activation commands should include the scoped public wallet verifier.", json.activation_commands);
+    assert(!joinedCommands.includes("<public-solana-address>"), "Live activation commands should not keep the placeholder when a scoped public wallet is known.", json.activation_commands);
+    assert(!joinedMilestoneCommands.includes("<public-solana-address>"), "Live activation milestone commands should not keep the placeholder when a scoped public wallet is known.", json.milestones);
+    assert(!String(json.text_packet ?? "").includes("<public-solana-address>"), "Live activation text should not keep the placeholder when a scoped public wallet is known.", json.text_packet);
+  }
   assert(Array.isArray(json.milestones) && json.milestones.length >= 10, "Live activation plan should include ordered milestones.", json.milestones);
   assert(json.milestones.some((item) => item.id === "live-autonomy-final-gate"), "Live activation plan should include the final live-autonomy gate.", json.milestones);
   assert(json.milestones.every((item) => item.blocks_live_capital === true && typeof item.completion_signal === "string" && item.completion_signal.length > 0), "Live activation milestones should block live capital and name completion signals.", json.milestones);

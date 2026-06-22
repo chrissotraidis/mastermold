@@ -34,6 +34,8 @@ export type Web3LiveActivationPlan = {
   readiness_score: number;
   live_autonomy_status: Web3TradingState["autonomous_live_autonomy_readiness"]["status"];
   live_usability_status: Web3LiveUsabilityBlockersReceipt["status"];
+  operator_wallet_public_key: string | null;
+  operator_wallet_strict_command: string | null;
   can_run_unattended: boolean;
   can_trade_real_capital: boolean;
   live_execution_permitted: boolean;
@@ -73,6 +75,8 @@ export type Web3LiveActivationPlanHealth = {
   readiness_score: number;
   live_autonomy_status: Web3LiveActivationPlan["live_autonomy_status"];
   live_usability_status: Web3LiveActivationPlan["live_usability_status"];
+  operator_wallet_public_key: string | null;
+  operator_wallet_strict_command: string | null;
   can_run_unattended: boolean;
   can_trade_real_capital: boolean;
   live_execution_permitted: boolean;
@@ -96,9 +100,12 @@ export function buildWeb3LiveActivationPlan(input: {
   requirements: Web3CredentialRequirementsReceipt;
   liveUsability: Web3LiveUsabilityBlockersReceipt;
   liveAutonomy: Web3TradingState["autonomous_live_autonomy_readiness"];
+  operatorWalletPublicKey?: string | null;
   now?: Date;
 }): Web3LiveActivationPlan {
   const generatedAt = (input.now ?? new Date()).toISOString();
+  const operatorWalletPublicKey = safeWalletCommandValue(input.operatorWalletPublicKey);
+  const operatorWalletStrictCommand = walletStrictVerifierCommand(operatorWalletPublicKey);
   const milestones = buildActivationMilestones(input);
   const nextMilestone = milestones.find((item) => item.status === "next") ??
     milestones.find((item) => item.status === "blocked") ??
@@ -117,6 +124,8 @@ export function buildWeb3LiveActivationPlan(input: {
     readiness_score: input.liveAutonomy.readiness_score,
     live_autonomy_status: input.liveAutonomy.status,
     live_usability_status: input.liveUsability.status,
+    operator_wallet_public_key: operatorWalletPublicKey,
+    operator_wallet_strict_command: operatorWalletStrictCommand,
     can_run_unattended: input.liveAutonomy.can_run_unattended,
     can_trade_real_capital: input.liveAutonomy.can_trade_real_capital,
     live_execution_permitted: input.liveAutonomy.live_execution_permitted,
@@ -173,6 +182,8 @@ export function buildWeb3LiveActivationPlanHealth(
     readiness_score: plan.readiness_score,
     live_autonomy_status: plan.live_autonomy_status,
     live_usability_status: plan.live_usability_status,
+    operator_wallet_public_key: plan.operator_wallet_public_key,
+    operator_wallet_strict_command: plan.operator_wallet_strict_command,
     can_run_unattended: plan.can_run_unattended,
     can_trade_real_capital: plan.can_trade_real_capital,
     live_execution_permitted: plan.live_execution_permitted,
@@ -197,6 +208,7 @@ function buildActivationMilestones(input: {
   requirements: Web3CredentialRequirementsReceipt;
   liveUsability: Web3LiveUsabilityBlockersReceipt;
   liveAutonomy: Web3TradingState["autonomous_live_autonomy_readiness"];
+  operatorWalletPublicKey?: string | null;
 }): Web3LiveActivationMilestone[] {
   const nextRequirementId = input.requirements.next_requirement?.id ?? null;
   const dedicatedWalletReady = input.liveUsability.operator_unlock_sequence.some((step) =>
@@ -240,7 +252,10 @@ function buildActivationMilestones(input: {
       storage_rule: "status-only",
       target_names: ["web3_live_autonomy_readiness"],
       completion_signal: "Daemon, market, route, fees, policy, signer, relay, and kill-switch items pass with external live-executor approval.",
-      verifier_command: "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
+      verifier_command: walletScopedCommand(
+        "npm run verify:web3 -- --base-url=http://localhost:4010 --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
+        input.operatorWalletPublicKey,
+      ),
       next_action: input.liveAutonomy.next_action,
       blocks_live_capital: true,
     },
@@ -252,14 +267,19 @@ function verifierCommandForRequirement(
   input: {
     requirements: Web3CredentialRequirementsReceipt;
     liveUsability: Web3LiveUsabilityBlockersReceipt;
+    operatorWalletPublicKey?: string | null;
   },
 ) {
   if (id === "dedicated-public-wallet" || id === "wallet-ownership-proof") {
-    return input.liveUsability.next_credential_request?.verifier_command ??
+    return walletScopedCommand(input.liveUsability.next_credential_request?.verifier_command, input.operatorWalletPublicKey) ??
+      walletStrictVerifierCommand(input.operatorWalletPublicKey) ??
       "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet";
   }
   if (id === "jupiter-order-rail") {
-    return "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order";
+    return walletScopedCommand(
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order",
+      input.operatorWalletPublicKey,
+    );
   }
   if (id === "read-provider-rail") {
     return "npm run verify:web3 -- --base-url=http://localhost:4010 --require-dex-live";
@@ -288,13 +308,18 @@ function activationPlanStatus(
 function buildActivationCommands(input: {
   requirements: Web3CredentialRequirementsReceipt;
   liveUsability: Web3LiveUsabilityBlockersReceipt;
+  operatorWalletPublicKey?: string | null;
 }) {
   return Array.from(new Set([
     ...input.requirements.safe_export_commands,
-    ...input.liveUsability.verifier_commands,
+    ...input.liveUsability.verifier_commands.map((command) => walletScopedCommand(command, input.operatorWalletPublicKey)),
     "npm run --silent activate:web3 -- --base-url=http://localhost:4010",
-    "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
-    "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
+    walletStrictVerifierCommand(input.operatorWalletPublicKey) ??
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet",
+    walletScopedCommand(
+      "npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet --require-jupiter-order --require-dex-live --require-live-canary",
+      input.operatorWalletPublicKey,
+    ),
     "npm run preflight-live:web3 -- --base-url=http://localhost:4010 --source=live-dex --account=persistent --scenario=breakout --json",
   ].filter((command): command is string => typeof command === "string" && command.length > 0)));
 }
@@ -353,6 +378,8 @@ function renderActivationPlanText(
     `Source: ${receipt.source}`,
     `Account: ${receipt.account}`,
     `Scenario: ${receipt.scenario}`,
+    `Operator wallet: ${receipt.operator_wallet_public_key ?? "not scoped"}`,
+    receipt.operator_wallet_strict_command ? `Operator wallet verifier: ${receipt.operator_wallet_strict_command}` : null,
     `Readiness score: ${receipt.readiness_score}/100`,
     `Activation permitted: ${receipt.activation_permitted ? "yes" : "no"}`,
     "",
@@ -381,6 +408,33 @@ function renderActivationPlanText(
     "## Controls",
     ...receipt.controls.map((control) => `- ${control}`),
   ].join("\n");
+}
+
+function safeWalletCommandValue(walletPublicKey: string | null | undefined) {
+  if (typeof walletPublicKey !== "string") return null;
+  const trimmed = walletPublicKey.trim();
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function walletStrictVerifierCommand(walletPublicKey: string | null | undefined) {
+  const wallet = safeWalletCommandValue(walletPublicKey);
+  return wallet
+    ? `npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=${wallet} --require-operator-wallet`
+    : null;
+}
+
+function walletScopedCommand(command: string | null | undefined, walletPublicKey: string | null | undefined) {
+  if (!command) return null;
+  const wallet = safeWalletCommandValue(walletPublicKey);
+  if (!wallet) return command;
+  if (command.includes("--wallet=<public-solana-address>")) {
+    return command.replaceAll("--wallet=<public-solana-address>", `--wallet=${wallet}`);
+  }
+  if (command.includes("--require-operator-wallet") && !command.includes("--wallet=")) {
+    return command.replace("--require-operator-wallet", `--wallet=${wallet} --require-operator-wallet`);
+  }
+  return command;
 }
 
 function hashJson(value: unknown) {
