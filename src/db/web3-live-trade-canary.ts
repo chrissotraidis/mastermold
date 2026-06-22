@@ -48,6 +48,7 @@ export type Web3LiveTradeCanaryReceipt = {
   live_execution_arming_status: Web3TradingState["live_execution_arming"]["status"];
   live_autonomy_status: Web3TradingState["autonomous_live_autonomy_readiness"]["status"];
   signed_relay_status: Web3TradingState["signed_transaction_relay"]["status"];
+  signed_relay_submit_path: Web3TradingState["signed_transaction_relay"]["submit_path"];
   signed_relay_accepts_payload: boolean;
   order_handoff_status: Web3TradingState["autonomous_order_handoff"]["status"];
   signer_status: Web3TradingState["autonomous_signer_ops"]["status"];
@@ -120,7 +121,8 @@ export type Web3LiveTradeCanaryActionReceipt = {
   real_funds_moved_by_this_app: boolean;
   request_id: string | null;
   expected_request_id: string | null;
-  request_continuity_status: "matched" | "missing-current-request" | "mismatch" | "relay-not-ready" | "not-checked";
+  expected_route: "jupiter-swap-v2" | "solana-rpc" | null;
+  request_continuity_status: "matched" | "missing-current-request" | "mismatch" | "route-mismatch" | "relay-not-ready" | "not-checked";
   current_relay_ready: boolean;
   route: "jupiter-swap-v2" | "solana-rpc" | null;
   signed_payload_received: boolean;
@@ -186,7 +188,8 @@ export function buildWeb3LiveTradeCanaryActionReceipt(input: {
     real_funds_moved_by_this_app: after.real_funds_moved_by_this_app,
     request_id: input.requestId,
     expected_request_id: input.before.current_request_id,
-    request_continuity_status: liveCanaryRequestContinuityStatus(input.before, input.requestId),
+    expected_route: liveCanaryExpectedRoute(input.before),
+    request_continuity_status: liveCanaryRequestContinuityStatus(input.before, input.requestId, input.route),
     current_relay_ready: input.before.can_submit_from_app_now,
     route: input.route,
     signed_payload_received: Boolean(input.signedPayloadHash),
@@ -224,12 +227,16 @@ export function buildWeb3LiveTradeCanaryActionReceipt(input: {
 export function liveCanaryRequestContinuityBlockers(
   before: Web3LiveTradeCanaryReceipt,
   requestId: string,
+  route?: "jupiter-swap-v2" | "solana-rpc" | null,
 ): string[] {
   if (!before.current_request_id) {
     return ["No active canary request id is ready; request a fresh one-shot unsigned order before relaying a signed payload."];
   }
   if (requestId !== before.current_request_id) {
     return [`request_id must match the current canary request ${before.current_request_id}.`];
+  }
+  if (route && before.signed_relay_submit_path !== "not-configured" && route !== before.signed_relay_submit_path) {
+    return [`route must match the current canary submit path ${before.signed_relay_submit_path}.`];
   }
   if (!before.can_submit_from_app_now) {
     return ["Current canary relay is not ready to accept a signed payload; clear the signed-relay readiness gate first."];
@@ -240,12 +247,20 @@ export function liveCanaryRequestContinuityBlockers(
 function liveCanaryRequestContinuityStatus(
   before: Web3LiveTradeCanaryReceipt,
   requestId: string | null,
+  route?: "jupiter-swap-v2" | "solana-rpc" | null,
 ): Web3LiveTradeCanaryActionReceipt["request_continuity_status"] {
   if (!requestId) return "not-checked";
   if (!before.current_request_id) return "missing-current-request";
   if (requestId !== before.current_request_id) return "mismatch";
+  if (route && before.signed_relay_submit_path !== "not-configured" && route !== before.signed_relay_submit_path) return "route-mismatch";
   if (!before.can_submit_from_app_now) return "relay-not-ready";
   return "matched";
+}
+
+function liveCanaryExpectedRoute(before: Web3LiveTradeCanaryReceipt) {
+  return before.signed_relay_submit_path === "jupiter-swap-v2" || before.signed_relay_submit_path === "solana-rpc"
+    ? before.signed_relay_submit_path
+    : null;
 }
 
 export function buildWeb3LiveTradeCanaryReceipt(
@@ -300,6 +315,7 @@ export function buildWeb3LiveTradeCanaryReceipt(
     live_execution_arming_status: state.live_execution_arming.status,
     live_autonomy_status: state.autonomous_live_autonomy_readiness.status,
     signed_relay_status: state.signed_transaction_relay.status,
+    signed_relay_submit_path: state.signed_transaction_relay.submit_path,
     signed_relay_accepts_payload: state.signed_transaction_relay.can_accept_signed_payload,
     order_handoff_status: state.autonomous_order_handoff.status,
     signer_status: state.autonomous_signer_ops.status,

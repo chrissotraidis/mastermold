@@ -691,7 +691,7 @@ export function Web3LiveCanaryConsole({
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <CanaryMetric label="Actual trade" value={actualTradeTested ? "yes" : "no"} tone={actualTradeTested ? "engine" : "critical"} />
             <CanaryMetric label="Browser sign" value={canaryReceipt.browser_wallet_signature_flow.replaceAll("-", " ")} tone="caution" />
-            <CanaryMetric label="Submit path" value={canaryReceipt.transaction_submission_permission.replaceAll("-", " ")} tone={canaryReceipt.can_submit_from_app_now ? "caution" : "neutral"} />
+            <CanaryMetric label="Relay route" value={canaryReceipt.signed_relay_submit_path.replaceAll("-", " ")} tone={canaryReceipt.can_submit_from_app_now ? "caution" : "neutral"} />
             <CanaryMetric label="Wallet" value={walletPreview ?? "not connected"} tone={walletPreview ? "caution" : "neutral"} />
           </div>
 
@@ -1185,6 +1185,7 @@ export function Web3LiveCanaryConsole({
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <CanaryMetric label="Confirm" value={canaryReceipt.confirmation_poll_status.replaceAll("-", " ")} tone={canaryReceipt.confirmation_poll_status === "confirmed" ? "engine" : "neutral"} />
+              <CanaryMetric label="Route" value={canaryReceipt.signed_relay_submit_path.replaceAll("-", " ")} tone={canaryReceipt.signed_relay_submit_path === "not-configured" ? "critical" : "caution"} />
               <CanaryMetric label="Settle" value={canaryReceipt.settlement_reconciliation_status.replaceAll("-", " ")} tone={canaryReceipt.settlement_reconciliation_status === "reconciled" ? "engine" : "neutral"} />
               <CanaryMetric label="Watchdog" value={canaryReceipt.settlement_watchdog_status.replaceAll("-", " ")} tone={["mirrored", "reconciled", "confirmed"].includes(canaryReceipt.settlement_watchdog_status) ? "engine" : "neutral"} />
               <CanaryMetric label="Mirror" value={canaryReceipt.portfolio_mirror_status.replaceAll("-", " ")} tone={["applied", "duplicate"].includes(canaryReceipt.portfolio_mirror_status) ? "engine" : "neutral"} />

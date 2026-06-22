@@ -3466,6 +3466,7 @@ describe("Web3 autonomous trading subsystem", () => {
       unsigned_transaction_return: string;
       live_execution_gate_enabled: boolean;
       signed_relay_status: string;
+      signed_relay_submit_path: string;
       signed_relay_accepts_payload: boolean;
       current_request_id: string | null;
       latest_signature_preview: string | null;
@@ -3511,6 +3512,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(receipt.browser_wallet_signature_flow).toBe("gated-unsigned-handoff");
     expect(receipt.unsigned_transaction_return).toBe("withheld");
     expect(receipt.live_execution_gate_enabled).toBe(false);
+    expect(receipt.signed_relay_submit_path).toMatch(/not-configured|jupiter-swap-v2|solana-rpc/);
     expect(receipt.signed_relay_accepts_payload).toBe(false);
     expect(receipt.current_request_id).toBeNull();
     expect(receipt.latest_signature_preview).toBeNull();
@@ -3632,6 +3634,7 @@ describe("Web3 autonomous trading subsystem", () => {
       signed_payload_received: boolean;
       signed_payload_echoed: boolean;
       expected_request_id: string | null;
+      expected_route: string | null;
       request_continuity_status: string;
       current_relay_ready: boolean;
       signed_payload_hash: string | null;
@@ -3647,6 +3650,7 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(actionReceipt.signed_payload_received).toBe(true);
     expect(actionReceipt.signed_payload_echoed).toBe(false);
     expect(actionReceipt.expected_request_id).toBeNull();
+    expect(actionReceipt.expected_route).toBeNull();
     expect(actionReceipt.request_continuity_status).toBe("missing-current-request");
     expect(actionReceipt.current_relay_ready).toBe(false);
     expect(actionReceipt.signed_payload_hash).toMatch(/^[0-9a-f]{64}$/);
@@ -3691,12 +3695,15 @@ describe("Web3 autonomous trading subsystem", () => {
       ...receipt,
       current_request_id: "order-current-001",
       can_submit_from_app_now: true,
+      signed_relay_submit_path: "jupiter-swap-v2",
     };
     const mismatch = liveCanaryRequestContinuityBlockers(readyReceipt, "stale-order-001");
     const matched = liveCanaryRequestContinuityBlockers(readyReceipt, "order-current-001");
+    const routeMismatch = liveCanaryRequestContinuityBlockers(readyReceipt, "order-current-001", "solana-rpc");
 
     expect(missing.join(" ")).toContain("No active canary request id");
     expect(mismatch).toEqual(["request_id must match the current canary request order-current-001."]);
+    expect(routeMismatch).toEqual(["route must match the current canary submit path jupiter-swap-v2."]);
     expect(matched).toEqual([]);
   });
 

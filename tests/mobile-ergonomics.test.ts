@@ -2066,6 +2066,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("web3-live-trade-canary-action");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("request_continuity_status");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("expected_request_id");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("expected_route");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("route-mismatch");
+    expect(source("src/db/web3-live-trade-canary.ts")).toContain("signed_relay_submit_path");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("signed_payload_echoed");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("post_signing_evidence_status");
     expect(source("src/db/web3-live-trade-canary.ts")).toContain("settlement-accounted");
@@ -2078,6 +2081,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/settings/integrations/page.tsx")).toContain("receipt.post_signing_next_action");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Post-signing proof chain");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading post-signing proof chain");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Relay route");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading canary gate snapshot");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Canary gate snapshot");
     expect(source("components/web3-live-canary-console.tsx")).toContain("Trading current canary gate action");
