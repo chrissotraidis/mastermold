@@ -24,7 +24,10 @@ import { buildWeb3AccountSetupReceipt } from "@/src/db/web3-account-setup";
 import { buildWeb3AccountAcquisitionReceipt } from "@/src/db/web3-account-acquisition";
 import { buildWeb3SignerCredentialPacket } from "@/src/db/web3-signer-credential-packet";
 import {
+  buildWeb3SupervisedCanaryAttemptReceipt,
   buildWeb3SupervisedCanaryReadinessReceipt,
+  persistWeb3SupervisedCanaryAttemptReceipt,
+  type Web3SupervisedCanaryAttemptReceipt,
   type Web3SupervisedCanaryReadinessReceipt,
 } from "@/src/db/web3-supervised-canary-readiness";
 import {
@@ -44,8 +47,44 @@ export async function GET(request: Request): Promise<NextResponse<Web3Supervised
   const parsed = parseCanaryReadinessQuery(request.url);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
 
+  return NextResponse.json(await buildReadinessReceipt(parsed.value));
+}
+
+export async function POST(request: Request): Promise<NextResponse<Web3SupervisedCanaryAttemptReceipt | { error: string; unsafe_fields?: string[] }>> {
+  const parsed = parseCanaryReadinessQuery(request.url);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 422 });
+  }
+  const record = isPlainObject(body) ? body : {};
+  const unsafeFields = findUnsafeFields(record);
+  if (unsafeFields.length > 0) {
+    return NextResponse.json({
+      error: "Live canary attempt snapshots cannot accept secrets, transaction bytes, or wallet authority.",
+      unsafe_fields: unsafeFields,
+    }, { status: 422 });
+  }
+  if (record.operator_ack !== true) {
+    return NextResponse.json({ error: "operator_ack must be true before recording a live canary attempt snapshot." }, { status: 422 });
+  }
+
+  const readiness = await buildReadinessReceipt(parsed.value);
+  const receipt = buildWeb3SupervisedCanaryAttemptReceipt({
+    readiness,
+    operatorAcknowledged: true,
+    operatorNote: typeof record.operator_note === "string" ? record.operator_note : null,
+  });
+  persistWeb3SupervisedCanaryAttemptReceipt(receipt);
+  return NextResponse.json(receipt);
+}
+
+async function buildReadinessReceipt(input: { scenario: TradingScenario; source: TradingMarketSource; account: TradingAccountMode; cycles: number }): Promise<Web3SupervisedCanaryReadinessReceipt> {
   const state = await getWeb3TradingStateAsync({
-    ...parsed.value,
+    ...input,
     advance: false,
   });
   const wallet = buildWeb3DedicatedWalletPacket(state);
@@ -131,7 +170,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3Supervised
     max_slippage_bps: state.execution_readiness.config.max_slippage_bps,
   });
 
-  return NextResponse.json(buildWeb3SupervisedCanaryReadinessReceipt({
+  return buildWeb3SupervisedCanaryReadinessReceipt({
     state,
     wallet,
     jupiter,
@@ -140,7 +179,7 @@ export async function GET(request: Request): Promise<NextResponse<Web3Supervised
     ignition,
     unsignedPreflight,
     canary,
-  }));
+  });
 }
 
 function parseCanaryReadinessQuery(url: string):
@@ -174,4 +213,47 @@ function parseCanaryReadinessQuery(url: string):
       cycles,
     },
   };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function findUnsafeFields(value: unknown, path = ""): string[] {
+  if (!isPlainObject(value)) return [];
+  return Object.entries(value).flatMap(([key, child]) => {
+    const childPath = path ? `${path}.${key}` : key;
+    const unsafeKey = unsafeKeyPatterns.some((pattern) => pattern.test(key));
+    const unsafeValue = typeof child === "string" && looksSecretLike(child);
+    const nested = isPlainObject(child) ? findUnsafeFields(child, childPath) : [];
+    return [
+      unsafeKey || unsafeValue ? childPath : null,
+      ...nested,
+    ].filter((item): item is string => Boolean(item));
+  });
+}
+
+const unsafeKeyPatterns = [
+  /private/i,
+  /seed/i,
+  /mnemonic/i,
+  /keypair/i,
+  /secret/i,
+  /password/i,
+  /token/i,
+  /api[_-]?key/i,
+  /raw[_-]?transaction/i,
+  /unsigned[_-]?transaction/i,
+  /signed[_-]?transaction/i,
+  /transaction[_-]?bytes/i,
+  /signed[_-]?payload/i,
+];
+
+function looksSecretLike(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/api-key=|bearer\s+[A-Za-z0-9._-]{16,}|sk-[A-Za-z0-9_-]{16,}/i.test(trimmed)) return true;
+  if (/private[_\s-]?key|seed\s+phrase|mnemonic|keypair/i.test(trimmed)) return true;
+  if (trimmed.split(/\s+/).length >= 12 && /^[a-z\s]+$/i.test(trimmed)) return true;
+  return false;
 }

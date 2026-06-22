@@ -858,6 +858,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Trading supervised canary readiness lanes");
     expect(tradingPage).toContain("Trading first live canary attempt contract");
     expect(tradingPage).toContain("Live canary attempt contract");
+    expect(tradingPage).toContain("Trading latest live canary gate check");
+    expect(tradingPage).toContain("No live gate check receipt recorded yet");
     expect(tradingPage).toContain("attempt.exact_next_command");
     expect(tradingPage).toContain("tiny unsigned order, external browser-wallet signature, guarded signed-payload relay");
     expect(tradingPage).toContain("Open ignition JSON");
@@ -866,6 +868,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("web3-supervised-canary-readiness");
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("first funded canary readiness ladder");
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("web3-first-live-canary-attempt-contract");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("web3-first-live-canary-attempt-receipt");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("latest_attempt_receipt");
+    expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("persistWeb3SupervisedCanaryAttemptReceipt");
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("web3-first-live-canary-attempt-health");
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("canary_attempt_contract");
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("runnable_now");
@@ -874,6 +879,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("Wait for wallet proof, Jupiter order proof, live flags, unsigned preflight, and a current request id before opening the external wallet transaction prompt.");
     expect(source("src/db/web3-supervised-canary-readiness.ts")).toContain("Complete manual live review for the tiny cap, emergency stop, settlement/accounting owner, and operator signoff");
     expect(source("app/api/web3-supervised-canary-readiness/route.ts")).toContain("buildWeb3SupervisedCanaryReadinessReceipt");
+    expect(source("app/api/web3-supervised-canary-readiness/route.ts")).toContain("export async function POST");
+    expect(source("app/api/web3-supervised-canary-readiness/route.ts")).toContain("recording a live canary attempt snapshot");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Record gate check");
+    expect(source("components/web3-live-canary-console.tsx")).toContain("Trading live canary gate check receipt");
     expect(source("app/api/health/route.ts")).toContain("web3_live_canary_attempt");
     expect(source("src/db/web3-live-ignition.ts")).toContain("web3-live-ignition");
     expect(source("src/db/web3-live-ignition.ts")).toContain("can_autonomously_trade_real_money_now");

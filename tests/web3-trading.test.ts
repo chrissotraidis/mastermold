@@ -21,7 +21,7 @@ import { GET as FIRST_CANARY_DRILL_GET } from "@/app/api/web3-first-canary-drill
 import { GET as LIVE_PREFLIGHT_GET } from "@/app/api/web3-live-capital-preflight/route";
 import { GET as LIVE_AUTONOMY_READINESS_GET } from "@/app/api/web3-live-autonomy-readiness/route";
 import { GET as LIVE_IGNITION_GET, POST as LIVE_IGNITION_POST } from "@/app/api/web3-live-ignition/route";
-import { GET as SUPERVISED_CANARY_READINESS_GET } from "@/app/api/web3-supervised-canary-readiness/route";
+import { GET as SUPERVISED_CANARY_READINESS_GET, POST as SUPERVISED_CANARY_READINESS_POST } from "@/app/api/web3-supervised-canary-readiness/route";
 import { GET as LIVE_USABILITY_BLOCKERS_GET } from "@/app/api/web3-live-usability-blockers/route";
 import { GET as LOCAL_CREDENTIALS_GET, POST as LOCAL_CREDENTIALS_POST } from "@/app/api/web3-local-credentials/route";
 import { GET as LIVE_OPS_PACKET_GET } from "@/app/api/web3-live-ops-packet/route";
@@ -2977,6 +2977,87 @@ describe("Web3 autonomous trading subsystem", () => {
     const invalidReceipt = await json<{ error: string }>(invalid);
     expect(invalid.status).toBe(422);
     expect(invalidReceipt.error).toContain("source must be sample or live-dex");
+  });
+
+  test("GIVEN the operator records a live canary gate check WHEN the supervised canary route posts THEN it persists a redacted attempt receipt", async () => {
+    const response = await SUPERVISED_CANARY_READINESS_POST(new Request("http://localhost/api/web3-supervised-canary-readiness?scenario=breakout&source=live-dex&account=persistent&cycles=0", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        operator_ack: true,
+        operator_note: "Manual cockpit gate check before the first funded canary.",
+      }),
+    }));
+    const receipt = await json<{
+      mode: string;
+      status: string;
+      receipt_hash: string;
+      readiness_hash: string;
+      operator_acknowledged: boolean;
+      requested_action: string;
+      stage: string;
+      runnable_now: boolean;
+      funded_action_attempted: boolean;
+      actual_live_trade_tested: boolean;
+      first_blocker: string | null;
+      missing_inputs: string[];
+      primary_endpoint: string;
+      exact_next_command: string;
+      operator_note_preview: string | null;
+      live_execution_permission: string;
+      transaction_submission_permission: string;
+      wallet_mutation_permission: string;
+      private_key_storage: string;
+      signed_payload_storage: string;
+      secret_echo_permission: string;
+      controls: string[];
+    }>(response);
+
+    expect(response.status).toBe(200);
+    expect(receipt.mode).toBe("web3-first-live-canary-attempt-receipt");
+    expect(receipt.status).toBe("blocked");
+    expect(receipt.receipt_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.readiness_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(receipt.operator_acknowledged).toBe(true);
+    expect(receipt.requested_action).toBe("record-live-canary-gate-check");
+    expect(receipt.stage).toBe("credential-intake");
+    expect(receipt.runnable_now).toBe(false);
+    expect(receipt.funded_action_attempted).toBe(false);
+    expect(receipt.actual_live_trade_tested).toBe(false);
+    expect(receipt.first_blocker).toBeTruthy();
+    expect(receipt.missing_inputs.length).toBeGreaterThan(0);
+    expect(receipt.primary_endpoint.length).toBeGreaterThan(0);
+    expect(receipt.exact_next_command.length).toBeGreaterThan(0);
+    expect(receipt.operator_note_preview).toContain("Manual cockpit gate check");
+    expect(receipt.controls.join(" ")).toContain("does not create, sign, submit, or store a transaction");
+    expect(receipt.live_execution_permission).toBe("blocked");
+    expect(receipt.transaction_submission_permission).toBe("blocked");
+    expect(receipt.wallet_mutation_permission).toBe("blocked");
+    expect(receipt.private_key_storage).toBe("blocked");
+    expect(receipt.signed_payload_storage).toBe("blocked");
+    expect(receipt.secret_echo_permission).toBe("blocked");
+
+    const audit = store().web3ExecutionAudits(20).find((row) => row.id.startsWith("first-live-canary-attempt-"));
+    expect(audit).toBeTruthy();
+
+    const refreshed = await SUPERVISED_CANARY_READINESS_GET(new Request("http://localhost/api/web3-supervised-canary-readiness?scenario=breakout&source=live-dex&account=persistent&cycles=0"));
+    const refreshedReceipt = await json<{ latest_attempt_receipt: { receipt_hash: string; first_blocker: string | null; actual_live_trade_tested: boolean } | null }>(refreshed);
+    expect(refreshedReceipt.latest_attempt_receipt?.receipt_hash).toBe(receipt.receipt_hash);
+    expect(refreshedReceipt.latest_attempt_receipt?.first_blocker).toBe(receipt.first_blocker);
+    expect(refreshedReceipt.latest_attempt_receipt?.actual_live_trade_tested).toBe(false);
+
+    const unsafe = await SUPERVISED_CANARY_READINESS_POST(new Request("http://localhost/api/web3-supervised-canary-readiness?scenario=breakout&source=live-dex&account=persistent&cycles=0", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        operator_ack: true,
+        private_key: "seed phrase should never be here",
+      }),
+    }));
+    const unsafeReceipt = await json<{ error: string; unsafe_fields: string[] }>(unsafe);
+    expect(unsafe.status).toBe(422);
+    expect(unsafeReceipt.unsafe_fields).toContain("private_key");
+    expect(unsafeReceipt.error).toContain("cannot accept secrets");
   });
 
   test("GIVEN the operator needs one first-canary truth source WHEN the drill route runs THEN it consolidates blockers without live authority", async () => {

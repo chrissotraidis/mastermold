@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Web3FirstCanaryDrillReceipt } from "@/src/db/web3-first-canary-drill";
 import type { Web3LiveTradeCanaryActionReceipt, Web3LiveTradeCanaryReceipt } from "@/src/db/web3-live-trade-canary";
 import type { Web3LiveUnsignedOrderHandoffReceipt, Web3LiveUnsignedOrderPreflightReceipt } from "@/src/db/web3-live-unsigned-order-handoff";
+import type { Web3SupervisedCanaryAttemptReceipt } from "@/src/db/web3-supervised-canary-readiness";
 import type { Web3WalletOwnershipChallengeReceipt, Web3WalletOwnershipReceipt } from "@/src/db/web3-wallet-ownership";
 import type { TradingAccountMode, TradingMarketSource, TradingScenario, Web3TradingState } from "@/src/db/web3-trading";
 
@@ -92,6 +93,7 @@ export function Web3LiveCanaryConsole({
   const [preflightReceipt, setPreflightReceipt] = useState<Web3LiveUnsignedOrderPreflightReceipt | null>(null);
   const [unsignedReceipt, setUnsignedReceipt] = useState<Web3LiveUnsignedOrderHandoffReceipt | null>(null);
   const [actionReceipt, setActionReceipt] = useState<Web3LiveTradeCanaryActionReceipt | null>(null);
+  const [attemptReceipt, setAttemptReceipt] = useState<Web3SupervisedCanaryAttemptReceipt | null>(null);
   const [ownershipChallengeReceipt, setOwnershipChallengeReceipt] = useState<Web3WalletOwnershipChallengeReceipt | null>(null);
   const [ownershipReceipt, setOwnershipReceipt] = useState<Web3WalletOwnershipReceipt | null>(initialWalletOwnershipReceipt);
   const [ownershipCheckBusy, setOwnershipCheckBusy] = useState(false);
@@ -362,6 +364,35 @@ export function Web3LiveCanaryConsole({
       await refreshFirstCanaryDrill("auto").catch(() => null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live canary preflight failed.");
+    } finally {
+      setPreflightBusy(false);
+    }
+  }
+
+  async function recordLiveCanaryGateCheck() {
+    setPreflightBusy(true);
+    setMessage("Recording the current live canary gate check without signing or submitting anything...");
+    try {
+      if (!sourceReady) {
+        throw new Error("Open the live DEX canary view before recording a live gate check.");
+      }
+      const response = await fetch(`/api/web3-supervised-canary-readiness?${params.toString()}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operator_ack: true,
+          operator_note: "Trading live canary cockpit gate check",
+        }),
+      });
+      const payload = await response.json().catch(() => null) as Web3SupervisedCanaryAttemptReceipt | { error: string } | null;
+      if (!response.ok || !payload || "error" in payload) {
+        throw new Error(payload && "error" in payload ? payload.error : "Live canary gate check failed.");
+      }
+      setAttemptReceipt(payload);
+      setMessage(payload.next_action);
+      await refreshCanaryConsoleReceipts("auto");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Live canary gate check failed.");
     } finally {
       setPreflightBusy(false);
     }
@@ -721,6 +752,15 @@ export function Web3LiveCanaryConsole({
                 >
                   <ShieldCheck aria-hidden="true" className={preflightBusy ? "size-4 animate-pulse" : "size-4"} />
                   {preflightBusy ? "Checking canary" : "Canary preflight"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void recordLiveCanaryGateCheck()}
+                  disabled={busy || ownershipBusy || ownershipCheckBusy || preflightBusy}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet/35 bg-violet/10 px-3 py-2 text-sm font-semibold text-violet transition hover:bg-violet/15 disabled:cursor-not-allowed disabled:border-outline/20 disabled:bg-surface-dim/45 disabled:text-outline"
+                >
+                  <ShieldCheck aria-hidden="true" className={preflightBusy ? "size-4 animate-pulse" : "size-4"} />
+                  Record gate check
                 </button>
                 <button
                   type="button"
@@ -1093,6 +1133,30 @@ export function Web3LiveCanaryConsole({
             </div>
           ) : null}
 
+          {attemptReceipt ? (
+            <div className="rounded-md border border-violet/25 bg-violet/[0.035] p-3" aria-label="Trading live canary gate check receipt">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-violet">Gate check receipt</p>
+                  <p className="mt-1 text-sm font-semibold text-on-surface">{attemptReceipt.status.replaceAll("-", " ")}</p>
+                </div>
+                <span className={canaryStatusClassName(attemptReceipt.status)}>
+                  {attemptReceipt.stage.replaceAll("-", " ")}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <CanaryMetric label="Runnable" value={attemptReceipt.runnable_now ? "yes" : "no"} tone={attemptReceipt.runnable_now ? "caution" : "critical"} />
+                <CanaryMetric label="Funded action" value={attemptReceipt.funded_action_attempted ? "attempted" : "not attempted"} tone={attemptReceipt.funded_action_attempted ? "caution" : "neutral"} />
+                <CanaryMetric label="Live trade" value={attemptReceipt.actual_live_trade_tested ? "tested" : "not tested"} tone={attemptReceipt.actual_live_trade_tested ? "engine" : "critical"} />
+                <CanaryMetric label="Receipt" value={attemptReceipt.receipt_hash.slice(0, 10)} tone="neutral" />
+              </div>
+              {attemptReceipt.first_blocker ? (
+                <p className="mt-2 text-[11px] leading-4 text-on-surface-variant">{attemptReceipt.first_blocker}</p>
+              ) : null}
+              <p className="mt-1 text-[11px] leading-4 text-outline">{attemptReceipt.controls[0]}</p>
+            </div>
+          ) : null}
+
           {unsignedReceipt ? (
             <div className="rounded-md border border-caution/25 bg-caution/[0.04] p-3" aria-label="Trading unsigned canary receipt">
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -1351,10 +1415,10 @@ function primaryGateControlClassName(tone: PrimaryCanaryGateControl["tone"]) {
   return `${base} border-critical/45 bg-critical/10 text-critical hover:bg-critical/15`;
 }
 
-function canaryStatusClassName(status: Web3LiveTradeCanaryReceipt["status"] | Web3LiveTradeCanaryActionReceipt["status"] | Web3LiveUnsignedOrderHandoffReceipt["status"] | Web3LiveUnsignedOrderPreflightReceipt["status"]) {
+function canaryStatusClassName(status: Web3LiveTradeCanaryReceipt["status"] | Web3LiveTradeCanaryActionReceipt["status"] | Web3LiveUnsignedOrderHandoffReceipt["status"] | Web3LiveUnsignedOrderPreflightReceipt["status"] | Web3SupervisedCanaryAttemptReceipt["status"]) {
   const base = "shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold capitalize";
-  if (status === "live-relay-evidence-recorded" || status === "order-ready" || status === "ready") return `${base} border-engine/35 bg-engine/10 text-engine`;
-  if (status === "relay-attempted" || status === "ready-for-external-signed-payload" || status === "order-failed") return `${base} border-caution/35 bg-caution/10 text-caution`;
+  if (status === "live-relay-evidence-recorded" || status === "order-ready" || status === "ready" || status === "canary-proven") return `${base} border-engine/35 bg-engine/10 text-engine`;
+  if (status === "relay-attempted" || status === "ready-for-external-signed-payload" || status === "order-failed" || status === "unsigned-order-ready" || status === "signed-relay-ready" || status === "proof-watch") return `${base} border-caution/35 bg-caution/10 text-caution`;
   return `${base} border-critical/35 bg-critical/10 text-critical`;
 }
 

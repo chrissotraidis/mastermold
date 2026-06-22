@@ -7,6 +7,7 @@ import type { Web3LiveTradeCanaryReceipt } from "./web3-live-trade-canary";
 import type { Web3LiveUnsignedOrderPreflightReceipt } from "./web3-live-unsigned-order-handoff";
 import type { Web3SignerCredentialPacket } from "./web3-signer-credential-packet";
 import type { Web3TradingState } from "./web3-trading";
+import { store } from "./store";
 
 export type Web3SupervisedCanaryReadinessLane = {
   id:
@@ -43,6 +44,50 @@ export type Web3SupervisedCanaryAttemptContract = {
   missing_inputs: string[];
   required_acknowledgements: string[];
   safety_boundary: string[];
+};
+
+export type Web3SupervisedCanaryAttemptReceipt = {
+  mode: "web3-first-live-canary-attempt-receipt";
+  status: "blocked" | "unsigned-order-ready" | "signed-relay-ready" | "proof-watch" | "canary-proven";
+  generated_at: string;
+  receipt_hash: string;
+  readiness_hash: string;
+  operator_acknowledged: boolean;
+  requested_action: "record-live-canary-gate-check";
+  stage: Web3SupervisedCanaryAttemptContract["stage"];
+  runnable_now: boolean;
+  funded_action_attempted: boolean;
+  actual_live_trade_tested: boolean;
+  real_funds_moved_by_this_app: boolean;
+  can_request_unsigned_order_now: boolean;
+  can_relay_signed_payload_now: boolean;
+  first_blocker: string | null;
+  missing_inputs: string[];
+  next_action: string;
+  primary_endpoint: string;
+  exact_next_command: string;
+  operator_note_preview: string | null;
+  live_execution_permission: Web3SupervisedCanaryReadinessReceipt["live_execution_permission"];
+  transaction_submission_permission: Web3SupervisedCanaryReadinessReceipt["transaction_submission_permission"];
+  wallet_mutation_permission: "blocked";
+  private_key_storage: "blocked";
+  seed_phrase_storage: "blocked";
+  signed_payload_storage: "blocked";
+  secret_echo_permission: "blocked";
+  controls: string[];
+};
+
+export type Web3SupervisedCanaryAttemptSnapshot = {
+  mode: Web3SupervisedCanaryAttemptReceipt["mode"];
+  status: Web3SupervisedCanaryAttemptReceipt["status"];
+  generated_at: string;
+  receipt_hash: string;
+  stage: Web3SupervisedCanaryAttemptContract["stage"];
+  runnable_now: boolean;
+  funded_action_attempted: boolean;
+  actual_live_trade_tested: boolean;
+  first_blocker: string | null;
+  next_action: string;
 };
 
 export type Web3SupervisedCanaryAttemptHealth = {
@@ -90,6 +135,7 @@ export type Web3SupervisedCanaryReadinessReceipt = {
   next_lane_id: Web3SupervisedCanaryReadinessLane["id"] | null;
   next_action: string;
   canary_attempt_contract: Web3SupervisedCanaryAttemptContract;
+  latest_attempt_receipt: Web3SupervisedCanaryAttemptSnapshot | null;
   ignition_endpoint: string;
   unsigned_handoff_endpoint: string;
   canary_endpoint: string;
@@ -171,6 +217,7 @@ export function buildWeb3SupervisedCanaryReadinessReceipt(input: {
     next_lane_id: nextLane?.id ?? null,
     next_action: supervisedCanaryNextAction(status, nextLane, input),
     canary_attempt_contract: canaryAttemptContract,
+    latest_attempt_receipt: getLatestWeb3SupervisedCanaryAttemptSnapshot(),
     ignition_endpoint: `/api/web3-live-ignition?${endpointParams}`,
     unsigned_handoff_endpoint: unsignedHandoffEndpoint,
     canary_endpoint: canaryEndpoint,
@@ -197,6 +244,78 @@ export function buildWeb3SupervisedCanaryReadinessReceipt(input: {
   };
 }
 
+export function buildWeb3SupervisedCanaryAttemptReceipt(input: {
+  readiness: Web3SupervisedCanaryReadinessReceipt;
+  operatorAcknowledged: boolean;
+  operatorNote?: string | null;
+  now?: Date;
+}): Web3SupervisedCanaryAttemptReceipt {
+  const generatedAt = (input.now ?? new Date()).toISOString();
+  const contract = input.readiness.canary_attempt_contract;
+  const missingInputs = [...new Set(contract.missing_inputs)].slice(0, 8);
+  const status = supervisedCanaryAttemptReceiptStatus(input.readiness, contract);
+  const fundedActionAttempted = input.operatorAcknowledged && contract.runnable_now && (
+    contract.stage === "unsigned-order-request" ||
+    contract.stage === "signed-payload-relay" ||
+    contract.stage === "proof-watch" ||
+    contract.stage === "canary-proven"
+  );
+  const base = {
+    mode: "web3-first-live-canary-attempt-receipt" as const,
+    status,
+    generated_at: generatedAt,
+    readiness_hash: input.readiness.receipt_hash,
+    operator_acknowledged: input.operatorAcknowledged,
+    requested_action: "record-live-canary-gate-check" as const,
+    stage: contract.stage,
+    runnable_now: contract.runnable_now,
+    funded_action_attempted: fundedActionAttempted,
+    actual_live_trade_tested: input.readiness.actual_live_trade_tested,
+    real_funds_moved_by_this_app: input.readiness.real_funds_moved_by_this_app,
+    can_request_unsigned_order_now: input.readiness.can_request_unsigned_order_now,
+    can_relay_signed_payload_now: input.readiness.can_relay_signed_payload_now,
+    first_blocker: missingInputs[0] ?? null,
+    missing_inputs: missingInputs,
+    next_action: input.readiness.next_action,
+    primary_endpoint: contract.primary_endpoint,
+    exact_next_command: contract.exact_next_command,
+    operator_note_preview: previewOperatorNote(input.operatorNote ?? null),
+    live_execution_permission: input.readiness.live_execution_permission,
+    transaction_submission_permission: input.readiness.transaction_submission_permission,
+    wallet_mutation_permission: "blocked" as const,
+    private_key_storage: "blocked" as const,
+    seed_phrase_storage: "blocked" as const,
+    signed_payload_storage: "blocked" as const,
+    secret_echo_permission: "blocked" as const,
+    controls: [
+      "This receipt records a live-canary gate check; it does not create, sign, submit, or store a transaction.",
+      "It stores only stage, blockers, endpoints, hashes, and redacted operator note preview.",
+      "Private keys, seed phrases, API keys, raw transactions, signed payloads, and wallet authority are never accepted by this attempt snapshot.",
+      "A funded action counts only after the separate unsigned handoff, browser wallet signature, signed relay, confirmation, settlement, and portfolio mirror proof chain is real.",
+    ],
+  };
+
+  return {
+    ...base,
+    receipt_hash: hashJson(base),
+  };
+}
+
+export function persistWeb3SupervisedCanaryAttemptReceipt(receipt: Web3SupervisedCanaryAttemptReceipt): void {
+  store().appendWeb3ExecutionAudit({
+    id: `first-live-canary-attempt-${receipt.receipt_hash.slice(0, 24)}`,
+    created_at: receipt.generated_at,
+    data: receipt,
+  });
+}
+
+export function getLatestWeb3SupervisedCanaryAttemptSnapshot(): Web3SupervisedCanaryAttemptSnapshot | null {
+  const receipt = store().web3ExecutionAudits(100)
+    .map((row) => row.data)
+    .find(isWeb3SupervisedCanaryAttemptReceipt);
+  return receipt ? toWeb3SupervisedCanaryAttemptSnapshot(receipt) : null;
+}
+
 export function buildWeb3SupervisedCanaryAttemptHealth(
   receipt: Web3SupervisedCanaryReadinessReceipt,
 ): Web3SupervisedCanaryAttemptHealth {
@@ -221,6 +340,49 @@ export function buildWeb3SupervisedCanaryAttemptHealth(
     signed_payload_storage: "blocked",
     secret_echo_permission: "blocked",
   };
+}
+
+function supervisedCanaryAttemptReceiptStatus(
+  readiness: Web3SupervisedCanaryReadinessReceipt,
+  contract: Web3SupervisedCanaryAttemptContract,
+): Web3SupervisedCanaryAttemptReceipt["status"] {
+  if (readiness.actual_live_trade_tested && contract.stage === "canary-proven") return "canary-proven";
+  if (contract.stage === "proof-watch") return "proof-watch";
+  if (readiness.can_relay_signed_payload_now || contract.stage === "signed-payload-relay") return "signed-relay-ready";
+  if (readiness.can_request_unsigned_order_now || contract.stage === "unsigned-order-request" || contract.stage === "browser-wallet-signature") return "unsigned-order-ready";
+  return "blocked";
+}
+
+function isWeb3SupervisedCanaryAttemptReceipt(value: unknown): value is Web3SupervisedCanaryAttemptReceipt {
+  const row = value as Partial<Web3SupervisedCanaryAttemptReceipt>;
+  return Boolean(
+    row &&
+    row.mode === "web3-first-live-canary-attempt-receipt" &&
+    typeof row.receipt_hash === "string" &&
+    typeof row.generated_at === "string" &&
+    typeof row.stage === "string",
+  );
+}
+
+function toWeb3SupervisedCanaryAttemptSnapshot(receipt: Web3SupervisedCanaryAttemptReceipt): Web3SupervisedCanaryAttemptSnapshot {
+  return {
+    mode: receipt.mode,
+    status: receipt.status,
+    generated_at: receipt.generated_at,
+    receipt_hash: receipt.receipt_hash,
+    stage: receipt.stage,
+    runnable_now: receipt.runnable_now,
+    funded_action_attempted: receipt.funded_action_attempted,
+    actual_live_trade_tested: receipt.actual_live_trade_tested,
+    first_blocker: receipt.first_blocker,
+    next_action: receipt.next_action,
+  };
+}
+
+function previewOperatorNote(value: string | null) {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return null;
+  return trimmed.length > 180 ? `${trimmed.slice(0, 177)}...` : trimmed;
 }
 
 function buildCanaryAttemptContract(input: {

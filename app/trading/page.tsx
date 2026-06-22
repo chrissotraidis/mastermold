@@ -382,6 +382,7 @@ function SupervisedCanaryReadinessPanel({ receipt }: { receipt: Web3SupervisedCa
     ...receipt.lanes.filter((lane) => !lane.blocks_first_canary),
   ].slice(0, 6);
   const attempt = receipt.canary_attempt_contract;
+  const latestAttempt = receipt.latest_attempt_receipt;
 
   return (
     <section
@@ -439,6 +440,28 @@ function SupervisedCanaryReadinessPanel({ receipt }: { receipt: Web3SupervisedCa
                 Missing: {attempt.missing_inputs[0]}
               </p>
             ) : null}
+            {latestAttempt ? (
+              <div className="mt-2 rounded-md border border-violet/20 bg-violet/[0.035] p-2" aria-label="Trading latest live canary gate check">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-violet">Latest gate check</p>
+                  <span className={canaryAttemptStageClassName(latestAttempt.stage, latestAttempt.runnable_now)}>
+                    {latestAttempt.status.replaceAll("-", " ")}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">
+                  {latestAttempt.actual_live_trade_tested
+                    ? "A funded canary proof exists."
+                    : latestAttempt.first_blocker ?? latestAttempt.next_action}
+                </p>
+                <p className="mt-1 truncate text-[10px] leading-4 text-outline">
+                  {latestAttempt.generated_at} · receipt {latestAttempt.receipt_hash.slice(0, 10)}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] leading-4 text-outline">
+                No live gate check receipt recorded yet; use Record gate check in the live cockpit to persist the current blocker without signing or submitting.
+              </p>
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -588,6 +611,7 @@ function LiveCanaryCommandCenter({
   const drillHref = drill.live_review_source_endpoint;
   const nextProof = canary.post_signing_evidence.find((item) => item.status !== "pass") ?? null;
   const proofPassCount = canary.post_signing_evidence.filter((item) => item.status === "pass").length;
+  const latestAttempt = readiness.latest_attempt_receipt;
   const leadingDrillLanes = [
     ...drill.lanes.filter((lane) => lane.status === "fail"),
     ...drill.lanes.filter((lane) => lane.status === "watch"),
@@ -737,6 +761,32 @@ function LiveCanaryCommandCenter({
               <code className="mt-2 block overflow-x-auto whitespace-nowrap rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
                 {drill.next_unblock_step.command}
               </code>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-violet/20 bg-violet/[0.035] p-3" aria-label="Trading latest live canary gate check">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-violet">Latest gate check</p>
+                <p className="mt-1 text-sm font-semibold text-on-surface">
+                  {latestAttempt ? latestAttempt.status.replaceAll("-", " ") : "Not recorded yet"}
+                </p>
+              </div>
+              <span className={canaryAttemptStageClassName(latestAttempt?.stage ?? "credential-intake", latestAttempt?.runnable_now ?? false)}>
+                {latestAttempt?.stage.replaceAll("-", " ") ?? "not recorded"}
+              </span>
+            </div>
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-on-surface-variant">
+              {latestAttempt
+                ? latestAttempt.actual_live_trade_tested
+                  ? "A funded canary proof exists."
+                  : latestAttempt.first_blocker ?? latestAttempt.next_action
+                : "No live gate check receipt recorded yet; use Record gate check in the live cockpit to persist the current blocker without signing or submitting."}
+            </p>
+            {latestAttempt ? (
+              <p className="mt-2 truncate text-[11px] leading-4 text-outline">
+                {latestAttempt.generated_at} · receipt {latestAttempt.receipt_hash.slice(0, 10)}
+              </p>
             ) : null}
           </div>
 
