@@ -182,6 +182,8 @@ describe("Web3 first canary handoff", () => {
     expect(receipt.text_packet).toContain("# Mastermind First Funded Canary Handoff");
     expect(receipt.text_packet).toContain(`Operator wallet verifier: ${drill.operator_wallet_strict_command}`);
     expect(receipt.text_packet).not.toContain("<public-solana-address>");
+    expect(receipt.safe_commands).toContain("npm run --silent handoff-canary:web3 -- --base-url=http://localhost:4010 --source=live-dex --account=persistent --scenario=breakout --cycles=0");
+    expect(receipt.safe_commands).toContain("npm run --silent handoff-canary:web3 -- --base-url=http://localhost:4010 --source=live-dex --account=persistent --scenario=breakout --cycles=0 --json");
     expect(receipt.safe_commands.join(" ")).not.toContain("<public-solana-address>");
     expect(receipt.text_packet).toContain("Actual live trade tested: false");
     expect(receipt.text_packet).toContain("Real funds moved by this app: false");
@@ -214,6 +216,7 @@ describe("Web3 first canary handoff", () => {
         expect(receipt.safe_commands.join(" ")).not.toContain("<public-solana-address>");
       }
     }
+    expect(receipt.safe_commands.join(" ")).toContain("handoff-canary:web3");
     expect(receipt.safe_commands.join(" ")).toContain("drill-canary:web3");
     expect(receipt.safe_commands.join(" ")).toContain("prove-canary:web3");
     expect(receipt.source_endpoints.join(" ")).toContain("/api/web3-first-canary-drill");

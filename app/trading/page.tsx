@@ -273,6 +273,7 @@ function TradingOperatorInputPacket({
   const safeTargetLabel = nextInput?.target_names.join(", ") ?? "No open target";
   const ownerLabel = nextInput?.owner.replace("-", " ") ?? "system";
   const contract = handoff.current_step_contract;
+  const handoffCommand = handoff.safe_commands.find((command) => command.includes("handoff-canary:web3")) ?? null;
 
   return (
     <section
@@ -379,6 +380,11 @@ function TradingOperatorInputPacket({
             <p className="mt-2 text-[11px] leading-4 text-outline">
               Copying this packet gives a helper the redacted current-step contract, proof ledger, safe values, never-provide boundary, and strict commands. It still cannot sign, submit, store payloads, or prove a live trade.
             </p>
+            {handoffCommand ? (
+              <code className="mt-2 block break-all rounded-md border border-outline/15 bg-black/20 px-2 py-1 text-[11px] leading-5 text-outline">
+                {handoffCommand}
+              </code>
+            ) : null}
           </div>
         </div>
 

@@ -832,11 +832,15 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Trading first funded canary share packet");
     expect(tradingPage).toContain("Shareable canary handoff");
     expect(tradingPage).toContain("CopyRedactedPacketButton");
+    expect(source("components/copy-redacted-packet-button.tsx")).toContain("copyText(text)");
+    expect(source("components/copy-redacted-packet-button.tsx")).toContain("document.execCommand(\"copy\")");
     expect(tradingPage).toContain("Copy handoff");
     expect(tradingPage).toContain("Open handoff JSON");
     expect(tradingPage).toContain("/api/web3-first-canary-handoff?source=${receipt.source}&account=${receipt.account}&scenario=${receipt.scenario}&cycles=0");
     expect(tradingPage).toContain("handoff.text_packet");
     expect(tradingPage).toContain("handoff.current_step_contract");
+    expect(tradingPage).toContain("handoff.safe_commands.find((command) => command.includes(\"handoff-canary:web3\"))");
+    expect(tradingPage).toContain("handoffCommand");
     expect(tradingPage).toContain("redacted current-step contract, proof ledger, safe values, never-provide boundary, and strict commands");
     expect(tradingPage).toContain("Open next input");
     expect(tradingPage).toContain("Open canary receipt");

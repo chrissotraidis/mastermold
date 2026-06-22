@@ -25,7 +25,7 @@ export function CopyRedactedPacketButton({
   async function copyPacket() {
     setFailed(false);
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -50,4 +50,31 @@ export function CopyRedactedPacketButton({
       <span>{failed ? "Select text" : copied ? copiedLabel : label}</span>
     </button>
   );
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    // Fall through to the selection-based path for restricted browser contexts.
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  try {
+    if (!document.execCommand("copy")) {
+      throw new Error("copy command rejected");
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
 }

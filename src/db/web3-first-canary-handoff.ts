@@ -89,6 +89,8 @@ export function buildWeb3FirstCanaryHandoffReceipt(input: {
   const openSteps = input.drill.operator_unblock_plan.filter((step) => step.status !== "done");
   const safeToProvideNow = buildSafeToProvideNow(nextOperatorStep, input.requirements);
   const safeCommands = uniqueText([
+    `npm run --silent handoff-canary:web3 -- --base-url=http://localhost:4010 --source=${input.drill.source} --account=${input.drill.account} --scenario=${input.drill.scenario} --cycles=0`,
+    `npm run --silent handoff-canary:web3 -- --base-url=http://localhost:4010 --source=${input.drill.source} --account=${input.drill.account} --scenario=${input.drill.scenario} --cycles=0 --json`,
     input.drill.strict_ready_command,
     input.drill.strict_proof_command,
     ...input.drill.safe_commands,
