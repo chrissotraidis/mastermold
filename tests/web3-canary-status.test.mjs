@@ -1,0 +1,156 @@
+import { describe, expect, test } from "bun:test";
+import {
+  buildCanaryStatusPacket,
+  parseCanaryStatusArgs,
+  runWeb3CanaryStatus,
+} from "../scripts/web3-canary-status.mjs";
+
+function canaryReceipt(overrides = {}) {
+  return {
+    mode: "web3-live-trade-canary",
+    status: "blocked",
+    source: "live-dex",
+    account: "persistent",
+    scenario: "breakout",
+    actual_live_trade_tested: false,
+    real_funds_moved_by_this_app: false,
+    can_submit_from_app_now: false,
+    signed_relay_status: "locked",
+    current_request_id: null,
+    latest_signature_preview: null,
+    blockers: ["Replace the sample wallet."],
+    next_required_input: {
+      id: "dedicated-public-wallet",
+      label: "Dedicated public wallet",
+      status: "needed-now",
+    },
+    next_action: "Replace the sample all-ones wallet with a dedicated public Solana address before canary review.",
+    transaction_submission_permission: "blocked",
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    private_key_storage: "blocked",
+    seed_phrase_storage: "blocked",
+    secret_echo_permission: "blocked",
+    ...overrides,
+  };
+}
+
+function ignitionReceipt(overrides = {}) {
+  return {
+    mode: "web3-live-ignition",
+    status: "blocked",
+    source: "live-dex",
+    account: "persistent",
+    scenario: "breakout",
+    can_autonomously_trade_real_money_now: false,
+    can_start_supervised_canary_now: false,
+    actual_live_trade_tested: false,
+    real_funds_moved_by_this_app: false,
+    next_gate_id: "wallet-scope",
+    next_gate_label: "Wallet scope",
+    next_action: "Save a dedicated public Solana trading wallet address in the Trading live canary console; do not paste private keys or seed phrases.",
+    blocker_count: 3,
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    private_key_storage: "blocked",
+    seed_phrase_storage: "blocked",
+    secret_echo_permission: "blocked",
+    ...overrides,
+  };
+}
+
+function localReceipt(overrides = {}) {
+  return {
+    mode: "web3-local-credential-install",
+    status: "unchanged",
+    configured_keys: ["HELIUS_API_KEY", "SOLANA_RPC_URL"],
+    missing_keys: ["JUPITER_API_KEY", "MASTERMOLD_ENABLE_LIVE_WEB3_EXECUTION"],
+    runtime_effective_next_action: "Install Jupiter and first-canary live flags in ignored local env.",
+    next_action: "Install Jupiter and first-canary live flags in ignored local env.",
+    live_execution_permission: "blocked",
+    wallet_mutation_permission: "blocked",
+    secret_echo_permission: "blocked",
+    ...overrides,
+  };
+}
+
+describe("web3 canary status command", () => {
+  test("GIVEN running-app receipts WHEN command runs THEN it performs GET only and returns the real funded-trade status", async () => {
+    const requested = [];
+    const packet = await runWeb3CanaryStatus({
+      baseUrl: "http://localhost:4010",
+      fetchImpl: async (url, init) => {
+        requested.push({ url: String(url), init });
+        if (String(url).includes("/api/web3-live-trade-canary")) return Response.json(canaryReceipt());
+        if (String(url).includes("/api/web3-live-ignition")) return Response.json(ignitionReceipt());
+        if (String(url).includes("/api/web3-local-credentials")) return Response.json(localReceipt());
+        throw new Error(`Unexpected URL ${url}`);
+      },
+    });
+
+    expect(requested.map((entry) => entry.init.method)).toEqual(["GET", "GET", "GET"]);
+    expect(requested.every((entry) => entry.init.body === undefined)).toBe(true);
+    expect(requested.map((entry) => entry.url).sort()).toEqual([
+      "http://localhost:4010/api/web3-live-ignition?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+      "http://localhost:4010/api/web3-live-trade-canary?source=live-dex&account=persistent&scenario=breakout&cycles=0",
+      "http://localhost:4010/api/web3-local-credentials",
+    ].sort());
+    expect(packet.status).toBe("blocked");
+    expect(packet.actual_live_trade_tested).toBe(false);
+    expect(packet.can_autonomously_trade_real_money_now).toBe(false);
+    expect(packet.next_gate_id).toBe("wallet-scope");
+    expect(packet.next_required_input_id).toBe("dedicated-public-wallet");
+    expect(packet.alignment.status).toBe("pass");
+  });
+
+  test("GIVEN unsafe flags WHEN args are parsed THEN the command refuses them before fetch", async () => {
+    const config = parseCanaryStatusArgs(["--jupiter-api-key=never", "--signed-transaction=never"], {});
+
+    expect(config.unsafeFlags).toContain("jupiter-api-key");
+    expect(config.unsafeFlags).toContain("signed-transaction");
+    await expect(runWeb3CanaryStatus({
+      ...config,
+      fetchImpl: async () => {
+        throw new Error("fetch should not be called");
+      },
+    })).rejects.toThrow("Unsafe canary status flags");
+  });
+
+  test("GIVEN canary and ignition disagree on the active gate WHEN packet is built THEN it fails closed", () => {
+    expect(() => buildCanaryStatusPacket({
+      canary: canaryReceipt(),
+      ignition: ignitionReceipt({ next_gate_id: "wallet-ownership" }),
+      local: localReceipt(),
+      http: { canary: 200, ignition: 200, local: 200 },
+    })).toThrow("disagree on the next gate");
+  });
+
+  test("GIVEN canary says no funded trade happened WHEN ignition claims autonomy THEN it fails closed", () => {
+    expect(() => buildCanaryStatusPacket({
+      canary: canaryReceipt({ actual_live_trade_tested: false }),
+      ignition: ignitionReceipt({
+        actual_live_trade_tested: false,
+        can_autonomously_trade_real_money_now: true,
+      }),
+      local: localReceipt(),
+      http: { canary: 200, ignition: 200, local: 200 },
+    })).toThrow("cannot claim autonomy");
+  });
+
+  test("GIVEN a response leaks an env assignment WHEN command runs THEN it fails closed", async () => {
+    await expect(runWeb3CanaryStatus({
+      baseUrl: "http://localhost:4010",
+      fetchImpl: async (url) => {
+        if (String(url).includes("/api/web3-live-trade-canary")) {
+          return new Response(JSON.stringify({
+            ...canaryReceipt(),
+            next_action: "JUPITER_API_KEY=secretvalue1234567890",
+          }));
+        }
+        if (String(url).includes("/api/web3-live-ignition")) return Response.json(ignitionReceipt());
+        if (String(url).includes("/api/web3-local-credentials")) return Response.json(localReceipt());
+        throw new Error(`Unexpected URL ${url}`);
+      },
+    })).rejects.toThrow("leaked");
+  });
+});

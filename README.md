@@ -97,6 +97,7 @@ npm run guard-mirror:web3 -- --base-url=http://localhost:4010 --json
 npm run drill-canary:web3 -- --base-url=http://localhost:4010 --json
 npm run prove-canary:web3 -- --base-url=http://localhost:4010 --run-watchdog --attempts=3 --json
 npm run credentials-local:web3 -- --base-url=http://localhost:4010 --json
+npm run status-canary:web3 -- --base-url=http://localhost:4010 --json
 npm run validate-wallet:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --json
 npm run verify:web3 -- --base-url=http://localhost:4010
 npm run verify:web3 -- --base-url=http://localhost:4010 --wallet=<public-solana-address> --require-operator-wallet

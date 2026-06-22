@@ -23,6 +23,7 @@
     "research:web3": "node scripts/web3-research-handoff.mjs",
     "requirements:web3": "node scripts/web3-credential-requirements.mjs",
     "credentials-local:web3": "node scripts/web3-local-credentials-status.mjs",
+    "status-canary:web3": "node scripts/web3-canary-status.mjs",
     "validate-wallet:web3": "node scripts/web3-wallet-intake-validate.mjs",
     "activate:web3": "node scripts/web3-live-activation-plan.mjs",
     "handoff-canary:web3": "node scripts/web3-first-canary-handoff.mjs",
