@@ -222,11 +222,11 @@ function buildMissingRequired(
   selectedPath: Web3SignerCredentialPath,
 ) {
   return [
-    !providerReadiness.dedicated_wallet_scoped ? "Dedicated public trading wallet" : null,
-    !providerReadiness.wallet_ownership_proved ? "Hash-only wallet ownership proof" : null,
-    !selectedPath.configured ? `${selectedPath.label} credential scope` : null,
-    !providerReadiness.policy_hash_valid ? "Reviewed signer policy hash" : null,
-    !providerReadiness.can_request_signature && !providerReadiness.can_request_provider_signature ? "Hash-only signer request" : null,
+    !providerReadiness.dedicated_wallet_scoped ? "Save a dedicated public trading wallet before signer review." : null,
+    !providerReadiness.wallet_ownership_proved ? "Run Prove ownership with the browser wallet; this signs text only and cannot move funds." : null,
+    !selectedPath.configured ? `Configure ${selectedPath.label} credential scope without private keys or seed phrases in Mastermind.` : null,
+    !providerReadiness.policy_hash_valid ? "Attach a reviewed signer policy hash with caps, route scope, slippage, expiry, and revocation." : null,
+    !providerReadiness.can_request_signature && !providerReadiness.can_request_provider_signature ? "Create a hash-only signer request with request id and payload hash after policy review." : null,
   ].filter((item): item is string => Boolean(item));
 }
 

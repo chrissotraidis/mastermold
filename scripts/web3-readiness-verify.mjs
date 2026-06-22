@@ -835,6 +835,11 @@ async function verifyLiveUsabilityBlockersReceipt() {
   assert(allRows.json.listed_live_usability_row_count === allRows.json.total_live_usability_row_count, "Live usability blockers rows=all should list every safe missing row.", allRows.json);
   assert(allRows.json.missing_for_live_usability.length === allRows.json.total_live_usability_row_count, "Live usability blockers rows=all rows should match total count.", allRows.json.missing_for_live_usability);
   assert(
+    !JSON.stringify(allRows.json).includes("Hash-only wallet ownership proof"),
+    "Live usability blockers rows should expose operator actions instead of raw signer evidence labels.",
+    allRows.json.missing_for_live_usability,
+  );
+  assert(
     allRows.json.missing_owner_summary.reduce((sum, item) => sum + item.missing_count, 0) === allRows.json.total_live_usability_row_count,
     "Live usability blockers rows=all owner summary should reconcile to total rows.",
     allRows.json.missing_owner_summary,

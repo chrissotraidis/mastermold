@@ -269,6 +269,8 @@ canary proof, and the safety boundary into one status for the trading cockpit, `
 When a public wallet is scoped but not proven, ignition ranks the hash-only browser-wallet ownership proof
 ahead of Jupiter/order rehearsal so every live-trade surface points at the same next safe action before
 any unsigned canary order can be requested.
+Signer runway rows now show operator actions such as saving the dedicated wallet or running text-only
+ownership proof instead of raw internal evidence labels.
 `POST /api/web3-live-ignition` can prepare a machine-readable launch envelope for either the next
 supervised canary or a future bounded autonomous launch, but only after explicit acknowledgements and
 only when the existing ignition gates say the step is allowed.

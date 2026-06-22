@@ -4054,6 +4054,9 @@ describe("Web3 autonomous trading subsystem", () => {
     const signerPreflight = receipt.missing_for_live_usability.find((item) => item.id === "preflight:signer-custody");
     expect(signerPreflight?.next_action).toContain("signer handoff receipt");
     expect(signerPreflight?.next_action).not.toContain("Spend:");
+    const signerRunway = receipt.missing_for_live_usability.find((item) => item.id === "runway:signer");
+    expect(signerRunway?.next_action).toMatch(/Save a dedicated public trading wallet|Run Prove ownership/);
+    expect(signerRunway?.next_action).not.toContain("Hash-only wallet ownership proof");
     expect(receipt.next_blocker).toMatchObject({
       owner: "operator",
       blocks_live_capital: true,
@@ -5578,7 +5581,8 @@ describe("Web3 autonomous trading subsystem", () => {
     expect(packet.paths.find((path) => path.id === "privy-server-wallet")?.env_targets).toContain("PRIVY_SOLANA_WALLET_ID");
     expect(packet.paths.find((path) => path.id === "turnkey-policy-wallet")?.env_targets).toContain("TURNKEY_SOLANA_WALLET_ACCOUNT");
     expect(packet.paths.find((path) => path.id === "session-key-vault")?.security_rule).toContain("do not store session private keys");
-    expect(packet.missing_required).toContain("Dedicated public trading wallet");
+    expect(packet.missing_required).toContain("Save a dedicated public trading wallet before signer review.");
+    expect(packet.missing_required.join(" ")).not.toContain("Hash-only wallet ownership proof");
     expect(packet.required_evidence).toContain("Manual live-executor review before any real signature or submit path");
     expect(packet.external_account_permission).toBe("operator-external-only");
     expect(packet.in_app_provider_signup_permission).toBe("blocked");
