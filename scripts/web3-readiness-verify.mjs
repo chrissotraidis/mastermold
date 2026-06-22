@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { webcrypto } from "node:crypto";
+import { withWeb3StateMutationLock } from "./web3-state-lock.mjs";
 
 const DEFAULT_BASE_URL = "http://localhost:4010";
 const DEFAULT_WALLET = "11111111111111111111111111111111";
@@ -2247,12 +2248,18 @@ async function main() {
   console.log(JSON.stringify(report, null, 2));
 }
 
-main().catch(async (error) => {
+withWeb3StateMutationLock("web3-readiness-verify", async () => {
   try {
-    await restoreExecutionConfig();
-  } catch (restoreError) {
-    console.error(redacted(`Restore after verifier failure also failed: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}`));
+    await main();
+  } catch (error) {
+    try {
+      await restoreExecutionConfig();
+    } catch (restoreError) {
+      console.error(redacted(`Restore after verifier failure also failed: ${restoreError instanceof Error ? restoreError.message : String(restoreError)}`));
+    }
+    throw error;
   }
+}).catch((error) => {
   console.error(redacted(error instanceof Error ? error.message : String(error)));
   process.exit(1);
 });

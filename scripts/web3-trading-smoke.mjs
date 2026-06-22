@@ -8,6 +8,7 @@ import { buildPortfolioMirrorGuardReport } from "./web3-portfolio-mirror-guard.m
 import { buildPromotedPaperAutopilotReport, parsePromotedPaperAutopilotArgs } from "./web3-promoted-paper-autopilot.mjs";
 import { buildSettlementReconciliationReport } from "./web3-settlement-reconciliation.mjs";
 import { buildLocalAccountabilityRepairReport, parseLocalAccountabilityRepairArgs } from "./web3-local-accountability-repair.mjs";
+import { withWeb3StateMutationLock } from "./web3-state-lock.mjs";
 
 const baseUrl = (process.env.WEB3_TRADING_BASE_URL ?? "http://localhost:4010").replace(/\/$/, "");
 
@@ -6175,7 +6176,7 @@ async function main() {
   console.log(JSON.stringify(summary, null, 2));
 }
 
-main().catch((error) => {
+withWeb3StateMutationLock("web3-trading-smoke", main).catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   console.error(`Start the app first, or set WEB3_TRADING_BASE_URL. Tried: ${baseUrl}`);
   process.exit(1);

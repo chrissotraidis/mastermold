@@ -2257,6 +2257,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.seed_phrase_storage === \"blocked\"");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("packet.secret_echo_permission === \"blocked\"");
     expect(source("scripts/web3-credential-requirements.mjs")).toContain("api-key=");
+    expect(source("scripts/web3-state-lock.mjs")).toContain("withWeb3StateMutationLock");
+    expect(source("scripts/web3-readiness-verify.mjs")).toContain("withWeb3StateMutationLock(\"web3-readiness-verify\"");
+    expect(source("scripts/web3-trading-smoke.mjs")).toContain("withWeb3StateMutationLock(\"web3-trading-smoke\"");
+    expect(source("docs/web3-credentials-runbook.md")).toContain("share a local Web3 state-mutation lock");
+    expect(source("components/review-readiness.tsx")).toContain("share a local state-mutation lock");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run --silent research:web3 -- --base-url=http://localhost:4010");
     expect(source("docs/web3-credentials-runbook.md")).toContain("npm run --silent requirements:web3 -- --base-url=http://localhost:4010");
     expect(source("docs/web3-credentials-runbook.md")).toContain("paste-ready Markdown");
