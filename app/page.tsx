@@ -10,9 +10,10 @@ import {
   ShieldCheck,
   Wallet,
 } from "lucide-react";
+import type { SystemState } from "@/components/sentinel-face";
 import { AsOfReplayControl } from "@/components/as-of-replay-control";
 import { AppShell } from "@/components/app-shell";
-import { AskMasterMoldButton } from "@/components/master-mold-actions";
+import { CommandConsole } from "@/components/command-console";
 import { DailyBriefingCard } from "@/components/briefing-card";
 import { AlertQueueButton, AlertStatButton } from "@/components/open-alerts-action";
 import { ProfileGreeting } from "@/components/profile-greeting";
@@ -38,7 +39,6 @@ import { getBrainState } from "@/src/db/brain";
 import { getBriefingCards } from "@/src/db/briefing";
 import { getDataMode } from "@/src/db/engine-data";
 import { getPortfolio } from "@/src/db/portfolio";
-import { getSystemState } from "@/src/db/system";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +50,6 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
   const params = await searchParams;
   const parsedAsOf = parseAsOf(params?.as_of ?? null);
   const asOf = parsedAsOf.ok ? parsedAsOf.asOf : null;
-  const system = getSystemState(asOf);
   const dataMode = getDataMode(asOf);
   const cards = getBriefingCards(asOf);
   const alerts = getAlerts(asOf);
@@ -70,6 +69,8 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
   const openAlerts = alerts.filter((a) => !a.acknowledged);
   const topAlertResponse = topAlert ? buildAlertSuggestedResponse(topAlert) : "";
   const dailyPrompt = buildTodayPrompt(topCard, topAlert, topHolding);
+  const systemState = todaySystemState({ dataMode, actionableCards, openAlerts });
+  const updatedLabel = todayUpdatedLabel(dataMode);
   const readiness = buildTodayReadiness({ portfolio, dataMode, brain });
   const riskNote = buildTodayRiskNote({
     topHoldingPct: topHolding?.weight_pct ?? 0,
@@ -77,9 +78,10 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
     activeAlerts: openAlerts.length,
     highScored: actionableCards.filter((card) => card.conviction >= 7).length,
   });
+  const todayRoute = asOf?.iso ? `/?as_of=${encodeURIComponent(asOf.iso)}` : "/";
 
   return (
-    <AppShell dataMode={publicPageDataMode} faceState={system.state}>
+    <AppShell dataMode={publicPageDataMode} faceState={systemState}>
       <TodayReadTimer />
       <div className="mx-auto max-w-6xl space-y-7">
         <section
@@ -96,7 +98,7 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
                       title={productProvenanceSource(pageDataMode, portfolio.provenance.source)}
                     />
                     <span aria-hidden="true" className="text-outline/70"> · </span>
-                    <span>{system.updatedLabel}</span>
+                    <span>{updatedLabel}</span>
                   </p>
                   <ProfileGreeting />
                   <h1
@@ -116,15 +118,25 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <CommandConsole
+                className="mt-4 max-w-2xl"
+                pageContext={{
+                  surface: "Today",
+                  route: todayRoute,
+                  summary:
+                    "The user is looking at today's short rundown, the few items worth checking, the top activity response, portfolio context, and paper-trade options.",
+                }}
+                suggestions={[
+                  { label: "Today", prompt: dailyPrompt },
+                  { label: "Save context", prompt: "Save context for chat." },
+                  { label: "Activity", prompt: "Show urgent activity." },
+                  { label: "Run scan", prompt: "Run today's scan." },
+                  { label: "Check Trade", prompt: "Check Trade." },
+                ]}
+              />
+
+              <div id="run-scan" className="mt-5 flex scroll-mt-28 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <RunScanButton className="w-full whitespace-nowrap sm:w-auto" />
-                <AskMasterMoldButton
-                  prompt={dailyPrompt}
-                  variant="outline"
-                  className="w-full whitespace-nowrap sm:w-auto"
-                >
-                  Ask for today's read
-                </AskMasterMoldButton>
                 <Link
                   href={buildTodayPaperHref(topHolding, topCard)}
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15 sm:w-auto"
@@ -181,7 +193,7 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
               />
               <MorningStat
                 icon={AlertTriangle}
-                label="Top alert"
+                label="Top activity"
                 value={topAlert ? `${shortAlertTierLabel(topAlert.tier)} · ${cleanAlertMessage(topAlert.message)}` : "All clear"}
                 detail={topAlert ? topAlertResponse : "Nothing needs attention right now"}
                 tone={topAlert?.tier === "T0" ? "critical" : "caution"}
@@ -209,7 +221,7 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
               title="Needs attention"
               items={[
                 queueItem(
-                  topAlert ? "Check the top alert" : "Alerts are quiet",
+                  topAlert ? "Check the top activity item" : "Activity is quiet",
                   topAlert ? topAlertResponse : "No action required",
                   Boolean(topAlert && !topAlert.acknowledged),
                   "alerts",
@@ -227,37 +239,61 @@ export default async function DeckPage({ searchParams }: DeckPageProps) {
               <p className="font-mono text-[11px] uppercase tracking-telemetry text-outline">Risk note</p>
               <p className="mt-2 text-sm leading-6 text-on-surface-variant">{riskNote}</p>
             </div>
-            <TodaySourceTrail
-              market={{
-                value: dataMode.label === "Engine output" ? "Saved read" : "Sample market data",
-                detail:
-                  dataMode.label === "Engine output"
-                    ? `Known ${formatTodaySourceTime(dataMode.as_of)}${dataMode.age_label ? ` (${dataMode.age_label})` : ""}.`
-                    : "No saved market read is loaded.",
-              }}
-              portfolio={{
-                value: todayPortfolioSourceLabel(portfolio.provenance.label),
-                detail: todayPortfolioSourceDetail(portfolio),
-              }}
-              memory={{
-                value: brain.summary.snapshot_freshness,
-                detail: todayMemoryDetail(brain, asOf?.iso ?? null),
-              }}
-              readiness={readiness}
-              replayAsOf={asOf?.iso ?? null}
-            />
           </aside>
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="More places to review">
           <FooterLink href="/portfolio" icon={LineChart} label="Portfolio" note="Holdings snapshots and concentration" />
-          <FooterLink href="/paper" icon={Wallet} label="Paper trading" note="Test ideas in the simulator" />
-          <FooterLink href="/trading" icon={Bot} label="Web3 Autopilot" note="Autonomous memecoin paper desk" />
-          <FooterLink href="/review" icon={ShieldCheck} label="Performance" note="Past calls, limits, and trust" />
+          <FooterLink href="/activity" icon={AlertTriangle} label="Activity" note="Recent changes and attention items" />
+          <FooterLink href="/paper" icon={Wallet} label="Paper trading" note="Test ideas before risking money" />
+          <FooterLink href="/trading" icon={Bot} label="Trade" note="Wallet, test trades, and active orders" />
+          <FooterLink href="/review" icon={ShieldCheck} label="System status" note="Reviewer evidence and limits" />
         </section>
+
+        <TodaySourceTrail
+          market={{
+            value: dataMode.label === "Engine output" ? "Saved read" : "Sample market data",
+            detail:
+              dataMode.label === "Engine output"
+                ? `Known ${formatTodaySourceTime(dataMode.as_of)}${dataMode.age_label ? ` (${dataMode.age_label})` : ""}.`
+                : "No saved market read is loaded.",
+          }}
+          portfolio={{
+            value: todayPortfolioSourceLabel(portfolio.provenance.label),
+            detail: todayPortfolioSourceDetail(portfolio),
+          }}
+          memory={{
+            value: brain.summary.snapshot_freshness,
+            detail: todayMemoryDetail(brain, asOf?.iso ?? null),
+          }}
+          readiness={readiness}
+          replayAsOf={asOf?.iso ?? null}
+        />
       </div>
     </AppShell>
   );
+}
+
+function todaySystemState({
+  dataMode,
+  actionableCards,
+  openAlerts,
+}: {
+  dataMode: ReturnType<typeof getDataMode>;
+  actionableCards: ReturnType<typeof getBriefingCards>;
+  openAlerts: ReturnType<typeof getAlerts>;
+}): SystemState {
+  if (openAlerts.some((alert) => alert.tier === "T0")) return "alert";
+  if (dataMode.notice) return "degraded";
+  if (dataMode.label === "Engine output" && actionableCards.length > 0) return "suggestion";
+  return "idle";
+}
+
+function todayUpdatedLabel(dataMode: ReturnType<typeof getDataMode>) {
+  if (dataMode.label === "Engine output") {
+    return `scanned ${dataMode.age_label ?? "just now"}`;
+  }
+  return "sample data";
 }
 
 function TodaySourceTrail({
@@ -280,7 +316,7 @@ function TodaySourceTrail({
   ];
 
   return (
-    <div className="border border-outline-variant/40 bg-surface-high/35 p-4 chamfer-sm">
+    <div id="today-inputs" className="scroll-mt-28 border border-outline-variant/40 bg-surface-high/35 p-4 chamfer-sm">
       <p className="font-mono text-[11px] uppercase tracking-telemetry text-outline">Today's inputs</p>
       <dl className="mt-3 space-y-3">
         {rows.map(([label, value, detail]) => (

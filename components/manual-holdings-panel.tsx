@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,10 +20,32 @@ const assetClasses: Array<{ value: AssetClass; label: string }> = [
 
 export function ManualHoldingsPanel({ holdings }: ManualHoldingsPanelProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const symbolInputRef = useRef<HTMLInputElement | null>(null);
+  const handledCommandActionRef = useRef<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const actionQuery = searchParams.toString();
+
+  useEffect(() => {
+    const params = new URLSearchParams(actionQuery);
+    if (params.get("action") !== "add-holding") return;
+    if (handledCommandActionRef.current === actionQuery) return;
+
+    handledCommandActionRef.current = actionQuery;
+    params.delete("action");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#add-holdings"}`);
+    setError("");
+    setMessage("Master Mold opened the holding form. Start with the symbol.");
+    window.requestAnimationFrame(() => {
+      symbolInputRef.current?.scrollIntoView({ block: "center", inline: "nearest" });
+      symbolInputRef.current?.focus({ preventScroll: true });
+      symbolInputRef.current?.select();
+    });
+  }, [actionQuery]);
 
   function submitHolding(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,10 +115,11 @@ export function ManualHoldingsPanel({ holdings }: ManualHoldingsPanelProps) {
         </span>
       </div>
 
-      <form className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-[0.75fr_0.75fr_0.75fr_0.75fr_auto]" onSubmit={submitHolding}>
+      <form className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-[0.75fr_0.75fr_0.75fr_0.75fr_auto]" onSubmit={submitHolding}>
         <Field id="manual-symbol" label="Symbol">
           <input
             id="manual-symbol"
+            ref={symbolInputRef}
             name="symbol"
             required
             maxLength={12}
@@ -138,7 +161,7 @@ export function ManualHoldingsPanel({ holdings }: ManualHoldingsPanelProps) {
             className="h-11 w-full rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
           />
         </Field>
-        <div className="col-span-2 flex items-end lg:col-span-1">
+        <div className="flex items-end sm:col-span-2 lg:col-span-1">
           <Button
             type="submit"
             disabled={isPending}
@@ -148,7 +171,7 @@ export function ManualHoldingsPanel({ holdings }: ManualHoldingsPanelProps) {
             <span>Add holding</span>
           </Button>
         </div>
-        <details className="col-span-2 rounded-md border border-outline-variant/40 bg-surface-dim/35 p-3 lg:col-span-5">
+        <details className="rounded-md border border-outline-variant/40 bg-surface-dim/35 p-3 sm:col-span-2 lg:col-span-5">
           <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-on-surface">
             More details
           </summary>
@@ -182,7 +205,7 @@ export function ManualHoldingsPanel({ holdings }: ManualHoldingsPanelProps) {
         </details>
       </form>
 
-      <p className="mt-3 text-sm text-outline" aria-live="polite">
+      <p className="mt-3 text-sm text-outline" data-testid="manual-holdings-command-status" aria-live="polite">
         {error || message}
       </p>
 
@@ -194,10 +217,10 @@ export function ManualHoldingsPanel({ holdings }: ManualHoldingsPanelProps) {
               className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3"
             >
               <div className="min-w-0">
-                <p className="font-semibold text-on-surface">
+                <p className="break-words font-semibold text-on-surface">
                   {holding.symbol} · {formatCurrency(holding.market_value)}
                 </p>
-                <p className="mt-0.5 text-xs text-outline">
+                <p className="mt-0.5 break-words text-xs leading-5 text-outline">
                   {holding.asset_name} · {formatQuantity(holding.quantity)} held · {holding.weight_pct.toFixed(1)}% of visible portfolio
                 </p>
               </div>
@@ -205,7 +228,7 @@ export function ManualHoldingsPanel({ holdings }: ManualHoldingsPanelProps) {
                 type="button"
                 onClick={() => deleteHolding(holding.id)}
                 disabled={pendingId === holding.id}
-                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-outline-variant/40 px-3 text-sm text-on-surface-variant transition hover:text-critical disabled:opacity-50"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-outline-variant/40 px-3 text-sm text-on-surface-variant transition hover:text-critical disabled:opacity-50 sm:w-auto"
               >
                 <Trash2 aria-hidden="true" className="size-4" />
                 Remove

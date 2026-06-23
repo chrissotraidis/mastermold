@@ -70,6 +70,12 @@ async function json<T>(r: Response): Promise<T> {
   return (await r.json()) as T;
 }
 
+function headerJson<T>(response: Response, name: string, fallback: T): T {
+  const value = response.headers.get(name);
+  if (!value) return fallback;
+  return JSON.parse(decodeURIComponent(value)) as T;
+}
+
 const req = (path: string) => new Request(`http://localhost${path}`);
 
 describe("API routes serve engine output end to end", () => {
@@ -512,6 +518,328 @@ describe("API routes serve engine output end to end", () => {
     }
   });
 
+  test("POST /api/chat can save local chat context as a safe app action", async () => {
+    const res = await postChatRoute(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: "save context for chat" }),
+      }),
+    );
+    const actions = headerJson<Array<{ label: string; href: string }>>(res, "X-Chat-Actions", []);
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Chat-Model")).toBe("local-command");
+    expect(text).toContain("Chat context: saved local app context");
+    expect(text).toContain("does not fetch fresh news");
+    expect(text).toContain("move funds");
+    expect(actions).toContainEqual({ label: "Open Chat", href: "/chat" });
+    expect(actions).toContainEqual({ label: "Chat Settings", href: "/settings#ai-chat-keys" });
+  });
+
+  test("POST /api/chat keeps market-scan commands quick and safe when the runner is unavailable", async () => {
+    const prevPython = process.env.MASTERMOLD_ENGINE_PYTHON;
+    const prevWrapper = process.env.MASTERMOLD_ENGINE_WRAPPER;
+    process.env.MASTERMOLD_ENGINE_PYTHON = "missing/python";
+    process.env.MASTERMOLD_ENGINE_WRAPPER = "missing/wrapper";
+    try {
+      const res = await postChatRoute(
+        new Request("http://localhost/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: "run today's scan" }),
+        }),
+      );
+      const actions = headerJson<Array<{ label: string; href: string }>>(res, "X-Chat-Actions", []);
+      const text = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Chat-Model")).toBe("local-command");
+      expect(text).toContain("Market scan: this machine is not set up");
+      expect(text).toContain("Nothing traded, signed, or moved.");
+      expect(actions).toContainEqual({ label: "Open Today", href: "/" });
+      expect(actions).toContainEqual({ label: "System Status", href: "/review" });
+    } finally {
+      if (prevPython === undefined) delete process.env.MASTERMOLD_ENGINE_PYTHON;
+      else process.env.MASTERMOLD_ENGINE_PYTHON = prevPython;
+      if (prevWrapper === undefined) delete process.env.MASTERMOLD_ENGINE_WRAPPER;
+      else process.env.MASTERMOLD_ENGINE_WRAPPER = prevWrapper;
+    }
+  });
+
+  test("POST /api/chat routes explicit Web3 requests to Trade even from Today", async () => {
+    const res = await postChatRoute(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          message: "check web3 trading status and tell me next action",
+          page_context: {
+            surface: "Today",
+            route: "/?source=sample&account=ephemeral&scenario=base",
+            summary: "The user is looking at today's short rundown.",
+          },
+        }),
+      }),
+    );
+    const actions = headerJson<Array<{ label: string; href: string }>>(res, "X-Chat-Actions", []);
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Chat-Model")).toBe("local-command");
+    expect(text).toContain("Trade check:");
+    expect(text).toContain("cannot sign");
+    expect(actions.some((action) => action.href.startsWith("/trading"))).toBe(true);
+  });
+
+  test("POST /api/chat does not let Trade page context steal explicit non-Trade commands", async () => {
+    const cases = [
+      {
+        message: "show my win rate",
+        expectedText: "Journal check:",
+        expectedAction: { label: "Open Journal", href: "/journal" },
+      },
+      {
+        message: "show me the top idea",
+        expectedText: "Today check:",
+        expectedAction: { label: "Open Today", href: "/" },
+      },
+      {
+        message: "refresh portfolio balances",
+        expectedText: "Portfolio check:",
+        expectedAction: { label: "Add Holding", href: "/portfolio?action=add-holding#add-holdings" },
+      },
+      {
+        message: "check web3 provider health",
+        expectedText: "Technical details:",
+        expectedAction: { label: "Technical Details", href: "/trading?details=technical#technical-status" },
+      },
+    ];
+
+    for (const testCase of cases) {
+      const res = await postChatRoute(
+        new Request("http://localhost/api/chat", {
+          method: "POST",
+          body: JSON.stringify({
+            message: testCase.message,
+            page_context: {
+              surface: "Trade",
+              route: "/trading",
+              summary: "The user is looking at wallet status, test trades, and active orders.",
+            },
+          }),
+        }),
+      );
+      const actions = headerJson<Array<{ label: string; href: string }>>(res, "X-Chat-Actions", []);
+      const text = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Chat-Model")).toBe("local-command");
+      expect(text).toContain(testCase.expectedText);
+      expect(actions).toContainEqual(testCase.expectedAction);
+    }
+  });
+
+  test("POST /api/chat routes direct app actions to their primary flows", async () => {
+    const cases = [
+      {
+        message: "add holding",
+        expectedText: "Add holding:",
+        expectedAction: { label: "Add Holding", href: "/portfolio?action=add-holding#add-holdings" },
+      },
+      {
+        message: "record a call",
+        expectedText: "Record a call:",
+        expectedAction: { label: "Record A Call", href: "/journal#record-call" },
+      },
+      {
+        message: "submit paper trade",
+        expectedText: "Paper trade:",
+        expectedAction: { label: "Submit Paper Trade", href: "/paper#paper-trade-form" },
+      },
+      {
+        message: "set up wallet",
+        expectedText: "Wallet setup:",
+        expectedAction: { label: "Set Up Wallet", href: "/trading#wallet-setup" },
+      },
+      {
+        message: "open web3 setup",
+        expectedText: "Web3 setup:",
+        expectedAction: { label: "Web3 Setup", href: "/settings#web3-wallet-trading" },
+      },
+      {
+        message: "open ai chat keys",
+        expectedText: "AI/chat keys:",
+        expectedAction: { label: "AI/chat Keys", href: "/settings#ai-chat-keys" },
+      },
+      {
+        message: "set safety limits",
+        expectedText: "Safety limits:",
+        expectedAction: { label: "Safety Limits", href: "/settings#safety-limits" },
+      },
+      {
+        message: "update profile",
+        expectedText: "Profile setup:",
+        expectedAction: { label: "Open Profile", href: "/settings#profile" },
+      },
+      {
+        message: "restore my profile backup",
+        expectedText: "Profile backup:",
+        expectedAction: { label: "Open Profile", href: "/settings#profile" },
+      },
+      {
+        message: "open profile settings",
+        expectedText: "Profile setup:",
+        expectedAction: { label: "Open Profile", href: "/settings#profile" },
+      },
+      {
+        message: "show me my account connections",
+        expectedText: "Account connections:",
+        expectedAction: { label: "Portfolio Connections", href: "/settings#portfolio-connections" },
+      },
+      {
+        message: "refresh portfolio balances",
+        expectedText: "Portfolio check:",
+        expectedAction: { label: "Add Holding", href: "/portfolio?action=add-holding#add-holdings" },
+      },
+      {
+        message: "import my portfolio",
+        expectedText: "Portfolio setup:",
+        expectedAction: { label: "Portfolio Setup", href: "/settings#portfolio-connections" },
+      },
+      {
+        message: "review active items",
+        expectedText: "Activity list:",
+        expectedAction: { label: "Review Active Items", href: "/activity#activity-list" },
+      },
+      {
+        message: "show urgent activity",
+        expectedText: "Urgent activity:",
+        expectedAction: { label: "Urgent activity", href: "/activity?filter=urgent#activity-list" },
+      },
+      {
+        message: "show worth checking activity",
+        expectedText: "Worth checking:",
+        expectedAction: { label: "Worth checking", href: "/activity?filter=worth-checking#activity-list" },
+      },
+      {
+        message: "show fyi activity",
+        expectedText: "FYI activity:",
+        expectedAction: { label: "FYI activity", href: "/activity?filter=fyi#activity-list" },
+      },
+      {
+        message: "acknowledge the top alert",
+        expectedText: "Activity list:",
+        expectedAction: { label: "Review Active Items", href: "/activity#activity-list" },
+      },
+      {
+        message: "why does the top item matter",
+        expectedText: "Activity check:",
+        expectedAction: { label: "Open Activity", href: "/activity" },
+      },
+      {
+        message: "mark top item useful",
+        expectedText: "Activity check:",
+        expectedAction: { label: "Open Activity", href: "/activity" },
+      },
+      {
+        message: "open system status",
+        expectedText: "System status:",
+        expectedAction: { label: "System Status", href: "/review" },
+      },
+      {
+        message: "pull system health",
+        expectedText: "System health:",
+        expectedAction: { label: "Health Status", href: "/api/health" },
+      },
+      {
+        message: "open trading monitor",
+        expectedText: "Trading monitor:",
+        expectedAction: { label: "Open Monitor", href: "/trading#trading-monitor" },
+      },
+      {
+        message: "start test trade flow",
+        expectedText: "Test trade flow:",
+        expectedAction: { label: "Review Test Trade", href: "/trading#test-trade-flow" },
+      },
+      {
+        message: "open technical details",
+        expectedText: "Technical details:",
+        expectedAction: { label: "Technical Details", href: "/trading?details=technical#technical-status" },
+      },
+      {
+        message: "show technical status",
+        expectedText: "Technical details:",
+        expectedAction: { label: "Technical Details", href: "/trading?details=technical#technical-status" },
+      },
+      {
+        message: "check web3 provider health",
+        expectedText: "Technical details:",
+        expectedAction: { label: "Technical Details", href: "/trading?details=technical#technical-status" },
+      },
+      {
+        message: "what needs review before live trading",
+        expectedText: "Technical details:",
+        expectedAction: { label: "Technical Details", href: "/trading?details=technical#technical-status" },
+      },
+      {
+        message: "add a holding",
+        expectedText: "Add holding:",
+        expectedAction: { label: "Add Holding", href: "/portfolio?action=add-holding#add-holdings" },
+      },
+      {
+        message: "show me the top idea",
+        expectedText: "Today check:",
+        expectedAction: { label: "Open Today", href: "/" },
+      },
+      {
+        message: "show my win rate",
+        expectedText: "Journal check:",
+        expectedAction: { label: "Open Journal", href: "/journal" },
+      },
+      {
+        message: "test my connections",
+        expectedText: "Setup check:",
+        expectedAction: { label: "Portfolio Setup", href: "/settings#portfolio-connections" },
+      },
+    ];
+
+    for (const testCase of cases) {
+      const res = await postChatRoute(
+        new Request("http://localhost/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message: testCase.message }),
+        }),
+      );
+      const actions = headerJson<Array<{ label: string; href: string }>>(res, "X-Chat-Actions", []);
+      const text = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Chat-Model")).toBe("local-command");
+      expect(text).toContain(testCase.expectedText);
+      expect(actions).toContainEqual(testCase.expectedAction);
+    }
+  });
+
+  test("POST /api/chat answers command-list requests without live chat", async () => {
+    const cases = ["what commands can i use", "what can I do on this page", "help"];
+
+    for (const message of cases) {
+      const res = await postChatRoute(
+        new Request("http://localhost/api/chat", {
+          method: "POST",
+          body: JSON.stringify({ message }),
+        }),
+      );
+      const actions = headerJson<Array<{ label: string; href: string }>>(res, "X-Chat-Actions", []);
+      const text = await res.text();
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("X-Chat-Model")).toBe("local-command");
+      expect(text).toContain("You can ask Master Mold");
+      expect(actions).toContainEqual({ label: "Check Trade", href: "/trading" });
+      expect(actions).toContainEqual({ label: "Open Settings", href: "/settings" });
+    }
+  });
+
   test("POST /api/chat narrows daily-focus and portfolio-truth questions before live chat", () => {
     const focusPrompt = buildUserPromptForRequest("What should I check first today?");
     expect(focusPrompt).toContain("Begin with `Top priority:`");
@@ -524,7 +852,7 @@ describe("API routes serve engine output end to end", () => {
     const portfolioPrompt = buildUserPromptForRequest("Is my portfolio live or sample?");
     expect(portfolioPrompt).toContain("Begin with `Portfolio state:`");
     expect(portfolioPrompt).toContain("sample, manual, or imported");
-    expect(portfolioPrompt).toContain("Do not mention unrelated alerts");
+    expect(portfolioPrompt).toContain("Do not mention unrelated activity items");
 
     const sampleDailyPrompt = buildUserPromptForRequest(
       "What should I focus on today with this sample portfolio?",
@@ -533,7 +861,7 @@ describe("API routes serve engine output end to end", () => {
     expect(sampleDailyPrompt).toContain("before calling any holding mine/yours");
   });
 
-  test("POST /api/chat accepts OpenAI-style messages and still applies daily-focus cleanup", async () => {
+  test("POST /api/chat accepts OpenAI-style messages and answers daily-focus commands locally", async () => {
     const prevA = process.env.ANTHROPIC_API_KEY;
     const prevR = process.env.OPENROUTER_API_KEY;
     const prevO = process.env.OPENAI_API_KEY;
@@ -542,25 +870,9 @@ describe("API routes serve engine output end to end", () => {
     delete process.env.OPENAI_API_KEY;
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
 
-    globalThis.fetch = ((url, init) => {
-      expect(String(url)).toBe("https://openrouter.ai/api/v1/chat/completions");
-      const body = JSON.parse(String(init?.body));
-      const userContent = JSON.stringify(body.messages);
-      expect(userContent).toContain("Begin with `Top priority:`");
-      expect(userContent).toContain("Keep the whole answer to one sentence");
-      expect(userContent).not.toContain("Summarize the advisory context");
-
-      return Promise.resolve(
-        new Response(
-          [
-            'data: {"choices":[{"delta":{"content":"Here is the context. Top priority: Check NVDA first because it is trading much more than usual; next, review the position before adding exposure."}}]}',
-            "data: [DONE]",
-            "",
-          ].join("\n"),
-          { status: 200 },
-        ),
-      );
-    }) as typeof fetch;
+    globalThis.fetch = ((() => {
+      throw new Error("Daily-focus commands should be answered locally.");
+    }) as unknown) as typeof fetch;
 
     try {
       const res = await postChatRoute(
@@ -574,10 +886,10 @@ describe("API routes serve engine output end to end", () => {
       const text = await res.text();
 
       expect(res.status).toBe(200);
-      expect(res.headers.get("X-Chat-Mode")).toBe("openrouter");
-      expect(res.headers.get("X-Chat-Cleanup-Mode")).toBe("daily-focus");
-      expect(text).toStartWith("Top priority:");
-      expect(text).not.toContain("Here is the context");
+      expect(res.headers.get("X-Chat-Mode")).toBe("canned");
+      expect(res.headers.get("X-Chat-Model")).toBe("local-command");
+      expect(text).toContain("Today check:");
+      expect(text).toContain("Next: open Today");
     } finally {
       globalThis.fetch = originalFetch;
       if (prevA === undefined) delete process.env.ANTHROPIC_API_KEY;
@@ -594,27 +906,13 @@ describe("API routes serve engine output end to end", () => {
     const prevR = process.env.OPENROUTER_API_KEY;
     const prevO = process.env.OPENAI_API_KEY;
     const originalFetch = globalThis.fetch;
-    let systemPrompt = "";
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
 
-    globalThis.fetch = ((url, init) => {
-      expect(String(url)).toBe("https://openrouter.ai/api/v1/chat/completions");
-      const body = JSON.parse(String(init?.body));
-      systemPrompt = String(body.messages[0]?.content ?? "");
-
-      return Promise.resolve(
-        new Response(
-          [
-            'data: {"choices":[{"delta":{"content":"Top priority: Treat this as a rewound view and do not use current memory."}}]}',
-            "data: [DONE]",
-            "",
-          ].join("\n"),
-          { status: 200 },
-        ),
-      );
-    }) as typeof fetch;
+    globalThis.fetch = ((() => {
+      throw new Error("Replay-aware Today commands should be answered locally.");
+    }) as unknown) as typeof fetch;
 
     try {
       const res = await postChatRoute(
@@ -630,13 +928,17 @@ describe("API routes serve engine output end to end", () => {
           }),
         }),
       );
+      const text = await res.text();
 
       expect(res.status).toBe(200);
-      expect(systemPrompt).toContain("No snapshot by replay time");
-      expect(systemPrompt).toContain(`"route":"/?as_of=2026-05-01T00:00:00.000Z"`);
-      expect(systemPrompt).not.toContain("Fresh today");
-      expect(systemPrompt).not.toContain("7 saved context notes");
-      await expect(res.text()).resolves.toContain("rewound view");
+      expect(res.headers.get("X-Chat-Mode")).toBe("canned");
+      expect(res.headers.get("X-Chat-Model")).toBe("local-command");
+      expect(text).toContain("Today check:");
+      expect(text).toContain("No briefing card");
+      expect(text).toContain("No visible holding is loaded");
+      expect(text).toContain("No visible activity item");
+      expect(text).not.toContain("Fresh today");
+      expect(text).not.toContain("7 saved context notes");
     } finally {
       globalThis.fetch = originalFetch;
       if (prevA === undefined) delete process.env.ANTHROPIC_API_KEY;
@@ -691,7 +993,7 @@ describe("API routes serve engine output end to end", () => {
       const res = await postChatRoute(
         new Request("http://localhost/api/chat", {
           method: "POST",
-          body: JSON.stringify({ message: "Explain today's top alert." }),
+          body: JSON.stringify({ message: "Give me a nuanced market read in one paragraph." }),
         }),
       );
       expect(res.status).toBe(200);
@@ -782,7 +1084,7 @@ describe("API routes serve engine output end to end", () => {
       const res = await postChatRoute(
         new Request("http://localhost/api/chat", {
           method: "POST",
-          body: JSON.stringify({ message: "What sources did today's read use?" }),
+          body: JSON.stringify({ message: "Please rewrite the saved-read source wording in one sentence." }),
         }),
       );
       const text = await res.text();
@@ -805,6 +1107,7 @@ describe("API routes serve engine output end to end", () => {
     const prevR = process.env.OPENROUTER_API_KEY;
     const prevO = process.env.OPENAI_API_KEY;
     const originalFetch = globalThis.fetch;
+    const prevMax = process.env.MASTERMOLD_CHAT_MAX_TOTAL_TOKENS;
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
@@ -819,7 +1122,7 @@ describe("API routes serve engine output end to end", () => {
       const res = await postChatRoute(
         new Request("http://localhost/api/chat", {
           method: "POST",
-          body: JSON.stringify({ message: "Explain today's top alert." }),
+          body: JSON.stringify({ message: "Give me a nuanced market read in one paragraph." }),
         }),
       );
       const body = await json<{ code: string; error: string; provider: string }>(res);
@@ -840,6 +1143,8 @@ describe("API routes serve engine output end to end", () => {
       else process.env.OPENROUTER_API_KEY = prevR;
       if (prevO === undefined) delete process.env.OPENAI_API_KEY;
       else process.env.OPENAI_API_KEY = prevO;
+      if (prevMax === undefined) delete process.env.MASTERMOLD_CHAT_MAX_TOTAL_TOKENS;
+      else process.env.MASTERMOLD_CHAT_MAX_TOTAL_TOKENS = prevMax;
     }
   });
 
@@ -865,7 +1170,7 @@ describe("API routes serve engine output end to end", () => {
       const res = await postChatRoute(
         new Request("http://localhost/api/chat", {
           method: "POST",
-          body: JSON.stringify({ message: "Explain today's top alert." }),
+          body: JSON.stringify({ message: "Give me a nuanced market read in one paragraph." }),
         }),
       );
       const body = await json<{ provider: string; code: string }>(res);

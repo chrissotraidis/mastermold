@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clearCachedWeb3TradingState, getCachedWeb3TradingState } from "@/src/db/web3-trading-state-cache";
 import {
   getWeb3TradingStateAsync,
   isExecutionMode,
@@ -82,7 +83,18 @@ export async function GET(request: Request): Promise<NextResponse<Web3TradingSta
     return NextResponse.json({ error: parsed.error }, { status: 422 });
   }
 
-  return NextResponse.json(await getWeb3TradingStateAsync(parsed.value));
+  const value = parsed.value;
+  if (value.reset || value.advance || value.daemon || value.drill) {
+    clearCachedWeb3TradingState();
+    return NextResponse.json(await getWeb3TradingStateAsync(value));
+  }
+
+  return NextResponse.json(await getCachedWeb3TradingState({
+    account: value.account ?? "persistent",
+    source: value.source ?? "sample",
+    scenario: value.scenario ?? "base",
+    cycles: value.cycles ?? 0,
+  }));
 }
 
 export async function POST(request: Request): Promise<NextResponse<Web3TradingState | { error: string }>> {
@@ -98,6 +110,7 @@ export async function POST(request: Request): Promise<NextResponse<Web3TradingSt
     return NextResponse.json({ error: parsed.error }, { status: 422 });
   }
 
+  clearCachedWeb3TradingState();
   return NextResponse.json(await getWeb3TradingStateAsync(parsed.value));
 }
 

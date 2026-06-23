@@ -247,7 +247,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                     )
                   }
                   rows={4}
-                  className="w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+                  className="w-full resize-y overflow-x-hidden rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                 />
               </FieldBlock>
 

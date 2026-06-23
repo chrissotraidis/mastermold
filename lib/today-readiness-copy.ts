@@ -58,7 +58,7 @@ export function buildTodayReadiness({
       label: "Refresh imports",
       detail: `${portfolio.import_snapshot.status}. Import again before relying on this read.`,
       action: "Open Settings",
-      href: "/settings/integrations",
+      href: "/settings",
     };
   }
 
@@ -68,7 +68,7 @@ export function buildTodayReadiness({
       label: "Chat has no saved context yet",
       detail: "Use Save context for chat here, or open Settings for Chat context controls.",
       action: "Open memory settings",
-      href: "/settings/integrations",
+      href: "/settings",
     };
   }
 
@@ -76,7 +76,7 @@ export function buildTodayReadiness({
     return {
       title: "Market context is sample",
       label: "Sample market context",
-      detail: "The portfolio can be personal, but Today and Alerts still use sample market examples until a saved read exists.",
+      detail: "The portfolio can be personal, but Today and Activity still use sample market examples until a saved read exists.",
       action: "See what is real",
       href: "/review",
     };
@@ -97,6 +97,6 @@ export function buildTodayReadiness({
     label: "Chat context check armed",
     detail: `${brain.summary.snapshot_freshness}. The local check can refresh chat context when called; it does not refresh accounts or fetch fresh news.`,
     action: "Review context",
-    href: "/settings/integrations",
+    href: "/settings",
   };
 }

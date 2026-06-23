@@ -564,7 +564,7 @@ export function toPublicExecutor(executor: ExecutorJson): PublicExecutor {
     })),
     provenance: {
       label: "Sample data",
-      source: "Executor preview data. It is local sample data and cannot sign or move funds.",
+      source: "Trade safety preview data. It is local sample data and cannot sign or move funds.",
       as_of: executor.provenance.as_of,
       replay_as_of: executor.provenance.replay_as_of,
     },
@@ -980,12 +980,12 @@ function publicMetricEventLabel(event: string) {
 function publicMetricSurface(surface: string) {
   if (surface === "app") return "App";
   if (surface === "today") return "Today";
-  if (surface === "alerts") return "Alerts";
+  if (surface === "alerts") return "Activity";
   if (surface === "journal") return "Decision journal";
   if (surface === "settings") return "Settings";
   if (surface === "chat") return "Chat";
   if (surface === "paper") return "Paper";
-  if (surface === "review") return "Performance";
+  if (surface === "review") return "System status";
   return plainBriefingText(surface).replace(/_/g, " ");
 }
 

@@ -129,7 +129,7 @@ export function ReviewerEvidencePanel() {
             data-rds-action="create"
             data-action-state={checked.briefing ? `changed-${actionSequence}` : "idle"}
             data-persona="reviewer"
-            onClick={() => markSurface("briefing", "Today and alerts")}
+            onClick={() => markSurface("briefing", "Today and activity")}
             className="justify-start bg-violet text-void hover:bg-violet"
           >
             <ClipboardCheck aria-hidden="true" />
@@ -157,11 +157,11 @@ export function ReviewerEvidencePanel() {
             data-action-state={checked.executor ? `changed-${actionSequence}` : "idle"}
             data-persona="reviewer"
             aria-pressed={checked.executor}
-            onClick={() => markSurface("executor", "Executor and integrations")}
+            onClick={() => markSurface("executor", "Trade and integrations")}
             className="justify-start border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
           >
             <CheckCircle2 aria-hidden="true" />
-            {checked.executor ? "Executor checked" : "Mark executor checked"}
+            {checked.executor ? "Trade checked" : "Mark Trade checked"}
           </Button>
           <Button
             type="button"

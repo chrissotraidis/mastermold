@@ -14,9 +14,9 @@ type CopyRedactedPacketButtonProps = {
 
 export function CopyRedactedPacketButton({
   text,
-  label = "Copy packet",
+  label = "Copy status",
   copiedLabel = "Copied",
-  ariaLabel = "Copy redacted packet",
+  ariaLabel = "Copy redacted status",
   className,
 }: CopyRedactedPacketButtonProps) {
   const [copied, setCopied] = useState(false);

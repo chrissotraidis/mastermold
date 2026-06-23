@@ -948,7 +948,7 @@ export function Web3LiveCanaryConsole({
               </Link>
             )}
             <Link
-              href="/settings/integrations#settings-web3-credentials-runway"
+              href="/settings#web3-wallet-trading"
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-semibold text-engine transition hover:bg-engine/15"
             >
               Fix credential gates

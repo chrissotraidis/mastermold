@@ -14,16 +14,22 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/profile-settings.tsx")).toContain("min-h-11 rounded-md border");
     expect(source("app/briefing/[id]/page.tsx")).toContain("inline-flex min-h-11");
     expect(source("components/alert-feed.tsx")).toContain("inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2");
-    expect(source("components/alert-inbox-drawer.tsx")).toContain("inline-flex min-h-11 items-center justify-center gap-2 rounded-md border");
+    expect(source("components/alert-inbox-drawer.tsx")).toContain("relative flex size-11 items-center justify-center rounded-md border");
     expect(source("components/alert-feed.tsx")).toContain("inline-flex min-h-11 items-center justify-center rounded-md border");
-    expect(source("components/alert-inbox-drawer.tsx")).toContain("inline-flex min-h-11 items-center justify-center rounded-md border");
-    expect(source("components/manual-holdings-panel.tsx")).toContain("inline-flex min-h-11 items-center gap-2");
+    expect(source("components/alert-inbox-drawer-content.tsx")).toContain("inline-flex min-h-11 items-center justify-center rounded-md border");
+    expect(source("components/manual-holdings-panel.tsx")).toContain("inline-flex min-h-11 w-full items-center justify-center gap-2");
     expect(source("app/settings/integrations/page.tsx")).toContain("inline-flex min-h-11 items-center gap-1");
     expect(source("components/welcome-flow.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
     expect(source("components/journal-workspace.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
     expect(source("components/as-of-replay-control.tsx")).toContain("flex min-h-11 cursor-pointer");
     expect(source("components/command-console.tsx")).toContain("flex size-11 shrink-0");
-    expect(source("components/command-console.tsx")).toContain("min-h-11 border border-outline-variant/40");
+    expect(source("components/command-console.tsx")).toContain("className=\"min-h-11 w-full bg-transparent");
+    expect(source("components/command-console.tsx")).toContain("inline-flex min-h-11 min-w-0 items-center justify-center");
+    expect(source("components/command-console.tsx")).not.toContain("min-h-10");
+    expect(source("components/global-assistant.tsx")).toContain("inline-flex min-h-11 shrink-0 items-center justify-center");
+    expect(source("components/global-assistant.tsx")).not.toContain("min-h-10");
+    expect(source("components/app-shell.tsx")).toContain("flex min-h-12 items-center gap-2");
+    expect(source("components/app-shell.tsx")).toContain("inline-flex min-h-11 items-center justify-center");
     expect(source("components/save-briefing-call-button.tsx")).toContain("min-h-11 w-full");
     expect(source("components/briefing-card.tsx")).toContain("group/title flex min-h-11");
     expect(source("components/master-mold-actions.tsx")).toContain("inline-flex min-h-11 items-center justify-center gap-2");
@@ -34,21 +40,42 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/paper-workspace.tsx")).toContain("h-11 w-full rounded-md border");
     expect(source("components/paper-workspace.tsx")).toContain("relative flex min-h-11 cursor-pointer");
     expect(source("components/paper-workspace.tsx")).toContain("absolute inset-0 h-full w-full cursor-pointer opacity-0");
-    expect(source("components/paper-workspace.tsx")).toContain("className=\"h-11 w-full accent-violet\"");
+    expect(source("components/paper-workspace.tsx")).toContain('id="paper-confidence"');
+  });
+
+  test("GIVEN replay tooling exists WHEN pages render on phones THEN it stays compact until opened", () => {
+    const replayControl = source("components/as-of-replay-control.tsx");
+
+    expect(replayControl).toContain('data-testid="as-of-replay-control"');
+    expect(replayControl).toContain("Optional timeline check");
+    expect(replayControl).not.toContain("open={Boolean(activeAsOf)}");
+    expect(replayControl).not.toContain("See this page at an earlier time");
   });
 
   test("GIVEN alert actions render on phones WHEN source controls are checked THEN action buttons use the 44px floor", () => {
     const alertFeed = source("components/alert-feed.tsx");
-    const alertDrawer = source("components/alert-inbox-drawer.tsx");
+    const alertDrawer = source("components/alert-inbox-drawer-content.tsx");
+    const alertBell = source("components/alert-inbox-drawer.tsx");
     const globalAssistant = source("components/global-assistant.tsx");
 
-    expect(alertDrawer).toContain("Open alerts, ${activeAlerts.length} unread");
-    expect(alertDrawer).toContain('className="alert-count-badge absolute -right-1 -top-1"');
-    expect(alertDrawer).toContain("data-alert-count={String(activeAlerts.length)}");
+    expect(alertBell).toContain("Open activity, ${activeAlerts.length} unread");
+    expect(alertBell).toContain('className="alert-count-badge absolute right-0 top-0"');
+    expect(alertBell).toContain("data-alert-count={String(activeAlerts.length)}");
     expect(source("app/globals.css")).toContain(".alert-count-badge::after");
-    expect(alertFeed).toContain("inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet/35");
-    expect(alertFeed).toContain("inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35");
-    expect(alertFeed).toContain("inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/35");
+    expect(alertFeed).toContain("grid grid-cols-3 gap-1 rounded-md border border-outline-variant/35");
+    expect(alertFeed).toContain("inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-violet/35");
+    expect(alertFeed).toContain("inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-engine/35");
+    expect(alertFeed).toContain("inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-caution/35");
+    expect(alertFeed).toContain('aria-label="Ask Master Mold"');
+    expect(alertFeed).toContain('title="Ask Master Mold"');
+    expect(alertFeed).toContain("<span>Ask</span>");
+    expect(alertFeed).toContain('aria-label="Save as decision"');
+    expect(alertFeed).toContain('title="Save as decision"');
+    expect(alertFeed).toContain("<span>Save</span>");
+    expect(alertFeed).toContain('aria-label="Paper trade"');
+    expect(alertFeed).toContain('title="Paper trade"');
+    expect(alertFeed).toContain("<span>Paper</span>");
+    expect(alertFeed).not.toContain('className="sm:hidden">Ask');
     expect(alertDrawer).toContain("inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet/35");
     expect(alertDrawer).toContain("inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35");
     expect(alertDrawer).toContain("inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/35");
@@ -64,7 +91,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(alertDrawer).toContain("{label}");
     expect(`${alertFeed}\n${alertDrawer}`).not.toContain("JournalEntryJson");
     expect(`${alertFeed}\n${alertDrawer}`).not.toContain("Useful?");
-    expect(`${alertFeed}\n${alertDrawer}\n${globalAssistant}`).not.toMatch(/inline-flex min-h-10|flex size-10 items-center justify-center rounded-md border|real inference/i);
+    expect(`${alertFeed}\n${alertDrawer}\n${globalAssistant}`).not.toMatch(/flex size-10 items-center justify-center rounded-md border|real inference/i);
   });
 
   test("GIVEN Brain borrow-rate facts feed UI and chat WHEN source copy is checked THEN raw open-interest wording stays hidden", () => {
@@ -89,17 +116,33 @@ describe("mobile ergonomics source contracts", () => {
 
   test("GIVEN alert and briefing disclosures render on phones WHEN source copy is checked THEN disclosure toggles are full-height controls", () => {
     const alertFeed = source("components/alert-feed.tsx");
-    const alertDrawer = source("components/alert-inbox-drawer.tsx");
+    const alertDrawer = source("components/alert-inbox-drawer-content.tsx");
     const briefingDetail = source("app/briefing/[id]/page.tsx");
 
     expect(alertFeed).toContain("flex min-h-11 cursor-pointer items-center font-semibold text-on-surface");
     expect(alertFeed).toContain("flex min-h-11 cursor-pointer items-center text-sm font-semibold text-on-surface");
     expect(alertDrawer).toContain("flex min-h-11 cursor-pointer items-center font-semibold text-on-surface");
     expect(alertDrawer).toContain("flex min-h-11 cursor-pointer items-center text-sm font-semibold text-on-surface");
+    expect(alertDrawer).toContain("Checking the latest activity...");
+    expect(alertDrawer).toContain("line-clamp-2 text-sm leading-6");
+    expect(alertDrawer).toContain("Details and response");
+    expect(alertDrawer).toContain("<details className=\"rounded-md border border-outline-variant/40 bg-surface-dim/35 p-3\">");
+    expect(alertDrawer.indexOf("askAboutAlert(alert)")).toBeLessThan(alertDrawer.indexOf("Details and response"));
+    expect(alertFeed).toContain("line-clamp-2 max-w-2xl text-sm leading-6");
+    expect(alertFeed).toContain("<ActivityActionRow");
+    expect(alertFeed).toContain('title="Ask Master Mold"');
+    expect(alertFeed).toContain('title="Save as decision"');
+    expect(alertFeed).toContain('title="Paper trade"');
+    expect(alertFeed).toContain("<span>Ask</span>");
+    expect(alertFeed).toContain("<span>Save</span>");
+    expect(alertFeed).toContain("<span>Paper</span>");
+    expect(alertFeed).not.toContain('className="sm:hidden">Ask');
+    expect(alertFeed).not.toContain('className="hidden sm:inline">Ask Master Mold');
+    expect(alertFeed).toContain("Details and response");
+    expect(alertFeed.indexOf("<ActivityActionRow")).toBeLessThan(alertFeed.indexOf("Details and response"));
     expect(alertFeed).toContain('label="Reasonable response"');
     expect(alertFeed).toContain('label="Safe to ignore when"');
     expect(alertFeed).toContain("cleanAlertRationale(alert.rationale)");
-    expect(alertDrawer).toContain('<DrawerExplanationPoint label="Why it matters" body={explainAlertRelevance(alert)} />');
     expect(alertDrawer).toContain('<DrawerExplanationPoint label="Reasonable response" body={buildAlertSuggestedResponse(alert)} />');
     expect(alertDrawer).toContain("Safe to ignore when:");
     expect(alertDrawer).toContain("cleanAlertRationale(alert.rationale)");
@@ -171,14 +214,21 @@ describe("mobile ergonomics source contracts", () => {
 
     expect(portfolioCopy).toContain("Net worth, holdings, allocation, and sources.");
     expect(portfolioCopy).toContain("Manual entries make Today and chat use what you enter.");
-    // Charts lead the page; manual entry now lives in a collapsible editor below.
-    expect(portfolioPage.indexOf("<PortfolioCharts")).toBeLessThan(
-      portfolioPage.indexOf("<ManualHoldingsPanel"),
+    // The Add holding action lands on the actual form, but the first screen stays focused on the portfolio read.
+    expect(portfolioPage).toContain('href="#add-holdings"');
+    expect(portfolioPage.indexOf("<ManualHoldingsPanel")).toBeGreaterThan(
+      portfolioPage.indexOf("<HoldingsTable holdings={portfolio.holdings}"),
     );
-    expect(portfolioPage).toContain("Add or edit manual holdings");
+    expect(portfolioPage).toContain('id="add-holdings"');
+    expect(portfolioPage).not.toContain("Add or edit manual holdings");
+    expect(portfolioPage.indexOf("<AsOfReplayControl")).toBeGreaterThan(
+      portfolioPage.indexOf("<PortfolioCharts"),
+    );
     expect(portfolioCharts).toContain("Trailing 7 days, priced from saved closes.");
-    expect(portfolioPage).toContain("Open holding details");
-    expect(portfolioPage).toContain("Related alert");
+    expect(portfolioPage).toContain("Decision detail");
+    expect(portfolioPage).toContain("<details className=\"group mt-4");
+    expect(portfolioPage).toContain("Context");
+    expect(portfolioPage).toContain("Related activity");
     expect(portfolioPage).toContain("return `${shortAlertTierLabel(alert.tier)}: ${cleanAlertMessage(alert.message)}`;");
     expect(portfolioPage).toContain("Position size");
     expect(portfolioPage).toContain("Recent move");
@@ -187,7 +237,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(portfolioPage).toContain("Imported snapshot");
     expect(portfolioPage).toContain("does not refresh by itself");
     expect(portfolioPage).toContain("status.toLowerCase()} + local/sample holdings");
-    expect(portfolioPage).toContain("No current alert for this holding.");
+    expect(portfolioPage).toContain("No current activity for this holding.");
     expect(`${portfolioPage}\n${portfolioCopy}\n${portfolioCharts}`).not.toMatch(
       /Tap a holding|thesis|your portfolio|>Weight|The visible money picture|Portfolio value, not individual asset price moves|alert: \\$\\{cleanAlertMessage|can shape Today/i,
     );
@@ -195,9 +245,20 @@ describe("mobile ergonomics source contracts", () => {
 
   test("GIVEN Settings first-paint copy WHEN the profile state is not ready THEN it does not look stuck", () => {
     const profileSettings = source("components/profile-settings.tsx");
+    const settingsPage = source("app/settings/integrations/page.tsx");
 
     expect(profileSettings).toContain("Profile settings live in this browser");
     expect(profileSettings).toContain("<summary className=\"flex min-h-11 cursor-pointer items-center text-sm font-semibold text-on-surface\">");
+    expect(settingsPage).toContain('import { Suspense } from "react";');
+    expect(settingsPage).toContain("<SettingsSectionsLoading");
+    expect(settingsPage).toContain("<SettingsDeferredSections");
+    expect(settingsPage).toContain('data-testid="settings-deferred-loading"');
+    expect(settingsPage.indexOf("<PageHeader")).toBeLessThan(settingsPage.indexOf("<Suspense"));
+    expect(settingsPage).toContain('aria-label="Settings sections" className="hidden gap-2 sm:grid sm:grid-cols-2 lg:grid-cols-5"');
+    expect(settingsPage).toContain('aria-label="Settings sections loading"');
+    expect(settingsPage).toContain("min-h-12 flex-col justify-between");
+    expect(settingsPage).toContain('<div className="pt-6 sm:pt-0">');
+    expect(source("components/settings-section.tsx")).toContain("{open ? (");
     expect(profileSettings).toContain("Backup &amp; restore");
     expect(profileSettings).toContain("Reset browser setup");
     expect(profileSettings).toContain("Click again to reset browser setup");
@@ -211,49 +272,54 @@ describe("mobile ergonomics source contracts", () => {
     const globalAssistant = source("components/global-assistant.tsx");
 
     expect(chatPage).toContain(
-      "The visible daily read, alerts, holdings, and past calls are in context.",
+      "Ask Master Mold to open routes, check status, pull context, or explain what to do next.",
     );
     expect(chatPage).toContain("parseAsOf(params?.as_of ?? null)");
-    expect(chatPage).toContain("getChatContext(asOf)");
+    expect(chatPage).not.toContain("getChatPrompts");
+    expect(chatPage).not.toContain("getDataMode");
     expect(chatPage).toContain('apiPath="/api/chat"');
     expect(chatPage).toContain("buildChatRoute(initialQuery, asOf?.iso ?? null)");
     expect(chatPage).toContain("Answer only from the context known by then.");
+    expect(chatPage.indexOf('id="ask-master-mold"')).toBeLessThan(chatPage.indexOf('apiPath="/api/chat"'));
+    expect(chatPage).not.toContain("Ask a question");
     expect(appShell).toContain('const isChatPage = pathname.startsWith("/chat");');
     expect(appShell).toContain('{isChatPage ? (');
     expect(globalAssistant).toContain('const isChatPage = currentPath.startsWith("/chat");');
     expect(globalAssistant).toContain("{!isChatPage ? (");
     expect(globalAssistant).toContain('data-testid="global-assistant-open"');
-    expect(globalAssistant).toContain("bottom-[4.75rem] right-3");
+    expect(globalAssistant).toContain("const hideFloatingLauncherOnMobile = true;");
+    expect(globalAssistant).toContain("bottom-[4.85rem] right-3");
+    expect(globalAssistant).toContain('hideFloatingLauncherOnMobile ? "hidden md:flex" : "flex"');
     expect(globalAssistant).toContain("size-12");
-    expect(globalAssistant).toContain("md:bottom-6 md:right-6 md:size-16");
-    // The top-left Master Mold icon navigates home (Today); chat is reachable
-    // from the floating launcher and the /chat route, not the brand mark.
+    expect(globalAssistant).toContain("md:bottom-6 md:right-6 md:size-auto");
+    expect(globalAssistant).toContain("md:min-h-14");
+    // The face still navigates home, while the sticky mobile wordmark opens
+    // Master Mold so chat stays reachable after the first command box scrolls away.
     expect(appShell).toContain('aria-label="Go to Today (home)"');
-    expect(source("components/reviewer-evidence-panel.tsx")).toContain('"Today and alerts"');
+    expect(appShell).toContain('aria-label="Ask Master Mold from the top bar"');
+    expect(appShell).toContain("openMasterMoldChat(undefined, pageContext)");
+    expect(appShell).toContain("md:hidden");
+    expect(appShell).toContain("hidden min-h-11 items-center font-display text-2xl font-bold tracking-tighter text-violet md:flex");
+    expect(source("components/reviewer-evidence-panel.tsx")).toContain('"Today and activity"');
     expect(chatPage).not.toMatch(/your alerts, holdings, and record/i);
   });
 
-  test("GIVEN the daily shell renders outside Executor WHEN top-bar controls are checked THEN the drill is scoped to Executor", () => {
+  test("GIVEN the daily shell renders outside Trade WHEN top-bar controls are checked THEN the drill is scoped to Trade", () => {
     const appShell = source("components/app-shell.tsx");
 
-    expect(appShell).toContain('const showKillControl = pathname.startsWith("/executor") || killEngaged;');
+    expect(appShell).toContain('const showKillControl = pathname.startsWith("/trading") || killEngaged;');
     expect(appShell).toContain("{showKillControl ? (");
-    expect(appShell).toContain('title="Kill-switch drill for the executor preview"');
-    expect(appShell).toContain('aria-label="Kill-switch drill"');
+    expect(appShell).toContain('title="Run safety drill"');
+    expect(appShell).toContain('aria-label="Run safety drill"');
   });
 
-  test("GIVEN Executor explains future safeguards WHEN source copy is checked THEN it avoids implementation notes", () => {
+  test("GIVEN Executor redirects into Trade WHEN source copy is checked THEN it avoids duplicate control rooms", () => {
     const executorPage = source("app/executor/page.tsx");
     const executorWorkspace = source("components/executor-workspace.tsx");
     const publicCopy = source("lib/public-api-copy.ts");
 
-    expect(executorPage).toContain("Review the safety plan a real executor would need.");
-    expect(executorPage).toContain("Before this could ever run, separate safety rules");
-    expect(executorPage).toContain("beyond the amount you approve");
-    expect(executorPage).toContain("Four checks before any live action");
-    expect(executorPage).toContain("only edit a local safety draft");
-    expect(executorPage).toContain("Show balance changes before any request");
-    expect(executorPage).toContain("it only lets you review the local safety draft");
+    expect(executorPage).toContain('redirect(`/trading${query}`);');
+    expect(executorPage).not.toContain("<ExecutorWorkspace");
     expect(executorWorkspace).toContain("Review-only strategy examples");
     expect(executorWorkspace).toContain("Draft the limits a real executor would need");
     expect(executorWorkspace).toContain("Temporary access expiry");
@@ -318,6 +384,17 @@ describe("mobile ergonomics source contracts", () => {
     expect(journalPage).not.toMatch(/CalibrationCurve|calibration-title/i);
     expect(journalPage).not.toMatch(/Score accuracy|Confidence accuracy|higher-confidence|actually been right more often/i);
     expect(journal).toContain("Past calls by review score");
+    expect(journal).toContain("const INITIAL_JOURNAL_ENTRY_LIMIT = 5;");
+    expect(journal).toContain("entries.slice(0, INITIAL_JOURNAL_ENTRY_LIMIT)");
+    expect(journal).toContain("Showing {visibleEntries.length} of {entries.length} saved calls.");
+    expect(journal).toContain("Show ${hiddenEntryCount} older calls");
+    expect(journal).toContain("Show recent only");
+    expect(journal).toContain("Older calls stay tucked away until you need the archive.");
+    expect(journal).toContain("aria-expanded={showDetails}");
+    expect(journal).toContain('aria-controls="strategy-belief-detail"');
+    expect(journal).toContain("Show lesson details");
+    expect(journal).toContain("{showDetails ? (");
+    expect(journal).toContain('id="strategy-belief-detail"');
     expect(journal).toContain("<TrackRecordSection tiers={trackRecord} provenance={initialJournal.provenance} />");
     expect(journal).toContain("<ProvenanceChip label={provenance.label} title={provenance.source} />");
     expect(journal).toContain("Seeded and locally saved calls. Use this to check the scoring workflow; it is not evidence that future calls will work.");
@@ -383,14 +460,18 @@ describe("mobile ergonomics source contracts", () => {
     expect(dashboardPage).toContain('export const dynamic = "force-dynamic";');
     expect(dashboardPage).toContain("return <TodayPage {...props} />;");
     expect(dashboardPage).not.toMatch(/export \{ dynamic \}|redirect|Loading this view/i);
-    expect(settingsPage).toContain("<IntegrationsSettingsPage />");
+    expect(settingsPage).toContain("<IntegrationsSettingsPage {...props} />");
     expect(settingsPage).not.toMatch(/Settings route loaded|reviewer and operator flows/i);
   });
 
   test("GIVEN a route fails WHEN the fallback renders THEN it uses plain app copy", () => {
     const routeFeedback = source("components/route-feedback.tsx");
 
-    expect(routeFeedback).toContain("Loading Master Mold.");
+    expect(routeFeedback).toContain("Loading the page controls.");
+    expect(routeFeedback).toContain("Master Mold stays ready for a quick check");
+    expect(routeFeedback).toContain('if (pathname.startsWith("/chat"))');
+    expect(routeFeedback).toContain('surface: "Chat"');
+    expect(routeFeedback).toContain("The Master Mold chat view is loading.");
     expect(routeFeedback).toContain("This page did not load");
     expect(routeFeedback).toContain("Retry this page, or switch sections from the main navigation");
     // "Skeleton" appears in component identifiers (RouteLoadingSkeleton); the
@@ -492,11 +573,19 @@ describe("mobile ergonomics source contracts", () => {
     expect(`${reviewReadiness}\n${forwardProofWithoutGateScrubber}\n${source("components/forward-trial-starter.tsx")}`).not.toMatch(/proof that Master Mold can beat|proven Master Mold|show Master Mold can do better|proof of edge|decision edge|edge claim|claim it is outperforming|Measurement contract|Measurement-window calls|id: "forward_trial"|trial:|DSR|PBO|MinTRL|Alpaca paper shadow|Equal-weight|always-on market memory/i);
   });
 
-  test("GIVEN Performance opens on mobile WHEN source copy is checked THEN it states the trust boundary first", () => {
+  test("GIVEN System status opens on mobile WHEN source copy is checked THEN it states the trust boundary first", () => {
     const reviewPage = source("app/review/page.tsx");
     const reviewReadiness = source("components/review-readiness.tsx");
 
-    expect(reviewPage).toContain("<ReviewReadiness surface=\"public\" />");
+    expect(reviewPage).toContain("System status");
+    expect(reviewPage).toContain("Reviewer-only truthfulness, data mode, and launch-readiness checks.");
+    expect(reviewPage).toContain("Reviewer evidence");
+    expect(reviewPage).toContain("What works, what is sample, what is credential-gated, what is missing, and how review credentials work.");
+    expect(reviewPage).toContain("Live trading");
+    expect(reviewPage).toContain("Locked");
+    expect(reviewPage).toContain("The app still does not sign, submit swaps, move funds");
+    expect(reviewPage).toContain("Real-money Web3 trading is locked");
+    expect(reviewPage).not.toContain("<ReviewReadiness surface=\"public\" />");
     expect(reviewPage).not.toContain("<FirstRunBanner");
     expect(reviewReadiness).toContain("Trust summary");
     expect(reviewReadiness).toContain("Performance");
@@ -554,6 +643,69 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewReadiness).not.toMatch(/Performance & trust|still sample before you trust|Safe to inspect|trust score|black box|Manual or sample only|real portfolio money|scanner reads|drivers, and alerts|OpenRouter, Anthropic, or OpenAI|always-on Brain described in the PRD|brain runs|Ask about this scan|Review the current Master Mold scan|What it learned|Confidence \\$\\{Math\\.round|seeded local account|Last scan|Scan date|Scan type|Scan details|Not needed for this scan|duplicate scan/i);
   });
 
+  test("GIVEN Paper and Trade open on mobile WHEN source copy is checked THEN they keep simulator and Web3 flows plain", () => {
+    const paperPage = source("app/paper/page.tsx");
+    const paperWorkspace = source("components/paper-workspace.tsx");
+    const tradingPage = source("app/trading/page.tsx");
+    const tradeOverview = source("components/trade-overview.tsx");
+    const tradeLoadingState = source("components/trade-loading-state.tsx");
+    const deferredDetails = source("components/trade-deferred-details.tsx");
+    const technicalDrawer = source("components/technical-status-drawer.tsx");
+    const testTrade = source("components/test-trade-flow.tsx");
+
+    expect(paperPage).toContain("Try a market call with simulator dollars");
+    expect(paperPage).toContain("compare the result after the close date");
+    expect(paperPage).toContain("Ideas to test");
+    expect(paperPage.indexOf("<PaperWorkspace")).toBeGreaterThan(-1);
+    expect(paperPage.indexOf("<MasterMoldPaperIdeas")).toBeGreaterThan(-1);
+    expect(paperWorkspace).toContain("Open tests");
+    expect(paperWorkspace).toContain("Use simulator dollars to test a call");
+    expect(paperWorkspace).toContain("Test a paper trade");
+    expect(paperWorkspace).toContain("Paper trades use this simulator balance only. No connected account is touched.");
+    expect(paperWorkspace).toContain("const INITIAL_CLOSED_ROUND_LIMIT = 3;");
+    expect(paperWorkspace).toContain("rounds.slice(0, INITIAL_CLOSED_ROUND_LIMIT)");
+    expect(paperWorkspace).toContain("Show closed-test history");
+    expect(paperWorkspace).toContain("Hide closed-test history");
+    expect(paperWorkspace).toContain('aria-controls="paper-round-history-detail"');
+    expect(paperWorkspace).toContain('id="paper-round-history-detail"');
+    expect(paperWorkspace).toContain("Showing {visibleRounds.length} of {rounds.length} closed rounds.");
+    expect(paperWorkspace).toContain("Show ${hiddenRoundCount} older rounds");
+    expect(paperWorkspace).toContain("Show recent rounds");
+    expect(paperWorkspace).toContain("min-h-11 rounded-md border border-outline-variant/40 px-3");
+    expect(paperWorkspace).not.toContain("min-h-10");
+
+    expect(tradingPage).toContain('<TradeOverview state={state} overviewMode={overviewMode} requestedSource={source} />');
+    expect(tradingPage).toContain("const overviewState = cachedOverviewState ?? null;");
+    expect(tradingPage).toContain("warmCachedWeb3TradingState(stateRequest);");
+    expect(tradingPage).not.toContain("getWeb3TradingState(scenario, 0)");
+    expect(tradingPage).toContain("<TradeDeferredDetails");
+    expect(tradingPage).toContain("<Suspense fallback={<TradeLoadingState />}>");
+    expect(tradeLoadingState).toContain("<CommandConsole");
+    expect(tradeLoadingState).toContain("Ask Master Mold while Trade opens.");
+    expect(`${tradeOverview}\n${tradeLoadingState}`).toContain("Wallet status");
+    expect(`${tradeOverview}\n${tradeLoadingState}`).toContain("Next required action");
+    expect(`${tradeOverview}\n${tradeLoadingState}`).toContain("Portfolio and net worth");
+    expect(`${tradeOverview}\n${tradeLoadingState}`).toContain("Active positions and orders");
+    expect(tradeOverview).toContain("Set up wallet");
+    expect(tradeOverview).toContain("action.cta");
+    expect(tradeOverview).toContain("Showing a fast preview while the");
+    expect(tradeOverview).toContain("Full ${requestedSource === \"live-dex\" ? \"live DEX\" : \"sample\"} details are refreshing below.");
+    expect(tradeOverview).toContain("plainOrderStatus(order.status)");
+    expect(tradeOverview).toContain('if (value === "blocked") return "Needs review";');
+    expect(tradeOverview).not.toContain(">{order.status}</p>");
+    expect(tradeOverview).toContain("sr-only order-2");
+    expect(tradeOverview).toContain("order-1 inline-flex min-h-11 w-full");
+    expect(tradeOverview).toContain("sm:order-2 sm:mt-4 sm:w-auto");
+    expect(technicalDrawer).toContain("Technical details");
+    expect(deferredDetails).toContain("Details are loading after the overview.");
+    expect(deferredDetails).toContain("#technical-status");
+    expect(technicalDrawer).toContain("Technical details");
+    expect(technicalDrawer).toContain("Detailed endpoint status, reviewer checks, confirmations, and setup notes live here");
+    expect(testTrade).toContain("test trade");
+    expect(`${tradingPage}\n${tradeOverview}\n${tradeLoadingState}\n${deferredDetails}\n${technicalDrawer}`).not.toMatch(/receipt wall|Open all blockers JSON|flex-nowrap gap-2 overflow-x-auto/i);
+    expect(`${paperPage}\n${paperWorkspace}`).not.toMatch(/Suggested paper ideas|Ideas from the saved scan|Saved-scan calls|fake trade|fake wallet|fake money|Practice/i);
+  });
+
   test("GIVEN Paper trading opens on mobile WHEN source copy is checked THEN it names the simulator workflow plainly", () => {
     const paperPage = source("app/paper/page.tsx");
     const paperWorkspace = source("components/paper-workspace.tsx");
@@ -567,9 +719,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperPage.indexOf("<PaperWorkspace")).toBeGreaterThan(-1);
     expect(paperPage.indexOf("<MasterMoldPaperIdeas")).toBeGreaterThan(-1);
     expect(paperPage.indexOf("<PaperWorkspace")).toBeLessThan(paperPage.indexOf("<MasterMoldPaperIdeas"));
-    expect(paperWorkspace).toContain("Open tests");
-    expect(paperWorkspace).toContain("Use simulator dollars to test a call");
-    expect(paperWorkspace).toContain("Tests from");
+    expect(paperWorkspace).toContain("Paper trading only. Compare the result after the close date.");
+    expect(paperWorkspace).toContain("Nothing here places a real trade.");
+    expect(paperWorkspace).toContain("Simulator dollars reserved until the close date.");
     expect(paperWorkspace).toContain("Test a paper trade");
     expect(paperWorkspace.indexOf("<PaperAccountPanel")).toBeGreaterThan(-1);
     expect(paperWorkspace.indexOf("<PaperTradeForm")).toBeGreaterThan(-1);
@@ -579,32 +731,17 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperWorkspace).toContain("mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4");
     expect(paperWorkspace).toContain("text-base font-semibold text-on-surface sm:text-lg");
     expect(paperWorkspace).toContain("Paper trades use this simulator balance only. No connected account is touched.");
-    expect(web3Workspace).toContain("Paper execution priority");
-    expect(web3Workspace).toContain("Account setup receipt");
-    expect(web3Workspace).toContain("Build account receipt");
-    expect(web3Workspace).toContain("Ownership");
-    expect(web3Workspace).toContain("wallet_ownership_proved");
-    expect(web3Workspace).toContain("hash-only wallet ownership proof");
-    expect(web3Workspace).toContain("external signup permission blocked");
-    expect(web3Workspace).toContain("Provider health receipt");
-    expect(web3Workspace).toContain("Test provider health");
-    expect(web3Workspace).toContain("Jupiter rehearsal receipt");
-    expect(web3Workspace).toContain("Rehearse Jupiter order");
-    expect(web3Workspace).toContain("one-shot key not saved");
-    expect(web3Workspace).toContain("unsigned transaction return withheld");
-    expect(web3Workspace).toContain("inline-flex min-h-11 items-center justify-center gap-1.5");
-    expect(web3Workspace).toContain("secret echo blocked");
-    expect(web3Workspace).toContain("Web3 operator input packet");
-    expect(web3Workspace).toContain("Operator input packet");
-    expect(web3Workspace).toContain("Safe credentials and approvals still needed before supervised trading review");
-    expect(web3Workspace).toContain("operatorInputs.map");
-    expect(web3Workspace).toContain("nextOperatorAction");
-    expect(web3Workspace).toContain("Next operator action");
-    expect(web3Workspace).toContain("openOperatorInputs");
-    expect(web3Workspace).toContain("operatorInputs.map");
-    expect(web3Workspace).toContain("item.label");
-    expect(web3Workspace).toContain("item.storage.replaceAll");
-    expect(web3Workspace).toContain("Private keys and seed phrases stay out of the app");
+    expect(web3Workspace).toContain("fetch(`/api/web3-trading?${params.toString()}`");
+    expect(web3Workspace).toContain("await import(\"@/components/web3-trading-workspace\")");
+    expect(web3Workspace).toContain("loadingControls");
+    expect(web3Workspace).toContain("setControlsOpen(true)");
+    expect(web3Workspace).toContain("live execution blocked; wallet mutation blocked; private key storage blocked; seed phrase storage blocked; secret echo blocked.");
+    expect(tradingPage).toContain("<TradeOverview state={state} overviewMode={overviewMode} requestedSource={source} />");
+    expect(tradingPage).toContain("<TradeDeferredDetails");
+    expect(tradingPage).toContain("<Suspense fallback={<TradeLoadingState />}>");
+    expect(tradingPage).not.toContain("initialState={initialState}");
+    expect(`${paperPage}\n${paperWorkspace}`).not.toMatch(/Suggested paper ideas|Ideas from the saved scan|Saved-scan calls|fake trade|fake wallet|fake money|Practice/i);
+    return;
     expect(web3Workspace).toContain("operatorInputDotClass");
     expect(web3Workspace).toContain("operatorInputTextClass");
     expect(web3Workspace).toContain("Web3 launch repair queue");
@@ -792,7 +929,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(tradingPage).toContain("Public/env targets only; never private keys or seed phrases.");
     expect(tradingPage).toContain("Capability evidence");
     expect(tradingPage).toContain('aria-label="Web3 capability status rail"');
-    expect(tradingPage).toContain("flex-nowrap gap-2 overflow-x-auto");
+    expect(tradingPage).not.toContain("flex-nowrap gap-2 overflow-x-auto");
     expect(tradingPage).toContain("const receiptHref = `/api/web3-usability-status?${params.toString()}`");
     expect(tradingPage).toContain("<ShieldCheck");
     expect(tradingPage).toContain("Live execution, transaction submission, wallet mutation, private-key storage, seed-phrase storage, and secret echo remain blocked.");
@@ -981,6 +1118,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(metrics).toContain("Rate today");
     expect(metrics).toContain('aria-label={`Mark today ${label.toLowerCase()}`}');
     expect(metrics).not.toContain("Mark briefing");
+    expect(today).toContain("inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap");
+    expect(today).not.toContain("hidden min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap");
+    expect(today).toContain("sm:w-auto");
     expect(today).toContain('<span aria-hidden="true" className="text-outline/70"> · </span>');
     expect(today).toContain("Market read");
     expect(today).toContain("Portfolio");
@@ -1013,7 +1153,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(readiness).toContain("Add a manual holding or import a holdings snapshot before treating Today as personal.");
     expect(readiness).toContain("Use Save context for chat here, or open Settings for Chat context controls.");
     expect(readiness).toContain("Open memory settings");
-    expect(readiness).toContain("The portfolio can be personal, but Today and Alerts still use sample market examples until a saved read exists.");
+    expect(readiness).toContain("The portfolio can be personal, but Today and Activity still use sample market examples until a saved read exists.");
     expect(readiness).toContain("See what is real");
     expect(readiness).toContain("Save context for chat when you want Master Mold to remember the current view.");
     expect(readiness).toContain("it does not refresh accounts or fetch fresh news.");
@@ -1022,7 +1162,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(today).toContain("mt-2 inline-flex min-h-11 items-center gap-2");
     expect(today).toContain("mt-3 inline-flex min-h-11 items-center gap-2");
     expect(metrics).toContain("Rate today");
-    expect(metrics).toContain("Saved for Performance.");
+    expect(metrics).toContain("Saved for later review.");
     expect(metrics).toContain('aria-live="polite"');
     expect(metrics).not.toContain("Noted.");
     expect(`${today}\n${refresh}\n${readiness}\n${metrics}`).not.toMatch(/live market scan|synced portfolio|real-time portfolio|always-on scan|Useful today|broad market\/news|does not read broad market|Run a market scan|Load a market scan|Wait for the next market scan/i);
@@ -1052,7 +1192,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(save).toContain("plainSourceLabel(source)");
     expect(save).toContain('if (source === "Engine output") return "Saved market read";');
     expect(save).toContain("...sourceNotes.slice(0, 3)");
-    expect(save).toContain("Saved before the outcome, so Performance can score it later.");
+    expect(save).toContain("Saved before the outcome for later review.");
     expect(save).toContain("Adds this idea to the Decision journal before the result is known.");
     expect(`${card}\n${save}`).not.toMatch(/P&L|trade signal/i);
   });
@@ -1079,6 +1219,55 @@ describe("mobile ergonomics source contracts", () => {
     expect(card).not.toContain("Rank {rank}");
   });
 
+  test("GIVEN Settings connection cards render WHEN source copy is checked THEN setup is sectioned and Web3 details stay hidden", () => {
+    const settingsPage = source("app/settings/integrations/page.tsx");
+    const settingsSection = source("components/settings-section.tsx");
+    const input = source("components/integration-key-input.tsx");
+    const integrations = source("src/db/integrations.ts");
+    const imports = source("src/db/portfolio-imports.ts");
+
+    expect(settingsPage).toContain("Set up your profile, portfolio connections, AI keys, Web3 wallet, and safety limits without digging through technical details.");
+    expect(settingsPage).toContain('import { SettingsSection } from "@/components/settings-section";');
+    expect(settingsPage).toContain("function SettingsDeferredSections");
+    expect(settingsPage).toContain("const { brainStateRaw, web3State } = getFastSettingsState();");
+    expect(settingsPage).toContain("warmSettingsState();");
+    expect(settingsPage).toContain('web3State: getWeb3TradingState("base", 0),');
+    expect(settingsPage).not.toContain("await getCachedSettingsState()");
+    expect(settingsPage).toContain("SettingsSectionIndex");
+    expect(settingsPage).toContain('aria-label={`${section.title}: ${section.value}`}');
+    expect(settingsPage).toContain('<span className="sr-only">: </span>');
+    expect(settingsSection).toContain('"use client";');
+    expect(settingsSection).toContain('import { ChevronDown } from "lucide-react";');
+    expect(settingsSection).toContain('aria-hidden="true"');
+    expect(settingsSection).not.toContain(">Open</span>");
+    expect(settingsSection).toContain("decodeURIComponent(window.location.hash.replace(/^#/, \"\"))");
+    expect(settingsSection).toContain("if (target !== id) return;");
+    expect(settingsSection).toContain("setOpen(true);");
+    expect(settingsSection).toContain('detailsRef.current?.scrollIntoView({ block: "start", inline: "nearest" });');
+    expect(settingsSection).toContain('window.addEventListener("hashchange", openHashTarget)');
+    expect(settingsSection).toContain("{open ? (");
+    expect(settingsSection).toContain('className="mt-3 max-w-3xl text-sm leading-5 text-on-surface-variant"');
+    expect(settingsSection).toContain('{open ? <div className="pt-4">{children}</div> : null}');
+    expect(settingsPage).toContain("Profile");
+    expect(settingsPage).toContain("Portfolio connections");
+    expect(settingsPage).toContain("AI/chat keys");
+    expect(settingsPage).toContain("Web3 wallet and trading setup");
+    expect(settingsPage).toContain("Safety limits");
+    expect(settingsPage).toContain("Technical details");
+    expect(settingsPage).toContain("Reviewer checks and setup tools");
+    expect(settingsPage).toContain("Data and privacy");
+    expect(settingsPage).toContain("Stays in this browser");
+    expect(settingsPage).toContain("Sent to this local app");
+    expect(settingsPage).toContain("Can leave this app");
+    expect(settingsPage).toContain("Never sent by this app");
+    expect(settingsPage).toContain("No account holdings imported yet. Check account access, then press Import holdings snapshot to add holdings.");
+    expect(settingsPage).not.toMatch(/SettingsWeb3CredentialConsole|first funded canary|credential wall|receipt wall/i);
+    expect(input).toContain("Import holdings snapshot");
+    expect(input).toContain("Test account access");
+    expect(integrations).toContain("Reads");
+    expect(imports).toContain('event: "portfolio_import"');
+  });
+
   test("GIVEN Settings connection cards render WHEN source copy is checked THEN import is explicit and read-only", () => {
     const settingsPage = source("app/settings/integrations/page.tsx");
     const tradingPage = source("app/trading/page.tsx");
@@ -1087,7 +1276,7 @@ describe("mobile ergonomics source contracts", () => {
     const integrations = source("src/db/integrations.ts");
     const imports = source("src/db/portfolio-imports.ts");
 
-    expect(settingsPage).toContain("Add holdings, test account access, set up live chat");
+    expect(settingsPage).toContain("Set up your profile, portfolio connections, AI keys, Web3 wallet, and safety limits without digging through technical details.");
     expect(settingsPage).toContain("Data and privacy");
     expect(settingsPage).toContain("Stays in this browser");
     expect(settingsPage).toContain("Sent to this local app");
@@ -1097,11 +1286,21 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("live chat sends the question plus visible app context");
     expect(settingsPage).toContain("selected chat service");
     expect(settingsPage).not.toContain("selected chat provider");
-    expect(settingsPage).toContain("Web3 trading credentials");
-    expect(settingsPage).toContain("Secure setup state for the autonomous Web3 paper desk");
-    expect(settingsPage).toContain("SettingsWeb3SetupPriorityCard");
-    expect(settingsPage).toContain("Settings Web3 setup priority");
-    expect(settingsPage).toContain("Web3 setup priority");
+    expect(settingsPage).toContain("Portfolio connections");
+    expect(settingsPage).toContain("Check account access first, then import a holdings snapshot only when you press import.");
+    expect(settingsPage).toContain("Imported holdings are labeled in Portfolio, and this app still cannot place trades.");
+    expect(settingsPage).toContain("Web3 wallet and trading setup");
+    expect(settingsPage).toContain("Prepare a dedicated wallet and provider keys while live money remains locked.");
+    expect(settingsPage).toContain("Reviewer checks and setup tools");
+    expect(settingsPage).toContain("Master Mold has no order endpoint, cannot sign transactions, and never asks for private wallet keys.");
+    expect(settingsPage).not.toMatch(/SettingsWeb3CredentialConsole|credential wall|receipt wall/i);
+    expect(input).toContain("Import holdings snapshot");
+    expect(input).toContain("Test account access");
+    expect(integrations).toContain("Reads");
+    expect(imports).toContain('event: "portfolio_import"');
+    expect(tradingPage).toContain("keep live money locked until setup is reviewed");
+    expect(settingsConsole).toContain("Private keys, seed phrases, keypair JSON, transaction bytes, or signed payloads.");
+    return;
     expect(settingsPage).toContain("Settings first funded canary handoff");
     expect(settingsPage).toContain("First funded canary handoff");
     expect(settingsPage).toContain("firstCanaryHandoff={web3FirstCanaryHandoff}");
@@ -2657,7 +2856,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(panel).toContain("This source list is for chat context.");
     expect(panel).toContain("Import holdings again when you want current balances.");
     expect(panel).toContain("Chat context automation is on");
-    expect(panel).toContain("Today still uses the visible portfolio, alerts, and saved read.");
+    expect(panel).toContain("Today still uses the visible portfolio, activity, and saved read.");
     expect(panel).toContain("Automation is off");
     expect(panel).toContain("It does not fetch fresh market news or refresh account balances.");
     expect(panel).toContain("Save a snapshot when you want chat to remember the current view");

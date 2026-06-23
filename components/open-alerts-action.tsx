@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { openMasterMoldAlerts } from "@/components/alert-inbox-drawer";
+import { openMasterMoldActivity } from "@/components/alert-inbox-drawer";
 import { cn } from "@/lib/utils";
 
 export function OpenAlertsAction({
@@ -13,7 +13,7 @@ export function OpenAlertsAction({
   className?: string;
 }) {
   return (
-    <button type="button" onClick={openMasterMoldAlerts} className={className}>
+    <button type="button" onClick={openMasterMoldActivity} className={className}>
       {children}
     </button>
   );

@@ -2,10 +2,7 @@ import { AsOfReplayControl } from "@/components/as-of-replay-control";
 import { AppShell } from "@/components/app-shell";
 import { ChatWorkspace } from "@/components/chat-workspace";
 import { PageHeader } from "@/components/page-header";
-import { productProvenanceLabel } from "@/lib/provenance-copy";
 import { parseAsOf } from "@/src/db/bitemporal";
-import { getChatContext } from "@/src/db/chat";
-import { getDataMode } from "@/src/db/engine-data";
 
 type ChatPageProps = {
   searchParams?: Promise<{ q?: string; as_of?: string }>;
@@ -16,34 +13,32 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   const initialQuery = typeof params?.q === "string" ? params.q : undefined;
   const parsedAsOf = parseAsOf(params?.as_of ?? null);
   const asOf = parsedAsOf.ok ? parsedAsOf.asOf : null;
-  const context = getChatContext(asOf);
-  const dataMode = getDataMode(asOf);
-  const publicDataMode = productProvenanceLabel(dataMode.label);
   const chatRoute = buildChatRoute(initialQuery, asOf?.iso ?? null);
+  const isReplay = Boolean(asOf);
 
   return (
-    <AppShell dataMode={publicDataMode}>
+    <AppShell>
       <div className="mx-auto max-w-4xl">
         <PageHeader
           title="Ask Master Mold"
-          subtitle="The visible daily read, alerts, holdings, and past calls are in context. I answer; I don't execute."
-          provenance={publicDataMode}
+          subtitle="Ask Master Mold to open routes, check status, pull context, or explain what to do next. It answers; it does not execute."
         />
-        <div className="mb-4">
+        <div id="ask-master-mold" className="scroll-mt-24">
+          <ChatWorkspace
+            initialQuery={initialQuery}
+            pageContext={{
+              surface: "Chat",
+              route: chatRoute,
+              summary:
+                isReplay
+                  ? "The user is in the dedicated conversation view rewound to an earlier point in time. Answer only from the context known by then."
+                  : "The user is in the dedicated conversation view with today's saved market context, visible portfolio context, activity, and recent calls available.",
+            }}
+          />
+        </div>
+        <div className="mt-4">
           <AsOfReplayControl activeAsOf={asOf?.iso ?? null} apiPath="/api/chat" />
         </div>
-        <ChatWorkspace
-          prompts={context.prompts}
-          initialQuery={initialQuery}
-          pageContext={{
-            surface: "Chat",
-            route: chatRoute,
-            summary:
-              asOf
-                ? "The user is in the dedicated conversation view rewound to an earlier point in time. Answer only from the context known by then."
-                : "The user is in the dedicated conversation view with today's saved market context, visible portfolio context, alerts, and recent calls available.",
-          }}
-        />
       </div>
     </AppShell>
   );

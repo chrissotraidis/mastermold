@@ -38,7 +38,7 @@ export function alertLoopActions(alert: AlertLoopInput) {
 
 export function buildAlertPaperHref(alert: AlertLoopInput) {
   const params = new URLSearchParams({
-    rationale: `Testing alert as a paper trade: ${cleanAlertMessage(alert.message)}. ${explainAlertRelevance(alert)}`,
+    rationale: `Testing this activity item as a paper trade: ${cleanAlertMessage(alert.message)}. ${explainAlertRelevance(alert)}`,
   });
   if (alert.asset_symbol) params.set("symbol", alert.asset_symbol);
   return `/paper?${params.toString()}`;
@@ -47,7 +47,7 @@ export function buildAlertPaperHref(alert: AlertLoopInput) {
 export function buildAlertChatPrompt(alert: AlertLoopInput) {
   const message = cleanAlertMessage(alert.message);
   return [
-    `Explain this alert in plain English: ${message}.`,
+    `Explain this activity item in plain English: ${message}.`,
     "Keep raw math hidden unless I ask for it.",
     "Tell me why it matters to the visible portfolio, what action is reasonable, and what would make it safe to ignore.",
     `Plain relevance: ${explainAlertRelevance(alert)}`,
@@ -59,10 +59,10 @@ export function buildAlertPageContext(alert: AlertLoopInput): ChatPageContext {
   const message = cleanAlertMessage(alert.message);
   const tier = alertTier(alert);
   return {
-    surface: "Selected alert",
-    route: "/alerts",
+    surface: "Selected activity item",
+    route: "/activity",
     summary:
-      "The user opened chat from a specific alert. Explain why it matters, what response is reasonable, and what would make it safe to ignore.",
+      "The user opened chat from a specific activity item. Explain why it matters, what response is reasonable, and what would make it safe to ignore.",
     selected: [
       `${shortAlertTierLabel(tier)}: ${message}`,
       explainAlertRelevance(alert),
@@ -76,7 +76,7 @@ export function buildAlertJournalInput(alert: AlertLoopInput) {
   const tier = alertTier(alert);
   const signal = alertSignalLabel(alertSignal(alert));
   return {
-    call: `Review alert: ${message}`,
+    call: `Review activity: ${message}`,
     signals: [alertTierLabel(tier), signal, alert.portfolio_weight_pct ? "Portfolio-relevant" : "Watchlist context"],
     confidence: Number(defaultConfidence(tier)),
     horizon: tier === "T0" ? "Today" : "1-3 days",
@@ -178,7 +178,7 @@ function defaultConfidence(tier: string) {
 }
 
 export function alertTierLabel(tier: string) {
-  if (tier === "T0") return "Urgent alert";
+  if (tier === "T0") return "Urgent activity";
   if (tier === "T1") return "Worth checking";
   return "FYI";
 }
@@ -198,7 +198,7 @@ function alertSignalLabel(signal: string | undefined) {
 }
 
 function buildAlertFalsification(alert: AlertLoopInput) {
-  const subject = alert.asset_symbol || alert.asset_key || cleanAlertMessage(alert.message).split(":")[0] || "This alert";
+  const subject = alert.asset_symbol || alert.asset_key || cleanAlertMessage(alert.message).split(":")[0] || "This activity item";
   const signal = alertSignal(alert);
   if (signal.includes("volume")) {
     return `${subject} stops trading unusually heavily, no new source confirms the move, or the position impact stays too small to change today's decision.`;
@@ -212,7 +212,7 @@ function buildAlertFalsification(alert: AlertLoopInput) {
   if (signal.includes("funding")) {
     return `${subject} funding normalizes or the carry setup is too crowded to justify attention.`;
   }
-  return `${subject} no longer affects the visible holdings, or the reason for the alert does not change a decision by the stated horizon.`;
+  return `${subject} no longer affects the visible holdings, or the reason for the activity item does not change a decision by the stated horizon.`;
 }
 
 function alertTier(alert: AlertLoopInput) {

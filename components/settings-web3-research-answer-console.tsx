@@ -142,7 +142,7 @@ export function SettingsWeb3ResearchAnswerConsole({
         id="web3-research-answer-text"
         value={answersText}
         onChange={(event) => setAnswersText(event.target.value)}
-        className="mt-2 min-h-32 w-full resize-y rounded-md border border-outline-variant/35 bg-void/30 px-3 py-2 text-sm leading-6 text-on-surface outline-none transition placeholder:text-outline focus:border-violet/60"
+        className="mt-2 min-h-32 w-full resize-y overflow-x-hidden rounded-md border border-outline-variant/35 bg-void/30 px-3 py-2 text-sm leading-6 text-on-surface outline-none transition placeholder:text-outline focus:border-violet/60"
         placeholder="Paste provider, custody, risk, ops, accounting, dashboard, and profit-proof recommendations. Do not paste keys, tokens, seed phrases, private keys, raw transactions, or signed payloads."
       />
 

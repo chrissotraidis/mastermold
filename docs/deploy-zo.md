@@ -54,3 +54,8 @@ bun run test           # 146 tests should pass on the box
 Keys live only in `engine/.env` / `.env.local` and are never committed. The
 app remains advisory-only by construction: no route can trade, sign, or move
 funds, and the static enforcement test fails the suite if one is ever added.
+
+For Zo review, allowed credentials are narrow: a live chat key, read-only
+portfolio import keys, Web3 read-provider keys, and Jupiter rehearsal/order-rail
+keys. Do not put private keys, seed phrases, raw keypairs, signed payload text,
+or wallet authority in Zo, `.env.local`, browser storage, or chat.

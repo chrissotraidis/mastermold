@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { BookOpenCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -11,6 +12,7 @@ export function SaveBriefingCallButton({
   horizon,
   source,
   sourceNotes = [],
+  autoSaveFromCommand = false,
 }: {
   headline: string;
   reason: string;
@@ -18,9 +20,13 @@ export function SaveBriefingCallButton({
   horizon: string;
   source: string;
   sourceNotes?: string[];
+  autoSaveFromCommand?: boolean;
 }) {
   const [state, setState] = useState<"idle" | "saved" | "error">("idle");
   const [isPending, startTransition] = useTransition();
+  const searchParams = useSearchParams();
+  const autoSaveRef = useRef<string | null>(null);
+  const actionQuery = searchParams.toString();
 
   function saveCall() {
     setState("idle");
@@ -46,6 +52,20 @@ export function SaveBriefingCallButton({
     });
   }
 
+  useEffect(() => {
+    if (!autoSaveFromCommand) return;
+    const params = new URLSearchParams(actionQuery);
+    if (params.get("action") !== "save-top-call") return;
+    if (autoSaveRef.current === actionQuery) return;
+
+    autoSaveRef.current = actionQuery;
+    params.delete("action");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#top-idea"}`);
+    saveCall();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionQuery, autoSaveFromCommand]);
+
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <Button
@@ -61,7 +81,7 @@ export function SaveBriefingCallButton({
       </Button>
       <p className="text-xs leading-5 text-outline" aria-live="polite">
         {state === "saved"
-          ? "Saved before the outcome, so Performance can score it later."
+          ? "Saved before the outcome for later review."
           : state === "error"
             ? "The call was not saved. Try again from the idea detail or Journal."
             : ""}

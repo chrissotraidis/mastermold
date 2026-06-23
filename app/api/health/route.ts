@@ -38,22 +38,49 @@ import {
   buildWeb3SupervisedCanaryReadinessReceipt,
 } from "@/src/db/web3-supervised-canary-readiness";
 import { buildWeb3SupervisedLiveRunway } from "@/src/db/web3-supervised-live-runway";
-import { getWeb3TradingStateAsync, type TradingStateInput, type Web3TradingState } from "@/src/db/web3-trading";
+import {
+  getCachedWeb3TradingState,
+  type CachedWeb3TradingStateInput,
+} from "@/src/db/web3-trading-state-cache";
+import { type Web3TradingState } from "@/src/db/web3-trading";
 import { buildWeb3UsabilityStatus } from "@/src/db/web3-usability-status";
 
-const CANONICAL_LIVE_STATE_INPUT: TradingStateInput = {
-  advance: false,
+const CANONICAL_LIVE_STATE_INPUT: CachedWeb3TradingStateInput = {
   source: "live-dex",
   account: "persistent",
   scenario: "breakout",
-  cycles: 0,
 };
 
+const DEFAULT_HEALTH_STATE_INPUT: CachedWeb3TradingStateInput = {
+  source: "sample",
+  account: "ephemeral",
+  scenario: "base",
+};
+
+const HEALTH_CACHE_TTL_MS = 5_000;
+const HEALTH_WEB3_STATE_TTL_MS = 10_000;
+let cachedHealth:
+  | {
+      expiresAt: number;
+      body: Record<string, unknown>;
+    }
+  | null = null;
+
 export async function GET() {
-  const canonicalLiveStatePromise = getWeb3TradingStateAsync(CANONICAL_LIVE_STATE_INPUT);
+  const now = Date.now();
+  if (cachedHealth && cachedHealth.expiresAt > now) {
+    return NextResponse.json(cachedHealth.body, {
+      headers: {
+        "Cache-Control": "no-store",
+        "X-MasterMold-Cache": "hit",
+      },
+    });
+  }
+
+  const canonicalLiveStatePromise = getCachedWeb3TradingState(CANONICAL_LIVE_STATE_INPUT, HEALTH_WEB3_STATE_TTL_MS);
   const web3DaemonSupervisor = getWeb3DaemonSupervisorHealth();
   const web3PromotedPaperAutopilot = getWeb3PromotedPaperAutopilotHealth();
-  const web3State = await getWeb3TradingStateAsync({ advance: false });
+  const web3State = await getCachedWeb3TradingState(DEFAULT_HEALTH_STATE_INPUT, HEALTH_WEB3_STATE_TTL_MS);
   const web3LaunchChecklist = buildWeb3AutonomyLaunchChecklist(
     web3State,
     web3PromotedPaperAutopilot,
@@ -184,7 +211,7 @@ export async function GET() {
     web3LiveCanaryProofHealth,
     web3LiveCanaryAttemptHealth,
   } = buildCanonicalLiveHealthBundle(await canonicalLiveStatePromise);
-  return NextResponse.json({
+  const body = {
     status: "ok",
     web3_daemon_supervisor: web3DaemonSupervisor,
     web3_production_supervisor: web3ProductionSupervisor,
@@ -202,6 +229,18 @@ export async function GET() {
     web3_live_usability: buildWeb3LiveUsabilityBlockersHealth(web3LiveUsability, web3RequestPacket.current_input),
     web3_research_handoff: buildWeb3ResearchHandoffHealth(web3ResearchHandoff),
     web3_credential_requirements: buildWeb3CredentialRequirementsHealth(web3CredentialRequirements),
+  };
+
+  cachedHealth = {
+    expiresAt: Date.now() + HEALTH_CACHE_TTL_MS,
+    body,
+  };
+
+  return NextResponse.json(body, {
+    headers: {
+      "Cache-Control": "no-store",
+      "X-MasterMold-Cache": "miss",
+    },
   });
 }
 

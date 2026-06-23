@@ -54,7 +54,7 @@ export function ForwardTrialStarter({ status }: ForwardTrialStarterProps) {
       </Button>
       <p className="text-sm leading-6 text-on-surface-variant">
         {state === "error"
-          ? "Measurement did not start. Try again from Performance after the local app settles."
+          ? "Measurement did not start. Try again after the local app settles."
           : "This saves the baseline and measures future saved calls only. It does not score old sample calls, make a performance claim, or move money."}
       </p>
     </div>

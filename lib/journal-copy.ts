@@ -9,7 +9,7 @@ export function plainJournalSignal(signal: string) {
   if (/^funding rate$/i.test(normalized)) return "Crypto borrow-payment rate";
   if (/^funding$/i.test(normalized)) return "Borrow-payment clue";
   if (/^basis$/i.test(normalized)) return "Futures price gap";
-  if (normalized === "T0") return "Urgent alert";
+  if (normalized === "T0") return "Urgent activity";
   if (normalized === "T1") return "Worth checking";
   if (normalized === "T2") return "FYI";
   return plainJournalText(normalized);

@@ -22,19 +22,25 @@ export function openMasterMoldChat(prompt?: string, pageContext?: ChatPageContex
 
 export function AskMasterMoldButton({
   prompt,
+  pageContext,
   children = "Ask Master Mold",
   className,
   variant = "outline",
 }: {
   prompt: string;
+  pageContext?: ChatPageContext;
   children?: ReactNode;
   className?: string;
   variant?: "outline" | "primary";
 }) {
+  function ask() {
+    openMasterMoldChat(prompt, pageContext);
+  }
+
   return (
     <button
       type="button"
-      onClick={() => openMasterMoldChat(prompt)}
+      onClick={ask}
       className={cn(
         "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet",
         variant === "primary"

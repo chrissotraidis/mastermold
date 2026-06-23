@@ -54,18 +54,18 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
   }
 
   return (
-    <details className="group border border-outline-variant/30 bg-surface-dim/40 chamfer-sm" open={Boolean(activeAsOf)}>
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant transition-colors hover:text-violet">
+    <details id="past-view" className="group scroll-mt-28 border border-outline-variant/30 bg-surface-dim/40 chamfer-sm" data-testid="as-of-replay-control">
+      <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant transition-colors hover:text-violet">
         <History aria-hidden="true" className="size-4 text-violet" />
-        <span>Rewind</span>
+        <span className="font-semibold text-on-surface">Past view</span>
         {activeLabel ? (
-          <span className="font-mono text-xs text-violet">· viewing {activeLabel}</span>
+          <span className="min-w-0 break-words font-mono text-xs text-violet">Viewing {activeLabel}</span>
         ) : (
-          <span className="text-xs text-outline">— see this page as of an earlier time</span>
+          <span className="text-xs text-outline">Optional timeline check</span>
         )}
       </summary>
-      <form className="flex flex-wrap items-end gap-2 border-t border-outline-variant/30 p-4" onSubmit={submitReplay}>
-        <div className="space-y-1">
+      <form className="grid gap-3 border-t border-outline-variant/30 p-4 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] sm:items-end" onSubmit={submitReplay}>
+        <div className="min-w-0 space-y-1">
           <Label htmlFor={`${apiPath.slice(5)}-as-of`} className="text-xs text-outline">
             Point in time
           </Label>
@@ -74,21 +74,21 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
             type="datetime-local"
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            className="border-outline-variant/50 bg-surface-dim/80 text-on-surface"
+            className="min-w-0 border-outline-variant/50 bg-surface-dim/80 text-on-surface"
           />
         </div>
-        <Button type="submit" disabled={!value || isPending} className="min-h-11 bg-violet text-void hover:bg-violet">
-          Go
+        <Button type="submit" disabled={!value || isPending} className="min-h-11 w-full bg-violet text-void hover:bg-violet sm:w-auto">
+          Show past view
         </Button>
         <Button
           type="button"
           variant="outline"
           disabled={!activeAsOf || isPending}
           onClick={clearReplay}
-          className="min-h-11 border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60"
+          className="min-h-11 w-full border-outline-variant/50 bg-transparent text-on-surface hover:bg-surface-high/60 sm:w-auto"
         >
           <RotateCcw aria-hidden="true" />
-          Now
+          Return to now
         </Button>
       </form>
     </details>

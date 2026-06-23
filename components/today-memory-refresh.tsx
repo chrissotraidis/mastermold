@@ -1,16 +1,19 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function TodayMemoryRefresh() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
+  const autoRefreshRef = useRef<string | null>(null);
+  const actionQuery = searchParams.toString();
 
-  function refreshMemory() {
+  const refreshMemory = useCallback(() => {
     setMessage("Updating…");
     startTransition(async () => {
       try {
@@ -25,7 +28,19 @@ export function TodayMemoryRefresh() {
         setMessage(caught instanceof Error ? caught.message : "Could not update chat memory.");
       }
     });
-  }
+  }, [router]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(actionQuery);
+    if (params.get("action") !== "save-context") return;
+    if (autoRefreshRef.current === actionQuery) return;
+
+    autoRefreshRef.current = actionQuery;
+    params.delete("action");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#today-inputs"}`);
+    refreshMemory();
+  }, [actionQuery, refreshMemory]);
 
   return (
     <div className="mt-4 border-t border-outline-variant/35 pt-3">

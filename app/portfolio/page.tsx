@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { ChevronDown } from "lucide-react";
+
 import { AppShell } from "@/components/app-shell";
 import { AsOfReplayControl } from "@/components/as-of-replay-control";
 import { ManualHoldingsPanel } from "@/components/manual-holdings-panel";
@@ -27,6 +30,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
   const portfolio = getPortfolio(asOf);
   const alerts = getAlerts(asOf);
   const publicProvenanceLabel = productProvenanceLabel(portfolio.provenance.label);
+  const portfolioRoute = asOf?.iso ? `/portfolio?as_of=${encodeURIComponent(asOf.iso)}` : "/portfolio";
 
   return (
     <AppShell dataMode={publicProvenanceLabel}>
@@ -35,11 +39,29 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           title="Portfolio"
           subtitle={portfolioPageSubtitle()}
           provenance={publicProvenanceLabel}
+          command={{
+            pageContext: {
+              surface: "Portfolio",
+              route: portfolioRoute,
+              summary:
+                "The user is looking at net worth, holdings, allocation, concentration, and whether portfolio data is sample, manual, or imported.",
+            },
+            suggestions: [
+              { label: "Check risk", prompt: "Check portfolio risk." },
+              { label: "Top holding", prompt: "Open largest visible holding." },
+              { label: "Save context", prompt: "Save context for chat." },
+              { label: "Check Trade", prompt: "Check Trade." },
+            ],
+          }}
+          right={
+            <Link
+              href="#add-holdings"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-violet px-4 py-2 text-sm font-semibold text-void transition hover:bg-violet/90"
+            >
+              Add holding
+            </Link>
+          }
         />
-        <div className="mb-6">
-          <AsOfReplayControl activeAsOf={portfolio.provenance.replay_as_of} apiPath="/api/portfolio" />
-        </div>
-
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Stat
             label="Total value"
@@ -93,11 +115,15 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           </div>
         ) : null}
 
-        <div className="mt-6">
+        <div id="portfolio-chart" className="mt-6 scroll-mt-28">
           <PortfolioCharts allocation={portfolio.allocation} netWorthSeries={portfolio.net_worth_series} />
         </div>
 
-        <section aria-labelledby="holdings-title" className="mt-8 space-y-3">
+        <div className="mt-6">
+          <AsOfReplayControl activeAsOf={portfolio.provenance.replay_as_of} apiPath="/api/portfolio" />
+        </div>
+
+        <section id="holdings" aria-labelledby="holdings-title" className="mt-8 scroll-mt-28 space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 id="holdings-title" className="font-display text-lg font-semibold text-on-surface">
@@ -123,14 +149,10 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
           </section>
         ) : null}
 
-        <details className="mt-8 rounded-lg border border-outline-variant/40 bg-surface-high/25 px-4 pb-1" id="add-holdings">
-          <summary className="flex min-h-12 cursor-pointer items-center gap-2 text-base font-semibold text-on-surface">
-            Add or edit manual holdings
-          </summary>
-          <div className="pb-4">
-            <ManualHoldingsPanel holdings={portfolio.manual_holdings} />
-          </div>
-        </details>
+        <section id="add-holdings" className="mt-8 scroll-mt-28">
+          <ManualHoldingsPanel holdings={portfolio.manual_holdings} />
+        </section>
+
       </div>
     </AppShell>
   );
@@ -185,18 +207,18 @@ function HoldingsTable({
           />
         ))}
       </div>
-      <div className="hidden overflow-x-auto border border-outline-variant/40 bg-surface-high/30 chamfer-sm sm:block">
-        <table className="w-full min-w-[640px] text-left text-sm">
+      <div className="hidden border border-outline-variant/40 bg-surface-high/30 chamfer-sm md:block">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="border-b border-outline-variant/40 bg-surface-dim/70 text-xs uppercase tracking-telemetry text-outline">
             <tr>
-              <th scope="col" className="px-4 py-3 font-semibold">Asset</th>
-              {!compact ? <th scope="col" className="px-4 py-3 font-semibold">Account</th> : null}
-              <th scope="col" className="px-4 py-3 font-semibold">Amount</th>
-              <th scope="col" className="px-4 py-3 font-semibold">Paid</th>
-              <th scope="col" className="px-4 py-3 font-semibold">Value</th>
-              <th scope="col" className="px-4 py-3 font-semibold">Today</th>
-              <th scope="col" className="px-4 py-3 font-semibold">Portfolio share</th>
-              <th scope="col" className="px-4 py-3 font-semibold">Status</th>
+              <th scope="col" className="w-[18%] px-4 py-3 font-semibold">Asset</th>
+              {!compact ? <th scope="col" className="w-[16%] px-4 py-3 font-semibold">Account</th> : null}
+              <th scope="col" className="w-[12%] px-4 py-3 font-semibold">Amount</th>
+              <th scope="col" className="w-[13%] px-4 py-3 font-semibold">Paid</th>
+              <th scope="col" className="w-[13%] px-4 py-3 font-semibold">Value</th>
+              <th scope="col" className="w-[12%] px-4 py-3 font-semibold">Today</th>
+              <th scope="col" className="w-[12%] px-4 py-3 font-semibold">Share</th>
+              <th scope="col" className="w-[14%] px-4 py-3 font-semibold">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/40">
@@ -207,33 +229,24 @@ function HoldingsTable({
                 title={holdingDetailSummary(holding, relatedAlertForHolding(holding, alerts))}
               >
                 <th scope="row" className="px-4 py-3 font-semibold text-on-surface">
-                  <span>{holding.symbol}</span>
+                  <span className="block truncate">{holding.symbol}</span>
                   <span className="mt-0.5 block max-w-44 truncate text-xs font-normal text-outline">
                     {holdingTableAssetMeta(holding, compact)}
                   </span>
                 </th>
                 {!compact ? (
-                  <td className="px-4 py-3 text-on-surface-variant">{holding.account.label}</td>
+                  <td className="truncate px-4 py-3 text-on-surface-variant">{holding.account.label}</td>
                 ) : null}
-                <td className="px-4 py-3 tabular-nums text-on-surface-variant">{formatQuantity(holding.quantity)}</td>
-                <td className="px-4 py-3 tabular-nums text-on-surface-variant">{formatCurrency(holding.cost_basis)}</td>
-                <td className="px-4 py-3 tabular-nums font-medium text-on-surface">{formatCurrency(holding.market_value)}</td>
+                <td className="truncate px-4 py-3 tabular-nums text-on-surface-variant">{formatQuantity(holding.quantity)}</td>
+                <td className="truncate px-4 py-3 tabular-nums text-on-surface-variant">{formatCurrency(holding.cost_basis)}</td>
+                <td className="truncate px-4 py-3 tabular-nums font-medium text-on-surface">{formatCurrency(holding.market_value)}</td>
                 <td className={holding.daily_change_value >= 0 ? "px-4 py-3 tabular-nums text-engine" : "px-4 py-3 tabular-nums text-critical"}>
                   {holding.daily_change_value >= 0 ? "+" : ""}
                   {formatCurrency(holding.daily_change_value)}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="w-12 shrink-0 tabular-nums text-on-surface-variant">
-                      {holding.weight_pct.toFixed(1)}%
-                    </span>
-                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
-                      <span
-                        className="block h-full rounded-full bg-violet/70"
-                        style={{ width: `${Math.min(holding.weight_pct, 100)}%` }}
-                      />
-                    </span>
-                  </div>
+                  <p className="tabular-nums font-semibold text-on-surface">{holding.weight_pct.toFixed(1)}%</p>
+                  <p className="mt-0.5 text-xs text-outline">{holdingShareLabel(holding.weight_pct)}</p>
                 </td>
                 <td className="px-4 py-3">
                   <IntegrationBadge holding={holding} />
@@ -264,7 +277,7 @@ function HoldingCard({
   return (
     <article className="border border-outline-variant/40 bg-surface-high/30 p-4 chamfer-sm">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h3 className="text-base font-semibold text-on-surface">{holding.symbol}</h3>
           <p className="mt-1 text-xs leading-5 text-outline">
             {holdingMeta(holding, compact)}
@@ -272,7 +285,7 @@ function HoldingCard({
         </div>
         <IntegrationBadge holding={holding} />
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+      <dl className="mt-4 grid gap-3 text-sm min-[420px]:grid-cols-2">
         <MobileMetric label="Amount" value={formatQuantity(holding.quantity)} />
         <MobileMetric label="Portfolio share" value={`${holding.weight_pct.toFixed(1)}%`} />
         <MobileMetric
@@ -281,12 +294,15 @@ function HoldingCard({
         />
         <MobileMetric label="Value" value={formatCurrency(holding.market_value)} />
       </dl>
-      <details className="mt-4 rounded-md border border-outline-variant/40 bg-surface-dim/35">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-on-surface">
-          <span>Open holding details</span>
-          <span className="text-xs font-medium text-outline">Tap</span>
+      <details className="group mt-4 rounded-md border border-outline-variant/40 bg-surface-dim/35 text-sm leading-6 text-on-surface-variant">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-on-surface transition hover:text-violet">
+          <span>Decision detail</span>
+          <span className="flex items-center text-outline" aria-hidden="true">
+            <ChevronDown aria-hidden="true" className="size-4 transition group-open:rotate-180" />
+          </span>
         </summary>
-        <div className="space-y-3 border-t border-outline-variant/40 p-3 text-sm leading-6 text-on-surface-variant">
+        <div className="space-y-3 border-t border-outline-variant/35 p-3">
+          <p className="text-xs font-semibold uppercase tracking-telemetry text-outline">Context</p>
           <InfoLine label="Position size" value={holdingConcentrationLine(holding)} />
           <InfoLine label="Recent move" value={holdingMoveLine(holding)} />
           <InfoLine label="Data source" value={holdingSourceLine(holding)} />
@@ -299,12 +315,12 @@ function HoldingCard({
 
 function RelatedAlertDetail({ alert }: { alert: AlertJson | null }) {
   if (!alert) {
-    return <InfoLine label="Related alert" value="No current alert for this holding." />;
+    return <InfoLine label="Related activity" value="No current activity for this holding." />;
   }
 
   return (
     <div className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-3">
-      <p className="text-xs font-semibold uppercase text-outline">Related alert</p>
+      <p className="text-xs font-semibold uppercase text-outline">Related activity</p>
       <p className="mt-1 font-semibold text-on-surface">
         {shortAlertTierLabel(alert.tier)} · {cleanAlertMessage(alert.message)}
       </p>
@@ -316,9 +332,9 @@ function RelatedAlertDetail({ alert }: { alert: AlertJson | null }) {
 
 function InfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs font-semibold uppercase text-outline">{label}</p>
-      <p className="mt-1 text-on-surface-variant">{value}</p>
+      <p className="mt-1 break-words text-on-surface-variant">{value}</p>
     </div>
   );
 }
@@ -339,7 +355,7 @@ function holdingTableAssetMeta(holding: PortfolioHoldingJson, compact: boolean) 
 
 function MobileMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border border-outline-variant/40 bg-surface-dim/45 p-3 chamfer-sm">
+    <div className="min-w-0 border border-outline-variant/40 bg-surface-dim/45 p-3 chamfer-sm">
       <dt className="text-xs text-outline">{label}</dt>
       <dd className="mt-1 break-words font-semibold text-on-surface">{value}</dd>
     </div>
@@ -355,7 +371,14 @@ function holdingDetailSummary(holding: PortfolioHoldingJson, alert: AlertJson | 
   if (alert) {
     return `${shortAlertTierLabel(alert.tier)}: ${cleanAlertMessage(alert.message)}`;
   }
-  return holding.weight_pct >= 20 ? "Large visible position; no current alert." : "No current alert.";
+  return holding.weight_pct >= 20 ? "Large visible position; no current activity." : "No current activity.";
+}
+
+function holdingShareLabel(weightPct: number) {
+  if (weightPct >= 30) return "Large";
+  if (weightPct >= 10) return "Meaningful";
+  if (weightPct > 0) return "Small";
+  return "None";
 }
 
 function holdingConcentrationLine(holding: PortfolioHoldingJson) {
@@ -423,7 +446,7 @@ function IntegrationBadge({ holding }: { holding: PortfolioHoldingJson }) {
         ? "border-caution/40 bg-caution/10 text-caution"
         : "border-violet/40 bg-violet/10 text-violet";
   return (
-    <Badge variant="outline" className={className}>
+    <Badge variant="outline" className={`${className} shrink-0`}>
       {label}
     </Badge>
   );

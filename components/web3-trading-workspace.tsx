@@ -19,7 +19,6 @@ import {
   Rocket,
   Save,
   ShieldAlert,
-  SlidersHorizontal,
   TimerReset,
   TrendingDown,
   TrendingUp,
@@ -5544,7 +5543,7 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
       <Panel tint="act" className="p-4 sm:p-5">
         <PanelHeader
           as="h2"
-          icon={SlidersHorizontal}
+          icon={Gauge}
           title="Capital allocator"
           right={<Chip tone={capitalAllocatorTone(state.autonomous_capital_allocator.status)}>{state.autonomous_capital_allocator.status}</Chip>}
         />
@@ -5959,7 +5958,7 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
           <Panel tint="observe" className="p-4 sm:p-5">
             <PanelHeader
               as="h2"
-              icon={SlidersHorizontal}
+              icon={Gauge}
               title="Discovery edge"
               right={<Chip tone={discoveryEdgeTone(state.discovery_edge.status)}>{state.discovery_edge.status.replace("-", " ")}</Chip>}
             />
@@ -7287,7 +7286,7 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
           <Panel tint="act" className="p-4 sm:p-5">
             <PanelHeader
               as="h2"
-              icon={SlidersHorizontal}
+              icon={Gauge}
               title="Liquidity-depth controller"
               right={<Chip tone={liquidityDepthTone(state.liquidity_depth_controller.status)}>{state.liquidity_depth_controller.status}</Chip>}
             />
@@ -9832,8 +9831,8 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
                 );
               })}
             </div>
-            <div className="relative z-10 hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[760px] border-separate border-spacing-y-2 text-left text-sm">
+            <div className="relative z-10 hidden md:block">
+              <table className="w-full table-fixed border-separate border-spacing-y-2 text-left text-sm">
                 <thead className="font-mono text-[11px] uppercase tracking-telemetry text-outline">
                   <tr>
                     <th className="px-3 py-2">Token</th>
@@ -10134,7 +10133,7 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
           <Panel tint="act" className="p-4 sm:p-5">
             <PanelHeader
               as="h2"
-              icon={SlidersHorizontal}
+              icon={Gauge}
               title="Execution readiness"
               right={<Chip tone={failedChecks > 0 ? "critical" : "caution"}>{failedChecks} fails</Chip>}
             />
@@ -10315,7 +10314,7 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
                     variant="outline"
                     className="border-caution/45 bg-caution/10 text-caution"
                   >
-                    {state.execution_readiness.cap_status === "exhausted" ? <TimerReset aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}
+                    {state.execution_readiness.cap_status === "exhausted" ? <TimerReset aria-hidden="true" /> : <Gauge aria-hidden="true" />}
                     {state.execution_readiness.cap_status === "exhausted" ? "Reset paper" : "Save safe caps"}
                   </Button>
                   <Button
@@ -10325,7 +10324,7 @@ export function Web3TradingWorkspace({ initialState }: Web3TradingWorkspaceProps
                     variant="outline"
                     className="border-outline-variant/60 bg-surface-dim/50"
                   >
-                    {state.execution_readiness.cap_status === "exhausted" ? <SlidersHorizontal aria-hidden="true" /> : <TimerReset aria-hidden="true" />}
+                    {state.execution_readiness.cap_status === "exhausted" ? <Gauge aria-hidden="true" /> : <TimerReset aria-hidden="true" />}
                     {state.execution_readiness.cap_status === "exhausted" ? "Raise cap" : "Reset paper"}
                   </Button>
                 </div>
@@ -14076,7 +14075,7 @@ function AutonomousFlowMap({ stages }: { stages: AutonomousFlowStage[] }) {
           {stages.filter((stage) => stage.tone === "engine").length}/{stages.length} clear
         </Chip>
       </div>
-      <div className="mt-3 grid auto-cols-[minmax(14rem,16rem)] grid-flow-col gap-2 overflow-x-auto pb-1 md:auto-cols-auto md:grid-flow-row md:grid-cols-3 md:overflow-visible md:pb-0 2xl:grid-cols-6">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6">
         {stages.map((stage, index) => (
           <article key={stage.label} className="min-w-0 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3">
             <div className="flex items-start justify-between gap-2">

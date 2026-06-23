@@ -1,5 +1,9 @@
 import IntegrationsSettingsPage from "./integrations/page";
 
-export default function SettingsPage() {
-  return <IntegrationsSettingsPage />;
+type SettingsPageProps = {
+  searchParams?: Promise<{ action?: string }>;
+};
+
+export default function SettingsPage(props: SettingsPageProps) {
+  return <IntegrationsSettingsPage {...props} />;
 }

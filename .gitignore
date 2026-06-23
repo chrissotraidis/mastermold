@@ -23,6 +23,12 @@ data/web3-*.json
 
 # Local preview launch config (machine-specific paths)
 .claude/launch.json
+.claude/bin/
+
+# Local agent/runtime scratch
+.agents/
+.codex/
+.codex-audits/
 
 # Local reference material (design mockups, integration plan, upstream clones)
 ref/

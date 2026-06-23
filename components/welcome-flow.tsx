@@ -251,7 +251,7 @@ function SegmentedField<T extends string>({
   return (
     <div className="space-y-2">
       <span className="text-sm font-semibold text-on-surface">{label}</span>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {options.map((option) => (
           <button
             key={option}
@@ -259,7 +259,7 @@ function SegmentedField<T extends string>({
             aria-pressed={value === option}
             onClick={() => onChange(option)}
             className={cn(
-              "min-h-11 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+              "min-h-11 rounded-md border px-3 py-2 text-center text-sm font-medium leading-5 transition-colors",
               value === option
                 ? "border-violet bg-violet text-void"
                 : "border-outline-variant/50 bg-surface-dim/70 text-on-surface-variant hover:bg-surface-high/60",

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CheckCircle2, Download, FlaskConical, KeyRound, Loader2, XCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,8 @@ type IntegrationKeyInputProps = {
   label: string;
   fields: IntegrationTestField[];
   permissionScope: string;
+  commandGroup?: "portfolio" | "chat";
+  commandPrimary?: boolean;
 };
 
 type PublicIntegrationService = "coinbase" | "robinhood" | "onchain_wallet" | "live_chat";
@@ -39,8 +41,16 @@ type ImportResult = {
   docs_url?: string;
 };
 
-export function IntegrationKeyInput({ service, label, fields, permissionScope }: IntegrationKeyInputProps) {
+export function IntegrationKeyInput({
+  service,
+  label,
+  fields,
+  permissionScope,
+  commandGroup,
+  commandPrimary = false,
+}: IntegrationKeyInputProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const baseId = useId();
   const storageKey = `financial-copilot.integration-fields.${service}`;
   const [values, setValues] = useState<Record<string, string>>({});
@@ -51,6 +61,8 @@ export function IntegrationKeyInput({ service, label, fields, permissionScope }:
   const [evidence, setEvidence] = useState("");
   const [docsUrl, setDocsUrl] = useState("");
   const canImport = service !== "live_chat";
+  const handledCommandActionRef = useRef<string | null>(null);
+  const actionQuery = searchParams.toString();
 
   useEffect(() => {
     const saved = window.localStorage.getItem(storageKey);
@@ -61,6 +73,31 @@ export function IntegrationKeyInput({ service, label, fields, permissionScope }:
     setValues(defaults);
     setLoaded(true);
   }, [fields, storageKey]);
+
+  useEffect(() => {
+    if (!loaded || !commandPrimary || !commandGroup) return;
+
+    const params = new URLSearchParams(actionQuery);
+    const action = params.get("action");
+    const shouldTestPortfolio = commandGroup === "portfolio" && action === "test-portfolio-connection";
+    const shouldImportPortfolio = commandGroup === "portfolio" && action === "import-portfolio-snapshot";
+    const shouldTestChat = commandGroup === "chat" && action === "test-live-chat";
+    if (!shouldTestPortfolio && !shouldImportPortfolio && !shouldTestChat) return;
+    if (handledCommandActionRef.current === actionQuery) return;
+    handledCommandActionRef.current = actionQuery;
+
+    params.delete("action");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || commandHashForGroup(commandGroup)}`);
+
+    if (shouldImportPortfolio) {
+      void importHoldings();
+      return;
+    }
+
+    void testConnection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionQuery, loaded, commandGroup, commandPrimary]);
 
   function updateValue(fieldName: string, nextValue: string) {
     const nextValues = { ...values, [fieldName]: nextValue };
@@ -270,6 +307,10 @@ function importEvidence(result: ImportResult) {
 
 function requestService(service: PublicIntegrationService) {
   return service === "live_chat" ? "llm" : service;
+}
+
+function commandHashForGroup(commandGroup: "portfolio" | "chat") {
+  return commandGroup === "portfolio" ? "#portfolio-connections" : "#ai-chat-keys";
 }
 
 function safeParse(raw: string): Record<string, string> {

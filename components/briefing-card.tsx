@@ -49,7 +49,7 @@ export function DailyBriefingCard({
     });
 
   return (
-    <article>
+    <article id={rank === 1 ? "top-idea" : `idea-${id}`}>
       <Panel
         tint="advise"
         className="p-5 transition-all duration-200 hover:translate-y-[-2px] sm:p-6"
@@ -109,6 +109,7 @@ export function DailyBriefingCard({
                   horizon={horizon}
                   source={provenance.label}
                   sourceNotes={sourceNotes}
+                  autoSaveFromCommand={rank === 1}
                 />
               ) : null}
               <Chip tone="neutral">
@@ -134,12 +135,6 @@ export function DailyBriefingCard({
                 <span className="text-lg text-outline">/10</span>
               </p>
               <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Confidence</p>
-            </div>
-            <div className="h-1.5 w-full max-w-24 overflow-hidden rounded-full bg-surface-container md:mt-2">
-              <div
-                className={cn("h-full rounded-full", confidence >= 7 ? "bg-engine" : "bg-violet")}
-                style={{ width: `${Math.min(confidence * 10, 100)}%` }}
-              />
             </div>
           </div>
         </div>

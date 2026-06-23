@@ -154,13 +154,13 @@ export function BrainInitializationPanel({ initialState }: BrainInitializationPa
             Saved {formatSnapshotTime(state.latest_snapshot.saved_at)} · {state.latest_snapshot.symbols.join(", ") || "no symbols"}
           </p>
           <p className="mt-2 text-xs leading-5 text-outline">
-            Used for chat only. Today still uses the visible portfolio, alerts, and saved read.
+            Used for chat only. Today still uses the visible portfolio, activity, and saved read.
           </p>
           <p className="mt-1 text-xs leading-5 text-outline">{state.schedule.note}</p>
         </div>
       ) : (
         <div className="mt-4 rounded-md border border-outline-variant/40 bg-surface-dim/45 p-3 text-sm leading-6 text-on-surface-variant">
-          No snapshot saved yet. Today and chat still work from the visible portfolio, alerts, and sample context. Save a snapshot when you want chat to remember the current view.
+          No snapshot saved yet. Today and chat still work from the visible portfolio, activity, and sample context. Save a snapshot when you want chat to remember the current view.
         </div>
       )}
 

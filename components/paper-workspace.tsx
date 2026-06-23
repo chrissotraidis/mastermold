@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { SendHorizonal } from "lucide-react";
+import type { Dispatch, SetStateAction } from "react";
+import { ChevronDown, SendHorizonal } from "lucide-react";
 import { submitPaperPrediction, type PaperPredictionFormState } from "@/app/paper/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,8 @@ type PaperWorkspaceProps = {
   paper: PaperWorkspaceData;
   prefill?: {
     assetKey?: string;
+    direction?: PaperPredictionDirection;
+    confidence?: number;
     rationale?: string;
   };
 };
@@ -79,13 +82,19 @@ const initialFormState: PaperPredictionFormState = {
   errors: [],
 };
 
+const INITIAL_CLOSED_ROUND_LIMIT = 3;
+
+function clampConfidence(value: number) {
+  return Math.max(1, Math.min(10, value));
+}
+
 export function PaperWorkspace({ paper, prefill }: PaperWorkspaceProps) {
   const [state, formAction, isPending] = useActionState(
     submitPaperPrediction,
     initialFormState,
   );
-  const [direction, setDirection] = useState<PaperPredictionDirection>("long");
-  const [confidence, setConfidence] = useState(6);
+  const [direction, setDirection] = useState<PaperPredictionDirection>(prefill?.direction ?? "long");
+  const [confidence, setConfidence] = useState(clampConfidence(prefill?.confidence ?? 6));
   const [lastToggle, setLastToggle] = useState("long");
   const [actionSequence, setActionSequence] = useState(0);
   const activePredictions = paper.activeRound?.predictions ?? [];
@@ -151,13 +160,13 @@ function PaperTradeForm({
   direction: PaperPredictionDirection;
   setDirection: (value: PaperPredictionDirection) => void;
   confidence: number;
-  setConfidence: (value: number) => void;
+  setConfidence: Dispatch<SetStateAction<number>>;
   setLastToggle: (value: string) => void;
   actionSequence: number;
   setActionSequence: (updater: (current: number) => number) => void;
 }) {
   return (
-    <Card className="border-outline-variant/40 bg-surface-high/40">
+    <Card id="paper-trade-form" className="scroll-mt-24 border-outline-variant/40 bg-surface-high/40">
       <CardHeader className="p-5">
         <CardTitle className="text-xl text-on-surface">Test a paper trade</CardTitle>
         <p className="text-sm leading-6 text-outline">
@@ -168,6 +177,12 @@ function PaperTradeForm({
         {paper.activeRound ? (
           <form action={formAction} className="space-y-4">
             <input type="hidden" name="round_id" value={paper.activeRound.id} />
+            {prefill?.assetKey || prefill?.rationale ? (
+              <div className="rounded-md border border-violet/35 bg-violet/[0.07] p-3 text-sm leading-6 text-on-surface-variant">
+                <span className="font-semibold text-on-surface">Prepared by Master Mold.</span>{" "}
+                Review the simulator setup, then submit only if this is the paper test you want.
+              </div>
+            ) : null}
 
             <FieldBlock id="paper-asset" label="Asset">
               <select
@@ -233,26 +248,31 @@ function PaperTradeForm({
               <p className="text-xs text-outline">Simulator dollars reserved until the close date.</p>
             </FieldBlock>
 
-            <FieldBlock id="paper-confidence" label={`Confidence ${confidence}/10`}>
-              <input
-                id="paper-confidence"
-                name="confidence"
-                type="range"
-                min={1}
-                max={10}
-                step={1}
-                value={confidence}
-                onChange={(event) => setConfidence(Number(event.target.value))}
-                className="h-11 w-full accent-violet"
-                aria-describedby="paper-confidence-help"
-              />
+            <FieldBlock id="paper-confidence" label="Confidence">
+              <input type="hidden" id="paper-confidence" name="confidence" value={confidence} />
               <div
                 id="paper-confidence-help"
-                className="flex justify-between text-xs text-outline"
+                className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-md border border-outline-variant/50 bg-surface-dim/70 p-2"
               >
-                <span>less sure</span>
-                <span>more sure</span>
+                <button
+                  type="button"
+                  onClick={() => setConfidence((current) => clampConfidence(current - 1))}
+                  className="min-h-11 rounded-md border border-outline-variant/40 px-3 text-sm font-semibold text-on-surface-variant transition hover:border-violet/50 hover:text-violet"
+                >
+                  Lower
+                </button>
+                <span className="min-w-20 text-center font-display text-2xl font-semibold tabular-nums text-on-surface">
+                  {confidence}/10
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setConfidence((current) => clampConfidence(current + 1))}
+                  className="min-h-11 rounded-md border border-outline-variant/40 px-3 text-sm font-semibold text-on-surface-variant transition hover:border-violet/50 hover:text-violet"
+                >
+                  Higher
+                </button>
               </div>
+              <p className="text-xs text-outline">Use a whole number from 1 to 10.</p>
             </FieldBlock>
 
             <FieldBlock id="paper-rationale" label="Reason">
@@ -260,7 +280,7 @@ function PaperTradeForm({
                 id="paper-rationale"
                 name="rationale"
                 defaultValue={prefill?.rationale}
-                className="min-h-28 w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+                className="min-h-28 w-full resize-y overflow-x-hidden rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                 placeholder="What would make this worth testing?"
                 required
               />
@@ -423,6 +443,16 @@ function RoundScorePanel({ round }: { round: PaperWorkspaceData["completedRounds
 }
 
 function RoundHistory({ rounds }: { rounds: PaperWorkspaceData["completedRounds"] }) {
+  const [showHistory, setShowHistory] = useState(false);
+  const [showAllRounds, setShowAllRounds] = useState(false);
+  const scoredRounds = rounds.filter((round) => round.score);
+  const totalTests = rounds.reduce((sum, round) => sum + round.predictions.length, 0);
+  const averageScore = scoredRounds.length > 0
+    ? scoredRounds.reduce((sum, round) => sum + (round.score?.total ?? 0), 0) / scoredRounds.length
+    : null;
+  const visibleRounds = showAllRounds ? rounds : rounds.slice(0, INITIAL_CLOSED_ROUND_LIMIT);
+  const hiddenRoundCount = Math.max(0, rounds.length - visibleRounds.length);
+
   return (
     <section aria-labelledby="round-history-title" className="space-y-4">
       <div>
@@ -435,32 +465,77 @@ function RoundHistory({ rounds }: { rounds: PaperWorkspaceData["completedRounds"
       </div>
 
       {rounds.length > 0 ? (
-        <div className="grid gap-4">
-          {rounds.map((round) => (
-            <Card key={round.id} className="border-outline-variant/40 bg-surface-high/30">
-              <CardHeader className="space-y-3 p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                    {titleCase(round.status)}
-                  </Badge>
-                  <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                    {round.predictions.length} {round.predictions.length === 1 ? "test" : "tests"}
-                  </Badge>
+        <>
+          <div className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Metric label="Closed rounds" value={String(rounds.length)} />
+              <Metric label="Simulator tests" value={String(totalTests)} />
+              <Metric label="Avg closed result" value={averageScore === null ? "Pending" : formatTotalScore(averageScore)} />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowHistory((current) => !current)}
+              className="mt-4 border-outline-variant/50 bg-surface-dim/40 text-on-surface hover:border-violet/50 hover:text-violet"
+              aria-expanded={showHistory}
+              aria-controls="paper-round-history-detail"
+            >
+              <ChevronDown
+                aria-hidden="true"
+                className={cn("transition-transform", showHistory && "rotate-180")}
+              />
+              {showHistory ? "Hide closed-test history" : "Show closed-test history"}
+            </Button>
+          </div>
+
+          {showHistory ? (
+            <div id="paper-round-history-detail" className="grid gap-4">
+              {visibleRounds.map((round) => (
+                <Card key={round.id} className="border-outline-variant/40 bg-surface-high/30">
+                  <CardHeader className="space-y-3 p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
+                        {titleCase(round.status)}
+                      </Badge>
+                      <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
+                        {round.predictions.length} {round.predictions.length === 1 ? "test" : "tests"}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-xl text-on-surface">{formatDateRange(round.opensAt, round.closesAt)}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4 p-5 pt-0">
+                    <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                      <Metric label="Starts" value={formatTimestamp(round.opensAt)} />
+                      <Metric label="Close date" value={formatTimestamp(round.closesAt)} />
+                      <Metric label="Overall result" value={round.score ? formatTotalScore(round.score.total) : "Pending"} />
+                      <Metric label="Risk spread" value={round.score ? formatScore(round.score.variety) : "Pending"} />
+                    </div>
+                    <PredictionList predictions={round.predictions} title={`Tests from ${formatDateRange(round.opensAt, round.closesAt)}`} />
+                  </CardContent>
+                </Card>
+              ))}
+              {showAllRounds || hiddenRoundCount > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-outline-variant/40 bg-surface-dim/30 p-3">
+                  <p className="text-sm leading-6 text-outline">
+                    Showing {visibleRounds.length} of {rounds.length} closed rounds.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAllRounds((current) => !current)}
+                    className="border-outline-variant/50 bg-surface-high/40 text-on-surface hover:border-violet/50 hover:text-violet"
+                  >
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={cn("transition-transform", showAllRounds && "rotate-180")}
+                    />
+                    {showAllRounds ? "Show recent rounds" : `Show ${hiddenRoundCount} older rounds`}
+                  </Button>
                 </div>
-                <CardTitle className="text-xl text-on-surface">{formatDateRange(round.opensAt, round.closesAt)}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 p-5 pt-0">
-                <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                  <Metric label="Starts" value={formatTimestamp(round.opensAt)} />
-                  <Metric label="Close date" value={formatTimestamp(round.closesAt)} />
-                  <Metric label="Overall result" value={round.score ? formatTotalScore(round.score.total) : "Pending"} />
-                  <Metric label="Risk spread" value={round.score ? formatScore(round.score.variety) : "Pending"} />
-                </div>
-                <PredictionList predictions={round.predictions} title={`Tests from ${formatDateRange(round.opensAt, round.closesAt)}`} />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              ) : null}
+            </div>
+          ) : null}
+        </>
       ) : (
         <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm text-on-surface-variant">
           No closed paper tests yet.

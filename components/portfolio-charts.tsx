@@ -137,24 +137,18 @@ function AllocationChart({ allocation }: { allocation: AllocationJson[] }) {
         <p className="text-sm text-outline">Stocks · crypto · on-chain · cash</p>
       </div>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-5 overflow-hidden rounded-md border border-outline-variant/35">
         {activeAllocation.length > 0 ? (
-          activeAllocation.map((item) => (
-            <div key={item.asset_class} className="space-y-2">
-              <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium capitalize text-on-surface">{labelAssetClass(item.asset_class)}</span>
-                <span className="tabular-nums text-on-surface-variant">
+          <dl className="divide-y divide-outline-variant/35">
+            {activeAllocation.map((item) => (
+              <div key={item.asset_class} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 bg-surface-dim/25 px-3 py-3 text-sm">
+                <dt className="min-w-0 truncate font-medium capitalize text-on-surface">{labelAssetClass(item.asset_class)}</dt>
+                <dd className="min-w-0 break-words text-right tabular-nums text-on-surface-variant">
                   {formatCurrency(item.market_value)} · {item.weight_pct.toFixed(1)}%
-                </span>
+                </dd>
               </div>
-              <div className="h-3 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
-                <div
-                  className={`${allocationColor(item.asset_class)} transition-[width] duration-500`}
-                  style={{ width: `${Math.max(item.weight_pct, 2)}%` }}
-                />
-              </div>
-            </div>
-          ))
+            ))}
+          </dl>
         ) : (
           <div className="rounded-md border border-outline-variant/40 bg-surface-dim/45 p-4 text-sm text-outline">
             No holdings loaded yet.
@@ -169,19 +163,6 @@ function labelAssetClass(assetClass: AllocationJson["asset_class"]) {
   if (assetClass === "defi") return "On-chain";
   if (assetClass === "cash") return "Cash";
   return assetClass;
-}
-
-function allocationColor(assetClass: AllocationJson["asset_class"]) {
-  switch (assetClass) {
-    case "equity":
-      return "h-full rounded-full bg-violet";
-    case "crypto":
-      return "h-full rounded-full bg-engine";
-    case "defi":
-      return "h-full rounded-full bg-caution";
-    case "cash":
-      return "h-full rounded-full bg-outline";
-  }
 }
 
 function formatCurrency(value: number) {

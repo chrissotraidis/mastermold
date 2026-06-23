@@ -71,7 +71,7 @@ export function buildUserPromptForRequest(message: string) {
 
   if (!isDailyFocus && includesPortfolioState) {
     requestRules.push(
-      "Begin with `Portfolio state:`. State clearly whether the visible portfolio is sample, manual, or imported. Do not mention unrelated alerts unless they change that answer.",
+      "Begin with `Portfolio state:`. State clearly whether the visible portfolio is sample, manual, or imported. Do not mention unrelated activity items unless they change that answer.",
     );
   }
 

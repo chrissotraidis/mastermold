@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   BookPlus,
   CheckCircle2,
@@ -46,20 +47,28 @@ const severityStyles: Record<PublicAlert["severity"], string> = {
 type AlertFeedProps = {
   initialAlerts: PublicAlert[];
   replayAsOf?: string | null;
+  initialFilter?: SeverityFilter;
 };
 
-export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) {
+export function AlertFeed({ initialAlerts, replayAsOf = null, initialFilter = "All" }: AlertFeedProps) {
+  const searchParams = useSearchParams();
   const [alerts, setAlerts] = useState(initialAlerts);
-  const [filter, setFilter] = useState<SeverityFilter>("All");
+  const [filter, setFilter] = useState<SeverityFilter>(initialFilter);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [pendingAlertId, setPendingAlertId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [savedJournalId, setSavedJournalId] = useState<string | null>(null);
   const [actionSequence, setActionSequence] = useState(0);
   const [lastAction, setLastAction] = useState("alerts-loaded");
+  const handledCommandActionRef = useRef<string | null>(null);
+  const actionQuery = searchParams.toString();
   const [lastDismissedId, setLastDismissedId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isReplay = Boolean(replayAsOf);
+
+  useEffect(() => {
+    setFilter(initialFilter);
+  }, [initialFilter]);
 
   const filteredAlerts = useMemo(
     () => alerts.filter((alert) => filter === "All" || alert.severity === filter),
@@ -112,7 +121,7 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
     updateAlert(alert.id, { acknowledged: true });
     setLastDismissedId(alert.id);
     setMessage("Dismissed.");
-    setLastAction(`Dismissed ${alert.severity} alert.`);
+    setLastAction(`Dismissed ${alert.severity} activity item.`);
     setActionSequence((current) => current + 1);
     setPendingAlertId(alert.id);
     startTransition(async () => {
@@ -143,8 +152,8 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
     if (lastDismissedId === alert.id) {
       setLastDismissedId(null);
     }
-    setMessage("Restored to active alerts.");
-    setLastAction(`Restored ${alert.severity} alert.`);
+    setMessage("Restored to active activity.");
+    setLastAction(`Restored ${alert.severity} activity item.`);
     setActionSequence((current) => current + 1);
     setPendingAlertId(alert.id);
     startTransition(async () => {
@@ -201,7 +210,7 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
   function saveAsDecision(alert: PublicAlert) {
     markBrowserAction(`save-alert-decision-${alert.id}`);
     setLastDismissedId(null);
-    setLastAction(`Saved ${alert.severity} alert as a decision draft.`);
+    setLastAction(`Saved ${alert.severity} activity item as a decision draft.`);
     setActionSequence((current) => current + 1);
     setPendingAlertId(alert.id);
     startTransition(async () => {
@@ -226,6 +235,46 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
     });
   }
 
+  useEffect(() => {
+    if (isReplay) return;
+
+    const params = new URLSearchParams(actionQuery);
+    const action = params.get("action");
+    if (!isActivityCommandAction(action)) return;
+    if (handledCommandActionRef.current === actionQuery) return;
+    handledCommandActionRef.current = actionQuery;
+
+    params.delete("action");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#activity-list"}`);
+
+    const topAlert = visibleAlerts[0];
+    if (!topAlert) {
+      setMessage("No active activity item to update.");
+      setLastAction("No active activity item was available for the Master Mold command.");
+      setActionSequence((current) => current + 1);
+      return;
+    }
+
+    if (action === "save-top-activity") {
+      saveAsDecision(topAlert);
+      return;
+    }
+
+    if (action === "dismiss-top-activity") {
+      dismiss(topAlert);
+      return;
+    }
+
+    if (action === "mark-top-activity-useful") {
+      submitFeedback(topAlert, true);
+      return;
+    }
+
+    submitFeedback(topAlert, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionQuery, isReplay, visibleAlerts]);
+
   return (
     <section
       aria-labelledby="alert-feed-title"
@@ -234,9 +283,9 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
       data-action-sequence={actionSequence}
     >
       <h2 id="alert-feed-title" className="sr-only">
-        Alert list
+        Activity list
       </h2>
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter alerts">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter activity">
         {filters.map((item) => (
           <button
             key={item}
@@ -266,7 +315,7 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
       </div>
 
       <p className="sr-only" aria-live="polite">
-        {isPending ? "Saving alert update." : message}
+        {isPending ? "Saving activity update." : message}
       </p>
       {message ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-outline-variant/35 bg-surface-dim/35 px-3 py-2 text-sm text-outline">
@@ -294,7 +343,7 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
       {isReplay ? (
         <div className="rounded-md border border-violet/35 bg-violet/[0.07] px-4 py-3 text-sm leading-6 text-on-surface-variant">
           <span className="font-semibold text-on-surface">Replay view:</span>{" "}
-          showing alerts Master Mold knew at this time. Current-state actions are disabled here.
+          showing activity Master Mold knew at this time. Current-state actions are disabled here.
         </div>
       ) : null}
 
@@ -316,13 +365,16 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
                       <CardTitle className="text-lg leading-7 text-on-surface">
                         {cleanAlertMessage(alert.message)}
                       </CardTitle>
-                      <p className="max-w-2xl text-sm leading-6 text-on-surface-variant">
+                      <p className="line-clamp-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
                         {explainAlertRelevance(alert)}
                       </p>
-                      <div className="max-w-2xl rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3 text-sm leading-6 text-on-surface">
-                        <span className="font-semibold text-on-surface">Suggested response: </span>
-                        <span className="text-on-surface-variant">{buildAlertSuggestedResponse(alert)}</span>
-                      </div>
+                      <ActivityActionRow
+                        alert={alert}
+                        isBusy={isBusy}
+                        isReplay={isReplay}
+                        onAsk={() => openMasterMoldChat(buildAlertChatPrompt(alert), buildAlertPageContext(alert))}
+                        onSave={() => saveAsDecision(alert)}
+                      />
                     </div>
                     <Button
                       type="button"
@@ -334,7 +386,7 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
                       aria-expanded={isExpanded}
                       aria-controls={`${alert.id}-rationale`}
                     >
-                      Why it matters
+                      Details and response
                       <ChevronDown
                         aria-hidden="true"
                         className={cn("transition-transform", isExpanded && "rotate-180")}
@@ -342,8 +394,8 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
-                  {isExpanded ? (
+                {isExpanded ? (
+                  <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
                     <div
                       id={`${alert.id}-rationale`}
                       className="rounded-md border border-violet/30 bg-violet/[0.07] p-4 text-sm leading-6 text-on-surface"
@@ -364,84 +416,44 @@ export function AlertFeed({ initialAlerts, replayAsOf = null }: AlertFeedProps) 
                         <p className="mt-2">{cleanAlertRationale(alert.rationale)}</p>
                       </details>
                     </div>
-                  ) : null}
 
-                  <div className="grid gap-3 rounded-md border border-outline-variant/35 bg-surface-dim/35 p-3 sm:grid-cols-3">
-                    <button
-                      type="button"
-                      onClick={() => openMasterMoldChat(buildAlertChatPrompt(alert), buildAlertPageContext(alert))}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-violet/35 bg-violet/10 px-3 py-2 text-sm font-medium text-violet transition-colors hover:bg-violet/15"
-                    >
-                      <MessageSquareText aria-hidden="true" className="size-4" />
-                      Ask Master Mold
-                    </button>
-                    {isReplay ? (
-                      <>
-                        <ReplayDisabledAction icon={<BookPlus aria-hidden="true" className="size-4" />}>
-                          Save disabled
-                        </ReplayDisabledAction>
-                        <ReplayDisabledAction icon={<Wallet aria-hidden="true" className="size-4" />}>
-                          Paper trade disabled
-                        </ReplayDisabledAction>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => saveAsDecision(alert)}
-                          disabled={isBusy}
-                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-engine/35 bg-engine/10 px-3 py-2 text-sm font-medium text-engine transition-colors hover:bg-engine/15 disabled:opacity-50"
-                        >
-                          <BookPlus aria-hidden="true" className="size-4" />
-                          Save as decision
-                        </button>
-                        <Link
-                          href={buildAlertPaperHref(alert)}
-                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-medium text-caution transition-colors hover:bg-caution/15"
-                        >
-                          <Wallet aria-hidden="true" className="size-4" />
-                          Paper trade
-                        </Link>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 border-t border-outline-variant/40 pt-4">
-                    {isReplay ? (
-                      <p className="text-sm leading-6 text-outline">
-                        Dismiss and feedback are disabled in replay so this snapshot stays unchanged.
-                      </p>
-                    ) : (
-                      <>
-                        <Button
-                          type="button"
-                          className="bg-engine text-void hover:brightness-110"
-                          onClick={() => dismiss(alert)}
-                          data-rds-action="submit"
-                          data-action-state={alert.acknowledged ? `changed-${actionSequence}` : "idle"}
-                          disabled={isBusy}
-                        >
-                          <CheckCircle2 aria-hidden="true" />
-                          Dismiss
-                        </Button>
-
-                        <div className="ml-auto flex flex-wrap items-center gap-2">
-                          <ThumbButton
-                            active={alert.useful_feedback === true}
+                    <div className="flex flex-wrap items-center gap-3 border-t border-outline-variant/40 pt-4">
+                      {isReplay ? (
+                        <p className="text-sm leading-6 text-outline">
+                          Dismiss and feedback are disabled in replay so this snapshot stays unchanged.
+                        </p>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            className="bg-engine text-void hover:brightness-110"
+                            onClick={() => dismiss(alert)}
+                            data-rds-action="submit"
+                            data-action-state={alert.acknowledged ? `changed-${actionSequence}` : "idle"}
                             disabled={isBusy}
-                            onClick={() => submitFeedback(alert, true)}
-                            up
-                          />
-                          <ThumbButton
-                            active={alert.useful_feedback === false}
-                            disabled={isBusy}
-                            onClick={() => submitFeedback(alert, false)}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
+                          >
+                            <CheckCircle2 aria-hidden="true" />
+                            Dismiss
+                          </Button>
+
+                          <div className="ml-auto flex flex-wrap items-center gap-2">
+                            <ThumbButton
+                              active={alert.useful_feedback === true}
+                              disabled={isBusy}
+                              onClick={() => submitFeedback(alert, true)}
+                              up
+                            />
+                            <ThumbButton
+                              active={alert.useful_feedback === false}
+                              disabled={isBusy}
+                              onClick={() => submitFeedback(alert, false)}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                ) : null}
               </Card>
             );
           })}
@@ -497,6 +509,68 @@ function AlertExplanationPoint({ label, body }: { label: string; body: string })
   );
 }
 
+function ActivityActionRow({
+  alert,
+  isBusy,
+  isReplay,
+  onAsk,
+  onSave,
+}: {
+  alert: PublicAlert;
+  isBusy: boolean;
+  isReplay: boolean;
+  onAsk: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-1 rounded-md border border-outline-variant/35 bg-surface-dim/35 p-1 md:gap-2 md:p-2">
+      <button
+        type="button"
+        onClick={onAsk}
+        aria-label="Ask Master Mold"
+        title="Ask Master Mold"
+        className="inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-violet/35 bg-violet/10 px-2 py-2 text-xs font-medium text-violet transition-colors hover:bg-violet/15 sm:gap-2 sm:px-3 sm:text-sm"
+      >
+        <MessageSquareText aria-hidden="true" className="size-4" />
+        <span>Ask</span>
+      </button>
+      {isReplay ? (
+        <>
+          <ReplayDisabledAction icon={<BookPlus aria-hidden="true" className="size-4" />}>
+            Save disabled
+          </ReplayDisabledAction>
+          <ReplayDisabledAction icon={<Wallet aria-hidden="true" className="size-4" />}>
+            Paper trade disabled
+          </ReplayDisabledAction>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={isBusy}
+            aria-label="Save as decision"
+            title="Save as decision"
+            className="inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-engine/35 bg-engine/10 px-2 py-2 text-xs font-medium text-engine transition-colors hover:bg-engine/15 disabled:opacity-50 sm:gap-2 sm:px-3 sm:text-sm"
+          >
+            <BookPlus aria-hidden="true" className="size-4" />
+            <span>Save</span>
+          </button>
+          <Link
+            href={buildAlertPaperHref(alert)}
+            aria-label="Paper trade"
+            title="Paper trade"
+            className="inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-caution/35 bg-caution/10 px-2 py-2 text-xs font-medium text-caution transition-colors hover:bg-caution/15 sm:gap-2 sm:px-3 sm:text-sm"
+          >
+            <Wallet aria-hidden="true" className="size-4" />
+            <span>Paper</span>
+          </Link>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ReplayDisabledAction({
   children,
   icon,
@@ -524,9 +598,22 @@ function markBrowserAction(token: string) {
   document.documentElement.dataset.rdsAction = token;
   const evidence = document.getElementById("rds-live-action-evidence");
   if (evidence) {
-    evidence.textContent = `Action evidence: ${token} changed visible alert feed state.`;
+    evidence.textContent = `Action evidence: ${token} changed visible activity feed state.`;
     evidence.dataset.rdsActionEvidence = token;
   }
+}
+
+function isActivityCommandAction(action: string | null): action is
+  | "save-top-activity"
+  | "dismiss-top-activity"
+  | "mark-top-activity-useful"
+  | "mark-top-activity-not-useful" {
+  return (
+    action === "save-top-activity" ||
+    action === "dismiss-top-activity" ||
+    action === "mark-top-activity-useful" ||
+    action === "mark-top-activity-not-useful"
+  );
 }
 
 function ThumbButton({

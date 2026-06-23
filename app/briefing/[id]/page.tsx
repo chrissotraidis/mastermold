@@ -90,14 +90,26 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
                 {headline}
               </h1>
               <p className="max-w-3xl text-sm leading-6 text-on-surface-variant sm:text-base sm:leading-7">
-                {plainBriefingText(card.why_now)}
+                {plainIdeaDetailText(card.why_now)}
               </p>
+              <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+                <AskMasterMoldButton prompt={askQuery} variant="primary" className="w-full sm:w-auto">
+                  Ask about this idea
+                </AskMasterMoldButton>
+                <Link
+                  href={paperDraftHref}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-caution/35 bg-caution/10 px-3 py-2 text-sm font-semibold text-caution transition hover:bg-caution/15 sm:w-auto"
+                >
+                  <Wallet aria-hidden="true" className="size-4" />
+                  Test as paper trade
+                </Link>
+              </div>
             </div>
             <div className="rounded-md border border-violet/30 bg-violet/10 p-4">
               <p className="text-sm font-medium text-violet">Review score</p>
               <p className="mt-2 text-4xl font-semibold text-on-surface">{card.conviction}/10</p>
               <p className="mt-1 text-sm font-semibold text-on-surface">{briefingStrengthLabel(card.conviction)}</p>
-              <p className="mt-2 text-sm leading-6 text-on-surface-variant">{plainBriefingText(card.relevance_note)}</p>
+              <p className="mt-2 text-sm leading-6 text-on-surface-variant">{plainIdeaDetailText(card.relevance_note)}</p>
             </div>
           </div>
         </header>
@@ -197,7 +209,7 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
                     }
                   >
                     <MessageSquareWarning aria-hidden="true" className="size-4" />
-                    {shortAlertTierLabel(matchingAlert.tier)} alert
+                    {shortAlertTierLabel(matchingAlert.tier)} activity
                   </CardDescription>
                   <CardTitle className="text-lg leading-6 text-on-surface">
                     {cleanAlertMessage(matchingAlert.message)}
@@ -208,7 +220,7 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
                     {explainAlertRelevance(matchingAlert)}
                   </p>
                   <OpenAlertsAction className="inline-flex min-h-11 w-full items-center justify-center rounded-md border border-outline-variant/50 bg-transparent px-3 py-2 text-sm font-semibold text-on-surface transition hover:bg-surface-high/60">
-                    Open alert inbox
+                    Open activity
                   </OpenAlertsAction>
                 </CardContent>
               </Card>
@@ -405,9 +417,15 @@ function briefingNextCheck(confidence: number) {
 
 function buildBriefingPaperHref(headline: string, relevance: string) {
   const params = new URLSearchParams({
-    rationale: `Testing this idea as a paper trade: ${headline}. ${plainBriefingText(relevance)}`,
+    rationale: `Testing this idea as a paper trade: ${headline}. ${plainIdeaDetailText(relevance)}`,
   });
   return `/paper?${params.toString()}`;
+}
+
+function plainIdeaDetailText(value: string) {
+  return plainBriefingText(value)
+    .replace(/\babove-average performance\b/gi, "above-average move")
+    .replace(/\bperformance\b/gi, "move");
 }
 
 function formatTimestamp(value: string) {

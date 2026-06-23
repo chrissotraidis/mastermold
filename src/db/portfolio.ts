@@ -100,8 +100,27 @@ export type PortfolioImportIssue = {
 };
 
 const assetClassOrder: AssetClass[] = ["equity", "crypto", "defi", "cash"];
+const PORTFOLIO_CACHE_TTL_MS = 5_000;
+const portfolioCache = new Map<string, { expiresAt: number; value: PortfolioJson }>();
 
 export function getPortfolio(asOf: AsOfFilter | null = null): PortfolioJson {
+  const cacheKey = portfolioCacheKey(asOf);
+  if (!isTestRuntime()) {
+    const cached = portfolioCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+  }
+
+  const value = buildPortfolio(asOf);
+  if (!isTestRuntime()) {
+    portfolioCache.set(cacheKey, {
+      expiresAt: Date.now() + PORTFOLIO_CACHE_TTL_MS,
+      value,
+    });
+  }
+  return value;
+}
+
+function buildPortfolio(asOf: AsOfFilter | null = null): PortfolioJson {
   const visibleHoldings = demoDatabase.holdings.filter((holding) =>
     isKnownBy(holding.knowledge_time, asOf),
   );
@@ -338,6 +357,7 @@ export function addManualHolding(input: ManualHoldingInput): PortfolioHoldingJso
     updated_at: now,
   };
   store().upsertManualHolding(row);
+  invalidatePortfolioCache();
   return manualRowToHolding(row);
 }
 
@@ -345,6 +365,7 @@ export function deleteManualHolding(id: string): boolean {
   const exists = store().manualHoldings().some((row) => row.id === id);
   if (!exists) return false;
   store().deleteManualHolding(id);
+  invalidatePortfolioCache();
   return true;
 }
 
@@ -353,7 +374,20 @@ export function replaceImportedHoldings(
   rows: ImportedHoldingRow[],
 ): PortfolioJson {
   store().replaceImportedHoldings(service, rows);
+  invalidatePortfolioCache();
   return getPortfolio();
+}
+
+function invalidatePortfolioCache() {
+  portfolioCache.clear();
+}
+
+function portfolioCacheKey(asOf: AsOfFilter | null) {
+  return asOf?.iso ?? "live";
+}
+
+function isTestRuntime() {
+  return process.env.NODE_ENV === "test" || process.env.npm_lifecycle_event === "test";
 }
 
 function getPriceChartAssets(priceBars: PriceBar[]): PriceChartAssetJson[] {

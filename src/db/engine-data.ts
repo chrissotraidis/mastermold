@@ -224,7 +224,7 @@ type LoadOptions = {
 };
 
 export function engineOutDir(): string {
-  return process.env.ENGINE_OUT_DIR ?? join(process.cwd(), "engine", "out");
+  return process.env.ENGINE_OUT_DIR ?? join(/* turbopackIgnore: true */ process.cwd(), "engine", "out");
 }
 
 function listBundleFiles(dir: string): string[] {

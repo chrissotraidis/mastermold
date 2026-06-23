@@ -5,8 +5,10 @@ import { PageHeader } from "@/components/page-header";
 import { PaperWorkspace, type PaperWorkspaceData } from "@/components/paper-workspace";
 import { Badge } from "@/components/ui/badge";
 import { plainPaperCopy } from "@/lib/paper-copy";
+import { cleanAlertMessage, explainAlertRelevance } from "@/lib/alert-loop";
 import { plainBriefingHeadline, plainBriefingText } from "@/lib/plain-finance-copy";
 import { productProvenanceLabel } from "@/lib/provenance-copy";
+import { getAlerts } from "@/src/db/alerts";
 import { parseAsOf } from "@/src/db/bitemporal";
 import { getPaperPageData, type PaperPredictionJson } from "@/src/db/paper";
 
@@ -19,12 +21,37 @@ export default async function PaperPage({ searchParams }: PaperPageProps) {
   const parsedAsOf = parseAsOf(singleParam(params?.as_of) ?? null);
   const paper = getPaperPageData(parsedAsOf.ok ? parsedAsOf.asOf : null);
   const symbol = singleParam(params?.symbol)?.toUpperCase();
+  const action = singleParam(params?.action);
+  const topIdea = action === "prepare-top-paper-trade" ? paper.enginePredictions[0] : null;
+  const topActivity =
+    action === "prepare-top-activity-paper-trade"
+      ? getAlerts(parsedAsOf.ok ? parsedAsOf.asOf : null).find((alert) => !alert.acknowledged) ?? null
+      : null;
+  const topActivityRationale = topActivity
+    ? `Testing the top activity item with simulator dollars: ${cleanAlertMessage(topActivity.message)}. ${explainAlertRelevance(topActivity)}`
+    : "";
+  const topIdeaRationale = topIdea
+    ? `Testing the top saved market idea with simulator dollars: ${plainBriefingHeadline(topIdea.rationale)}`
+    : "";
+  const requestedRationale = singleParam(params?.rationale);
   const prefill = {
-    assetKey: paper.assets.find((asset) => asset.symbol.toUpperCase() === symbol)?.symbol,
-    rationale: plainPaperCopy(plainBriefingText(singleParam(params?.rationale) ?? "")),
+    assetKey:
+      paper.assets.find((asset) => asset.symbol.toUpperCase() === symbol)?.symbol ??
+      topActivity?.asset_symbol ??
+      topIdea?.asset.symbol,
+    direction: topIdea?.direction,
+    confidence: topIdea?.conviction,
+    rationale: plainPaperCopy(
+      plainBriefingText(
+        requestedRationale ?? (topActivityRationale || topIdeaRationale),
+      ),
+    ),
   };
   const workspacePaper = toPaperWorkspaceData(paper);
   const publicProvenanceLabel = productProvenanceLabel(paper.provenance.label);
+  const paperRoute = paper.provenance.replay_as_of
+    ? `/paper?as_of=${encodeURIComponent(paper.provenance.replay_as_of)}`
+    : "/paper";
 
   return (
     <AppShell dataMode={publicProvenanceLabel}>
@@ -33,6 +60,28 @@ export default async function PaperPage({ searchParams }: PaperPageProps) {
           title="Paper trading"
           subtitle="Try a market call with simulator dollars, then compare the result after the close date. No real money moves here."
           provenance={publicProvenanceLabel}
+          command={{
+            pageContext: {
+              surface: "Paper",
+              route: paperRoute,
+              summary:
+                "The user is looking at paper trades, the paper account, open ideas, and what recent paper results taught them. No real money moves here.",
+            },
+            suggestions: [
+              { label: "Next paper trade", prompt: "Prepare paper trade." },
+              { label: "Why test it", prompt: "Why would this paper idea teach me something before risking real money?" },
+              { label: "Check journal", prompt: "Open journal." },
+              { label: "Save context", prompt: "Save context for chat." },
+            ],
+          }}
+          right={
+            <a
+              href="#paper-trade-form"
+              className="inline-flex min-h-11 items-center justify-center rounded-md bg-violet px-4 py-2 text-sm font-semibold text-void transition hover:bg-violet/90"
+            >
+              Submit paper trade
+            </a>
+          }
         />
 
         <PaperWorkspace paper={workspacePaper} prefill={prefill} />

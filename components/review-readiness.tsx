@@ -883,6 +883,7 @@ const disclosureSections = [
       "Web3 helper packets — Settings shows the current input contract for the operator request and research handoff packets, so a reviewer can see the exact next safe field or external review step without scrolling through every blocker.",
       "Jupiter setup is explicit but still credential-gated: the app can point the operator to the Jupiter Developer Platform, install `JUPITER_API_KEY` into ignored local env in trusted local development, rehearse quote/order evidence with transaction bytes withheld, and expose Trading and Settings `Sign tiny canary` browser-wallet handoffs only after explicit live flags and canary acknowledgement; Mastermind still stores no wallet authority and cannot bypass the canary relay.",
       "Signer setup is now an explicit credential packet in Settings: manual external wallet, Privy server wallet, Turnkey policy wallet, and future session-key paths show env target names, selected-path status, missing evidence, and no-secret boundaries without creating provider accounts or requesting signatures.",
+      "Zo review credentials, if supplied, are limited to a live chat key, read-only portfolio import keys, Web3 read-provider keys, and Jupiter rehearsal/order-rail keys. Private keys, seed phrases, raw keypairs, and wallet authority are never acceptable review inputs.",
       "Account imports are one-time snapshots in this build; import again before relying on balances.",
       "Live chat can be tested and used when a key is saved.",
     ],
@@ -1210,7 +1211,7 @@ function TrustBoundaryCard() {
     {
       title: "What is actually left",
       body:
-        "Still missing for real-money autonomy: production process management, reviewed signer/custody provider credentials, provider-backed market and route workers, real wallet accounting, audited live submit/settlement, and out-of-sample profit proof. These now appear as explicit launch-checklist gates instead of only review copy.",
+        "Still missing for real-money autonomy: production process management, reviewed signer/custody provider credentials, provider-backed market and route workers, real wallet accounting, audited live submit/settlement, and out-of-sample profit proof. Zo testing may use chat, read-only import, read-provider, and Jupiter rehearsal keys only; private keys and seed phrases stay out.",
       tone: "border-critical/30 bg-critical/[0.06]",
     },
   ];
@@ -1252,7 +1253,7 @@ function AutonomousTradingStatusCard() {
       label: "Safe boundary",
       value: "Live capital locked",
       detail:
-        "The app does not store private keys or raw signed transactions. Live swaps remain blocked unless external signer, RPC/API, wallet approval, kill switch, submit, confirmation, and mirror checks all clear.",
+        "The app does not store private keys or raw signed transactions. Review may supply live chat, read-only import, read-provider, and Jupiter rehearsal keys only; live swaps remain blocked unless external signer, RPC/API, wallet approval, kill switch, submit, confirmation, and mirror checks all clear.",
       tone: "text-caution",
     },
     {

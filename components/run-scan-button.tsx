@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, RefreshCw } from "lucide-react";
 import { cachedGetJson, invalidateCachedJson } from "@/lib/client-fetch-cache";
 import { cn } from "@/lib/utils";
@@ -23,10 +23,13 @@ export function RunScanButton({
   unavailableNote?: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [state, setState] = useState<ScanState>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [available, setAvailable] = useState<boolean | null>(null);
   const mounted = useRef(true);
+  const autoRunRef = useRef<string | null>(null);
+  const actionQuery = searchParams.toString();
 
   useEffect(() => {
     mounted.current = true;
@@ -44,14 +47,14 @@ export function RunScanButton({
     };
   }, []);
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (trigger = "today-button") => {
     setState("running");
     setMessage(null);
     try {
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trigger: "today-button" }),
+        body: JSON.stringify({ trigger }),
       });
       const body = (await response.json()) as { ok?: boolean; detail?: string };
       if (!mounted.current) return;
@@ -74,6 +77,19 @@ export function RunScanButton({
     }
   }, [router]);
 
+  useEffect(() => {
+    if (available === false || state === "running") return;
+    const params = new URLSearchParams(actionQuery);
+    if (params.get("action") !== "run-scan") return;
+    if (autoRunRef.current === actionQuery) return;
+
+    autoRunRef.current = actionQuery;
+    params.delete("action");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#run-scan"}`);
+    void run("master-mold-command");
+  }, [actionQuery, available, run, state]);
+
   if (available === false) {
     if (!unavailableNote) return null;
     return (
@@ -88,7 +104,7 @@ export function RunScanButton({
     <div className={cn("flex flex-col gap-1.5", className)}>
       <button
         type="button"
-        onClick={run}
+        onClick={() => run()}
         disabled={running}
         className={cn(
           "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition",

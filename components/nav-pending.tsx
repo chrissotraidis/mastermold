@@ -10,17 +10,15 @@ import { cn } from "@/lib/utils";
  * as a descendant of the <Link> it reports on.
  */
 
-/** A thin progress sliver along the bottom edge of the active nav item. */
+/** A tiny pending dot so nav clicks feel responsive without looking like a slider. */
 export function NavPendingBar({ className }: { className?: string }) {
   const { pending } = useLinkStatus();
   if (!pending) return null;
   return (
     <span
       aria-hidden="true"
-      className={cn("pointer-events-none absolute inset-x-1 bottom-0 h-0.5 overflow-hidden rounded-full", className)}
-    >
-      <span className="block h-full w-full origin-left animate-nav-progress bg-violet" />
-    </span>
+      className={cn("pointer-events-none absolute right-1 top-1 size-1.5 rounded-full bg-violet", className)}
+    />
   );
 }
 

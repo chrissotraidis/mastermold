@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { recordProductEvent } from "@/lib/product-metrics";
 import { cn } from "@/lib/utils";
@@ -41,8 +42,13 @@ export function TodayReadTimer() {
 
 export function BriefingUsefulnessFeedback() {
   const [choice, setChoice] = useState<"useful" | "not_useful" | null>(null);
+  const [open, setOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const autoFeedbackRef = useRef<string | null>(null);
+  const actionQuery = searchParams.toString();
 
   function submit(nextChoice: "useful" | "not_useful") {
+    setOpen(true);
     setChoice(nextChoice);
     recordProductEvent({
       event: "briefing_feedback",
@@ -51,27 +57,59 @@ export function BriefingUsefulnessFeedback() {
     });
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(actionQuery);
+    const action = params.get("action");
+    const nextChoice =
+      action === "mark-today-useful"
+        ? "useful"
+        : action === "mark-today-not-useful"
+          ? "not_useful"
+          : null;
+
+    if (!nextChoice) return;
+    if (autoFeedbackRef.current === actionQuery) return;
+
+    autoFeedbackRef.current = actionQuery;
+    params.delete("action");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#today-feedback"}`);
+    submit(nextChoice);
+  }, [actionQuery]);
+
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="mr-1 whitespace-nowrap text-xs font-medium text-outline">Rate today</span>
-      <FeedbackButton
-        label="Useful"
-        active={choice === "useful"}
-        onClick={() => submit("useful")}
-        icon="up"
-      />
-      <FeedbackButton
-        label="Not useful"
-        active={choice === "not_useful"}
-        onClick={() => submit("not_useful")}
-        icon="down"
-      />
-      {choice ? (
-        <span aria-live="polite" className="text-xs text-engine">
-          Saved for Performance.
-        </span>
+    <details
+      id="today-feedback"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      className="group rounded-md border border-outline-variant/40 bg-surface-dim/45"
+    >
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center px-3 py-2 text-xs font-semibold text-on-surface-variant marker:hidden hover:text-on-surface">
+        Rate this read
+      </summary>
+      {open ? (
+        <div className="flex items-center gap-1.5 border-t border-outline-variant/35 px-2 pb-2 pt-2">
+          <span className="sr-only">Rate today</span>
+          <FeedbackButton
+            label="Useful"
+            active={choice === "useful"}
+            onClick={() => submit("useful")}
+            icon="up"
+          />
+          <FeedbackButton
+            label="Not useful"
+            active={choice === "not_useful"}
+            onClick={() => submit("not_useful")}
+            icon="down"
+          />
+          {choice ? (
+            <span aria-live="polite" className="text-xs text-engine">
+              Saved for later review.
+            </span>
+          ) : null}
+        </div>
       ) : null}
-    </div>
+    </details>
   );
 }
 
@@ -93,7 +131,7 @@ function FeedbackButton({
       onClick={onClick}
       aria-pressed={active}
       aria-label={`Mark today ${label.toLowerCase()}`}
-      title={label}
+      title={`Mark today ${label.toLowerCase()}`}
       className={cn(
         "inline-flex size-11 items-center justify-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet",
         active

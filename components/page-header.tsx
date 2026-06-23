@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { CommandConsole, type CommandSuggestion } from "@/components/command-console";
 import { ProvenanceChip, type ProvenanceLabel } from "@/components/provenance-chip";
+import type { ChatPageContext } from "@/src/db/chat";
 
 /**
  * One terse, consistent page header. Title + optional one-line subtitle + provenance.
@@ -11,12 +13,18 @@ export function PageHeader({
   subtitle,
   provenance,
   right,
+  command,
   back = true,
 }: {
   title: string;
   subtitle?: string;
   provenance?: ProvenanceLabel;
   right?: React.ReactNode;
+  command?: {
+    pageContext: ChatPageContext;
+    suggestions?: CommandSuggestion[];
+    placeholder?: string;
+  };
   back?: boolean;
 }) {
   return (
@@ -44,6 +52,14 @@ export function PageHeader({
         </div>
         {right ? <div className="shrink-0">{right}</div> : null}
       </div>
+      {command ? (
+        <CommandConsole
+          className="mt-4 max-w-2xl"
+          pageContext={command.pageContext}
+          suggestions={command.suggestions}
+          placeholder={command.placeholder}
+        />
+      ) : null}
     </div>
   );
 }

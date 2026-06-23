@@ -125,7 +125,7 @@ describe("UAT user journeys over seeded data", () => {
         { message: "NVDA volume 2.1x avg", portfolio_weight_pct: 27, tier: "T0" },
         portfolio.holdings[0],
       ),
-    ).toContain("Focus 1 first, then urgent alerts or smaller checks.");
+    ).toContain("Focus 1 first, then urgent activity items or smaller checks.");
     expect(journal.entries.length).toBeGreaterThan(0);
     expect(journal.track_record.length).toBeGreaterThan(0);
     expect(["Sample data", "Saved read"]).toContain(journal.provenance.label);
@@ -411,21 +411,21 @@ describe("UAT user journeys over seeded data", () => {
     expect(ignoreCondition).toMatch(/stops|gives back|does not|get follow-through|normalizes|no longer affects/i);
     expect(ignoreCondition).not.toMatch(/z-score|sigma|σ|z=|flagged|clear noise|tune/i);
     expect(cleanRationale).not.toMatch(/z-score|sigma|σ|z=|screener/i);
-    expect(pageContext.surface).toBe("Selected alert");
-    expect(pageContext.route).toBe("/alerts");
-    expect(pageContext.summary).toContain("specific alert");
+    expect(pageContext.surface).toBe("Selected activity item");
+    expect(pageContext.route).toBe("/activity");
+    expect(pageContext.summary).toContain("specific activity item");
     expect(pageContext.selected).toContain(visibleTier);
     expect(pageContext.selected).toContain("Suggested response:");
     expect(pageContext.selected).not.toMatch(/z-score|sigma|σ|z=|signal|flagged|clear noise|tune/i);
     expect(["Urgent", "Worth checking", "FYI"]).toContain(visibleTier);
     expect(visibleTier).not.toMatch(/^T[0-2]$/);
     expect(journalUrl.pathname).toBe("/journal");
-    expect(journalUrl.searchParams.get("call")).toContain("Review alert:");
+    expect(journalUrl.searchParams.get("call")).toContain("Review activity:");
     expect(journalUrl.searchParams.get("thesis")).toBeNull();
     expect(journalUrl.searchParams.get("confidence")).toBeTruthy();
     expect(journalUrl.searchParams.get("conviction")).toBeNull();
     expect(journalUrl.searchParams.get("reasons")).toContain(
-      critical.tier === "T0" ? "Urgent alert" : critical.tier === "T1" ? "Worth checking" : "FYI",
+      critical.tier === "T0" ? "Urgent activity" : critical.tier === "T1" ? "Worth checking" : "FYI",
     );
     expect(journalUrl.searchParams.get("reasons")).not.toContain("z=");
     expect(journalUrl.searchParams.get("reasons")).not.toContain("_z");
@@ -438,7 +438,7 @@ describe("UAT user journeys over seeded data", () => {
     expect(paperUrl.pathname).toBe("/paper");
     expect(critical.asset_symbol).toBeTruthy();
     expect(paperUrl.searchParams.get("symbol")).toBe(critical.asset_symbol ?? null);
-    expect(paperUrl.searchParams.get("rationale")).toContain("Testing alert as a paper trade");
+    expect(paperUrl.searchParams.get("rationale")).toContain("Testing this activity item as a paper trade");
     expect(paperUrl.searchParams.get("rationale")).toContain("visible portfolio");
     expect(paperUrl.searchParams.get("rationale")).not.toMatch(/z-score|sigma|σ|trailing mean|_z/i);
   });
@@ -534,10 +534,10 @@ describe("UAT user journeys over seeded data", () => {
       expect(todayPrompt).toContain("including local manual entries plus sample data");
       expect(todayPrompt).toContain("Visible Focus 1:");
       expect(todayPrompt).toContain("Start with this portfolio-aware idea.");
-      expect(todayPrompt).toContain("Top alert to also check:");
-      expect(todayPrompt.indexOf("Visible Focus 1:")).toBeLessThan(todayPrompt.indexOf("Top alert to also check:"));
+      expect(todayPrompt).toContain("Top activity item to also check:");
+      expect(todayPrompt.indexOf("Visible Focus 1:")).toBeLessThan(todayPrompt.indexOf("Top activity item to also check:"));
       expect(todayPrompt).toContain("why each matters to the visible portfolio");
-      expect(todayPrompt).toContain("Focus 1 first, then urgent alerts or smaller checks.");
+      expect(todayPrompt).toContain("Focus 1 first, then urgent activity items or smaller checks.");
       expect(todayPrompt).not.toMatch(/z-score|sigma|σ|trailing mean|_z/i);
       expect(todayPaperHref).toContain("symbol=BTC");
       expect(new URL(`http://localhost${todayPaperHref}`).searchParams.get("rationale")).toContain("paper trade");
@@ -547,7 +547,7 @@ describe("UAT user journeys over seeded data", () => {
       expect(todayRiskNote).toContain("BTC is concentrated");
       expect(todayRiskNote).toContain("risk decision");
       expect(morningCopy).toMatch(/^Start with /);
-      expect(morningCopy).toContain("alerts to review");
+      expect(morningCopy).toContain("activity items to review");
       expect(morningCopy).not.toMatch(/^\d+ alerts? to check/i);
       expect(morningCopy).not.toMatch(/dashboard|engine output|actionable signals|z-score|sigma/i);
 
@@ -591,7 +591,7 @@ describe("UAT user journeys over seeded data", () => {
     );
 
     expect(morningCopy).toBe(
-      "Start with BTC moved up; check the bear case before adding risk. Also check why NVDA is trading 2.1× its usual volume; it touches 27.0% of the visible portfolio. 4 alerts to review.",
+      "Start with BTC moved up; check the bear case before adding risk. Also check why NVDA is trading 2.1× its usual volume; it touches 27.0% of the visible portfolio. 4 activity items to review.",
     );
     expect(morningCopy).not.toMatch(/^4 alerts? to check/i);
     expect(morningCopy).not.toMatch(/Focus first|picture is mixed|urgent alert|\d+(\.\d+)?x\s+avg|z-score|sigma|σ/i);
@@ -755,15 +755,15 @@ describe("UAT user journeys over seeded data", () => {
 
       expect(response.headers.get("X-Chat-Mode")).toBe("canned");
       expect(context.prompts).toHaveLength(4);
-      expect(sources).toContain(context.facts.top_holding_context);
-      expect(sources).toContain(`Top alert: ${context.facts.top_alert_tier} ${context.facts.top_alert}`);
+      expect(sources).toContain("Master Mold app");
+      expect(sources).toContain("Local app status");
+      expect(sources).toContain("Advisory safety boundary");
       expect(sources.join(" ")).not.toContain("Top alert: FYI NVDA");
-      expect(text).toContain(context.facts.top_holding_context);
+      expect(text).toContain("Today check:");
+      expect(text).toContain("Activity context:");
       expect(text).not.toContain("your largest exposure");
-      expect(text).toContain("No live chat key is saved");
-      expect(text).toContain("Guidance only");
+      expect(text).toContain("before risking real money.");
       expect(text).toContain(context.facts.top_alert);
-      expect(text).toContain("I cannot trade or move funds");
     } finally {
       if (originalOpenAiKey === undefined) {
         delete process.env.OPENAI_API_KEY;

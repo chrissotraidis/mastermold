@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState, useTransition } from "react";
-import { BookPlus, CheckCircle2, SendHorizonal } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
+import { BookPlus, CheckCircle2, ChevronDown, SendHorizonal } from "lucide-react";
 import { ProvenanceChip } from "@/components/provenance-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,13 +43,17 @@ const initialFormState: FormState = {
   falsification_condition: "",
 };
 
+const INITIAL_JOURNAL_ENTRY_LIMIT = 5;
+
 export function JournalWorkspace({
   initialJournal,
   initialDraft,
+  initialDraftReason,
   focusedEntryId,
 }: {
   initialJournal: JournalWorkspaceData;
   initialDraft?: Partial<FormState>;
+  initialDraftReason?: string;
   focusedEntryId?: string;
 }) {
   const [entries, setEntries] = useState(initialJournal.entries);
@@ -60,7 +64,17 @@ export function JournalWorkspace({
   const [isPending, startTransition] = useTransition();
 
   const trackRecord = useMemo(() => buildTrackRecord(entries), [entries]);
+  const initialDraftKey = draftKey(initialDraft);
   const statusText = isPending ? "Logging decision." : message;
+
+  useEffect(() => {
+    if (!initialDraft) return;
+
+    setForm({ ...initialFormState, ...initialDraft });
+    setErrors({});
+    setLastLoggedId(null);
+    setMessage("Draft prepared. Review it before saving.");
+  }, [initialDraft, initialDraftKey]);
 
   function resolveEntry(entry: JournalEntryData) {
     setEntries((current) => current.map((item) => (item.id === entry.id ? entry : item)));
@@ -136,7 +150,7 @@ export function JournalWorkspace({
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_23rem] xl:items-start">
       {/* DOM order puts the record-a-call form after the entries so phones see
           the journal itself first; on xl it becomes the sticky right column. */}
-      <aside className="order-2 space-y-4 xl:sticky xl:top-6">
+      <aside id="record-call" className="order-2 scroll-mt-24 space-y-4 xl:sticky xl:top-6">
         <Card className="border-outline-variant/40 bg-surface-high/40">
           <CardHeader className="p-5">
             <div className="flex items-center gap-2">
@@ -149,12 +163,22 @@ export function JournalWorkspace({
           </CardHeader>
           <CardContent className="p-5 pt-0">
             <form className="space-y-4" onSubmit={submitDecision} noValidate>
+              {initialDraftReason ? (
+                <div
+                  data-testid="journal-prepared-draft"
+                  className="rounded-md border border-violet/35 bg-violet/[0.07] p-3 text-sm leading-6 text-on-surface-variant"
+                >
+                  <span className="font-semibold text-on-surface">Prepared by Master Mold.</span>{" "}
+                  {initialDraftReason} Review the fields, then save only if this is the decision you want recorded.
+                </div>
+              ) : null}
+
               <FieldBlock id="journal-call" label="Call" error={errors.call}>
                 <textarea
                   id="journal-call"
                   value={form.call}
                   onChange={(event) => updateForm("call", event.target.value)}
-                  className="min-h-24 w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+                  className="min-h-24 w-full resize-y overflow-x-hidden rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                   placeholder="What needs to be true?"
                   aria-invalid={Boolean(errors.call)}
                 />
@@ -206,7 +230,7 @@ export function JournalWorkspace({
                   id="journal-falsification"
                   value={form.falsification_condition}
                   onChange={(event) => updateForm("falsification_condition", event.target.value)}
-                  className="min-h-24 w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+                  className="min-h-24 w-full resize-y overflow-x-hidden rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                   placeholder="What would prove this wrong?"
                   aria-invalid={Boolean(errors.falsification_condition)}
                 />
@@ -247,6 +271,17 @@ export function JournalWorkspace({
       </div>
     </div>
   );
+}
+
+function draftKey(draft: Partial<FormState> | undefined) {
+  if (!draft) return "";
+  return [
+    draft.call ?? "",
+    draft.signals ?? "",
+    draft.confidence ?? "",
+    draft.horizon ?? "",
+    draft.falsification_condition ?? "",
+  ].join("\u001f");
 }
 
 function FieldBlock({
@@ -328,6 +363,23 @@ function EntryList({
   lastLoggedId: string | null;
   onResolved: (entry: JournalEntryData) => void;
 }) {
+  const [showAllEntries, setShowAllEntries] = useState(false);
+  const visibleEntries = useMemo(() => {
+    if (showAllEntries) return entries;
+
+    const nextEntries = entries.slice(0, INITIAL_JOURNAL_ENTRY_LIMIT);
+    const pinnedIds = [lastLoggedId, focusedEntryId].filter(Boolean);
+
+    for (const id of pinnedIds) {
+      if (nextEntries.some((entry) => entry.id === id)) continue;
+      const pinnedEntry = entries.find((entry) => entry.id === id);
+      if (pinnedEntry) nextEntries.push(pinnedEntry);
+    }
+
+    return nextEntries;
+  }, [entries, focusedEntryId, lastLoggedId, showAllEntries]);
+  const hiddenEntryCount = Math.max(0, entries.length - visibleEntries.length);
+
   return (
     <section aria-labelledby="journal-entries-title" className="space-y-4">
       <div>
@@ -335,13 +387,13 @@ function EntryList({
           Past calls
         </h2>
         <p className="mt-1 text-sm text-outline">
-          Newest first, with the original reasoning kept intact.
+          Newest first. Older calls stay tucked away until you need the archive.
         </p>
       </div>
 
       {entries.length > 0 ? (
         <div className="grid gap-4">
-          {entries.map((entry) => {
+          {visibleEntries.map((entry) => {
             const signalGroups = journalSignalGroups(entry.reasons);
 
             return (
@@ -353,88 +405,117 @@ function EntryList({
                   (entry.id === lastLoggedId || entry.id === focusedEntryId) && "border-violet/50 bg-violet/10",
                 )}
               >
-                <CardHeader className="space-y-3 p-4 sm:p-5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {entry.id === lastLoggedId ? (
-                      <Badge className="bg-violet text-void hover:bg-violet">
-                        Just logged
-                      </Badge>
-                    ) : null}
-                    {entry.id === focusedEntryId && entry.id !== lastLoggedId ? (
-                      <Badge className="bg-violet text-void hover:bg-violet">
-                        Saved call
-                      </Badge>
-                    ) : null}
-                    <Badge variant="outline" className={tierBadgeClass(entry.confidence_band.key)}>
-                      {entry.confidence_band.label}
-                    </Badge>
-                    <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                      Confidence {entry.confidence}/10
-                    </Badge>
-                    <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                      {entry.horizon}
-                    </Badge>
-                    {entry.past_horizon ? (
-                      <Badge variant="outline" className="border-caution/50 text-caution">
-                        Past horizon — score it
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <CardTitle className="text-xl leading-7 text-on-surface">{plainJournalText(entry.call)}</CardTitle>
-                  <p className="text-sm text-outline">Logged {formatTimestamp(entry.logged_at)}</p>
-                </CardHeader>
-                <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
-                  <div className="grid gap-3 text-sm leading-6 lg:grid-cols-2">
-                    <InfoPanel label="What would prove this wrong?" value={plainJournalText(entry.what_would_prove_wrong)} />
-                    <InfoPanel label="Reason to watch" value={journalSignalText(entry.reasons)} />
-                  </div>
-                  {signalGroups.sources.length > 0 ? <JournalSourceNotes sources={signalGroups.sources} /> : null}
-                  {entry.result ? (
-                    <div className="rounded-md border border-engine/20 bg-engine/[0.07] p-4">
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <CheckCircle2 aria-hidden="true" className="size-4 text-engine" />
-                        <p className="text-sm font-semibold text-engine">Result saved</p>
-                        <Badge variant="outline" className="border-engine/40 text-engine">
-                          {entry.result.call_was_right ? "Right" : "Missed"}
+                <details open={entry.id === lastLoggedId || entry.id === focusedEntryId}>
+                  <summary className="cursor-pointer list-none space-y-3 p-4 marker:hidden sm:p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {entry.id === lastLoggedId ? (
+                        <Badge className="bg-violet text-void hover:bg-violet">
+                          Just logged
                         </Badge>
-                      </div>
-                      <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                        <Metric label="Review quality" value={entry.result.review_quality.toFixed(1)} />
-                        <Metric label="Result score" value={entry.result.result_score.toFixed(1)} />
-                        <Metric label="Closed" value={formatTimestamp(entry.result.resolved_at)} />
-                        <Metric label="Result note" value={plainJournalText(entry.result.result_note)} />
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      className={
-                        entry.past_horizon
-                          ? "space-y-4 rounded-md border border-caution/40 bg-caution/[0.06] p-4"
-                          : "space-y-4 rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4"
-                      }
-                    >
-                      <p className={entry.past_horizon ? "text-sm font-medium text-caution" : "text-sm text-outline"}>
-                        {entry.review_note ??
-                          "No result yet. This call is saved before the market has answered."}
-                      </p>
+                      ) : null}
+                      {entry.id === focusedEntryId && entry.id !== lastLoggedId ? (
+                        <Badge className="bg-violet text-void hover:bg-violet">
+                          Saved call
+                        </Badge>
+                      ) : null}
+                      <Badge variant="outline" className={tierBadgeClass(entry.confidence_band.key)}>
+                        {entry.confidence_band.label}
+                      </Badge>
+                      <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
+                        Confidence {entry.confidence}/10
+                      </Badge>
+                      <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
+                        {entry.horizon}
+                      </Badge>
                       {entry.past_horizon ? (
-                        <ResolveOutcomeForm entry={entry} onResolved={onResolved} />
-                      ) : (
-                        <details>
-                          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-violet transition-colors hover:text-on-surface">
-                            Score this call now
-                          </summary>
-                          <div className="pt-3">
-                            <ResolveOutcomeForm entry={entry} onResolved={onResolved} />
-                          </div>
-                        </details>
-                      )}
+                        <Badge variant="outline" className="border-caution/50 text-caution">
+                          Score it
+                        </Badge>
+                      ) : null}
+                      {entry.result ? (
+                        <Badge variant="outline" className="border-engine/40 text-engine">
+                          Result saved
+                        </Badge>
+                      ) : null}
                     </div>
-                  )}
-                </CardContent>
+                    <CardTitle className="text-xl leading-7 text-on-surface">{plainJournalText(entry.call)}</CardTitle>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <p className="text-outline">Logged {formatTimestamp(entry.logged_at)}</p>
+                      <span className="font-semibold text-violet">Open details</span>
+                    </div>
+                  </summary>
+                  <CardContent className="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
+                    <div className="grid gap-3 text-sm leading-6 lg:grid-cols-2">
+                      <InfoPanel label="What would prove this wrong?" value={plainJournalText(entry.what_would_prove_wrong)} />
+                      <InfoPanel label="Reason to watch" value={journalSignalText(entry.reasons)} />
+                    </div>
+                    {signalGroups.sources.length > 0 ? <JournalSourceNotes sources={signalGroups.sources} /> : null}
+                    {entry.result ? (
+                      <div className="rounded-md border border-engine/20 bg-engine/[0.07] p-4">
+                        <div className="mb-3 flex flex-wrap items-center gap-2">
+                          <CheckCircle2 aria-hidden="true" className="size-4 text-engine" />
+                          <p className="text-sm font-semibold text-engine">Result saved</p>
+                          <Badge variant="outline" className="border-engine/40 text-engine">
+                            {entry.result.call_was_right ? "Right" : "Missed"}
+                          </Badge>
+                        </div>
+                        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                          <Metric label="Review quality" value={entry.result.review_quality.toFixed(1)} />
+                          <Metric label="Result score" value={entry.result.result_score.toFixed(1)} />
+                          <Metric label="Closed" value={formatTimestamp(entry.result.resolved_at)} />
+                          <Metric label="Result note" value={plainJournalText(entry.result.result_note)} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className={
+                          entry.past_horizon
+                            ? "space-y-4 rounded-md border border-caution/40 bg-caution/[0.06] p-4"
+                            : "space-y-4 rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4"
+                        }
+                      >
+                        <p className={entry.past_horizon ? "text-sm font-medium text-caution" : "text-sm text-outline"}>
+                          {entry.review_note ??
+                            "No result yet. This call is saved before the market has answered."}
+                        </p>
+                        {entry.past_horizon ? (
+                          <ResolveOutcomeForm entry={entry} onResolved={onResolved} />
+                        ) : (
+                          <details>
+                            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-violet transition-colors hover:text-on-surface">
+                              Score this call now
+                            </summary>
+                            <div className="pt-3">
+                              <ResolveOutcomeForm entry={entry} onResolved={onResolved} />
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </details>
               </Card>
             );
           })}
+          {showAllEntries || hiddenEntryCount > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-outline-variant/40 bg-surface-dim/30 p-3">
+              <p className="text-sm leading-6 text-outline">
+                Showing {visibleEntries.length} of {entries.length} saved calls.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowAllEntries((current) => !current)}
+                className="border-outline-variant/50 bg-surface-high/40 text-on-surface hover:border-violet/50 hover:text-violet"
+              >
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn("transition-transform", showAllEntries && "rotate-180")}
+                />
+                {showAllEntries ? "Show recent only" : `Show ${hiddenEntryCount} older calls`}
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="rounded-lg border border-outline-variant/40 bg-surface-high/30 p-6 text-sm text-on-surface-variant">
@@ -570,7 +651,7 @@ function ResolveOutcomeForm({
           id={`${entry.id}-result-note`}
           value={form.result_note}
           onChange={(event) => updateForm("result_note", event.target.value)}
-          className="min-h-20 w-full resize-y rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+          className="min-h-20 w-full resize-y overflow-x-hidden rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
           placeholder="What happened, and how should this shape the next call?"
         />
       </FieldBlock>
@@ -615,6 +696,17 @@ function OutcomeChoice({
 }
 
 function StrategyBeliefSection({ journal }: { journal: JournalWorkspaceData }) {
+  const [showDetails, setShowDetails] = useState(false);
+  const beliefCount = journal.strategy_beliefs.length;
+  const updateCount = journal.strategy_beliefs.reduce(
+    (total, belief) => total + belief.reflection_updates.length,
+    0,
+  );
+  const appliedCount = journal.strategy_beliefs.reduce(
+    (total, belief) => total + belief.reflection_updates.filter((update) => update.applied).length,
+    0,
+  );
+
   return (
     <section aria-labelledby="strategy-beliefs-title" className="space-y-4">
       <div>
@@ -625,56 +717,79 @@ function StrategyBeliefSection({ journal }: { journal: JournalWorkspaceData }) {
           Updates only after several consistent outcomes, never from one result.
         </p>
       </div>
-      <div className="grid gap-4">
-        {journal.strategy_beliefs.map((belief) => (
-          <Card key={belief.id} className="border-outline-variant/40 bg-surface-high/30">
-            <CardHeader className="p-4 sm:p-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="border-violet/40 text-violet">
-                  Confidence {(belief.confidence * 100).toFixed(0)}%
-                </Badge>
-                <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                  Updated {formatTimestamp(belief.updated_at)}
-                </Badge>
-              </div>
-              <CardTitle className="text-xl text-on-surface">{belief.name}</CardTitle>
-              <p className="text-sm leading-6 text-on-surface-variant">{belief.statement}</p>
-            </CardHeader>
-            <CardContent className="space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
-              {belief.reflection_updates.length > 0 ? (
-                belief.reflection_updates.map((update) => (
-                  <div
-                    key={update.id}
-                    className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm leading-6 text-on-surface-variant"
-                  >
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={
-                          update.significance_passed
-                            ? "border-engine/40 text-engine"
-                            : "border-amber-300/40 text-caution"
-                        }
-                      >
-                        {update.significance_passed ? "Lesson updated" : "Not enough yet"}
-                      </Badge>
-                      <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
-                        Used: {update.applied ? "yes" : "no"}
-                      </Badge>
-                      <span className="text-outline">{formatTimestamp(update.created_at)}</span>
-                    </div>
-                    {update.evidence_summary}
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
-                  No updates to this belief yet.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+      <div className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Metric label="Beliefs watched" value={String(beliefCount)} />
+          <Metric label="Updates saved" value={String(updateCount)} />
+          <Metric label="Used in app" value={String(appliedCount)} />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowDetails((current) => !current)}
+          className="mt-4 border-outline-variant/50 bg-surface-dim/40 text-on-surface hover:border-violet/50 hover:text-violet"
+          aria-expanded={showDetails}
+          aria-controls="strategy-belief-detail"
+        >
+          <ChevronDown
+            aria-hidden="true"
+            className={cn("transition-transform", showDetails && "rotate-180")}
+          />
+          {showDetails ? "Hide lesson details" : "Show lesson details"}
+        </Button>
       </div>
+      {showDetails ? (
+        <div id="strategy-belief-detail" className="grid gap-4">
+          {journal.strategy_beliefs.map((belief) => (
+            <Card key={belief.id} className="border-outline-variant/40 bg-surface-high/30">
+              <CardHeader className="p-4 sm:p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="border-violet/40 text-violet">
+                    Confidence {(belief.confidence * 100).toFixed(0)}%
+                  </Badge>
+                  <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
+                    Updated {formatTimestamp(belief.updated_at)}
+                  </Badge>
+                </div>
+                <CardTitle className="text-xl text-on-surface">{belief.name}</CardTitle>
+                <p className="text-sm leading-6 text-on-surface-variant">{belief.statement}</p>
+              </CardHeader>
+              <CardContent className="space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
+                {belief.reflection_updates.length > 0 ? (
+                  belief.reflection_updates.map((update) => (
+                    <div
+                      key={update.id}
+                      className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm leading-6 text-on-surface-variant"
+                    >
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className={
+                            update.significance_passed
+                              ? "border-engine/40 text-engine"
+                              : "border-amber-300/40 text-caution"
+                          }
+                        >
+                          {update.significance_passed ? "Lesson updated" : "Not enough yet"}
+                        </Badge>
+                        <Badge variant="outline" className="border-outline-variant/50 text-on-surface-variant">
+                          Used: {update.applied ? "yes" : "no"}
+                        </Badge>
+                        <span className="text-outline">{formatTimestamp(update.created_at)}</span>
+                      </div>
+                      {update.evidence_summary}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-md border border-outline-variant/40 bg-surface-dim/40 p-4 text-sm text-outline">
+                    No updates to this belief yet.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

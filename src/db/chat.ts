@@ -28,18 +28,56 @@ export type ChatContext = {
   prompts: ChatPrompt[];
   fallback_response: string;
   llm_context: string;
-  facts: {
-    top_holding: string;
-    top_holding_weight_pct: number;
-    top_holding_context: string;
-    top_alert: string;
-    top_alert_tier: string;
-    decision_accuracy: string;
-    briefing_headline: string;
-  };
+  facts: ChatFacts;
 };
 
+export type ChatFacts = {
+  top_holding: string;
+  top_holding_weight_pct: number;
+  top_holding_context: string;
+  top_alert: string;
+  top_alert_tier: string;
+  decision_accuracy: string;
+  briefing_headline: string;
+};
+
+const CHAT_FACTS_TTL_MS = 20_000;
+const chatFactsCache = new Map<string, { expiresAt: number; facts: ChatFacts }>();
+
 export function getChatContext(asOf: AsOfFilter | null = null): ChatContext {
+  const facts = getChatFacts(asOf);
+
+  return {
+    prompts: buildChatPrompts(facts),
+    fallback_response: buildCannedResponse(facts),
+    llm_context: buildLlmContext(asOf),
+    facts,
+  };
+}
+
+export function getChatPrompts(asOf: AsOfFilter | null = null): ChatPrompt[] {
+  return buildChatPrompts(getChatFacts(asOf));
+}
+
+export function getChatFacts(asOf: AsOfFilter | null = null): ChatFacts {
+  if (isTestRuntime()) {
+    return readChatFacts(asOf);
+  }
+
+  const cacheKey = chatFactsCacheKey(asOf);
+  const cached = chatFactsCache.get(cacheKey);
+  const now = Date.now();
+
+  if (cached && cached.expiresAt > now) {
+    return cached.facts;
+  }
+
+  const facts = readChatFacts(asOf);
+  chatFactsCache.set(cacheKey, { expiresAt: now + CHAT_FACTS_TTL_MS, facts });
+  return facts;
+}
+
+function readChatFacts(asOf: AsOfFilter | null = null): ChatFacts {
   const portfolio = getPortfolio(asOf);
   const alerts = getAlerts(asOf);
   const journal = getJournal(asOf);
@@ -64,49 +102,57 @@ export function getChatContext(asOf: AsOfFilter | null = null): ChatContext {
     top_holding_context: topHolding
       ? topHoldingContext(topHolding.source, topHolding.symbol, topHolding.weight_pct)
       : "No visible holding is loaded",
-    top_alert: topAlert ? cleanAlertMessage(topAlert.message) : "No visible alert",
+    top_alert: topAlert ? cleanAlertMessage(topAlert.message) : "No visible activity item",
     top_alert_tier: topAlert ? shortAlertTierLabel(topAlert.tier) : "n/a",
     decision_accuracy: decisionAccuracy,
     briefing_headline: topBriefing ? plainBriefingHeadline(topBriefing.headline) : "No briefing card",
   };
 
-  return {
-    prompts: [
-      {
-        id: "today-focus",
-        label: "Today focus",
-        prompt: "What should I focus on today, using the visible portfolio, alerts, and market context?",
-        reference: facts.top_holding_context,
-      },
-      {
-        id: "top-alert",
-        label: "Top alert",
-        prompt: "Why does the top alert matter, and what should I check?",
-        reference: `${facts.top_alert_tier} alert: ${facts.top_alert}`,
-      },
-      {
-        id: "recent-calls",
-        label: "Recent calls",
-        prompt: "What have your recent calls gotten right or wrong?",
-        reference: facts.decision_accuracy,
-      },
-      {
-        id: "top-idea",
-        label: "Top idea",
-        prompt: "What is the strongest daily idea, and what would prove it wrong?",
-        reference: facts.briefing_headline,
-      },
-    ],
-    fallback_response: buildCannedResponse(facts),
-    llm_context: buildLlmContext(asOf),
-    facts,
-  };
+  return facts;
+}
+
+function chatFactsCacheKey(asOf: AsOfFilter | null) {
+  if (!asOf) return "latest";
+  return JSON.stringify(asOf);
+}
+
+function isTestRuntime() {
+  return process.env.NODE_ENV === "test" || process.env.npm_lifecycle_event === "test";
+}
+
+function buildChatPrompts(facts: ChatFacts): ChatPrompt[] {
+  return [
+    {
+      id: "today-focus",
+      label: "Today focus",
+      prompt: "What should I focus on today, using the visible portfolio, activity, and market context?",
+      reference: facts.top_holding_context,
+    },
+    {
+      id: "top-activity",
+      label: "Top activity",
+      prompt: "Why does the top activity item matter, and what should I check?",
+      reference: `${facts.top_alert_tier} activity: ${facts.top_alert}`,
+    },
+    {
+      id: "recent-calls",
+      label: "Recent calls",
+      prompt: "What have your recent calls gotten right or wrong?",
+      reference: facts.decision_accuracy,
+    },
+    {
+      id: "top-idea",
+      label: "Top idea",
+      prompt: "What is the strongest daily idea, and what would prove it wrong?",
+      reference: facts.briefing_headline,
+    },
+  ];
 }
 
 function buildCannedResponse(facts: ChatContext["facts"]) {
   return [
     facts.top_holding_context,
-    `Top alert right now: ${facts.top_alert_tier}: ${facts.top_alert}.`,
+    `Top activity item right now: ${facts.top_alert_tier}: ${facts.top_alert}.`,
     `Recent record: ${facts.decision_accuracy}.`,
     "No live chat key is saved, so this is a fixed read. Guidance only; I cannot trade or move funds.",
   ].join(" ");
@@ -158,11 +204,11 @@ function buildLlmContext(asOf: AsOfFilter | null = null) {
       "Do not describe Save context for chat as a way to get live updates. It only saves local context for future chat answers.",
       "Use daily_readiness to explain what would make Today more personal. Do not imply the full PRD Brain is complete.",
       "The forward measurement status is included in context. A running measurement window only starts the clock; it needs enough later results before the baseline comparison means anything. Seeded/sample calls do not count as forward evidence.",
-      "The app can create paper trades from Today, Alerts, and Paper using simulator dollars. Never describe that as real execution, and never say the app cannot paper trade.",
+      "The app can create paper trades from Today, Activity, and Paper using simulator dollars. Never describe that as real execution, and never say the app cannot paper trade.",
     ],
     app_actions: {
       paper_trading:
-        "Available in the app for simulator-only paper trades. Alerts and Today can prefill a Paper trade with the asset and plain-language reason. No real money moves.",
+        "Available in the app for simulator-only paper trades. Activity and Today can prefill a Paper trade with the asset and plain-language reason. No real money moves.",
       real_trading:
         "Unavailable. The app cannot place orders, move funds, sign transactions, or call a chain.",
     },
@@ -173,16 +219,16 @@ function buildLlmContext(asOf: AsOfFilter | null = null) {
       portfolio_detail: userFacingPortfolioSource(portfolio.provenance.label),
       user_facing_summary:
         dataMode.label === "Engine output"
-          ? `Today and Alerts come from a saved market read${formatSavedRunDate(dataMode.as_of)}. Portfolio values are ${portfolioValueSummary(portfolio.provenance.label)}.`
-          : `Today and Alerts are sample data. Portfolio values are ${portfolioValueSummary(portfolio.provenance.label)}.`,
+          ? `Today and Activity come from a saved market read${formatSavedRunDate(dataMode.as_of)}. Portfolio values are ${portfolioValueSummary(portfolio.provenance.label)}.`
+          : `Today and Activity are sample data. Portfolio values are ${portfolioValueSummary(portfolio.provenance.label)}.`,
       note:
         portfolio.provenance.label === "Imported portfolio"
           ? "Portfolio context includes an imported holdings snapshot. It cannot trade or move money."
           : portfolio.provenance.label === "Manual portfolio"
           ? "Portfolio context includes local manual holdings. Treat broker or wallet values as sample unless they are shown in Portfolio as imported."
           : dataMode.label === "Engine output"
-          ? "Today and Alerts below come from a saved market read. Do not call them live. Portfolio values can still be sample data; use the portfolio data state before describing them."
-          : "No saved market read is loaded; Today and Alerts below are sample data. Portfolio values can also be sample data; use the portfolio data state before describing them.",
+          ? "Today and Activity below come from a saved market read. Do not call them live. Portfolio values can still be sample data; use the portfolio data state before describing them."
+          : "No saved market read is loaded; Today and Activity below are sample data. Portfolio values can also be sample data; use the portfolio data state before describing them.",
     },
     daily_readiness: todayReadiness,
     portfolio: {
@@ -242,7 +288,7 @@ function userFacingBriefingSource(dataMode: ReturnType<typeof getDataMode>) {
   if (dataMode.label === "Engine output") {
     return `Saved market read${formatSavedRunDate(dataMode.as_of)}`;
   }
-  return "Sample Today and Alerts";
+  return "Sample Today and Activity";
 }
 
 function userFacingPortfolioSource(label: string) {
