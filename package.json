@@ -1,0 +1,58 @@
+{
+  "name": "app-1-overview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "postbuild": "node scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/server.js",
+    "seed": "bun run scripts/seed.ts",
+    "typecheck": "tsc --noEmit",
+    "smoke:app": "node scripts/runtime-smoke.mjs",
+    "privacy:audit": "node scripts/privacy-audit.mjs",
+    "test": "bun run typecheck && bun test tests",
+    "daily": "bin/daily-run",
+    "autopilot": "bin/autopilot-daemon",
+    "autopilot:drill": "bun run scripts/autopilot-live-drill.ts",
+    "autopilot:provision": "bun run scripts/autopilot-provision.ts",
+    "v3:backtest": "bun run scripts/v3-backtest.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@radix-ui/react-label": "^2.1.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@react-three/fiber": "^9.6.1",
+    "@solana/web3.js": "^1.98.4",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lightweight-charts": "^5.2.0",
+    "lucide-react": "latest",
+    "next": "^16.2.9",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwind-merge": "^2.5.4",
+    "tailwindcss-animate": "^1.0.7",
+    "three": "^0.185.1",
+    "zod": "^4.4.3"
+  },
+  "overrides": {
+    "postcss": "8.5.15",
+    "jayson": {
+      "uuid": "11.1.1"
+    }
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/three": "^0.185.0",
+    "autoprefixer": "^10.4.20",
+    "bun": "^1.3.14",
+    "postcss": "8.5.15",
+    "tailwindcss": "^3.4.14",
+    "typescript": "latest"
+  }
+}

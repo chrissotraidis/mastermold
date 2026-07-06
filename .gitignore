@@ -1,0 +1,50 @@
+.DS_Store
+*.swp
+*.swo
+*~
+node_modules/
+.next/
+dist/
+.env
+.env.*
+!.env.example
+!**/.env.example
+.env.local
+tsconfig.tsbuildinfo
+
+# Local app state and databases
+.data
+.data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Local Web3 readiness receipts (sanitized but machine/run-specific)
+data/web3-*.json
+
+# Local preview, scaffold, and agent/runtime scratch
+.claude/
+.rds/
+.scaffold/
+.scaffold-debug/
+.well-known/rds-deploy-fingerprint.json
+public/.well-known/rds-deploy-fingerprint.json
+public/rds-deploy-fingerprint.json
+
+.agents/
+.codex/
+.codex-audits/
+
+# Local/private review material
+docs/private/
+artifacts/
+screenshots/
+reports/private/
+
+# Local reference material (design mockups, integration plans, upstream clones)
+ref/

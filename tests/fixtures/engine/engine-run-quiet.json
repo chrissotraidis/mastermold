@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "run": {
+    "run_date": "2026-06-04",
+    "event_time": "2026-06-04T13:30:00.000Z",
+    "knowledge_time": "2026-06-04T13:41:02.000Z",
+    "provider": "anthropic",
+    "models": {
+      "quick_think": "claude-haiku-4-5",
+      "deep_think": "claude-sonnet-4-6"
+    },
+    "watchlist": [
+      "NVDA",
+      "HOOD",
+      "BTC",
+      "ETH",
+      "aUSDC"
+    ],
+    "triggered_tickers": [],
+    "cost": {
+      "llm_calls": 0,
+      "tool_calls": 0,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "usd": 0.0
+    },
+    "stages": {
+      "data_refresh": "ok",
+      "screener": "ok",
+      "agent_runs": 0,
+      "outcome_resolution": "skipped"
+    }
+  },
+  "briefing_cards": [
+    {
+      "id": "engine_card_2026-06-04_quiet",
+      "date": "2026-06-04",
+      "rank": 1,
+      "headline": "Nothing urgent today",
+      "why_now": "No watchlist ticker cleared the screener; no material change detected.",
+      "relevance_note": "A quiet day is a first-class outcome \u2014 no agent runs, no LLM cost.",
+      "bull_case": "",
+      "bear_case": "",
+      "conviction": 0,
+      "horizon": "\u2014",
+      "status": "nothing_actionable",
+      "asset_ids": [],
+      "event_time": "2026-06-04T13:30:00.000Z",
+      "knowledge_time": "2026-06-04T13:41:02.000Z",
+      "drivers": []
+    }
+  ],
+  "alerts": [],
+  "journal_sync": {
+    "pending_entries": [],
+    "outcomes": [],
+    "reflections": []
+  }
+}

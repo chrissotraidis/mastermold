@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# bin/autopilot-daemon — run the Autopilot paper daemon (24/7 loop).
+#
+# Paper only: watches Solana majors via the keyless Jupiter lite price API and
+# paper-trades them into .data/autopilot.db.json. Holds no keys, signs nothing.
+# Point launchd (ops/com.mastermold.autopilot.plist) or a Zo worker at this.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+if command -v bun >/dev/null 2>&1; then
+  exec bun run src/autopilot/daemon.ts
+fi
+exec npx bun run src/autopilot/daemon.ts

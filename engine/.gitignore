@@ -1,0 +1,9 @@
+# Engine secrets and data-drop — never committed.
+.env
+out
+out/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv

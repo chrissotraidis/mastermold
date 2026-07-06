@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# bin/daily-run — the proactive loop: run the market scan, then save the daily report.
+#
+# Drives the running app's own API (not the engine directly) so every run lands in
+# the store with full bookkeeping: scan attempt history, portfolio context preflight,
+# position-policy checks, and a durable daily-report row. Point a scheduler at this
+# script — launchd/cron locally (see ops/com.mastermold.daily.plist), a scheduled
+# job on Zo — and the operator wakes up to a fresh read with zero clicks.
+#
+# Usage:
+#   bin/daily-run                       # against http://localhost:4002
+#   MASTERMOLD_URL=https://... bin/daily-run
+#
+# Exit codes: 0 all good; 1 scan failed; 2 report failed; 3 app unreachable.
+set -uo pipefail
+
+BASE="${MASTERMOLD_URL:-http://localhost:4002}"
+CURL="curl -sS -m 420"
+
+echo "daily-run: $(date -u +%FT%TZ) against $BASE"
+
+if ! $CURL -o /dev/null "$BASE/api/health"; then
+  echo "daily-run: app is not reachable at $BASE — start it first (npm run dev or the Zo service)." >&2
+  exit 3
+fi
+
+scan_response="$($CURL -X POST -H "Content-Type: application/json" -d '{"trigger":"scheduled"}' "$BASE/api/scan")" || {
+  echo "daily-run: scan request failed." >&2
+  exit 1
+}
+scan_ok="$(printf '%s' "$scan_response" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const r=JSON.parse(d);console.log(r.ok===true?"true":"false");console.error(r.detail||"")}catch{console.log("false")}})')"
+if [[ "$scan_ok" != "true" ]]; then
+  echo "daily-run: scan did not complete cleanly (continuing to report so the day still gets a row)." >&2
+fi
+
+report_response="$($CURL -X POST "$BASE/api/daily-report")" || {
+  echo "daily-run: daily report request failed." >&2
+  exit 2
+}
+printf '%s' "$report_response" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const r=JSON.parse(d);const rep=r.report||{};console.log(`daily-run: report ${rep.run_date||"?"} saved — portfolio: ${rep.portfolio_source||"?"}, market: ${rep.market_source||"?"}`)}catch{console.log("daily-run: report response was not JSON");process.exit(2)}})' || exit 2
+
+if [[ "$scan_ok" != "true" ]]; then
+  exit 1
+fi
+echo "daily-run: done."

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd template for the Master Mold proactive daily run (macOS local scheduling).
+
+  Install (adjust the repo path first if yours differs):
+    cp ops/com.mastermold.daily.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.mastermold.daily.plist
+  Remove:
+    launchctl unload ~/Library/LaunchAgents/com.mastermold.daily.plist
+    rm ~/Library/LaunchAgents/com.mastermold.daily.plist
+
+  Runs bin/daily-run every day at 07:15 local time. The app must be running
+  (or hosted) at MASTERMOLD_URL. Logs land in /tmp/mastermold-daily-run.log.
+  On Zo this file is unnecessary — use a scheduled job that calls bin/daily-run.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.mastermold.daily</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd "$HOME/Documents/GitHub/mastermold" &amp;&amp; bin/daily-run</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>7</integer>
+    <key>Minute</key>
+    <integer>15</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/tmp/mastermold-daily-run.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/mastermold-daily-run.log</string>
+</dict>
+</plist>
