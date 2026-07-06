@@ -188,7 +188,7 @@ const emptySnapshot = (): StoreSnapshot => ({
 // --- bun:sqlite adapter -----------------------------------------------------
 
 function dbPath(): string {
-  return process.env.MASTERMOLD_DB ?? join(process.cwd(), ".data", "mastermold.db");
+  return process.env.MASTERMOLD_DB ?? join(/* turbopackIgnore: true */ process.cwd(), ".data", "mastermold.db");
 }
 
 function loadSqlite(): { Database: new (path: string) => SqliteDb } | null {

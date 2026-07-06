@@ -327,7 +327,7 @@ function autopilotDbPath(): string {
     testGuardDir ??= mkdtempSync(join(tmpdir(), "mm-autopilot-testguard-"));
     return join(testGuardDir, "autopilot.db.json");
   }
-  return join(process.cwd(), ".data", "autopilot.db.json");
+  return join(/* turbopackIgnore: true */ process.cwd(), ".data", "autopilot.db.json");
 }
 
 const SCHEMA_SQL = `

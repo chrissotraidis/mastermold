@@ -45,6 +45,8 @@ bun run dev
 ```
 
 Open the printed local URL. The app runs without external accounts or API keys.
+Production-style `npm run start` requires Node 22.5 or newer; local development
+uses Bun's built-in SQLite support.
 
 ## Optional Local Configuration
 

@@ -136,7 +136,7 @@ type FirewallLedger = {
 };
 
 function ledgerPath(): string {
-  return process.env.HELIUS_FIREWALL_LEDGER ?? join(process.cwd(), ".data", "helius-firewall.json");
+  return process.env.HELIUS_FIREWALL_LEDGER ?? join(/* turbopackIgnore: true */ process.cwd(), ".data", "helius-firewall.json");
 }
 
 function emptyLedger(day: string): FirewallLedger {

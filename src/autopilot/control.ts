@@ -18,6 +18,7 @@
 import { evaluateGoLiveGate } from "./gate";
 import { liveReadiness } from "./live";
 import {
+  DEFAULT_AUTOPILOT_CAPS,
   autopilotStore,
   type AutopilotCaps,
   type BotActivityRow,
@@ -39,6 +40,7 @@ export type AutopilotStateView = BotStateRow & {
   equity_usd: number;
   last_activity: BotActivityRow | null;
   daemon: DaemonStatus;
+  runtime_unavailable?: string;
 };
 
 /**
@@ -62,7 +64,13 @@ export type ControlResult =
 /** Bot control row plus the derived numbers the status panel needs.
  * Read-only: derives daemon liveness from the heartbeat, never writes it. */
 export function getAutopilotState(): AutopilotStateView {
-  const store = autopilotStore();
+  let store: ReturnType<typeof autopilotStore>;
+  try {
+    store = autopilotStore();
+  } catch (error) {
+    if (isMissingSqliteDriver(error)) return unavailableAutopilotState();
+    throw error;
+  }
   const series = store.equitySeries(1);
   const latestActivity = store.activity(1);
   const state = store.botState();
@@ -72,6 +80,29 @@ export function getAutopilotState(): AutopilotStateView {
     equity_usd: series.length > 0 ? series[series.length - 1].equity_usd : 0,
     last_activity: latestActivity[0] ?? null,
     daemon: deriveDaemonStatus(state.last_tick_at),
+  };
+}
+
+function isMissingSqliteDriver(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("requires a builtin SQLite driver");
+}
+
+function unavailableAutopilotState(): AutopilotStateView {
+  return {
+    mode: "off",
+    kill_switch: true,
+    started_at: null,
+    updated_at: new Date(0).toISOString(),
+    caps: { ...DEFAULT_AUTOPILOT_CAPS },
+    wallet_label: null,
+    last_tick_at: null,
+    daemon_pid: null,
+    last_analyst_run_at: null,
+    open_positions: 0,
+    equity_usd: 0,
+    last_activity: null,
+    daemon: "offline",
+    runtime_unavailable: "Autopilot store requires Bun or Node 22.5+ for SQLite.",
   };
 }
 

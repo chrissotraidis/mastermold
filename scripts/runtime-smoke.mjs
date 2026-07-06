@@ -5,8 +5,8 @@
 // then asserts the truths that stabilization established:
 //   1. /api/health is core-only (no web3_* receipt keys, details_url present);
 //   2. adding a manual holding through /api/portfolio flips Portfolio, Today,
-//      Review, chat, and the daily report to manual-portfolio truth, with no
-//      sample holdings left visible.
+//      Settings health, chat, and the daily report to manual-portfolio truth,
+//      with no sample holdings left visible.
 //
 // It needs no credentials, never touches the real .data/ store, and exits
 // nonzero with a plain reason when a truth regresses. Network access is only
@@ -42,22 +42,32 @@ async function fetchText(path, init) {
 }
 
 const server = spawn(
-  join(process.cwd(), "node_modules", ".bin", "next"),
-  ["dev", "-H", "127.0.0.1", "-p", String(port)],
+  "bun",
+  ["run", "--bun", "dev", "-H", "127.0.0.1", "-p", String(port)],
   {
     env: {
       ...process.env,
       MASTERMOLD_DB: join(dbDir, "mastermold.db"),
+      AUTOPILOT_DB: join(dbDir, "autopilot.db.json"),
       ENGINE_OUT_DIR: engineDir,
     },
     stdio: "ignore",
+    detached: true,
   },
 );
 
+let cleaned = false;
 function cleanup() {
+  if (cleaned) return;
+  cleaned = true;
   try {
-    server.kill("SIGTERM");
-  } catch {}
+    if (server.pid) process.kill(-server.pid, "SIGTERM");
+    else server.kill("SIGTERM");
+  } catch {
+    try {
+      server.kill("SIGTERM");
+    } catch {}
+  }
   rmSync(dbDir, { recursive: true, force: true });
   rmSync(engineDir, { recursive: true, force: true });
 }
@@ -121,15 +131,19 @@ try {
 
   const report = await fetchJson("/api/daily-report", { method: "POST" });
   const reportBody = report.body.report ?? report.body;
-  check("daily report names Manual holdings", reportBody.portfolio_source === "Manual holdings");
+  const reportSourceOk = reportBody.portfolio_source === "Manual holdings";
+  check("daily report names Manual holdings", reportSourceOk, reportSourceOk ? "" : String(reportBody.portfolio_source ?? report.status));
 
   const today = await fetchText("/");
   check("Today renders manual portfolio context", today.body.includes("Manual portfolio"));
 
-  const review = await fetchText("/review");
+  const healthSurface = await fetchText("/settings");
+  const reviewSourceSnippet = healthSurface.body.match(/Portfolio source.{0,240}/s)?.[0]?.replace(/\s+/g, " ").slice(0, 240) ?? "Portfolio source not found";
+  const settingsSourceOk = healthSurface.body.includes("Portfolio source") && healthSurface.body.includes("Manual holdings");
   check(
-    "Review names the manual portfolio source",
-    review.body.includes("Portfolio source") && review.body.includes("Manual holdings"),
+    "Settings health names the manual portfolio source",
+    settingsSourceOk,
+    settingsSourceOk ? "" : reviewSourceSnippet,
   );
 
   const chat = await fetchText("/api/chat", {

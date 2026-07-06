@@ -3,15 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/prepare-standalone.mjs",
+    "postbuild": "node scripts/prepare-standalone.mjs && node scripts/release-artifact-audit.mjs",
     "start": "node .next/standalone/server.js",
     "seed": "bun run scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "smoke:app": "node scripts/runtime-smoke.mjs",
     "privacy:audit": "node scripts/privacy-audit.mjs",
+    "artifact:audit": "node scripts/release-artifact-audit.mjs",
     "test": "bun run typecheck && bun test tests",
     "daily": "bin/daily-run",
     "autopilot": "bin/autopilot-daemon",

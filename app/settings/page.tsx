@@ -56,10 +56,14 @@ export default async function SettingsPage() {
   const connectionsStatus = `${portfolio.import_snapshot.count} imported · ${connectedCount}/${portfolioIntegrations.length} tested`;
   const chatStatus = chatIntegrations.length > 0 ? statusLabels[chatIntegrations[0].status] : "Not configured";
   const autopilotLive = autopilot.mode === "live" && !autopilot.kill_switch;
-  const autopilotStatus = autopilot.kill_switch
+  const autopilotStatus = autopilot.runtime_unavailable
+    ? "Runtime unavailable"
+    : autopilot.kill_switch
     ? "Kill switch engaged"
     : `Mode ${autopilot.mode} · daemon ${autopilot.daemon}`;
-  const safetyStatus = `Max trade ${formatSettingsCurrency(autopilot.caps.max_trade_usd)} · cap ${formatSettingsCurrency(autopilot.caps.daily_spend_limit_usd)}/day · live ${autopilotLive ? "on" : "off"}`;
+  const safetyStatus = autopilot.runtime_unavailable
+    ? "Autopilot locked · live off"
+    : `Max trade ${formatSettingsCurrency(autopilot.caps.max_trade_usd)} · cap ${formatSettingsCurrency(autopilot.caps.daily_spend_limit_usd)}/day · live ${autopilotLive ? "on" : "off"}`;
   const healthStatus = `${publicDataMode} · report ${dailyReport ? dailyReport.run_date : "not saved"}`;
 
   return (
@@ -121,7 +125,7 @@ export default async function SettingsPage() {
             id="autopilot"
             title="Autopilot"
             status={autopilotStatus}
-            statusTone={autopilot.kill_switch ? "watch" : autopilot.daemon === "live" ? "ok" : "muted"}
+            statusTone={autopilot.runtime_unavailable ? "muted" : autopilot.kill_switch ? "watch" : autopilot.daemon === "live" ? "ok" : "muted"}
             aliases={["web3-wallet-trading"]}
           >
             <span id="web3-wallet-trading" aria-hidden="true" className="block scroll-mt-24" />
@@ -296,8 +300,9 @@ function AutopilotSettingsSummary({ state }: { state: ReturnType<typeof getAutop
         {formatSettingsCurrency(state.equity_usd)} · kill switch {state.kill_switch ? "engaged" : "off"}
       </p>
       <p className="mt-1 text-xs leading-5 text-outline">
-        The live wallet key lives in server env only (AUTOPILOT_WALLET_SECRET); nothing in Settings can arm live mode
-        — the go-live gate on the Trade page owns that.
+        {state.runtime_unavailable
+          ? "Autopilot storage is unavailable in this runtime; use Bun or Node 22.5+ for paper/live bot controls."
+          : "The live wallet key lives in server env only (AUTOPILOT_WALLET_SECRET); nothing in Settings can arm live mode — the go-live gate on the Trade page owns that."}
       </p>
     </div>
   );
