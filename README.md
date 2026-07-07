@@ -2,26 +2,44 @@
 
 ![Master Mold banner](public/master-mold-banner.png)
 
-Master Mold is a local-first financial copilot for reviewing a portfolio,
-capturing daily notes, asking bounded questions, and experimenting with a paper
-autopilot lane. The public repository ships with synthetic sample data only.
-This public build is advisory; it does not place brokerage trades or move funds.
+Master Mold is a local-first AI investing console with a Solana/Web3 autopilot
+lane. It pairs portfolio review, daily briefings, journal, and chat with a bot
+cockpit that watches live Solana markets and proves itself in paper mode. The
+public repository ships with synthetic sample data only.
+
+The draw is the paper-to-live path for autonomous Web3 trading: Master Mold
+tracks a liquid Solana universe, records the bot's decisions, rehearses Jupiter
+routes against live DEX quotes, and keeps any live swap behind local wallet
+provisioning, hard caps, a kill switch, and an evidence-based go-live gate.
+Today, the public build is paper-first and advisory by default. It never places
+brokerage trades, and Solana execution stays off unless a spare local wallet is
+deliberately provisioned and the go-live gate passes.
 
 Master Mold does not include a live portfolio, brokerage account, wallet
-authority, or personal account history. If you connect your own accounts or add
-your own notes, that state is created locally and belongs in ignored storage
-such as `.data/`, `.env.local`, `engine/.env`, or another local-only workspace.
+authority, or personal account history. If you connect your own accounts, add
+notes, or provision a Solana wallet locally, that state belongs in ignored
+storage such as `.data/`, `.env.local`, `engine/.env`, or another local-only
+workspace.
 
 ## What Ships
 
-- A Next.js App Router app with `/api/health`.
+- A Next.js App Router app with `/api/health`, a review surface, and a local
+  dashboard for portfolio context.
 - Synthetic sample holdings and sample activity so the app can be reviewed
   before any account is connected.
 - Read-only portfolio import surfaces for credentials you provide locally.
-- Local stores under `.data/` for imported holdings, notes, reports, and other
-  user-created state.
-- A paper/autopilot lane that is reviewable, bounded, and advisory in this
-  public build.
+- A Solana/Web3 Autopilot page for SOL, JUP, BONK, WIF, JTO, WETH, WBTC, RAY,
+  and PYTH, with live market watching, paper equity, decision logs, caps, a kill
+  switch, wallet readiness, and a go-live gate.
+- Guarded Solana execution plumbing for the operator path: Jupiter quote/swap
+  building, local wallet signing from ignored environment variables, Solana RPC
+  resolution, and a Helius credit firewall.
+- Local stores under `.data/` for imported holdings, notes, reports, paper bot
+  state, and other user-created data.
+
+The default bot mode is paper. Live Solana execution is not the public default;
+it requires local wallet provisioning, passing go-live evidence, and deliberate
+operator action.
 
 ## Privacy Boundary
 
@@ -48,8 +66,8 @@ bun run dev
 ```
 
 Open the printed local URL. The app starts in sample mode and runs without
-external accounts or API keys. Connecting real accounts is optional and should
-use local, ignored configuration only.
+external accounts, API keys, or a wallet. Connecting accounts or preparing a
+Solana wallet is optional and must use local, ignored configuration only.
 
 Production-style `npm run start` requires Node 22.5 or newer; local development
 uses Bun's built-in SQLite support.
@@ -72,6 +90,19 @@ AUTOPILOT_DB=.data/autopilot.db.json
 ENGINE_OUT_DIR=engine/out
 ```
 
+Optional Web3 settings are also local-only:
+
+```bash
+SOLANA_RPC_URL=
+HELIUS_ENABLED=false
+HELIUS_API_KEY=
+AUTOPILOT_WALLET_SECRET=
+```
+
+`AUTOPILOT_WALLET_SECRET` is for a spare Solana wallet, never a primary wallet,
+and should stay out of git. Use the paper lane first; the live path is intended
+for reviewed canary execution after the bot has earned it.
+
 ## Development
 
 ```bash
@@ -90,8 +121,8 @@ app/                 Next.js pages and API routes
 components/          UI components
 src/db/              Local app store, sample data, portfolio imports, reports
 src/chat/            Chat providers, context, and bounded local actions
-src/autopilot/       Paper/autopilot domain logic and local store
-src/helius/          Optional provider credit firewall
+src/autopilot/       Solana/Web3 paper bot, go-live gate, and executor logic
+src/helius/          Optional Helius/Solana RPC credit firewall
 engine/              Optional Python briefing engine
 public/              Public app assets
 scripts/             Local helper and verification scripts
