@@ -2,27 +2,30 @@
 
 ![Master Mold banner](public/master-mold-banner.png)
 
-Master Mold is a local-first financial copilot demo. It combines a read-only
-portfolio workspace, a daily briefing surface, a journal, chat, and a paper
-autopilot lane. The repository ships with synthetic sample data only.
+Master Mold is a local-first financial copilot for reviewing a portfolio,
+capturing daily notes, asking bounded questions, and experimenting with a paper
+autopilot lane. The public repository ships with synthetic sample data only.
+This public build is advisory; it does not place brokerage trades or move funds.
 
-The tracked repository must never contain a user's real portfolio, account
-history, wallet state, local reports, credentials, browser screenshots, or
-personal operating notes. Those belong in ignored local storage such as
-`.data/`, `.env.local`, `engine/.env`, or another ignored private workspace.
+Master Mold does not include a live portfolio, brokerage account, wallet
+authority, or personal account history. If you connect your own accounts or add
+your own notes, that state is created locally and belongs in ignored storage
+such as `.data/`, `.env.local`, `engine/.env`, or another local-only workspace.
 
 ## What Ships
 
 - A Next.js App Router app with `/api/health`.
-- Seeded sample holdings and sample activity for local review.
-- Read-only portfolio import surfaces that require the user to provide their
-  own credentials locally.
-- Local stores under `.data/` for user-created state.
-- A paper/autopilot lane that is designed to be reviewable and bounded.
+- Synthetic sample holdings and sample activity so the app can be reviewed
+  before any account is connected.
+- Read-only portfolio import surfaces for credentials you provide locally.
+- Local stores under `.data/` for imported holdings, notes, reports, and other
+  user-created state.
+- A paper/autopilot lane that is reviewable, bounded, and advisory in this
+  public build.
 
 ## Privacy Boundary
 
-Tracked files are code, public docs, assets, tests, and sanitized sample data.
+Tracked files are code, public docs, assets, tests, and synthetic sample data.
 
 Ignored local files are where personal state belongs:
 
@@ -31,7 +34,7 @@ Ignored local files are where personal state belongs:
 - `engine/out/` for generated engine output.
 - `artifacts/`, `screenshots/`, `reports/private/`, and `docs/private/` for local review material.
 
-Before publishing or pushing, run:
+Before publishing, pushing, or preparing a release, run:
 
 ```bash
 npm run privacy:audit
@@ -44,7 +47,10 @@ bun install
 bun run dev
 ```
 
-Open the printed local URL. The app runs without external accounts or API keys.
+Open the printed local URL. The app starts in sample mode and runs without
+external accounts or API keys. Connecting real accounts is optional and should
+use local, ignored configuration only.
+
 Production-style `npm run start` requires Node 22.5 or newer; local development
 uses Bun's built-in SQLite support.
 
@@ -103,5 +109,6 @@ docs/                Public documentation only
 
 ## License
 
-No license has been declared. Treat this repository as all rights reserved
-unless a license is added.
+This is a public source release. A formal open-source license has not been
+selected yet; until a `LICENSE` file is added, do not assume redistribution,
+commercial-use, or reuse rights beyond viewing and local evaluation.
