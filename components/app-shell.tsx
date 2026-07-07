@@ -37,7 +37,7 @@ import {
   type MasterMoldCommandHandoff,
 } from "@/lib/master-mold-command-handoff";
 import { SentinelFace, type SystemState } from "@/components/sentinel-face";
-import { useProfile } from "@/components/profile-provider";
+import { useOptionalProfile } from "@/components/profile-provider";
 import { useFaceActivity } from "@/components/face-activity";
 import type { ProductProvenanceLabel } from "@/lib/provenance-copy";
 import { cn } from "@/lib/utils";
@@ -154,7 +154,7 @@ export function AppShell({
 }) {
   const [killOpen, setKillOpen] = useState(false);
   const [killEngaged, setKillEngaged] = useState(false);
-  const { ready, hasProfile, welcomeSeen } = useProfile();
+  const { ready, hasProfile, welcomeSeen } = useOptionalProfile();
   const router = useRouter();
   const pathname = usePathname() || "/";
   const runSafetyDrill = useCallback(() => {
@@ -411,7 +411,7 @@ function TopBar({
   const router = useRouter();
   const pathname = usePathname() || "/";
   const searchParams = useSearchParams();
-  const { ready, profile } = useProfile();
+  const { ready, profile } = useOptionalProfile();
   const { speaking } = useFaceActivity();
   const [q, setQ] = useState("");
   const [commandStatus, setCommandStatus] = useState<ShellCommandStatus | undefined>();
@@ -625,13 +625,13 @@ function TopBar({
         <AlertInboxDrawer />
         {ready ? (
           <Link
-            href="/settings"
-            title={profile ? "Profile & settings" : "Set up your profile"}
+            href={profile ? "/settings" : "/settings#profile"}
+            title={profile ? "Profile & settings" : "Create local profile preferences"}
             className="hidden min-h-10 items-center gap-2 rounded-md border border-outline-variant/25 bg-void/35 px-2.5 py-1 text-sm transition-colors hover:border-violet/45 hover:text-violet sm:flex"
           >
             <UserRound aria-hidden="true" className="size-4 text-outline" />
             <span className="max-w-28 truncate text-on-surface-variant">
-              {profile ? firstName || "Profile" : "Set up"}
+              {profile ? firstName || "Profile" : "Profile"}
             </span>
           </Link>
         ) : null}

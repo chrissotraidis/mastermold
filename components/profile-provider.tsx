@@ -111,3 +111,25 @@ export function useProfile(): ProfileContextValue {
   }
   return ctx;
 }
+
+export function useOptionalProfile(): ProfileContextValue {
+  return useContext(ProfileContext) ?? {
+    ready: false,
+    profile: null,
+    hasProfile: false,
+    welcomeSeen: false,
+    createProfile: () => {
+      throw new Error("createProfile requires ProfileProvider");
+    },
+    updateProfile: () => {
+      throw new Error("updateProfile requires ProfileProvider");
+    },
+    dismissWelcome: () => {},
+    exportProfile: () => {},
+    importBackupFile: async () => ({ ok: false, error: "ProfileProvider is not ready." }),
+    applyBackup: () => {
+      throw new Error("applyBackup requires ProfileProvider");
+    },
+    resetProfile: () => {},
+  };
+}

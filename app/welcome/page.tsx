@@ -3,7 +3,7 @@ import { WelcomeFlow } from "@/components/welcome-flow";
 
 export const metadata: Metadata = {
   title: "Get started - Master Mold",
-  description: "Set up your Master Mold profile, or explore the sample data first.",
+  description: "Save local Master Mold preferences, or open the sample dashboard first.",
 };
 
 export default function WelcomePage() {

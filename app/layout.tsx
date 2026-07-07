@@ -7,7 +7,7 @@ import { FaceActivityProvider } from "@/components/face-activity";
 
 export const metadata: Metadata = {
   title: "Master Mold",
-  description: "A personal financial copilot for daily portfolio review. Advisory only in this build.",
+  description: "A local portfolio review workspace. Advisory only in this build.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

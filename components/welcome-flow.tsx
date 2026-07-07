@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, HardDriveDownload, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, HardDriveDownload, ShieldCheck, Sparkles } from "lucide-react";
 import { SentinelFace } from "@/components/sentinel-face";
 import { useProfile } from "@/components/profile-provider";
 import {
@@ -35,10 +35,16 @@ const ALERT_LABELS: Record<AlertSensitivity, string> = {
 };
 
 const PRINCIPLES = [
-  { icon: ShieldCheck, text: "Advisory only. Master Mold cannot move your money." },
-  { icon: Eye, text: "Sample data works immediately. No account connection required." },
-  { icon: HardDriveDownload, text: "Profile settings and saved test fields stay in this browser." },
+  { icon: ShieldCheck, text: "No account is connected by default, and Master Mold cannot move funds." },
+  { icon: Sparkles, text: "Sample holdings are only a tour of the app. They are not your portfolio." },
+  { icon: HardDriveDownload, text: "Preferences and restored setup fields stay in this browser." },
 ];
+
+const FIELD_HELP: Record<"risk" | "focus" | "alerts", string> = {
+  risk: "A local preference for how cautious the app should sound. It does not change caps or trade behavior.",
+  focus: "A local hint for what you care about first. It does not connect an account by itself.",
+  alerts: "A local preference for how much detail you want. Feedback buttons still decide what gets quieter over time.",
+};
 
 export function WelcomeFlow() {
   const router = useRouter();
@@ -87,13 +93,14 @@ export function WelcomeFlow() {
               <SentinelFace state="idle" />
             </div>
             <p className="font-mono text-[11px] uppercase tracking-telemetry text-violet">
-              Personal financial copilot
+              Local financial cockpit
             </p>
             <h1 className="mt-2 font-display text-2xl font-semibold text-on-surface sm:text-3xl">
               Welcome to Master Mold
             </h1>
             <p className="mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
-              Add a light profile for better daily reads, or jump into sample data now.
+              Start with the sample dashboard, or save a few local preferences first. No account
+              data is pulled in until you connect or import it.
             </p>
           </header>
 
@@ -101,16 +108,16 @@ export function WelcomeFlow() {
             <button
               type="button"
               onClick={handleSkip}
-              className="flex min-h-11 items-center justify-center gap-2 bg-violet px-4 py-3 font-semibold text-void chamfer-sm transition hover:brightness-110"
+              className="flex min-h-11 items-center justify-center gap-2 bg-violet px-4 py-3 text-sm font-semibold text-void chamfer-sm transition hover:brightness-110"
             >
-              Explore sample data
+              Open sample dashboard
               <ArrowRight aria-hidden="true" className="size-4" />
             </button>
             <Link
               href="/review"
               className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline-variant/45 px-3 text-sm font-semibold text-on-surface-variant transition hover:border-violet/50 hover:text-violet"
             >
-              See what is real
+              Review app limits
             </Link>
           </div>
 
@@ -121,14 +128,18 @@ export function WelcomeFlow() {
           <div className="mb-4 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Sparkles aria-hidden="true" className="size-5 text-violet" />
-              <h2 className="font-display text-lg font-semibold text-on-surface">Make it yours</h2>
+              <h2 className="font-display text-lg font-semibold text-on-surface">Save local preferences</h2>
             </div>
           </div>
+          <p className="mb-4 text-xs leading-5 text-outline">
+            Optional setup. These choices are stored in this browser and help shape wording; they
+            do not connect accounts, import holdings, or arm trading.
+          </p>
 
           <div className="space-y-5">
             <div className="space-y-2">
               <label htmlFor="welcome-name" className="text-sm font-semibold text-on-surface">
-                What should I call you?
+                Name for this browser
               </label>
               <input
                 id="welcome-name"
@@ -138,10 +149,12 @@ export function WelcomeFlow() {
                 maxLength={120}
                 className="w-full rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2.5 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
               />
+              <p className="text-xs leading-5 text-outline">Used only for local UI copy.</p>
             </div>
 
             <SegmentedField<RiskPosture>
-              label="Risk posture"
+              label="Suggestion style"
+              helper={FIELD_HELP.risk}
               value={risk}
               options={RISK_POSTURES}
               labels={RISK_LABELS}
@@ -149,7 +162,8 @@ export function WelcomeFlow() {
             />
 
             <SegmentedField<AssetFocus>
-              label="What do you focus on?"
+              label="Primary focus"
+              helper={FIELD_HELP.focus}
               value={focus}
               options={ASSET_FOCUSES}
               labels={FOCUS_LABELS}
@@ -157,7 +171,8 @@ export function WelcomeFlow() {
             />
 
             <SegmentedField<AlertSensitivity>
-              label="Alert sensitivity"
+              label="Detail level"
+              helper={FIELD_HELP.alerts}
               value={alertSensitivity}
               options={ALERT_SENSITIVITIES}
               labels={ALERT_LABELS}
@@ -169,13 +184,13 @@ export function WelcomeFlow() {
             <button
               type="button"
               onClick={handleCreate}
-              className="flex min-h-11 w-full items-center justify-center gap-2 bg-violet px-4 py-3 font-semibold text-void chamfer-sm transition hover:brightness-110"
+              className="flex min-h-11 w-full items-center justify-center gap-2 bg-violet px-4 py-3 text-sm font-semibold text-void chamfer-sm transition hover:brightness-110"
             >
-              Create profile
+              Save preferences
               <ArrowRight aria-hidden="true" className="size-4" />
             </button>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm">
+          <div className="mt-3 grid gap-1 text-center text-sm">
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -183,6 +198,10 @@ export function WelcomeFlow() {
             >
               Restore from a backup
             </button>
+            <p className="text-xs leading-5 text-outline">
+              Imports a Master Mold JSON backup: preferences plus saved connection-test fields.
+              It does not fetch live account data.
+            </p>
           </div>
 
           <input
@@ -218,7 +237,7 @@ function SafetyNotes({ className }: { className?: string }) {
   return (
     <details className={cn("rounded-md border border-outline-variant/40 bg-surface-dim/35 px-3 py-2", className)}>
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-on-surface marker:hidden">
-        <span>What stays safe</span>
+        <span>Before you start</span>
         <span className="text-xs font-semibold text-outline">3 notes</span>
       </summary>
       <ul className="mt-2 grid gap-2 border-t border-outline-variant/25 pt-3">
@@ -235,12 +254,14 @@ function SafetyNotes({ className }: { className?: string }) {
 
 function SegmentedField<T extends string>({
   label,
+  helper,
   value,
   options,
   labels,
   onChange,
 }: {
   label: string;
+  helper?: string;
   value: T;
   options: readonly T[];
   labels: Record<T, string>;
@@ -248,7 +269,10 @@ function SegmentedField<T extends string>({
 }) {
   return (
     <div className="space-y-2">
-      <span className="text-sm font-semibold text-on-surface">{label}</span>
+      <div>
+        <span className="text-sm font-semibold text-on-surface">{label}</span>
+        {helper ? <p className="mt-0.5 text-xs leading-5 text-outline">{helper}</p> : null}
+      </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {options.map((option) => (
           <button

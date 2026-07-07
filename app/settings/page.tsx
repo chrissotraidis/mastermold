@@ -30,7 +30,7 @@ type SettingsIntegrationStatus = Omit<IntegrationStatusJson, "id" | "service"> &
 const statusLabels: Record<IntegrationStatusJson["status"], string> = {
   connected: "Test passed",
   stubbed: "Sample mode",
-  credential_gated: "Needs key",
+  credential_gated: "Key needed",
 };
 
 export default async function SettingsPage() {
@@ -53,16 +53,19 @@ export default async function SettingsPage() {
 
   // One-line closed-row summaries so the whole page reads at a glance.
   const connectedCount = portfolioIntegrations.filter((integration) => integration.status === "connected").length;
-  const connectionsStatus = `${portfolio.import_snapshot.count} imported · ${connectedCount}/${portfolioIntegrations.length} tested`;
-  const chatStatus = chatIntegrations.length > 0 ? statusLabels[chatIntegrations[0].status] : "Not configured";
+  const connectionsStatus =
+    portfolio.import_snapshot.count === 0 && connectedCount === 0
+      ? "No account source connected"
+      : `${portfolio.import_snapshot.count} imported · ${connectedCount}/${portfolioIntegrations.length} tested`;
+  const chatStatus = chatIntegrations.length > 0 ? integrationStatusLabel(chatIntegrations[0]) : "No chat provider";
   const autopilotLive = autopilot.mode === "live" && !autopilot.kill_switch;
   const autopilotStatus = autopilot.runtime_unavailable
-    ? "Runtime unavailable"
+    ? "Bot store locked"
     : autopilot.kill_switch
     ? "Kill switch engaged"
     : `Mode ${autopilot.mode} · daemon ${autopilot.daemon}`;
   const safetyStatus = autopilot.runtime_unavailable
-    ? "Autopilot locked · live off"
+    ? "Autopilot read-only · live off"
     : `Max trade ${formatSettingsCurrency(autopilot.caps.max_trade_usd)} · cap ${formatSettingsCurrency(autopilot.caps.daily_spend_limit_usd)}/day · live ${autopilotLive ? "on" : "off"}`;
   const healthStatus = `${publicDataMode} · report ${dailyReport ? dailyReport.run_date : "not saved"}`;
 
@@ -71,8 +74,31 @@ export default async function SettingsPage() {
       <div className="mx-auto grid w-full max-w-4xl gap-3">
         <header>
           <h1 className="font-display text-lg font-semibold text-on-surface">Settings</h1>
-          <p className="mt-0.5 text-xs text-outline">Connections, profile, autopilot, safety, and system health.</p>
+          <p className="mt-0.5 text-xs text-outline">
+            Choose what to connect. Nothing here places trades, signs transactions, or moves funds.
+          </p>
         </header>
+
+        <nav
+          aria-label="First-run setup path"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-outline-variant/25 px-3 py-2 text-xs leading-5 text-outline"
+        >
+          <span className="font-semibold text-on-surface">New here?</span>
+          <Link href="#profile" className="font-semibold text-violet hover:text-tertiary">
+            Save local preferences
+          </Link>
+          <span aria-hidden="true">/</span>
+          <Link href="/portfolio#add-holdings" className="font-semibold text-violet hover:text-tertiary">
+            add holdings manually
+          </Link>
+          <span aria-hidden="true">/</span>
+          <Link href="#chat" className="font-semibold text-violet hover:text-tertiary">
+            add a chat key if you want live answers
+          </Link>
+          <span className="basis-full text-outline sm:basis-auto">
+            Sample data stays separate until you add your own context.
+          </span>
+        </nav>
 
         <div className="divide-y divide-outline-variant/15 rounded-md border border-outline-variant/25">
           <SettingsSection
@@ -84,11 +110,12 @@ export default async function SettingsPage() {
           >
             <span id="investment-awareness" aria-hidden="true" className="block scroll-mt-24" />
             <p className="text-xs leading-5 text-outline">
-              Read-only portfolio sources. To add or edit holdings by hand, use{" "}
+              Read-only portfolio sources. Manual holdings are often the fastest first setup; to add
+              or edit them by hand, use{" "}
               <Link href="/portfolio#add-holdings" className="text-violet hover:text-tertiary">
                 Portfolio
               </Link>
-              .
+              . Imports are snapshots only, not automatic brokerage trading.
             </p>
             <div id="portfolio-connections" className="mt-2 grid scroll-mt-24 gap-2">
               <MonarchMcpPanel initialState={portfolioBrain} config={monarchConfig} />
@@ -109,7 +136,10 @@ export default async function SettingsPage() {
             aliases={["ai-chat-keys"]}
           >
             <span id="ai-chat-keys" aria-hidden="true" className="block scroll-mt-24" />
-            <p className="text-xs leading-5 text-outline">Optional external chat provider for live answers.</p>
+            <p className="text-xs leading-5 text-outline">
+              Optional. App commands and sample screens work without a chat key. Add an OpenRouter,
+              OpenAI, or Anthropic key only if you want model-written answers using visible app context.
+            </p>
             <div className="mt-2">
               {chatIntegrations.length > 0 ? (
                 <ConnectionChecks integrations={chatIntegrations} commandGroup="chat" />
@@ -131,17 +161,23 @@ export default async function SettingsPage() {
             <span id="web3-wallet-trading" aria-hidden="true" className="block scroll-mt-24" />
             <div className="grid gap-2">
               <AutopilotSettingsSummary state={autopilot} />
-              <p className="text-xs leading-5 text-outline">
-                Technical details:{" "}
-                <Link href="/trading" className="font-semibold text-violet hover:text-tertiary">
-                  Trade control room
-                </Link>{" "}
-                (mode, gate, feed, positions, decisions) ·{" "}
-                <a href="/api/autopilot" className="font-semibold text-violet hover:text-tertiary">
-                  Autopilot status
-                </a>{" "}
-                (state JSON for troubleshooting).
-              </p>
+              <details className="rounded-md border border-outline-variant/25 px-3 py-2">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-on-surface marker:hidden [&::-webkit-details-marker]:hidden">
+                  <span>Technical details</span>
+                  <span className="text-outline">Bot room and raw status</span>
+                </summary>
+                <p className="border-t border-outline-variant/15 pt-2 text-xs leading-5 text-outline">
+                  Trade controls, daemon status, wallet provisioning, and go-live evidence live in{" "}
+                  <Link href="/trading" className="font-semibold text-violet hover:text-tertiary">
+                    Autopilot
+                  </Link>
+                  . Raw troubleshooting payload:{" "}
+                  <a href="/api/autopilot" className="font-semibold text-violet hover:text-tertiary">
+                    status JSON
+                  </a>
+                  .
+                </p>
+              </details>
             </div>
           </SettingsSection>
 
@@ -290,10 +326,20 @@ function AutopilotSettingsSummary({ state }: { state: ReturnType<typeof getAutop
   return (
     <div className="rounded-md border border-outline-variant/25 px-3 py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold text-on-surface">
-          Autonomous lane · mode {state.mode}
-        </h3>
-        <StatusBadge status={state.kill_switch ? "credential_gated" : "connected"} />
+        <h3 className="text-sm font-semibold text-on-surface">Autopilot paper bot · {modeCopy(state.mode)}</h3>
+        <Badge
+          variant="outline"
+          className={cn(
+            "border text-xs",
+            state.runtime_unavailable
+              ? "border-outline-variant/40 bg-surface-dim/40 text-outline"
+              : state.kill_switch
+                ? "border-caution/40 bg-caution/10 text-caution"
+                : "border-engine/30 bg-engine/10 text-engine",
+          )}
+        >
+          {state.runtime_unavailable ? "Read-only" : state.kill_switch ? "Locked" : "Ready"}
+        </Badge>
       </div>
       <p className="mt-1 text-xs leading-5 text-on-surface-variant">
         Daemon {state.daemon} · {state.open_positions} open position{state.open_positions === 1 ? "" : "s"} · equity{" "}
@@ -301,8 +347,13 @@ function AutopilotSettingsSummary({ state }: { state: ReturnType<typeof getAutop
       </p>
       <p className="mt-1 text-xs leading-5 text-outline">
         {state.runtime_unavailable
-          ? "Autopilot storage is unavailable in this runtime; use Bun or Node 22.5+ for paper/live bot controls."
-          : "The live wallet key lives in server env only (AUTOPILOT_WALLET_SECRET); nothing in Settings can arm live mode — the go-live gate on the Trade page owns that."}
+          ? "The local bot store is unavailable, so controls are locked and this section is read-only."
+          : "This lane is separate from Portfolio imports and connected-account snapshots. It can paper trade only when the daemon is running and the kill switch is released."}
+      </p>
+      <p className="mt-1 text-xs leading-5 text-outline">
+        Wallet setup is server-side: set <code className="font-mono text-[11px] text-on-surface-variant">AUTOPILOT_WALLET_SECRET</code>{" "}
+        for a spare wallet. The browser never asks for private keys, and live mode still requires the
+        go-live gate on the Autopilot page.
       </p>
     </div>
   );
@@ -388,6 +439,20 @@ function StatusBadge({ status }: { status: IntegrationStatusJson["status"] }) {
       {statusLabels[status]}
     </Badge>
   );
+}
+
+function integrationStatusLabel(integration: SettingsIntegrationStatus) {
+  if (integration.status === "connected") return "Test passed";
+  if (integration.status === "stubbed") return integration.service === "live_chat" ? "No chat key" : "Sample mode";
+  if (integration.service === "live_chat") return "Chat key missing";
+  return "Key needed";
+}
+
+function modeCopy(mode: ReturnType<typeof getAutopilotState>["mode"]) {
+  if (mode === "off") return "off";
+  if (mode === "paper") return "paper mode";
+  if (mode === "live") return "live mode";
+  return "halted";
 }
 
 function toSettingsIntegrationStatus(status: IntegrationStatusJson): SettingsIntegrationStatus {

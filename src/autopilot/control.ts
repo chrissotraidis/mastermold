@@ -16,7 +16,7 @@
  */
 
 import { evaluateGoLiveGate } from "./gate";
-import { liveReadiness } from "./live";
+import { liveReadiness } from "./live-readiness";
 import {
   DEFAULT_AUTOPILOT_CAPS,
   autopilotStore,
@@ -68,7 +68,7 @@ export function getAutopilotState(): AutopilotStateView {
   try {
     store = autopilotStore();
   } catch (error) {
-    if (isMissingSqliteDriver(error)) return unavailableAutopilotState();
+    if (isAutopilotStoreUnavailable(error)) return unavailableAutopilotState();
     throw error;
   }
   const series = store.equitySeries(1);
@@ -83,8 +83,11 @@ export function getAutopilotState(): AutopilotStateView {
   };
 }
 
-function isMissingSqliteDriver(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("requires a builtin SQLite driver");
+export function isAutopilotStoreUnavailable(error: unknown): boolean {
+  return error instanceof Error && (
+    error.message.includes("requires a builtin SQLite driver") ||
+    error.message.includes("autopilot store at")
+  );
 }
 
 function unavailableAutopilotState(): AutopilotStateView {
@@ -102,7 +105,7 @@ function unavailableAutopilotState(): AutopilotStateView {
     equity_usd: 0,
     last_activity: null,
     daemon: "offline",
-    runtime_unavailable: "Autopilot store requires Bun or Node 22.5+ for SQLite.",
+    runtime_unavailable: "Autopilot store is unavailable; bot controls are locked.",
   };
 }
 

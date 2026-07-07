@@ -165,10 +165,10 @@ export const demoDatabase: DemoDatabase = {
     { id: "guard_default", per_tx_cap: 0, daily_cap: 0, contract_allowlist: ["0xDemoAavePool", "0xDemoPermitModule"], recipient_allowlist: ["0xDemoVault"], session_key_expiry: "2026-06-30T00:00:00Z", event_time: "2026-05-28T10:00:00Z", knowledge_time: "2026-05-28T10:02:00Z" },
   ],
   integrationStatuses: [
-    { id: "int_coinbase", service: "coinbase", status: "stubbed", detail: "Portfolio starts with sample Coinbase holdings. You can test account access and import a holdings snapshot only when you press import.", event_time: "2026-05-24T14:00:00Z", knowledge_time: "2026-05-24T14:03:00Z" },
-    { id: "int_robinhood", service: "robinhood", status: "stubbed", detail: "Portfolio starts with sample equity holdings. You can test SnapTrade account access and import a holdings snapshot only when you press import.", event_time: "2026-05-25T13:30:00Z", knowledge_time: "2026-05-25T13:41:00Z" },
-    { id: "int_wallet", service: "onchain_wallet", status: "stubbed", detail: "Portfolio starts with a sample on-chain wallet. You can test a wallet read key and import wallet positions only when you press import.", event_time: "2026-05-26T16:20:00Z", knowledge_time: "2026-05-26T16:25:00Z" },
-    { id: "int_llm", service: "llm", status: "credential_gated", detail: "Live chat can use a saved server key or a one-time test key. Use Test live chat before relying on a daily read.", event_time: "2026-05-27T10:00:00Z", knowledge_time: "2026-05-27T10:01:00Z" },
+    { id: "int_coinbase", service: "coinbase", status: "stubbed", detail: "Portfolio starts with sample holdings, not your Coinbase account. Test access and import a snapshot only when you choose it.", event_time: "2026-05-24T14:00:00Z", knowledge_time: "2026-05-24T14:03:00Z" },
+    { id: "int_robinhood", service: "robinhood", status: "stubbed", detail: "Portfolio starts with sample equities, not your brokerage account. Test SnapTrade access and import a snapshot only when you choose it.", event_time: "2026-05-25T13:30:00Z", knowledge_time: "2026-05-25T13:41:00Z" },
+    { id: "int_wallet", service: "onchain_wallet", status: "stubbed", detail: "Portfolio starts with a sample wallet, not your wallet. Test a read key and import positions only when you choose it.", event_time: "2026-05-26T16:20:00Z", knowledge_time: "2026-05-26T16:25:00Z" },
+    { id: "int_llm", service: "llm", status: "credential_gated", detail: "Live chat needs an OpenRouter, OpenAI, or Anthropic key. Without one, app commands still work locally.", event_time: "2026-05-27T10:00:00Z", knowledge_time: "2026-05-27T10:01:00Z" },
   ],
   strategyBeliefs: [
     { id: "belief_patience", name: "Patience over churn", statement: "One reason to watch is not enough to change exposure.", confidence: 0.72, updated_at: "2026-05-29T21:00:00Z", event_time: "2026-05-29T21:00:00Z", knowledge_time: "2026-05-29T21:03:00Z" },

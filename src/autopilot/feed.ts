@@ -16,7 +16,7 @@
  * because DexScreener hiccuped.
  */
 
-import { UNIVERSE } from "./daemon";
+import { UNIVERSE } from "./universe";
 
 export type MarketFeedRow = {
   symbol: string;

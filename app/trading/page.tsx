@@ -10,7 +10,9 @@ export default function TradingPage() {
         <header>
           <h1 className="font-display text-lg font-semibold text-on-surface">Autopilot</h1>
           <p className="mt-0.5 text-xs text-outline">
-            The Web3 lane: paper trading against live markets today, the autonomous wallet later. Live money stays locked.
+            Separate paper-bot lane for live market watching. Live money stays locked.
+            Portfolio imports are not used here; server wallet setup and the go-live gate are
+            separate.
           </p>
         </header>
 

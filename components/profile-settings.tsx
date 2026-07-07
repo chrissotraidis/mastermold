@@ -39,6 +39,12 @@ const ALERT_LABELS: Record<AlertSensitivity, string> = {
   more_detail: "More detail",
 };
 
+const PROFILE_HELP = {
+  risk: "Saved as local preference context. It does not change safety caps or trading behavior.",
+  focus: "Tells Master Mold what to emphasize first after you add holdings.",
+  alerts: "Sets how much detail you prefer; feedback buttons still decide what gets quieter over time.",
+};
+
 export function ProfileSettings() {
   const router = useRouter();
   const { ready, profile, updateProfile, exportProfile, importBackupFile, applyBackup, resetProfile } =
@@ -78,6 +84,10 @@ export function ProfileSettings() {
         <p className="text-sm leading-6 text-on-surface-variant">
           You&apos;re exploring on sample data — no profile yet. Create one to save risk, focus,
           and alert preferences, or restore a profile you exported elsewhere.
+        </p>
+        <p className="mt-1 text-xs leading-5 text-outline">
+          Restoring reads a Master Mold JSON backup from your disk: preferences plus saved connection-test fields.
+          It does not fetch live account data.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <Button size="sm" onClick={() => router.push("/welcome")} className="bg-violet text-xs text-void hover:brightness-110">
@@ -171,15 +181,29 @@ export function ProfileSettings() {
               />
             </div>
 
-            <Segmented label="Risk posture" value={risk} options={RISK_POSTURES} labels={RISK_LABELS} onChange={setRisk} />
-            <Segmented label="Focus" value={focus} options={ASSET_FOCUSES} labels={FOCUS_LABELS} onChange={setFocus} />
             <Segmented
-              label="Alert sensitivity"
+              label="Suggestion style"
+              value={risk}
+              options={RISK_POSTURES}
+              labels={RISK_LABELS}
+              onChange={setRisk}
+              helper={PROFILE_HELP.risk}
+            />
+            <Segmented
+              label="Primary focus"
+              value={focus}
+              options={ASSET_FOCUSES}
+              labels={FOCUS_LABELS}
+              onChange={setFocus}
+              helper={PROFILE_HELP.focus}
+            />
+            <Segmented
+              label="Detail level"
               value={alertSensitivity}
               options={ALERT_SENSITIVITIES}
               labels={ALERT_LABELS}
               onChange={setAlertSensitivity}
-              helper="Sets your local preference; Useful / Not useful ratings still teach Master Mold which activity items to show."
+              helper={PROFILE_HELP.alerts}
             />
 
             <Button size="sm" onClick={handleSave} className="bg-violet text-xs text-void hover:brightness-110">

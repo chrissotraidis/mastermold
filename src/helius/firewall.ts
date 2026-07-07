@@ -26,7 +26,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-export const PUBLIC_RPC_URL = "https://api.mainnet-beta.solana.com";
+import { PUBLIC_RPC_URL, isHeliusHost, resolveGuardedRpcUrl } from "./rpc-url";
+export { PUBLIC_RPC_URL, isHeliusHost, resolveGuardedRpcUrl } from "./rpc-url";
 
 export type HeliusCategory = "rpc" | "das" | "enhanced" | "unknown";
 
@@ -65,15 +66,6 @@ const ENHANCED_METHODS = new Set(["gettransactionsforaddress", "parsetransaction
 
 /** Estimated credits per call, per the memo's published costs. */
 const CATEGORY_COST: Record<HeliusCategory, number> = { rpc: 1, das: 10, enhanced: 100, unknown: 100 };
-
-export function isHeliusHost(url: string): boolean {
-  try {
-    const host = new URL(url).hostname;
-    return host.endsWith("helius-rpc.com") || host.endsWith("helius.xyz") || host.endsWith("helius.dev");
-  } catch {
-    return false;
-  }
-}
 
 /** Classify a call by URL path + JSON-RPC method name. */
 export function classifyHeliusCall(url: string, method: string | null): HeliusCategory {
@@ -227,18 +219,6 @@ export async function guardedHeliusFetch(
   record(meta.feature, verdict, verdict.allowed ? (method ?? new URL(url).pathname) : (verdict as { reason: string }).reason);
   if (!verdict.allowed) throw new HeliusBlockedError(verdict.reason);
   return fetchImpl(url, init);
-}
-
-/**
- * RPC URL for execution paths: if the configured SOLANA_RPC_URL points at
- * Helius while Helius is disabled, fall back to the public RPC (zero credits)
- * instead of failing execution — standard RPC is allowed infrastructure, the
- * firewall only protects the CREDIT pool (memo §6.2).
- */
-export function resolveGuardedRpcUrl(env: Record<string, string | undefined> = process.env as unknown as Record<string, string | undefined>): string {
-  const configured = env.SOLANA_RPC_URL ?? PUBLIC_RPC_URL;
-  if (!isHeliusHost(configured)) return configured;
-  return env.HELIUS_ENABLED === "true" ? configured : PUBLIC_RPC_URL;
 }
 
 /** Fetch impl for @solana/web3.js Connection so even library-internal calls

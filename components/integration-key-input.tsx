@@ -63,6 +63,7 @@ export function IntegrationKeyInput({
   const canImport = service !== "live_chat";
   const handledCommandActionRef = useRef<string | null>(null);
   const actionQuery = searchParams.toString();
+  const actionCopy = service === "live_chat" ? liveChatCopy(values.chat_service) : null;
 
   useEffect(() => {
     const saved = window.localStorage.getItem(storageKey);
@@ -115,7 +116,7 @@ export function IntegrationKeyInput({
     setTestState("testing");
     setEvidence("");
     setDocsUrl("");
-    setMessage(service === "live_chat" ? "Testing live chat..." : "Testing account access...");
+    setMessage(service === "live_chat" ? "Sending one short test question..." : "Testing read-only account access...");
 
     try {
       const response = await fetch("/api/integrations/test", {
@@ -145,7 +146,7 @@ export function IntegrationKeyInput({
     setImportState("importing");
     setEvidence("");
     setDocsUrl("");
-    setMessage("Importing holdings...");
+    setMessage("Importing a holdings snapshot...");
 
     try {
       const response = await fetch("/api/portfolio/import", {
@@ -173,7 +174,10 @@ export function IntegrationKeyInput({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-on-surface">{label}</p>
+        <div>
+          <p className="text-sm font-semibold text-on-surface">{label}</p>
+          {actionCopy ? <p className="mt-0.5 text-xs leading-5 text-outline">{actionCopy}</p> : null}
+        </div>
         {testState === "passed" ? (
           <Badge variant="outline" className="border-engine/40 text-engine">
             <CheckCircle2 aria-hidden="true" className="mr-1 size-3" />
@@ -198,7 +202,7 @@ export function IntegrationKeyInput({
                 id={`${baseId}-${field.name}`}
                 value={values[field.name] ?? field.options?.[0]?.value ?? ""}
                 onChange={(event) => updateValue(field.name, event.target.value)}
-                className="h-11 w-full rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+                className="h-11 w-full rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet sm:h-9"
               >
                 {field.options?.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -236,14 +240,14 @@ export function IntegrationKeyInput({
           data-rds-action="test"
           data-action-state={testState}
           data-persona="operator reviewer user"
-          className="w-full bg-violet text-xs text-void hover:bg-violet/90 sm:min-h-8"
+          className="min-h-11 w-full bg-violet text-xs text-void hover:bg-violet/90 sm:min-h-9"
         >
           {testState === "testing" ? (
             <Loader2 aria-hidden="true" className="animate-spin" />
           ) : (
             <FlaskConical aria-hidden="true" />
           )}
-          {service === "live_chat" ? "Test live chat" : "Test account access"}
+          {service === "live_chat" ? "Test chat key" : "Test read-only access"}
         </Button>
         {canImport ? (
           <Button
@@ -254,7 +258,7 @@ export function IntegrationKeyInput({
             data-action-state={importState}
             data-persona="operator reviewer user"
             variant="outline"
-            className="w-full border-outline-variant/50 bg-transparent text-xs text-on-surface hover:bg-surface-high/70 sm:min-h-8"
+            className="min-h-11 w-full border-outline-variant/50 bg-transparent text-xs text-on-surface hover:bg-surface-high/70 sm:min-h-9"
           >
             {importState === "importing" ? (
               <Loader2 aria-hidden="true" className="animate-spin" />
@@ -285,9 +289,9 @@ export function IntegrationKeyInput({
       ) : null}
       <p className="text-xs leading-5 text-outline">
         {permissionScope} These entries are saved in this browser and sent through this
-        local app only when you test or import.{" "}
+        local app only when you press a test or import action.{" "}
         {service === "live_chat"
-          ? "Use a key you are comfortable testing locally."
+          ? "Live chat sends the question plus visible app context to the selected chat service."
           : "Importing copies holdings into Portfolio and still cannot trade."}
       </p>
     </div>
@@ -311,6 +315,14 @@ function requestService(service: PublicIntegrationService) {
 
 function commandHashForGroup(commandGroup: "portfolio" | "chat") {
   return commandGroup === "portfolio" ? "#portfolio-connections" : "#ai-chat-keys";
+}
+
+function liveChatCopy(provider: string | undefined) {
+  const name =
+    provider === "openai" ? "OpenAI" :
+    provider === "anthropic" ? "Anthropic" :
+    "OpenRouter";
+  return `Needs an ${name} API key, or a saved server key. Without it, local app commands still work.`;
 }
 
 function safeParse(raw: string): Record<string, string> {

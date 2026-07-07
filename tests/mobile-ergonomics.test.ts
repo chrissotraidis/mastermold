@@ -23,9 +23,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("app/portfolio/page.tsx")).toContain("inline-flex min-h-11 items-center gap-2");
     expect(source("components/welcome-flow.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
     expect(source("components/welcome-flow.tsx")).toContain("lg:grid-cols-[minmax(0,0.78fr)_minmax(26rem,1fr)]");
-    expect(source("components/welcome-flow.tsx")).toContain("Add a light profile for better daily reads");
-    expect(source("components/welcome-flow.tsx")).toContain("What stays safe");
-    expect(source("components/welcome-flow.tsx")).toContain("Create profile");
+    expect(source("components/welcome-flow.tsx")).toContain("Start with the sample dashboard");
+    expect(source("components/welcome-flow.tsx")).toContain("Before you start");
+    expect(source("components/welcome-flow.tsx")).toContain("Save preferences");
     expect(source("components/welcome-flow.tsx")).not.toContain("Set up profile");
     expect(source("components/journal-workspace.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
     expect(source("components/as-of-replay-control.tsx")).toContain("flex min-h-11 cursor-pointer");
@@ -313,7 +313,8 @@ describe("mobile ergonomics source contracts", () => {
 
     expect(profileSettings).toContain("Profile settings live in this browser");
     expect(profileSettings).toContain("<summary className=\"flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 marker:hidden [&::-webkit-details-marker]:hidden\">");
-    expect(settingsPage).toContain("Connections, profile, autopilot, safety, and system health.");
+    expect(settingsPage).toContain("Choose what to connect. Nothing here places trades, signs transactions, or moves funds.");
+    expect(settingsPage).toContain("New here?");
     expect(settingsPage).toContain('id="connections"');
     expect(settingsPage).toContain('id="profile"');
     expect(settingsPage).toContain('id="chat"');
@@ -921,7 +922,8 @@ describe("mobile ergonomics source contracts", () => {
     const integrations = source("src/db/integrations.ts");
     const imports = source("src/db/portfolio-imports.ts");
 
-    expect(settingsPage).toContain("Connections, profile, autopilot, safety, and system health.");
+    expect(settingsPage).toContain("Choose what to connect. Nothing here places trades, signs transactions, or moves funds.");
+    expect(settingsPage).toContain("New here?");
     expect(settingsPage).toContain('id="connections"');
     expect(settingsPage).toContain('id="profile"');
     expect(settingsPage).toContain('id="chat"');
@@ -955,7 +957,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("No account holdings imported yet. Check account access, then press Import holdings.");
     expect(settingsPage).not.toMatch(/SettingsWeb3CredentialConsole|first funded canary|credential wall|receipt wall/i);
     expect(input).toContain("Import holdings");
-    expect(input).toContain("Test account access");
+    expect(input).toContain("Test read-only access");
     expect(integrations).toContain("Reads");
     expect(imports).toContain('event: "portfolio_import"');
   });
@@ -970,6 +972,7 @@ describe("mobile ergonomics source contracts", () => {
     const imports = source("src/db/portfolio-imports.ts");
 
     expect(settingsPage).toContain("Read-only portfolio sources.");
+    expect(settingsPage).toContain("Manual holdings are often the fastest first setup");
     expect(settingsPage).toContain("Stays in this browser");
     expect(settingsPage).toContain("Sent to this local app");
     expect(settingsPage).toContain("Can leave this app");
@@ -988,7 +991,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Master Mold has no order endpoint, cannot sign transactions, and never asks for private wallet keys.");
     expect(settingsPage).not.toMatch(/SettingsWeb3CredentialConsole|credential wall|receipt wall/i);
     expect(input).toContain("Import holdings");
-    expect(input).toContain("Test account access");
+    expect(input).toContain("Test read-only access");
     expect(integrations).toContain("Reads");
     expect(imports).toContain('event: "portfolio_import"');
     expect(tradingPage).toContain("Live money stays locked");

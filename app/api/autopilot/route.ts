@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getAutopilotState,
+  isAutopilotStoreUnavailable,
   setKillSwitch,
   setMode,
   updateCaps,
@@ -11,8 +12,8 @@ import { fetchMarketFeed, type MarketFeedRow } from "@/src/autopilot/feed";
 import { buildAttribution, type AttributionSummary } from "@/src/autopilot/attribution";
 import { calibrate, type CalibrationSummary } from "@/src/autopilot/v3/calibration";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
-import { liveReadiness } from "@/src/autopilot/live";
-import type { ParamChangelogEntry, StrategyParams } from "@/src/autopilot/params";
+import { liveReadiness } from "@/src/autopilot/live-readiness";
+import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry, type StrategyParams } from "@/src/autopilot/params";
 import {
   autopilotStore,
   type AutopilotCaps,
@@ -30,7 +31,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const DATA_BOUNDARY =
-  "Paper mode only. The Autopilot lane cannot touch brokerage, Monarch, or any other account.";
+  "Paper mode only. The Autopilot lane cannot touch connected accounts or move funds.";
 
 export type AutopilotApiPayload = {
   state: AutopilotStateView;
@@ -59,13 +60,18 @@ type AutopilotControlRequest = {
 };
 
 async function payload(): Promise<AutopilotApiPayload> {
-  const store = autopilotStore();
+  const state = getAutopilotState();
+  if (state.runtime_unavailable) return unavailablePayload(state, []);
+
   // The feed is best-effort color: a DexScreener hiccup must never fail the
   // endpoint, so any error degrades to []. GET never writes bot_state — the
   // daemon owns the heartbeat; this path only derives status from it.
   const marketFeed = await fetchMarketFeed().catch(() => [] as MarketFeedRow[]);
+
+  const store = autopilotStore();
+  const readiness = liveReadiness();
   return {
-    state: getAutopilotState(),
+    state,
     positions: store.positions(),
     equity: store.equitySeries(200),
     recent_trades: store.trades(50),
@@ -78,7 +84,7 @@ async function payload(): Promise<AutopilotApiPayload> {
       trades: store.trades(1000),
       decisions: store.decisions(400),
       equity_series: store.equitySeries(2000),
-      wallet_provisioned: liveReadiness().wallet_provisioned,
+      wallet_provisioned: readiness.wallet_provisioned,
       now_ms: Date.now(),
     }),
     strategy_params: store.strategyParams(),
@@ -100,7 +106,7 @@ async function payload(): Promise<AutopilotApiPayload> {
         calibration: calibrate(snapshots),
       };
     })(),
-    live_wallet: { provisioned: liveReadiness().wallet_provisioned, pubkey: liveReadiness().wallet_pubkey },
+    live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
     data_boundary: DATA_BOUNDARY,
   };
 }
@@ -120,7 +126,18 @@ export async function POST(
     return NextResponse.json({ error: "Expected JSON body" }, { status: 400 });
   }
 
-  const store = autopilotStore();
+  let store: ReturnType<typeof autopilotStore>;
+  try {
+    store = autopilotStore();
+  } catch (error) {
+    if (isAutopilotStoreUnavailable(error)) {
+      return NextResponse.json(
+        { error: "Autopilot store is unavailable; bot controls are locked." },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 
   switch (body.action) {
     case "kill": {
@@ -174,4 +191,32 @@ export async function POST(
 
 function describeCaps(caps: AutopilotCaps): string {
   return `$${caps.max_trade_usd} per paper entry, $${caps.daily_spend_limit_usd} daily spend, $${caps.daily_loss_limit_usd} daily loss limit, ${caps.max_positions} positions max, ${caps.drawdown_halt_pct}% drawdown halt`;
+}
+
+function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow[]): AutopilotApiPayload {
+  const readiness = liveReadiness();
+  const goLiveGate = evaluateGoLiveGate({
+    trades: [],
+    decisions: [],
+    equity_series: [],
+    wallet_provisioned: readiness.wallet_provisioned,
+    now_ms: Date.now(),
+  });
+  return {
+    state,
+    positions: [],
+    equity: [],
+    recent_trades: [],
+    recent_activity: [],
+    recent_decisions: [],
+    market_feed: marketFeed,
+    go_live_gate: goLiveGate,
+    strategy_params: { ...DEFAULT_STRATEGY_PARAMS },
+    param_changelog: [],
+    attribution: buildAttribution({ trades: [], decisions: [], exit_watches: [], param_changelog: [] }).summary,
+    analyst: null,
+    v3: { snapshot_count: 0, labeled_count: 0, latest_note: null, calibration: calibrate([]) },
+    live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
+    data_boundary: DATA_BOUNDARY,
+  };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 
 import { AutopilotTerminal } from "./autopilot-terminal";
 
@@ -23,6 +24,7 @@ type AutopilotStateView = {
   open_positions: number;
   equity_usd: number;
   last_activity: { id: string; ts: string; kind: string; message: string } | null;
+  runtime_unavailable?: string;
 };
 
 type MarketFeedRow = {
@@ -112,6 +114,11 @@ export function AutopilotPanel() {
   }, [load]);
 
   function post(body: Record<string, unknown>, successMessage: string) {
+    if (data?.state.runtime_unavailable) {
+      setMessage("");
+      setError(data.state.runtime_unavailable);
+      return;
+    }
     setMessage("");
     setError("");
     startTransition(async () => {
@@ -137,6 +144,12 @@ export function AutopilotPanel() {
   }
 
   function handleKillClick(engaged: boolean) {
+    if (data?.state.runtime_unavailable) {
+      setConfirmingKill(false);
+      setMessage("");
+      setError(data.state.runtime_unavailable);
+      return;
+    }
     if (!confirmingKill) {
       setConfirmingKill(true);
       // The confirm window closes itself: a stray first click never leaves a
@@ -161,6 +174,11 @@ export function AutopilotPanel() {
 
   function submitCaps(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (data?.state.runtime_unavailable) {
+      setMessage("");
+      setError(data.state.runtime_unavailable);
+      return;
+    }
     const entries = Object.fromEntries(new FormData(event.currentTarget).entries());
     const caps: Record<string, number> = {};
     for (const key of ["max_trade_usd", "daily_loss_limit_usd", "max_positions", "drawdown_halt_pct"]) {
@@ -180,6 +198,7 @@ export function AutopilotPanel() {
 
   const { state, positions, equity, recent_trades: recentTrades, recent_activity: recentActivity } = data;
   const killEngaged = state.kill_switch;
+  const runtimeUnavailable = Boolean(state.runtime_unavailable);
 
   return (
     <div className="rounded-md border border-outline-variant/25">
@@ -202,18 +221,22 @@ export function AutopilotPanel() {
             {modeLabel[state.mode]}
           </span>
         </span>
-        <span className="text-xs text-outline">
-          {data.live_wallet?.provisioned && data.live_wallet.pubkey
-            ? `wallet ${data.live_wallet.pubkey.slice(0, 4)}…${data.live_wallet.pubkey.slice(-4)}`
-            : "No wallet provisioned"}
-        </span>
+        {data.live_wallet?.provisioned && data.live_wallet.pubkey ? (
+          <span className="text-xs text-outline">
+            wallet {data.live_wallet.pubkey.slice(0, 4)}…{data.live_wallet.pubkey.slice(-4)}
+          </span>
+        ) : (
+          <Link href="/settings#autopilot" className="text-xs font-semibold text-violet hover:text-tertiary">
+            Wallet setup notes
+          </Link>
+        )}
         <DaemonHeartbeat daemon={state.daemon} lastTickAt={state.last_tick_at} />
         <span className="ml-auto flex items-center gap-3">
-          <span className="text-sm tabular-nums text-on-surface">
-            {formatCurrency(state.equity_usd)}
-            <span className="ml-1 text-xs text-on-surface-variant">paper equity</span>
+          <span className="inline-flex items-baseline gap-1 text-sm tabular-nums text-on-surface">
+            <span>{formatCurrency(state.equity_usd)}</span>
+            <span className="text-xs text-on-surface-variant">paper equity</span>
           </span>
-          {!killEngaged && state.mode === "off" ? (
+          {!runtimeUnavailable && !killEngaged && state.mode === "off" ? (
             <button
               type="button"
               disabled={isPending}
@@ -223,7 +246,7 @@ export function AutopilotPanel() {
               Arm paper trading
             </button>
           ) : null}
-          {!killEngaged && (state.mode === "paper" || state.mode === "live") ? (
+          {!runtimeUnavailable && !killEngaged && (state.mode === "paper" || state.mode === "live") ? (
             <button
               type="button"
               disabled={isPending}
@@ -235,7 +258,7 @@ export function AutopilotPanel() {
           ) : null}
           <button
             type="button"
-            disabled={isPending}
+            disabled={isPending || runtimeUnavailable}
             onClick={() => handleKillClick(killEngaged)}
             onBlur={() => setConfirmingKill(false)}
             className={`inline-flex min-h-11 items-center justify-center rounded-md border px-3 text-xs font-semibold transition-colors disabled:opacity-50 sm:min-h-8 ${
@@ -250,15 +273,21 @@ export function AutopilotPanel() {
               ? killEngaged
                 ? "Click again to release"
                 : "CONFIRM: halt the bot"
+              : runtimeUnavailable
+                ? "Controls locked"
               : killEngaged
                 ? "Release kill switch"
                 : "Kill switch"}
           </button>
         </span>
       </div>
-      {killEngaged || message || error ? (
+      {runtimeUnavailable || killEngaged || message || error ? (
         <p aria-live="polite" className="px-3 pb-1.5 text-xs text-outline">
-          {killEngaged ? (
+          {runtimeUnavailable ? (
+            <span className="font-semibold text-outline">
+              RUNTIME UNAVAILABLE — {state.runtime_unavailable}{" "}
+            </span>
+          ) : killEngaged ? (
             <span className="font-semibold text-critical">HALTED — release the kill switch, then Arm paper trading. </span>
           ) : null}
           {message || error}
@@ -428,39 +457,41 @@ export function AutopilotPanel() {
           </span>
         </summary>
         <form className="grid gap-3 pb-3 sm:grid-cols-4" onSubmit={submitCaps}>
-          <CapField
-            id="autopilot-cap-trade"
-            name="max_trade_usd"
-            label="Max per entry ($)"
-            defaultValue={state.caps.max_trade_usd}
-            max={1000}
-          />
-          <CapField
-            id="autopilot-cap-daily-loss"
-            name="daily_loss_limit_usd"
-            label="Daily loss limit ($)"
-            defaultValue={state.caps.daily_loss_limit_usd}
-          />
-          <CapField
-            id="autopilot-cap-positions"
-            name="max_positions"
-            label="Max positions"
-            defaultValue={state.caps.max_positions}
-            step={1}
-          />
-          <CapField
-            id="autopilot-cap-drawdown"
-            name="drawdown_halt_pct"
-            label="Drawdown halt (%)"
-            defaultValue={state.caps.drawdown_halt_pct}
-          />
-          <button
-            type="submit"
-            disabled={isPending}
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline-variant/40 px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-dim/40 disabled:opacity-50 sm:col-span-4 sm:min-h-8 sm:justify-self-start"
-          >
-            Save caps
-          </button>
+          <fieldset disabled={runtimeUnavailable || isPending} className="contents">
+            <CapField
+              id="autopilot-cap-trade"
+              name="max_trade_usd"
+              label="Max per entry ($)"
+              defaultValue={state.caps.max_trade_usd}
+              max={1000}
+            />
+            <CapField
+              id="autopilot-cap-daily-loss"
+              name="daily_loss_limit_usd"
+              label="Daily loss limit ($)"
+              defaultValue={state.caps.daily_loss_limit_usd}
+            />
+            <CapField
+              id="autopilot-cap-positions"
+              name="max_positions"
+              label="Max positions"
+              defaultValue={state.caps.max_positions}
+              step={1}
+            />
+            <CapField
+              id="autopilot-cap-drawdown"
+              name="drawdown_halt_pct"
+              label="Drawdown halt (%)"
+              defaultValue={state.caps.drawdown_halt_pct}
+            />
+            <button
+              type="submit"
+              disabled={runtimeUnavailable || isPending}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline-variant/40 px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-dim/40 disabled:opacity-50 sm:col-span-4 sm:min-h-8 sm:justify-self-start"
+            >
+              Save caps
+            </button>
+          </fieldset>
         </form>
       </details>
 

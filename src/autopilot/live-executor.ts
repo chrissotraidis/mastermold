@@ -20,7 +20,8 @@ import { Connection, Keypair, PublicKey, VersionedTransaction } from "@solana/we
 import { guardedConnectionFetch } from "../helius/firewall";
 import type { Executor, ExecutionResult } from "./executor";
 import type { TradeIntent } from "./intent";
-import { keypairFromSecret, liveReadiness } from "./live";
+import { keypairFromSecret } from "./live";
+import { liveReadiness } from "./live-readiness";
 import { MINT_DECIMALS } from "./rehearsal";
 
 const QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote";

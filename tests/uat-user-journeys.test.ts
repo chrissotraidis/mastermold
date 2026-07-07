@@ -828,7 +828,8 @@ describe("UAT user journeys over seeded data", () => {
     expect(integrations.filter((integration) => integration.status === "Sample mode")).toHaveLength(3);
     expect(integrations.filter((integration) => integration.status === "Needs key")).toHaveLength(1);
     expect(JSON.stringify(integrations)).not.toMatch(/stubbed|credential_gated/i);
-    expect(JSON.stringify(integrations)).toContain("Test live chat");
+    expect(JSON.stringify(integrations)).toContain("Provider API key");
+    expect(JSON.stringify(integrations)).toContain("Sends one short test question");
     expect(JSON.stringify(integrations)).not.toMatch(/AI test|AI key|ai_service|int_llm|"service":"llm"|event_time|knowledge_time/i);
     expect(
       integrations.every(

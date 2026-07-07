@@ -68,16 +68,16 @@ const serviceDisplay: Record<
   },
   llm: {
     display_name: "Live chat",
-    credential_hint: "Live chat key",
-    permission_scope: "Sends one short test question. Uses the saved server key if the key field is blank; no account action happens.",
+    credential_hint: "Provider key for live chat",
+    permission_scope: "Sends one short test question to the selected chat service. Uses the saved server key if the key field is blank; no account action happens.",
     docs_url: "https://openrouter.ai/docs/api-reference/chat-completion",
     researched_at: "2026-06-25",
     test_fields: [
       {
         name: "provider",
-        label: "Chat service",
+        label: "Chat provider",
         type: "select",
-        placeholder: "Chat service",
+        placeholder: "Chat provider",
         required: true,
         options: [
           { value: "openrouter", label: "OpenRouter" },
@@ -85,8 +85,8 @@ const serviceDisplay: Record<
           { value: "anthropic", label: "Anthropic" },
         ],
       },
-      { name: "api_key", label: "Live chat key", type: "password", placeholder: "Leave blank to use saved server key", required: false },
-      { name: "model", label: "Advanced override", type: "text", placeholder: "Usually leave blank", required: false },
+      { name: "api_key", label: "Provider API key", type: "password", placeholder: "Optional one-time key for this browser", required: false },
+      { name: "model", label: "Model override", type: "text", placeholder: "Optional, usually blank", required: false },
     ],
   },
 };
