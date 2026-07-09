@@ -12,6 +12,7 @@ import { fetchMarketFeed, type MarketFeedRow } from "@/src/autopilot/feed";
 import { fetchTrendingTokens, type TrendingToken } from "@/src/autopilot/v3/trending";
 import { buildAttribution, type AttributionSummary } from "@/src/autopilot/attribution";
 import { calibrate, type CalibrationSummary } from "@/src/autopilot/v3/calibration";
+import { summarizeCarryBook, type CarrySummary } from "@/src/autopilot/v3/carry-book";
 import { evaluateV3Promotion, type V3Promotion } from "@/src/autopilot/v3/promotion";
 import { isPlausibleSolanaAddress, MAX_WATCHED_WALLETS } from "@/src/autopilot/v3/smart-wallets";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
@@ -74,6 +75,8 @@ export type AutopilotApiPayload = {
     latest_note: string | null;
     calibration: CalibrationSummary;
     promotion: V3Promotion;
+    /** Synthetic funding-carry book: the delta-neutral strategy's evidence. */
+    carry: CarrySummary;
   };
   /** Public key only; the secret never leaves env (autonomy ADR, D6). */
   live_wallet: { provisioned: boolean; pubkey: string | null };
@@ -145,6 +148,7 @@ async function payload(): Promise<AutopilotApiPayload> {
         latest_note: latest?.message ?? null,
         calibration,
         promotion: evaluateV3Promotion(calibration),
+        carry: summarizeCarryBook(store.carryBook(), Date.now()),
       };
     })(),
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
@@ -300,6 +304,7 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
       latest_note: null,
       calibration: calibrate([]),
       promotion: evaluateV3Promotion(calibrate([])),
+      carry: summarizeCarryBook({ positions: {}, realized_usd: 0, round_trips: 0, history: [] }, Date.now()),
     },
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
     smart_wallets: { watched: [] },

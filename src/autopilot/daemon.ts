@@ -39,6 +39,7 @@ import { conservativeCost, memecoinConservativeCost } from "./v3/execution-cost"
 import type { FundingInput } from "./v3/funding-basis";
 import { fetchDriftFunding, PERP_MARKET_BY_MINT } from "./v3/perps";
 import { calibrate } from "./v3/calibration";
+import { markCarryBook } from "./v3/carry-book";
 import { evaluateV3Promotion } from "./v3/promotion";
 import { evaluateV3Shadow, labelDueCandidates, recordV3Shadow } from "./v3/shadow";
 import type { CandidateSignal } from "./v3/signal";
@@ -670,12 +671,13 @@ async function tick(context: TickContext): Promise<void> {
       // Drift funding for the perp-able majors (30-min cache inside; stale or
       // unreachable data yields fresh:false and simply produces no inputs).
       const fundingByMint = new Map<string, FundingInput>();
+      const fundingByMarket = new Map<string, FundingInput>();
       for (const [mint, market] of Object.entries(PERP_MARKET_BY_MINT)) {
         const asset = UNIVERSE.find((a) => a.mint === mint);
         if (!asset) continue;
         const snapshot = await fetchDriftFunding(market, nowMs);
         if (!snapshot.fresh || snapshot.funding_rate_8h_pct === null) continue;
-        fundingByMint.set(mint, {
+        const input: FundingInput = {
           symbol: asset.symbol,
           mint,
           funding_rate_8h_pct: snapshot.funding_rate_8h_pct,
@@ -684,8 +686,17 @@ async function tick(context: TickContext): Promise<void> {
           cost: conservativeCost(),
           liquidity_usd: feed.get(asset.symbol)?.liquidity_usd ?? null,
           funding_persistence_windows: snapshot.persistence_windows,
-        });
+        };
+        fundingByMint.set(mint, input);
+        fundingByMarket.set(market, input);
       }
+
+      // Synthetic carry book: mark the funding_basis strategy's would-be
+      // delta-neutral P&L from the same snapshots, so its evidence is a
+      // cumulative series instead of unlabeled shadow rows.
+      const carry = markCarryBook(store.carryBook(), fundingByMarket, nowMs);
+      store.setCarryBook(carry.state);
+      for (const note of carry.notes) store.appendActivity("carry", note);
       // The Solana radar: keyless trending/attention flow. Cached 5 minutes
       // inside; failures degrade to [] and the shadow simply runs without it.
       context.lastTrending = await fetchTrendingTokens(nowMs);

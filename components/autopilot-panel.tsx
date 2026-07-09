@@ -106,6 +106,13 @@ type AutopilotApiPayload = {
     latest_note: string | null;
     calibration: { verdict: string; labeled_snapshots: number };
     promotion?: { ready: boolean; checks: Array<{ key: string; label: string; pass: boolean; detail: string }> };
+    carry?: {
+      open_markets: number;
+      realized_usd: number;
+      round_trips: number;
+      total_usd: number;
+      apr_pct: number | null;
+    };
   };
   data_boundary: string;
 };
@@ -393,6 +400,16 @@ export function AutopilotPanel() {
               {data.v3.promotion.ready
                 ? "PROMOTED: co-piloting the paper book"
                 : `paper promotion ${data.v3.promotion.checks.filter((check) => check.pass).length}/${data.v3.promotion.checks.length} checks`}
+            </span>
+          ) : null}
+          {data.v3.carry ? (
+            <span title="Synthetic $100-per-market delta-neutral funding carry, marked from live Drift funding — the strategy's evidence, never a live position.">
+              {" · "}
+              carry shadow{" "}
+              <span className={data.v3.carry.total_usd >= 0 ? "text-engine" : "text-critical"}>
+                {data.v3.carry.total_usd >= 0 ? "+" : ""}${data.v3.carry.total_usd.toFixed(2)}
+              </span>
+              {` (${data.v3.carry.open_markets} open${data.v3.carry.apr_pct !== null ? `, ~${data.v3.carry.apr_pct.toFixed(1)}% APR` : ""})`}
             </span>
           ) : null}
         </p>

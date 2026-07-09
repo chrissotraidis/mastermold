@@ -47,6 +47,7 @@ import {
   type StrategyParams,
 } from "./params";
 import type { EvaluationSnapshot } from "./strategy-view";
+import { EMPTY_CARRY_BOOK, type CarryBookState } from "./v3/carry-book";
 import {
   isSqliteFile,
   openSqliteDatabase,
@@ -754,6 +755,17 @@ export class AutopilotStore {
 
   setSmartWalletCursors(cursors: Record<string, string>): void {
     this.setSingleton("smart_wallet_cursors", cursors);
+  }
+
+  // --- synthetic carry book (funding_basis shadow P&L) ---------------------------
+
+  carryBook(): CarryBookState {
+    const state = this.getSingleton<CarryBookState>("carry_book");
+    return state ? { ...EMPTY_CARRY_BOOK, ...state } : { ...EMPTY_CARRY_BOOK };
+  }
+
+  setCarryBook(state: CarryBookState): void {
+    this.setSingleton("carry_book", state);
   }
 
   // --- V3 paper-promotion state (evidence-gated, daemon-evaluated) --------------
