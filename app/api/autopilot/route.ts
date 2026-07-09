@@ -13,6 +13,7 @@ import { fetchTrendingTokens, type TrendingToken } from "@/src/autopilot/v3/tren
 import { buildAttribution, type AttributionSummary } from "@/src/autopilot/attribution";
 import { calibrate, type CalibrationSummary } from "@/src/autopilot/v3/calibration";
 import { evaluateV3Promotion, type V3Promotion } from "@/src/autopilot/v3/promotion";
+import { isPlausibleSolanaAddress, MAX_WATCHED_WALLETS } from "@/src/autopilot/v3/smart-wallets";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
 import { liveReadiness } from "@/src/autopilot/live-readiness";
 import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry, type StrategyParams } from "@/src/autopilot/params";
@@ -76,6 +77,8 @@ export type AutopilotApiPayload = {
   };
   /** Public key only; the secret never leaves env (autonomy ADR, D6). */
   live_wallet: { provisioned: boolean; pubkey: string | null };
+  /** Operator-curated smart-money list the copy_wallets module follows. */
+  smart_wallets: { watched: string[] };
   data_boundary: string;
 };
 
@@ -83,6 +86,7 @@ type AutopilotControlRequest = {
   action?: unknown;
   mode?: unknown;
   caps?: unknown;
+  wallets?: unknown;
 };
 
 async function payload(): Promise<AutopilotApiPayload> {
@@ -144,6 +148,7 @@ async function payload(): Promise<AutopilotApiPayload> {
       };
     })(),
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
+    smart_wallets: { watched: store.watchedWallets() },
     data_boundary: DATA_BOUNDARY,
   };
 }
@@ -218,9 +223,39 @@ export async function POST(
       return NextResponse.json(await payload());
     }
 
+    case "set_watched_wallets": {
+      // The copy_wallets module follows these addresses (read-only public-RPC
+      // polling; no keys, no authority). Base58-shaped, deduped, capped.
+      if (!Array.isArray(body.wallets) || body.wallets.some((wallet) => typeof wallet !== "string")) {
+        return NextResponse.json({ error: "wallets must be an array of addresses." }, { status: 422 });
+      }
+      const cleaned = [...new Set((body.wallets as string[]).map((wallet) => wallet.trim()).filter(Boolean))];
+      const invalid = cleaned.filter((wallet) => !isPlausibleSolanaAddress(wallet));
+      if (invalid.length > 0) {
+        return NextResponse.json(
+          { error: `not Solana addresses: ${invalid.slice(0, 3).join(", ")}` },
+          { status: 422 },
+        );
+      }
+      if (cleaned.length > MAX_WATCHED_WALLETS) {
+        return NextResponse.json(
+          { error: `watch at most ${MAX_WATCHED_WALLETS} wallets — this is a curated list, not a firehose.` },
+          { status: 422 },
+        );
+      }
+      store.setWatchedWallets(cleaned);
+      store.appendActivity(
+        "copy",
+        cleaned.length > 0
+          ? `Watched wallet list updated: following ${cleaned.length} wallet${cleaned.length === 1 ? "" : "s"}.`
+          : "Watched wallet list cleared.",
+      );
+      return NextResponse.json(await payload());
+    }
+
     default:
       return NextResponse.json(
-        { error: 'action must be one of "kill", "release", "set_mode", "set_caps".' },
+        { error: 'action must be one of "kill", "release", "set_mode", "set_caps", "set_watched_wallets".' },
         { status: 400 },
       );
   }
@@ -267,6 +302,7 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
       promotion: evaluateV3Promotion(calibrate([])),
     },
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
+    smart_wallets: { watched: [] },
     data_boundary: DATA_BOUNDARY,
   };
 }

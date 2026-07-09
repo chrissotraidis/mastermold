@@ -95,6 +95,8 @@ type AutopilotApiPayload = {
     liquidity_usd: number | null;
     boost_amount: number | null;
   }>;
+  /** Operator-curated smart-money list the copy_wallets module follows. */
+  smart_wallets?: { watched: string[] };
   analyst?: { ts: string; memo: string } | null;
   /** V3 shadow telemetry: candidate dataset size, calibration verdict, and
    * the paper-promotion gate. */
@@ -590,6 +592,47 @@ export function AutopilotPanel() {
           ) : null}
         </div>
       ) : null}
+
+      <details className="border-t border-outline-variant/20 px-3">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
+          Smart wallets
+          <span className="font-normal text-outline">
+            {(data.smart_wallets?.watched ?? []).length === 0
+              ? "none watched — paste addresses to follow smart money"
+              : `following ${(data.smart_wallets?.watched ?? []).length} wallet${(data.smart_wallets?.watched ?? []).length === 1 ? "" : "s"}`}
+          </span>
+        </summary>
+        <div className="pb-3">
+          <p className="text-xs leading-5 text-outline">
+            Read-only: the bot polls these addresses for fresh buys and scores them as slow-horizon copy
+            candidates in the V3 shadow. It never mirrors trades directly and holds no wallet authority.
+          </p>
+          <form
+            className="mt-2 grid gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const raw = String(new FormData(event.currentTarget).get("wallets") ?? "");
+              const wallets = raw.split(/[\s,]+/).filter(Boolean);
+              post({ action: "set_watched_wallets", wallets }, "Watched wallet list saved.");
+            }}
+          >
+            <textarea
+              name="wallets"
+              rows={3}
+              defaultValue={(data.smart_wallets?.watched ?? []).join("\n")}
+              placeholder={"One Solana address per line (max 8).\nFind candidates on GMGN/Birdeye PnL leaderboards."}
+              className="w-full rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 font-mono text-xs text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+            />
+            <button
+              type="submit"
+              disabled={runtimeUnavailable || isPending}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline-variant/40 px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-dim/40 disabled:opacity-50 sm:min-h-8 sm:justify-self-start"
+            >
+              Save watched wallets
+            </button>
+          </form>
+        </div>
+      </details>
 
       <details className="border-t border-outline-variant/20 px-3">
         <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">

@@ -108,6 +108,60 @@ export function parseMarketFeed(body: unknown, universe: UniverseAsset[] = UNIVE
   return rows;
 }
 
+export type TokenSummary = {
+  mint: string;
+  symbol: string;
+  price_usd: number;
+  liquidity_usd: number | null;
+  volume_h24_usd: number | null;
+};
+
+/** Pure: summarize one arbitrary mint from a DexScreener token-pairs body —
+ * deepest sane-quote pair wins, symbol comes from the pair's own base token.
+ * Used by the copy_wallets shell to price tokens outside the majors universe. */
+export function parseTokenSummary(body: unknown, mint: string): TokenSummary | null {
+  const pairs =
+    body && typeof body === "object" && Array.isArray((body as { pairs?: unknown }).pairs)
+      ? ((body as { pairs: unknown[] }).pairs as Array<Record<string, unknown>>)
+      : [];
+  let best: { summary: TokenSummary; liquidity: number } | null = null;
+  for (const pair of pairs) {
+    if (!pair || typeof pair !== "object" || pair.chainId !== "solana") continue;
+    const base = pair.baseToken as Record<string, unknown> | undefined;
+    if (!base || base.address !== mint) continue;
+    const quote = pair.quoteToken as Record<string, unknown> | undefined;
+    const quoteAddress = quote && typeof quote === "object" ? quote.address : null;
+    if (typeof quoteAddress !== "string" || !SANE_QUOTE_MINTS.has(quoteAddress)) continue;
+    const price = asFiniteNumber(pair.priceUsd);
+    if (price === null || price <= 0) continue;
+    const liquidity = asFiniteNumber(((pair.liquidity ?? {}) as Record<string, unknown>).usd);
+    const summary: TokenSummary = {
+      mint,
+      symbol: (typeof base.symbol === "string" && base.symbol ? base.symbol : mint.slice(0, 6)).slice(0, 12),
+      price_usd: price,
+      liquidity_usd: liquidity,
+      volume_h24_usd: asFiniteNumber(((pair.volume ?? {}) as Record<string, unknown>).h24),
+    };
+    if (!best || (liquidity ?? 0) > best.liquidity) best = { summary, liquidity: liquidity ?? 0 };
+  }
+  return best?.summary ?? null;
+}
+
+/** Fetch one off-universe token's market summary. Never throws; null on any
+ * failure. Uncached — callers budget their own request counts. */
+export async function fetchTokenSummary(mint: string, doFetch: typeof fetch = fetch): Promise<TokenSummary | null> {
+  try {
+    const response = await doFetch(`${FEED_URL}${mint}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    return parseTokenSummary(await response.json(), mint);
+  } catch {
+    return null;
+  }
+}
+
 let cache: { rows: MarketFeedRow[]; fetchedAtMs: number; ok: boolean } | null = null;
 
 /** Test seam: forget the cached feed so the next fetchMarketFeed() hits the network. */

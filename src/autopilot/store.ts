@@ -737,6 +737,25 @@ export class AutopilotStore {
     this.setSingleton("last_evaluations", snapshot);
   }
 
+  // --- watched wallets (copy_wallets module: operator-curated smart money) ------
+
+  watchedWallets(): string[] {
+    const list = this.getSingleton<string[]>("watched_wallets");
+    return Array.isArray(list) ? [...list] : [];
+  }
+
+  setWatchedWallets(wallets: string[]): void {
+    this.setSingleton("watched_wallets", wallets);
+  }
+
+  smartWalletCursors(): Record<string, string> {
+    return { ...(this.getSingleton<Record<string, string>>("smart_wallet_cursors") ?? {}) };
+  }
+
+  setSmartWalletCursors(cursors: Record<string, string>): void {
+    this.setSingleton("smart_wallet_cursors", cursors);
+  }
+
   // --- V3 paper-promotion state (evidence-gated, daemon-evaluated) --------------
 
   v3Promotion(): { ready: boolean; ts: string } | null {

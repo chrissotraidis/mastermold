@@ -20,6 +20,7 @@ import { pairEnabledIn } from "./pair-rv";
 import { classifyRegime, describeRegime } from "./regime";
 import { routeCandidates, type RouterResult } from "./router";
 import type { CandidateSignal, ExecutionCost, MarketRegime, StrategyId } from "./signal";
+import { copyWalletsEnabledIn } from "./smart-wallets";
 import { trendingCandidate, trendingEnabledIn, type TrendingToken } from "./trending";
 import { scoreToConfidence, xsecCandidate, xsecScore } from "./xsec";
 
@@ -34,6 +35,7 @@ export function enabledModulesFor(regime: MarketRegime): Set<StrategyId> {
   if (fundingEnabledIn(regime)) enabled.add("funding_basis");
   if (pairEnabledIn(regime)) enabled.add("pair_rv");
   if (trendingEnabledIn(regime)) enabled.add("trending");
+  if (copyWalletsEnabledIn(regime)) enabled.add("copy_wallets");
   return enabled;
 }
 
@@ -50,6 +52,8 @@ export type ShadowInput = {
   fundingByMint?: Map<string, FundingInput>;
   /** Solana trending radar rows (keyless GeckoTerminal + DexScreener boosts). */
   trendingTokens?: TrendingToken[];
+  /** Pre-built copy_wallets candidates (the shell resolves price/liquidity). */
+  copyCandidates?: CandidateSignal[];
   /** Conservative default cost for radar tokens outside `costByMint`. */
   defaultCost?: ExecutionCost;
 };
@@ -174,6 +178,11 @@ export function evaluateV3Shadow(input: ShadowInput): ShadowResult {
       const candidate = trendingCandidate(token, cost);
       if (candidate) candidates.push(candidate);
     }
+  }
+  // copy_wallets: smart-money follows built in the shell (they need price and
+  // liquidity lookups). Shadow-only like everything else until promotion.
+  if (enabled.has("copy_wallets") && input.copyCandidates) {
+    candidates.push(...input.copyCandidates);
   }
   // pair_rv needs spread history the daemon does not persist yet (plan §P5).
 

@@ -27,7 +27,7 @@ import { runAnalyst } from "./analyst";
 import { MEMECOIN_PAPER_FEE_RATE, paperExecutor, PAPER_FEE_RATE } from "./executor";
 import { fetchTokenBalanceUi, fetchUsdcBalanceUsd } from "./live";
 import { jupiterLiveExecutor } from "./live-executor";
-import { fetchMarketFeed, type MarketFeedRow } from "./feed";
+import { fetchMarketFeed, fetchTokenSummary, type MarketFeedRow, type TokenSummary } from "./feed";
 import { intentFromDecision } from "./intent";
 import { notifyOperator } from "./notify";
 import { DEFAULT_STRATEGY_PARAMS, type StrategyParams } from "./params";
@@ -42,6 +42,8 @@ import { calibrate } from "./v3/calibration";
 import { evaluateV3Promotion } from "./v3/promotion";
 import { evaluateV3Shadow, labelDueCandidates, recordV3Shadow } from "./v3/shadow";
 import type { CandidateSignal } from "./v3/signal";
+import { copyWalletCandidate, scanWatchedWallets, type WalletBuyEvent } from "./v3/smart-wallets";
+import { PUBLIC_RPC_URL } from "../helius/rpc-url";
 import { fetchTrendingTokens, type TrendingToken } from "./v3/trending";
 import { UNIVERSE } from "./universe";
 import {
@@ -523,6 +525,8 @@ type TickContext = {
   /** Latest Solana trending radar (refreshed in the V3 block; prices feed the
    * minute bars so off-universe snapshots can be forward-labeled). */
   lastTrending: TrendingToken[];
+  /** Latest smart-wallet buy targets' market summaries (same labeling ride). */
+  lastCopySummaries: TokenSummary[];
 };
 
 async function tick(context: TickContext): Promise<void> {
@@ -636,6 +640,11 @@ async function tick(context: TickContext): Promise<void> {
         barPrices[token.mint] = token.price_usd;
       }
     }
+    for (const summary of context.lastCopySummaries) {
+      if (summary.price_usd > 0 && barPrices[summary.mint] === undefined) {
+        barPrices[summary.mint] = summary.price_usd;
+      }
+    }
     store.appendPriceHistory(barPrices);
     const volumes: Record<string, number> = {};
     for (const asset of UNIVERSE) {
@@ -680,6 +689,45 @@ async function tick(context: TickContext): Promise<void> {
       // The Solana radar: keyless trending/attention flow. Cached 5 minutes
       // inside; failures degrade to [] and the shadow simply runs without it.
       context.lastTrending = await fetchTrendingTokens(nowMs);
+
+      // Smart-money follows: scan the operator's watched wallets for fresh
+      // buys (public RPC, budgeted), then price the bought tokens so the
+      // copy_wallets module can emit EV-gated candidates. Shadow-only.
+      const copyCandidates: CandidateSignal[] = [];
+      const watched = store.watchedWallets();
+      if (watched.length > 0) {
+        const scan = await scanWatchedWallets(
+          watched,
+          store.smartWalletCursors(),
+          process.env.SOLANA_RPC_URL?.trim() || PUBLIC_RPC_URL,
+        );
+        store.setSmartWalletCursors(scan.cursors);
+        const eventsByMint = new Map<string, WalletBuyEvent[]>();
+        for (const event of scan.events) {
+          eventsByMint.set(event.mint, [...(eventsByMint.get(event.mint) ?? []), event]);
+        }
+        const summaries: TokenSummary[] = [];
+        for (const [mint, events] of [...eventsByMint.entries()].slice(0, 3)) {
+          const summary = await fetchTokenSummary(mint);
+          if (!summary) continue;
+          summaries.push(summary);
+          store.appendActivity(
+            "copy",
+            `Watched wallet buy: ${[...new Set(events.map((e) => e.wallet.slice(0, 4)))].join(",")} bought ${summary.symbol}.`,
+          );
+          const candidate = copyWalletCandidate({
+            mint,
+            symbol: summary.symbol,
+            events,
+            price_usd: summary.price_usd,
+            liquidity_usd: summary.liquidity_usd,
+            cost: memecoinConservativeCost(),
+          });
+          if (candidate) copyCandidates.push(candidate);
+        }
+        if (summaries.length > 0) context.lastCopySummaries = summaries;
+      }
+
       const history = store.priceHistory();
       const shadow = evaluateV3Shadow({
         universe: UNIVERSE,
@@ -690,6 +738,7 @@ async function tick(context: TickContext): Promise<void> {
         volumeBaselineByMint: new Map(Object.entries(store.volumeBaselines())),
         fundingByMint,
         trendingTokens: context.lastTrending,
+        copyCandidates,
         // Off-universe tokens pay the memecoin tier: the EV gate must demand
         // ~2× more expected return from them than from majors.
         defaultCost: memecoinConservativeCost(),
@@ -700,6 +749,11 @@ async function tick(context: TickContext): Promise<void> {
       for (const token of context.lastTrending) {
         if (token.price_usd !== null && token.price_usd > 0 && !snapshotPrices.has(token.mint)) {
           snapshotPrices.set(token.mint, token.price_usd);
+        }
+      }
+      for (const summary of context.lastCopySummaries) {
+        if (summary.price_usd > 0 && !snapshotPrices.has(summary.mint)) {
+          snapshotPrices.set(summary.mint, summary.price_usd);
         }
       }
       const note = recordV3Shadow(store, shadow, snapshotPrices);
@@ -1020,6 +1074,7 @@ async function main(): Promise<void> {
     priceBackoffUntilMs: 0,
     cooldownUntilMs: new Map<string, number>(),
     lastTrending: [],
+    lastCopySummaries: [],
   };
   let stopping = false;
   const stop = () => {
