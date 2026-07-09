@@ -1013,9 +1013,9 @@ describe("mobile ergonomics source contracts", () => {
     const reviewCapabilities = source("src/product/capabilities.ts");
 
     expect(readme).toContain("synthetic sample data only");
-    expect(readme).toContain("must never contain a user's real portfolio");
+    expect(readme).toContain("does not include a live portfolio");
     expect(readme).toContain("npm run privacy:audit");
-    expect(readme).toContain("No license has been declared");
+    expect(readme).toContain("A formal open-source license has not been");
     expect(reviewCapabilities).toContain("Long-horizon live/out-of-sample forward evaluation with external baselines");
     expect(readme).not.toMatch(/real ~?\$?120k|demo\.local|docs\/STATUS/i);
     expect(readme).not.toContain(["docs", "ref"].join("/"));
