@@ -14,6 +14,7 @@
  */
 
 import { buildAttribution, type AttributionSummary } from "./attribution";
+import { notifyOperator } from "./notify";
 import { calibrate, describeCalibration } from "./v3/calibration";
 import { PARAM_CLAMPS, type Changeset, type ParamChangelogEntry, type ParamKey, type StrategyParams } from "./params";
 import { autopilotStore, type BotDecisionRow } from "./store";
@@ -371,6 +372,7 @@ export async function runAnalyst(
     proposalApplied = applied.ok;
     if (applied.ok) {
       store.appendActivity("analyst", `Param change applied: ${output.proposal.reason.slice(0, 160)}`);
+      notifyOperator("analyst", `Param change applied: ${output.proposal.reason.slice(0, 200)}`);
     } else {
       proposalError = applied.error;
       store.appendActivity("analyst", `Param proposal REFUSED by the rails: ${applied.error}`);

@@ -29,6 +29,7 @@ import { fetchTokenBalanceUi, fetchUsdcBalanceUsd } from "./live";
 import { jupiterLiveExecutor } from "./live-executor";
 import { fetchMarketFeed, type MarketFeedRow } from "./feed";
 import { intentFromDecision } from "./intent";
+import { notifyOperator } from "./notify";
 import { DEFAULT_STRATEGY_PARAMS, type StrategyParams } from "./params";
 import { validateIntent } from "./policy";
 import { describeRehearsal, rehearseFill } from "./rehearsal";
@@ -599,12 +600,16 @@ async function tick(context: TickContext): Promise<void> {
   const peakEquity = Math.max(...eraPoints.map((point) => point.equity_usd), equity, isLive ? equity : PAPER_STARTING_CASH_USD);
   if (dayStart - equity > state.caps.daily_loss_limit_usd) {
     store.updateBotState({ mode: "halted", kill_switch: true });
-    store.appendActivity("halt", `Daily loss limit hit: down $${(dayStart - equity).toFixed(2)} today. Bot halted; release the kill switch to reset.`);
+    const message = `Daily loss limit hit: down $${(dayStart - equity).toFixed(2)} today. Bot halted; release the kill switch to reset.`;
+    store.appendActivity("halt", message);
+    notifyOperator("halt", message);
     return;
   }
   if (equity < peakEquity * (1 - state.caps.drawdown_halt_pct / 100)) {
     store.updateBotState({ mode: "halted", kill_switch: true });
-    store.appendActivity("halt", `Drawdown halt: equity $${equity.toFixed(2)} is ${state.caps.drawdown_halt_pct}% below peak $${peakEquity.toFixed(2)}.`);
+    const message = `Drawdown halt: equity $${equity.toFixed(2)} is ${state.caps.drawdown_halt_pct}% below peak $${peakEquity.toFixed(2)}.`;
+    store.appendActivity("halt", message);
+    notifyOperator("halt", message);
     return;
   }
 
@@ -716,12 +721,11 @@ async function tick(context: TickContext): Promise<void> {
       const previous = store.v3Promotion();
       if ((previous?.ready ?? false) !== promotion.ready) {
         store.setV3Promotion({ ready: promotion.ready, ts: new Date(nowMs).toISOString() });
-        store.appendActivity(
-          "v3-shadow",
-          promotion.ready
-            ? "V3 PROMOTION GATE OPEN: calibrated shadow candidates now co-pilot the paper book."
-            : `V3 promotion gate closed: ${promotion.checks.filter((check) => !check.pass).map((check) => check.detail).join("; ")}.`,
-        );
+        const transition = promotion.ready
+          ? "V3 PROMOTION GATE OPEN: calibrated shadow candidates now co-pilot the paper book."
+          : `V3 promotion gate closed: ${promotion.checks.filter((check) => !check.pass).map((check) => check.detail).join("; ")}.`;
+        store.appendActivity("v3-shadow", transition);
+        notifyOperator("v3", transition);
       }
       if (promotion.ready && state.mode === "paper") {
         const top = shadow.route.ranked[0] ?? null;
@@ -877,6 +881,7 @@ async function tick(context: TickContext): Promise<void> {
       spendToday += fill.value_usd;
       store.appendDecision({ symbol: intent.symbol, verdict: "enter", reason: intent.reason, signals: intent.signals });
       store.appendActivity("entry", `Paper buy ${intent.symbol}: $${fill.value_usd.toFixed(2)} at $${fill.price_usd.toFixed(4)}. ${intent.reason}`);
+      notifyOperator("entry", `${isLive ? "LIVE" : "Paper"} buy ${intent.symbol}: $${fill.value_usd.toFixed(2)} at $${fill.price_usd.toFixed(4)}`);
       store.appendWeb3Memory({ symbol: intent.symbol, kind: "entry", summary: `Entered ${intent.symbol} at $${fill.price_usd.toFixed(4)}. ${intent.reason}` });
     } else {
       const position = store.positions().find((row) => row.mint === intent.mint);
@@ -899,6 +904,7 @@ async function tick(context: TickContext): Promise<void> {
       freeCash += fill.value_usd - fill.fee_usd;
       store.appendDecision({ symbol: intent.symbol, verdict: "exit", reason: intent.reason, signals: intent.signals });
       store.appendActivity("exit", `Paper sell ${intent.symbol}: $${fill.value_usd.toFixed(2)} at $${fill.price_usd.toFixed(4)} (${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} before fees). ${intent.reason}`);
+      notifyOperator("exit", `${isLive ? "LIVE" : "Paper"} sell ${intent.symbol}: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} before fees. ${intent.reason}`);
       store.appendWeb3Memory({ symbol: intent.symbol, kind: "exit", summary: `Exited ${intent.symbol} at $${fill.price_usd.toFixed(4)}, ${pnl >= 0 ? "gain" : "loss"} $${Math.abs(pnl).toFixed(2)} before fees. ${intent.reason}` });
     }
   }
@@ -913,10 +919,9 @@ async function tick(context: TickContext): Promise<void> {
       store.appendActivity("error", "Live reconcile skipped: USDC balance unavailable after fills.");
     } else if (Math.abs(actual - freeCash) > Math.max(1, freeCash * 0.02)) {
       store.updateBotState({ mode: "halted", kill_switch: true });
-      store.appendActivity(
-        "halt",
-        `LIVE RECONCILE MISMATCH: wallet USDC $${actual.toFixed(2)} vs booked $${freeCash.toFixed(2)} — halted pending operator review.`,
-      );
+      const message = `LIVE RECONCILE MISMATCH: wallet USDC $${actual.toFixed(2)} vs booked $${freeCash.toFixed(2)} — halted pending operator review.`;
+      store.appendActivity("halt", message);
+      notifyOperator("halt", message);
       return;
     }
     // ON-CHAIN POSITION RECONCILE: every open position's booked quantity must
@@ -932,10 +937,9 @@ async function tick(context: TickContext): Promise<void> {
       const drift = Math.abs(onChain - position.qty);
       if (drift > Math.max(position.qty * 0.02, 1e-9)) {
         store.updateBotState({ mode: "halted", kill_switch: true });
-        store.appendActivity(
-          "halt",
-          `LIVE POSITION MISMATCH: ${position.symbol} on-chain ${onChain} vs booked ${position.qty} — halted pending operator review.`,
-        );
+        const message = `LIVE POSITION MISMATCH: ${position.symbol} on-chain ${onChain} vs booked ${position.qty} — halted pending operator review.`;
+        store.appendActivity("halt", message);
+        notifyOperator("halt", message);
         return;
       }
     }
@@ -1021,6 +1025,7 @@ async function main(): Promise<void> {
   const stop = () => {
     stopping = true;
     store.appendActivity("daemon", "Paper daemon stopped.");
+    notifyOperator("daemon", "Autopilot daemon stopped.");
     process.exit(0);
   };
   process.on("SIGINT", stop);
