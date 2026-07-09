@@ -25,17 +25,35 @@ export const PRIORITY_FEE_BPS = 3; // small priority fee, size-relative
 export const FAILED_TX_BPS = 4; // amortized cost of a failed/late landing
 /** Conservative fallback when no quote is available — keeps the EV gate strict. */
 export const CONSERVATIVE_TOTAL_BPS = 120;
+/**
+ * Memecoin/off-universe tier (2026-07-09 cost research): real round trips on
+ * $100k–$2M-liquidity tokens run 1.5–4% all-in (25–100bp/side pool fees,
+ * impact, sandwich exposure, failed-tx overhead) — the 120bp default was
+ * flattering by 2–3×, which would have let the promotion gate open on trades
+ * that lose in reality. 250bp is the mid-range conservative estimate.
+ */
+export const MEMECOIN_CONSERVATIVE_TOTAL_BPS = 250;
+export const MEMECOIN_DEX_FEE_BPS = 50; // 0.25–0.5%/side pools dominate this class
 
-export function conservativeCost(): ExecutionCost {
+function conservativeCostAt(totalBps: number, dexFeeBps: number): ExecutionCost {
   return {
-    dex_fee_bps: DEX_FEE_BPS,
-    price_impact_bps: CONSERVATIVE_TOTAL_BPS - DEX_FEE_BPS - BASE_SPREAD_BPS - PRIORITY_FEE_BPS - FAILED_TX_BPS,
+    dex_fee_bps: dexFeeBps,
+    price_impact_bps: totalBps - dexFeeBps - BASE_SPREAD_BPS - PRIORITY_FEE_BPS - FAILED_TX_BPS,
     spread_bps: BASE_SPREAD_BPS,
     slippage_bps: 0,
     priority_fee_bps: PRIORITY_FEE_BPS,
     failed_tx_bps: FAILED_TX_BPS,
-    total_bps: CONSERVATIVE_TOTAL_BPS,
+    total_bps: totalBps,
   };
+}
+
+export function conservativeCost(): ExecutionCost {
+  return conservativeCostAt(CONSERVATIVE_TOTAL_BPS, DEX_FEE_BPS);
+}
+
+/** The strict default for any token outside the majors universe. */
+export function memecoinConservativeCost(): ExecutionCost {
+  return conservativeCostAt(MEMECOIN_CONSERVATIVE_TOTAL_BPS, MEMECOIN_DEX_FEE_BPS);
 }
 
 /**

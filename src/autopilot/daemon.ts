@@ -24,7 +24,7 @@
  */
 
 import { runAnalyst } from "./analyst";
-import { paperExecutor, PAPER_FEE_RATE } from "./executor";
+import { MEMECOIN_PAPER_FEE_RATE, paperExecutor, PAPER_FEE_RATE } from "./executor";
 import { fetchTokenBalanceUi, fetchUsdcBalanceUsd } from "./live";
 import { jupiterLiveExecutor } from "./live-executor";
 import { fetchMarketFeed, type MarketFeedRow } from "./feed";
@@ -34,7 +34,7 @@ import { validateIntent } from "./policy";
 import { describeRehearsal, rehearseFill } from "./rehearsal";
 import type { SymbolEvaluation } from "./strategy-view";
 import type { PriceObservation } from "./v3/candidate-store";
-import { conservativeCost } from "./v3/execution-cost";
+import { conservativeCost, memecoinConservativeCost } from "./v3/execution-cost";
 import type { FundingInput } from "./v3/funding-basis";
 import { fetchDriftFunding, PERP_MARKET_BY_MINT } from "./v3/perps";
 import { calibrate } from "./v3/calibration";
@@ -685,7 +685,9 @@ async function tick(context: TickContext): Promise<void> {
         volumeBaselineByMint: new Map(Object.entries(store.volumeBaselines())),
         fundingByMint,
         trendingTokens: context.lastTrending,
-        defaultCost: conservativeCost(),
+        // Off-universe tokens pay the memecoin tier: the EV gate must demand
+        // ~2× more expected return from them than from majors.
+        defaultCost: memecoinConservativeCost(),
       });
       // Radar prices join the map so off-universe snapshots record a real
       // entry price instead of 0.
@@ -798,9 +800,13 @@ async function tick(context: TickContext): Promise<void> {
   // (docs/roadmap/2026-07-03-autonomy-architecture.md, D2/D3). Cash, spend,
   // and trade counters advance locally so a tick's second intent is judged
   // against the state its first one produced.
+  // Fee tier by token class: majors pay the tight-pool rate, anything off
+  // the universe (promoted V3 entries) pays the honest memecoin rate.
+  const paperFeeRateFor = (mint: string): number =>
+    UNIVERSE.some((asset) => asset.mint === mint) ? PAPER_FEE_RATE : MEMECOIN_PAPER_FEE_RATE;
   const executor = isLive
     ? jupiterLiveExecutor({ dry_run: false, reserve_floor_sol: state.caps.reserve_floor_sol })
-    : paperExecutor();
+    : paperExecutor({ feeRateForMint: paperFeeRateFor });
   let freeCash = cash;
   let buysToday = tradesToday;
   let spendToday = modeTrades
@@ -888,7 +894,7 @@ async function tick(context: TickContext): Promise<void> {
         exit_price_usd: fill.price_usd,
         exit_ts: sellRow.ts,
         // Net of BOTH sides' fees (the buy fee is estimated from cost basis).
-        was_loss: pnl - fill.fee_usd - position.qty * position.avg_cost_usd * PAPER_FEE_RATE < 0,
+        was_loss: pnl - fill.fee_usd - position.qty * position.avg_cost_usd * paperFeeRateFor(intent.mint) < 0,
       });
       freeCash += fill.value_usd - fill.fee_usd;
       store.appendDecision({ symbol: intent.symbol, verdict: "exit", reason: intent.reason, signals: intent.signals });

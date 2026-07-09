@@ -12,8 +12,12 @@
 
 import type { TradeIntent } from "./intent";
 
-/** 30bps per side: fees + slippage estimate for the paper book. */
+/** 30bps per side: fees + slippage estimate for MAJORS in the paper book. */
 export const PAPER_FEE_RATE = 0.003;
+/** 125bps per side for off-universe/memecoin tokens (2026-07-09 cost
+ * research: real round trips on that class run 1.5–4% all-in — flat 30bp
+ * would flatter every promoted V3 fill and poison the go-live evidence). */
+export const MEMECOIN_PAPER_FEE_RATE = 0.0125;
 
 export type ExecutionFill = {
   qty: number;
@@ -31,19 +35,27 @@ export interface Executor {
   execute(intent: TradeIntent): Promise<ExecutionResult>;
 }
 
+export type PaperExecutorOptions = {
+  /** Per-mint fee tier; defaults to the flat majors rate. The daemon passes a
+   * classifier so off-universe fills pay the honest memecoin rate. */
+  feeRateForMint?: (mint: string) => number;
+};
+
 /** Simulated fills at the reference price; the only executor that exists today. */
-export function paperExecutor(): Executor {
+export function paperExecutor(options: PaperExecutorOptions = {}): Executor {
+  const feeRateFor = options.feeRateForMint ?? (() => PAPER_FEE_RATE);
   return {
     kind: "paper",
     async execute(intent: TradeIntent): Promise<ExecutionResult> {
       if (intent.mode !== "paper") {
         return { ok: false, error: `paper executor refuses ${intent.mode} intents` };
       }
+      const feeRate = feeRateFor(intent.mint);
       if (intent.action === "buy") {
         const qty = intent.notional_usd / intent.price_usd;
         return {
           ok: true,
-          fill: { qty, price_usd: intent.price_usd, value_usd: intent.notional_usd, fee_usd: intent.notional_usd * PAPER_FEE_RATE },
+          fill: { qty, price_usd: intent.price_usd, value_usd: intent.notional_usd, fee_usd: intent.notional_usd * feeRate },
         };
       }
       if (intent.qty === null || intent.qty <= 0) {
@@ -52,7 +64,7 @@ export function paperExecutor(): Executor {
       const value = intent.qty * intent.price_usd;
       return {
         ok: true,
-        fill: { qty: intent.qty, price_usd: intent.price_usd, value_usd: value, fee_usd: value * PAPER_FEE_RATE },
+        fill: { qty: intent.qty, price_usd: intent.price_usd, value_usd: value, fee_usd: value * feeRate },
       };
     },
   };

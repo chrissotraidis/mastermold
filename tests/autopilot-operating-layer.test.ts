@@ -10,7 +10,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { MAX_TRADES_PER_DAY, UNIVERSE } from "../src/autopilot/daemon";
-import { PAPER_FEE_RATE, paperExecutor } from "../src/autopilot/executor";
+import { MEMECOIN_PAPER_FEE_RATE, PAPER_FEE_RATE, paperExecutor } from "../src/autopilot/executor";
 import { intentFromDecision, type TradeIntent } from "../src/autopilot/intent";
 import { MIN_NOTIONAL_USD, validateIntent, type PolicyContext } from "../src/autopilot/policy";
 import { DEFAULT_AUTOPILOT_CAPS, type BotPositionRow, type BotStateRow, type DecisionSignals } from "../src/autopilot/store";
@@ -211,5 +211,15 @@ describe("paper executor", () => {
     if (!result.ok) throw new Error(result.error);
     expect(result.fill.value_usd).toBeCloseTo(25.5, 9);
     expect(result.fill.fee_usd).toBeCloseTo(25.5 * PAPER_FEE_RATE, 9);
+  });
+
+  test("GIVEN a fee classifier THEN off-universe mints pay the memecoin tier", async () => {
+    const executor = paperExecutor({
+      feeRateForMint: (mint) => (mint === "major-mint" ? PAPER_FEE_RATE : MEMECOIN_PAPER_FEE_RATE),
+    });
+    const memecoin = await executor.execute(buyIntent({ notional_usd: 25, price_usd: 100 }));
+    if (!memecoin.ok) throw new Error(memecoin.error);
+    expect(memecoin.fill.fee_usd).toBeCloseTo(25 * MEMECOIN_PAPER_FEE_RATE, 9);
+    expect(memecoin.fill.fee_usd).toBeGreaterThan(25 * PAPER_FEE_RATE * 3);
   });
 });

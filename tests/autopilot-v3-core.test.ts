@@ -12,7 +12,9 @@ import {
   conservativeCost,
   costFromImpact,
   impactFromQuoteBody,
+  memecoinConservativeCost,
   CONSERVATIVE_TOTAL_BPS,
+  MEMECOIN_CONSERVATIVE_TOTAL_BPS,
 } from "../src/autopilot/v3/execution-cost";
 import { passesEvGate, requiredEvBps } from "../src/autopilot/v3/ev-gate";
 import { classifyRegime, EXTREME_VOL_PCT } from "../src/autopilot/v3/regime";
@@ -34,6 +36,15 @@ describe("execution-cost model", () => {
     expect(impactFromQuoteBody({ priceImpactPct: "0.0005" })).toBeCloseTo(0.0005, 6);
     expect(impactFromQuoteBody({})).toBeNull();
     expect(impactFromQuoteBody(null)).toBeNull();
+  });
+
+  test("GIVEN the memecoin tier THEN the EV bar sits ~2x above the majors default and components add up", () => {
+    const cost = memecoinConservativeCost();
+    expect(cost.total_bps).toBe(MEMECOIN_CONSERVATIVE_TOTAL_BPS);
+    expect(cost.total_bps).toBeGreaterThanOrEqual(conservativeCost().total_bps * 2);
+    const sum =
+      cost.dex_fee_bps + cost.price_impact_bps + cost.spread_bps + cost.slippage_bps + cost.priority_fee_bps + cost.failed_tx_bps;
+    expect(sum).toBeCloseTo(cost.total_bps, 5);
   });
 });
 
