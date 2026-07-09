@@ -71,7 +71,14 @@ app starts in sample mode and runs without external accounts, API keys, or a
 wallet. Connecting accounts or preparing a Solana wallet is optional and must
 use local, ignored configuration only.
 
-Two optional processes deepen the experience once the app runs:
+To run everything — web app plus the Solana paper-bot daemon, supervised and
+auto-restarted — use the one command:
+
+```bash
+npm run up
+```
+
+The pieces are also available individually:
 
 ```bash
 npm run autopilot   # the Solana paper-bot daemon (arm it from the Autopilot page)

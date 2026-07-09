@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { AutomationHealthBanner } from "@/components/automation-health-banner";
 import { DailyReportRefreshButton } from "@/components/daily-report-refresh-button";
 import { TodayMemoryRefresh } from "@/components/today-memory-refresh";
 import { TodayReadTimer } from "@/components/today-metrics";
@@ -55,6 +56,9 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
               <p className="mt-0.5 text-xs text-outline">{todayDateLine(report)}</p>
             </div>
             <DailyReportRefreshButton variant="ghost" />
+          </div>
+          <div className="mt-2 empty:hidden">
+            <AutomationHealthBanner />
           </div>
           <p className="mt-2 text-lg text-on-surface" data-testid="today-pulse">
             <span className="font-semibold tabular-nums">{formatCurrency(portfolio.total_market_value)}</span>

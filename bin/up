@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# bin/up — the one command: web app + autopilot daemon, supervised.
+#
+# Starts the Next dev server (port 4002) and the Autopilot paper daemon,
+# restarts either one if it crashes (exponential backoff, 30s cap), and stops
+# both on Ctrl-C. Logs land in .data/logs/. If an app is already listening on
+# :4002 (another terminal, the desktop preview), only the daemon is
+# supervised so two servers never fight over the port.
+#
+# This supervises PROCESSES only. Whether the bot trades is still the mode
+# set from the Autopilot page — a supervised daemon in mode "off" just idles.
+set -uo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+mkdir -p .data/logs
+
+BUN="node_modules/.bin/bun"
+[ -x "$BUN" ] || BUN="bun"
+
+supervise() {
+  local name="$1"
+  shift
+  local delay=2
+  while true; do
+    echo "up: starting ${name} ($(date -u +%FT%TZ))" >>".data/logs/${name}.log"
+    "$@" >>".data/logs/${name}.log" 2>&1
+    echo "up: ${name} exited; restarting in ${delay}s (log: .data/logs/${name}.log)"
+    sleep "$delay"
+    delay=$((delay < 30 ? delay * 2 : 30))
+  done
+}
+
+echo "up: logs in .data/logs/ · Ctrl-C stops everything"
+if curl -s -o /dev/null -m 2 http://localhost:4002/api/health 2>/dev/null; then
+  echo "up: an app is already running on :4002 — supervising the autopilot daemon only"
+else
+  supervise web "$BUN" run dev &
+  echo "up: web starting at http://localhost:4002"
+fi
+supervise autopilot bin/autopilot-daemon &
+echo "up: autopilot daemon starting (arm or stop the bot from the Autopilot page)"
+
+# Ctrl-C / SIGTERM: drop the trap, then signal the whole process group so the
+# supervisor loops and their children all stop together.
+trap 'trap - INT TERM; kill 0' INT TERM
+wait

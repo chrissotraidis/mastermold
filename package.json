@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev --port 4002",
+    "up": "bin/up",
     "build": "next build",
     "postbuild": "node scripts/prepare-standalone.mjs && node scripts/release-artifact-audit.mjs",
     "start": "PORT=${PORT:-4002} node .next/standalone/server.js",
