@@ -34,7 +34,33 @@ export type GateInput = {
    * acknowledged the live caps. No code path sets this yet — by design. */
   wallet_provisioned: boolean;
   now_ms: number;
+  /** Persisted minute bars (oldest → newest). When present, the performance
+   * check demands alpha over SOL buy-and-hold, not just an absolute gain. */
+  price_history?: Array<{ ts: string; prices: Record<string, number> }>;
 };
+
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+/** SOL buy-and-hold return (%) across the window, from persisted minute bars.
+ * Null when the history doesn't span enough of the window to be meaningful. */
+export function solBenchmarkReturnPct(
+  history: Array<{ ts: string; prices: Record<string, number> }>,
+  windowStartMs: number,
+  nowMs: number,
+): number | null {
+  const inWindow = history.filter((row) => {
+    const ms = Date.parse(row.ts);
+    return ms >= windowStartMs && ms <= nowMs && Number.isFinite(row.prices[SOL_MINT]) && row.prices[SOL_MINT] > 0;
+  });
+  if (inWindow.length < 2) return null;
+  const first = inWindow[0];
+  const last = inWindow[inWindow.length - 1];
+  // Demand real coverage: a benchmark from a sliver of the window would let a
+  // lucky hour stand in for five days.
+  const spanMs = Date.parse(last.ts) - Date.parse(first.ts);
+  if (spanMs < (nowMs - windowStartMs) * 0.5) return null;
+  return ((last.prices[SOL_MINT] - first.prices[SOL_MINT]) / first.prices[SOL_MINT]) * 100;
+}
 
 /** Every trade must have a matching trace row: same symbol, enter/exit
  * verdict matching the side, stamped within a minute of the fill. */
@@ -80,16 +106,27 @@ export function evaluateGoLiveGate(input: GateInput): GoLiveGate {
 
   const startEquity = equity[0]?.equity_usd ?? null;
   const endEquity = equity.length > 0 ? equity[equity.length - 1].equity_usd : null;
+  // Alpha, not beta: with persisted minute bars the bot must beat SOL
+  // buy-and-hold over the window — a bot that underperforms holding SOL has no
+  // business going live. Without enough history the check stays absolute.
+  const solReturnPct = solBenchmarkReturnPct(input.price_history ?? [], windowStartMs, input.now_ms);
+  const equityReturnPct =
+    startEquity !== null && endEquity !== null && startEquity > 0
+      ? ((endEquity - startEquity) / startEquity) * 100
+      : null;
+  const beatsBenchmark = solReturnPct === null || (equityReturnPct !== null && equityReturnPct >= solReturnPct);
   const performance: GateCheck = {
     key: "performance",
-    label: "equity above the window start, net of modeled costs",
-    // A SOL-benchmark comparison lands with persisted price history; until
-    // then the honest check is absolute: the window must not have lost money.
-    pass: startEquity !== null && endEquity !== null && endEquity > startEquity,
+    label: "equity above the window start and ahead of SOL buy-and-hold",
+    pass: startEquity !== null && endEquity !== null && endEquity > startEquity && beatsBenchmark,
     detail:
       startEquity === null || endEquity === null
         ? "no equity marks in the window yet"
-        : `$${startEquity.toFixed(2)} → $${endEquity.toFixed(2)}`,
+        : `$${startEquity.toFixed(2)} → $${endEquity.toFixed(2)}${
+            solReturnPct !== null && equityReturnPct !== null
+              ? ` (${equityReturnPct >= 0 ? "+" : ""}${equityReturnPct.toFixed(1)}% vs SOL ${solReturnPct >= 0 ? "+" : ""}${solReturnPct.toFixed(1)}%)`
+              : " (SOL benchmark pending price history)"
+          }`,
   };
 
   let peak = -Infinity;

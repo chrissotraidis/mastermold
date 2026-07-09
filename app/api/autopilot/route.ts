@@ -9,11 +9,19 @@ import {
   type ControlResult,
 } from "@/src/autopilot/control";
 import { fetchMarketFeed, type MarketFeedRow } from "@/src/autopilot/feed";
+import { fetchTrendingTokens, type TrendingToken } from "@/src/autopilot/v3/trending";
 import { buildAttribution, type AttributionSummary } from "@/src/autopilot/attribution";
 import { calibrate, type CalibrationSummary } from "@/src/autopilot/v3/calibration";
+import { evaluateV3Promotion, type V3Promotion } from "@/src/autopilot/v3/promotion";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
 import { liveReadiness } from "@/src/autopilot/live-readiness";
 import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry, type StrategyParams } from "@/src/autopilot/params";
+import {
+  describeStrategyRules,
+  STRATEGY_NAME,
+  STRATEGY_SUMMARY,
+  type EvaluationSnapshot,
+} from "@/src/autopilot/strategy-view";
 import {
   autopilotStore,
   type AutopilotCaps,
@@ -41,13 +49,31 @@ export type AutopilotApiPayload = {
   recent_activity: BotActivityRow[];
   recent_decisions: BotDecisionRow[];
   market_feed: MarketFeedRow[];
+  /** Solana trending radar (keyless GeckoTerminal + DexScreener boosts) —
+   * where attention is flowing right now; feeds the V3 trending module. */
+  trending: TrendingToken[];
   go_live_gate: GoLiveGate;
+  /** The strategy made legible: name, rules as sentences from the LIVE params,
+   * and the daemon's latest per-symbol verdicts. */
+  strategy: {
+    name: string;
+    summary: string;
+    rules: string[];
+    evaluations: EvaluationSnapshot | null;
+  };
   strategy_params: StrategyParams;
   param_changelog: ParamChangelogEntry[];
   attribution: AttributionSummary;
   analyst: { ts: string; memo: string } | null;
-  /** V3 shadow status: dataset size + the calibration verdict. */
-  v3: { snapshot_count: number; labeled_count: number; latest_note: string | null; calibration: CalibrationSummary };
+  /** V3 shadow status: dataset size, the calibration verdict, and the
+   * paper-promotion gate (whether shadow candidates may co-pilot the book). */
+  v3: {
+    snapshot_count: number;
+    labeled_count: number;
+    latest_note: string | null;
+    calibration: CalibrationSummary;
+    promotion: V3Promotion;
+  };
   /** Public key only; the secret never leaves env (autonomy ADR, D6). */
   live_wallet: { provisioned: boolean; pubkey: string | null };
   data_boundary: string;
@@ -67,6 +93,7 @@ async function payload(): Promise<AutopilotApiPayload> {
   // endpoint, so any error degrades to []. GET never writes bot_state — the
   // daemon owns the heartbeat; this path only derives status from it.
   const marketFeed = await fetchMarketFeed().catch(() => [] as MarketFeedRow[]);
+  const trending = await fetchTrendingTokens().catch(() => [] as TrendingToken[]);
 
   const store = autopilotStore();
   const readiness = liveReadiness();
@@ -78,6 +105,7 @@ async function payload(): Promise<AutopilotApiPayload> {
     recent_activity: store.activity(50),
     recent_decisions: store.decisions(30),
     market_feed: marketFeed,
+    trending,
     // The wallet check reads env provisioning (AUTOPILOT_WALLET_SECRET); the
     // secret itself never enters the payload or the store (autonomy ADR, D6).
     go_live_gate: evaluateGoLiveGate({
@@ -86,7 +114,14 @@ async function payload(): Promise<AutopilotApiPayload> {
       equity_series: store.equitySeries(2000),
       wallet_provisioned: readiness.wallet_provisioned,
       now_ms: Date.now(),
+      price_history: store.priceHistory(),
     }),
+    strategy: {
+      name: STRATEGY_NAME,
+      summary: STRATEGY_SUMMARY,
+      rules: describeStrategyRules(store.strategyParams()),
+      evaluations: store.lastEvaluations(),
+    },
     strategy_params: store.strategyParams(),
     param_changelog: store.paramChangelog(20),
     attribution: buildAttribution({
@@ -99,11 +134,13 @@ async function payload(): Promise<AutopilotApiPayload> {
     v3: (() => {
       const snapshots = store.candidateSnapshots(2000);
       const latest = store.activity(50).find((row) => row.kind === "v3-shadow") ?? null;
+      const calibration = calibrate(snapshots);
       return {
         snapshot_count: snapshots.length,
         labeled_count: snapshots.filter((row) => row.labeled).length,
         latest_note: latest?.message ?? null,
-        calibration: calibrate(snapshots),
+        calibration,
+        promotion: evaluateV3Promotion(calibration),
       };
     })(),
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
@@ -210,12 +247,25 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
     recent_activity: [],
     recent_decisions: [],
     market_feed: marketFeed,
+    trending: [],
     go_live_gate: goLiveGate,
+    strategy: {
+      name: STRATEGY_NAME,
+      summary: STRATEGY_SUMMARY,
+      rules: describeStrategyRules({ ...DEFAULT_STRATEGY_PARAMS }),
+      evaluations: null,
+    },
     strategy_params: { ...DEFAULT_STRATEGY_PARAMS },
     param_changelog: [],
     attribution: buildAttribution({ trades: [], decisions: [], exit_watches: [], param_changelog: [] }).summary,
     analyst: null,
-    v3: { snapshot_count: 0, labeled_count: 0, latest_note: null, calibration: calibrate([]) },
+    v3: {
+      snapshot_count: 0,
+      labeled_count: 0,
+      latest_note: null,
+      calibration: calibrate([]),
+      promotion: evaluateV3Promotion(calibrate([])),
+    },
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
     data_boundary: DATA_BOUNDARY,
   };

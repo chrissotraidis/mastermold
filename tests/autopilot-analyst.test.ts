@@ -12,7 +12,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { evaluateRevert, parseAnalystOutput, runAnalyst } from "../src/autopilot/analyst";
+import { evaluateRevert, parseAnalystOutput, ruleBasedAnalysis, runAnalyst } from "../src/autopilot/analyst";
 import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry } from "../src/autopilot/params";
 import { __resetAutopilotStoreForTests, autopilotStore } from "../src/autopilot/store";
 
@@ -118,5 +118,105 @@ describe("runAnalyst against a temp store", () => {
     expect(result.ran).toBe(false);
     expect(result.error).toContain("provider down");
     expect(autopilotStore().analystMemo()).toBeNull();
+  });
+});
+
+describe("ruleBasedAnalysis (the no-LLM-key fallback)", () => {
+  const emptyAttribution = {
+    round_trips: 0,
+    wins: 0,
+    losses: 0,
+    win_rate: null,
+    avg_win_usd: null,
+    avg_loss_usd: null,
+    expectancy_usd: null,
+    premature_stops: 0,
+    by_symbol: [],
+  };
+  const skipRow = (id: number, reason: string) => ({
+    id: `dec_${id}`,
+    ts: new Date(NOW - id * 60_000).toISOString(),
+    symbol: "SOL",
+    verdict: "skip" as const,
+    reason,
+    signals: { price_usd: 1, short_pct: 0, range_pct: 1, h1_pct: 0, h24_pct: 1, volume_h24_usd: 1e6, liquidity_usd: 1e6 },
+  });
+
+  test("GIVEN zero trades and few skips THEN patient review with no proposal", () => {
+    const output = ruleBasedAnalysis({
+      params: { ...DEFAULT_STRATEGY_PARAMS },
+      attribution: emptyAttribution,
+      prematureStops: 0,
+      recentDecisions: [skipRow(1, "24h trend 1.0% below the +2.5% gate")],
+    });
+    expect(output.proposal).toBeNull();
+    expect(output.review).toContain("Rule-based review");
+  });
+
+  test("GIVEN zero trades and a dominant 24h-trend gate THEN one in-rail loosening is proposed", () => {
+    const decisions = Array.from({ length: 40 }, (_, index) =>
+      skipRow(index, index < 30 ? "24h trend 1.0% below the +2.5% gate" : "pool liquidity below the floor"),
+    );
+    const output = ruleBasedAnalysis({
+      params: { ...DEFAULT_STRATEGY_PARAMS },
+      attribution: emptyAttribution,
+      prematureStops: 0,
+      recentDecisions: decisions,
+    });
+    expect(output.proposal).not.toBeNull();
+    expect(output.proposal?.changes.entry_min_h24_pct).toBe(DEFAULT_STRATEGY_PARAMS.entry_min_h24_pct - 0.5);
+  });
+
+  test("GIVEN a small sample THEN no proposal, honestly stated", () => {
+    const output = ruleBasedAnalysis({
+      params: { ...DEFAULT_STRATEGY_PARAMS },
+      attribution: { ...emptyAttribution, round_trips: 3, wins: 1, losses: 2, win_rate: 1 / 3, expectancy_usd: -0.4 },
+      prematureStops: 1,
+      recentDecisions: [],
+    });
+    expect(output.proposal).toBeNull();
+    expect(output.review).toContain("small");
+  });
+
+  test("GIVEN repeated premature stops THEN the stop multiple widens within the rails", () => {
+    const output = ruleBasedAnalysis({
+      params: { ...DEFAULT_STRATEGY_PARAMS },
+      attribution: { ...emptyAttribution, round_trips: 6, wins: 2, losses: 4, win_rate: 2 / 6, expectancy_usd: -0.5 },
+      prematureStops: 3,
+      recentDecisions: [],
+    });
+    expect(output.proposal?.changes.stop_vol_mult).toBe(DEFAULT_STRATEGY_PARAMS.stop_vol_mult + 0.25);
+  });
+
+  test("GIVEN a poor win rate without premature stops THEN the entry gate tightens", () => {
+    const output = ruleBasedAnalysis({
+      params: { ...DEFAULT_STRATEGY_PARAMS },
+      attribution: { ...emptyAttribution, round_trips: 8, wins: 2, losses: 6, win_rate: 0.25, expectancy_usd: -0.8 },
+      prematureStops: 0,
+      recentDecisions: [],
+    });
+    expect(output.proposal?.changes.entry_min_h24_pct).toBe(DEFAULT_STRATEGY_PARAMS.entry_min_h24_pct + 0.5);
+  });
+
+  test("GIVEN healthy stats THEN it changes nothing", () => {
+    const output = ruleBasedAnalysis({
+      params: { ...DEFAULT_STRATEGY_PARAMS },
+      attribution: { ...emptyAttribution, round_trips: 10, wins: 6, losses: 4, win_rate: 0.6, expectancy_usd: 0.7 },
+      prematureStops: 0,
+      recentDecisions: [],
+    });
+    expect(output.proposal).toBeNull();
+  });
+
+  test("GIVEN no OPENROUTER_API_KEY THEN runAnalyst lands the rule-based memo through the store", async () => {
+    const prevKey = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    try {
+      const result = await runAnalyst(undefined, NOW);
+      expect(result.ran).toBe(true);
+      expect(autopilotStore().analystMemo()?.memo).toContain("Rule-based review");
+    } finally {
+      if (prevKey !== undefined) process.env.OPENROUTER_API_KEY = prevKey;
+    }
   });
 });

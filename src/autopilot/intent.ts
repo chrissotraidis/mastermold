@@ -31,7 +31,7 @@ export type TradeIntent = {
   /** Buy only: volatility-scaled stop distance chosen at entry (percent). */
   stop_pct: number | null;
   reason: string;
-  strategy: "v2-trend-pullback";
+  strategy: "v2-trend-pullback" | "v3-alpha-router";
   signals: DecisionSignals;
 };
 
@@ -50,6 +50,7 @@ export function intentFromDecision(
   decision: DecisionLike,
   positions: BotPositionRow[],
   mode: "paper" | "live" = "paper",
+  strategy: TradeIntent["strategy"] = "v2-trend-pullback",
 ): TradeIntent | null {
   const base = {
     id: `int_${randomUUID()}`,
@@ -59,7 +60,7 @@ export function intentFromDecision(
     symbol: decision.symbol,
     price_usd: decision.price,
     reason: decision.reason,
-    strategy: "v2-trend-pullback" as const,
+    strategy,
     signals: decision.signals,
   };
   if (decision.action === "buy") {

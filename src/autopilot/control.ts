@@ -147,6 +147,7 @@ export function setMode(mode: "off" | "paper" | "live"): ControlResult {
       equity_series: store.equitySeries(2000),
       wallet_provisioned: liveReadiness().wallet_provisioned,
       now_ms: Date.now(),
+      price_history: store.priceHistory(),
     });
     if (!gate.ready) {
       const failing = gate.checks.filter((check) => !check.pass).map((check) => check.detail);

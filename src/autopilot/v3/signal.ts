@@ -8,7 +8,7 @@
  * measurable positive EV?". Everything here is pure and typed.
  */
 
-export type StrategyId = "xsec" | "funding_basis" | "pair_rv" | "quote_arb" | "new_token_event";
+export type StrategyId = "xsec" | "funding_basis" | "pair_rv" | "quote_arb" | "new_token_event" | "trending";
 
 export type CandidateSide = "buy" | "sell" | "long_spot_short_perp" | "short_spot_long_perp" | "atomic_arb";
 

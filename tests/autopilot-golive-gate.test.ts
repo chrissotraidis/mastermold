@@ -143,6 +143,46 @@ describe("go-live gate", () => {
     expect(gate.checks.find((check) => check.key === "traced")?.detail).toContain("no fills");
     expect(gate.checks.find((check) => check.key === "performance")?.detail).toContain("no equity marks");
   });
+
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  /** Minute bars spanning the whole window with SOL moving start → end. */
+  function solHistory(startPrice: number, endPrice: number): Array<{ ts: string; prices: Record<string, number> }> {
+    return Array.from({ length: 30 }, (_, index) => ({
+      ts: iso(GATE_WINDOW_DAYS * DAY_MS - index * ((GATE_WINDOW_DAYS * DAY_MS) / 30)),
+      prices: { [SOL_MINT]: startPrice + ((endPrice - startPrice) * index) / 29 },
+    }));
+  }
+
+  test("GIVEN SOL rallied harder than the book THEN performance fails: beta is not alpha", () => {
+    const input = passingInput(); // equity +~4% over the window
+    input.price_history = solHistory(100, 120); // SOL +20%
+    const gate = evaluateGoLiveGate(input);
+    const performance = gate.checks.find((check) => check.key === "performance");
+    expect(performance?.pass).toBe(false);
+    expect(performance?.detail).toContain("vs SOL");
+  });
+
+  test("GIVEN the book beat a flat-to-down SOL THEN performance passes with both returns shown", () => {
+    const input = passingInput();
+    input.price_history = solHistory(100, 98); // SOL -2%
+    const gate = evaluateGoLiveGate(input);
+    const performance = gate.checks.find((check) => check.key === "performance");
+    expect(performance?.pass).toBe(true);
+    expect(performance?.detail).toContain("vs SOL");
+  });
+
+  test("GIVEN price history covering under half the window THEN the benchmark abstains", () => {
+    const input = passingInput();
+    // Two bars 10 minutes apart: a sliver, not a benchmark.
+    input.price_history = [
+      { ts: iso(20 * 60_000), prices: { [SOL_MINT]: 100 } },
+      { ts: iso(10 * 60_000), prices: { [SOL_MINT]: 150 } },
+    ];
+    const gate = evaluateGoLiveGate(input);
+    const performance = gate.checks.find((check) => check.key === "performance");
+    expect(performance?.pass).toBe(true); // absolute check still applies
+    expect(performance?.detail).toContain("benchmark pending");
+  });
 });
 
 describe("live-route rehearsal parser", () => {

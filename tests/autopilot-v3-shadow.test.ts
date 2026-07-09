@@ -44,9 +44,9 @@ function risingWindow(): number[] {
 }
 
 describe("regime → module enablement", () => {
-  test("GIVEN regimes THEN xsec only risk-on, funding always, pair in chop/risk-off", () => {
-    expect([...enabledModulesFor("risk_on")].sort()).toEqual(["funding_basis", "xsec"]);
-    expect([...enabledModulesFor("chop")].sort()).toEqual(["funding_basis", "pair_rv"]);
+  test("GIVEN regimes THEN xsec only risk-on, funding always, pair in chop/risk-off, trending outside risk-off", () => {
+    expect([...enabledModulesFor("risk_on")].sort()).toEqual(["funding_basis", "trending", "xsec"]);
+    expect([...enabledModulesFor("chop")].sort()).toEqual(["funding_basis", "pair_rv", "trending"]);
     expect([...enabledModulesFor("risk_off")].sort()).toEqual(["funding_basis", "pair_rv"]);
   });
 });

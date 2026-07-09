@@ -147,6 +147,110 @@ export function evaluateRevert(
   };
 }
 
+/**
+ * Rule-based Analyst (no-LLM fallback, 2026-07-09): a fresh clone has no
+ * OPENROUTER_API_KEY, and "the learning loop is off until you add a key" is
+ * not a working product. This is the deterministic subset of the review: the
+ * same attribution evidence, the same rails, at most one conservative
+ * changeset — chosen by fixed rules instead of a model. Pure and testable.
+ */
+export function ruleBasedAnalysis(input: {
+  params: StrategyParams;
+  attribution: AttributionSummary;
+  prematureStops: number;
+  recentDecisions: BotDecisionRow[];
+}): AnalystOutput {
+  const { attribution, params } = input;
+  const skips = input.recentDecisions.filter(
+    (decision) => decision.verdict === "skip" || decision.verdict === "blocked",
+  );
+  const skipCounts = new Map<string, number>();
+  for (const decision of skips) {
+    const key = decision.reason.slice(0, 60);
+    skipCounts.set(key, (skipCounts.get(key) ?? 0) + 1);
+  }
+  const topSkips = [...skipCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const skipLine =
+    topSkips.length > 0
+      ? ` Most common refusals: ${topSkips.map(([reason, count]) => `${count}x "${reason}"`).join("; ")}.`
+      : "";
+
+  const clampToRail = (key: ParamKey, value: number): number =>
+    Math.min(PARAM_CLAMPS[key].max, Math.max(PARAM_CLAMPS[key].min, value));
+
+  // Zero trades: distinguish "rightly patient" from "wrongly picky" on volume
+  // of evidence — only a heavily exercised 24h-trend gate justifies loosening.
+  if (attribution.round_trips === 0) {
+    const trendGateSkips = skips.filter((decision) => decision.reason.includes("below the +")).length;
+    if (skips.length >= 30 && trendGateSkips / skips.length >= 0.6) {
+      const proposed = clampToRail("entry_min_h24_pct", params.entry_min_h24_pct - 0.5);
+      if (proposed < params.entry_min_h24_pct) {
+        return {
+          review: `Rule-based review (no LLM key set). No round trips closed in the window; the bot refused ${skips.length} candidates and ${trendGateSkips} of those failed the +${params.entry_min_h24_pct}% 24h-trend gate.${skipLine} The gate looks like the binding constraint, so this proposes one conservative loosening inside the rails. Auto-revert will undo it if expectancy worsens.`,
+          lessons: [],
+          proposal: {
+            changes: { entry_min_h24_pct: proposed },
+            reason: `${trendGateSkips}/${skips.length} window skips failed the 24h-trend gate with zero trades taken; lowering entry_min_h24_pct ${params.entry_min_h24_pct} → ${proposed} within the rails.`,
+          },
+        };
+      }
+    }
+    return {
+      review: `Rule-based review (no LLM key set). No round trips closed in the window and only ${skips.length} refusals were recorded — not enough evidence to call the gates wrong.${skipLine} Sitting out can be correct; keep collecting.`,
+      lessons: [],
+      proposal: null,
+    };
+  }
+
+  // Small sample: the honest move is no change.
+  if (attribution.round_trips < 5) {
+    return {
+      review: `Rule-based review (no LLM key set). Only ${attribution.round_trips} round trip${attribution.round_trips === 1 ? "" : "s"} closed in the window (expectancy ${attribution.expectancy_usd === null ? "n/a" : `$${attribution.expectancy_usd.toFixed(2)}`}). A sample this small proves little, so no parameter change is proposed.${skipLine}`,
+      lessons: [],
+      proposal: null,
+    };
+  }
+
+  const winRate = attribution.win_rate ?? 0;
+  const stats = `${attribution.round_trips} round trips, ${(winRate * 100).toFixed(0)}% wins, expectancy ${attribution.expectancy_usd === null ? "n/a" : `$${attribution.expectancy_usd.toFixed(2)}`}, ${input.prematureStops} premature stop${input.prematureStops === 1 ? "" : "s"}`;
+
+  // Stops that keep proving premature are the clearest single signal we have.
+  if (input.prematureStops >= 2 && input.prematureStops >= attribution.wins) {
+    const proposed = clampToRail("stop_vol_mult", params.stop_vol_mult + 0.25);
+    if (proposed > params.stop_vol_mult) {
+      return {
+        review: `Rule-based review (no LLM key set). ${stats}. Losses keep recovering within 2h of the stop — stops look systematically too tight for current volatility, so this widens the volatility multiple one notch inside the rails.`,
+        lessons: [],
+        proposal: {
+          changes: { stop_vol_mult: proposed },
+          reason: `${input.prematureStops} premature stops vs ${attribution.wins} wins in the window; widening stop_vol_mult ${params.stop_vol_mult} → ${proposed}.`,
+        },
+      };
+    }
+  }
+
+  // A poor hit rate with a real sample: demand a stronger trend before entering.
+  if (winRate < 0.35) {
+    const proposed = clampToRail("entry_min_h24_pct", params.entry_min_h24_pct + 0.5);
+    if (proposed > params.entry_min_h24_pct) {
+      return {
+        review: `Rule-based review (no LLM key set). ${stats}. The hit rate is poor on a real sample, so this tightens the 24h-trend entry gate one notch inside the rails — fewer, stronger setups.`,
+        lessons: [],
+        proposal: {
+          changes: { entry_min_h24_pct: proposed },
+          reason: `Win rate ${(winRate * 100).toFixed(0)}% over ${attribution.round_trips} trips; raising entry_min_h24_pct ${params.entry_min_h24_pct} → ${proposed}.`,
+        },
+      };
+    }
+  }
+
+  return {
+    review: `Rule-based review (no LLM key set). ${stats}. Nothing in the window argues for a parameter change.${skipLine}`,
+    lessons: [],
+    proposal: null,
+  };
+}
+
 /** Default completion: one-shot OpenRouter chat call (no streaming). */
 export async function openRouterCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
@@ -215,31 +319,44 @@ export async function runAnalyst(
     if (applied.ok) store.appendActivity("analyst", revert.reason);
   }
 
-  const prompt = buildAnalystPrompt({
-    params: store.strategyParams(),
-    attribution: summary,
-    prematureStopTrips: trips.filter((trip) => trip.premature_stop).length,
-    recentDecisions: store.decisions(200),
-    recentLessons: store
-      .web3Memory(100)
-      .filter((row) => row.kind === "lesson")
-      .slice(0, 10)
-      .map((row) => `${row.ts.slice(0, 10)} ${row.symbol}: ${row.summary}`),
-    changelog: store.paramChangelog(20),
-    windowDays: WINDOW_DAYS,
-    // The V3 shadow's realized-outcome calibration: the evidence block that
-    // lets the Analyst judge the NEW signal against what actually happened.
-    v3Calibration: describeCalibration(calibrate(store.candidateSnapshots(2000))),
-  });
+  // No key and no injected completion → the deterministic reviewer, so the
+  // learning loop works on a fresh clone instead of skipping for lack of an
+  // LLM. An injected `complete` (tests, alt providers) always wins.
+  let output: AnalystOutput | null;
+  if (complete === openRouterCompletion && !process.env.OPENROUTER_API_KEY) {
+    output = ruleBasedAnalysis({
+      params: store.strategyParams(),
+      attribution: summary,
+      prematureStops: trips.filter((trip) => trip.premature_stop).length,
+      recentDecisions: store.decisions(200),
+    });
+  } else {
+    const prompt = buildAnalystPrompt({
+      params: store.strategyParams(),
+      attribution: summary,
+      prematureStopTrips: trips.filter((trip) => trip.premature_stop).length,
+      recentDecisions: store.decisions(200),
+      recentLessons: store
+        .web3Memory(100)
+        .filter((row) => row.kind === "lesson")
+        .slice(0, 10)
+        .map((row) => `${row.ts.slice(0, 10)} ${row.symbol}: ${row.summary}`),
+      changelog: store.paramChangelog(20),
+      windowDays: WINDOW_DAYS,
+      // The V3 shadow's realized-outcome calibration: the evidence block that
+      // lets the Analyst judge the NEW signal against what actually happened.
+      v3Calibration: describeCalibration(calibrate(store.candidateSnapshots(2000))),
+    });
 
-  let raw: string;
-  try {
-    raw = await complete(ANALYST_SYSTEM_PROMPT, prompt);
-  } catch (error) {
-    return { ran: false, reverted, error: `completion failed: ${error instanceof Error ? error.message : String(error)}` };
+    let raw: string;
+    try {
+      raw = await complete(ANALYST_SYSTEM_PROMPT, prompt);
+    } catch (error) {
+      return { ran: false, reverted, error: `completion failed: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    output = parseAnalystOutput(raw);
+    if (!output) return { ran: false, reverted, error: "analyst output was not valid JSON" };
   }
-  const output = parseAnalystOutput(raw);
-  if (!output) return { ran: false, reverted, error: "analyst output was not valid JSON" };
 
   store.setAnalystMemo(output.review, nowMs);
   store.appendActivity("analyst", `Daily review: ${output.review.slice(0, 180)}`);

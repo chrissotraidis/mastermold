@@ -59,18 +59,73 @@ type AutopilotApiPayload = {
   }>;
   recent_activity: Array<{ id: string; ts: string; kind: string; message: string }>;
   recent_decisions?: Array<{ id: string; ts: string; symbol: string; verdict: string; reason: string }>;
+  /** The strategy made legible: name, rule sentences from live params, and the
+   * daemon's latest per-symbol verdicts. */
+  strategy?: {
+    name: string;
+    summary: string;
+    rules: string[];
+    evaluations: {
+      ts: string;
+      mode: string;
+      evaluations: Array<{ symbol: string; status: SymbolStatus; reason: string }>;
+    } | null;
+  };
+  attribution?: {
+    round_trips: number;
+    wins: number;
+    losses: number;
+    win_rate: number | null;
+    expectancy_usd: number | null;
+    premature_stops: number;
+  };
   go_live_gate?: { ready: boolean; checks: Array<{ key: string; label: string; pass: boolean; detail: string }> };
   live_wallet?: { provisioned: boolean; pubkey: string | null };
   market_feed?: MarketFeedRow[];
+  /** Solana trending radar: where attention is flowing right now. */
+  trending?: Array<{
+    mint: string;
+    symbol: string;
+    sources: string[];
+    rank: number | null;
+    price_usd: number | null;
+    price_change_h1_pct: number | null;
+    price_change_h24_pct: number | null;
+    volume_h24_usd: number | null;
+    liquidity_usd: number | null;
+    boost_amount: number | null;
+  }>;
   analyst?: { ts: string; memo: string } | null;
-  /** V3 shadow telemetry: candidate dataset size + the calibration verdict. */
+  /** V3 shadow telemetry: candidate dataset size, calibration verdict, and
+   * the paper-promotion gate. */
   v3?: {
     snapshot_count: number;
     labeled_count: number;
     latest_note: string | null;
     calibration: { verdict: string; labeled_snapshots: number };
+    promotion?: { ready: boolean; checks: Array<{ key: string; label: string; pass: boolean; detail: string }> };
   };
   data_boundary: string;
+};
+
+type SymbolStatus = "warming" | "held" | "exiting" | "blocked" | "rejected" | "entering";
+
+const statusChipClass: Record<SymbolStatus, string> = {
+  entering: "bg-engine/15 text-engine",
+  held: "bg-violet/15 text-violet",
+  exiting: "bg-caution/15 text-caution",
+  warming: "bg-surface-dim/70 text-outline",
+  rejected: "bg-surface-dim/70 text-on-surface-variant",
+  blocked: "bg-critical/10 text-critical",
+};
+
+const statusChipLabel: Record<SymbolStatus, string> = {
+  entering: "entering",
+  held: "held",
+  exiting: "exiting",
+  warming: "warming up",
+  rejected: "waiting",
+  blocked: "blocked",
 };
 
 const modeDotClass: Record<AutopilotStateView["mode"], string> = {
@@ -298,6 +353,8 @@ export function AutopilotPanel() {
         </span>
       )}
 
+      {data.strategy ? <StrategyCard strategy={data.strategy} /> : null}
+
       {data.go_live_gate ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-outline-variant/20 px-3 py-1.5">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-outline">
@@ -325,6 +382,17 @@ export function AutopilotPanel() {
           {" · "}
           {data.v3.snapshot_count} observations · {data.v3.labeled_count} labeled ·{" "}
           {data.v3.calibration.verdict}
+          {data.v3.promotion ? (
+            <span
+              className={data.v3.promotion.ready ? "text-engine" : undefined}
+              title={data.v3.promotion.checks.map((check) => `${check.pass ? "✓" : "✗"} ${check.label} — ${check.detail}`).join("\n")}
+            >
+              {" · "}
+              {data.v3.promotion.ready
+                ? "PROMOTED: co-piloting the paper book"
+                : `paper promotion ${data.v3.promotion.checks.filter((check) => check.pass).length}/${data.v3.promotion.checks.length} checks`}
+            </span>
+          ) : null}
         </p>
       ) : null}
 
@@ -377,6 +445,55 @@ export function AutopilotPanel() {
           </div>
         )}
       </div>
+
+      {(data.trending ?? []).length > 0 ? (
+        <div className="border-t border-outline-variant/20 px-3 py-2">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Solana radar</h3>
+            <span className="text-[11px] text-outline">
+              trending on-chain right now · feeds the V3 shadow, never trades directly
+            </span>
+          </div>
+          <div className="mt-1 overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-outline">
+                  <th scope="col" className="py-1 pr-2 font-medium">#</th>
+                  <th scope="col" className="py-1 pr-2 font-medium">Token</th>
+                  <th scope="col" className="py-1 pr-2 text-right font-medium">1h</th>
+                  <th scope="col" className="py-1 pr-2 text-right font-medium">24h</th>
+                  <th scope="col" className="py-1 pr-2 text-right font-medium">Vol 24h</th>
+                  <th scope="col" className="py-1 pr-2 text-right font-medium">Liquidity</th>
+                  <th scope="col" className="py-1 text-right font-medium">Signal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/15">
+                {(data.trending ?? []).map((row) => (
+                  <tr key={row.mint}>
+                    <td className="py-1 pr-2 tabular-nums text-outline">{row.rank ?? "—"}</td>
+                    <td className="py-1 pr-2 font-semibold text-on-surface">{row.symbol}</td>
+                    <td className={`py-1 pr-2 text-right tabular-nums ${pctToneClass(row.price_change_h1_pct)}`}>
+                      {formatPct(row.price_change_h1_pct)}
+                    </td>
+                    <td className={`py-1 pr-2 text-right tabular-nums ${pctToneClass(row.price_change_h24_pct)}`}>
+                      {formatPct(row.price_change_h24_pct)}
+                    </td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-outline">
+                      {formatCompactUsd(row.volume_h24_usd)}
+                    </td>
+                    <td className="py-1 pr-2 text-right tabular-nums text-outline">
+                      {formatCompactUsd(row.liquidity_usd)}
+                    </td>
+                    <td className="py-1 text-right text-outline">
+                      {row.boost_amount !== null ? `boosted ${Math.round(row.boost_amount)}` : "trending"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-x-4 gap-y-2 border-t border-outline-variant/20 px-3 py-2 sm:grid-cols-2">
         <div>
@@ -439,12 +556,38 @@ export function AutopilotPanel() {
         </div>
       ) : null}
 
-      {data.analyst ? (
+      {data.attribution || data.analyst ? (
         <div className="border-t border-outline-variant/20 px-3 py-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-outline">
-            Analyst review · {new Date(data.analyst.ts).toLocaleDateString()}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{data.analyst.memo}</p>
+          <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Learning</h3>
+          {data.attribution ? (
+            <p className="mt-1 text-xs leading-5 text-on-surface-variant">
+              {data.attribution.round_trips === 0 ? (
+                "No completed round trips yet — win rate and expectancy appear after the first exits."
+              ) : (
+                <>
+                  <span className="font-semibold text-on-surface">{data.attribution.round_trips}</span> round trips ·{" "}
+                  <span className={data.attribution.win_rate !== null && data.attribution.win_rate >= 0.5 ? "text-engine" : "text-on-surface-variant"}>
+                    {data.attribution.win_rate !== null ? `${Math.round(data.attribution.win_rate * 100)}% wins` : "win rate n/a"}
+                  </span>
+                  {" · "}
+                  <span className={data.attribution.expectancy_usd !== null && data.attribution.expectancy_usd >= 0 ? "text-engine" : "text-critical"}>
+                    {data.attribution.expectancy_usd !== null
+                      ? `${data.attribution.expectancy_usd >= 0 ? "+" : ""}$${data.attribution.expectancy_usd.toFixed(2)}/trade expectancy`
+                      : "expectancy n/a"}
+                  </span>
+                  {data.attribution.premature_stops > 0 ? ` · ${data.attribution.premature_stops} premature stops` : null}
+                </>
+              )}
+            </p>
+          ) : null}
+          {data.analyst ? (
+            <>
+              <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-outline">
+                Analyst review · {new Date(data.analyst.ts).toLocaleDateString()}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{data.analyst.memo}</p>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -498,6 +641,57 @@ export function AutopilotPanel() {
       <p className="border-t border-outline-variant/20 px-3 py-2 text-xs leading-5 text-outline">
         {data.data_boundary}
       </p>
+    </div>
+  );
+}
+
+/** The strategy, visible: what it is, the rules it runs, and the live verdict
+ * on every universe token — the answer to "what is this bot actually doing?" */
+function StrategyCard({ strategy }: { strategy: NonNullable<AutopilotApiPayload["strategy"]> }) {
+  const snapshot = strategy.evaluations;
+  return (
+    <div className="border-t border-outline-variant/20 px-3 py-2">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Strategy</h3>
+        <span className="text-xs font-semibold text-on-surface">{strategy.name}</span>
+        {snapshot ? (
+          <span className="text-[11px] text-outline">verdicts from {formatAgo(snapshot.ts)}</span>
+        ) : null}
+      </div>
+      <p className="mt-0.5 text-xs leading-5 text-on-surface-variant">{strategy.summary}</p>
+
+      {snapshot && snapshot.evaluations.length > 0 ? (
+        <ul className="mt-1.5 divide-y divide-outline-variant/15">
+          {snapshot.evaluations.map((row) => (
+            <li key={row.symbol} className="flex items-baseline gap-2 py-1 text-xs">
+              <span className="w-12 shrink-0 font-semibold text-on-surface">{row.symbol}</span>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusChipClass[row.status] ?? statusChipClass.rejected}`}
+              >
+                {statusChipLabel[row.status] ?? row.status}
+              </span>
+              <span className="min-w-0 truncate text-on-surface-variant" title={row.reason}>
+                {row.reason}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1.5 text-xs leading-5 text-outline">
+          No per-symbol verdicts yet — they appear once the daemon completes a tick in paper mode.
+        </p>
+      )}
+
+      <details className="mt-1">
+        <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-on-surface sm:min-h-8">
+          Entry and exit rules (live values)
+        </summary>
+        <ul className="list-disc space-y-1 pb-2 pl-5 text-xs leading-5 text-on-surface-variant">
+          {strategy.rules.map((rule) => (
+            <li key={rule}>{rule}</li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

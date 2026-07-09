@@ -20,6 +20,7 @@ import { pairEnabledIn } from "./pair-rv";
 import { classifyRegime, describeRegime } from "./regime";
 import { routeCandidates, type RouterResult } from "./router";
 import type { CandidateSignal, ExecutionCost, MarketRegime, StrategyId } from "./signal";
+import { trendingCandidate, trendingEnabledIn, type TrendingToken } from "./trending";
 import { scoreToConfidence, xsecCandidate, xsecScore } from "./xsec";
 
 /** xsec's liquidity floor for shadow eval (report tier-2 mid-liquidity). */
@@ -32,6 +33,7 @@ export function enabledModulesFor(regime: MarketRegime): Set<StrategyId> {
   if (regime === "risk_on") enabled.add("xsec");
   if (fundingEnabledIn(regime)) enabled.add("funding_basis");
   if (pairEnabledIn(regime)) enabled.add("pair_rv");
+  if (trendingEnabledIn(regime)) enabled.add("trending");
   return enabled;
 }
 
@@ -46,6 +48,10 @@ export type ShadowInput = {
   priceHistory?: Array<{ ts: string; prices: Record<string, number> }>;
   /** Live perp funding inputs by mint (Drift adapter; only FRESH data arrives here). */
   fundingByMint?: Map<string, FundingInput>;
+  /** Solana trending radar rows (keyless GeckoTerminal + DexScreener boosts). */
+  trendingTokens?: TrendingToken[];
+  /** Conservative default cost for radar tokens outside `costByMint`. */
+  defaultCost?: ExecutionCost;
 };
 
 /** The strongest xsec read this tick regardless of regime/floor — always
@@ -155,6 +161,17 @@ export function evaluateV3Shadow(input: ShadowInput): ShadowResult {
   if (enabled.has("funding_basis") && input.fundingByMint) {
     for (const fundingInput of input.fundingByMint.values()) {
       const candidate = fundingCandidate(fundingInput);
+      if (candidate) candidates.push(candidate);
+    }
+  }
+  // trending: attention-flow candidates from the Solana radar. Tokens outside
+  // the majors universe are welcome here — that is the point — but they only
+  // ever become SHADOW snapshots; nothing trades until calibration proves out.
+  if (enabled.has("trending") && input.trendingTokens) {
+    for (const token of input.trendingTokens) {
+      const cost = input.costByMint.get(token.mint) ?? input.defaultCost;
+      if (!cost) continue;
+      const candidate = trendingCandidate(token, cost);
       if (candidate) candidates.push(candidate);
     }
   }

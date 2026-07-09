@@ -32,11 +32,16 @@ import { intentFromDecision } from "./intent";
 import { DEFAULT_STRATEGY_PARAMS, type StrategyParams } from "./params";
 import { validateIntent } from "./policy";
 import { describeRehearsal, rehearseFill } from "./rehearsal";
+import type { SymbolEvaluation } from "./strategy-view";
 import type { PriceObservation } from "./v3/candidate-store";
 import { conservativeCost } from "./v3/execution-cost";
 import type { FundingInput } from "./v3/funding-basis";
 import { fetchDriftFunding, PERP_MARKET_BY_MINT } from "./v3/perps";
+import { calibrate } from "./v3/calibration";
+import { evaluateV3Promotion } from "./v3/promotion";
 import { evaluateV3Shadow, labelDueCandidates, recordV3Shadow } from "./v3/shadow";
+import type { CandidateSignal } from "./v3/signal";
+import { fetchTrendingTokens, type TrendingToken } from "./v3/trending";
 import { UNIVERSE } from "./universe";
 import {
   autopilotStore,
@@ -110,6 +115,8 @@ export type DecisionInput = {
 export type DecisionOutput = {
   decisions: Decision[];
   skipped: SkippedCandidate | null; // best rejected candidate, for the log
+  /** Every universe symbol's verdict this tick, for the strategy panel. */
+  evaluations: SymbolEvaluation[];
 };
 
 export function windowReturnPct(prices: number[]): number | null {
@@ -155,9 +162,13 @@ function signalsFor(symbol: string, prices: number[], feedRow: MarketFeedRow | u
  */
 export function decide(input: DecisionInput): DecisionOutput {
   const { windows, positions, state, cash_usd, feed, now_ms, trades_today, cooldown_until_ms, loss_streak, last_loss_ms, params } = input;
-  if (state.kill_switch || (state.mode !== "paper" && state.mode !== "live")) return { decisions: [], skipped: null };
+  if (state.kill_switch || (state.mode !== "paper" && state.mode !== "live")) return { decisions: [], skipped: null, evaluations: [] };
 
   const decisions: Decision[] = [];
+  // Per-symbol verdicts for the strategy panel: why each token is or isn't
+  // being traded RIGHT NOW. Filled as the gates run, so the reasons shown are
+  // the exact ones the strategy acted on this tick.
+  const evalBySymbol = new Map<string, SymbolEvaluation>();
   const held = new Set(positions.map((position) => position.mint));
 
   // --- exits: hard stop / take profit / armed trail / time stop -------------
@@ -192,6 +203,22 @@ export function decide(input: DecisionInput): DecisionOutput {
   const exiting = new Set(decisions.map((decision) => decision.mint));
   const openAfterExits = positions.filter((position) => !exiting.has(position.mint)).length;
 
+  for (const position of positions) {
+    const exit = decisions.find((decision) => decision.action === "sell" && decision.mint === position.mint);
+    const prices = windows.get(position.mint) ?? [];
+    const price = prices[prices.length - 1];
+    const stopPct = position.stop_pct ?? params.min_stop_pct;
+    const pnlPct = Number.isFinite(price) && price > 0 ? ((price / position.avg_cost_usd - 1) * 100).toFixed(1) : null;
+    evalBySymbol.set(position.symbol, {
+      symbol: position.symbol,
+      status: exit ? "exiting" : "held",
+      reason: exit
+        ? exit.reason
+        : `holding${pnlPct !== null ? ` at ${Number(pnlPct) >= 0 ? "+" : ""}${pnlPct}%` : ""}; stop -${stopPct.toFixed(1)}%, target +${(stopPct * params.take_profit_r).toFixed(1)}%`,
+      signals: exit?.signals ?? signalsFor(position.symbol, prices, feed.get(position.symbol)),
+    });
+  }
+
   const globalBlock =
     openAfterExits >= state.caps.max_positions
       ? "at max positions"
@@ -204,14 +231,22 @@ export function decide(input: DecisionInput): DecisionOutput {
   let skipped: SkippedCandidate | null = null;
   let best: { symbol: string; mint: string; price: number; stopPct: number; signals: DecisionSignals } | null = null;
 
+  const passedGates: Array<{ symbol: string; signals: DecisionSignals }> = [];
   for (const { symbol, mint } of UNIVERSE) {
     if (held.has(mint) || exiting.has(mint)) continue;
     const prices = windows.get(mint) ?? [];
     const feedRow = feed.get(symbol);
     const signals = signalsFor(symbol, prices, feedRow);
-    if (signals.price_usd === null || signals.short_pct === null) continue; // window still filling
+    if (signals.price_usd === null || signals.short_pct === null) {
+      // Window still filling: say so instead of silently doing nothing — the
+      // first 13 minutes after a daemon start looked like "no strategy".
+      const minutesLeft = Math.max(1, Math.ceil(((WINDOW_TICKS - prices.length) * TICK_MS) / 60_000));
+      evalBySymbol.set(symbol, { symbol, status: "warming", reason: `signal window filling — ~${minutesLeft}m until this token is evaluated`, signals });
+      continue;
+    }
 
     const reject = (reason: string) => {
+      evalBySymbol.set(symbol, { symbol, status: "rejected", reason, signals });
       // Keep the strongest rejected candidate (by 24h trend) for the log.
       if (!skipped || (signals.h24_pct ?? -Infinity) > (skipped.signals.h24_pct ?? -Infinity)) {
         skipped = { symbol, reason, signals };
@@ -220,6 +255,8 @@ export function decide(input: DecisionInput): DecisionOutput {
 
     if (globalBlock) {
       reject(globalBlock);
+      const rejected = evalBySymbol.get(symbol);
+      if (rejected) evalBySymbol.set(symbol, { ...rejected, status: "blocked" });
       continue;
     }
     const cooldown = cooldown_until_ms.get(mint) ?? 0;
@@ -261,8 +298,18 @@ export function decide(input: DecisionInput): DecisionOutput {
       continue;
     }
 
+    passedGates.push({ symbol, signals });
     if (!best || (signals.h24_pct ?? 0) > (best.signals.h24_pct ?? 0)) {
       best = { symbol, mint, price: signals.price_usd, stopPct, signals };
+    }
+  }
+  // Gate-passers that lost the ranking still get an honest line — "passed but
+  // outranked" reads very differently from "rejected".
+  for (const passed of passedGates) {
+    if (best && passed.symbol === best.symbol) {
+      evalBySymbol.set(passed.symbol, { symbol: passed.symbol, status: "entering", reason: `strongest qualified candidate — entering this tick (24h +${(passed.signals.h24_pct ?? 0).toFixed(1)}%)`, signals: passed.signals });
+    } else {
+      evalBySymbol.set(passed.symbol, { symbol: passed.symbol, status: "rejected", reason: `passed every gate but ${best?.symbol ?? "another token"} ranked higher on 24h trend`, signals: passed.signals });
     }
   }
 
@@ -286,7 +333,18 @@ export function decide(input: DecisionInput): DecisionOutput {
     }
   }
 
-  return { decisions, skipped };
+  // UNIVERSE order first (stable panel rows), then any held off-universe token.
+  const evaluations: SymbolEvaluation[] = [];
+  for (const { symbol } of UNIVERSE) {
+    const row = evalBySymbol.get(symbol);
+    if (row) {
+      evaluations.push(row);
+      evalBySymbol.delete(symbol);
+    }
+  }
+  evaluations.push(...evalBySymbol.values());
+
+  return { decisions, skipped, evaluations };
 }
 
 /** Cash is derived from the ledger, never stored: starting stake + sells − buys − fees. */
@@ -430,14 +488,18 @@ function priceSeriesFromHistory(history: Array<{ ts: string; prices: Record<stri
 const PRICE_URL = "https://lite-api.jup.ag/price/v3?ids=";
 const PRICE_BACKOFF_MS = 90_000; // sit out after a 429 instead of hammering
 
-async function fetchPrices(): Promise<Map<string, number>> {
-  const ids = UNIVERSE.map((asset) => asset.mint).join(",");
+async function fetchPrices(extraMints: string[] = []): Promise<Map<string, number>> {
+  // Held off-universe tokens (promoted V3 entries) ride along in the same
+  // call: a position that cannot price cannot exit, so its mint must always
+  // be quoted for as long as it is held.
+  const mints = [...new Set([...UNIVERSE.map((asset) => asset.mint), ...extraMints])];
+  const ids = mints.join(",");
   const response = await fetch(`${PRICE_URL}${ids}`, { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(`price fetch ${response.status}`);
   const body = (await response.json()) as Record<string, unknown>;
   const data = (body.data && typeof body.data === "object" ? body.data : body) as Record<string, { usdPrice?: number; price?: number | string }>;
   const prices = new Map<string, number>();
-  for (const { mint } of UNIVERSE) {
+  for (const mint of mints) {
     const entry = data[mint];
     const price = Number(entry?.usdPrice ?? entry?.price);
     if (Number.isFinite(price) && price > 0) prices.set(mint, price);
@@ -457,6 +519,9 @@ type TickContext = {
   lastPriceBarMs: number;
   priceBackoffUntilMs: number;
   cooldownUntilMs: Map<string, number>;
+  /** Latest Solana trending radar (refreshed in the V3 block; prices feed the
+   * minute bars so off-universe snapshots can be forward-labeled). */
+  lastTrending: TrendingToken[];
 };
 
 async function tick(context: TickContext): Promise<void> {
@@ -475,7 +540,7 @@ async function tick(context: TickContext): Promise<void> {
 
   let prices: Map<string, number>;
   try {
-    prices = await fetchPrices();
+    prices = await fetchPrices(store.positions().map((position) => position.mint));
   } catch (error) {
     if (error instanceof Error && error.message.includes("429")) {
       context.priceBackoffUntilMs = nowMs + PRICE_BACKOFF_MS;
@@ -558,7 +623,15 @@ async function tick(context: TickContext): Promise<void> {
   // and the per-mint 24h-volume EMA baseline behind xsec's volume_z.
   if (nowMs - context.lastPriceBarMs >= 60_000 && prices.size > 0) {
     context.lastPriceBarMs = nowMs;
-    store.appendPriceHistory(Object.fromEntries(prices));
+    // Radar tokens ride along in the same minute bar so their shadow
+    // snapshots can be forward-labeled exactly like universe tokens.
+    const barPrices = Object.fromEntries(prices);
+    for (const token of context.lastTrending) {
+      if (token.price_usd !== null && token.price_usd > 0 && barPrices[token.mint] === undefined) {
+        barPrices[token.mint] = token.price_usd;
+      }
+    }
+    store.appendPriceHistory(barPrices);
     const volumes: Record<string, number> = {};
     for (const asset of UNIVERSE) {
       const row = feed.get(asset.symbol);
@@ -573,6 +646,10 @@ async function tick(context: TickContext): Promise<void> {
   // v2 stays the benchmark; V3 accumulates the labeled dataset and proves its
   // net-EV discipline before it ever routes a real intent. Throttled to one
   // recorded snapshot per 5 minutes to keep the JSON store light.
+  // When the promotion gate is open, the shadow's top candidate this tick may
+  // co-pilot the PAPER book through the same intent → policy → executor path
+  // as v2. Never live: live routing keeps its own gate.
+  let v3PaperCandidate: { signal: CandidateSignal; price: number } | null = null;
   if (nowMs - context.lastV3ShadowMs >= 5 * 60_000) {
     try {
       const costByMint = new Map(UNIVERSE.map((asset) => [asset.mint, conservativeCost()]));
@@ -595,6 +672,9 @@ async function tick(context: TickContext): Promise<void> {
           funding_persistence_windows: snapshot.persistence_windows,
         });
       }
+      // The Solana radar: keyless trending/attention flow. Cached 5 minutes
+      // inside; failures degrade to [] and the shadow simply runs without it.
+      context.lastTrending = await fetchTrendingTokens(nowMs);
       const history = store.priceHistory();
       const shadow = evaluateV3Shadow({
         universe: UNIVERSE,
@@ -604,8 +684,18 @@ async function tick(context: TickContext): Promise<void> {
         priceHistory: history,
         volumeBaselineByMint: new Map(Object.entries(store.volumeBaselines())),
         fundingByMint,
+        trendingTokens: context.lastTrending,
+        defaultCost: conservativeCost(),
       });
-      const note = recordV3Shadow(store, shadow, prices);
+      // Radar prices join the map so off-universe snapshots record a real
+      // entry price instead of 0.
+      const snapshotPrices = new Map(prices);
+      for (const token of context.lastTrending) {
+        if (token.price_usd !== null && token.price_usd > 0 && !snapshotPrices.has(token.mint)) {
+          snapshotPrices.set(token.mint, token.price_usd);
+        }
+      }
+      const note = recordV3Shadow(store, shadow, snapshotPrices);
       if (note) {
         // Advance the throttle only when something was actually recorded, so a
         // cold start (empty price windows) keeps trying each tick until the
@@ -616,6 +706,34 @@ async function tick(context: TickContext): Promise<void> {
       // Backfill forward labels on snapshots old enough to observe, from the
       // PERSISTED minute bars — labels survive daemon restarts now.
       labelDueCandidates(store, priceSeriesFromHistory(history), nowMs);
+
+      // Promotion gate: pure over the labeled calibration record. State
+      // transitions land in the tape; an open gate stages this tick's top
+      // candidate for the paper book (validated by policy like any intent).
+      const promotion = evaluateV3Promotion(calibrate(store.candidateSnapshots(2000)));
+      const previous = store.v3Promotion();
+      if ((previous?.ready ?? false) !== promotion.ready) {
+        store.setV3Promotion({ ready: promotion.ready, ts: new Date(nowMs).toISOString() });
+        store.appendActivity(
+          "v3-shadow",
+          promotion.ready
+            ? "V3 PROMOTION GATE OPEN: calibrated shadow candidates now co-pilot the paper book."
+            : `V3 promotion gate closed: ${promotion.checks.filter((check) => !check.pass).map((check) => check.detail).join("; ")}.`,
+        );
+      }
+      if (promotion.ready && state.mode === "paper") {
+        const top = shadow.route.ranked[0] ?? null;
+        const heldMints = new Set(store.positions().map((position) => position.mint));
+        const topPrice = top ? snapshotPrices.get(top.token_mint) : undefined;
+        if (
+          top &&
+          topPrice !== undefined &&
+          !heldMints.has(top.token_mint) &&
+          nowMs >= (context.cooldownUntilMs.get(top.token_mint) ?? 0)
+        ) {
+          v3PaperCandidate = { signal: top, price: topPrice };
+        }
+      }
     } catch (error) {
       store.appendActivity("error", `V3 shadow failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -625,7 +743,7 @@ async function tick(context: TickContext): Promise<void> {
   // effect on the very next decision (learning-loop plan, layer 2).
   const params = store.strategyParams();
 
-  const { decisions, skipped } = decide({
+  const { decisions, skipped, evaluations } = decide({
     windows: context.windows,
     positions: store.positions(),
     state,
@@ -640,6 +758,40 @@ async function tick(context: TickContext): Promise<void> {
     // Canary week: the first CANARY_WINDOW_MS of live mode pins entry size.
     live_canary: isLive && state.started_at !== null && nowMs - Date.parse(state.started_at) < CANARY_WINDOW_MS,
   });
+
+  // Persist this tick's per-symbol verdicts so the panel can show the strategy
+  // working in real time (strategy-legibility slice, 2026-07-09).
+  store.setLastEvaluations({ ts: new Date(nowMs).toISOString(), mode: state.mode, evaluations });
+
+  // Promoted V3 co-pilot entry (paper only, one entry per tick total): the
+  // candidate rides the same policy → executor path as any v2 decision, and
+  // v2's exit engine (stop / take-profit / trail / time) manages the position.
+  const v3EntryMints = new Set<string>();
+  if (v3PaperCandidate && !isLive && !decisions.some((decision) => decision.action === "buy")) {
+    const { signal, price } = v3PaperCandidate;
+    const num = (value: unknown): number | null =>
+      typeof value === "number" && Number.isFinite(value) ? value : null;
+    const stopPct = Math.min(params.max_stop_pct, Math.max(params.min_stop_pct, signal.max_loss_bps / 100));
+    decisions.push({
+      action: "buy",
+      mint: signal.token_mint,
+      symbol: signal.symbol,
+      price,
+      value_usd: Math.max(5, Math.min(state.caps.max_trade_usd, cash * 0.25)),
+      stop_pct: stopPct,
+      reason: `V3 ${signal.strategy_id}: ${signal.reason}`,
+      signals: {
+        price_usd: price,
+        short_pct: null,
+        range_pct: null,
+        h1_pct: num(signal.features.h1_pct ?? signal.features.r_1h_pct),
+        h24_pct: num(signal.features.h24_pct ?? signal.features.r_24h_pct),
+        volume_h24_usd: num(signal.features.volume_h24_usd),
+        liquidity_usd: signal.liquidity_usd,
+      },
+    });
+    v3EntryMints.add(signal.token_mint);
+  }
 
   // Decisions become typed intents; the policy engine re-checks every hard
   // rule independently of the strategy core; only the executor produces fills
@@ -656,7 +808,12 @@ async function tick(context: TickContext): Promise<void> {
     .reduce((sum, trade) => sum + trade.value_usd, 0);
 
   for (const decision of decisions) {
-    const intent = intentFromDecision(decision, store.positions(), isLive ? "live" : "paper");
+    const intent = intentFromDecision(
+      decision,
+      store.positions(),
+      isLive ? "live" : "paper",
+      v3EntryMints.has(decision.mint) ? "v3-alpha-router" : "v2-trend-pullback",
+    );
     if (!intent) continue; // sell of an already-closed position: nothing to do
     const verdict = validateIntent(intent, {
       state,
@@ -779,8 +936,10 @@ async function tick(context: TickContext): Promise<void> {
   }
 
   // The best rejected candidate goes to the decision log (throttled) so the
-  // ledger shows what the bot chose NOT to do and why.
-  if (decisions.length === 0 && skipped && nowMs - context.lastSkipLogMs >= 5 * 60_000) {
+  // ledger shows what the bot chose NOT to do and why. Paper mode logs a skip
+  // per minute — silence read as "no strategy"; live keeps the quieter cadence.
+  const skipLogEveryMs = isLive ? 5 * 60_000 : 60_000;
+  if (decisions.length === 0 && skipped && nowMs - context.lastSkipLogMs >= skipLogEveryMs) {
     context.lastSkipLogMs = nowMs;
     store.appendDecision({ symbol: skipped.symbol, verdict: "skip", reason: skipped.reason, signals: skipped.signals });
   }
@@ -796,18 +955,21 @@ async function tick(context: TickContext): Promise<void> {
   // trading ticks.
   if ((state.last_analyst_run_at ?? "").slice(0, 10) !== today) {
     store.updateBotState({ last_analyst_run_at: new Date().toISOString() });
-    if (process.env.OPENROUTER_API_KEY) {
-      store.appendActivity("analyst", "Daily Analyst review started.");
-      void runAnalyst()
-        .then((result) => {
-          if (result.error) store.appendActivity("analyst", `Analyst run failed: ${result.error}`);
-        })
-        .catch((error: unknown) => {
-          store.appendActivity("analyst", `Analyst run crashed: ${error instanceof Error ? error.message : String(error)}`);
-        });
-    } else {
-      store.appendActivity("analyst", "Analyst skipped: OPENROUTER_API_KEY is not set.");
-    }
+    // Without an LLM key the run degrades to the deterministic rule-based
+    // reviewer inside runAnalyst — the learning loop never silently stops.
+    store.appendActivity(
+      "analyst",
+      process.env.OPENROUTER_API_KEY
+        ? "Daily Analyst review started."
+        : "Daily Analyst review started (rule-based — no LLM key set).",
+    );
+    void runAnalyst()
+      .then((result) => {
+        if (result.error) store.appendActivity("analyst", `Analyst run failed: ${result.error}`);
+      })
+      .catch((error: unknown) => {
+        store.appendActivity("analyst", `Analyst run crashed: ${error instanceof Error ? error.message : String(error)}`);
+      });
   }
 
   // Throttled observation: at most one web3-memory note per 10 minutes, so
@@ -847,6 +1009,7 @@ async function main(): Promise<void> {
     lastPriceBarMs: 0,
     priceBackoffUntilMs: 0,
     cooldownUntilMs: new Map<string, number>(),
+    lastTrending: [],
   };
   let stopping = false;
   const stop = () => {

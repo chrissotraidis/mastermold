@@ -46,6 +46,7 @@ import {
   type ParamKey,
   type StrategyParams,
 } from "./params";
+import type { EvaluationSnapshot } from "./strategy-view";
 import {
   isSqliteFile,
   openSqliteDatabase,
@@ -723,6 +724,28 @@ export class AutopilotStore {
 
   volumeBaselines(): Record<string, number> {
     return { ...(this.getSingleton<Record<string, number>>("volume_baselines") ?? {}) };
+  }
+
+  // --- per-tick strategy evaluations (panel snapshot, overwritten each tick) ----
+
+  lastEvaluations(): EvaluationSnapshot | null {
+    const snapshot = this.getSingleton<EvaluationSnapshot | null>("last_evaluations");
+    return snapshot ? { ...snapshot } : null;
+  }
+
+  setLastEvaluations(snapshot: EvaluationSnapshot): void {
+    this.setSingleton("last_evaluations", snapshot);
+  }
+
+  // --- V3 paper-promotion state (evidence-gated, daemon-evaluated) --------------
+
+  v3Promotion(): { ready: boolean; ts: string } | null {
+    const state = this.getSingleton<{ ready: boolean; ts: string } | null>("v3_promotion");
+    return state ? { ...state } : null;
+  }
+
+  setV3Promotion(state: { ready: boolean; ts: string }): void {
+    this.setSingleton("v3_promotion", state);
   }
 
   // --- analyst memo -------------------------------------------------------------
