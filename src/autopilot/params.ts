@@ -48,7 +48,12 @@ export type StrategyParams = {
 
 export type ParamKey = keyof StrategyParams;
 
-/** The current v2 values (research doc 2026-07-03) — the changelog origin. */
+/** The current v2 values — changelog origin. Launch values come from the
+ * 2026-07-03 research doc; the 2026-07-09 cost/edge research slowed the
+ * horizon: documented momentum edge on liquid majors lives at hours-to-days,
+ * not intraday, and every avoided round trip saves the full 0.6% cost. So the
+ * time stop holds winners a day instead of four hours and the daily entry
+ * budget starts at the floor — frequency is earned back via the Analyst. */
 export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   entry_min_h24_pct: 2.5,
   entry_max_h24_pct: 25,
@@ -62,9 +67,9 @@ export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   stop_vol_mult: 2.0,
   take_profit_r: 2.0,
   min_edge_over_cost: 3.0,
-  time_stop_ms: 4 * 60 * 60_000,
-  cooldown_ms: 60 * 60_000,
-  max_trades_per_day: 5,
+  time_stop_ms: 24 * 60 * 60_000,
+  cooldown_ms: 2 * 60 * 60_000,
+  max_trades_per_day: 3,
   loss_streak_limit: 2,
   loss_streak_pause_ms: 2 * 60 * 60_000,
 };
@@ -83,8 +88,11 @@ export const PARAM_CLAMPS: Record<ParamKey, { min: number; max: number }> = {
   stop_vol_mult: { min: 1.5, max: 3 },
   take_profit_r: { min: 1.5, max: 3 },
   min_edge_over_cost: { min: 2, max: 5 },
-  time_stop_ms: { min: 60 * 60_000, max: 12 * 60 * 60_000 },
-  cooldown_ms: { min: 15 * 60_000, max: 4 * 60 * 60_000 },
+  // Rails widened 2026-07-09: the evidence-backed holding period on majors is
+  // hours-to-days, so the Analyst may stretch toward multi-day holds — but
+  // never below one hour, where the cost stack eats every edge.
+  time_stop_ms: { min: 60 * 60_000, max: 72 * 60 * 60_000 },
+  cooldown_ms: { min: 15 * 60_000, max: 24 * 60 * 60_000 },
   max_trades_per_day: { min: 3, max: 10 },
   loss_streak_limit: { min: 2, max: 4 },
   loss_streak_pause_ms: { min: 60 * 60_000, max: 8 * 60 * 60_000 },

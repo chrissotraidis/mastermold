@@ -185,7 +185,7 @@ describe("autopilot v2 trend-pullback strategy", () => {
   test("GIVEN a stale position and the hourly trend flips down THEN the time stop closes it", () => {
     const windows = new Map([[SOL.mint, window(100.1, 100)]]);
     const feed = new Map([feedRow("SOL", { change_h1_pct: -0.5 })]);
-    const oldPosition = solPosition(100, { opened_at: new Date(NOW - 5 * 60 * 60_000).toISOString() });
+    const oldPosition = solPosition(100, { opened_at: new Date(NOW - 25 * 60 * 60_000).toISOString() });
     const { decisions } = decide(input({ positions: [oldPosition], windows, feed }));
     expect(decisions[0]?.action).toBe("sell");
     expect(decisions[0]?.reason).toContain("Time stop");
