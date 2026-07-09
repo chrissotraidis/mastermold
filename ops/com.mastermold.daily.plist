@@ -13,6 +13,13 @@
   Runs bin/daily-run every day at 07:15 local time. The app must be running
   (or hosted) at MASTERMOLD_URL. Logs land in /tmp/mastermold-daily-run.log.
   On Zo this file is unnecessary — use a scheduled job that calls bin/daily-run.
+
+  WARNING (macOS TCC): launchd agents are blocked from executing inside
+  ~/Documents, ~/Desktop, and ~/Downloads — if the repo lives there (the
+  default clone location), this job fails SILENTLY. Either clone outside
+  ~/Documents (e.g. ~/src/mastermold) and fix the path below, or skip this
+  file entirely: the app schedules the same daily read in-process while the
+  server is running (see instrumentation.ts), which needs no setup.
 -->
 <plist version="1.0">
 <dict>

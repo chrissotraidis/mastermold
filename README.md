@@ -65,9 +65,19 @@ bun install
 bun run dev
 ```
 
-Open the printed local URL. The app starts in sample mode and runs without
-external accounts, API keys, or a wallet. Connecting accounts or preparing a
-Solana wallet is optional and must use local, ignored configuration only.
+Open http://localhost:4002. The app pins port 4002 so the daily-run script,
+scheduler templates, and integration tests line up without configuration. The
+app starts in sample mode and runs without external accounts, API keys, or a
+wallet. Connecting accounts or preparing a Solana wallet is optional and must
+use local, ignored configuration only.
+
+Two optional processes deepen the experience once the app runs:
+
+```bash
+npm run autopilot   # the Solana paper-bot daemon (arm it from the Autopilot page)
+npm run daily       # one proactive daily read (the app also self-schedules a
+                    # morning read while the server is running)
+```
 
 Production-style `npm run start` requires Node 22.5 or newer; local development
 uses Bun's built-in SQLite support.
@@ -89,6 +99,21 @@ MASTERMOLD_DB=.data/mastermold.db
 AUTOPILOT_DB=.data/autopilot.db.json
 ENGINE_OUT_DIR=engine/out
 ```
+
+Three separate surfaces read LLM keys — set only what you use:
+
+- Chat: `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, or `OPENAI_API_KEY` in
+  `.env.local` (restart the server after changing them), or paste a
+  browser-scoped key in Settings → Chat.
+- Today-page play refinement and the autopilot's daily Analyst:
+  `OPENROUTER_API_KEY` in `.env.local`. Without it the Analyst runs a built-in
+  rule-based review, so the learning loop still works.
+- The Python briefing engine: its own keys in `engine/.env`. The engine is
+  optional; to enable richer daily scans, set it up once with
+  `cd engine && uv venv && uv pip install -e .` (see `engine/README.md`).
+
+Monarch Money import is available through a local MCP server: set
+`MONARCH_MCP_COMMAND` (stdio) or `MONARCH_MCP_URL` (HTTP) in `.env.local`.
 
 Optional Web3 settings are also local-only:
 

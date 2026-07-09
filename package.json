@@ -7,10 +7,10 @@
     "node": ">=22.5"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 4002",
     "build": "next build",
     "postbuild": "node scripts/prepare-standalone.mjs && node scripts/release-artifact-audit.mjs",
-    "start": "node .next/standalone/server.js",
+    "start": "PORT=${PORT:-4002} node .next/standalone/server.js",
     "seed": "bun run scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "smoke:app": "node scripts/runtime-smoke.mjs",

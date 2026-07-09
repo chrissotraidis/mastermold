@@ -36,9 +36,16 @@ export async function POST(request: Request): Promise<Response> {
   const baseLlmContext = contextWithPageContext(context.llm_context, parsed.pageContext);
   const budget = chatBudget(userMessage, baseLlmContext);
   const llmContext = contextWithInferenceBudget(baseLlmContext, budget);
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  const openrouterKey = process.env.OPENROUTER_API_KEY;
-  const openaiKey = process.env.OPENAI_API_KEY;
+  // Key resolution: server env wins (a deployment stays authoritative), then
+  // the browser-scoped key saved in Settings → Chat. Before this fallback the
+  // Settings key "tested green" but chat silently ignored it — the tested key
+  // must be the used key.
+  const browserProvider = request.headers.get("x-chat-provider");
+  const browserKey = request.headers.get("x-chat-api-key")?.trim() || null;
+  const browserModel = request.headers.get("x-chat-model")?.trim() || null;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY || (browserProvider === "anthropic" ? browserKey : null);
+  const openrouterKey = process.env.OPENROUTER_API_KEY || (browserProvider === "openrouter" ? browserKey : null);
+  const openaiKey = process.env.OPENAI_API_KEY || (browserProvider === "openai" ? browserKey : null);
 
   if (!budget.ok) {
     return Response.json(
@@ -58,7 +65,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (anthropicKey) {
-    const model = process.env.ANTHROPIC_MODEL ?? "claude-3-5-haiku-latest";
+    const model = process.env.ANTHROPIC_MODEL ?? (browserProvider === "anthropic" ? browserModel : null) ?? "claude-3-5-haiku-latest";
     return streamAnthropicResponse(
       anthropicKey,
       model,
@@ -71,7 +78,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (openrouterKey) {
-    const model = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-chat";
+    const model = process.env.OPENROUTER_MODEL ?? (browserProvider === "openrouter" ? browserModel : null) ?? "deepseek/deepseek-chat";
     return streamOpenRouterResponse(
       openrouterKey,
       model,
@@ -84,7 +91,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (openaiKey) {
-    const model = process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
+    const model = process.env.OPENAI_MODEL ?? (browserProvider === "openai" ? browserModel : null) ?? "gpt-4.1-mini";
     return streamOpenAIResponse(
       openaiKey,
       model,

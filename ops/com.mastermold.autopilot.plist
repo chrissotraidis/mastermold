@@ -14,6 +14,12 @@
   is "paper" (set from the Autopilot panel or POST /api/autopilot); otherwise
   the process idles. Laptop sleep pauses it — a Zo worker is the real 24/7 home.
   Logs land in /tmp/mastermold-autopilot.log.
+
+  WARNING (macOS TCC): launchd agents are blocked from executing inside
+  ~/Documents, ~/Desktop, and ~/Downloads — if the repo lives there (the
+  default clone location), this job fails SILENTLY. Clone outside ~/Documents
+  (e.g. ~/src/mastermold) and fix the path below, or run the daemon manually
+  with `npm run autopilot` / the supervised `npm run up`.
 -->
 <plist version="1.0">
 <dict>

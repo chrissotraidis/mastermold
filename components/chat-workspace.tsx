@@ -321,6 +321,7 @@ export function ChatWorkspace({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...browserChatKeyHeaders(),
           },
           body: JSON.stringify({ message: trimmed, page_context: pageContext }),
         });
@@ -1630,6 +1631,24 @@ function decodeActionHeader(value: string | null): ChatAction[] {
       .slice(0, 4);
   } catch {
     return [];
+  }
+}
+
+/** The Settings → Chat key, saved per-browser, rides along on chat requests so
+ * the key that "tested green" is the key that answers. Server env keys still
+ * win on the other side; this only upgrades the no-env-key case. */
+function browserChatKeyHeaders(): Record<string, string> {
+  try {
+    const saved = window.localStorage.getItem("financial-copilot.integration-fields.live_chat");
+    const fields = saved ? (JSON.parse(saved) as Record<string, unknown>) : null;
+    const apiKey = typeof fields?.api_key === "string" ? fields.api_key.trim() : "";
+    if (!apiKey || !/^[\x21-\x7e]+$/.test(apiKey)) return {};
+    const headers: Record<string, string> = { "x-chat-api-key": apiKey };
+    if (typeof fields?.provider === "string" && fields.provider) headers["x-chat-provider"] = fields.provider;
+    if (typeof fields?.model === "string" && fields.model) headers["x-chat-model"] = fields.model;
+    return headers;
+  } catch {
+    return {};
   }
 }
 
