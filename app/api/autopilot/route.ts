@@ -133,7 +133,7 @@ async function payload(): Promise<AutopilotApiPayload> {
     // secret itself never enters the payload or the store (autonomy ADR, D6).
     go_live_gate: evaluateGoLiveGate({
       trades: store.trades(1000),
-      decisions: store.decisions(400),
+      decisions: store.decisions(3000),
       equity_series: store.equitySeries(2000),
       wallet_provisioned: readiness.wallet_provisioned,
       now_ms: Date.now(),
@@ -149,7 +149,7 @@ async function payload(): Promise<AutopilotApiPayload> {
     param_changelog: store.paramChangelog(20),
     attribution: buildAttribution({
       trades: store.trades(1000),
-      decisions: store.decisions(400),
+      decisions: store.decisions(3000),
       exit_watches: store.exitWatches(200),
       param_changelog: store.paramChangelog(200),
     }).summary,

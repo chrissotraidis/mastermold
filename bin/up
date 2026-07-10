@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # bin/up — the one command: web app + autopilot daemon, supervised.
 #
-# Starts the Next dev server (port 4002) and the Autopilot paper daemon,
-# restarts either one if it crashes (exponential backoff, 30s cap), and stops
-# both on Ctrl-C. Logs land in .data/logs/. If an app is already listening on
-# :4002 (another terminal, the desktop preview), only the daemon is
-# supervised so two servers never fight over the port.
+# Starts the web server (port 4002) and the Autopilot paper daemon, restarts
+# either one if it crashes (exponential backoff, 30s cap), and stops both on
+# Ctrl-C. Logs land in .data/logs/ and are trimmed when they pass ~5MB — an
+# unattended host must never fill its disk with request logs. If an app is
+# already listening on :4002 (another terminal, the desktop preview), only
+# the daemon is supervised so two servers never fight over the port.
+#
+# Web mode: `next dev` by default (local hacking). For unattended hosting set
+# MASTERMOLD_WEB=prod — after `npm run build`, the standalone server is what
+# should run for weeks, not a dev server with file watchers.
 #
 # This supervises PROCESSES only. Whether the bot trades is still the mode
 # set from the Autopilot page — a supervised daemon in mode "off" just idles.
@@ -17,11 +22,25 @@ mkdir -p .data/logs
 BUN="node_modules/.bin/bun"
 [ -x "$BUN" ] || BUN="bun"
 
+MAX_LOG_BYTES=$((5 * 1024 * 1024))
+
+trim_log() {
+  local log="$1"
+  [ -f "$log" ] || return 0
+  local size
+  size=$(wc -c <"$log" | tr -d ' ')
+  if [ "$size" -gt "$MAX_LOG_BYTES" ]; then
+    tail -c $((512 * 1024)) "$log" >"${log}.tmp" && mv "${log}.tmp" "$log"
+    echo "up: trimmed ${log} (was ${size} bytes)" >>"$log"
+  fi
+}
+
 supervise() {
   local name="$1"
   shift
   local delay=2
   while true; do
+    trim_log ".data/logs/${name}.log"
     echo "up: starting ${name} ($(date -u +%FT%TZ))" >>".data/logs/${name}.log"
     "$@" >>".data/logs/${name}.log" 2>&1
     echo "up: ${name} exited; restarting in ${delay}s (log: .data/logs/${name}.log)"
@@ -30,12 +49,28 @@ supervise() {
   done
 }
 
+web_command() {
+  if [ "${MASTERMOLD_WEB:-dev}" = "prod" ]; then
+    if [ -f ".next/standalone/server.js" ]; then
+      echo "prod"
+      return
+    fi
+    echo "up: MASTERMOLD_WEB=prod but no build found — run 'npm run build' first; falling back to dev" >&2
+  fi
+  echo "dev"
+}
+
 echo "up: logs in .data/logs/ · Ctrl-C stops everything"
 if curl -s -o /dev/null -m 2 http://localhost:4002/api/health 2>/dev/null; then
   echo "up: an app is already running on :4002 — supervising the autopilot daemon only"
 else
-  supervise web "$BUN" run dev &
-  echo "up: web starting at http://localhost:4002"
+  if [ "$(web_command)" = "prod" ]; then
+    supervise web env PORT=4002 node .next/standalone/server.js &
+    echo "up: web (production standalone) starting at http://localhost:4002"
+  else
+    supervise web "$BUN" run dev &
+    echo "up: web (dev) starting at http://localhost:4002"
+  fi
 fi
 supervise autopilot bin/autopilot-daemon &
 echo "up: autopilot daemon starting (arm or stop the bot from the Autopilot page)"

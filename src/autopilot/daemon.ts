@@ -59,7 +59,11 @@ import {
 } from "./store";
 
 export const TICK_MS = 20_000;
-const EQUITY_MARK_EVERY_TICKS = 3; // one equity point per minute
+// One equity mark per FIVE minutes (unattended-runway audit, 2026-07-10):
+// per-minute marks meant equitySeries(2000) spanned only ~33 hours, so the
+// go-live gate's 5-day window could never be measured. At 5-minute cadence
+// the same read spans ~7 days, and the table cap keeps ~10 weeks of curve.
+const EQUITY_MARK_EVERY_TICKS = 15;
 export const PAPER_STARTING_CASH_USD = 1_000;
 export const ROUND_TRIP_COST_PCT = PAPER_FEE_RATE * 2 * 100; // 0.6%
 const WINDOW_TICKS = 40; // ~13 minutes of 20s samples
@@ -632,7 +636,11 @@ async function tick(context: TickContext): Promise<void> {
   // Persist the V3 learning substrate once per minute: a combined minute bar
   // of every mint's price (restart-proof forward labeling + r_4h features)
   // and the per-mint 24h-volume EMA baseline behind xsec's volume_z.
-  if (nowMs - context.lastPriceBarMs >= 60_000 && prices.size > 0) {
+  // Five-minute bars (runway audit): at 1/min the capped history spanned 15
+  // hours — too short for the gate's SOL benchmark. 5-minute bars × the raised
+  // cap span ~7 days, and every consumer (forward labels at +30m/2h/6h, r_4h,
+  // wallet report cards with 15m tolerance) is comfortably coarser than 5m.
+  if (nowMs - context.lastPriceBarMs >= 5 * 60_000 && prices.size > 0) {
     context.lastPriceBarMs = nowMs;
     // Radar tokens ride along in the same minute bar so their shadow
     // snapshots can be forward-labeled exactly like universe tokens.
@@ -1054,9 +1062,10 @@ async function tick(context: TickContext): Promise<void> {
   }
 
   // The best rejected candidate goes to the decision log (throttled) so the
-  // ledger shows what the bot chose NOT to do and why. Paper mode logs a skip
-  // per minute — silence read as "no strategy"; live keeps the quieter cadence.
-  const skipLogEveryMs = isLive ? 5 * 60_000 : 60_000;
+  // ledger shows what the bot chose NOT to do and why. One row per 5 minutes:
+  // the strategy card now shows every symbol's live verdict each tick, so the
+  // log is the analyst's evidence trail, not the legibility surface.
+  const skipLogEveryMs = 5 * 60_000;
   if (decisions.length === 0 && skipped && nowMs - context.lastSkipLogMs >= skipLogEveryMs) {
     context.lastSkipLogMs = nowMs;
     store.appendDecision({ symbol: skipped.symbol, verdict: "skip", reason: skipped.reason, signals: skipped.signals });
@@ -1146,20 +1155,21 @@ async function main(): Promise<void> {
     lastCopySummaries: [],
   };
 
-  // Warm-start: seed the signal windows from the persisted minute bars so a
-  // restart doesn't blind the strategy for 13 minutes — under the supervisor,
-  // restarts are routine. Each 1-minute bar stands in for ~3 ticks: the
+  // Warm-start: seed the signal windows from the persisted bars so a restart
+  // doesn't blind the strategy for 13 minutes — under the supervisor,
+  // restarts are routine. Each 5-minute bar stands in for ~15 ticks: the
   // 13-minute return comes out the same, the range is slightly coarser, and
   // live 20s samples refine it from the first tick. Only RECENT bars qualify;
   // seeding a long outage's stale prices would fake a 13-minute move.
+  const BAR_TICKS = Math.round((5 * 60_000) / TICK_MS);
   const warmCutoffMs = Date.now() - 20 * 60_000;
   const warmBars = store.priceHistory().filter((bar) => Date.parse(bar.ts) >= warmCutoffMs);
-  if (warmBars.length >= 3) {
-    for (const bar of warmBars.slice(-Math.ceil(WINDOW_TICKS / 3))) {
+  if (warmBars.length >= 2) {
+    for (const bar of warmBars.slice(-Math.ceil(WINDOW_TICKS / BAR_TICKS) - 1)) {
       for (const [mint, price] of Object.entries(bar.prices)) {
         if (!Number.isFinite(price) || price <= 0) continue;
         const window = context.windows.get(mint) ?? [];
-        for (let tick = 0; tick < 3 && window.length < WINDOW_TICKS; tick += 1) window.push(price);
+        for (let tick = 0; tick < BAR_TICKS && window.length < WINDOW_TICKS; tick += 1) window.push(price);
         context.windows.set(mint, window);
       }
     }

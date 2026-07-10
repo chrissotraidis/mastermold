@@ -235,12 +235,22 @@ type AutopilotSnapshot = {
 const CANDIDATE_SNAPSHOT_CAP = 2000;
 const ACTIVITY_CAP = 400;
 const WEB3_MEMORY_CAP = 400;
-const DECISION_CAP = 400;
+// Must outlive the go-live gate's 5-day trace window (runway audit): at the
+// paper skip cadence of one row per 5 minutes, 5 days ≈ 1,440 skip rows —
+// with 400, fills aged out of the trace in hours and the gate's "every fill
+// traced" check would silently start failing as history grew.
+const DECISION_CAP = 3_000;
 const WALLET_BUY_CAP = 500;
 const EXIT_WATCH_CAP = 200;
 const PARAM_CHANGELOG_CAP = 200;
 // ≈15h of minute bars; widened so the 6h label pass has margin
-const PRICE_HISTORY_CAP = 900;
+// Sized to the go-live gate's 5-day evidence window (unattended-runway audit,
+// 2026-07-10): bars land every 5 minutes, so 2,016 rows ≈ 7 days — enough for
+// the SOL benchmark's ≥2.5-day span requirement with headroom. The old
+// 900 one-minute bars covered 15 hours and the benchmark could never engage.
+const PRICE_HISTORY_CAP = 2_016;
+// ~10 weeks of 5-minute equity marks; the one previously unbounded table.
+const EQUITY_POINT_CAP = 20_000;
 
 function defaultBotState(now: string): BotStateRow {
   return {
@@ -525,10 +535,22 @@ export class AutopilotStore {
 
   appendEquityPoint(equityUsd: number, ts?: string): EquityPointRow {
     const point: EquityPointRow = { ts: ts ?? new Date().toISOString(), equity_usd: equityUsd };
-    this.db
-      .prepare("INSERT INTO equity_points (ts, data) VALUES (?, ?)")
-      .run(point.ts, JSON.stringify(point));
+    this.transaction(() => {
+      this.db
+        .prepare("INSERT INTO equity_points (ts, data) VALUES (?, ?)")
+        .run(point.ts, JSON.stringify(point));
+      this.capEquityPoints();
+    });
     return point;
+  }
+
+  /** equity_points has no id column, so the generic capTable can't serve it. */
+  private capEquityPoints(): void {
+    this.db
+      .prepare(
+        "DELETE FROM equity_points WHERE ts IN (SELECT ts FROM equity_points ORDER BY ts DESC LIMIT -1 OFFSET ?)",
+      )
+      .run(EQUITY_POINT_CAP);
   }
 
   /** Last `limit` points in chronological order (oldest → newest), for charting. */

@@ -143,7 +143,7 @@ export function setMode(mode: "off" | "paper" | "live"): ControlResult {
   if (mode === "live") {
     const gate = evaluateGoLiveGate({
       trades: store.trades(1000),
-      decisions: store.decisions(400),
+      decisions: store.decisions(3000),
       equity_series: store.equitySeries(2000),
       wallet_provisioned: liveReadiness().wallet_provisioned,
       now_ms: Date.now(),

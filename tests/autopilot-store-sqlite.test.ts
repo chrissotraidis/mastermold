@@ -314,16 +314,17 @@ describe("two-writer concurrency (daemon + server on one db)", () => {
 });
 
 describe("price history rolling cap", () => {
-  test("GIVEN more rows than the widened cap THEN only the newest 900 minute bars survive", () => {
+  test("GIVEN more rows than the cap THEN only the newest 2,016 bars survive (~7 days at 5-minute cadence)", () => {
     const store = autopilotStore();
     const base = Date.parse("2026-07-02T00:00:00.000Z");
-    for (let i = 0; i < 950; i++) {
-      store.appendPriceHistory({ mint: i }, new Date(base + i * 60_000).toISOString());
+    for (let i = 0; i < 2_066; i++) {
+      store.appendPriceHistory({ mint: i }, new Date(base + i * 5 * 60_000).toISOString());
     }
     const rows = store.priceHistory();
-    // ≈15h of minute bars; widened from 420 so the 6h label pass has margin.
-    expect(rows).toHaveLength(900);
+    // Sized for the go-live gate's SOL benchmark, which needs ≥2.5 days of
+    // span — the old 900-minute-bar cap (15h) could never satisfy it.
+    expect(rows).toHaveLength(2_016);
     expect(rows[0].prices.mint).toBe(50); // the oldest 50 aged out
-    expect(rows[rows.length - 1].prices.mint).toBe(949);
+    expect(rows[rows.length - 1].prices.mint).toBe(2_065);
   });
 });
