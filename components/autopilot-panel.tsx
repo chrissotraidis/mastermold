@@ -95,8 +95,24 @@ type AutopilotApiPayload = {
     liquidity_usd: number | null;
     boost_amount: number | null;
   }>;
-  /** Operator-curated smart-money list the copy_wallets module follows. */
-  smart_wallets?: { watched: string[] };
+  /** Operator-curated smart-money list the copy_wallets module follows,
+   * plus the system's own scored discovery suggestions. */
+  smart_wallets?: {
+    watched: string[];
+    suggestions?: {
+      ts: string;
+      source: "solanatracker" | "gecko_trades" | "none";
+      suggestions: Array<{
+        address: string;
+        source: string;
+        score: number;
+        win_rate: number | null;
+        realized_pnl_usd: number | null;
+        trades: number | null;
+        flags: string[];
+      }>;
+    } | null;
+  };
   analyst?: { ts: string; memo: string } | null;
   /** V3 shadow telemetry: candidate dataset size, calibration verdict, and
    * the paper-promotion gate. */
@@ -648,6 +664,56 @@ export function AutopilotPanel() {
               Save watched wallets
             </button>
           </form>
+
+          {data.smart_wallets?.suggestions && data.smart_wallets.suggestions.suggestions.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-outline">
+                Discovered candidates ·{" "}
+                {data.smart_wallets.suggestions.source === "solanatracker"
+                  ? "PnL leaderboard, trap-filtered"
+                  : "trending-pool activity — no PnL history, vet before following"}
+              </p>
+              <ul className="mt-1 divide-y divide-outline-variant/15">
+                {data.smart_wallets.suggestions.suggestions.map((suggestion) => {
+                  const followed = (data.smart_wallets?.watched ?? []).includes(suggestion.address);
+                  return (
+                    <li key={suggestion.address} className="flex items-center gap-2 py-1 text-xs">
+                      <span className="w-10 shrink-0 tabular-nums font-semibold text-on-surface" title="Anti-trap score (0-100)">
+                        {suggestion.score}
+                      </span>
+                      <span className="min-w-0 truncate font-mono text-on-surface-variant" title={suggestion.address}>
+                        {suggestion.address.slice(0, 4)}…{suggestion.address.slice(-4)}
+                      </span>
+                      <span className="min-w-0 truncate text-outline" title={suggestion.flags.join("; ")}>
+                        {suggestion.win_rate !== null ? `${Math.round(suggestion.win_rate * 100)}% wins` : "wins n/a"}
+                        {suggestion.realized_pnl_usd !== null
+                          ? ` · +$${Math.round(suggestion.realized_pnl_usd).toLocaleString("en-US")} realized`
+                          : ""}
+                        {suggestion.trades !== null ? ` · ${suggestion.trades} trades` : ""}
+                        {suggestion.flags.length > 0 ? " · ⚠" : ""}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={runtimeUnavailable || isPending || followed}
+                        onClick={() =>
+                          post(
+                            {
+                              action: "set_watched_wallets",
+                              wallets: [...(data.smart_wallets?.watched ?? []), suggestion.address],
+                            },
+                            `Now following ${suggestion.address.slice(0, 4)}…${suggestion.address.slice(-4)}.`,
+                          )
+                        }
+                        className="ml-auto inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-outline-variant/40 px-2 text-[11px] font-semibold text-on-surface transition-colors hover:bg-surface-dim/40 disabled:opacity-50 sm:min-h-7"
+                      >
+                        {followed ? "Following" : "Follow"}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </details>
 

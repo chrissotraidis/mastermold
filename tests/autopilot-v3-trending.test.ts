@@ -106,6 +106,7 @@ describe("trending candidate", () => {
     volume_h24_usd: 5_200_000,
     liquidity_usd: 800_000,
     boost_amount: null,
+    pool_address: "PoolAddr111111111111111111111111111111111",
   };
 
   test("GIVEN a hot, liquid token THEN a positive-scored buy candidate emerges", () => {

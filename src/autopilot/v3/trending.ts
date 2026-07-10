@@ -34,6 +34,8 @@ export type TrendingToken = {
   liquidity_usd: number | null;
   /** Active DexScreener boost points, if any — paid attention. */
   boost_amount: number | null;
+  /** The trending pool's address (wallet discovery's keyless trade source). */
+  pool_address: string | null;
 };
 
 const GECKO_TRENDING_URL = "https://api.geckoterminal.com/api/v2/networks/solana/trending_pools";
@@ -92,6 +94,7 @@ export function parseGeckoTrendingPools(body: unknown): TrendingToken[] {
       volume_h24_usd: asFiniteNumber(volume.h24),
       liquidity_usd: asFiniteNumber(attributes.reserve_in_usd),
       boost_amount: null,
+      pool_address: typeof attributes.address === "string" ? attributes.address : null,
     });
     if (tokens.length >= TRENDING_MAX_TOKENS) break;
   }

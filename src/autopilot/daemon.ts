@@ -44,6 +44,7 @@ import { evaluateV3Promotion } from "./v3/promotion";
 import { evaluateV3Shadow, labelDueCandidates, recordV3Shadow } from "./v3/shadow";
 import type { CandidateSignal } from "./v3/signal";
 import { copyWalletCandidate, scanWatchedWallets, type WalletBuyEvent } from "./v3/smart-wallets";
+import { fetchWalletSuggestions, SUGGESTIONS_TTL_MS } from "./v3/wallet-discovery";
 import { PUBLIC_RPC_URL } from "../helius/rpc-url";
 import { fetchTrendingTokens, type TrendingToken } from "./v3/trending";
 import { UNIVERSE } from "./universe";
@@ -700,6 +701,26 @@ async function tick(context: TickContext): Promise<void> {
       // The Solana radar: keyless trending/attention flow. Cached 5 minutes
       // inside; failures degrade to [] and the shadow simply runs without it.
       context.lastTrending = await fetchTrendingTokens(nowMs);
+
+      // Wallet discovery: refresh the suggested-wallets list twice a day
+      // (SolanaTracker leaderboard when a key exists, else trending-pool
+      // activity leads). Suggestions only — following stays a human click.
+      const existingSuggestions = store.walletSuggestions();
+      if (!existingSuggestions || nowMs - Date.parse(existingSuggestions.ts) >= SUGGESTIONS_TTL_MS) {
+        const suggestions = await fetchWalletSuggestions({
+          trendingPools: context.lastTrending
+            .map((token) => token.pool_address)
+            .filter((pool): pool is string => Boolean(pool)),
+          nowMs,
+        });
+        store.setWalletSuggestions(suggestions);
+        if (suggestions.suggestions.length > 0) {
+          store.appendActivity(
+            "copy",
+            `Wallet discovery refreshed: ${suggestions.suggestions.length} candidate${suggestions.suggestions.length === 1 ? "" : "s"} from ${suggestions.source === "solanatracker" ? "the SolanaTracker PnL leaderboard" : "trending-pool activity (no PnL history — vet before following)"}.`,
+          );
+        }
+      }
 
       // Smart-money follows: scan the operator's watched wallets for fresh
       // buys (public RPC, budgeted), then price the bought tokens so the

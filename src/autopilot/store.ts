@@ -48,6 +48,7 @@ import {
 } from "./params";
 import type { EvaluationSnapshot } from "./strategy-view";
 import { EMPTY_CARRY_BOOK, type CarryBookState } from "./v3/carry-book";
+import type { WalletSuggestions } from "./v3/wallet-discovery";
 import {
   isSqliteFile,
   openSqliteDatabase,
@@ -747,6 +748,15 @@ export class AutopilotStore {
 
   setWatchedWallets(wallets: string[]): void {
     this.setSingleton("watched_wallets", wallets);
+  }
+
+  walletSuggestions(): WalletSuggestions | null {
+    const state = this.getSingleton<WalletSuggestions>("wallet_suggestions");
+    return state ? { ...state } : null;
+  }
+
+  setWalletSuggestions(state: WalletSuggestions): void {
+    this.setSingleton("wallet_suggestions", state);
   }
 
   smartWalletCursors(): Record<string, string> {
