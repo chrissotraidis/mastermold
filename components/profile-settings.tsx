@@ -58,6 +58,10 @@ export function ProfileSettings() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
+  const resetTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+  }, []);
 
   // Mirror the loaded profile into the form once it's ready.
   useEffect(() => {
@@ -141,8 +145,13 @@ export function ProfileSettings() {
   function handleReset() {
     if (!confirmReset) {
       setConfirmReset(true);
+      // Self-cancel like the kill switch: a stray first click must never leave
+      // a primed destructive action waiting for an accidental second one.
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+      resetTimer.current = window.setTimeout(() => setConfirmReset(false), 4_000);
       return;
     }
+    if (resetTimer.current) clearTimeout(resetTimer.current);
     resetProfile();
     router.push("/welcome");
   }
@@ -250,6 +259,7 @@ export function ProfileSettings() {
                 variant="outline"
                 size="sm"
                 onClick={handleReset}
+                onBlur={() => setConfirmReset(false)}
                 className={cn(
                   "border-outline-variant/50 bg-transparent text-xs hover:bg-surface-high/60",
                   confirmReset ? "border-critical/60 text-critical" : "text-on-surface",

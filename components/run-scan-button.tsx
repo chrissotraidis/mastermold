@@ -86,7 +86,9 @@ export function RunScanButton({
     autoRunRef.current = actionQuery;
     params.delete("action");
     const query = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#run-scan"}`);
+    // Scroll target is the System health section (id="health"); "#run-scan"
+    // resolved to no element.
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash || "#health"}`);
     void run("master-mold-command");
   }, [actionQuery, available, run, state]);
 

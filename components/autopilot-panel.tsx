@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState, useTransition } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 
 import { AutopilotTerminal } from "./autopilot-terminal";
@@ -182,6 +182,7 @@ export function AutopilotPanel() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [confirmingKill, setConfirmingKill] = useState(false);
+  const killConfirmTimer = useRef<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const load = useCallback(async () => {
@@ -243,10 +244,13 @@ export function AutopilotPanel() {
     if (!confirmingKill) {
       setConfirmingKill(true);
       // The confirm window closes itself: a stray first click never leaves a
-      // primed kill switch waiting for an accidental second one.
-      window.setTimeout(() => setConfirmingKill(false), 4_000);
+      // primed kill switch waiting for an accidental second one. Tracked in a
+      // ref and cleared so a re-primed confirm gets a full fresh 4s.
+      if (killConfirmTimer.current) clearTimeout(killConfirmTimer.current);
+      killConfirmTimer.current = window.setTimeout(() => setConfirmingKill(false), 4_000);
       return;
     }
+    if (killConfirmTimer.current) clearTimeout(killConfirmTimer.current);
     setConfirmingKill(false);
     if (engaged) {
       post({ action: "release" }, "Kill switch released. Arm paper trading to resume.");
@@ -663,6 +667,10 @@ export function AutopilotPanel() {
             <textarea
               name="wallets"
               rows={3}
+              // Keyed on the watched list so a "Follow" click (which posts a
+              // new list and updates data) remounts the field with the fresh
+              // set instead of showing the stale mounted value.
+              key={(data.smart_wallets?.watched ?? []).join(",")}
               defaultValue={(data.smart_wallets?.watched ?? []).join("\n")}
               placeholder={"One Solana address per line (max 8).\nFind candidates on GMGN/Birdeye PnL leaderboards."}
               className="w-full rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 font-mono text-xs text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"

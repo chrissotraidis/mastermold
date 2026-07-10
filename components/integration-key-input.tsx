@@ -63,7 +63,10 @@ export function IntegrationKeyInput({
   const canImport = service !== "live_chat";
   const handledCommandActionRef = useRef<string | null>(null);
   const actionQuery = searchParams.toString();
-  const actionCopy = service === "live_chat" ? liveChatCopy(values.chat_service) : null;
+  // The live-chat provider field is named "provider" (src/db/integrations.ts);
+  // reading values.chat_service was always undefined, so the hint always said
+  // "OpenRouter" regardless of the dropdown selection.
+  const actionCopy = service === "live_chat" ? liveChatCopy(values.provider) : null;
 
   useEffect(() => {
     const saved = window.localStorage.getItem(storageKey);
