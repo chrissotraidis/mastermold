@@ -96,7 +96,7 @@ describe("engine-data helpers (edge cases)", () => {
     expect(getEngineRunHistory()).toEqual([]);
   });
 
-  test("engine bundles clamp knowledge time forward when a saved scan violates no-lookahead ordering", () => {
+  test("engine bundles repair no-lookahead violations: rows clamp knowledge forward, run header pulls event back", () => {
     const dir = mkdtempSync(join(tmpdir(), "mm-clamp-"));
     const bundle = JSON.parse(readFileSync(join(FIXTURES, "engine-run-active.json"), "utf8"));
     bundle.run.run_date = "2026-06-08";
@@ -115,8 +115,32 @@ describe("engine-data helpers (edge cases)", () => {
 
     expect(status.state).toBe("live");
     if (status.state !== "live") return;
-    expect(status.bundle.run.knowledge_time).toBe("2026-06-08T13:30:00.000Z");
+    // The header keeps its honest write moment — pushing it forward would
+    // future-stamp the run — and its event time is pulled back to match.
+    expect(status.bundle.run.knowledge_time).toBe("2026-06-08T13:29:28.513Z");
+    expect(status.bundle.run.event_time).toBe("2026-06-08T13:29:28.513Z");
+    // Row-level facts still clamp knowledge forward to their event time.
     expect(status.bundle.briefing_cards[0].knowledge_time).toBe("2026-06-08T13:30:00.000Z");
     expect(status.bundle.briefing_cards[0].drivers[0].knowledge_time).toBe("2026-06-08T13:30:00.000Z");
+  });
+
+  test("a pre-open morning run is live immediately, not hidden as look-ahead until 13:30Z", () => {
+    // The real-world case: engine ran at 00:15Z stamping event_time as the
+    // upcoming open. The bundle must be visible all day, starting right away.
+    const dir = mkdtempSync(join(tmpdir(), "mm-preopen-"));
+    const bundle = JSON.parse(readFileSync(join(FIXTURES, "engine-run-active.json"), "utf8"));
+    bundle.run.run_date = "2026-06-08";
+    bundle.run.event_time = "2026-06-08T13:30:00.000Z";
+    bundle.run.knowledge_time = "2026-06-08T00:15:10.953Z";
+    writeFileSync(join(dir, "engine-run-2026-06-08.json"), JSON.stringify(bundle));
+    process.env.ENGINE_OUT_DIR = dir;
+
+    const status = getEngineStatus(null, {
+      now: Date.parse("2026-06-08T06:00:00.000Z"),
+    });
+
+    expect(status.state).toBe("live");
+    if (status.state !== "live") return;
+    expect(status.bundle.run.knowledge_time).toBe("2026-06-08T00:15:10.953Z");
   });
 });

@@ -14,6 +14,10 @@ type TestResult = {
   docs_url?: string;
 };
 
+// A connection test must answer fast or fail fast — without a bound, one
+// hung provider socket leaves the Settings button spinning indefinitely.
+const TEST_TIMEOUT_MS = 15_000;
+
 const docsByService: Record<IntegrationService, string> = {
   coinbase: "https://docs.cdp.coinbase.com/coinbase-app/advanced-trade-apis/guides/oauth-access",
   robinhood: "https://docs.snaptrade.com/docs/account-data",
@@ -61,6 +65,7 @@ async function testCoinbase(body: Record<string, unknown> | null): Promise<TestR
       Accept: "application/json",
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
   });
 
   if (!response.ok) return providerFailure("coinbase", response, "Coinbase rejected the read-only account test.");
@@ -83,6 +88,7 @@ async function testSnapTrade(body: Record<string, unknown> | null): Promise<Test
       Accept: "application/json",
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
   });
 
   if (!response.ok) return providerFailure("robinhood", response, "SnapTrade rejected the connection list test.");
@@ -100,6 +106,7 @@ async function testZerion(body: Record<string, unknown> | null): Promise<TestRes
       Accept: "application/json",
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
   });
 
   if (!response.ok) return providerFailure("onchain_wallet", response, "Zerion rejected the wallet portfolio test.");
@@ -146,6 +153,7 @@ async function testOpenRouter(apiKey: string, model: string) {
       max_tokens: 8,
       messages: [{ role: "user", content: "Reply with OK." }],
     }),
+    signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(await providerErrorText(response, "OpenRouter rejected the live chat test."));
   return "The selected chat service responded.";
@@ -163,6 +171,7 @@ async function testOpenAI(apiKey: string, model: string) {
       max_tokens: 8,
       messages: [{ role: "user", content: "Reply with OK." }],
     }),
+    signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(await providerErrorText(response, "OpenAI rejected the live chat test."));
   return "The selected chat service responded.";
@@ -181,6 +190,7 @@ async function testAnthropic(apiKey: string, model: string) {
       max_tokens: 8,
       messages: [{ role: "user", content: "Reply with OK." }],
     }),
+    signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(await providerErrorText(response, "Anthropic rejected the live chat test."));
   return "The selected chat service responded.";

@@ -159,8 +159,12 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
         if override_entries:
             config["watchlist"] = override_entries
             config["watchlist_source"] = "portfolio"
-    event_time = f"{args.date}T13:30:00.000Z"
     knowledge_time = now_iso()
+    # A run before the US open describes pre-open data, so its event_time is
+    # the run moment itself — stamping the future open would make the bundle
+    # look-ahead-invalid on the dashboard until 13:30Z passes. Both strings
+    # are Z-suffixed millisecond ISO, so lexical min() is chronological.
+    event_time = min(f"{args.date}T13:30:00.000Z", knowledge_time)
     signals, data_refresh_status, data_refresh_detail = load_market_signals(args.date, config["watchlist"])
     screener_cfg = config["screener"]
     screens, triggered = run_screener_stage(

@@ -19,6 +19,10 @@ beforeEach(() => {
   prevEngine = process.env.ENGINE_OUT_DIR;
   prevDb = process.env.MASTERMOLD_DB;
   process.env.MASTERMOLD_DB = join(mkdtempSync(join(tmpdir(), "mm-chat-")), "db.sqlite");
+  // Default to an empty engine dir so tests that don't opt into FIXTURES
+  // never read the developer's real engine/out (whose bundles go live or
+  // stale with the wall clock). Tests that want engine data set FIXTURES.
+  process.env.ENGINE_OUT_DIR = mkdtempSync(join(tmpdir(), "mm-chat-engine-"));
   __resetStoreForTests();
 });
 

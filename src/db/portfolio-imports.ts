@@ -6,6 +6,11 @@ import type { ImportedHoldingRow } from "./store";
 
 export type PortfolioImportService = ImportedHoldingRow["service"];
 
+// Imports page through real position data, so they get more room than a
+// connection test — but still a hard bound, or one dead provider socket
+// hangs the import button forever.
+const IMPORT_TIMEOUT_MS = 20_000;
+
 export type PortfolioImportResult = {
   ok: boolean;
   service: PortfolioImportService;
@@ -153,6 +158,7 @@ async function importZerion(
         Accept: "application/json",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(IMPORT_TIMEOUT_MS),
     },
   );
   if (!response.ok) throw new Error(await providerErrorText(response, "Zerion rejected the wallet import."));
@@ -186,6 +192,7 @@ async function snapTradeRequest<T>({
       Accept: "application/json",
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(IMPORT_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(await providerErrorText(response, fallback));
   return (await response.json().catch(() => [])) as T;
@@ -198,6 +205,7 @@ async function coinbaseRequest<T>(url: string, apiKey: string, fallback: string)
       Accept: "application/json",
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(IMPORT_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(await providerErrorText(response, fallback));
   return (await response.json().catch(() => ({}))) as T;

@@ -5,6 +5,7 @@ import {
   type ChatBudget,
 } from "@/src/chat/context";
 import {
+  connectToProvider,
   providerErrorResponse,
   streamServerSentEvents,
 } from "@/src/chat/streaming";
@@ -18,26 +19,32 @@ export async function streamAnthropicResponse(
   responseMode?: ChatTextCleanupMode,
   budget?: ChatBudget,
 ) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
+  const { upstream: response, error } = await connectToProvider(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: budget?.maxResponseTokens ?? defaultMaxResponseTokens(),
+        stream: true,
+        system: buildSystemPrompt(llmContext),
+        messages: [
+          {
+            role: "user",
+            content: message,
+          },
+        ],
+      }),
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: budget?.maxResponseTokens ?? defaultMaxResponseTokens(),
-      stream: true,
-      system: buildSystemPrompt(llmContext),
-      messages: [
-        {
-          role: "user",
-          content: message,
-        },
-      ],
-    }),
-  });
+    "Anthropic",
+    headers,
+  );
+  if (error) return error;
 
   if (!response.ok || !response.body) {
     return providerErrorResponse(response, "Anthropic", headers);

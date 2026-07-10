@@ -13,8 +13,10 @@
  * Files, not RPC: the engine writes JSON, the dashboard reads JSON. Nothing here
  * mutates anything external, so the advisory-only / read-only invariant holds.
  * `knowledge_time` is stamped by the engine at write time. If an older saved
- * file violates no-lookahead ordering, the dashboard clamps the visible
- * knowledge time forward to the event time before surfacing it.
+ * file violates no-lookahead ordering, the dashboard repairs it before
+ * surfacing: row knowledge times are clamped forward to their event time,
+ * while the run header's event time is pulled back to its knowledge time
+ * (so a pre-open run isn't hidden as "future" until the open passes).
  *
  * See `engine/CONTRACT.md` for the bundle shape this mirrors.
  */
@@ -483,7 +485,13 @@ type BitemporalRow = {
 };
 
 function normalizeNoLookahead(bundle: EngineBundle): EngineBundle {
-  clampKnownTime(bundle.run);
+  // Run header clamps the OTHER way from rows. Older engines stamped
+  // event_time as the run date's 13:30Z open even for pre-open runs; pushing
+  // knowledge_time forward to match would future-stamp the run and
+  // getEngineStatus would hide the whole bundle as look-ahead until the open
+  // passed. knowledge_time is the honest write moment — keep it, and pull the
+  // header event_time back to it instead.
+  clampEventTimeToKnown(bundle.run);
 
   for (const card of bundle.briefing_cards) {
     clampKnownTime(card);
@@ -505,6 +513,15 @@ function clampKnownTime(row: BitemporalRow) {
   if (Number.isNaN(eventTime) || Number.isNaN(knowledgeTime)) return;
   if (knowledgeTime < eventTime) {
     row.knowledge_time = row.event_time;
+  }
+}
+
+function clampEventTimeToKnown(row: BitemporalRow) {
+  const eventTime = Date.parse(row.event_time);
+  const knowledgeTime = Date.parse(row.knowledge_time);
+  if (Number.isNaN(eventTime) || Number.isNaN(knowledgeTime)) return;
+  if (knowledgeTime < eventTime) {
+    row.event_time = row.knowledge_time;
   }
 }
 

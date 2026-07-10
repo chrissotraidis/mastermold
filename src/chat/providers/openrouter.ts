@@ -5,6 +5,7 @@ import {
   type ChatBudget,
 } from "@/src/chat/context";
 import {
+  connectToProvider,
   providerErrorResponse,
   streamServerSentEvents,
 } from "@/src/chat/streaming";
@@ -18,31 +19,37 @@ export async function streamOpenRouterResponse(
   responseMode?: ChatTextCleanupMode,
   budget?: ChatBudget,
 ) {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4002",
-      "X-OpenRouter-Title": "Master Mold",
+  const { upstream: response, error } = await connectToProvider(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4002",
+        "X-OpenRouter-Title": "Master Mold",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: budget?.maxResponseTokens ?? defaultMaxResponseTokens(),
+        stream: true,
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content: buildSystemPrompt(llmContext),
+          },
+          {
+            role: "user",
+            content: message,
+          },
+        ],
+      }),
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: budget?.maxResponseTokens ?? defaultMaxResponseTokens(),
-      stream: true,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content: buildSystemPrompt(llmContext),
-        },
-        {
-          role: "user",
-          content: message,
-        },
-      ],
-    }),
-  });
+    "OpenRouter",
+    headers,
+  );
+  if (error) return error;
 
   if (!response.ok || !response.body) {
     return providerErrorResponse(response, "OpenRouter", headers);

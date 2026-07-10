@@ -25,6 +25,46 @@ export async function providerErrorResponse(response: Response, provider: string
   );
 }
 
+// Bounds only the connect phase of a streaming provider call: a provider that
+// never answers must not hang the chat panel forever, but once headers arrive
+// the streamed reply may take as long as it needs. Also converts plain network
+// failures — previously an unhandled 500 — into the same 502 error shape the
+// chat client already renders.
+const PROVIDER_CONNECT_TIMEOUT_MS = 30_000;
+
+export async function connectToProvider(
+  url: string,
+  init: RequestInit,
+  provider: string,
+  headers: Record<string, string>,
+): Promise<{ upstream: Response; error?: undefined } | { upstream?: undefined; error: Response }> {
+  const connect = new AbortController();
+  const timer = setTimeout(() => connect.abort(), PROVIDER_CONNECT_TIMEOUT_MS);
+  try {
+    return { upstream: await fetch(url, { ...init, signal: connect.signal }) };
+  } catch (cause) {
+    const timedOut = connect.signal.aborted;
+    const code = timedOut ? "provider_down" : "network";
+    return {
+      error: Response.json(
+        {
+          error: `${provider} chat request failed`,
+          provider,
+          code,
+          detail: timedOut
+            ? `No response from ${provider} within ${PROVIDER_CONNECT_TIMEOUT_MS / 1000}s.`
+            : cause instanceof Error
+              ? cause.message.slice(0, 300)
+              : "Network error reaching the provider.",
+        },
+        { status: 502, headers: { ...headers, "X-Chat-Error-Code": code } },
+      ),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function streamServerSentEvents(
   body: ReadableStream<Uint8Array>,
   provider: ChatProvider,

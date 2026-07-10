@@ -14,8 +14,8 @@
 //
 // Usage: node scripts/runtime-smoke.mjs [--port=4031]
 
-import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -41,8 +41,20 @@ async function fetchText(path, init) {
   return { status: response.status, body: await response.text() };
 }
 
+// bun may not be on PATH (fresh VPS shells often miss ~/.bun/bin) — prefer
+// the copy npm install vendors into node_modules/.bin, then known homes.
+const bunBin =
+  [join(process.cwd(), "node_modules", ".bin", "bun"), join(process.env.HOME ?? "", ".bun", "bin", "bun")].find(
+    existsSync,
+  ) ?? (spawnSync("bun", ["--version"], { stdio: "ignore" }).error === undefined ? "bun" : null);
+
+if (!bunBin) {
+  console.error("bun not found (node_modules/.bin, ~/.bun/bin, PATH) — run npm install first.");
+  process.exit(1);
+}
+
 const server = spawn(
-  "bun",
+  bunBin,
   ["run", "--bun", "dev", "-H", "127.0.0.1", "-p", String(port)],
   {
     env: {

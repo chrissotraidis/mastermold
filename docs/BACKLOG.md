@@ -36,18 +36,28 @@ head. Items leave this list by being built or by being rejected with a reason.
 
 ## Small knowns
 
-- SnapTrade import, integration-test fetches, and streaming chat providers
-  have no request timeouts (user-triggered paths only; nothing on the
-  autopilot hot loop).
-- `bin/smoke_test` is Ruby (absent on minimal Linux); `scripts/runtime-smoke.mjs`
-  spawns bare `bun` from PATH. Tooling only — not on the deploy path.
-- The engine's daily run record can trip the bundle validator's look-ahead
-  guard until its stamped event time passes (cosmetic "invalid" in
-  /api/health for part of the day).
+- `bin/smoke_test` is Ruby (absent on minimal Linux). Tooling only — not on
+  the deploy path; `npm run smoke:app` covers the same ground.
 - The 3D avatar logs a deprecated `THREE.Clock` warning to the dev console.
-- The in-app scheduler fires at 7:15 server-local time — set the host TZ on a
-  UTC VPS if the wall-clock hour matters.
 - Alert inbox ships with sample alerts that hold the unread badge at 2 until
   acknowledged.
 - Solana radar shows raw on-chain token names, which can be offensive; a
   display filter has been discussed and not built.
+- Engine Python tests need `pytest` (not vendored in the engine venv) and two
+  integration cases additionally need the unpublished `ref/TradingAgents`
+  fork; the TS contract tests cover the bundle boundary either way.
+
+## Fixed since first logged
+
+- Request timeouts: SnapTrade/Coinbase/Zerion imports (20s), integration
+  connection tests (15s), and chat provider connects (30s, connect phase
+  only — streams stay unbounded) now all abort instead of hanging.
+- Look-ahead "invalid" health wart: the engine stamped a pre-open run's
+  event_time as the upcoming 13:30Z open, which the dashboard's clamp turned
+  into a future knowledge stamp — hiding the morning read until the open.
+  Engine now stamps `min(open, run moment)`; the dashboard pulls a violating
+  run header's event time back instead of pushing knowledge forward.
+- `scripts/runtime-smoke.mjs` finds bun via `node_modules/.bin` → `~/.bun/bin`
+  → PATH instead of requiring it on PATH.
+- Scheduler hour is overridable with `MASTERMOLD_READ_AFTER=HH:MM` (local
+  time) for UTC-clocked hosts; default stays 7:15.

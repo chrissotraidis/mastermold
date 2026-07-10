@@ -65,5 +65,7 @@ Checklist for a new host:
 - Optional: `cd engine && uv venv && uv pip install -e .` for engine-backed
   daily scans.
 - The in-app scheduler runs the morning read at 7:15 **server-local time**
-  (UTC on most VPSes) — set the host timezone if the hour matters to you.
+  (UTC on most VPSes). On a UTC host, set `MASTERMOLD_READ_AFTER=HH:MM` in
+  `.env.local` (e.g. `12:15` for 7:15 ET) instead of changing the system
+  timezone.
 - Logs in `.data/logs/` self-trim at ~5MB; snapshots keep 14 days by default.

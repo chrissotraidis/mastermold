@@ -14,14 +14,19 @@ import { __resetAutopilotStoreForTests } from "../src/autopilot/store";
 
 let prevDb: string | undefined;
 let prevAutopilotDb: string | undefined;
+let prevEngine: string | undefined;
 
 beforeEach(() => {
   prevDb = process.env.MASTERMOLD_DB;
   prevAutopilotDb = process.env.AUTOPILOT_DB;
+  prevEngine = process.env.ENGINE_OUT_DIR;
   // Unique temp db file per test so cases don't bleed into each other.
   const dir = mkdtempSync(join(tmpdir(), "mm-db-"));
   process.env.MASTERMOLD_DB = join(dir, "mastermold.db");
   process.env.AUTOPILOT_DB = join(dir, "autopilot.db.json");
+  // Empty engine dir: without this the suite reads the developer's real
+  // engine/out, and whether a bundle is live there depends on the wall clock.
+  process.env.ENGINE_OUT_DIR = mkdtempSync(join(tmpdir(), "mm-engine-"));
   __resetStoreForTests();
   __resetAutopilotStoreForTests();
 });
@@ -31,6 +36,8 @@ afterEach(() => {
   else process.env.MASTERMOLD_DB = prevDb;
   if (prevAutopilotDb === undefined) delete process.env.AUTOPILOT_DB;
   else process.env.AUTOPILOT_DB = prevAutopilotDb;
+  if (prevEngine === undefined) delete process.env.ENGINE_OUT_DIR;
+  else process.env.ENGINE_OUT_DIR = prevEngine;
   __resetStoreForTests();
   __resetAutopilotStoreForTests();
 });

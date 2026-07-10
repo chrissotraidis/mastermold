@@ -17,7 +17,7 @@ Three moving parts:
 | --- | --- | --- |
 | Web app (port 4002) | Dashboard, API, and the in-app scheduler that fires the morning read | Supervisor restarts it; nothing is lost |
 | Autopilot daemon | Ticks every 20s: prices, strategy, shadow learning, backups | Supervisor restarts it; signal windows warm-start from persisted bars, so no blind spot |
-| In-app scheduler | Runs the daily read after 7:15 server-local time | Runs on next server start; the Today page also self-heals on view |
+| In-app scheduler | Runs the daily read after 7:15 server-local time (override: `MASTERMOLD_READ_AFTER=HH:MM`) | Runs on next server start; the Today page also self-heals on view |
 
 ## The cadences
 
