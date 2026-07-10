@@ -49,6 +49,7 @@ import {
 import type { EvaluationSnapshot } from "./strategy-view";
 import { EMPTY_CARRY_BOOK, type CarryBookState } from "./v3/carry-book";
 import type { WalletSuggestions } from "./v3/wallet-discovery";
+import { EMPTY_BUDGET_STATE, type ApiBudgetState } from "./v3/api-budget";
 import {
   isSqliteFile,
   openSqliteDatabase,
@@ -753,6 +754,22 @@ export class AutopilotStore {
   walletSuggestions(): WalletSuggestions | null {
     const state = this.getSingleton<WalletSuggestions>("wallet_suggestions");
     return state ? { ...state } : null;
+  }
+
+  // --- monthly API request budgets (paid-tier guardrails) ------------------------
+
+  /** Keyed by service name (e.g. "solanatracker"); absent services start empty. */
+  apiBudget(service: string): ApiBudgetState {
+    const budgets = this.getSingleton<Record<string, ApiBudgetState>>("api_budgets") ?? {};
+    return budgets[service] ? { ...budgets[service] } : { ...EMPTY_BUDGET_STATE };
+  }
+
+  setApiBudget(service: string, state: ApiBudgetState): void {
+    this.transaction(() => {
+      const budgets = { ...(this.getSingleton<Record<string, ApiBudgetState>>("api_budgets") ?? {}) };
+      budgets[service] = state;
+      this.setSingleton("api_budgets", budgets);
+    });
   }
 
   setWalletSuggestions(state: WalletSuggestions): void {

@@ -13,6 +13,8 @@ import {
   parseSolanaTrackerLeaderboard,
   scoreLeaderboardWallet,
   tradersFromPoolTrades,
+  MAX_TOKENS_TRADED,
+  MAX_TRADES,
   MIN_TRADES,
   WIN_RATE_BOT_CEILING,
 } from "../src/autopilot/v3/wallet-discovery";
@@ -60,9 +62,24 @@ describe("scoreLeaderboardWallet (anti-trap rules)", () => {
     expect(WIN_RATE_BOT_CEILING).toBeLessThan(0.95);
   });
 
-  test("GIVEN spray-everything token counts THEN penalized and flagged", () => {
-    const sprayer = scoreLeaderboardWallet(walletInput({ tokens_traded: 400 }));
+  test("GIVEN a moderately high but sub-ceiling token count THEN penalized and flagged, not excluded", () => {
+    const sprayer = scoreLeaderboardWallet(walletInput({ tokens_traded: 120 }));
+    expect(sprayer).not.toBeNull();
     expect(sprayer!.flags.some((flag) => flag.includes("spray"))).toBe(true);
+  });
+
+  // Numbers observed live against the real SolanaTracker leaderboard
+  // (2026-07-10, sort=realized): the top rows were 1.1M+ trades / 1,476
+  // tokens closed in 30 days with identity=null — market-maker/institutional
+  // scale that the identity label alone did NOT catch. These ceilings are
+  // the load-bearing filter for exactly that shape of wallet.
+  test("GIVEN institutional/MM-scale activity (identity unset) THEN excluded outright", () => {
+    expect(
+      scoreLeaderboardWallet(walletInput({ trades: 1_186_389, tokens_traded: 1_476, win_rate: 0.8083 })),
+    ).toBeNull();
+    expect(scoreLeaderboardWallet(walletInput({ trades: MAX_TRADES + 1 }))).toBeNull();
+    expect(scoreLeaderboardWallet(walletInput({ tokens_traded: MAX_TOKENS_TRADED + 1 }))).toBeNull();
+    expect(scoreLeaderboardWallet(walletInput({ trades: MAX_TRADES, tokens_traded: MAX_TOKENS_TRADED }))).not.toBeNull();
   });
 });
 
@@ -99,6 +116,27 @@ describe("parseSolanaTrackerLeaderboard", () => {
   test("GIVEN garbage THEN [] instead of throwing", () => {
     expect(parseSolanaTrackerLeaderboard(null, 30)).toEqual([]);
     expect(parseSolanaTrackerLeaderboard({ traders: "nope" }, 30)).toEqual([]);
+  });
+
+  // A trimmed capture of the ACTUAL live response (2026-07-10, sort=realized):
+  // identity is null (not an object, not absent) on every row in practice,
+  // and the top-of-leaderboard wallet is MM/institutional scale. The parser
+  // must degrade identity=null to "no label" and the scorer's trade/token
+  // ceilings must still exclude this wallet.
+  test("GIVEN a real captured response shape THEN institutional wallets are filtered, identity=null does not crash", () => {
+    const liveShape = {
+      traders: [
+        {
+          wallet: "6LkGY852ponKKMuq2e7yZXrxnz1jd6weU1XBs7tEvHS",
+          period: { realized: 9_906_813.05, roi: 5.4, days: { winRate: 93.75 } },
+          counts: { buys: 612_854, sells: 573_535, trades: 1_186_389 },
+          tokens: { profitable: 1_193, losing: 283, closed: 1_476 },
+          winRate: 80.83,
+          identity: null,
+        },
+      ],
+    };
+    expect(parseSolanaTrackerLeaderboard(liveShape, 30)).toEqual([]);
   });
 });
 

@@ -16,6 +16,7 @@ import { summarizeCarryBook, type CarrySummary } from "@/src/autopilot/v3/carry-
 import { evaluateV3Promotion, type V3Promotion } from "@/src/autopilot/v3/promotion";
 import { isPlausibleSolanaAddress, MAX_WATCHED_WALLETS } from "@/src/autopilot/v3/smart-wallets";
 import type { WalletSuggestions } from "@/src/autopilot/v3/wallet-discovery";
+import { checkBudget, SOLANATRACKER_BUDGET, type BudgetCheck } from "@/src/autopilot/v3/api-budget";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
 import { liveReadiness } from "@/src/autopilot/live-readiness";
 import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry, type StrategyParams } from "@/src/autopilot/params";
@@ -83,7 +84,12 @@ export type AutopilotApiPayload = {
   live_wallet: { provisioned: boolean; pubkey: string | null };
   /** Operator-curated smart-money list the copy_wallets module follows,
    * plus the system's own scored discovery suggestions. */
-  smart_wallets: { watched: string[]; suggestions: WalletSuggestions | null };
+  smart_wallets: {
+    watched: string[];
+    suggestions: WalletSuggestions | null;
+    /** SolanaTracker's metered monthly request budget — never assumed unlimited. */
+    api_budget: BudgetCheck;
+  };
   data_boundary: string;
 };
 
@@ -154,7 +160,11 @@ async function payload(): Promise<AutopilotApiPayload> {
       };
     })(),
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
-    smart_wallets: { watched: store.watchedWallets(), suggestions: store.walletSuggestions() },
+    smart_wallets: {
+      watched: store.watchedWallets(),
+      suggestions: store.walletSuggestions(),
+      api_budget: checkBudget(store.apiBudget(SOLANATRACKER_BUDGET.service), SOLANATRACKER_BUDGET, Date.now()),
+    },
     data_boundary: DATA_BOUNDARY,
   };
 }
@@ -309,7 +319,11 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
       carry: summarizeCarryBook({ positions: {}, realized_usd: 0, round_trips: 0, history: [] }, Date.now()),
     },
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
-    smart_wallets: { watched: [], suggestions: null },
+    smart_wallets: {
+      watched: [],
+      suggestions: null,
+      api_budget: checkBudget({ month_key: "", used: 0 }, SOLANATRACKER_BUDGET, Date.now()),
+    },
     data_boundary: DATA_BOUNDARY,
   };
 }

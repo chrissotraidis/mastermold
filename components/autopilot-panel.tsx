@@ -112,6 +112,8 @@ type AutopilotApiPayload = {
         flags: string[];
       }>;
     } | null;
+    /** SolanaTracker's metered monthly request budget. */
+    api_budget?: { used: number; limit: number; remaining: number; fraction_used: number; allowed: boolean };
   };
   analyst?: { ts: string; memo: string } | null;
   /** V3 shadow telemetry: candidate dataset size, calibration verdict, and
@@ -664,6 +666,18 @@ export function AutopilotPanel() {
               Save watched wallets
             </button>
           </form>
+
+          {data.smart_wallets?.api_budget ? (
+            <p className="mt-2 text-[11px] text-outline">
+              SolanaTracker budget:{" "}
+              <span className={data.smart_wallets.api_budget.allowed ? undefined : "font-semibold text-caution"}>
+                {data.smart_wallets.api_budget.used}/{data.smart_wallets.api_budget.limit} requests this month
+              </span>
+              {!data.smart_wallets.api_budget.allowed
+                ? " — soft stop reached, discovery is using the keyless fallback until next month"
+                : null}
+            </p>
+          ) : null}
 
           {data.smart_wallets?.suggestions && data.smart_wallets.suggestions.suggestions.length > 0 ? (
             <div className="mt-3">

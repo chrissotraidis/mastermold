@@ -45,6 +45,7 @@ import { evaluateV3Shadow, labelDueCandidates, recordV3Shadow } from "./v3/shado
 import type { CandidateSignal } from "./v3/signal";
 import { copyWalletCandidate, scanWatchedWallets, type WalletBuyEvent } from "./v3/smart-wallets";
 import { fetchWalletSuggestions, SUGGESTIONS_TTL_MS } from "./v3/wallet-discovery";
+import { checkBudget, crossedAlertThreshold, recordUsage, SOLANATRACKER_BUDGET } from "./v3/api-budget";
 import { PUBLIC_RPC_URL } from "../helius/rpc-url";
 import { fetchTrendingTokens, type TrendingToken } from "./v3/trending";
 import { UNIVERSE } from "./universe";
@@ -707,12 +708,32 @@ async function tick(context: TickContext): Promise<void> {
       // activity leads). Suggestions only — following stays a human click.
       const existingSuggestions = store.walletSuggestions();
       if (!existingSuggestions || nowMs - Date.parse(existingSuggestions.ts) >= SUGGESTIONS_TTL_MS) {
+        // Metered: the SolanaTracker leaderboard call only fires when this
+        // month's soft-stop (90% of the account's stated 2,500/month) hasn't
+        // been reached — twice-daily refreshes cost ~60/month, so this is
+        // headroom for the tier changing or future calls, not a live risk.
+        const budgetBefore = checkBudget(store.apiBudget(SOLANATRACKER_BUDGET.service), SOLANATRACKER_BUDGET, nowMs);
         const suggestions = await fetchWalletSuggestions({
           trendingPools: context.lastTrending
             .map((token) => token.pool_address)
             .filter((pool): pool is string => Boolean(pool)),
           nowMs,
+          budgetAllows: budgetBefore.allowed,
+          onLeaderboardCall: () => {
+            const updated = recordUsage(store.apiBudget(SOLANATRACKER_BUDGET.service), nowMs);
+            store.setApiBudget(SOLANATRACKER_BUDGET.service, updated);
+            const after = checkBudget(updated, SOLANATRACKER_BUDGET, nowMs);
+            const crossed = crossedAlertThreshold(budgetBefore.fraction_used, after.fraction_used);
+            if (crossed !== null) {
+              const message = `SolanaTracker API budget at ${Math.round(crossed * 100)}%: ${after.used}/${after.limit} requests this month.`;
+              store.appendActivity("copy", message);
+              notifyOperator("v3", message);
+            }
+          },
         });
+        if (!budgetBefore.allowed && budgetBefore.reason) {
+          store.appendActivity("copy", budgetBefore.reason);
+        }
         store.setWalletSuggestions(suggestions);
         if (suggestions.suggestions.length > 0) {
           store.appendActivity(

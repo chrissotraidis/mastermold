@@ -5,17 +5,28 @@
  *
  *  1. SolanaTracker `/v2/pnl/leaderboard/top` — the only free, documented,
  *     purpose-built profitable-wallet leaderboard (set SOLANATRACKER_API_KEY;
- *     free tier ~10k req/month). Server-side quality filters + identity
- *     labels (bot/pool/developer/exchange) do half the trap-filtering for us.
+ *     free tier 2,500 req/month per the account holder — metered by the
+ *     daemon via v3/api-budget.ts, never assumed unlimited). Server-side
+ *     quality filters help, but identity labels (bot/pool/developer/exchange)
+ *     were `null` for every wallet observed live — NOT reliable alone; our
+ *     own MAX_TRADES/MAX_TOKENS_TRADED ceilings are the load-bearing filter
+ *     for institutional/MM-scale activity. This endpoint has no working
+ *     pagination (page/offset are silently ignored), so one call = one
+ *     top-100 snapshot; sort=win_percentage is used because sort=realized's
+ *     top 100 was 100% whale/MM-scale in live testing and yielded zero
+ *     candidates after filtering.
  *  2. Keyless fallback: GeckoTerminal pool trades on the trending pools the
  *     radar already tracks — aggregates recent buyers by volume. No PnL
  *     history, so these are "activity-only" leads, scored low and flagged.
  *
  * Anti-trap scoring encodes the 2026 copy-trading research: 90%+ win rates
- * are bot/insider red flags (the sweet spot is 45–80%), realized PnL beats
- * paper PnL, one-hit wonders and sub-20-trade windows prove nothing, and
- * labeled bots/pools/devs are excluded outright. Suggestions are SUGGESTIONS:
- * a human clicks Follow; nothing auto-follows.
+ * are bot/insider red flags (the sweet spot is 45–80%) — heavily discounted
+ * and flagged rather than excluded, since win_percentage-sorted results are
+ * dominated by near-perfect records in practice and flagging beats showing
+ * nothing. Realized PnL beats paper PnL, one-hit wonders and sub-20-trade
+ * windows prove nothing, MM/institutional trade-count scale is excluded
+ * outright, and labeled bots/pools/devs are excluded outright. Suggestions
+ * are SUGGESTIONS: a human clicks Follow; nothing auto-follows.
  */
 
 import { isPlausibleSolanaAddress } from "./smart-wallets";
@@ -48,6 +59,19 @@ export const MAX_SUGGESTIONS = 10;
 export const WIN_RATE_FLOOR = 0.4;
 export const WIN_RATE_BOT_CEILING = 0.9;
 export const MIN_TRADES = 20;
+/**
+ * Hard trade/token ceilings (2026-07-10, discovered against the LIVE
+ * SolanaTracker leaderboard): `sort=realized` is dominated by wallets with
+ * 100,000–1,200,000+ trades and 1,400+ tokens closed in a 30-day window —
+ * market-maker/institutional-scale activity, not a human's conviction picks —
+ * and the API's `identity` label was `null` for every one of them in
+ * practice, so it cannot be trusted as the sole bot filter. These ceilings
+ * are the load-bearing exclusion: generous enough for a very active manual
+ * trader (a few hundred trades, a few dozen tokens a month), well below any
+ * observed bot/MM wallet.
+ */
+export const MAX_TRADES = 3_000;
+export const MAX_TOKENS_TRADED = 150;
 
 function asNumber(value: unknown): number | null {
   const parsed = typeof value === "string" ? Number(value) : value;
@@ -71,6 +95,8 @@ export function scoreLeaderboardWallet(input: {
   if (!isPlausibleSolanaAddress(input.address)) return null;
   if (input.labeled_bot || input.labeled_infra) return null;
   if ((input.trades ?? 0) < MIN_TRADES) return null;
+  if ((input.trades ?? 0) > MAX_TRADES) return null; // MM/institutional scale, not a human
+  if ((input.tokens_traded ?? 0) > MAX_TOKENS_TRADED) return null; // scanning bot, not curated conviction
   if (input.realized_pnl_usd === null || input.realized_pnl_usd <= 0) return null;
   if (input.win_rate !== null && input.win_rate < WIN_RATE_FLOOR) return null;
 
@@ -205,6 +231,13 @@ export async function fetchWalletSuggestions(
     trendingPools?: string[];
     nowMs?: number;
     fetchImpl?: typeof fetch;
+    /** Budget gate: false skips the paid call even with a key present (this
+     * month's soft-stop reached). Omitted/undefined means "allowed" — callers
+     * without a budget tracker still work, just unmetered. */
+    budgetAllows?: boolean;
+    /** Invoked once, only after a successful leaderboard response, so the
+     * caller can record real usage — never called for a skipped/failed call. */
+    onLeaderboardCall?: () => void;
   } = {},
 ): Promise<WalletSuggestions> {
   const doFetch = options.fetchImpl ?? fetch;
@@ -212,14 +245,25 @@ export async function fetchWalletSuggestions(
   const ts = new Date(nowMs).toISOString();
 
   const apiKey = options.apiKey ?? process.env.SOLANATRACKER_API_KEY?.trim() ?? null;
-  if (apiKey) {
+  if (apiKey && options.budgetAllows !== false) {
     try {
       const params = new URLSearchParams({
         days: String(LEADERBOARD_PERIOD_DAYS),
-        sort: "realized",
+        // sort=win_percentage, not realized (verified live, 2026-07-10): the
+        // realized-sorted leaderboard's top 100 rows were 100% MM/institutional
+        // scale (1.1M+ trades each) with identity=null — MAX_TRADES/
+        // MAX_TOKENS_TRADED excluded every single one, yielding zero
+        // candidates. win_percentage's top 100 all cleared the trap filters
+        // structurally (human-scale trade/token counts); the scorer's
+        // WIN_RATE_BOT_CEILING discount+flag is what keeps the near-perfect
+        // records from being trusted at face value. This endpoint offers no
+        // working pagination (page/offset params were silently ignored in
+        // testing), so a single top-100 pull is genuinely all one call buys.
+        sort: "win_percentage",
         limit: "50",
         minTrades: String(MIN_TRADES),
         minDays: "3",
+        minWinRate: String(Math.round(WIN_RATE_FLOOR * 100)),
         maxSingleTokenPct: "40", // one-hit wonders out (research heuristic)
         pnlMode: "strict", // realized only — paper gains are bait
       });
@@ -227,6 +271,7 @@ export async function fetchWalletSuggestions(
         headers: { "x-api-key": apiKey, Accept: "application/json" },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
+      options.onLeaderboardCall?.(); // the request landed — count it regardless of body shape
       if (response.ok) {
         const suggestions = parseSolanaTrackerLeaderboard(await response.json(), LEADERBOARD_PERIOD_DAYS);
         if (suggestions.length > 0) return { ts, source: "solanatracker", suggestions };
