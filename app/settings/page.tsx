@@ -71,7 +71,7 @@ export default async function SettingsPage() {
 
   return (
     <AppShell dataMode={publicProvenanceLabel}>
-      <div className="mx-auto grid w-full max-w-4xl gap-3">
+      <div className="mx-auto grid w-full max-w-4xl gap-3 [&>*]:min-w-0">
         <header>
           <h1 className="font-display text-lg font-semibold text-on-surface">Settings</h1>
           <p className="mt-0.5 text-xs text-outline">

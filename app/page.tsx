@@ -55,7 +55,12 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   return (
     <AppShell dataMode={productProvenanceLabel(pageDataMode)}>
       <TodayReadTimer />
-      <div className="mx-auto grid w-full max-w-3xl gap-4">
+      {/* [&>*]:min-w-0 — grid tracks size to items' intrinsic min-content, and
+          a `truncate` (nowrap) span inside a flex summary propagates its FULL
+          text width up as that minimum (min-w-0 on the span only lets it
+          shrink at layout, not at track sizing). Without this, one long play
+          headline widened every section past the phone viewport. */}
+      <div className="mx-auto grid w-full max-w-3xl gap-4 [&>*]:min-w-0">
         <header>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>

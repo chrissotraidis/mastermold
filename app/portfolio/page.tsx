@@ -33,7 +33,7 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
 
   return (
     <AppShell dataMode={productProvenanceLabel(portfolio.provenance.label)}>
-      <div className="mx-auto grid w-full max-w-4xl gap-4">
+      <div className="mx-auto grid w-full max-w-4xl gap-4 [&>*]:min-w-0">
         <header>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
