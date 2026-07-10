@@ -174,6 +174,7 @@ docs/                Public documentation only
 - [Privacy](docs/PRIVACY.md)
 - [Security](docs/SECURITY.md)
 - [Deployment](docs/DEPLOYMENT.md)
+- [Operations](docs/OPERATIONS.md)
 
 ## License
 

@@ -1191,13 +1191,25 @@ async function main(): Promise<void> {
 
   // Simple aligned loop; a failed tick logs and keeps going. Small jitter
   // de-synchronizes us from other clients of the shared keyless APIs.
+  // Repeated identical failures (a multi-hour API outage fails every 20s)
+  // log once per 10 minutes instead of per tick — otherwise the outage
+  // churns the capped activity table and evicts the history that matters.
+  let lastTickError = "";
+  let lastTickErrorLogMs = 0;
   for (;;) {
     if (stopping) return;
     context.count += 1;
     try {
       await tick(context);
+      lastTickError = "";
     } catch (error) {
-      store.appendActivity("error", `Tick failed: ${error instanceof Error ? error.message : String(error)}`);
+      const message = `Tick failed: ${error instanceof Error ? error.message : String(error)}`;
+      const nowMs = Date.now();
+      if (message !== lastTickError || nowMs - lastTickErrorLogMs >= 10 * 60_000) {
+        store.appendActivity("error", message);
+        lastTickError = message;
+        lastTickErrorLogMs = nowMs;
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, TICK_MS + Math.floor(Math.random() * 2_000)));
   }

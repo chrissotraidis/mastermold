@@ -8,6 +8,7 @@ generated review artifacts here.
 - [Privacy](PRIVACY.md)
 - [Security](SECURITY.md)
 - [Deployment](DEPLOYMENT.md)
+- [Operations](OPERATIONS.md)
 
 Local/private material belongs in ignored folders such as `docs/private/`,
 `artifacts/`, `screenshots/`, `reports/private/`, or outside the repository.

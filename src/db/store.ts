@@ -167,6 +167,11 @@ type StoreSnapshot = {
   portfolio_brain_snapshots: PortfolioBrainSnapshotRow[];
 };
 
+/** Rolling cap for UI telemetry — one row lands per interaction, and under
+ * the Node JSON adapter every append rewrites the whole store file, so an
+ * unbounded table slowly taxes every write. Readers use productEvents(500). */
+const PRODUCT_EVENT_CAP = 5_000;
+
 const emptySnapshot = (): StoreSnapshot => ({
   journal: [],
   outcomes: [],
@@ -551,6 +556,14 @@ class SqliteAdapter implements PersistAdapter {
         JSON.stringify(event.metadata ?? {}),
         event.created_at,
       );
+    // Rolling cap (extended-run audit 2026-07-10): one row lands per UI
+    // interaction, and unbounded telemetry was the store's last unbounded
+    // table. Readers use productEvents(500); months of history is plenty.
+    this.db
+      .query(
+        "DELETE FROM product_events WHERE id IN (SELECT id FROM product_events ORDER BY created_at DESC LIMIT -1 OFFSET ?)",
+      )
+      .run(PRODUCT_EVENT_CAP);
   }
 
   productEvents(limit = 500): ProductMetricEventRow[] {
@@ -780,6 +793,9 @@ class MemoryAdapter implements PersistAdapter {
   recordProductEvent(event: ProductMetricEventRow) {
     this.productEventRows = this.productEventRows.filter((row) => row.id !== event.id);
     this.productEventRows.push(event);
+    if (this.productEventRows.length > PRODUCT_EVENT_CAP) {
+      this.productEventRows = this.productEventRows.slice(-PRODUCT_EVENT_CAP);
+    }
   }
   productEvents(limit = 500) {
     return [...this.productEventRows]
@@ -953,6 +969,9 @@ class JsonFileAdapter implements PersistAdapter {
     const snapshot = this.read();
     snapshot.product_events = snapshot.product_events.filter((row) => row.id !== event.id);
     snapshot.product_events.push(event);
+    if (snapshot.product_events.length > PRODUCT_EVENT_CAP) {
+      snapshot.product_events = snapshot.product_events.slice(-PRODUCT_EVENT_CAP);
+    }
     this.write(snapshot);
   }
   productEvents(limit = 500) {
