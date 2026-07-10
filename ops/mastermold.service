@@ -1,0 +1,36 @@
+# ops/mastermold.service — systemd unit for a Linux VPS (Zo).
+#
+# Install (as the user that owns the checkout — never root):
+#   sed "s|%USER%|$USER|g; s|%ROOT%|$HOME/mastermold|g" ops/mastermold.service \
+#     | sudo tee /etc/systemd/system/mastermold.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mastermold
+#
+# Check:   systemctl status mastermold
+# Logs:    journalctl -u mastermold -f   (app logs also land in .data/logs/)
+# Stop:    sudo systemctl stop mastermold
+#
+# bin/zo-start already supervises both processes with backoff, so systemd's
+# only jobs are boot-time start and restarting the supervisor itself if it
+# ever dies. KillMode=mixed sends SIGTERM to bin/up first (which stops its
+# whole process group cleanly) before systemd sweeps the cgroup.
+
+[Unit]
+Description=Master Mold — investing console + autopilot daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%USER%
+WorkingDirectory=%ROOT%
+ExecStart=%ROOT%/bin/zo-start
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=30
+# The app reads .env.local itself (bin/up sources it); nothing secret here.
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

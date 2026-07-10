@@ -72,7 +72,9 @@ const binaryExts = new Set([
 const patterns = [
   ["personal path", /\/Users\/[^/\s"'`]+|\/home\/workspace\/Programs\/[^/\s"'`]+/i],
   ["old demo identity", /\b[A-Z][a-z]{4,8} Operator\b|\b[A-Z]{2,8} Reviewer\b|\b[A-Za-z0-9._%+-]+@demo\.local\b/],
-  ["private portfolio amount", /real\s+~?\$?120k/i],
+  // Any "real $NNNk"-shaped amount — a specific figure in the detector would
+  // itself disclose the number it exists to protect.
+  ["private portfolio amount", /real\s+~?\$?\d{2,4}(?:[.,]\d+)?k\b/i],
   ["known wallet or balance fragment", /Hfmr8|0\.5 SOL/i],
   ["secret inventory wording", /wallet secret|exhausted Helius key/i],
   ["private artifact reference", /(^|[\s"'(])docs\/(?:ui-passes|ref|review|history)\b|(^|[\s"'(])\.(?:scaffold|rds|claude)(?:\/|\b)/i],

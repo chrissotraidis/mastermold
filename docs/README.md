@@ -8,6 +8,7 @@ generated review artifacts here.
 - [Privacy](PRIVACY.md)
 - [Security](SECURITY.md)
 - [Deployment](DEPLOYMENT.md)
+- [Zo migration](ZO-MIGRATION.md) — moving an existing install to a VPS
 - [Operations](OPERATIONS.md)
 - [Backlog](BACKLOG.md)
 

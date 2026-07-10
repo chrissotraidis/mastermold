@@ -1,27 +1,22 @@
 #!/usr/bin/env bash
-# bin/zo-start — the one command a Zo Service (or any VPS supervisor) runs.
+# bin/zo-start — what a Zo Service / systemd unit / @reboot cron runs.
 #
-# Builds once if no build exists, then serves. Safe across Zo's periodic
-# restarts: the build is reused, the durable store lives in .data/, and the
-# app falls back to the last saved read if the engine has not run yet.
+# A thin, idempotent wrapper over production bin/up: installs dependencies and
+# builds only when missing, then hands off to the real supervisor (web app +
+# autopilot daemon, crash restarts, log trimming). Kept as its own entrypoint
+# so the Service command never has to change when bin/up grows.
 #
-#   Service command:  bin/zo-start          (PORT defaults to 3000)
-#   Daily Automation: bin/engine-briefing   (writes engine/out; app ingests it)
+# Binding stays 127.0.0.1 (bin/up's default) — this app has NO authentication.
+# Reach it over an SSH tunnel or Tailscale; only set MASTERMOLD_BIND=0.0.0.0
+# behind an authenticating reverse proxy, knowingly.
+#
+# See docs/ZO-MIGRATION.md for the full cutover checklist.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-PORT="${PORT:-3000}"
 
-# Prefer bun (the intended runtime); fall back to npm so a bare box still serves.
-if command -v bun >/dev/null 2>&1; then
-  RUN="bun run"
-  [ -d node_modules ] || bun install --frozen-lockfile || bun install
-else
-  RUN="npm run"
-  [ -d node_modules ] || npm install
-fi
+[ -d node_modules ] || npm install
+[ -f .next/standalone/server.js ] || npm run build
 
-[ -d .next ] || $RUN build
-
-exec $RUN start -- -p "$PORT" --hostname 0.0.0.0
+MASTERMOLD_WEB=prod exec bin/up

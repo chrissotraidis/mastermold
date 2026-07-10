@@ -31,8 +31,9 @@ head. Items leave this list by being built or by being rejected with a reason.
   server binds 127.0.0.1 and the deployment doc mandates tunnel/proxy. Build
   real auth only if the app is ever intentionally exposed.
 - **Reboot autostart on macOS** — TCC blocks launchd under `~/Documents`
-  (documented in the ops/ templates); the real fix is the planned VPS
-  transfer, not a workaround.
+  (documented in the ops/ templates). The real fix shipped for Linux:
+  `ops/mastermold.service` + `bin/zo-start` (see docs/ZO-MIGRATION.md);
+  macOS stays manual-start by design.
 
 ## Small knowns
 

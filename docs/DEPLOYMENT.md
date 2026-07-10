@@ -37,8 +37,21 @@ Rehearsed end-to-end 2026-07-10. The whole deployment is:
 ```bash
 npm install
 npm run build
-MASTERMOLD_WEB=prod bin/up        # under your supervisor of choice
+MASTERMOLD_WEB=prod bin/up        # or bin/zo-start, which wraps exactly this
 ```
+
+`bin/zo-start` is the idempotent entrypoint for a service manager: it
+installs and builds only when missing, then execs production `bin/up`.
+Point a supervisor at it and the host survives reboots:
+
+- **systemd:** install `ops/mastermold.service` (instructions in the file),
+  then `sudo systemctl enable --now mastermold`.
+- **No sudo:** `crontab -e` →
+  `@reboot cd $HOME/mastermold && bin/zo-start >> .data/logs/boot.log 2>&1`.
+
+Moving an existing install (with its accumulated `.data` evidence) to a
+VPS? Follow [ZO-MIGRATION.md](ZO-MIGRATION.md) — it sequences the cutover
+so only one daemon ever runs and the store is never copied mid-write.
 
 `bin/up` in prod mode handles the two standalone-server traps for you — get
 these right if you run the server any other way:
