@@ -382,69 +382,75 @@ export function AutopilotPanel() {
 
       {data.strategy ? <StrategyCard strategy={data.strategy} /> : null}
 
-      {data.go_live_gate ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-outline-variant/20 px-3 py-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-outline">
-            Go-live gate {data.go_live_gate.ready ? "OPEN" : "locked"}
-          </span>
-          {data.go_live_gate.checks.map((check) => (
-            <span key={check.key} className="flex items-center gap-1.5 text-[11px] text-on-surface-variant" title={check.detail}>
-              <span
-                aria-hidden="true"
-                className={`size-1.5 rounded-full ${check.pass ? "bg-engine" : "bg-outline/60"}`}
-              />
-              {check.key}
-              <span className={check.pass ? "text-engine" : "text-outline"}>{check.pass ? "✓" : "✗"}</span>
-            </span>
-          ))}
+      {/* Autonomy status: gate, shadow learning, and carry evidence as ONE
+          block — three separate bordered rows read as clutter. */}
+      {data.go_live_gate || data.v3 ? (
+        <div className="border-t border-outline-variant/20 px-3 py-1.5">
+          {data.go_live_gate ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-outline">
+                Go-live gate {data.go_live_gate.ready ? "OPEN" : "locked"}
+              </span>
+              {data.go_live_gate.checks.map((check) => (
+                <span key={check.key} className="flex items-center gap-1.5 text-[11px] text-on-surface-variant" title={check.detail}>
+                  <span
+                    aria-hidden="true"
+                    className={`size-1.5 rounded-full ${check.pass ? "bg-engine" : "bg-outline/60"}`}
+                  />
+                  {check.key}
+                  <span className={check.pass ? "text-engine" : "text-outline"}>{check.pass ? "✓" : "✗"}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {data.v3 ? (
+            <p className="mt-1 text-[11px] text-outline" title={data.v3.latest_note ?? undefined}>
+              <span className="text-[10px] font-semibold uppercase tracking-widest">V3 shadow</span>
+              {" · "}
+              {data.v3.snapshot_count} observations · {data.v3.labeled_count} labeled ·{" "}
+              {data.v3.calibration.verdict}
+              {data.v3.promotion ? (
+                <span
+                  className={data.v3.promotion.ready ? "text-engine" : undefined}
+                  title={data.v3.promotion.checks.map((check) => `${check.pass ? "✓" : "✗"} ${check.label} — ${check.detail}`).join("\n")}
+                >
+                  {" · "}
+                  {data.v3.promotion.ready
+                    ? "PROMOTED: co-piloting the paper book"
+                    : `paper promotion ${data.v3.promotion.checks.filter((check) => check.pass).length}/${data.v3.promotion.checks.length} checks`}
+                </span>
+              ) : null}
+              {data.v3.carry ? (
+                <span title="Synthetic $100-per-market delta-neutral funding carry, marked from live Drift funding — the strategy's evidence, never a live position.">
+                  {" · "}
+                  carry shadow{" "}
+                  <span className={data.v3.carry.total_usd >= 0 ? "text-engine" : "text-critical"}>
+                    {data.v3.carry.total_usd >= 0 ? "+" : ""}${data.v3.carry.total_usd.toFixed(2)}
+                  </span>
+                  {` (${data.v3.carry.open_markets} open${data.v3.carry.apr_pct !== null ? `, ~${data.v3.carry.apr_pct.toFixed(1)}% APR` : ""})`}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+          <div className="mt-1">
+            <EquitySparkline points={equity} />
+          </div>
         </div>
       ) : null}
 
-      {data.v3 ? (
-        <p
-          className="border-t border-outline-variant/20 px-3 py-1.5 text-[11px] text-outline"
-          title={data.v3.latest_note ?? undefined}
-        >
-          <span className="text-[10px] font-semibold uppercase tracking-widest">V3 shadow</span>
-          {" · "}
-          {data.v3.snapshot_count} observations · {data.v3.labeled_count} labeled ·{" "}
-          {data.v3.calibration.verdict}
-          {data.v3.promotion ? (
-            <span
-              className={data.v3.promotion.ready ? "text-engine" : undefined}
-              title={data.v3.promotion.checks.map((check) => `${check.pass ? "✓" : "✗"} ${check.label} — ${check.detail}`).join("\n")}
-            >
-              {" · "}
-              {data.v3.promotion.ready
-                ? "PROMOTED: co-piloting the paper book"
-                : `paper promotion ${data.v3.promotion.checks.filter((check) => check.pass).length}/${data.v3.promotion.checks.length} checks`}
-            </span>
-          ) : null}
-          {data.v3.carry ? (
-            <span title="Synthetic $100-per-market delta-neutral funding carry, marked from live Drift funding — the strategy's evidence, never a live position.">
-              {" · "}
-              carry shadow{" "}
-              <span className={data.v3.carry.total_usd >= 0 ? "text-engine" : "text-critical"}>
-                {data.v3.carry.total_usd >= 0 ? "+" : ""}${data.v3.carry.total_usd.toFixed(2)}
-              </span>
-              {` (${data.v3.carry.open_markets} open${data.v3.carry.apr_pct !== null ? `, ~${data.v3.carry.apr_pct.toFixed(1)}% APR` : ""})`}
-            </span>
-          ) : null}
-        </p>
-      ) : null}
-
-      <div className="border-t border-outline-variant/20 px-3 py-1.5">
-        <EquitySparkline points={equity} />
-      </div>
-
-      <div className="border-t border-outline-variant/20 px-3 py-2">
-        <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Live market feed</h3>
+      {/* Reference tables live in collapsed sections: the cockpit stays one
+          screen tall and the data is one click away when wanted. */}
+      <details className="border-t border-outline-variant/20 px-3">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
+          Live market feed
+          <span className="font-normal text-outline">{feedSummaryLine(data.market_feed ?? [])}</span>
+        </summary>
         {(data.market_feed ?? []).length === 0 ? (
-          <p className="mt-1 text-xs leading-5 text-outline">
+          <p className="pb-2 text-xs leading-5 text-outline">
             Feed unavailable right now — it retries on the next refresh.
           </p>
         ) : (
-          <div className="mt-1 overflow-x-auto">
+          <div className="overflow-x-auto pb-2">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-outline">
@@ -481,17 +487,17 @@ export function AutopilotPanel() {
             </table>
           </div>
         )}
-      </div>
+      </details>
 
       {(data.trending ?? []).length > 0 ? (
-        <div className="border-t border-outline-variant/20 px-3 py-2">
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Solana radar</h3>
-            <span className="text-[11px] text-outline">
-              trending on-chain right now · feeds the V3 shadow, never trades directly
+        <details className="border-t border-outline-variant/20 px-3">
+          <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
+            Solana radar
+            <span className="font-normal text-outline">
+              {(data.trending ?? []).length} trending on-chain · feeds the V3 shadow, never trades directly
             </span>
-          </div>
-          <div className="mt-1 overflow-x-auto">
+          </summary>
+          <div className="overflow-x-auto pb-2">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-outline">
@@ -529,69 +535,64 @@ export function AutopilotPanel() {
               </tbody>
             </table>
           </div>
-        </div>
+        </details>
       ) : null}
 
-      <div className="grid gap-x-4 gap-y-2 border-t border-outline-variant/20 px-3 py-2 sm:grid-cols-2">
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">
-            Positions ({state.open_positions})
-          </h3>
-          {positions.length === 0 ? (
-            <p className="mt-1 text-xs leading-5 text-outline">
-              No positions. Entries fire when window momentum clears the gate.
-            </p>
-          ) : (
-            <ul className="mt-1 divide-y divide-outline-variant/15">
-              {positions.map((position) => (
-                <li key={position.mint} className="flex items-baseline gap-2 py-1 text-xs">
-                  <span className="font-semibold text-on-surface">{position.symbol}</span>
-                  <span className="tabular-nums text-on-surface-variant">{formatQuantity(position.qty)}</span>
-                  <span className="ml-auto tabular-nums text-outline">
-                    avg {formatCurrency(position.avg_cost_usd)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+      {/* The book: a single quiet line until something is actually held or
+          filled — two columns of empty states earned no space. */}
+      {positions.length === 0 && recentTrades.length === 0 ? (
+        <p className="border-t border-outline-variant/20 px-3 py-2 text-xs leading-5 text-outline">
+          No positions, no fills yet — entries land here when a setup clears the gate.
+        </p>
+      ) : (
+        <div className="grid gap-x-4 gap-y-2 border-t border-outline-variant/20 px-3 py-2 sm:grid-cols-2">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">
+              Positions ({state.open_positions})
+            </h3>
+            {positions.length === 0 ? (
+              <p className="mt-1 text-xs leading-5 text-outline">
+                No positions. Entries fire when window momentum clears the gate.
+              </p>
+            ) : (
+              <ul className="mt-1 divide-y divide-outline-variant/15">
+                {positions.map((position) => (
+                  <li key={position.mint} className="flex items-baseline gap-2 py-1 text-xs">
+                    <span className="font-semibold text-on-surface">{position.symbol}</span>
+                    <span className="tabular-nums text-on-surface-variant">{formatQuantity(position.qty)}</span>
+                    <span className="ml-auto tabular-nums text-outline">
+                      avg {formatCurrency(position.avg_cost_usd)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Paper ledger</h3>
+            {recentTrades.length === 0 ? (
+              <p className="mt-1 text-xs leading-5 text-outline">No entries yet. Fills append here, never edit.</p>
+            ) : (
+              <ul className="mt-1 divide-y divide-outline-variant/15">
+                {recentTrades.slice(0, 5).map((trade) => (
+                  <li key={trade.id} className="flex items-baseline gap-2 py-1 text-xs">
+                    <span className={trade.side === "buy" ? "text-engine" : "text-critical"}>
+                      {trade.side === "buy" ? "Buy" : "Sell"}
+                    </span>
+                    <span className="font-semibold text-on-surface">{trade.symbol}</span>
+                    <span className="ml-auto tabular-nums text-on-surface-variant">
+                      {formatCurrency(trade.value_usd)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Paper ledger</h3>
-          {recentTrades.length === 0 ? (
-            <p className="mt-1 text-xs leading-5 text-outline">No entries yet. Fills append here, never edit.</p>
-          ) : (
-            <ul className="mt-1 divide-y divide-outline-variant/15">
-              {recentTrades.slice(0, 5).map((trade) => (
-                <li key={trade.id} className="flex items-baseline gap-2 py-1 text-xs">
-                  <span className={trade.side === "buy" ? "text-engine" : "text-critical"}>
-                    {trade.side === "buy" ? "Buy" : "Sell"}
-                  </span>
-                  <span className="font-semibold text-on-surface">{trade.symbol}</span>
-                  <span className="ml-auto tabular-nums text-on-surface-variant">
-                    {formatCurrency(trade.value_usd)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+      )}
 
-      {recentActivity.length > 0 ? (
-        <div className="border-t border-outline-variant/20 px-3 py-2">
-          <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Recent decisions</h3>
-          <ul className="mt-1 divide-y divide-outline-variant/15">
-            {recentActivity.slice(0, 5).map((entry) => (
-              <li key={entry.id} className="flex items-baseline gap-2 py-1 text-xs">
-                <span className="shrink-0 tabular-nums text-outline">{formatAgo(entry.ts)}</span>
-                <span className="min-w-0 truncate text-on-surface-variant" title={entry.message}>
-                  {entry.message}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {/* "Recent decisions" was the tape's activity stream rendered a second
+          time on the same page — pure duplication, removed. */}
 
       {data.attribution || data.analyst ? (
         <div className="border-t border-outline-variant/20 px-3 py-2">
@@ -891,6 +892,16 @@ function formatPct(value: number | null): string {
 function formatFeedPrice(value: number): string {
   if (value >= 1) return formatCurrency(value);
   return `$${value.toLocaleString("en-US", { maximumSignificantDigits: 3 })}`;
+}
+
+/** Collapsed-state one-liner: enough signal to decide whether to expand. */
+function feedSummaryLine(rows: MarketFeedRow[]): string {
+  if (rows.length === 0) return "unavailable — retrying";
+  const sol = rows.find((row) => row.symbol === "SOL");
+  const solNote = sol
+    ? ` · SOL ${formatFeedPrice(sol.price_usd)}${sol.change_h24_pct !== null ? ` (${sol.change_h24_pct > 0 ? "+" : ""}${sol.change_h24_pct.toFixed(1)}% 24h)` : ""}`
+    : "";
+  return `${rows.length} symbols${solNote}`;
 }
 
 function formatCompactUsd(value: number | null): string {
