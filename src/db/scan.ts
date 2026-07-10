@@ -83,14 +83,21 @@ let inFlight: Promise<ScanRunResult> | null = null;
 
 // Paths are resolved through env-overridable strings (split at runtime) so the
 // bundler's static tracer never follows the venv symlink tree at build time.
+// MASTERMOLD_ROOT anchors them when the server's cwd is not the repo root —
+// the production standalone server chdir()s into .next/standalone, where the
+// engine does not exist (bin/up exports it; VPS deployment, 2026-07-10).
+function repoRoot(): string {
+  return process.env.MASTERMOLD_ROOT ?? /* turbopackIgnore: true */ process.cwd();
+}
+
 function enginePythonPath(): string {
   const rel = process.env.MASTERMOLD_ENGINE_PYTHON ?? "engine/.venv/bin/python";
-  return join(/* turbopackIgnore: true */ process.cwd(), ...rel.split("/"));
+  return join(repoRoot(), ...rel.split("/"));
 }
 
 function engineWrapperPath(): string {
   const rel = process.env.MASTERMOLD_ENGINE_WRAPPER ?? "bin/engine-briefing";
-  return join(/* turbopackIgnore: true */ process.cwd(), ...rel.split("/"));
+  return join(repoRoot(), ...rel.split("/"));
 }
 
 /** True when this machine can run the engine at all (venv or uv present). */
@@ -288,7 +295,7 @@ function writePortfolioWatchlist(): string | null {
 }
 
 function spawnEngine(runDate: string): Promise<{ ok: true } | { ok: false; detail: string }> {
-  const root = /* turbopackIgnore: true */ process.cwd();
+  const root = repoRoot();
   const venvPython = enginePythonPath();
   const useVenv = existsSync(venvPython);
   const command = useVenv ? venvPython : engineWrapperPath();

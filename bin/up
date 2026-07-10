@@ -65,8 +65,31 @@ if curl -s -o /dev/null -m 2 http://localhost:4002/api/health 2>/dev/null; then
   echo "up: an app is already running on :4002 — supervising the autopilot daemon only"
 else
   if [ "$(web_command)" = "prod" ]; then
-    supervise web env PORT=4002 node .next/standalone/server.js &
-    echo "up: web (production standalone) starting at http://localhost:4002"
+    # The standalone server chdir()s into .next/standalone and the release
+    # artifact deliberately ships without .env.local or .data — so BOTH must
+    # be provided here explicitly: env sourced from the repo's .env.local,
+    # and ABSOLUTE store paths so the web app reads the same .data the
+    # daemon writes (a relative default would silently create a second,
+    # empty store inside the artifact).
+    #
+    # Binding: 127.0.0.1 by default — this app has NO authentication, and a
+    # VPS must never expose the dashboard (or its control POSTs) to the open
+    # internet. Reach it over an SSH tunnel or Tailscale, or front it with an
+    # authenticating reverse proxy and set MASTERMOLD_BIND=0.0.0.0 knowingly.
+    set -a
+    [ -f .env.local ] && . ./.env.local
+    set +a
+    export PORT=4002
+    export HOSTNAME="${MASTERMOLD_BIND:-127.0.0.1}"
+    export MASTERMOLD_DB="${MASTERMOLD_DB:-$ROOT/.data/mastermold.db}"
+    export AUTOPILOT_DB="${AUTOPILOT_DB:-$ROOT/.data/autopilot.db.json}"
+    export ENGINE_OUT_DIR="${ENGINE_OUT_DIR:-$ROOT/engine/out}"
+    # Anchors engine spawning (venv, wrapper, spawn cwd) and the Helius
+    # firewall ledger to the repo, not the artifact's chdir'd cwd.
+    export MASTERMOLD_ROOT="${MASTERMOLD_ROOT:-$ROOT}"
+    export HELIUS_FIREWALL_LEDGER="${HELIUS_FIREWALL_LEDGER:-$ROOT/.data/helius-firewall.json}"
+    supervise web node .next/standalone/server.js &
+    echo "up: web (production standalone) starting at http://${HOSTNAME}:4002"
   else
     supervise web "$BUN" run dev &
     echo "up: web (dev) starting at http://localhost:4002"
