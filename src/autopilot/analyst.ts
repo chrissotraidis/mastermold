@@ -361,6 +361,9 @@ export async function runAnalyst(
 
   store.setAnalystMemo(output.review, nowMs);
   store.appendActivity("analyst", `Daily review: ${output.review.slice(0, 180)}`);
+  // The one daily "here's what I learned" should reach the operator's pocket,
+  // not just the panel — fills and halts already do.
+  notifyOperator("analyst", `Daily review: ${output.review.slice(0, 240)}`);
   for (const lesson of output.lessons.slice(0, 5)) {
     store.appendWeb3Memory({ symbol: lesson.symbol.slice(0, 12), kind: "lesson", summary: lesson.summary });
   }

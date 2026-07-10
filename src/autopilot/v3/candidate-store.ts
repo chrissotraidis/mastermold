@@ -79,6 +79,26 @@ export type ForwardLabels = {
 /** A price observation after the snapshot: ms timestamp + executable price. */
 export type PriceObservation = { ts: number; price: number };
 
+/** Persisted minute bars → per-mint observation series (oldest → newest).
+ * Shared by forward labeling, wallet report cards, and anything else that
+ * grades a moment against what prices did next. */
+export function priceSeriesFromHistory(
+  history: Array<{ ts: string; prices: Record<string, number> }>,
+): Map<string, PriceObservation[]> {
+  const byMint = new Map<string, PriceObservation[]>();
+  for (const row of history) {
+    const ms = Date.parse(row.ts);
+    if (!Number.isFinite(ms)) continue;
+    for (const [mint, price] of Object.entries(row.prices)) {
+      if (!Number.isFinite(price) || price <= 0) continue;
+      const series = byMint.get(mint) ?? [];
+      series.push({ ts: ms, price });
+      byMint.set(mint, series);
+    }
+  }
+  return byMint;
+}
+
 const MIN_30 = 30 * 60_000;
 const HOUR_2 = 2 * 60 * 60_000;
 const HOUR_6 = 6 * 60 * 60_000;

@@ -16,9 +16,12 @@ import {
   copyWalletsEnabledIn,
   isPlausibleSolanaAddress,
   scanWatchedWallets,
+  walletReportCards,
   COPY_MIN_LIQUIDITY_USD,
+  WALLET_GRADE_HORIZON_MS,
   type WalletBuyEvent,
 } from "../src/autopilot/v3/smart-wallets";
+import type { PriceObservation } from "../src/autopilot/v3/candidate-store";
 
 const WALLET = "SmartWa11etAddressAAAAAAAAAAAAAAAAAAAAAAA";
 const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -187,5 +190,53 @@ describe("copyWalletCandidate", () => {
     expect(isPlausibleSolanaAddress("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")).toBe(true);
     expect(isPlausibleSolanaAddress("0xdeadbeef")).toBe(false);
     expect(isPlausibleSolanaAddress("short")).toBe(false);
+  });
+});
+
+describe("walletReportCards", () => {
+  const NOW = Date.parse("2026-07-10T12:00:00Z");
+  const buy = (wallet: string, mint: string, msAgo: number): WalletBuyEvent => ({
+    wallet,
+    mint,
+    ui_amount: 100,
+    quote_spent_usd: 500,
+    ts: new Date(NOW - msAgo).toISOString(),
+    signature: `sig-${wallet.slice(0, 4)}-${msAgo}`,
+  });
+  /** Minute-bar-ish series: price at the buy moment and at the 6h horizon. */
+  const series = (mint: string, atBuy: number, atHorizon: number, buyMsAgo: number): [string, PriceObservation[]] => [
+    mint,
+    [
+      { ts: NOW - buyMsAgo, price: atBuy },
+      { ts: NOW - buyMsAgo + WALLET_GRADE_HORIZON_MS, price: atHorizon },
+    ],
+  ];
+
+  test("GIVEN priced buys past the horizon THEN per-wallet averages and hit rates come out of OUR record", () => {
+    const eightHours = 8 * 60 * 60_000;
+    const cards = walletReportCards(
+      [buy(WALLET, MEME, eightHours), buy(WALLET, "OtherMintBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", eightHours)],
+      new Map([
+        series(MEME, 100, 105, eightHours), // +5%
+        series("OtherMintBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", 200, 194, eightHours), // -3%
+      ]),
+      NOW,
+    );
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ wallet: WALLET, buys: 2, graded: 2, hit_rate: 0.5, avg_return_pct: 1 });
+  });
+
+  test("GIVEN young buys or unpriced mints THEN they stay ungraded rather than guessed", () => {
+    const cards = walletReportCards(
+      [
+        buy(WALLET, MEME, 60_000), // 1 minute old — inside the horizon
+        buy(WALLET, "NeverTrackedMintCCCCCCCCCCCCCCCCCCCCCCCCCCC", 8 * 60 * 60_000),
+      ],
+      new Map([series(MEME, 100, 120, 60_000)]),
+      NOW,
+    );
+    expect(cards[0].buys).toBe(2);
+    expect(cards[0].graded).toBe(0);
+    expect(cards[0].hit_rate).toBeNull();
   });
 });

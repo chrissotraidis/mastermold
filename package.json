@@ -20,6 +20,7 @@
     "test": "bun run typecheck && bun test tests",
     "daily": "bin/daily-run",
     "autopilot": "bin/autopilot-daemon",
+    "backup": "bun run scripts/backup-data.ts",
     "autopilot:drill": "bun run scripts/autopilot-live-drill.ts",
     "autopilot:provision": "bun run scripts/autopilot-provision.ts",
     "v3:backtest": "bun run scripts/v3-backtest.ts"

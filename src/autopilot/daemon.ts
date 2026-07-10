@@ -34,7 +34,7 @@ import { DEFAULT_STRATEGY_PARAMS, type StrategyParams } from "./params";
 import { validateIntent } from "./policy";
 import { describeRehearsal, rehearseFill } from "./rehearsal";
 import type { SymbolEvaluation } from "./strategy-view";
-import type { PriceObservation } from "./v3/candidate-store";
+import { priceSeriesFromHistory } from "./v3/candidate-store";
 import { conservativeCost, memecoinConservativeCost } from "./v3/execution-cost";
 import type { FundingInput } from "./v3/funding-basis";
 import { fetchDriftFunding, PERP_MARKET_BY_MINT } from "./v3/perps";
@@ -47,6 +47,7 @@ import { copyWalletCandidate, scanWatchedWallets, type WalletBuyEvent } from "./
 import { fetchWalletSuggestions, SUGGESTIONS_TTL_MS } from "./v3/wallet-discovery";
 import { checkBudget, crossedAlertThreshold, recordUsage, solanaTrackerBudget } from "./v3/api-budget";
 import { resolveGuardedRpcUrl } from "../helius/rpc-url";
+import { runDailyBackup } from "../db/backup";
 import { fetchTrendingTokens, type TrendingToken } from "./v3/trending";
 import { UNIVERSE } from "./universe";
 import {
@@ -478,21 +479,8 @@ function processExitWatches(store: ReturnType<typeof autopilotStore>, prices: Ma
   }
 }
 
-/** Persisted minute bars → per-mint observation series for forward labeling. */
-function priceSeriesFromHistory(history: Array<{ ts: string; prices: Record<string, number> }>): Map<string, PriceObservation[]> {
-  const byMint = new Map<string, PriceObservation[]>();
-  for (const row of history) {
-    const ms = Date.parse(row.ts);
-    if (!Number.isFinite(ms)) continue;
-    for (const [mint, price] of Object.entries(row.prices)) {
-      if (!Number.isFinite(price) || price <= 0) continue;
-      const series = byMint.get(mint) ?? [];
-      series.push({ ts: ms, price });
-      byMint.set(mint, series);
-    }
-  }
-  return byMint;
-}
+// priceSeriesFromHistory moved to v3/candidate-store.ts — it now also feeds
+// the wallet report cards, so it lives with PriceObservation.
 
 // --- IO shell -----------------------------------------------------------------
 
@@ -768,6 +756,7 @@ async function tick(context: TickContext): Promise<void> {
         store.setSmartWalletCursors(scan.cursors);
         const eventsByMint = new Map<string, WalletBuyEvent[]>();
         for (const event of scan.events) {
+          store.appendWalletBuy(event); // the raw record the report cards grade
           eventsByMint.set(event.mint, [...(eventsByMint.get(event.mint) ?? []), event]);
         }
         const summaries: TokenSummary[] = [];
@@ -1099,6 +1088,21 @@ async function tick(context: TickContext): Promise<void> {
       .catch((error: unknown) => {
         store.appendActivity("analyst", `Analyst run crashed: ${error instanceof Error ? error.message : String(error)}`);
       });
+  }
+
+  // Daily evidence backup: the snapshot directory is its own state (a folder
+  // named for today means today is done), so this is one stat() on most ticks.
+  const backup = runDailyBackup();
+  if (!backup.skipped) {
+    if (backup.path) {
+      store.appendActivity(
+        "daemon",
+        `Daily backup saved: ${backup.files.length} store${backup.files.length === 1 ? "" : "s"} → ${backup.path}${backup.pruned.length > 0 ? ` (pruned ${backup.pruned.length} old)` : ""}.`,
+      );
+    } else {
+      store.appendActivity("error", "Daily .data backup FAILED — check MASTERMOLD_BACKUP_DIR and permissions.");
+      notifyOperator("error", "Daily .data backup failed — the evidence record is not being protected.");
+    }
   }
 
   // Throttled observation: at most one web3-memory note per 10 minutes, so

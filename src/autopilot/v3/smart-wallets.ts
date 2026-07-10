@@ -16,6 +16,7 @@
  * request budget per cycle so public-RPC rate limits stay comfortable.
  */
 
+import type { PriceObservation } from "./candidate-store";
 import { toExpectedValue, type CandidateSignal, type ExecutionCost, type MarketRegime } from "./signal";
 
 export type WalletBuyEvent = {
@@ -195,6 +196,79 @@ export async function scanWatchedWallets(
 }
 
 // --- candidate builder --------------------------------------------------------
+
+// --- per-wallet report cards ---------------------------------------------------
+
+/** Grade a followed wallet's buys at this horizon (matches the 6h forward
+ * labels the shadow already computes — one clock for all evidence). */
+export const WALLET_GRADE_HORIZON_MS = 6 * 60 * 60_000;
+/** A bar must sit within this window of the wanted moment to count. */
+const GRADE_TOLERANCE_MS = 15 * 60_000;
+
+export type WalletReportCard = {
+  wallet: string;
+  buys: number;
+  graded: number;
+  /** Fraction of graded buys that were up at the horizon. */
+  hit_rate: number | null;
+  avg_return_pct: number | null;
+  last_buy_at: string | null;
+};
+
+/** Nearest observation to `ms` within tolerance, else null. */
+function priceNear(series: PriceObservation[] | undefined, ms: number): number | null {
+  if (!series) return null;
+  let best: PriceObservation | null = null;
+  for (const observation of series) {
+    if (Math.abs(observation.ts - ms) > GRADE_TOLERANCE_MS) continue;
+    if (!best || Math.abs(observation.ts - ms) < Math.abs(best.ts - ms)) best = observation;
+  }
+  return best?.price ?? null;
+}
+
+/**
+ * Judge each followed wallet by what OUR OWN price record says happened after
+ * its buys — the discovery leaderboard got them followed; this decides
+ * whether they stay followed. Pure: buys + minute-bar series in, cards out.
+ * Buys the bars can't price (mint never tracked, or younger than the horizon)
+ * stay ungraded rather than guessed.
+ */
+export function walletReportCards(
+  buys: WalletBuyEvent[],
+  seriesByMint: Map<string, PriceObservation[]>,
+  nowMs: number,
+): WalletReportCard[] {
+  const byWallet = new Map<string, WalletBuyEvent[]>();
+  for (const buy of buys) {
+    byWallet.set(buy.wallet, [...(byWallet.get(buy.wallet) ?? []), buy]);
+  }
+
+  return [...byWallet.entries()].map(([wallet, walletBuys]) => {
+    const returns: number[] = [];
+    for (const buy of walletBuys) {
+      const buyMs = Date.parse(buy.ts);
+      if (!Number.isFinite(buyMs) || nowMs - buyMs < WALLET_GRADE_HORIZON_MS) continue;
+      const series = seriesByMint.get(buy.mint);
+      const entry = priceNear(series, buyMs);
+      const exit = priceNear(series, buyMs + WALLET_GRADE_HORIZON_MS);
+      if (entry === null || exit === null || entry <= 0) continue;
+      returns.push(((exit - entry) / entry) * 100);
+    }
+    const wins = returns.filter((value) => value > 0).length;
+    const lastBuy = walletBuys.map((buy) => buy.ts).sort().at(-1) ?? null;
+    return {
+      wallet,
+      buys: walletBuys.length,
+      graded: returns.length,
+      hit_rate: returns.length > 0 ? Math.round((wins / returns.length) * 100) / 100 : null,
+      avg_return_pct:
+        returns.length > 0
+          ? Math.round((returns.reduce((sum, value) => sum + value, 0) / returns.length) * 100) / 100
+          : null,
+      last_buy_at: lastBuy,
+    };
+  });
+}
 
 export const COPY_MIN_LIQUIDITY_USD = 150_000;
 /** Conservative gross-return map from distinct-wallet conviction (research:

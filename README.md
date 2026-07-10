@@ -52,6 +52,11 @@ Ignored local files are where personal state belongs:
 - `engine/out/` for generated engine output.
 - `artifacts/`, `screenshots/`, `reports/private/`, and `docs/private/` for local review material.
 
+The autopilot daemon snapshots `.data/` once a day to `~/.mastermold/backups`
+(outside the repo; override with `MASTERMOLD_BACKUP_DIR`, retention with
+`MASTERMOLD_BACKUP_KEEP`, default 14 days). `npm run backup` takes today's
+snapshot on demand. Restoring is copying a snapshot's files back into `.data/`.
+
 Before publishing, pushing, or preparing a release, run:
 
 ```bash

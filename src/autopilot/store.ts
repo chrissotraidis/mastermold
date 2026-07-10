@@ -48,6 +48,7 @@ import {
 } from "./params";
 import type { EvaluationSnapshot } from "./strategy-view";
 import { EMPTY_CARRY_BOOK, type CarryBookState } from "./v3/carry-book";
+import type { WalletBuyEvent } from "./v3/smart-wallets";
 import type { WalletSuggestions } from "./v3/wallet-discovery";
 import { EMPTY_BUDGET_STATE, type ApiBudgetState } from "./v3/api-budget";
 import {
@@ -235,6 +236,7 @@ const CANDIDATE_SNAPSHOT_CAP = 2000;
 const ACTIVITY_CAP = 400;
 const WEB3_MEMORY_CAP = 400;
 const DECISION_CAP = 400;
+const WALLET_BUY_CAP = 500;
 const EXIT_WATCH_CAP = 200;
 const PARAM_CHANGELOG_CAP = 200;
 // ≈15h of minute bars; widened so the 6h label pass has margin
@@ -365,6 +367,11 @@ const SCHEMA_SQL = `
     data TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS decisions (
+    id TEXT PRIMARY KEY,
+    ts TEXT NOT NULL,
+    data TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS wallet_buys (
     id TEXT PRIMARY KEY,
     ts TEXT NOT NULL,
     data TEXT NOT NULL
@@ -774,6 +781,17 @@ export class AutopilotStore {
 
   setWalletSuggestions(state: WalletSuggestions): void {
     this.setSingleton("wallet_suggestions", state);
+  }
+
+  /** Followed wallets' detected buys — the raw record the report cards grade. */
+  appendWalletBuy(event: WalletBuyEvent): void {
+    this.insertRow("wallet_buys", `wb_${randomUUID()}`, event.ts, event, WALLET_BUY_CAP);
+  }
+
+  walletBuys(limit = 500): WalletBuyEvent[] {
+    return this.allRows<WalletBuyEvent>("wallet_buys")
+      .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts))
+      .slice(0, limit);
   }
 
   smartWalletCursors(): Record<string, string> {

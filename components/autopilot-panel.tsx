@@ -112,6 +112,14 @@ type AutopilotApiPayload = {
         flags: string[];
       }>;
     } | null;
+    /** Followed wallets judged by our own price record of their buys. */
+    report_cards?: Array<{
+      wallet: string;
+      buys: number;
+      graded: number;
+      hit_rate: number | null;
+      avg_return_pct: number | null;
+    }>;
     /** SolanaTracker's metered monthly request budget. */
     api_budget?: { used: number; limit: number; remaining: number; fraction_used: number; allowed: boolean };
   };
@@ -667,6 +675,37 @@ export function AutopilotPanel() {
               Save watched wallets
             </button>
           </form>
+
+          {(data.smart_wallets?.report_cards ?? []).length > 0 ? (
+            <div className="mt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-outline">
+                Report cards · graded by our own record of what happened 6h after each buy
+              </p>
+              <ul className="mt-1 divide-y divide-outline-variant/15">
+                {(data.smart_wallets?.report_cards ?? []).map((card) => (
+                  <li key={card.wallet} className="flex items-baseline gap-2 py-1 text-xs">
+                    <span className="min-w-0 truncate font-mono text-on-surface-variant" title={card.wallet}>
+                      {card.wallet.slice(0, 4)}…{card.wallet.slice(-4)}
+                    </span>
+                    <span className="text-outline">
+                      {card.buys} buy{card.buys === 1 ? "" : "s"}
+                      {card.graded > 0 ? (
+                        <>
+                          {" · "}
+                          <span className={card.avg_return_pct !== null && card.avg_return_pct >= 0 ? "text-engine" : "text-critical"}>
+                            {card.avg_return_pct !== null ? `${card.avg_return_pct >= 0 ? "+" : ""}${card.avg_return_pct.toFixed(1)}% avg` : ""}
+                          </span>
+                          {card.hit_rate !== null ? ` · ${Math.round(card.hit_rate * 100)}% up at 6h (${card.graded} graded)` : ""}
+                        </>
+                      ) : (
+                        " · awaiting the 6h grade"
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {data.smart_wallets?.api_budget ? (
             <p className="mt-2 text-[11px] text-outline">

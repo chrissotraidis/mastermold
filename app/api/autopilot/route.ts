@@ -14,7 +14,13 @@ import { buildAttribution, type AttributionSummary } from "@/src/autopilot/attri
 import { calibrate, type CalibrationSummary } from "@/src/autopilot/v3/calibration";
 import { summarizeCarryBook, type CarrySummary } from "@/src/autopilot/v3/carry-book";
 import { evaluateV3Promotion, type V3Promotion } from "@/src/autopilot/v3/promotion";
-import { isPlausibleSolanaAddress, MAX_WATCHED_WALLETS } from "@/src/autopilot/v3/smart-wallets";
+import {
+  isPlausibleSolanaAddress,
+  walletReportCards,
+  MAX_WATCHED_WALLETS,
+  type WalletReportCard,
+} from "@/src/autopilot/v3/smart-wallets";
+import { priceSeriesFromHistory } from "@/src/autopilot/v3/candidate-store";
 import type { WalletSuggestions } from "@/src/autopilot/v3/wallet-discovery";
 import { checkBudget, solanaTrackerBudget, type BudgetCheck } from "@/src/autopilot/v3/api-budget";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
@@ -87,6 +93,8 @@ export type AutopilotApiPayload = {
   smart_wallets: {
     watched: string[];
     suggestions: WalletSuggestions | null;
+    /** Followed wallets judged by OUR OWN price record of their buys. */
+    report_cards: WalletReportCard[];
     /** SolanaTracker's metered monthly request budget — never assumed unlimited. */
     api_budget: BudgetCheck;
   };
@@ -163,6 +171,7 @@ async function payload(): Promise<AutopilotApiPayload> {
     smart_wallets: {
       watched: store.watchedWallets(),
       suggestions: store.walletSuggestions(),
+      report_cards: walletReportCards(store.walletBuys(), priceSeriesFromHistory(store.priceHistory()), Date.now()),
       api_budget: (() => {
         const config = solanaTrackerBudget();
         return checkBudget(store.apiBudget(config.service), config, Date.now());
@@ -325,6 +334,7 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
     smart_wallets: {
       watched: [],
       suggestions: null,
+      report_cards: [],
       api_budget: checkBudget({ month_key: "", used: 0 }, solanaTrackerBudget(), Date.now()),
     },
     data_boundary: DATA_BOUNDARY,
