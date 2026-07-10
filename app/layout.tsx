@@ -1,6 +1,6 @@
 // Root layout — Master Mold "Sentinel" theme.
 // Keep `import "./globals.css"` and the design-token classes on body.
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ProfileProvider } from "@/components/profile-provider";
 import { FaceActivityProvider } from "@/components/face-activity";
@@ -16,6 +16,11 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/master-mold-icon-512.png", sizes: "512x512", type: "image/png" }],
   },
+};
+
+/** Dark status/address bar on mobile, matching the Void background. */
+export const viewport: Viewport = {
+  themeColor: "#0f090b",
 };
 
 export default function RootLayout({

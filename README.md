@@ -127,6 +127,12 @@ Three separate surfaces read LLM keys — set only what you use:
 Monarch Money import is available through a local MCP server: set
 `MONARCH_MCP_COMMAND` (stdio) or `MONARCH_MCP_URL` (HTTP) in `.env.local`.
 
+Operator notifications (fills, halts, the daily Analyst review) are optional:
+set the `NOTIFY_*` values in `.env.local` and verify from Settings →
+Notifications, which shows live status and sends a test through the real
+path. See [Operations](docs/OPERATIONS.md) for the always-on runbook and
+[Backlog](docs/BACKLOG.md) for known gaps.
+
 Optional Web3 settings are also local-only:
 
 ```bash
@@ -175,6 +181,7 @@ docs/                Public documentation only
 - [Security](docs/SECURITY.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Operations](docs/OPERATIONS.md)
+- [Backlog](docs/BACKLOG.md)
 
 ## License
 

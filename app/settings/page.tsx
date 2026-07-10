@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { IntegrationKeyInput } from "@/components/integration-key-input";
 import { MonarchMcpPanel } from "@/components/monarch-mcp-panel";
+import { NotificationTestButton } from "@/components/notification-test-button";
 import { ProfileSettings } from "@/components/profile-settings";
 import { SettingsSection } from "@/components/settings-section";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import { getDataMode } from "@/src/db/engine-data";
 import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/integrations";
 import { getMonarchMcpPublicConfig } from "@/src/db/monarch-mcp";
 import { getPortfolio } from "@/src/db/portfolio";
+import { notifyConfigFromEnv, notifyEnabled } from "@/src/autopilot/notify";
 import { getPortfolioBrainScanContext, getPortfolioBrainState } from "@/src/db/portfolio-brain";
 import { getAutopilotState } from "@/src/autopilot/control";
 
@@ -42,6 +44,13 @@ export default async function SettingsPage() {
   const portfolioBrain = getPortfolioBrainState();
   const monarchConfig = getMonarchMcpPublicConfig();
   const autopilot = getAutopilotState();
+  const notifyConfig = notifyConfigFromEnv();
+  const notificationsEnabled = notifyEnabled(notifyConfig);
+  const notificationsStatus = notificationsEnabled
+    ? [notifyConfig.telegram_token && notifyConfig.telegram_chat_id ? "Telegram" : null, notifyConfig.desktop ? "Desktop" : null]
+        .filter(Boolean)
+        .join(" + ") + " configured"
+    : "Not configured";
 
   // System health (absorbed from /review).
   const dataMode = getDataMode();
@@ -178,6 +187,28 @@ export default async function SettingsPage() {
                   .
                 </p>
               </details>
+            </div>
+          </SettingsSection>
+
+          <SettingsSection
+            id="notifications"
+            title="Notifications"
+            status={notificationsStatus}
+            statusTone={notificationsEnabled ? "ok" : "muted"}
+          >
+            <p className="text-xs leading-5 text-outline">
+              Optional. The bot pushes fills, halts, the daily Analyst review, and backup failures to
+              Telegram and/or the desktop. Configuration lives in <code>.env.local</code> because the
+              daemon reads it too — the browser can&apos;t own this key:
+            </p>
+            <pre className="mt-2 overflow-x-auto rounded-md border border-outline-variant/25 bg-surface-dim/40 px-3 py-2 text-xs leading-5 text-on-surface-variant">
+              {"NOTIFY_TELEGRAM_BOT_TOKEN=   # from @BotFather\nNOTIFY_TELEGRAM_CHAT_ID=     # your chat id\nNOTIFY_DESKTOP=false         # macOS notification center"}
+            </pre>
+            <p className="mt-1 text-xs leading-5 text-outline">
+              Restart <code>npm run up</code> after editing, then prove the pipe:
+            </p>
+            <div className="mt-2">
+              <NotificationTestButton />
             </div>
           </SettingsSection>
 
