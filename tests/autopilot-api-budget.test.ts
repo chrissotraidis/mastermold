@@ -14,6 +14,7 @@ import {
   currentMonthKey,
   recordUsage,
   resetIfNewMonth,
+  solanaTrackerBudget,
   EMPTY_BUDGET_STATE,
   SOLANATRACKER_BUDGET,
 } from "../src/autopilot/v3/api-budget";
@@ -65,6 +66,19 @@ describe("checkBudget / recordUsage", () => {
     state = recordUsage(state, JULY_10 + 1000);
     state = recordUsage(state, JULY_10 + 2000);
     expect(state.used).toBe(3);
+  });
+});
+
+describe("solanaTrackerBudget env override", () => {
+  test("GIVEN no override THEN the stated free tier; GIVEN a valid override THEN it wins; garbage is ignored", () => {
+    expect(solanaTrackerBudget({}).monthly_limit).toBe(SOLANATRACKER_BUDGET.monthly_limit);
+    expect(solanaTrackerBudget({ SOLANATRACKER_MONTHLY_LIMIT: "10000" }).monthly_limit).toBe(10_000);
+    expect(solanaTrackerBudget({ SOLANATRACKER_MONTHLY_LIMIT: "not-a-number" }).monthly_limit).toBe(
+      SOLANATRACKER_BUDGET.monthly_limit,
+    );
+    expect(solanaTrackerBudget({ SOLANATRACKER_MONTHLY_LIMIT: "-5" }).monthly_limit).toBe(
+      SOLANATRACKER_BUDGET.monthly_limit,
+    );
   });
 });
 

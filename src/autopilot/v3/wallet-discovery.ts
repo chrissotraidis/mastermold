@@ -10,23 +10,21 @@
  *     quality filters help, but identity labels (bot/pool/developer/exchange)
  *     were `null` for every wallet observed live — NOT reliable alone; our
  *     own MAX_TRADES/MAX_TOKENS_TRADED ceilings are the load-bearing filter
- *     for institutional/MM-scale activity. This endpoint has no working
- *     pagination (page/offset are silently ignored), so one call = one
- *     top-100 snapshot; sort=win_percentage is used because sort=realized's
- *     top 100 was 100% whale/MM-scale in live testing and yielded zero
- *     candidates after filtering.
+ *     for institutional/MM-scale activity. The query is sort=roi with
+ *     real-capital floors (minInvested + minWinRate + minTrades + minDays),
+ *     the only combination observed live to surface the credible 45–80%
+ *     win-rate band; see the inline note at the query for the probe results.
  *  2. Keyless fallback: GeckoTerminal pool trades on the trending pools the
  *     radar already tracks — aggregates recent buyers by volume. No PnL
  *     history, so these are "activity-only" leads, scored low and flagged.
  *
  * Anti-trap scoring encodes the 2026 copy-trading research: 90%+ win rates
  * are bot/insider red flags (the sweet spot is 45–80%) — heavily discounted
- * and flagged rather than excluded, since win_percentage-sorted results are
- * dominated by near-perfect records in practice and flagging beats showing
- * nothing. Realized PnL beats paper PnL, one-hit wonders and sub-20-trade
- * windows prove nothing, MM/institutional trade-count scale is excluded
- * outright, and labeled bots/pools/devs are excluded outright. Suggestions
- * are SUGGESTIONS: a human clicks Follow; nothing auto-follows.
+ * and flagged rather than excluded. Realized PnL beats paper PnL, one-hit
+ * wonders and sub-20-trade windows prove nothing, MM/institutional
+ * trade-count scale is excluded outright, and labeled bots/pools/devs are
+ * excluded outright. Suggestions are SUGGESTIONS: a human clicks Follow;
+ * nothing auto-follows.
  */
 
 import { isPlausibleSolanaAddress } from "./smart-wallets";
@@ -218,6 +216,9 @@ const FETCH_TIMEOUT_MS = 10_000;
 const LEADERBOARD_URL = "https://data.solanatracker.io/v2/pnl/leaderboard/top";
 const GECKO_TRADES_URL = "https://api.geckoterminal.com/api/v2/networks/solana/pools";
 export const LEADERBOARD_PERIOD_DAYS = 30;
+/** Server-side floor for the leaderboard query — slightly above the scorer's
+ * WIN_RATE_FLOOR so the page-one pool skews toward the credible band. */
+export const LEADERBOARD_MIN_WIN_RATE_PCT = 45;
 
 /**
  * Fetch fresh wallet suggestions. With SOLANATRACKER_API_KEY set, the real
@@ -249,21 +250,25 @@ export async function fetchWalletSuggestions(
     try {
       const params = new URLSearchParams({
         days: String(LEADERBOARD_PERIOD_DAYS),
-        // sort=win_percentage, not realized (verified live, 2026-07-10): the
-        // realized-sorted leaderboard's top 100 rows were 100% MM/institutional
-        // scale (1.1M+ trades each) with identity=null — MAX_TRADES/
-        // MAX_TOKENS_TRADED excluded every single one, yielding zero
-        // candidates. win_percentage's top 100 all cleared the trap filters
-        // structurally (human-scale trade/token counts); the scorer's
-        // WIN_RATE_BOT_CEILING discount+flag is what keeps the near-perfect
-        // records from being trusted at face value. This endpoint offers no
-        // working pagination (page/offset params were silently ignored in
-        // testing), so a single top-100 pull is genuinely all one call buys.
-        sort: "win_percentage",
-        limit: "50",
-        minTrades: String(MIN_TRADES),
-        minDays: "3",
-        minWinRate: String(Math.round(WIN_RATE_FLOOR * 100)),
+        // Query tuned against the LIVE leaderboard (2026-07-10, three probes):
+        // - sort=realized: top 100 all MM/institutional scale (1.1M+ trades,
+        //   identity=null) — every row excluded by our ceilings, zero yield.
+        // - sort=win_percentage: the server-filtered pool is dominated by
+        //   100%-win-rate wallets — real candidates, but every one arrives
+        //   pre-flagged "bot/insider pattern".
+        // - sort=roi + REAL CAPITAL floors (minInvested kills the dust-ROI
+        //   degenerates that made bare roi-sort useless): 46 of the first 100
+        //   passed every trap filter with 47-80% win rates and $27k-$165k
+        //   realized — exactly the research-recommended band. This is the
+        //   query. (Pagination DOES exist — pagination.nextCursor in the
+        //   response — but page one already yields dozens of candidates, so
+        //   one metered call per refresh stays the budget-honest choice.)
+        sort: "roi",
+        limit: "100",
+        minTrades: "50",
+        minDays: "5",
+        minInvested: "5000",
+        minWinRate: String(LEADERBOARD_MIN_WIN_RATE_PCT),
         maxSingleTokenPct: "40", // one-hit wonders out (research heuristic)
         pnlMode: "strict", // realized only — paper gains are bait
       });

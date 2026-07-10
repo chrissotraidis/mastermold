@@ -26,13 +26,24 @@ export type ApiBudgetConfig = {
 
 export const EMPTY_BUDGET_STATE: ApiBudgetState = { month_key: "", used: 0 };
 
-/** SolanaTracker's stated free tier (per the operator, 2026-07-10). Override
- * via SOLANATRACKER_MONTHLY_LIMIT if the account's actual plan differs. */
+/** SolanaTracker's stated free tier (per the operator, 2026-07-10). */
 export const SOLANATRACKER_BUDGET: ApiBudgetConfig = {
   service: "solanatracker",
   monthly_limit: 2_500,
   soft_stop_fraction: 0.9,
 };
+
+/** The live config: defaults above, with SOLANATRACKER_MONTHLY_LIMIT from the
+ * environment taking precedence when the account's actual plan differs. */
+export function solanaTrackerBudget(
+  env: Record<string, string | undefined> = process.env as unknown as Record<string, string | undefined>,
+): ApiBudgetConfig {
+  const raw = Number(env.SOLANATRACKER_MONTHLY_LIMIT);
+  if (Number.isFinite(raw) && raw > 0) {
+    return { ...SOLANATRACKER_BUDGET, monthly_limit: Math.floor(raw) };
+  }
+  return SOLANATRACKER_BUDGET;
+}
 
 export function currentMonthKey(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 7); // "YYYY-MM"

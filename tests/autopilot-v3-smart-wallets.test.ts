@@ -102,6 +102,45 @@ describe("scanWatchedWallets", () => {
     expect(result.events).toEqual([]);
     expect(result.cursors[WALLET]).toBe("sig-old");
   });
+
+  test("GIVEN a mid-loop transaction failure THEN the watermark stays at the last processed tx so nothing is lost", async () => {
+    // Listing is newest-first: [sig-3, sig-2, sig-1]; processing is
+    // oldest-first. sig-1 succeeds, sig-2 blows up — the cursor must end at
+    // sig-1 so sig-2 and sig-3 are re-listed (until=sig-1) next cycle.
+    let txCalls = 0;
+    const fetchImpl = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { method: string; params: unknown[] };
+      if (body.method === "getSignaturesForAddress") {
+        return new Response(
+          JSON.stringify({ result: [{ signature: "sig-3", err: null }, { signature: "sig-2", err: null }, { signature: "sig-1", err: null }] }),
+        );
+      }
+      txCalls += 1;
+      if (txCalls >= 2) throw new Error("rate limited");
+      return new Response(JSON.stringify(swapTransaction()));
+    }) as unknown as typeof fetch;
+
+    const result = await scanWatchedWallets([WALLET], { [WALLET]: "sig-0" }, "http://rpc.test", fetchImpl);
+    expect(result.events).toHaveLength(1); // sig-1's buy landed before the failure
+    expect(result.cursors[WALLET]).toBe("sig-1"); // NOT sig-3 — sig-2/sig-3 retry next cycle
+  });
+
+  test("GIVEN more fresh txs than the per-cycle cap THEN the oldest are processed and the watermark leaves the rest for next cycle", async () => {
+    const signatures = ["sig-9", "sig-8", "sig-7", "sig-6", "sig-5"]; // newest-first
+    const fetchImpl = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { method: string };
+      if (body.method === "getSignaturesForAddress") {
+        return new Response(JSON.stringify({ result: signatures.map((signature) => ({ signature, err: null })) }));
+      }
+      return new Response(JSON.stringify(swapTransaction()));
+    }) as unknown as typeof fetch;
+
+    const result = await scanWatchedWallets([WALLET], { [WALLET]: "sig-4" }, "http://rpc.test", fetchImpl);
+    // Cap is 3: oldest three (sig-5, sig-6, sig-7) processed; watermark at
+    // sig-7 so sig-8/sig-9 are re-listed next cycle instead of skipped.
+    expect(result.events).toHaveLength(3);
+    expect(result.cursors[WALLET]).toBe("sig-7");
+  });
 });
 
 describe("copyWalletCandidate", () => {

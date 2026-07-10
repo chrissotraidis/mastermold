@@ -45,8 +45,8 @@ import { evaluateV3Shadow, labelDueCandidates, recordV3Shadow } from "./v3/shado
 import type { CandidateSignal } from "./v3/signal";
 import { copyWalletCandidate, scanWatchedWallets, type WalletBuyEvent } from "./v3/smart-wallets";
 import { fetchWalletSuggestions, SUGGESTIONS_TTL_MS } from "./v3/wallet-discovery";
-import { checkBudget, crossedAlertThreshold, recordUsage, SOLANATRACKER_BUDGET } from "./v3/api-budget";
-import { PUBLIC_RPC_URL } from "../helius/rpc-url";
+import { checkBudget, crossedAlertThreshold, recordUsage, solanaTrackerBudget } from "./v3/api-budget";
+import { resolveGuardedRpcUrl } from "../helius/rpc-url";
 import { fetchTrendingTokens, type TrendingToken } from "./v3/trending";
 import { UNIVERSE } from "./universe";
 import {
@@ -712,7 +712,8 @@ async function tick(context: TickContext): Promise<void> {
         // month's soft-stop (90% of the account's stated 2,500/month) hasn't
         // been reached — twice-daily refreshes cost ~60/month, so this is
         // headroom for the tier changing or future calls, not a live risk.
-        const budgetBefore = checkBudget(store.apiBudget(SOLANATRACKER_BUDGET.service), SOLANATRACKER_BUDGET, nowMs);
+        const budgetConfig = solanaTrackerBudget();
+        const budgetBefore = checkBudget(store.apiBudget(budgetConfig.service), budgetConfig, nowMs);
         const suggestions = await fetchWalletSuggestions({
           trendingPools: context.lastTrending
             .map((token) => token.pool_address)
@@ -720,9 +721,9 @@ async function tick(context: TickContext): Promise<void> {
           nowMs,
           budgetAllows: budgetBefore.allowed,
           onLeaderboardCall: () => {
-            const updated = recordUsage(store.apiBudget(SOLANATRACKER_BUDGET.service), nowMs);
-            store.setApiBudget(SOLANATRACKER_BUDGET.service, updated);
-            const after = checkBudget(updated, SOLANATRACKER_BUDGET, nowMs);
+            const updated = recordUsage(store.apiBudget(budgetConfig.service), nowMs);
+            store.setApiBudget(budgetConfig.service, updated);
+            const after = checkBudget(updated, budgetConfig, nowMs);
             const crossed = crossedAlertThreshold(budgetBefore.fraction_used, after.fraction_used);
             if (crossed !== null) {
               const message = `SolanaTracker API budget at ${Math.round(crossed * 100)}%: ${after.used}/${after.limit} requests this month.`;
@@ -749,11 +750,10 @@ async function tick(context: TickContext): Promise<void> {
       const copyCandidates: CandidateSignal[] = [];
       const watched = store.watchedWallets();
       if (watched.length > 0) {
-        const scan = await scanWatchedWallets(
-          watched,
-          store.smartWalletCursors(),
-          process.env.SOLANA_RPC_URL?.trim() || PUBLIC_RPC_URL,
-        );
+        // Guarded resolution: background polling must never silently burn
+        // Helius credits — a Helius SOLANA_RPC_URL only applies when the
+        // credit firewall is explicitly enabled (src/helius/rpc-url.ts).
+        const scan = await scanWatchedWallets(watched, store.smartWalletCursors(), resolveGuardedRpcUrl());
         store.setSmartWalletCursors(scan.cursors);
         const eventsByMint = new Map<string, WalletBuyEvent[]>();
         for (const event of scan.events) {

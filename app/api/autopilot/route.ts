@@ -16,7 +16,7 @@ import { summarizeCarryBook, type CarrySummary } from "@/src/autopilot/v3/carry-
 import { evaluateV3Promotion, type V3Promotion } from "@/src/autopilot/v3/promotion";
 import { isPlausibleSolanaAddress, MAX_WATCHED_WALLETS } from "@/src/autopilot/v3/smart-wallets";
 import type { WalletSuggestions } from "@/src/autopilot/v3/wallet-discovery";
-import { checkBudget, SOLANATRACKER_BUDGET, type BudgetCheck } from "@/src/autopilot/v3/api-budget";
+import { checkBudget, solanaTrackerBudget, type BudgetCheck } from "@/src/autopilot/v3/api-budget";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
 import { liveReadiness } from "@/src/autopilot/live-readiness";
 import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry, type StrategyParams } from "@/src/autopilot/params";
@@ -163,7 +163,10 @@ async function payload(): Promise<AutopilotApiPayload> {
     smart_wallets: {
       watched: store.watchedWallets(),
       suggestions: store.walletSuggestions(),
-      api_budget: checkBudget(store.apiBudget(SOLANATRACKER_BUDGET.service), SOLANATRACKER_BUDGET, Date.now()),
+      api_budget: (() => {
+        const config = solanaTrackerBudget();
+        return checkBudget(store.apiBudget(config.service), config, Date.now());
+      })(),
     },
     data_boundary: DATA_BOUNDARY,
   };
@@ -322,7 +325,7 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
     smart_wallets: {
       watched: [],
       suggestions: null,
-      api_budget: checkBudget({ month_key: "", used: 0 }, SOLANATRACKER_BUDGET, Date.now()),
+      api_budget: checkBudget({ month_key: "", used: 0 }, solanaTrackerBudget(), Date.now()),
     },
     data_boundary: DATA_BOUNDARY,
   };

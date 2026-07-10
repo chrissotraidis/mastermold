@@ -161,11 +161,22 @@ export async function scanWatchedWallets(
       const fresh = rows
         .filter((row) => row && row.err === null && typeof row.signature === "string")
         .map((row) => row.signature as string);
-      if (fresh.length > 0) nextCursors[wallet] = fresh[0];
+      if (fresh.length === 0) continue;
       // Without a cursor this is the first sight of the wallet: set the
-      // watermark but do not replay history as if it just happened.
-      if (!cursors[wallet]) continue;
-      for (const signature of fresh.slice(0, MAX_TX_LOOKUPS_PER_WALLET)) {
+      // watermark to the newest signature but do not replay history.
+      if (!cursors[wallet]) {
+        nextCursors[wallet] = fresh[0];
+        continue;
+      }
+      // The listing is newest-first; process OLDEST-first and advance the
+      // watermark per fully-processed transaction. `until` returns everything
+      // newer than the watermark, so a mid-loop RPC failure or the per-cycle
+      // lookup cap just leaves the rest for the next cycle — nothing is
+      // skipped and nothing is double-processed. (The original version
+      // advanced the cursor to fresh[0] up front, which silently dropped
+      // every transaction the loop hadn't inspected yet.)
+      const oldestFirst = [...fresh].reverse();
+      for (const signature of oldestFirst.slice(0, MAX_TX_LOOKUPS_PER_WALLET)) {
         const tx = await rpcCall(
           rpcUrl,
           "getTransaction",
@@ -173,9 +184,11 @@ export async function scanWatchedWallets(
           doFetch,
         );
         events.push(...buysFromTransaction(tx, wallet));
+        nextCursors[wallet] = signature;
       }
     } catch {
-      // This wallet's scan failed (rate limit, RPC hiccup): skip it this cycle.
+      // This wallet's scan failed (rate limit, RPC hiccup): the watermark
+      // stays at the last fully-processed transaction; next cycle resumes.
     }
   }
   return { events, cursors: nextCursors };
