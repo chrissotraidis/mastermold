@@ -7,6 +7,8 @@ import { TodayMemoryRefresh } from "@/components/today-memory-refresh";
 import { TodayReadTimer } from "@/components/today-metrics";
 import { productProvenanceLabel } from "@/lib/provenance-copy";
 import { parseAsOf } from "@/src/db/bitemporal";
+import { describeTrackRecord, gradePlayHistory, playTrackRecord } from "@/src/db/play-outcomes";
+import { store } from "@/src/db/store";
 import { getAlerts, type AlertJson } from "@/src/db/alerts";
 import { cleanAlertMessage } from "@/lib/alert-loop";
 import {
@@ -44,6 +46,11 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       ? portfolio.provenance.label
       : dataMode.label;
   const movers = topMovers(report);
+  // Accountability: every directional play is graded against what the price
+  // actually did (pure derivation over stored reports; see play-outcomes.ts).
+  const trackRecordLine = asOf
+    ? null
+    : describeTrackRecord(playTrackRecord(gradePlayHistory(store().dailyReports(90))));
 
   return (
     <AppShell dataMode={productProvenanceLabel(pageDataMode)}>
@@ -90,6 +97,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
               </div>
               <p className="mt-1.5 text-xs leading-5 text-outline">
                 Suggestions from your holdings, today&apos;s moves, and saved memory — Master Mold never places trades.
+                {trackRecordLine ? <> {trackRecordLine}</> : null}
               </p>
             </>
           ) : (

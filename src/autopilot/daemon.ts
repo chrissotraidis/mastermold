@@ -112,6 +112,8 @@ export type DecisionInput = {
   cooldown_until_ms: Map<string, number>; // by mint
   loss_streak: number;
   last_loss_ms: number | null;
+  /** When the most recent NEW entry filled (any symbol), for entry spacing. */
+  last_entry_ms?: number | null;
   /** Store-backed, clamp-sanitized strategy params (the learnable surface). */
   params: StrategyParams;
   /** True during the first live week: entries are pinned to canary size. */
@@ -225,6 +227,7 @@ export function decide(input: DecisionInput): DecisionOutput {
     });
   }
 
+  const lastEntryMs = input.last_entry_ms ?? null;
   const globalBlock =
     openAfterExits >= state.caps.max_positions
       ? "at max positions"
@@ -232,7 +235,9 @@ export function decide(input: DecisionInput): DecisionOutput {
         ? `at the ${params.max_trades_per_day}-trade daily limit`
         : loss_streak >= params.loss_streak_limit && last_loss_ms !== null && now_ms - last_loss_ms < params.loss_streak_pause_ms
           ? `paused after ${loss_streak} consecutive losses`
-          : null;
+          : lastEntryMs !== null && now_ms - lastEntryMs < params.entry_spacing_ms
+            ? `spacing entries: last fill ${Math.round((now_ms - lastEntryMs) / 60_000)}m ago, ${Math.round(params.entry_spacing_ms / 60_000)}m required — one regime flip is one bet, not three`
+            : null;
 
   let skipped: SkippedCandidate | null = null;
   let best: { symbol: string; mint: string; price: number; stopPct: number; signals: DecisionSignals } | null = null;
@@ -625,6 +630,12 @@ async function tick(context: TickContext): Promise<void> {
   const roundTrips = realizedRoundTrips(modeTrades);
   const streak = lossStreak(roundTrips);
   const tradesToday = modeTrades.filter((trade) => trade.side === "buy" && trade.ts.slice(0, 10) === today).length;
+  const lastEntryMs = modeTrades
+    .filter((trade) => trade.side === "buy")
+    .reduce<number | null>((latest, trade) => {
+      const ms = Date.parse(trade.ts);
+      return Number.isFinite(ms) && (latest === null || ms > latest) ? ms : latest;
+    }, null);
 
   // Post-exit counterfactuals: stamp due marks on open watches from live
   // prices, and flag loss exits that recovered (a "premature stop" lesson).
@@ -867,6 +878,7 @@ async function tick(context: TickContext): Promise<void> {
     cooldown_until_ms: context.cooldownUntilMs,
     loss_streak: streak.streak,
     last_loss_ms: streak.last_loss_ms,
+    last_entry_ms: lastEntryMs,
     params,
     // Canary week: the first CANARY_WINDOW_MS of live mode pins entry size.
     live_canary: isLive && state.started_at !== null && nowMs - Date.parse(state.started_at) < CANARY_WINDOW_MS,
@@ -1129,6 +1141,30 @@ async function main(): Promise<void> {
     lastTrending: [],
     lastCopySummaries: [],
   };
+
+  // Warm-start: seed the signal windows from the persisted minute bars so a
+  // restart doesn't blind the strategy for 13 minutes — under the supervisor,
+  // restarts are routine. Each 1-minute bar stands in for ~3 ticks: the
+  // 13-minute return comes out the same, the range is slightly coarser, and
+  // live 20s samples refine it from the first tick. Only RECENT bars qualify;
+  // seeding a long outage's stale prices would fake a 13-minute move.
+  const warmCutoffMs = Date.now() - 20 * 60_000;
+  const warmBars = store.priceHistory().filter((bar) => Date.parse(bar.ts) >= warmCutoffMs);
+  if (warmBars.length >= 3) {
+    for (const bar of warmBars.slice(-Math.ceil(WINDOW_TICKS / 3))) {
+      for (const [mint, price] of Object.entries(bar.prices)) {
+        if (!Number.isFinite(price) || price <= 0) continue;
+        const window = context.windows.get(mint) ?? [];
+        for (let tick = 0; tick < 3 && window.length < WINDOW_TICKS; tick += 1) window.push(price);
+        context.windows.set(mint, window);
+      }
+    }
+    store.appendActivity(
+      "daemon",
+      `Warm-started signal windows from ${warmBars.length} recent minute bars (${context.windows.size} mints) — no 13-minute blind spot this boot.`,
+    );
+  }
+
   let stopping = false;
   const stop = () => {
     stopping = true;

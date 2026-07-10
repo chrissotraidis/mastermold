@@ -39,6 +39,11 @@ export type StrategyParams = {
   time_stop_ms: number;
   /** Per-symbol cooldown after any exit (ms). */
   cooldown_ms: number;
+  /** Minimum gap between consecutive NEW entries, any symbol (ms). Observed
+   * live 2026-07-10: a regime flip spent the whole daily budget in minutes on
+   * three correlated majors — one bet dressed as three. Spacing forces the
+   * later entries to re-qualify after the move has had time to develop. */
+  entry_spacing_ms: number;
   /** Entries per UTC day — frequency is EARNED via the Analyst, not configured. */
   max_trades_per_day: number;
   /** Consecutive losses that pause entries, and for how long (ms). */
@@ -69,6 +74,7 @@ export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   min_edge_over_cost: 3.0,
   time_stop_ms: 24 * 60 * 60_000,
   cooldown_ms: 2 * 60 * 60_000,
+  entry_spacing_ms: 20 * 60_000,
   max_trades_per_day: 3,
   loss_streak_limit: 2,
   loss_streak_pause_ms: 2 * 60 * 60_000,
@@ -93,6 +99,7 @@ export const PARAM_CLAMPS: Record<ParamKey, { min: number; max: number }> = {
   // never below one hour, where the cost stack eats every edge.
   time_stop_ms: { min: 60 * 60_000, max: 72 * 60 * 60_000 },
   cooldown_ms: { min: 15 * 60_000, max: 24 * 60 * 60_000 },
+  entry_spacing_ms: { min: 0, max: 4 * 60 * 60_000 },
   max_trades_per_day: { min: 3, max: 10 },
   loss_streak_limit: { min: 2, max: 4 },
   loss_streak_pause_ms: { min: 60 * 60_000, max: 8 * 60 * 60_000 },

@@ -151,6 +151,18 @@ describe("autopilot v2 trend-pullback strategy", () => {
     expect(paused.skipped?.reason).toContain("consecutive losses");
   });
 
+  test("GIVEN a fill minutes ago THEN entry spacing blocks the next entry; a spaced fill does not (2026-07-10 burst)", () => {
+    // Observed live: a regime flip bought three correlated majors in minutes —
+    // the daily budget spent on what was really one bet.
+    const windows = new Map([[SOL.mint, window(100.4, 100)]]);
+    const burst = decide(input({ windows, last_entry_ms: NOW - 5 * 60_000 }));
+    expect(burst.decisions).toEqual([]);
+    expect(burst.skipped?.reason).toContain("spacing entries");
+
+    const spaced = decide(input({ windows, last_entry_ms: NOW - DEFAULT_STRATEGY_PARAMS.entry_spacing_ms - 1 }));
+    expect(spaced.decisions).toHaveLength(1);
+  });
+
   test("GIVEN price at the hard stop THEN it sells regardless of window noise", () => {
     const windows = new Map([[SOL.mint, window(98.6, 98.4)]]); // below 100*(1-1.5%)
     const { decisions } = decide(input({ positions: [solPosition(100)], windows }));

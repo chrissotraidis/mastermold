@@ -41,7 +41,7 @@ export function describeStrategyRules(params: StrategyParams): string[] {
     `Only tokens with ≥$${Math.round(params.min_volume_h24_usd / 1000)}k 24h volume and ≥$${Math.round(params.min_liquidity_usd / 1000)}k pool liquidity qualify.`,
     `Stops are volatility-scaled between ${params.min_stop_pct}% and ${params.max_stop_pct}%; take profit at ${params.take_profit_r}R; a trailing stop arms after +1R.`,
     `Target profit must clear ${params.min_edge_over_cost}× the round-trip cost or the trade is refused.`,
-    `Anti-churn: at most ${params.max_trades_per_day} entries/day, ${Math.round(params.cooldown_ms / 60_000)}m per-symbol cooldown after an exit, and a ${Math.round(params.loss_streak_pause_ms / 3_600_000)}h pause after ${params.loss_streak_limit} straight losses.`,
+    `Anti-churn: at most ${params.max_trades_per_day} entries/day spaced ≥${Math.round(params.entry_spacing_ms / 60_000)}m apart, ${Math.round(params.cooldown_ms / 60_000)}m per-symbol cooldown after an exit, and a ${Math.round(params.loss_streak_pause_ms / 3_600_000)}h pause after ${params.loss_streak_limit} straight losses.`,
     `Exits: hard stop, ${params.take_profit_r}R take profit, armed trail, or a ${Math.round(params.time_stop_ms / 3_600_000)}h time stop once the hourly trend turns down.`,
   ];
 }
