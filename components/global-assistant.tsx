@@ -111,16 +111,15 @@ export function GlobalAssistant() {
           onPointerEnter={() => setLauncherHovered(true)}
           onPointerLeave={() => setLauncherHovered(false)}
           className={cn(
-            "fixed bottom-[4.85rem] right-3 z-[70] size-[4.5rem] items-center justify-center rounded-full border border-violet/35 bg-surface-high/95 p-1 shadow-xl shadow-void/25 ring-1 ring-violet/15 transition hover:border-violet hover:bg-surface-highest active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet md:bottom-6 md:right-6 md:size-auto md:min-h-14 md:max-w-[calc(100vw-3rem)] md:justify-start md:gap-2.5 md:py-1 md:pl-1 md:pr-3.5",
-            "flex",
+            "fixed bottom-4 right-4 z-[70] hidden min-h-12 max-w-[calc(100vw-2rem)] items-center justify-start gap-2 rounded-full border border-violet/35 bg-surface-high/95 py-1 pl-1 pr-3 shadow-xl shadow-void/25 ring-1 ring-violet/15 transition hover:border-violet hover:bg-surface-highest active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet xl:flex",
           )}
           aria-label="Open Master Mold chat"
           data-testid="global-assistant-open"
         >
-          <span className="size-16 shrink-0">
+          <span className="size-12 shrink-0">
             <SentinelFace state="idle" hovered={launcherHovered} />
           </span>
-          <span className="hidden min-w-0 items-center gap-1.5 text-left text-sm font-semibold leading-tight text-on-surface md:flex">
+          <span className="flex min-w-0 items-center gap-1.5 text-left text-sm font-semibold leading-tight text-on-surface">
             <MessageCircle aria-hidden="true" className="size-3.5 text-violet" />
             Ask Master Mold
           </span>

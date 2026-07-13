@@ -44,6 +44,12 @@ describe("notify config + gating", () => {
     expect(notifyEnabled(notifyConfigFromEnv({ NOTIFY_DESKTOP: "true" } as unknown as NodeJS.ProcessEnv))).toBe(true);
   });
 
+  test("GIVEN only a webhook URL THEN notifications are enabled", () => {
+    expect(
+      notifyEnabled(notifyConfigFromEnv({ NOTIFY_WEBHOOK_URL: "http://127.0.0.1:4011/notify" } as unknown as NodeJS.ProcessEnv)),
+    ).toBe(true);
+  });
+
   test("GIVEN identical messages inside the window THEN dedupe suppresses repeats", () => {
     expect(shouldSend(undefined, 0)).toBe(true);
     expect(shouldSend(0, NOTIFY_DEDUPE_MS - 1)).toBe(false);
@@ -62,6 +68,7 @@ describe("telegram sender via notifyOperator", () => {
     telegram_token: "test-token",
     telegram_chat_id: "42",
     desktop: false,
+    webhook_url: null,
   };
 
   test("GIVEN a configured channel THEN one send fires and the repeat dedupes", async () => {
@@ -85,5 +92,32 @@ describe("telegram sender via notifyOperator", () => {
       throw new Error("network down");
     }) as unknown as typeof fetch;
     expect(() => notifyOperator("halt", "boom", { nowMs: 5, config, fetchImpl })).not.toThrow();
+  });
+});
+
+describe("webhook sender via notifyOperator", () => {
+  test("GIVEN a webhook-only config THEN one real POST lands with the formatted text", async () => {
+    const received: Array<{ path: string; body: unknown }> = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        received.push({ path: new URL(req.url).pathname, body: await req.json() });
+        return new Response(null, { status: 202 });
+      },
+    });
+    const config = {
+      telegram_token: null,
+      telegram_chat_id: null,
+      desktop: false,
+      webhook_url: `http://127.0.0.1:${server.port}/notify`,
+    };
+
+    notifyOperator("exit", "Paper sell WETH: trailing stop", { nowMs: 1_000, config });
+    for (let i = 0; i < 100 && received.length === 0; i++) await Bun.sleep(10);
+    server.stop(true);
+
+    expect(received).toHaveLength(1);
+    expect(received[0].path).toBe("/notify");
+    expect(received[0].body).toMatchObject({ text: expect.stringContaining("Master Mold exit") });
   });
 });

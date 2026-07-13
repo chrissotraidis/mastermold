@@ -85,7 +85,49 @@ export default async function PortfolioPage({ searchParams }: PortfolioPageProps
             </h2>
             <span className="text-xs text-outline">{rows.length} positions</span>
           </div>
-          <div className="mt-2 overflow-x-auto rounded-md border border-outline-variant/25">
+          <div className="mt-2 grid gap-2 sm:hidden">
+            {primaryRows.map((holding) => {
+              const policy = policyBySymbol.get(holding.symbol.toUpperCase());
+              return (
+                <article key={holding.id} className="rounded-md border border-outline-variant/25 bg-surface-low/35 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-on-surface">{holding.symbol}</p>
+                      <p className="truncate text-xs text-outline">{holding.asset_name}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-semibold tabular-nums text-on-surface">{formatCurrency(holding.market_value)}</p>
+                      <p className="text-xs tabular-nums text-on-surface-variant">{holding.weight_pct.toFixed(1)}% share</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 border-t border-outline-variant/15 pt-2 text-xs">
+                    <div>
+                      <p className="text-outline">Amount</p>
+                      <p className="mt-0.5 tabular-nums text-on-surface-variant">{formatQuantity(holding.quantity)}</p>
+                    </div>
+                    <div>
+                      <p className="text-outline">Today</p>
+                      <p className={`mt-0.5 tabular-nums ${holding.daily_change_pct > 0 ? "text-engine" : holding.daily_change_pct < 0 ? "text-critical" : "text-on-surface-variant"}`}>
+                        {holding.daily_change_pct === 0 ? "—" : `${holding.daily_change_pct > 0 ? "+" : ""}${holding.daily_change_pct.toFixed(1)}%`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-outline">Rule</p>
+                      <a
+                        href="#position-policies"
+                        className="mt-0.5 inline-flex items-center gap-1 text-violet hover:text-tertiary"
+                        title={policyTitle(policy?.intent)}
+                      >
+                        <Shield aria-hidden="true" className="size-3" />
+                        {policy?.intent ?? "set"}
+                      </a>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <div className="mt-2 hidden overflow-x-auto rounded-md border border-outline-variant/25 sm:block">
             <table className="w-full min-w-[36rem] text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/25 text-left text-[10px] uppercase tracking-wide text-outline">

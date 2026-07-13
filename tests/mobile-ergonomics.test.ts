@@ -41,7 +41,7 @@ describe("mobile ergonomics source contracts", () => {
     // Drawer close button: 44px on phones, compact on pointer devices.
     expect(source("components/global-assistant.tsx")).toContain("inline-flex size-11 shrink-0 items-center justify-center rounded-md");
     expect(source("components/global-assistant.tsx")).not.toContain("min-h-10");
-    expect(source("components/app-shell.tsx")).toContain("flex min-h-11 min-w-0 max-w-[11rem] items-center");
+    expect(source("components/app-shell.tsx")).toContain("flex min-h-11 shrink-0 items-center whitespace-nowrap");
     expect(source("components/app-shell.tsx")).toContain("inline-flex min-h-11 items-center justify-center");
     expect(source("components/save-briefing-call-button.tsx")).toContain("min-h-11 w-full");
     expect(source("components/briefing-card.tsx")).toContain("group/title flex min-h-11");
@@ -355,32 +355,32 @@ describe("mobile ergonomics source contracts", () => {
     expect(appShell).toContain('const isChatPage = pathname.startsWith("/chat");');
     expect(appShell).toContain('{isChatPage ? (');
     expect(globalAssistant).toContain('const isChatPage = currentPath.startsWith("/chat");');
-    // Redesign: Master Mold persists via the floating launcher only.
+    // Master Mold persists through the top-bar brand on phones and the
+    // floating launcher on desktop.
     expect(source("app/page.tsx")).toContain('id="today-chat"');
     expect(source("app/page.tsx")).not.toContain("<ChatWorkspace");
-    // The floating launcher is always visible outside /chat so the entity is
-    // reachable from every page.
+    // The launcher remains available outside /chat without covering mobile
+    // page content; the mobile top-bar brand opens the same drawer.
     expect(globalAssistant).toContain("const showFloatingLauncher = !open && !isChatPage;");
     expect(globalAssistant).toContain("{showFloatingLauncher ? (");
     expect(globalAssistant).toContain('data-testid="global-assistant-open"');
-    expect(globalAssistant).toContain("bottom-[4.85rem] right-3");
-    // Shown on all breakpoints (sits above the mobile nav at 4.85rem).
-    expect(globalAssistant).toContain('"flex"');
+    expect(globalAssistant).toContain("fixed bottom-4 right-4");
+    expect(globalAssistant).toContain("hidden min-h-12");
+    expect(globalAssistant).toContain("xl:flex");
     expect(globalAssistant).toContain("size-12");
-    expect(globalAssistant).toContain("md:bottom-6 md:right-6 md:size-auto");
-    expect(globalAssistant).toContain("md:min-h-14");
+    expect(globalAssistant).not.toContain("bottom-[4.85rem] right-3");
     expect(appShell).toContain('aria-label="Mobile primary"');
     expect(appShell).toContain("fixed bottom-3 left-1/2");
     expect(appShell).toContain("w-[calc(100%-1.5rem)] -translate-x-1/2");
     expect(appShell).toContain("relative flex min-h-11 min-w-0 flex-1 flex-col");
-    // The face still navigates home, while the sticky mobile wordmark opens
-    // Master Mold so chat stays reachable after the first command box scrolls away.
+    // The face still navigates home, while the sticky wordmark opens Master
+    // Mold at every breakpoint without relying on an overlapping launcher.
     expect(appShell).toContain('aria-label="Go to Today (home)"');
     expect(appShell).toContain('aria-label="Ask Master Mold from the top bar"');
     expect(appShell).toContain("openMasterMoldChat(undefined, pageContext)");
-    expect(appShell).toContain("md:hidden");
     expect(appShell).toContain("fixed top-0 left-0 z-50 flex h-14 w-full");
-    expect(appShell).toContain("hidden min-h-11 items-center whitespace-nowrap font-display text-base font-bold tracking-tight text-violet md:flex");
+    expect(appShell).toContain("flex min-h-11 shrink-0 items-center whitespace-nowrap");
+    expect(appShell).not.toContain("hidden min-h-11 items-center whitespace-nowrap font-display text-base font-bold tracking-tight text-violet md:flex");
     expect(appShell).toContain("hidden h-full w-14 flex-col");
     expect(appShell).toContain("pt-20 md:pl-16");
     expect(source("components/reviewer-evidence-panel.tsx")).toContain('"Today and activity"');
@@ -577,7 +577,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(dashboardPage).not.toMatch(/export \{ dynamic \}|redirect|Loading this view/i);
     expect(settingsPage).toContain("export default async function SettingsPage()");
     expect(integrationsRedirect).toContain("redirect(`/settings${suffix}`);");
-    expect(reviewRoute).toContain('redirect(new URL("/settings#health", request.url), 307)');
+    expect(reviewRoute).toContain('headers: { location: "/settings#health" }');
     expect(settingsPage).not.toMatch(/Settings route loaded|reviewer and operator flows/i);
   });
 
@@ -705,7 +705,7 @@ describe("mobile ergonomics source contracts", () => {
     const reviewCapabilities = source("src/product/capabilities.ts");
     const reviewSurface = `${settingsPage}\n${reviewCapabilities}`;
 
-    expect(reviewRoute).toContain('redirect(new URL("/settings#health", request.url), 307)');
+    expect(reviewRoute).toContain('headers: { location: "/settings#health" }');
     expect(appShell).toContain("Advisory only — Master Mold never places trades or moves funds.");
     expect(appShell).toContain('href="/settings#health"');
     expect(settingsPage).toContain("System health");

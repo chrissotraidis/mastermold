@@ -462,8 +462,24 @@ export function AutopilotPanel() {
             Feed unavailable right now — it retries on the next refresh.
           </p>
         ) : (
-          <div className="overflow-x-auto pb-2">
-            <table className="w-full text-xs">
+          <div className="pb-2">
+            <div className="grid gap-1.5 sm:hidden">
+              {(data.market_feed ?? []).map((row) => (
+                <div key={row.symbol} className="rounded-md border border-outline-variant/20 bg-void/20 p-2 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-on-surface">{row.symbol}</span>
+                    <span className="tabular-nums text-on-surface-variant">{formatFeedPrice(row.price_usd)}</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                    <span className={`flex justify-between gap-2 ${pctToneClass(row.change_h1_pct)}`}><span className="text-outline">1h</span>{formatPct(row.change_h1_pct)}</span>
+                    <span className={`flex justify-between gap-2 ${pctToneClass(row.change_h24_pct)}`}><span className="text-outline">24h</span>{formatPct(row.change_h24_pct)}</span>
+                    <span className="flex justify-between gap-2 text-outline"><span>Volume</span>{formatCompactUsd(row.volume_h24_usd)}</span>
+                    <span className="flex justify-between gap-2 text-outline"><span>Liquidity</span>{formatCompactUsd(row.liquidity_usd)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <table className="hidden w-full text-xs sm:table">
               <thead>
                 <tr className="text-left text-outline">
                   <th scope="col" className="py-1 pr-2 font-medium">Symbol</th>
@@ -509,8 +525,24 @@ export function AutopilotPanel() {
               {(data.trending ?? []).length} trending on-chain · feeds the V3 shadow, never trades directly
             </span>
           </summary>
-          <div className="overflow-x-auto pb-2">
-            <table className="w-full text-xs">
+          <div className="pb-2">
+            <div className="grid gap-1.5 sm:hidden">
+              {(data.trending ?? []).map((row) => (
+                <div key={row.mint} className="rounded-md border border-outline-variant/20 bg-void/20 p-2 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-on-surface">{row.rank ?? "—"}. {row.symbol}</span>
+                    <span className="text-outline">{row.boost_amount !== null ? `boosted ${Math.round(row.boost_amount)}` : "trending"}</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                    <span className={`flex justify-between gap-2 ${pctToneClass(row.price_change_h1_pct)}`}><span className="text-outline">1h</span>{formatPct(row.price_change_h1_pct)}</span>
+                    <span className={`flex justify-between gap-2 ${pctToneClass(row.price_change_h24_pct)}`}><span className="text-outline">24h</span>{formatPct(row.price_change_h24_pct)}</span>
+                    <span className="flex justify-between gap-2 text-outline"><span>Volume</span>{formatCompactUsd(row.volume_h24_usd)}</span>
+                    <span className="flex justify-between gap-2 text-outline"><span>Liquidity</span>{formatCompactUsd(row.liquidity_usd)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <table className="hidden w-full text-xs sm:table">
               <thead>
                 <tr className="text-left text-outline">
                   <th scope="col" className="py-1 pr-2 font-medium">#</th>

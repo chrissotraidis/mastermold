@@ -375,7 +375,7 @@ function TopBarFallback({ dataMode }: { dataMode: DataModeLabel }) {
 
   return (
     <header className="fixed top-0 left-0 z-50 flex h-14 w-full items-center justify-between border-b border-outline-variant/25 bg-surface-dim/85 px-margin-mobile backdrop-blur-xl md:px-margin-desktop">
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         <Link href="/" aria-label="Go to Today (home)" className="flex size-11 shrink-0 items-center justify-center rounded-full border border-violet/30 bg-violet/10">
           <Hexagon aria-hidden="true" className="size-5 text-violet" />
         </Link>
@@ -496,15 +496,12 @@ function TopBar({
         <button
           type="button"
           onClick={() => openMasterMoldChat(undefined, pageContext)}
-          className="flex min-h-11 min-w-0 max-w-[11rem] items-center truncate whitespace-nowrap font-display text-base font-bold tracking-tight text-violet transition hover:text-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet md:hidden"
+          className="flex min-h-11 shrink-0 items-center whitespace-nowrap font-display text-base font-bold tracking-tight text-violet transition hover:text-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
           aria-label="Ask Master Mold from the top bar"
           title="Ask Master Mold"
         >
           Master Mold
         </button>
-        <Link href="/" className="hidden min-h-11 items-center whitespace-nowrap font-display text-base font-bold tracking-tight text-violet md:flex">
-          Master Mold
-        </Link>
         <span
           className={cn(
             "hidden items-center gap-1.5 rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-wide sm:inline-flex",
@@ -518,7 +515,7 @@ function TopBar({
         <ScanStatusLine />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {showCommandBar ? (
           <div className="group relative hidden lg:block">
             <form

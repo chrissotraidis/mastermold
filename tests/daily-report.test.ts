@@ -541,7 +541,7 @@ describe("simple daily auto-refresh", () => {
     const settingsPage = readFileSync(join(process.cwd(), "app/settings/page.tsx"), "utf8");
     const dailyReport = readFileSync(join(process.cwd(), "src/db/daily-report.ts"), "utf8");
 
-    expect(reviewRoute).toContain('redirect(new URL("/settings#health", request.url), 307)');
+    expect(reviewRoute).toContain('headers: { location: "/settings#health" }');
     // The simple app-load check: Settings itself triggers the auto-refresh.
     expect(settingsPage).toContain("ensureDailyReportAutoRefresh");
     expect(settingsPage).toContain("getDailyReportAutoRefreshStatus");

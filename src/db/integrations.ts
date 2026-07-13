@@ -91,9 +91,23 @@ const serviceDisplay: Record<
   },
 };
 
+const disconnectedDetail: Partial<Record<IntegrationStatus["service"], string>> = {
+  coinbase: "No Coinbase account is connected. Manual or imported holdings remain available separately.",
+  robinhood: "No brokerage account is connected through SnapTrade. Manual or imported holdings remain available separately.",
+  onchain_wallet: "No Web3 wallet is connected through Zerion. Manual or imported holdings remain available separately.",
+};
+
 export function getIntegrationStatuses(): IntegrationStatusJson[] {
-  return demoDatabase.integrationStatuses.map((status) => ({
-    ...status,
-    ...serviceDisplay[status.service],
-  }));
+  return demoDatabase.integrationStatuses.map((status) => {
+    const runtimeStatus =
+      status.service === "llm" && hasServerChatKey()
+        ? { ...status, status: "connected" as const, detail: "Live chat can use the configured server provider key." }
+        : { ...status, detail: disconnectedDetail[status.service] ?? status.detail };
+
+    return { ...runtimeStatus, ...serviceDisplay[status.service] };
+  });
+}
+
+function hasServerChatKey(): boolean {
+  return Boolean(process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 }

@@ -47,7 +47,11 @@ export default async function SettingsPage() {
   const notifyConfig = notifyConfigFromEnv();
   const notificationsEnabled = notifyEnabled(notifyConfig);
   const notificationsStatus = notificationsEnabled
-    ? [notifyConfig.telegram_token && notifyConfig.telegram_chat_id ? "Telegram" : null, notifyConfig.desktop ? "Desktop" : null]
+    ? [
+        notifyConfig.telegram_token && notifyConfig.telegram_chat_id ? "Telegram" : null,
+        notifyConfig.webhook_url ? "Zo Telegram relay" : null,
+        notifyConfig.desktop ? "Desktop" : null,
+      ]
         .filter(Boolean)
         .join(" + ") + " configured"
     : "Not configured";
@@ -97,15 +101,21 @@ export default async function SettingsPage() {
             Save local preferences
           </Link>
           <span aria-hidden="true">/</span>
-          <Link href="/portfolio#add-holdings" className="font-semibold text-violet hover:text-tertiary">
-            add holdings manually
+          <Link href="/portfolio" className="font-semibold text-violet hover:text-tertiary">
+            {portfolio.provenance.label === "Manual portfolio" ? "review manual holdings" : "add holdings manually"}
           </Link>
-          <span aria-hidden="true">/</span>
-          <Link href="#chat" className="font-semibold text-violet hover:text-tertiary">
-            add a chat key if you want live answers
-          </Link>
+          {chatIntegrations[0]?.status !== "connected" ? (
+            <>
+              <span aria-hidden="true">/</span>
+              <Link href="#chat" className="font-semibold text-violet hover:text-tertiary">
+                add a chat key if you want live answers
+              </Link>
+            </>
+          ) : null}
           <span className="basis-full text-outline sm:basis-auto">
-            Sample data stays separate until you add your own context.
+            {portfolio.provenance.label === "Manual portfolio"
+              ? "Manual portfolio active. Account connections remain separate."
+              : "Sample data stays separate until you add your own context."}
           </span>
         </nav>
 

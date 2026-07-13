@@ -15,6 +15,7 @@
  */
 
 import { execFile } from "node:child_process";
+import { request as httpRequest } from "node:http";
 
 export type NotifyKind = "entry" | "exit" | "halt" | "daemon" | "analyst" | "v3" | "error";
 
@@ -36,6 +37,7 @@ export type NotifyConfig = {
   telegram_token: string | null;
   telegram_chat_id: string | null;
   desktop: boolean;
+  webhook_url: string | null;
 };
 
 export function notifyConfigFromEnv(env: NodeJS.ProcessEnv = process.env): NotifyConfig {
@@ -43,11 +45,43 @@ export function notifyConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Notif
     telegram_token: env.NOTIFY_TELEGRAM_BOT_TOKEN?.trim() || null,
     telegram_chat_id: env.NOTIFY_TELEGRAM_CHAT_ID?.trim() || null,
     desktop: env.NOTIFY_DESKTOP === "true" || env.NOTIFY_DESKTOP === "1",
+    webhook_url: env.NOTIFY_WEBHOOK_URL?.trim() || null,
   };
 }
 
 export function notifyEnabled(config: NotifyConfig = notifyConfigFromEnv()): boolean {
-  return Boolean((config.telegram_token && config.telegram_chat_id) || config.desktop);
+  return Boolean((config.telegram_token && config.telegram_chat_id) || config.desktop || config.webhook_url);
+}
+
+/** Generic webhook (e.g. a local forwarder that relays to another channel):
+ * POST {"text": ...}. Uses raw node:http instead of fetch because Next.js
+ * patches global fetch inside route handlers and silently drops this call in
+ * the standalone runtime; node:http behaves identically under Node and Bun.
+ * Never throws, but logs one line on failure so a dead pipe is visible. */
+function sendWebhook(config: NotifyConfig, text: string): void {
+  if (!config.webhook_url) return;
+  try {
+    const url = new URL(config.webhook_url);
+    const body = JSON.stringify({ text });
+    const req = httpRequest(
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+        timeout: TELEGRAM_TIMEOUT_MS,
+      },
+      (res) => {
+        res.resume();
+      },
+    );
+    req.on("timeout", () => req.destroy());
+    req.on("error", (err) => console.error(`notify webhook failed: ${err.message}`));
+    req.end(body);
+  } catch (err) {
+    console.error(`notify webhook failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 async function sendTelegram(config: NotifyConfig, text: string, doFetch: typeof fetch = fetch): Promise<void> {
@@ -101,5 +135,6 @@ export function notifyOperator(
 
   const text = formatNotification(kind, message);
   void sendTelegram(config, text, options.fetchImpl ?? fetch);
+  sendWebhook(config, text);
   sendDesktop(config, text);
 }

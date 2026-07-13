@@ -157,6 +157,7 @@ describe("UAT user journeys over seeded data", () => {
     expect(JSON.stringify(integrations)).toContain('"name":"chat_service"');
     expect(JSON.stringify(integrations)).not.toContain('"name":"provider"');
     expect(JSON.stringify(integrations)).not.toMatch(/AI test|AI key|ai_service|int_llm|"service":"llm"|event_time|knowledge_time/i);
+    expect(JSON.stringify(integrations)).not.toMatch(/Portfolio starts with sample|sample wallet/i);
   });
 
   test("GIVEN review readiness is required WHEN the review copy is checked THEN it names the seeded local persona and no-login path", () => {
@@ -810,6 +811,16 @@ describe("UAT user journeys over seeded data", () => {
   });
 
   test("GIVEN integration settings and review readiness are required WHEN statuses are loaded THEN sample and key-gated services are disclosed", async () => {
+    const originalKeys = {
+      openrouter: process.env.OPENROUTER_API_KEY,
+      openai: process.env.OPENAI_API_KEY,
+      anthropic: process.env.ANTHROPIC_API_KEY,
+    };
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+
+    try {
     const integrations = await responseJson<
       Array<{
         service: string;
@@ -845,5 +856,29 @@ describe("UAT user journeys over seeded data", () => {
     const snapTrade = integrations.find((integration) => integration.service === "robinhood");
     expect(snapTrade?.permission_scope).toContain("Trading capability is ignored");
     expect(snapTrade?.permission_scope).toContain("never calls order endpoints");
+    } finally {
+      restoreEnv("OPENROUTER_API_KEY", originalKeys.openrouter);
+      restoreEnv("OPENAI_API_KEY", originalKeys.openai);
+      restoreEnv("ANTHROPIC_API_KEY", originalKeys.anthropic);
+    }
+  });
+
+  test("GIVEN a server chat key WHEN status is loaded THEN live chat is connected", async () => {
+    const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "test-key";
+    try {
+      const integrations = await responseJson<Array<{ service: string; status: string; detail: string }>>(getStatusRoute());
+      expect(integrations.find((integration) => integration.service === "live_chat")).toMatchObject({
+        status: "Connected",
+        detail: "Live chat can use the configured server provider key.",
+      });
+    } finally {
+      restoreEnv("OPENROUTER_API_KEY", originalOpenRouterKey);
+    }
   });
 });
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
