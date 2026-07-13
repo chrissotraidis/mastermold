@@ -9,6 +9,7 @@ import { GET, POST } from "@/app/api/autopilot/route";
 import { __resetMarketFeedCacheForTests } from "@/src/autopilot/feed";
 import { __resetAutopilotStoreForTests } from "@/src/autopilot/store";
 import { autopilotStore } from "@/src/autopilot/store";
+import { __resetExperimentStoreForTests } from "@/src/autopilot/experiments/store";
 
 function localPost(body: Record<string, unknown>, origin = "http://localhost"): Request {
   return new Request("http://localhost/api/autopilot", {
@@ -29,6 +30,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mm-autopilot-route-"));
   process.env.AUTOPILOT_DB = join(dir, "autopilot.db.json");
   __resetAutopilotStoreForTests();
+  __resetExperimentStoreForTests();
   __resetMarketFeedCacheForTests();
 });
 
@@ -37,6 +39,7 @@ afterEach(() => {
   else process.env.AUTOPILOT_DB = prevDb;
   globalThis.fetch = prevFetch;
   __resetAutopilotStoreForTests();
+  __resetExperimentStoreForTests();
   __resetMarketFeedCacheForTests();
 });
 
@@ -85,6 +88,19 @@ describe("/api/autopilot release safety", () => {
 
     const invalid = await POST(localPost({ action: "set_tier_b_denylist", denylist: ["not-a-mint"] }));
     expect(invalid.status).toBe(422);
+  });
+
+  test("parallel paper experiments are visible and can be paused independently", async () => {
+    const initial = await GET();
+    const initialBody = await initial.json() as { experiments: { summaries: Array<{ experiment_id: string; paused: boolean; paper_only: boolean }> } };
+    expect(initialBody.experiments.summaries).toHaveLength(5);
+    expect(initialBody.experiments.summaries.every((summary) => summary.paper_only)).toBe(true);
+
+    const response = await POST(localPost({ action: "set_experiment_paused", experiment_id: "xsec", paused: true }));
+    const body = await response.json() as { experiments: { summaries: Array<{ experiment_id: string; paused: boolean }> } };
+    expect(response.status).toBe(200);
+    expect(body.experiments.summaries.find((summary) => summary.experiment_id === "xsec")?.paused).toBe(true);
+    expect(body.experiments.summaries.find((summary) => summary.experiment_id === "v2-control")?.paused).toBe(false);
   });
 
   test("paper promotion requires full evidence and an explicit operator POST", async () => {

@@ -25,6 +25,7 @@
     "autopilot:drill": "bun run scripts/autopilot-live-drill.ts",
     "autopilot:provision": "bun run scripts/autopilot-provision.ts",
     "v3:backtest": "bun run scripts/v3-backtest.ts",
+    "experiments:report": "bun run scripts/experiment-report.ts",
     "replay": "bun run scripts/replay.ts",
     "replay:fetch": "bun run scripts/fetch-replay-data.ts",
     "ml:train": "cd engine && PATH=\".venv/bin:$PATH\" UV_CACHE_DIR=out/cache/uv uv run --active python -m ml.train"
