@@ -25,6 +25,10 @@
 
 import { runAnalyst } from "./analyst";
 import { MEMECOIN_PAPER_FEE_RATE, paperExecutor, PAPER_FEE_RATE } from "./executor";
+import { runExperimentTick } from "./experiments/runner";
+import type { ExperimentOrder } from "./experiments/types";
+import { experimentStore } from "./experiments/store";
+import { writeCurrentExperimentReport } from "./experiments/report";
 import { formatLatencySummary, modelDriftAlerts, summarizeDecisionToFill } from "./execution-telemetry";
 import { fetchTokenBalanceUi, fetchUsdcBalanceUsd } from "./live";
 import { jupiterLiveExecutor } from "./live-executor";
@@ -814,6 +818,7 @@ type TickContext = {
   cexScoutRunning: boolean;
   lastFundingByMint: Map<string, FundingInput>;
   lastMlWarningMs: number;
+  lastExperimentReportMs: number;
   cusumObservationStartedAtMs: number;
   lastCusumRateCheckMs: number;
   /** CUSUM events waiting for an exact response from the out-of-process ML
@@ -1115,6 +1120,8 @@ async function tick(context: TickContext): Promise<void> {
   // co-pilot the PAPER book through the same intent → policy → executor path
   // as v2. Never live: live routing keeps its own gate.
   let v3PaperCandidate: { signal: CandidateSignal; price: number } | null = null;
+  const experimentCandidates: CandidateSignal[] = [];
+  const experimentPrices = new Map(prices);
   const promotionForStrategy = (strategyId: CandidateSignal["strategy_id"]) => {
     const snapshots = store.candidateSnapshots(2_000);
     const promotion = evaluateV3Promotion(calibrateStrategy(paperPromotionSnapshots(snapshots, strategyId), strategyId), store.replayConfirmation(strategyId));
@@ -1227,6 +1234,7 @@ async function tick(context: TickContext): Promise<void> {
         cusumEdgeRatio: store.cusumEdgeRatio().value,
         fundingByMint: context.lastFundingByMint,
         });
+        experimentCandidates.push(...shadow.candidates);
         const note = recordV3Shadow(store, shadow, prices);
         if (note) store.appendActivity("v3-shadow", `${note} (CUSUM event bypass)`);
         labelDueCandidates(store, priceSeriesFromHistory(history), nowMs);
@@ -1435,6 +1443,8 @@ async function tick(context: TickContext): Promise<void> {
           snapshotPrices.set(summary.mint, summary.price_usd);
         }
       }
+      experimentCandidates.push(...shadow.candidates);
+      for (const [mint, price] of snapshotPrices) experimentPrices.set(mint, price);
       const note = recordV3Shadow(store, shadow, snapshotPrices);
       if (note) {
         // Advance the throttle only when something was actually recorded, so a
@@ -1513,6 +1523,81 @@ async function tick(context: TickContext): Promise<void> {
       modeledRoundTripCostPctByMint.set(v2Entry.mint, quote.cost.total_bps / 100);
       ({ decisions, skipped, evaluations } = decide({ ...decisionInput, modeledRoundTripCostPctByMint }));
     }
+  }
+
+  try {
+    const experiments = experimentStore();
+    runExperimentTick({
+      now_ms: nowMs,
+      prices: experimentPrices,
+      candidates: experimentCandidates,
+      one_way_cost_bps_by_mint: new Map(
+        [...context.lastExecutionCostByMint].map(([mint, cost]) => [mint, cost.total_bps / 2]),
+      ),
+      last_closed_bp_by_mint: new Map(
+        [...barMetricsByMint].map(([mint, metrics]) => [mint, metrics.bp]),
+      ),
+      v2_orders: (account): ExperimentOrder[] => {
+        const experimentPositions: BotPositionRow[] = account.positions.map((position) => ({
+          mint: position.mint,
+          symbol: position.symbol,
+          qty: position.qty,
+          avg_cost_usd: position.entry_price_usd,
+          stop_pct: position.stop_pct,
+          tp_pct: position.tp_pct,
+          deadline_ts: position.deadline_ts,
+          peak_usd: position.peak_usd,
+          opened_at: position.opened_at,
+          updated_at: position.opened_at,
+          strategy_id: position.strategy_id,
+        }));
+        const output = decide({
+          ...decisionInput,
+          positions: experimentPositions,
+          state: {
+            ...state,
+            mode: "paper",
+            kill_switch: false,
+            caps: {
+              ...state.caps,
+              max_trade_usd: account.run.config.max_entry_usd,
+              daily_spend_limit_usd: account.run.config.daily_spend_limit_usd,
+              daily_loss_limit_usd: account.run.config.daily_loss_limit_usd,
+              max_positions: account.run.config.max_positions,
+              drawdown_halt_pct: account.run.config.drawdown_halt_pct,
+            },
+          },
+          cash_usd: account.cash_usd,
+          params: account.run.config.v2_params ?? params,
+          trades_today: account.trades_today,
+          cooldown_until_ms: account.cooldown_until_ms,
+          loss_streak: account.loss_streak,
+          last_loss_ms: account.last_loss_ms,
+          last_entry_ms: account.last_entry_ms,
+          live_canary: false,
+        });
+        return output.decisions.map((decision) => ({
+          action: decision.action,
+          mint: decision.mint,
+          symbol: decision.symbol,
+          price: decision.price,
+          ...(decision.action === "buy" ? {
+            value_usd: decision.value_usd,
+            stop_pct: decision.stop_pct,
+            tp_pct: decision.tp_pct,
+            deadline_ts: decision.deadline_ts,
+          } : {}),
+          reason: decision.reason,
+          strategy_id: "v2-trend-pullback",
+        }));
+      },
+    }, experiments);
+    if (nowMs - context.lastExperimentReportMs >= 6 * 60 * 60_000) {
+      writeCurrentExperimentReport(experiments, new Date(nowMs));
+      context.lastExperimentReportMs = nowMs;
+    }
+  } catch (error) {
+    store.appendActivity("error", `Paper experiment tick failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   // Persist this tick's per-symbol verdicts so the panel can show the strategy
@@ -2051,6 +2136,7 @@ async function main(): Promise<void> {
     cexScoutRunning: false,
     lastFundingByMint: new Map<string, FundingInput>(),
     lastMlWarningMs: 0,
+    lastExperimentReportMs: 0,
     cusumObservationStartedAtMs: Date.parse(store.ensureCusumObservationStartedAt()),
     lastCusumRateCheckMs: 0,
     pendingMlCusumEvents: new Map(),

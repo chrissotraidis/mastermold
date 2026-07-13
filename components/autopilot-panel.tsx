@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { Pause, Play } from "lucide-react";
 
 import { AutopilotTerminal } from "./autopilot-terminal";
 
@@ -158,6 +159,36 @@ type AutopilotApiPayload = {
       total_usd: number;
       apr_pct: number | null;
     };
+  };
+  experiments?: {
+    summaries: Array<{
+      experiment_id: string;
+      run_id: string;
+      name: string;
+      source: string;
+      treatment: string;
+      started_at: string;
+      paused: boolean;
+      paper_only: true;
+      starting_cash_usd: number;
+      cash_usd: number;
+      equity_usd: number;
+      net_pnl_usd: number;
+      net_bps: number;
+      open_positions: number;
+      round_trips: number;
+      wins: number;
+      win_rate_pct: number | null;
+      expectancy_usd: number | null;
+      profit_factor: number | null;
+      max_drawdown_pct: number;
+      fees_usd: number;
+      turnover_usd: number;
+      confidence: "provisional" | "directional" | "stronger";
+      last_trade_at: string | null;
+      config_hash: string;
+    }>;
+    data_boundary: string;
   };
   data_boundary: string;
 };
@@ -498,6 +529,64 @@ export function AutopilotPanel() {
             <EquitySparkline points={equity} />
           </div>
         </div>
+      ) : null}
+
+      {data.experiments ? (
+        <section className="border-t border-outline-variant/20 px-3 py-3" aria-labelledby="paper-experiments-title">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <div>
+              <h2 id="paper-experiments-title" className="text-xs font-semibold text-on-surface">Parallel paper experiments</h2>
+              <p className="mt-0.5 text-[11px] text-outline">Five isolated $1,000 books · $25 entry cap · no live route</p>
+            </div>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-outline">
+              {data.experiments.summaries.filter((row) => !row.paused).length} running
+            </span>
+          </div>
+          <div className="mt-2 grid gap-1.5">
+            {data.experiments.summaries.map((experiment) => (
+              <div
+                key={experiment.run_id}
+                className="grid min-w-0 grid-cols-[minmax(0,1fr)_2rem] gap-2 rounded-md bg-surface-dim/35 px-2 py-2 sm:grid-cols-[minmax(11rem,1.4fr)_repeat(5,minmax(4.5rem,.65fr))_2rem] sm:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-xs font-semibold text-on-surface">{experiment.name}</span>
+                    <span className={`shrink-0 text-[10px] font-semibold uppercase ${experiment.paused ? "text-caution" : "text-engine"}`}>
+                      {experiment.paused ? "paused" : "running"}
+                    </span>
+                  </div>
+                  <p className="truncate text-[10px] text-outline">{experiment.confidence} · {experiment.open_positions} open</p>
+                </div>
+                <div className="col-start-2 row-start-1 flex justify-end sm:col-start-7">
+                  <button
+                    type="button"
+                    title={experiment.paused ? `Resume ${experiment.name}` : `Pause ${experiment.name}`}
+                    aria-label={experiment.paused ? `Resume ${experiment.name}` : `Pause ${experiment.name}`}
+                    disabled={isPending}
+                    onClick={() => post(
+                      { action: "set_experiment_paused", experiment_id: experiment.experiment_id, paused: !experiment.paused },
+                      `${experiment.name} ${experiment.paused ? "resumed" : "paused"}.`,
+                    )}
+                    className="grid size-8 place-items-center rounded-md text-outline hover:bg-surface-dim hover:text-on-surface disabled:opacity-50"
+                  >
+                    {experiment.paused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
+                  </button>
+                </div>
+                <div className="col-span-2 grid grid-cols-3 gap-x-3 gap-y-1 sm:contents">
+                  <ExperimentMetric label="Equity" value={`$${experiment.equity_usd.toFixed(2)}`} />
+                  <ExperimentMetric
+                    label="Net P&L"
+                    value={`${experiment.net_pnl_usd >= 0 ? "+" : ""}$${experiment.net_pnl_usd.toFixed(2)}`}
+                    tone={experiment.net_pnl_usd > 0 ? "positive" : experiment.net_pnl_usd < 0 ? "negative" : "neutral"}
+                  />
+                  <ExperimentMetric label="Exits" value={String(experiment.round_trips)} />
+                  <ExperimentMetric label="Drawdown" value={`${experiment.max_drawdown_pct.toFixed(2)}%`} />
+                  <ExperimentMetric label="Cost" value={`$${experiment.fees_usd.toFixed(2)}`} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       {/* Reference tables live in collapsed sections: the cockpit stays one
@@ -967,6 +1056,24 @@ export function AutopilotPanel() {
       <p className="border-t border-outline-variant/20 px-3 py-2 text-xs leading-5 text-outline">
         {data.data_boundary}
       </p>
+    </div>
+  );
+}
+
+function ExperimentMetric({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "positive" | "negative" | "neutral";
+}) {
+  const toneClass = tone === "positive" ? "text-engine" : tone === "negative" ? "text-critical" : "text-on-surface";
+  return (
+    <div className="min-w-0 sm:text-right">
+      <span className="block text-[9px] font-semibold uppercase tracking-widest text-outline">{label}</span>
+      <span className={`block truncate text-[11px] font-semibold tabular-nums ${toneClass}`}>{value}</span>
     </div>
   );
 }

@@ -27,6 +27,9 @@ import { checkBudget, solanaTrackerBudget, type BudgetCheck } from "@/src/autopi
 import { buildTradableUniverse, type TierBToken } from "@/src/autopilot/v3/universe-tiers";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
 import { liveReadiness } from "@/src/autopilot/live-readiness";
+import { EXPERIMENT_DEFINITIONS } from "@/src/autopilot/experiments/definitions";
+import { experimentStore } from "@/src/autopilot/experiments/store";
+import type { ExperimentId, ExperimentSummary } from "@/src/autopilot/experiments/types";
 import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry, type StrategyParams } from "@/src/autopilot/params";
 import {
   describeStrategyRules,
@@ -107,6 +110,10 @@ export type AutopilotApiPayload = {
     denylist: string[];
     last_rotation_at: string | null;
   };
+  experiments: {
+    summaries: ExperimentSummary[];
+    data_boundary: string;
+  };
   data_boundary: string;
 };
 
@@ -117,6 +124,8 @@ type AutopilotControlRequest = {
   wallets?: unknown;
   denylist?: unknown;
   strategy?: unknown;
+  experiment_id?: unknown;
+  paused?: unknown;
 };
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
@@ -156,6 +165,12 @@ async function payload(): Promise<AutopilotApiPayload> {
   // endpoint, so any error degrades to []. GET never writes bot_state — the
   // daemon owns the heartbeat; this path only derives status from it.
   const marketFeed = await fetchMarketFeed(Date.now(), buildTradableUniverse(activeTierB, store.mintMeta())).catch(() => [] as MarketFeedRow[]);
+  const marketPriceBySymbol = new Map(marketFeed.map((row) => [row.symbol, row.price_usd]));
+  const experimentPrices = new Map(
+    buildTradableUniverse(activeTierB, store.mintMeta())
+      .map((asset) => [asset.mint, marketPriceBySymbol.get(asset.symbol)] as const)
+      .filter((entry): entry is readonly [string, number] => typeof entry[1] === "number"),
+  );
   const trending = await fetchTrendingTokens().catch(() => [] as TrendingToken[]);
   const readiness = liveReadiness();
   const allTrades = store.trades(2_000);
@@ -239,6 +254,10 @@ async function payload(): Promise<AutopilotApiPayload> {
       active: activeTierB,
       denylist: tierBDenylist,
       last_rotation_at: store.tierBLastRotationAt(),
+    },
+    experiments: {
+      summaries: experimentStore().summaries(experimentPrices),
+      data_boundary: "Five isolated synthetic paper accounts. No live execution path and no access to the primary paper book.",
     },
     data_boundary: DATA_BOUNDARY,
   };
@@ -395,9 +414,22 @@ export async function POST(
       return NextResponse.json(await payload());
     }
 
+    case "set_experiment_paused": {
+      const experimentIds = new Set(EXPERIMENT_DEFINITIONS.map((definition) => definition.id));
+      if (typeof body.experiment_id !== "string" || !experimentIds.has(body.experiment_id as ExperimentId)) {
+        return NextResponse.json({ error: "experiment_id is not a current experiment." }, { status: 422 });
+      }
+      if (typeof body.paused !== "boolean") {
+        return NextResponse.json({ error: "paused must be a boolean." }, { status: 422 });
+      }
+      experimentStore().setPaused(body.experiment_id as ExperimentId, body.paused);
+      store.appendActivity("control", `${body.paused ? "Paused" : "Resumed"} paper experiment ${body.experiment_id}.`);
+      return NextResponse.json(await payload());
+    }
+
     default:
       return NextResponse.json(
-        { error: 'action must be one of "kill", "release", "set_mode", "set_caps", "set_watched_wallets", "set_tier_b_denylist", "confirm_v3_promotion", "demote_v3_strategy".' },
+        { error: 'action must be one of "kill", "release", "set_mode", "set_caps", "set_watched_wallets", "set_tier_b_denylist", "confirm_v3_promotion", "demote_v3_strategy", "set_experiment_paused".' },
         { status: 400 },
       );
   }
@@ -454,6 +486,10 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
       api_budget: checkBudget({ month_key: "", used: 0 }, solanaTrackerBudget(), Date.now()),
     },
     tier_b: { active: [], denylist: [], last_rotation_at: null },
+    experiments: {
+      summaries: [],
+      data_boundary: "Five isolated synthetic paper accounts. No live execution path and no access to the primary paper book.",
+    },
     data_boundary: DATA_BOUNDARY,
   };
 }

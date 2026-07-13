@@ -11,6 +11,7 @@ generated review artifacts here.
 - [Zo migration](ZO-MIGRATION.md) — moving an existing install to a VPS
 - [Operations](OPERATIONS.md)
 - [Backlog](BACKLOG.md)
+- [Parallel paper experiments](experiments/README.md)
 
 Local/private material belongs in ignored folders such as `docs/private/`,
 `artifacts/`, `screenshots/`, `reports/private/`, or outside the repository.
