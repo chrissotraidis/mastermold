@@ -534,14 +534,12 @@ describe("simple daily auto-refresh", () => {
   });
 
   test("GIVEN Review explains readiness WHEN source copy is checked THEN auto-refresh is simple and research boundaries stay visible", () => {
-    // Redesign: /review is now a redirect; its readiness copy lives in the
-    // Settings "System health" section, and the auto-refresh scope/boundaries
-    // stay pinned in the daily-report module itself.
-    const reviewRoute = readFileSync(join(process.cwd(), "app/review/route.ts"), "utf8");
+    const reviewPage = readFileSync(join(process.cwd(), "app/review/page.tsx"), "utf8");
     const settingsPage = readFileSync(join(process.cwd(), "app/settings/page.tsx"), "utf8");
     const dailyReport = readFileSync(join(process.cwd(), "src/db/daily-report.ts"), "utf8");
 
-    expect(reviewRoute).toContain('headers: { location: "/settings#health" }');
+    expect(reviewPage).toContain("Build truth and review readiness");
+    expect(reviewPage).toContain("Capability truth");
     // The simple app-load check: Settings itself triggers the auto-refresh.
     expect(settingsPage).toContain("ensureDailyReportAutoRefresh");
     expect(settingsPage).toContain("getDailyReportAutoRefreshStatus");

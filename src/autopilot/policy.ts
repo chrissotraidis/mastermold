@@ -14,6 +14,7 @@ import type { BotPositionRow, BotStateRow } from "./store";
 
 /** Below this a paper fill is noise: fees round to zero and the ledger fills with dust. */
 export const MIN_NOTIONAL_USD = 5;
+export const MAX_TIER_B_POSITIONS = 2;
 
 export type PolicyContext = {
   state: BotStateRow;
@@ -26,6 +27,9 @@ export type PolicyContext = {
   /** Strategy-level daily entry cap (the daemon's MAX_TRADES_PER_DAY). */
   max_trades_per_day: number;
   fee_rate: number;
+  /** Current Tier B plus any off-Tier-A positions retained exit-only. */
+  tier_b_mints: Set<string>;
+  max_tier_b_positions: number;
 };
 
 export type PolicyVerdict = { allowed: true } | { allowed: false; reason: string };
@@ -62,6 +66,12 @@ export function validateIntent(intent: TradeIntent, context: PolicyContext): Pol
     }
     if (positions.length >= state.caps.max_positions) {
       return reject(`already at the ${state.caps.max_positions}-position cap`);
+    }
+    if (context.tier_b_mints.has(intent.mint)) {
+      const tierBPositions = positions.filter((position) => context.tier_b_mints.has(position.mint)).length;
+      if (tierBPositions >= context.max_tier_b_positions) {
+        return reject(`already at the ${context.max_tier_b_positions}-position Tier B cap`);
+      }
     }
     if (context.trades_today >= context.max_trades_per_day) {
       return reject(`already at the ${context.max_trades_per_day}-entry daily cap`);

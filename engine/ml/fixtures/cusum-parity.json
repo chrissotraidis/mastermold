@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "cases": [
+    {"name":"drift","prices":[100,100.8,101.6,102.1,102.1,99.9,97.7],"h_pct":2,"events":[{"index":3,"direction":"up","magnitude":0.020782539183,"ts_ms":900000},{"index":5,"direction":"down","magnitude":0.021783039516,"ts_ms":1500000},{"index":6,"direction":"down","magnitude":0.022268126606,"ts_ms":1800000}]},
+    {"name":"consecutive","prices":[100,102.1,104.3,102.1,99.9],"h_pct":2,"events":[{"index":1,"direction":"up","magnitude":0.020782539183,"ts_ms":300000},{"index":2,"direction":"up","magnitude":0.021318636836,"ts_ms":600000},{"index":3,"direction":"down","magnitude":0.021318636836,"ts_ms":900000},{"index":4,"direction":"down","magnitude":0.021783039516,"ts_ms":1200000}]},
+    {"name":"invalid-recovery","prices":[100,null,101,103.1],"h_pct":2,"events":[{"index":3,"direction":"up","magnitude":0.020578874182,"ts_ms":900000}]}
+  ]
+}

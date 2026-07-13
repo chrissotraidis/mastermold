@@ -128,6 +128,18 @@ describe("candidate snapshot store", () => {
     expect(autopilotStore().unlabeledSnapshotsOlderThan(0, NOW + 1)).toHaveLength(0);
   });
 
+  test("GIVEN bounded detail rows THEN the per-strategy first/latest evidence clock persists independently", () => {
+    const store = autopilotStore();
+    store.appendCandidateSnapshot(enterInput({ strategy_id: "cusum_tb", ts: new Date(NOW - 30 * 86_400_000).toISOString() }));
+    store.appendCandidateSnapshot(enterInput({ strategy_id: "xsec", ts: new Date(NOW - 60 * 86_400_000).toISOString() }));
+    store.appendCandidateSnapshot(enterInput({ strategy_id: "cusum_tb", ts: new Date(NOW).toISOString() }));
+    __resetAutopilotStoreForTests();
+    expect(autopilotStore().v3StrategyEvidenceRange("cusum_tb")).toEqual({
+      first_ts: new Date(NOW - 30 * 86_400_000).toISOString(),
+      latest_ts: new Date(NOW).toISOString(),
+    });
+  });
+
   test("GIVEN more than the rolling cap THEN only the newest ~2000 rows survive", () => {
     const store = autopilotStore();
     for (let i = 0; i < 2050; i++) {

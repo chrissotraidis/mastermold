@@ -14,6 +14,11 @@
 import type { MarketFeedRow } from "../feed";
 import type { AutopilotStore } from "../store";
 import { computeForwardLabels, type PriceObservation } from "./candidate-store";
+import { bpCandidate } from "./bar-portion";
+import { PERP_MARKET_BY_MINT } from "./perps";
+import type { CusumEvent } from "./cusum";
+import { cusumTbCandidate } from "./cusum-tb";
+import type { FreshMlSignal } from "./ml-signals";
 import { buildRegimeInput, buildTokenFeatures } from "./features";
 import { fundingCandidate, fundingEnabledIn, type FundingInput } from "./funding-basis";
 import { pairEnabledIn } from "./pair-rv";
@@ -27,20 +32,22 @@ import { scoreToConfidence, xsecCandidate, xsecScore } from "./xsec";
 /** xsec's liquidity floor for shadow eval (report tier-2 mid-liquidity). */
 export const SHADOW_MIN_LIQUIDITY_USD = 250_000;
 
-/** Which modules run in a given regime (plan §Modules). funding is always on
- * (market-neutral); xsec only in risk-on; pair in chop/risk-off. */
+/** Which modules run in a given regime (plan §Modules). funding is always on;
+ * pair runs in chop/risk-off. xsec remains a labeled observation stream but
+ * is retired from ranking while its calibration is inverted. */
 export function enabledModulesFor(regime: MarketRegime): Set<StrategyId> {
   const enabled = new Set<StrategyId>();
-  if (regime === "risk_on") enabled.add("xsec");
   if (fundingEnabledIn(regime)) enabled.add("funding_basis");
   if (pairEnabledIn(regime)) enabled.add("pair_rv");
   if (trendingEnabledIn(regime)) enabled.add("trending");
   if (copyWalletsEnabledIn(regime)) enabled.add("copy_wallets");
+  if (regime === "risk_on" || regime === "chop") enabled.add("cusum_tb");
+  if (regime === "risk_on" || regime === "chop") enabled.add("bar_portion");
   return enabled;
 }
 
 export type ShadowInput = {
-  universe: Array<{ symbol: string; mint: string }>;
+  universe: Array<{ symbol: string; mint: string; tier?: "A" | "B" }>;
   windows: Map<string, number[]>; // mint → price window
   feed: Map<string, MarketFeedRow>; // symbol → row
   /** Cost estimate per mint (from a real quote in the shell; conservative default otherwise). */
@@ -56,6 +63,14 @@ export type ShadowInput = {
   copyCandidates?: CandidateSignal[];
   /** Conservative default cost for radar tokens outside `costByMint`. */
   defaultCost?: ExecutionCost;
+  /** Sparse per-tick CUSUM breaches, produced by the daemon's owned state. */
+  cusumEvents?: Map<string, CusumEvent & { h_pct: number; sigma_daily_pct: number | null }>;
+  /** Exact mint:event timestamp signals, prevalidated by the daemon shell. */
+  mlSignals?: Map<string, FreshMlSignal>;
+  heldMints?: Set<string>;
+  cusumEdgeRatio?: number;
+  barMetricsByMint?: Map<string, { bp: number | null; atr_bps: number | null; ema_close: number | null }>;
+  barPortionEdgeRatio?: number;
 };
 
 /** The strongest xsec read this tick regardless of regime/floor — always
@@ -143,7 +158,10 @@ export function evaluateV3Shadow(input: ShadowInput): ShadowResult {
     const cost = input.costByMint.get(asset.mint);
     if (!cost) continue;
     const score = xsecScore(features);
-    const candidate = xsecCandidate(features, cost); // null when score < floor
+    const rawCandidate = xsecCandidate(features, cost); // null when score < floor
+    const candidate = rawCandidate
+      ? { ...rawCandidate, features: { ...rawCandidate.features, tier: asset.tier ?? "A" } }
+      : null;
     if (candidate && enabled.has("xsec")) candidates.push(candidate);
     if (!best || score > best.score) {
       const evBps = candidate?.expected_value_bps ?? Math.round((xsecScore(features) * 45 - cost.total_bps) * 100) / 100;
@@ -151,7 +169,7 @@ export function evaluateV3Shadow(input: ShadowInput): ShadowResult {
         symbol: asset.symbol,
         mint: asset.mint,
         score,
-        features: candidate?.features ?? { score, r_1h_pct: features.r_1h_pct ?? 0, r_24h_pct: features.r_24h_pct ?? 0 },
+        features: candidate?.features ?? { score, r_1h_pct: features.r_1h_pct ?? 0, r_24h_pct: features.r_24h_pct ?? 0, tier: asset.tier ?? "A" },
         cost_total_bps: cost.total_bps,
         expected_value_bps: evBps,
         confidence: candidate?.confidence ?? scoreToConfidence(score),
@@ -184,7 +202,68 @@ export function evaluateV3Shadow(input: ShadowInput): ShadowResult {
   if (enabled.has("copy_wallets") && input.copyCandidates) {
     candidates.push(...input.copyCandidates);
   }
+  if (enabled.has("cusum_tb") && input.cusumEvents) {
+    for (const asset of input.universe) {
+      const event = input.cusumEvents.get(asset.mint);
+      const cost = input.costByMint.get(asset.mint);
+      if (!event || !cost) continue;
+      const row = input.feed.get(asset.symbol);
+      const price = input.windows.get(asset.mint)?.at(-1) ?? null;
+      if (price === null) continue;
+      const candidate = cusumTbCandidate({
+        symbol: asset.symbol,
+        mint: asset.mint,
+        price_usd: price,
+        event,
+        h_pct: event.h_pct,
+        held: input.heldMints?.has(asset.mint) ?? false,
+        h1_pct: row?.change_h1_pct ?? null,
+        h24_pct: row?.change_h24_pct ?? null,
+        liquidity_usd: row?.liquidity_usd ?? null,
+        volume_h24_usd: row?.volume_h24_usd ?? null,
+        sigma_daily_pct: event.sigma_daily_pct,
+        edge_ratio: input.cusumEdgeRatio ?? 0.15,
+        ml: input.mlSignals?.get(`${asset.mint}:${event.ts_ms}`) ?? null,
+        perp: event.direction === "down" && PERP_MARKET_BY_MINT[asset.mint] ? {
+          market: PERP_MARKET_BY_MINT[asset.mint],
+          funding_rate_8h_pct: input.fundingByMint?.get(asset.mint)?.funding_rate_8h_pct ?? null,
+        } : null,
+      }, cost);
+      if (candidate) candidates.push(candidate);
+    }
+  }
+  if (enabled.has("bar_portion") && input.barMetricsByMint) {
+    for (const asset of input.universe) {
+      const metrics = input.barMetricsByMint.get(asset.mint);
+      const cost = input.costByMint.get(asset.mint);
+      const row = input.feed.get(asset.symbol);
+      const price = input.windows.get(asset.mint)?.at(-1) ?? null;
+      if (!metrics || !cost || price === null) continue;
+      const candidate = bpCandidate({
+        symbol: asset.symbol,
+        mint: asset.mint,
+        price_usd: price,
+        bp: metrics.bp,
+        atr_bps: metrics.atr_bps,
+        ema_close: metrics.ema_close,
+        held: input.heldMints?.has(asset.mint) ?? false,
+        h1_pct: row?.change_h1_pct ?? null,
+        h24_pct: row?.change_h24_pct ?? null,
+        liquidity_usd: row?.liquidity_usd ?? null,
+        edge_ratio: input.barPortionEdgeRatio ?? 0.25,
+      }, cost);
+      if (candidate) candidates.push(candidate);
+    }
+  }
   // pair_rv needs spread history the daemon does not persist yet (plan §P5).
+
+  const tierByMint = new Map(input.universe.map((asset) => [asset.mint, asset.tier ?? "A"]));
+  for (const candidate of candidates) {
+    candidate.features = {
+      ...candidate.features,
+      tier: tierByMint.get(candidate.token_mint) ?? "C",
+    };
+  }
 
   const route = routeCandidates({
     candidates,
@@ -207,10 +286,9 @@ export function evaluateV3Shadow(input: ShadowInput): ShadowResult {
 }
 
 /**
- * Record this tick's shadow evaluation into the candidate store: the top
- * passing candidate as an "enter" snapshot, and the strongest rejected one as a
- * "skip" snapshot with its gate reason. Throttled by the caller — one write per
- * few minutes is plenty for a training set and keeps the JSON store light.
+ * Record every routed candidate. Only the selected top is an enter;
+ * passing-but-outranked candidates and gate rejects are explicit skips. This
+ * keeps each strategy's calibration substrate independent of router rank.
  * Returns a short note for the activity log, or null when nothing to record.
  */
 export function recordV3Shadow(
@@ -221,34 +299,31 @@ export function recordV3Shadow(
   const top = result.route.ranked[0] ?? null;
   const rejected = result.route.best_rejected;
 
-  if (top) {
-    store.appendCandidateSnapshot({
-      strategy_id: top.strategy_id,
-      token_mint: top.token_mint,
-      symbol: top.symbol,
-      decision: "enter",
-      features: top.features,
-      cost_total_bps: top.cost.total_bps,
-      expected_value_bps: top.expected_value_bps,
-      confidence: top.confidence,
-      price_usd_at_snapshot: priceByMint.get(top.token_mint) ?? 0,
-    });
-    return `V3 shadow [${result.regime}] would ENTER ${top.symbol} (${top.strategy_id}, EV ${top.expected_value_bps.toFixed(0)}bp).`;
-  }
-  if (rejected && rejected.verdict.pass === false) {
-    store.appendCandidateSnapshot({
-      strategy_id: rejected.signal.strategy_id,
-      token_mint: rejected.signal.token_mint,
-      symbol: rejected.signal.symbol,
-      decision: "skip",
-      skip_reason: rejected.verdict.reason,
-      features: rejected.signal.features,
-      cost_total_bps: rejected.signal.cost.total_bps,
-      expected_value_bps: rejected.signal.expected_value_bps,
-      confidence: rejected.signal.confidence,
-      price_usd_at_snapshot: priceByMint.get(rejected.signal.token_mint) ?? 0,
-    });
-    return `V3 shadow [${result.regime}] skipped ${rejected.signal.symbol}: ${rejected.verdict.reason}.`;
+  if (result.route.evaluated.length > 0) {
+    for (const row of result.route.evaluated) {
+      const selected = row.signal === top;
+      const skipReason = selected
+        ? undefined
+        : row.verdict.pass
+          ? `passed EV gate but ranked below ${top?.symbol ?? "the selected candidate"}`
+          : row.verdict.reason;
+      store.appendCandidateSnapshot({
+        strategy_id: row.signal.strategy_id,
+        token_mint: row.signal.token_mint,
+        symbol: row.signal.symbol,
+        decision: selected ? "enter" : "skip",
+        ...(skipReason ? { skip_reason: skipReason } : {}),
+        features: row.signal.features,
+        cost_total_bps: row.signal.cost.total_bps,
+        expected_value_bps: row.signal.expected_value_bps,
+        confidence: row.signal.confidence,
+        price_usd_at_snapshot: priceByMint.get(row.signal.token_mint) ?? 0,
+      });
+    }
+    if (top) return `V3 shadow [${result.regime}] would ENTER ${top.symbol} (${top.strategy_id}, EV ${top.expected_value_bps.toFixed(0)}bp).`;
+    if (rejected && rejected.verdict.pass === false) {
+      return `V3 shadow [${result.regime}] skipped ${rejected.signal.symbol}: ${rejected.verdict.reason}.`;
+    }
   }
   // No routed candidate this tick (common in risk-off/chop, or sub-floor
   // scores) — still snapshot the best observation so the dataset has coverage

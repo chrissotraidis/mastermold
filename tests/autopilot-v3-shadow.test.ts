@@ -44,10 +44,13 @@ function risingWindow(): number[] {
 }
 
 describe("regime → module enablement", () => {
-  test("GIVEN regimes THEN xsec only risk-on, funding always, pair in chop/risk-off, attention modules outside risk-off", () => {
-    expect([...enabledModulesFor("risk_on")].sort()).toEqual(["copy_wallets", "funding_basis", "trending", "xsec"]);
-    expect([...enabledModulesFor("chop")].sort()).toEqual(["copy_wallets", "funding_basis", "pair_rv", "trending"]);
+  test("GIVEN regimes THEN inverted xsec never ranks, funding always, pair in chop/risk-off, attention modules outside risk-off", () => {
+    expect([...enabledModulesFor("risk_on")].sort()).toEqual(["bar_portion", "copy_wallets", "cusum_tb", "funding_basis", "trending"]);
+    expect([...enabledModulesFor("chop")].sort()).toEqual(["bar_portion", "copy_wallets", "cusum_tb", "funding_basis", "pair_rv", "trending"]);
     expect([...enabledModulesFor("risk_off")].sort()).toEqual(["funding_basis", "pair_rv"]);
+    for (const regime of ["risk_on", "chop", "risk_off"] as const) {
+      expect(enabledModulesFor(regime).has("xsec")).toBe(false);
+    }
   });
 });
 
@@ -70,6 +73,7 @@ describe("evaluateV3Shadow", () => {
     // records skips rather than enters — feature enrichment is a P3 follow-up.)
     const evs = result.route.ranked.map((c) => c.expected_value_bps);
     expect([...evs]).toEqual([...evs].sort((a, b) => b - a));
+    expect(result.candidates.filter((candidate) => candidate.strategy_id === "xsec")).toHaveLength(0);
   });
 
   test("GIVEN risk-off THEN xsec is disabled so it produces no xsec candidates", () => {
@@ -79,6 +83,71 @@ describe("evaluateV3Shadow", () => {
     }));
     expect(down.regime).toBe("risk_off");
     expect(down.candidates.filter((c) => c.strategy_id === "xsec")).toHaveLength(0);
+  });
+
+  test("GIVEN a Tier B universe candidate THEN its stored feature snapshot carries tier B", () => {
+    const copy: CandidateSignal = {
+      strategy_id: "copy_wallets",
+      token_mint: JUP.mint,
+      symbol: "JUP",
+      side: "buy",
+      horizon_sec: 21_600,
+      expected_return_bps: 400,
+      cost: costFromImpact(0.0002),
+      expected_value_bps: 300,
+      confidence: 0.8,
+      max_loss_bps: 200,
+      liquidity_usd: 3_000_000,
+      features: { source: "fixture" },
+      reason: "fixture",
+    };
+    const result = evaluateV3Shadow(input({
+      universe: [{ ...SOL, tier: "A" }, { ...JUP, tier: "B" }],
+      copyCandidates: [copy],
+    }));
+    expect(result.candidates.find((candidate) => candidate.strategy_id === "copy_wallets")?.features.tier).toBe("B");
+  });
+
+  test("GIVEN one synthetic CUSUM drift event THEN exactly one cusum_tb candidate is snapshotted", () => {
+    const store = autopilotStore();
+    const result = evaluateV3Shadow(input({
+      cusumEvents: new Map([[SOL.mint, { direction: "up", magnitude: 0.025, ts_ms: 1, h_pct: 2.5, sigma_daily_pct: 5 }]]),
+      heldMints: new Set(),
+      cusumEdgeRatio: 0.15,
+    }));
+    expect(result.candidates.filter((row) => row.strategy_id === "cusum_tb")).toHaveLength(1);
+    recordV3Shadow(store, result, new Map([[SOL.mint, 100], [JUP.mint, 100]]));
+    const rows = store.candidateSnapshots().filter((row) => row.strategy_id === "cusum_tb");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].features).toMatchObject({ direction: "up", h_pct: 2.5, sigma_daily_pct: 5, barrier_bps: 550 });
+  });
+
+  test("GIVEN an unheld SOL down breach THEN a Drift short lands in snapshots but never the paper book", () => {
+    const store = autopilotStore();
+    const result = evaluateV3Shadow(input({
+      cusumEvents: new Map([[SOL.mint, { direction: "down", magnitude: 0.03, ts_ms: 1, h_pct: 2.5, sigma_daily_pct: 5 }]]),
+      heldMints: new Set(),
+      fundingByMint: new Map([[SOL.mint, { symbol: "SOL", mint: SOL.mint, funding_rate_8h_pct: 0.01, hold_hours: 72, basis_pct: 0, cost: costFromImpact(0), liquidity_usd: 3_000_000, funding_persistence_windows: 2 }]]),
+    }));
+    const short = result.candidates.find((row) => row.strategy_id === "cusum_tb" && row.features.venue === "drift_perp");
+    expect(short).toMatchObject({ side: "sell", features: { perp_market: "SOL-PERP" } });
+    recordV3Shadow(store, result, new Map([[SOL.mint, 100], [JUP.mint, 100]]));
+    expect(store.candidateSnapshots().find((row) => row.features.venue === "drift_perp")).toBeDefined();
+    expect(store.trades()).toHaveLength(0);
+  });
+
+  test("GIVEN an extreme down bar THEN one standalone bar_portion snapshot carries exact bar features", () => {
+    const store = autopilotStore();
+    const result = evaluateV3Shadow(input({
+      barMetricsByMint: new Map([[SOL.mint, { bp: -0.8, atr_bps: 800, ema_close: risingWindow().at(-1)! }]]),
+      heldMints: new Set(),
+      barPortionEdgeRatio: 0.25,
+    }));
+    expect(result.candidates.filter((row) => row.strategy_id === "bar_portion")).toHaveLength(1);
+    recordV3Shadow(store, result, new Map([[SOL.mint, risingWindow().at(-1)!], [JUP.mint, 100]]));
+    const rows = store.candidateSnapshots().filter((row) => row.strategy_id === "bar_portion");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].features).toMatchObject({ bp: -0.8, atr_bps: 800, edge_ratio: 0.25, direction: "buy" });
   });
 });
 
@@ -110,6 +179,24 @@ describe("recordV3Shadow (recorder tested in isolation)", () => {
     expect(snaps).toHaveLength(1);
     expect(snaps[0].decision).toBe("skip");
     expect(snaps[0].skip_reason).toContain("under the 25bp floor");
+  });
+
+  test("GIVEN another strategy ranks first THEN the outranked module still gets a skip substrate", () => {
+    const store = autopilotStore();
+    const bp = { ...passingSignal, strategy_id: "bar_portion" as const, token_mint: JUP.mint, symbol: "JUP", expected_value_bps: 100 };
+    recordV3Shadow(store, shadowWith({
+      ranked: [passingSignal, bp],
+      evaluated: [
+        { signal: passingSignal, verdict: { pass: true } },
+        { signal: bp, verdict: { pass: true } },
+      ],
+      best_rejected: null,
+    }), new Map([[SOL.mint, 100], [JUP.mint, 1]]));
+    const rows = store.candidateSnapshots();
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.strategy_id === "bar_portion")).toMatchObject({
+      decision: "skip", skip_reason: "passed EV gate but ranked below SOL",
+    });
   });
 });
 

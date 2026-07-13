@@ -221,7 +221,7 @@ describe("mobile ergonomics source contracts", () => {
     const briefingDetail = source("app/briefing/[id]/page.tsx");
     const todayPage = source("app/page.tsx");
     const appShell = source("components/app-shell.tsx");
-    // Redesign: /review is a redirect; its status view lives on /settings#health.
+    // Review is the dedicated truth surface; Settings retains live health.
     const settingsPage = source("app/settings/page.tsx");
     const routeSources = [
       source("app/alerts/page.tsx"),
@@ -564,12 +564,12 @@ describe("mobile ergonomics source contracts", () => {
   });
 
   test("GIVEN legacy routes are still reachable WHEN their source is checked THEN they render product surfaces without implementation copy", () => {
-    // Redesign: /settings/integrations and /review became redirects into the
-    // single flat /settings page; /dashboard still renders Today.
+    // /settings/integrations redirects into Settings; /review is the required
+    // app-visible truth surface; /dashboard still renders Today.
     const dashboardPage = source("app/dashboard/page.tsx");
     const settingsPage = source("app/settings/page.tsx");
     const integrationsRedirect = source("app/settings/integrations/page.tsx");
-    const reviewRoute = source("app/review/route.ts");
+    const reviewPage = source("app/review/page.tsx");
 
     expect(dashboardPage).toContain('import TodayPage from "../page";');
     expect(dashboardPage).toContain('export const dynamic = "force-dynamic";');
@@ -577,7 +577,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(dashboardPage).not.toMatch(/export \{ dynamic \}|redirect|Loading this view/i);
     expect(settingsPage).toContain("export default async function SettingsPage()");
     expect(integrationsRedirect).toContain("redirect(`/settings${suffix}`);");
-    expect(reviewRoute).toContain('headers: { location: "/settings#health" }');
+    expect(reviewPage).toContain("Build truth and review readiness");
+    expect(reviewPage).toContain("reviewCapabilitySections.map");
     expect(settingsPage).not.toMatch(/Settings route loaded|reviewer and operator flows/i);
   });
 
@@ -696,16 +697,16 @@ describe("mobile ergonomics source contracts", () => {
   });
 
   test("GIVEN System status opens on mobile WHEN source copy is checked THEN it states the trust boundary first", () => {
-    // Redesign: the /review status page became the Settings "System health"
-    // section, and the trust boundary is now stated globally (AppShell footer
-    // + side-rail health link) plus the Live trading health row.
+    // Review owns the truth surface; Settings retains the live health rows.
     const settingsPage = source("app/settings/page.tsx");
     const appShell = source("components/app-shell.tsx");
-    const reviewRoute = source("app/review/route.ts");
+    const reviewPage = source("app/review/page.tsx");
     const reviewCapabilities = source("src/product/capabilities.ts");
     const reviewSurface = `${settingsPage}\n${reviewCapabilities}`;
 
-    expect(reviewRoute).toContain('headers: { location: "/settings#health" }');
+    expect(reviewPage).toContain("Paper results and replay results are evidence—not claims of future profit.");
+    expect(reviewPage).toContain("Review credentials never include private keys, seed phrases, or wallet authority.");
+    expect(reviewPage).toContain("Paper evidence clocks are paused because mode is off.");
     expect(appShell).toContain("Advisory only — Master Mold never places trades or moves funds.");
     expect(appShell).toContain('href="/settings#health"');
     expect(settingsPage).toContain("System health");

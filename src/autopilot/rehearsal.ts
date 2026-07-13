@@ -11,6 +11,10 @@
  */
 
 import type { TradeIntent } from "./intent";
+import { decimalsFor, STATIC_MINT_DECIMALS, type MintMetaRow } from "./mint-meta";
+import type { RehearsalRow } from "./store";
+
+type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -21,17 +25,7 @@ const SLIPPAGE_BPS = 50;
 /** SPL decimals for the fixed paper universe. Informational only — a wrong
  * entry shows up as an absurd effective price in the rehearsal log, and
  * nothing downstream trades on it. */
-export const MINT_DECIMALS: Record<string, number> = {
-  So11111111111111111111111111111111111111112: 9, // SOL
-  JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN: 6, // JUP
-  DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: 5, // BONK
-  EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm: 6, // WIF
-  jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL: 9, // JTO
-  "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": 8, // WETH (Wormhole)
-  "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh": 8, // WBTC (Wormhole)
-  "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6, // RAY
-  HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3: 6, // PYTH
-};
+export const MINT_DECIMALS = STATIC_MINT_DECIMALS;
 
 export type SwapRehearsal = {
   symbol: string;
@@ -47,6 +41,26 @@ export type SwapRehearsal = {
   status: "quoted" | "no-route" | "error";
   detail: string;
 };
+
+/** Pure adapter from the quote parser's rich result to the bounded numeric
+ * store row. Keeping this mapping out of the async callback makes every
+ * persisted field independently testable. */
+export function rehearsalRowFromSwap(
+  mint: string,
+  rehearsal: SwapRehearsal,
+  referenceBasis: NonNullable<RehearsalRow["reference_basis"]> = "flat_fallback",
+): Omit<RehearsalRow, "id" | "ts"> {
+  return {
+    mint,
+    symbol: rehearsal.symbol,
+    side: rehearsal.side,
+    notional_usd: rehearsal.notional_usd,
+    live_cost_vs_paper_pct: rehearsal.live_cost_vs_paper_pct,
+    reference_basis: referenceBasis,
+    price_impact_pct: rehearsal.price_impact_pct,
+    status: rehearsal.status,
+  };
+}
 
 type QuoteArgs = {
   symbol: string;
@@ -132,9 +146,11 @@ export function describeRehearsal(rehearsal: SwapRehearsal): string {
 export async function rehearseFill(
   intent: TradeIntent,
   fill: { qty: number; price_usd: number; value_usd: number },
+  mintMeta: MintMetaRow[] = [],
+  doFetch: FetchLike = fetch,
 ): Promise<SwapRehearsal | null> {
-  const decimals = MINT_DECIMALS[intent.mint];
-  if (decimals === undefined) return null;
+  const decimals = decimalsFor(intent.mint, mintMeta);
+  if (decimals === null) return null;
   const args: QuoteArgs = {
     symbol: intent.symbol,
     side: intent.action,
@@ -152,7 +168,7 @@ export async function rehearseFill(
 
   try {
     const url = `${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${SLIPPAGE_BPS}&swapMode=ExactIn`;
-    const response = await fetch(url, {
+    const response = await doFetch(url, {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });

@@ -14,8 +14,12 @@
  */
 
 import { buildAttribution, type AttributionSummary } from "./attribution";
+import { describeBpTimingEvidence, summarizeBpTimingEvidence } from "./bp-evidence";
 import { notifyOperator } from "./notify";
-import { calibrate, describeCalibration } from "./v3/calibration";
+import { calibrate, calibrateStrategy, describeCalibration } from "./v3/calibration";
+import { priceSeriesFromHistory } from "./v3/candidate-store";
+import { ANTI_OVERFIT_CONSTITUTION } from "./v3/replay/constitution";
+import { describeCexGapSummary, summarizeCexGaps } from "./v3/cex-gap";
 import { PARAM_CLAMPS, type Changeset, type ParamChangelogEntry, type ParamKey, type StrategyParams } from "./params";
 import { autopilotStore, type BotDecisionRow } from "./store";
 
@@ -37,6 +41,8 @@ export const ANALYST_SYSTEM_PROMPT = [
   "- Position-size caps, loss limits, stops existing, and the kill switch are NOT parameters; never mention changing them.",
   "- A small sample proves little. With under 5 round trips in the window, prefer proposal: null and say why.",
   "- If the bot sat out because market conditions failed its gates, sitting out may be correct — distinguish 'wrongly picky' from 'rightly patient' using the skip reasons.",
+  "Anti-overfit constitution (binding):",
+  ...ANTI_OVERFIT_CONSTITUTION.map((rule) => `- ${rule}`),
   "- Output STRICT JSON only, no markdown fences, matching:",
   '{"review": "3-6 sentence plain-English memo of what happened and why",',
   ' "lessons": [{"symbol": "SOL", "summary": "one concrete lesson tied to a specific trade"}],',
@@ -54,6 +60,8 @@ export function buildAnalystPrompt(input: {
   windowDays: number;
   /** V3 shadow calibration block (see v3/calibration.ts); empty when absent. */
   v3Calibration?: string;
+  bpTimingEvidence?: string;
+  cexGapEvidence?: string;
 }): string {
   const skipCounts = new Map<string, number>();
   for (const decision of input.recentDecisions) {
@@ -77,6 +85,8 @@ export function buildAnalystPrompt(input: {
     `RECENT PARAM CHANGES:\n${input.changelog.slice(0, 5).map((entry) => `${entry.ts.slice(0, 10)} [${entry.source}] ${entry.reason}`).join("\n") || "none yet"}`,
     `PRIOR LESSONS (do not re-learn these):\n${input.recentLessons.join("\n") || "none yet"}`,
     ...(input.v3Calibration ? [input.v3Calibration] : []),
+    ...(input.bpTimingEvidence ? [input.bpTimingEvidence] : []),
+    ...(input.cexGapEvidence ? [input.cexGapEvidence] : []),
   ].join("\n\n");
 }
 
@@ -346,7 +356,22 @@ export async function runAnalyst(
       windowDays: WINDOW_DAYS,
       // The V3 shadow's realized-outcome calibration: the evidence block that
       // lets the Analyst judge the NEW signal against what actually happened.
-      v3Calibration: describeCalibration(calibrate(store.candidateSnapshots(2000))),
+      v3Calibration: (() => {
+        const snapshots = store.candidateSnapshots(2_000);
+        const strategies = [...new Set(snapshots.map((row) => row.strategy_id))];
+        return strategies.length > 0
+          ? strategies.map((strategyId) => `${strategyId}\n${describeCalibration(calibrateStrategy(snapshots, strategyId))}`).join("\n\n")
+          : describeCalibration(calibrate([]));
+      })(),
+      bpTimingEvidence: describeBpTimingEvidence(summarizeBpTimingEvidence(
+        store.vetoWatches(1_000),
+        store.trades(2_000),
+        priceSeriesFromHistory(store.priceHistory()),
+      )),
+      cexGapEvidence: describeCexGapSummary(summarizeCexGaps(
+        store.cexGapObservations(),
+        store.cexGapWeeklyAggregates(),
+      )),
     });
 
     let raw: string;

@@ -1,0 +1,103 @@
+{
+  "pack": "mastermold-strategy-pack",
+  "version": "2.0",
+  "date": "2026-07-12",
+  "verified_against_source": "2026-07-12",
+  "repo_root_relative": "docs/strategy-pack/",
+  "ingestion_protocol": {
+    "order": ["01", "04", "05", "02", "03", "08", "06", "07"],
+    "rule": "One spec per agent session. Read 00-README.md guardrails first, then the spec's agent_contract block, then the full spec. Complete the Implementation checklist in order. Run every verify command before claiming done.",
+    "never_touch": [
+      "src/autopilot/control.ts kill-switch logic",
+      "src/autopilot/gate.ts go-live gate",
+      "src/autopilot/policy.ts hard checks",
+      "DEFAULT_AUTOPILOT_CAPS in src/autopilot/store.ts",
+      "CONSTITUTION in src/autopilot/params.ts"
+    ],
+    "verify_commands": ["bun run typecheck", "bun test tests", "npm run privacy:audit"]
+  },
+  "specs": [
+    {
+      "id": "01",
+      "file": "01-diagnosis-and-quick-wins.md",
+      "title": "Diagnosis and quick wins",
+      "phase": 0,
+      "effort": "hours",
+      "depends_on": [],
+      "creates": ["src/autopilot/rehearsal-stats.ts"],
+      "edits": ["src/autopilot/store.ts", "src/autopilot/daemon.ts", "src/autopilot/v3/shadow.ts"],
+      "includes_operator_action": "parameter changeset via applyParamChangeset"
+    },
+    {
+      "id": "04",
+      "file": "04-spec-universe-expansion.md",
+      "title": "Liquidity-tiered dynamic universe",
+      "phase": 0,
+      "effort": "1-2 days",
+      "depends_on": [],
+      "creates": ["src/autopilot/v3/universe-tiers.ts", "src/autopilot/mint-meta.ts"],
+      "edits": ["src/autopilot/store.ts", "src/autopilot/daemon.ts", "src/autopilot/rehearsal.ts", "src/autopilot/live-executor.ts", "src/autopilot/v3/execution-cost.ts", "src/autopilot/policy.ts"]
+    },
+    {
+      "id": "05",
+      "file": "05-spec-execution-cost-and-speed.md",
+      "title": "Honest execution costs and requote discipline",
+      "phase": 0,
+      "effort": "2 days",
+      "depends_on": ["01"],
+      "creates": [],
+      "edits": ["src/autopilot/v3/execution-cost.ts", "src/autopilot/executor.ts", "src/autopilot/daemon.ts", "src/autopilot/store.ts"]
+    },
+    {
+      "id": "02",
+      "file": "02-spec-cusum-event-engine.md",
+      "title": "CUSUM event engine (cusum_tb)",
+      "phase": 1,
+      "effort": "2-3 days",
+      "depends_on": ["01"],
+      "creates": ["src/autopilot/v3/cusum.ts", "src/autopilot/v3/cusum-tb.ts"],
+      "edits": ["src/autopilot/v3/signal.ts", "src/autopilot/store.ts", "src/autopilot/intent.ts", "src/autopilot/daemon.ts", "src/autopilot/v3/shadow.ts", "src/autopilot/v3/calibration.ts"],
+      "note": "Introduces per-strategy promotion state; specs 06 and 08 build on it."
+    },
+    {
+      "id": "03",
+      "file": "03-spec-bar-portion.md",
+      "title": "Bar Portion overlay + standalone module",
+      "phase": 1,
+      "effort": "1-2 days",
+      "depends_on": ["02"],
+      "creates": ["src/autopilot/v3/bars.ts", "src/autopilot/v3/bar-portion.ts"],
+      "edits": ["src/autopilot/v3/signal.ts", "src/autopilot/store.ts", "src/autopilot/daemon.ts", "src/autopilot/v3/shadow.ts"]
+    },
+    {
+      "id": "08",
+      "file": "08-spec-backtest-and-promotion.md",
+      "title": "Replay harness, promotion criteria, anti-overfit rules",
+      "phase": 1,
+      "effort": "2-3 days",
+      "depends_on": ["02", "05"],
+      "creates": ["scripts/replay.ts", "scripts/fetch-replay-data.ts", "src/autopilot/v3/replay/"],
+      "edits": ["src/autopilot/v3/promotion.ts", "src/autopilot/daemon.ts"]
+    },
+    {
+      "id": "06",
+      "file": "06-spec-cross-venue-and-perps.md",
+      "title": "CEX gap scout (measurement-only) + Drift short lane (shadow)",
+      "phase": 2,
+      "effort": "2 days",
+      "depends_on": ["02", "05"],
+      "creates": ["src/autopilot/v3/cex-gap.ts"],
+      "edits": ["src/autopilot/store.ts", "src/autopilot/daemon.ts", "src/autopilot/v3/cusum-tb.ts"]
+    },
+    {
+      "id": "07",
+      "file": "07-spec-ml-pipeline.md",
+      "title": "ML pipeline (ResNet-LSTM confidence for cusum_tb)",
+      "phase": 3,
+      "effort": "1-2 weeks",
+      "depends_on": ["02 (plus >= 4 weeks of cusum_tb shadow data)"],
+      "creates": ["engine/ml/"],
+      "edits": ["src/autopilot/v3/cusum-tb.ts", "package.json"]
+    }
+  ]
+}

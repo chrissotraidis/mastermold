@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { MAX_TRADES_PER_DAY, UNIVERSE } from "../src/autopilot/daemon";
 import { MEMECOIN_PAPER_FEE_RATE, PAPER_FEE_RATE, paperExecutor } from "../src/autopilot/executor";
 import { intentFromDecision, type TradeIntent } from "../src/autopilot/intent";
-import { MIN_NOTIONAL_USD, validateIntent, type PolicyContext } from "../src/autopilot/policy";
+import { MAX_TIER_B_POSITIONS, MIN_NOTIONAL_USD, validateIntent, type PolicyContext } from "../src/autopilot/policy";
 import { DEFAULT_AUTOPILOT_CAPS, type BotPositionRow, type BotStateRow, type DecisionSignals } from "../src/autopilot/store";
 
 const SOL = UNIVERSE[0];
@@ -88,6 +88,8 @@ function context(overrides: Partial<PolicyContext> = {}): PolicyContext {
     spend_today_usd: 0,
     max_trades_per_day: MAX_TRADES_PER_DAY,
     fee_rate: PAPER_FEE_RATE,
+    tier_b_mints: new Set(),
+    max_tier_b_positions: MAX_TIER_B_POSITIONS,
     ...overrides,
   };
 }
@@ -108,7 +110,18 @@ describe("intentFromDecision", () => {
     expect(intent?.notional_usd).toBe(25);
     expect(intent?.qty).toBeNull();
     expect(intent?.stop_pct).toBe(1.5);
+    expect(intent?.tp_pct).toBeNull();
+    expect(intent?.deadline_ts).toBeNull();
     expect(intent?.strategy).toBe("v2-trend-pullback");
+  });
+
+  test("GIVEN CUSUM barriers THEN intent construction preserves TP and deadline", () => {
+    const deadline = "2026-07-04T12:00:00.000Z";
+    const intent = intentFromDecision(
+      { action: "buy", mint: SOL.mint, symbol: SOL.symbol, price: 100, value_usd: 15, stop_pct: 4.4, tp_pct: 4.4, deadline_ts: deadline, reason: "cusum", signals: SIGNALS },
+      [], "paper", "v3-alpha-router",
+    );
+    expect(intent).toMatchObject({ stop_pct: 4.4, tp_pct: 4.4, deadline_ts: deadline });
   });
 
   test("GIVEN a sell decision THEN the quantity resolves from the open position", () => {
@@ -180,6 +193,21 @@ describe("policy engine — buys", () => {
     // Under the line it still passes.
     expect(validateIntent(buyIntent({ notional_usd: 10 }), context({ spend_today_usd: spent }))).toEqual({ allowed: true });
   });
+
+  test("GIVEN two Tier B positions THEN a third Tier B buy is rejected without changing the global cap", () => {
+    const tierB = new Set(["tier-b-1", "tier-b-2", "tier-b-3"]);
+    const positions = [
+      solPosition({ mint: "tier-b-1", symbol: "B1" }),
+      solPosition({ mint: "tier-b-2", symbol: "B2" }),
+    ];
+    const verdict = validateIntent(
+      buyIntent({ mint: "tier-b-3", symbol: "B3", notional_usd: 15 }),
+      context({ positions, tier_b_mints: tierB }),
+    );
+    expect(reasonOf(verdict)).toContain("2-position Tier B cap");
+    expect(positions).toHaveLength(2);
+    expect(DEFAULT_AUTOPILOT_CAPS.max_positions).toBe(5);
+  });
 });
 
 describe("policy engine — sells", () => {
@@ -221,5 +249,23 @@ describe("paper executor", () => {
     if (!memecoin.ok) throw new Error(memecoin.error);
     expect(memecoin.fill.fee_usd).toBeCloseTo(25 * MEMECOIN_PAPER_FEE_RATE, 9);
     expect(memecoin.fill.fee_usd).toBeGreaterThan(25 * PAPER_FEE_RATE * 3);
+  });
+
+  test("GIVEN a modeled fill THEN quoted price and fee replace the flat model", async () => {
+    const result = await paperExecutor({ fillFor: () => ({ price_usd: 101, fee_usd: 0.012 }) })
+      .execute(buyIntent({ notional_usd: 25, price_usd: 100 }));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.fill.price_usd).toBe(101);
+    expect(result.fill.qty).toBeCloseTo(25 / 101, 9);
+    expect(result.fill.fee_usd).toBe(0.012);
+    expect(result.fill.fill_basis).toBe("quoted");
+  });
+
+  test("GIVEN no modeled fill THEN the exact legacy flat fallback remains", async () => {
+    const result = await paperExecutor({ fillFor: () => null }).execute(buyIntent({ notional_usd: 25, price_usd: 100 }));
+    if (!result.ok) throw new Error(result.error);
+    expect(result.fill.price_usd).toBe(100);
+    expect(result.fill.fee_usd).toBeCloseTo(25 * PAPER_FEE_RATE, 9);
+    expect(result.fill.fill_basis).toBe("flat_fallback");
   });
 });
