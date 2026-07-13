@@ -22,7 +22,9 @@ import type { Executor, ExecutionResult } from "./executor";
 import type { TradeIntent } from "./intent";
 import { keypairFromSecret } from "./live";
 import { liveReadiness } from "./live-readiness";
-import { MINT_DECIMALS } from "./rehearsal";
+import { decimalsFor, type MintMetaRow } from "./mint-meta";
+
+type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 const QUOTE_URL = "https://lite-api.jup.ag/swap/v1/quote";
 const SWAP_URL = "https://lite-api.jup.ag/swap/v1/swap";
@@ -90,8 +92,8 @@ export function planFromQuote(
   };
 }
 
-async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+async function fetchJson(url: string, init?: RequestInit, doFetch: FetchLike = fetch): Promise<unknown> {
+  const response = await doFetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`${new URL(url).pathname} ${response.status}`);
   return response.json();
 }
@@ -136,9 +138,11 @@ export type BuiltSwap = {
 export async function buildSignedSwap(
   intent: Pick<TradeIntent, "action" | "mint" | "symbol" | "notional_usd" | "qty">,
   keypair: Keypair,
+  mintMeta: MintMetaRow[] = [],
+  doFetch: FetchLike = fetch,
 ): Promise<{ ok: true; built: BuiltSwap } | { ok: false; error: string }> {
-  const decimals = MINT_DECIMALS[intent.mint];
-  if (decimals === undefined) return { ok: false, error: `no known decimals for mint ${intent.mint}` };
+  const decimals = decimalsFor(intent.mint, mintMeta);
+  if (decimals === null) return { ok: false, error: `no known decimals for mint ${intent.mint}` };
 
   const amountRaw =
     intent.action === "buy"
@@ -152,6 +156,8 @@ export async function buildSignedSwap(
   try {
     const quoteBody = await fetchJson(
       `${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountRaw}&slippageBps=${LIVE_SLIPPAGE_BPS}&swapMode=ExactIn`,
+      undefined,
+      doFetch,
     );
     const planned = planFromQuote(quoteBody, { side: intent.action, token_mint: intent.mint, token_decimals: decimals });
     if (!planned.ok) return planned;
@@ -164,7 +170,7 @@ export async function buildSignedSwap(
         userPublicKey: keypair.publicKey.toBase58(),
         dynamicComputeUnitLimit: true,
       }),
-    })) as { swapTransaction?: unknown };
+    }, doFetch)) as { swapTransaction?: unknown };
     if (typeof swapBody.swapTransaction !== "string") {
       return { ok: false, error: "swap build returned no transaction" };
     }
@@ -182,6 +188,7 @@ export type LiveExecutorOptions = {
   dry_run?: boolean;
   reserve_floor_sol: number;
   env?: NodeJS.ProcessEnv;
+  mint_meta?: MintMetaRow[];
 };
 
 /**
@@ -217,7 +224,7 @@ export function jupiterLiveExecutor(options: LiveExecutorOptions): Executor {
         return { ok: false, error: `balance check failed: ${error instanceof Error ? error.message : String(error)}` };
       }
 
-      const buildResult = await buildSignedSwap(intent, keypair);
+      const buildResult = await buildSignedSwap(intent, keypair, options.mint_meta ?? []);
       if (!buildResult.ok) return buildResult;
       const { plan, transaction } = buildResult.built;
 
@@ -249,7 +256,8 @@ export function jupiterLiveExecutor(options: LiveExecutorOptions): Executor {
         if (!confirmed.ok) {
           return { ok: false, error: `${confirmed.error}` };
         }
-        const decimals = MINT_DECIMALS[intent.mint];
+        const decimals = decimalsFor(intent.mint, options.mint_meta ?? []);
+        if (decimals === null) return { ok: false, error: `no known decimals for mint ${intent.mint}` };
         const tokenRaw = intent.action === "buy" ? plan.out_amount_raw : plan.in_amount_raw;
         const usdcRaw = intent.action === "buy" ? plan.in_amount_raw : plan.out_amount_raw;
         const qty = tokenRaw / 10 ** decimals;

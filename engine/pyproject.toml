@@ -12,6 +12,15 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
     "yfinance>=0.2",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    # The currently published beta is Python 3.12-only. The frozen feature
+    # formulas are implemented in-tree, so older supported engine interpreters
+    # remain resolvable while the local ML runtime can still install pandas-ta.
+    "pandas-ta>=0.4.71b0; python_version >= '3.12'",
+    "pyarrow>=17.0",
+    "torch>=2.4",
+    "optuna>=4.0",
 ]
 
 [project.optional-dependencies]

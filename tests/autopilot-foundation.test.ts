@@ -140,21 +140,27 @@ describe("autopilot foundation (slice C3)", () => {
     expect(updateCaps({ daily_loss_limit_usd: -5 }).ok).toBe(false);
     expect(updateCaps({ max_positions: 2.5 }).ok).toBe(false);
     expect(updateCaps({ drawdown_halt_pct: Number.NaN }).ok).toBe(false);
+    expect(updateCaps({ daily_loss_limit_usd: DEFAULT_AUTOPILOT_CAPS.daily_loss_limit_usd + 1 }).ok).toBe(false);
+    expect(updateCaps({ daily_spend_limit_usd: DEFAULT_AUTOPILOT_CAPS.daily_spend_limit_usd + 1 }).ok).toBe(false);
+    expect(updateCaps({ max_positions: DEFAULT_AUTOPILOT_CAPS.max_positions + 1 }).ok).toBe(false);
+    expect(updateCaps({ drawdown_halt_pct: DEFAULT_AUTOPILOT_CAPS.drawdown_halt_pct + 1 }).ok).toBe(false);
+    expect(updateCaps({ reserve_floor_sol: DEFAULT_AUTOPILOT_CAPS.reserve_floor_sol - 0.01 }).ok).toBe(false);
     expect(updateCaps({}).ok).toBe(false);
 
     // Nothing invalid landed.
     expect(autopilotStore().botState().caps).toEqual(DEFAULT_AUTOPILOT_CAPS);
 
-    // A valid partial edit lands, holds the hard bound, and leaves other caps alone.
-    const updated = updateCaps({ max_trade_usd: MAX_TRADE_USD_HARD_BOUND, max_positions: 3 });
+    // A tightening partial edit lands and leaves other caps alone.
+    const updated = updateCaps({ max_trade_usd: MAX_TRADE_USD_HARD_BOUND - 5, max_positions: 3, reserve_floor_sol: 0.1 });
     expect(updated.ok).toBe(true);
-    expect(updated.state.caps.max_trade_usd).toBe(1000);
+    expect(updated.state.caps.max_trade_usd).toBe(20);
     expect(updated.state.caps.max_positions).toBe(3);
+    expect(updated.state.caps.reserve_floor_sol).toBe(0.1);
     expect(updated.state.caps.daily_loss_limit_usd).toBe(50);
     expect(updated.state.caps.drawdown_halt_pct).toBe(20);
 
     restart();
-    expect(autopilotStore().botState().caps.max_trade_usd).toBe(1000);
+    expect(autopilotStore().botState().caps.max_trade_usd).toBe(20);
   });
 
   test("GIVEN the kill switch is on WHEN paper mode is requested THEN it is refused until release", () => {

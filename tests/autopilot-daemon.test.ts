@@ -13,6 +13,7 @@ import {
   MAX_TRADES_PER_DAY,
   PAPER_STARTING_CASH_USD,
   realizedRoundTrips,
+  requoteEntryEdgeVerdict,
   stopPctFromRange,
   TAKE_PROFIT_R,
   UNIVERSE,
@@ -22,6 +23,7 @@ import {
 import type { MarketFeedRow } from "../src/autopilot/feed";
 import { DEFAULT_STRATEGY_PARAMS } from "../src/autopilot/params";
 import { DEFAULT_AUTOPILOT_CAPS, type BotPositionRow, type BotStateRow, type BotTradeRow } from "../src/autopilot/store";
+import { conservativeCost } from "../src/autopilot/v3/execution-cost";
 
 const SOL = UNIVERSE[0];
 const NOW = Date.parse("2026-07-03T12:00:00Z");
@@ -110,6 +112,57 @@ describe("autopilot v2 trend-pullback strategy", () => {
     expect(buy.reason).toContain("Trend pullback");
     expect(buy.reason).toContain("target");
     expect(buy.signals.h24_pct).toBe(5.0);
+    expect(buy.signals.cost_source).toBe("flat");
+    expect(buy.signals.round_trip_cost_pct).toBe(0.6);
+  });
+
+  test("GIVEN no measured route evidence THEN an explicit empty cost map is behavior-identical", () => {
+    const windows = new Map([[SOL.mint, window(100.4, 100)]]);
+    expect(decide(input({ windows, measuredRoundTripCostPctByMint: new Map() }))).toEqual(
+      decide(input({ windows })),
+    );
+  });
+
+  test("GIVEN a measured per-mint cost THEN the edge gate uses and records it", () => {
+    const windows = new Map([[SOL.mint, window(100.4, 100)]]);
+    const result = decide(input({
+      windows,
+      measuredRoundTripCostPctByMint: new Map([[SOL.mint, 1.0]]),
+    }));
+    expect(result.decisions).toEqual([]);
+    expect(result.skipped?.reason).toContain("measured cost 1.00%");
+    expect(result.skipped?.signals.cost_source).toBe("measured");
+    expect(result.skipped?.signals.round_trip_cost_pct).toBe(1.0);
+  });
+
+  test("GIVEN a non-positive signed route median THEN the flat safety fallback remains", () => {
+    const windows = new Map([[SOL.mint, window(100.4, 100)]]);
+    const result = decide(input({
+      windows,
+      measuredRoundTripCostPctByMint: new Map([[SOL.mint, -0.2]]),
+    }));
+    expect(result.decisions).toHaveLength(1);
+    expect(result.decisions[0]?.signals.cost_source).toBe("flat");
+    expect(result.decisions[0]?.signals.round_trip_cost_pct).toBe(0.6);
+  });
+
+  test("GIVEN modeled and measured costs THEN the fresh modeled cost has precedence", () => {
+    const windows = new Map([[SOL.mint, window(100.4, 100)]]);
+    const result = decide(input({
+      windows,
+      measuredRoundTripCostPctByMint: new Map([[SOL.mint, 0.7]]),
+      modeledRoundTripCostPctByMint: new Map([[SOL.mint, 0.2]]),
+    }));
+    expect(result.decisions[0]?.signals.round_trip_cost_pct).toBe(0.2);
+    expect(result.decisions[0]?.signals.cost_source).toBe("modeled");
+  });
+
+  test("GIVEN a requote that destroys V2 edge THEN the exact block reason is stable", () => {
+    expect(requoteEntryEdgeVerdict({
+      cost: { ...conservativeCost(), total_bps: 1_000 },
+      stop_pct: 1.2,
+      params: DEFAULT_STRATEGY_PARAMS,
+    })).toEqual({ pass: false, reason: "requote: edge gone" });
   });
 
   test("GIVEN a completed 13m spike THEN it refuses to chase and logs why", () => {
@@ -178,6 +231,24 @@ describe("autopilot v2 trend-pullback strategy", () => {
     expect(decisions[0]?.reason).toContain("Take profit");
   });
 
+  test("GIVEN a CUSUM tp_pct THEN it overrides the legacy R-multiple target", () => {
+    const position = solPosition(100, { stop_pct: 4.4, tp_pct: 4.4, peak_usd: 104.4 });
+    const windows = new Map([[SOL.mint, window(103, 104.4)]]);
+    const result = decide(input({ positions: [position], windows }));
+    expect(result.decisions[0]).toMatchObject({ action: "sell" });
+    expect(result.decisions[0]?.reason).toContain("Take profit");
+  });
+
+  test("GIVEN a reached vertical barrier THEN it exits even while the hourly trend is positive", () => {
+    const position = solPosition(100, {
+      stop_pct: 4.4, tp_pct: 4.4, deadline_ts: new Date(NOW - 1).toISOString(),
+      peak_usd: 101,
+    });
+    const windows = new Map([[SOL.mint, window(100, 101)]]);
+    const result = decide(input({ positions: [position], windows }));
+    expect(result.decisions[0]).toMatchObject({ action: "sell", reason: "Vertical barrier: deadline reached." });
+  });
+
   test("GIVEN +1R was reached THEN the trail arms and a stop-sized retrace exits", () => {
     // Peak 102 (>= 101.5 arm level); price 100.4 is >1.5% off the peak.
     const windows = new Map([[SOL.mint, window(101, 100.4)]]);
@@ -226,6 +297,10 @@ describe("autopilot v2 trend-pullback strategy", () => {
     expect(streak.streak).toBe(2);
     expect(streak.last_loss_ms).toBe(Date.parse("2026-07-03T04:00:00Z"));
     expect(derivePaperCash(trades)).toBeCloseTo(PAPER_STARTING_CASH_USD - 1.5 - 0.295, 3);
+
+    const newestFirst = [...trades].reverse();
+    expect(realizedRoundTrips(newestFirst)).toEqual(trips);
+    expect(lossStreak(realizedRoundTrips(newestFirst))).toEqual(streak);
   });
 
   test("GIVEN open positions WHEN marking equity THEN cash plus positions at market", () => {

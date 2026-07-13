@@ -123,6 +123,17 @@ type AutopilotApiPayload = {
     /** SolanaTracker's metered monthly request budget. */
     api_budget?: { used: number; limit: number; remaining: number; fraction_used: number; allowed: boolean };
   };
+  tier_b?: {
+    active: Array<{
+      symbol: string;
+      mint: string;
+      liquidity_usd: number;
+      volume_h24_usd: number;
+      below_exit_floor_days: number;
+    }>;
+    denylist: string[];
+    last_rotation_at: string | null;
+  };
   analyst?: { ts: string; memo: string } | null;
   /** V3 shadow telemetry: candidate dataset size, calibration verdict, and
    * the paper-promotion gate. */
@@ -132,6 +143,14 @@ type AutopilotApiPayload = {
     latest_note: string | null;
     calibration: { verdict: string; labeled_snapshots: number };
     promotion?: { ready: boolean; checks: Array<{ key: string; label: string; pass: boolean; detail: string }> };
+    by_strategy?: Record<string, {
+      calibration: { verdict: string; labeled_snapshots: number; enter_count: number; enter_net_mean_bps: number | null; ev_realized_slope: number | null };
+      promotion: { ready: boolean; checks: Array<{ key: string; label: string; pass: boolean; detail: string }> };
+      stored_ready: boolean;
+      stored_eligible: boolean;
+      operator_confirmed_at: string | null;
+      live_candidate: { ready: boolean; reasons: string[]; paper_observation_days: number; paper_round_trips: number; paper_net_bps: number | null; module_risk_halts: number };
+    }>;
     carry?: {
       open_markets: number;
       realized_usd: number;
@@ -428,7 +447,7 @@ export function AutopilotPanel() {
                 >
                   {" · "}
                   {data.v3.promotion.ready
-                    ? "PROMOTED: co-piloting the paper book"
+                    ? "eligible for operator review"
                     : `paper promotion ${data.v3.promotion.checks.filter((check) => check.pass).length}/${data.v3.promotion.checks.length} checks`}
                 </span>
               ) : null}
@@ -443,6 +462,37 @@ export function AutopilotPanel() {
                 </span>
               ) : null}
             </p>
+          ) : null}
+          {data.v3?.by_strategy && Object.keys(data.v3.by_strategy).length > 0 ? (
+            <div className="mt-1 flex flex-wrap gap-2">
+              {Object.entries(data.v3.by_strategy).map(([strategyId, row]) => (
+                <span key={strategyId} className="inline-flex items-center gap-2 rounded-md bg-surface-dim/35 px-2 py-1 text-[11px] text-on-surface-variant">
+                  <span title={[...row.promotion.checks.map((check) => `${check.pass ? "✓" : "✗"} ${check.label} — ${check.detail}`), `Live candidate: ${row.live_candidate.ready ? "ready" : row.live_candidate.reasons.join("; ")}`].join("\n")}>
+                    {strategyId} · {row.stored_ready ? "PAPER active" : row.promotion.ready ? "eligible" : `${row.promotion.checks.filter((check) => check.pass).length}/${row.promotion.checks.length}`}
+                  </span>
+                  {row.promotion.ready && !row.stored_ready ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => post({ action: "confirm_v3_promotion", strategy: strategyId }, `${strategyId} confirmed for the PAPER co-pilot.`)}
+                      className="rounded bg-engine/15 px-2 py-0.5 font-semibold text-engine hover:bg-engine/25 disabled:opacity-50"
+                    >
+                      Confirm
+                    </button>
+                  ) : null}
+                  {row.stored_ready ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => post({ action: "demote_v3_strategy", strategy: strategyId }, `${strategyId} removed from the PAPER co-pilot.`)}
+                      className="rounded bg-critical/10 px-2 py-0.5 font-semibold text-critical hover:bg-critical/20 disabled:opacity-50"
+                    >
+                      Demote
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+            </div>
           ) : null}
           <div className="mt-1">
             <EquitySparkline points={equity} />
@@ -640,6 +690,62 @@ export function AutopilotPanel() {
           ) : null}
         </div>
       ) : null}
+
+      <details className="border-t border-outline-variant/20 px-3">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
+          Dynamic Tier B
+          <span className="font-normal text-outline">
+            {(data.tier_b?.active ?? []).length} liquid token{(data.tier_b?.active ?? []).length === 1 ? "" : "s"} active
+          </span>
+        </summary>
+        <div className="pb-3">
+          <p className="text-xs leading-5 text-outline">
+            Rotates daily from the keyless Solana radar after age, liquidity, volume, and mint-metadata checks.
+            Tier B entries are capped at $15 and two open positions; dropped holdings become exit-only.
+          </p>
+          {(data.tier_b?.active ?? []).length > 0 ? (
+            <ul className="mt-2 divide-y divide-outline-variant/15">
+              {(data.tier_b?.active ?? []).map((token) => (
+                <li key={token.mint} className="flex items-center justify-between gap-2 py-1 text-xs">
+                  <span className="font-semibold text-on-surface">{token.symbol}</span>
+                  <span className="text-outline">
+                    ${(token.liquidity_usd / 1_000_000).toFixed(1)}m liquidity · ${(token.volume_h24_usd / 1_000_000).toFixed(1)}m volume
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <form
+            className="mt-3 grid gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const raw = String(new FormData(event.currentTarget).get("tier_b_denylist") ?? "");
+              const denylist = raw.split(/[\s,]+/).filter(Boolean);
+              post({ action: "set_tier_b_denylist", denylist }, "Tier B denylist saved.");
+            }}
+          >
+            <label htmlFor="tier-b-denylist" className="text-[11px] font-semibold uppercase tracking-wide text-outline">
+              Operator denylist
+            </label>
+            <textarea
+              id="tier-b-denylist"
+              name="tier_b_denylist"
+              rows={3}
+              key={(data.tier_b?.denylist ?? []).join(",")}
+              defaultValue={(data.tier_b?.denylist ?? []).join("\n")}
+              placeholder="One Solana mint per line"
+              className="w-full rounded-md border border-outline-variant/50 bg-surface-dim/70 px-3 py-2 font-mono text-xs text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+            />
+            <button
+              type="submit"
+              disabled={runtimeUnavailable || isPending}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline-variant/40 px-3 text-xs font-semibold text-on-surface transition-colors hover:bg-surface-dim/40 disabled:opacity-50 sm:min-h-8 sm:justify-self-start"
+            >
+              Save denylist
+            </button>
+          </form>
+        </div>
+      </details>
 
       <details className="border-t border-outline-variant/20 px-3">
         <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">

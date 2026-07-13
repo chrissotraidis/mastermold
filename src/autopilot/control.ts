@@ -12,7 +12,7 @@
  * - Kill ON always forces mode "halted".
  * - Releasing the kill switch sets mode "off" — the bot NEVER auto-resumes.
  * - Mode "paper" is refused while the kill switch is engaged.
- * - Caps must be positive, and max_trade_usd has a $1,000 hard bound.
+ * - Caps must be positive and cannot be edited weaker than the frozen defaults.
  */
 
 import { evaluateGoLiveGate } from "./gate";
@@ -25,8 +25,8 @@ import {
   type BotStateRow,
 } from "./store";
 
-/** Hard bound: no cap edit can push a single paper trade above this. */
-export const MAX_TRADE_USD_HARD_BOUND = 1000;
+/** Compatibility export: the frozen default is also the maximum safe edit. */
+export const MAX_TRADE_USD_HARD_BOUND = DEFAULT_AUTOPILOT_CAPS.max_trade_usd;
 
 /** Heartbeat freshness: a tick within this window means the daemon is live. */
 export const DAEMON_LIVE_WITHIN_MS = 90_000;
@@ -167,7 +167,7 @@ export function setMode(mode: "off" | "paper" | "live"): ControlResult {
   return { ok: true, state: getAutopilotState() };
 }
 
-/** Update hard caps. All values must be positive; max_trade_usd is hard-bounded at $1,000. */
+/** Update hard caps. Values may tighten safety, never weaken frozen defaults. */
 export function updateCaps(partial: Partial<AutopilotCaps>): ControlResult {
   const errors: string[] = [];
   const patch: Partial<AutopilotCaps> = {};
@@ -187,8 +187,14 @@ export function updateCaps(partial: Partial<AutopilotCaps>): ControlResult {
       errors.push(`${key} must be a positive number.`);
       continue;
     }
-    if (key === "max_trade_usd" && value > MAX_TRADE_USD_HARD_BOUND) {
-      errors.push(`max_trade_usd cannot exceed $${MAX_TRADE_USD_HARD_BOUND}.`);
+    const frozen = DEFAULT_AUTOPILOT_CAPS[key];
+    const weakensSafety = key === "reserve_floor_sol" ? value < frozen : value > frozen;
+    if (weakensSafety) {
+      errors.push(
+        key === "reserve_floor_sol"
+          ? `${key} cannot be lower than the frozen ${frozen}.`
+          : `${key} cannot exceed the frozen ${frozen}.`,
+      );
       continue;
     }
     if (key === "max_positions" && !Number.isInteger(value)) {

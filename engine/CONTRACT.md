@@ -170,3 +170,38 @@ The dashboard treats a bundle as usable only if **all** hold:
 
 Otherwise the dashboard falls back to seeds and surfaces a visible notice on
 `/review` describing why (missing, unparseable, schema-invalid, or future-stamped).
+
+## CUSUM ML append-only contract
+
+This contract is independent of the dashboard bundle above. The scorer appends
+one compact JSON object per line to `engine/out/ml/signals.jsonl`:
+
+```json
+{"mint":"...","event_ts":1783872000000,"p_up":0.73,"model_id":"f2d75fe0610fc32f","trained_through":"2026-06-30T12:10:00Z","scored_at":"2026-07-12T12:00:10Z"}
+```
+
+The TypeScript daemon first appends an exact observation request to
+`engine/out/ml/events.jsonl`:
+
+```json
+{"mint":"...","event_ts":1783872020123}
+```
+
+- `(mint, event_ts)` must exactly match the TypeScript CUSUM event; latest valid
+  append wins for duplicate keys.
+- An independently supervised scorer may tail `events.jsonl`, refresh its
+  same-source Coinbase Parquet through the request time, construct the latest
+  96 fixed-threshold Python event bars as-of that moment, and echo the exact
+  daemon key in its signal. A cache more than five minutes behind fails closed.
+- `p_up` is a probability only. Python cannot create candidates, intents,
+  positions, orders, signatures, or fills.
+- TypeScript ignores malformed lines and requires a score age at most 60 seconds,
+  a model age at most 100 days, exact approval via `APPROVED_MODEL`, a matching
+  real/data-compliant/criterion-passing `training-result.json`, and at least 28
+  days of independently persisted CUSUM shadow evidence. An approval filename
+  can never override a rejected or fixture result.
+- Fresh scores apply the frozen 60/40 direction filter and conservative confidence
+  mapping. Missing or stale scores stamp `features.ml = "absent"` and preserve the
+  rule path. Held protective exits are never blocked by ML.
+- Models and signals are ignored local artifacts. The content hash is the model
+  ID; every training run also writes `MODELCARD.md` and `training-result.json`.

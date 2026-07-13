@@ -11,9 +11,10 @@ import {
 import { fetchMarketFeed, type MarketFeedRow } from "@/src/autopilot/feed";
 import { fetchTrendingTokens, type TrendingToken } from "@/src/autopilot/v3/trending";
 import { buildAttribution, type AttributionSummary } from "@/src/autopilot/attribution";
-import { calibrate, type CalibrationSummary } from "@/src/autopilot/v3/calibration";
+import { summarizeBpTimingEvidence, type BpTimingEvidence } from "@/src/autopilot/bp-evidence";
+import { calibrate, calibrateStrategy, type CalibrationSummary } from "@/src/autopilot/v3/calibration";
 import { summarizeCarryBook, type CarrySummary } from "@/src/autopilot/v3/carry-book";
-import { evaluateV3Promotion, type V3Promotion } from "@/src/autopilot/v3/promotion";
+import { evaluateModuleLiveCandidate, evaluateV3Promotion, paperPromotionSnapshots, type V3LiveCandidate, type V3Promotion } from "@/src/autopilot/v3/promotion";
 import {
   isPlausibleSolanaAddress,
   walletReportCards,
@@ -23,6 +24,7 @@ import {
 import { priceSeriesFromHistory } from "@/src/autopilot/v3/candidate-store";
 import type { WalletSuggestions } from "@/src/autopilot/v3/wallet-discovery";
 import { checkBudget, solanaTrackerBudget, type BudgetCheck } from "@/src/autopilot/v3/api-budget";
+import { buildTradableUniverse, type TierBToken } from "@/src/autopilot/v3/universe-tiers";
 import { evaluateGoLiveGate, type GoLiveGate } from "@/src/autopilot/gate";
 import { liveReadiness } from "@/src/autopilot/live-readiness";
 import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry, type StrategyParams } from "@/src/autopilot/params";
@@ -83,6 +85,8 @@ export type AutopilotApiPayload = {
     latest_note: string | null;
     calibration: CalibrationSummary;
     promotion: V3Promotion;
+    by_strategy: Record<string, { calibration: CalibrationSummary; promotion: V3Promotion; stored_ready: boolean; stored_eligible: boolean; operator_confirmed_at: string | null; live_candidate: V3LiveCandidate }>;
+    bp_timing: BpTimingEvidence;
     /** Synthetic funding-carry book: the delta-neutral strategy's evidence. */
     carry: CarrySummary;
   };
@@ -98,6 +102,11 @@ export type AutopilotApiPayload = {
     /** SolanaTracker's metered monthly request budget — never assumed unlimited. */
     api_budget: BudgetCheck;
   };
+  tier_b: {
+    active: TierBToken[];
+    denylist: string[];
+    last_rotation_at: string | null;
+  };
   data_boundary: string;
 };
 
@@ -106,20 +115,55 @@ type AutopilotControlRequest = {
   mode?: unknown;
   caps?: unknown;
   wallets?: unknown;
+  denylist?: unknown;
+  strategy?: unknown;
 };
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+
+function loopbackHost(value: string): boolean {
+  return LOOPBACK_HOSTS.has(value.toLowerCase());
+}
+
+/** Local control writes require the exact loopback origin serving this route. */
+export function isAuthorizedLocalControlRequest(request: Request): boolean {
+  try {
+    const target = new URL(request.url);
+    if (!loopbackHost(target.hostname)) return false;
+    const hostHeader = request.headers.get("host");
+    if (hostHeader) {
+      const headerUrl = new URL(`http://${hostHeader}`);
+      if (!loopbackHost(headerUrl.hostname) || headerUrl.host !== target.host) return false;
+    }
+    const originHeader = request.headers.get("origin");
+    if (!originHeader) return false;
+    const origin = new URL(originHeader);
+    return loopbackHost(origin.hostname) && origin.origin === target.origin;
+  } catch {
+    return false;
+  }
+}
 
 async function payload(): Promise<AutopilotApiPayload> {
   const state = getAutopilotState();
   if (state.runtime_unavailable) return unavailablePayload(state, []);
 
+  const store = autopilotStore();
+  const tierBDenylist = store.tierBDenylist();
+  const deniedTierBMints = new Set(tierBDenylist);
+  const activeTierB = store.tierB().filter((token) => !deniedTierBMints.has(token.mint));
   // The feed is best-effort color: a DexScreener hiccup must never fail the
   // endpoint, so any error degrades to []. GET never writes bot_state — the
   // daemon owns the heartbeat; this path only derives status from it.
-  const marketFeed = await fetchMarketFeed().catch(() => [] as MarketFeedRow[]);
+  const marketFeed = await fetchMarketFeed(Date.now(), buildTradableUniverse(activeTierB, store.mintMeta())).catch(() => [] as MarketFeedRow[]);
   const trending = await fetchTrendingTokens().catch(() => [] as TrendingToken[]);
-
-  const store = autopilotStore();
   const readiness = liveReadiness();
+  const allTrades = store.trades(2_000);
+  const recentActivity = store.activity(2_000);
+  const goLiveGate = evaluateGoLiveGate({
+    trades: store.trades(1000), decisions: store.decisions(3000), equity_series: store.equitySeries(2000),
+    wallet_provisioned: readiness.wallet_provisioned, now_ms: Date.now(), price_history: store.priceHistory(),
+  });
   return {
     state,
     positions: store.positions(),
@@ -131,14 +175,7 @@ async function payload(): Promise<AutopilotApiPayload> {
     trending,
     // The wallet check reads env provisioning (AUTOPILOT_WALLET_SECRET); the
     // secret itself never enters the payload or the store (autonomy ADR, D6).
-    go_live_gate: evaluateGoLiveGate({
-      trades: store.trades(1000),
-      decisions: store.decisions(3000),
-      equity_series: store.equitySeries(2000),
-      wallet_provisioned: readiness.wallet_provisioned,
-      now_ms: Date.now(),
-      price_history: store.priceHistory(),
-    }),
+    go_live_gate: goLiveGate,
     strategy: {
       name: STRATEGY_NAME,
       summary: STRATEGY_SUMMARY,
@@ -157,13 +194,34 @@ async function payload(): Promise<AutopilotApiPayload> {
     v3: (() => {
       const snapshots = store.candidateSnapshots(2000);
       const latest = store.activity(50).find((row) => row.kind === "v3-shadow") ?? null;
-      const calibration = calibrate(snapshots);
+      const calibration = calibrateStrategy(paperPromotionSnapshots(snapshots, "xsec"), "xsec");
+      const strategyIds = [...new Set(snapshots.map((row) => row.strategy_id))];
       return {
         snapshot_count: snapshots.length,
         labeled_count: snapshots.filter((row) => row.labeled).length,
         latest_note: latest?.message ?? null,
         calibration,
-        promotion: evaluateV3Promotion(calibration),
+        promotion: evaluateV3Promotion(calibration, store.replayConfirmation("xsec")),
+        by_strategy: Object.fromEntries(strategyIds.map((strategyId) => {
+          const strategyCalibration = calibrateStrategy(paperPromotionSnapshots(snapshots, strategyId), strategyId);
+          return [strategyId, {
+            calibration: strategyCalibration,
+            promotion: evaluateV3Promotion(strategyCalibration, store.replayConfirmation(strategyId)),
+            stored_ready: store.v3Promotion(strategyId)?.ready ?? false,
+            stored_eligible: store.v3Promotion(strategyId)?.eligible ?? false,
+            operator_confirmed_at: store.v3Promotion(strategyId)?.operator_confirmed_at ?? null,
+            live_candidate: evaluateModuleLiveCandidate({
+              trades: allTrades, strategy_id: strategyId, now_ms: Date.now(),
+              existing_go_live_gate_passes: goLiveGate.ready,
+              module_risk_halts: recentActivity.filter((row) => row.kind === "halt" && row.message.includes(strategyId)).length,
+            }),
+          }];
+        })),
+        bp_timing: summarizeBpTimingEvidence(
+          store.vetoWatches(1_000),
+          store.trades(2_000),
+          priceSeriesFromHistory(store.priceHistory()),
+        ),
         carry: summarizeCarryBook(store.carryBook(), Date.now()),
       };
     })(),
@@ -177,6 +235,11 @@ async function payload(): Promise<AutopilotApiPayload> {
         return checkBudget(store.apiBudget(config.service), config, Date.now());
       })(),
     },
+    tier_b: {
+      active: activeTierB,
+      denylist: tierBDenylist,
+      last_rotation_at: store.tierBLastRotationAt(),
+    },
     data_boundary: DATA_BOUNDARY,
   };
 }
@@ -188,6 +251,12 @@ export async function GET(): Promise<NextResponse<AutopilotApiPayload>> {
 export async function POST(
   request: Request,
 ): Promise<NextResponse<AutopilotApiPayload | { error: string }>> {
+  if (!isAuthorizedLocalControlRequest(request)) {
+    return NextResponse.json(
+      { error: "Autopilot controls require a matching local loopback origin." },
+      { status: 403 },
+    );
+  }
   let body: AutopilotControlRequest;
 
   try {
@@ -281,9 +350,54 @@ export async function POST(
       return NextResponse.json(await payload());
     }
 
+    case "set_tier_b_denylist": {
+      if (!Array.isArray(body.denylist) || body.denylist.some((mint) => typeof mint !== "string")) {
+        return NextResponse.json({ error: "denylist must be an array of mint addresses." }, { status: 422 });
+      }
+      const cleaned = [...new Set((body.denylist as string[]).map((mint) => mint.trim()).filter(Boolean))];
+      const invalid = cleaned.filter((mint) => !isPlausibleSolanaAddress(mint));
+      if (invalid.length > 0) {
+        return NextResponse.json({ error: `not Solana mint addresses: ${invalid.slice(0, 3).join(", ")}` }, { status: 422 });
+      }
+      if (cleaned.length > 100) {
+        return NextResponse.json({ error: "denylist is capped at 100 mints." }, { status: 422 });
+      }
+      store.setTierBDenylist(cleaned);
+      store.appendActivity("tier-b", `Tier B operator denylist updated: ${cleaned.length} mint${cleaned.length === 1 ? "" : "s"}.`);
+      return NextResponse.json(await payload());
+    }
+
+    case "confirm_v3_promotion": {
+      if (typeof body.strategy !== "string" || !body.strategy.trim()) {
+        return NextResponse.json({ error: "strategy must be a non-empty strategy id." }, { status: 422 });
+      }
+      const strategyId = body.strategy.trim();
+      const calibration = calibrateStrategy(paperPromotionSnapshots(store.candidateSnapshots(2_000), strategyId), strategyId);
+      const eligibility = evaluateV3Promotion(calibration, store.replayConfirmation(strategyId));
+      if (!eligibility.ready) {
+        return NextResponse.json({ error: `strategy is not eligible: ${eligibility.checks.filter((check) => !check.pass).map((check) => check.detail).join("; ")}` }, { status: 409 });
+      }
+      const now = new Date().toISOString();
+      store.setV3Promotion(strategyId, { ready: true, eligible: true, ts: now, operator_confirmed_at: now, last_reason: "Explicitly confirmed from the operator dashboard." });
+      store.appendActivity("control", `Operator confirmed V3 ${strategyId} for PAPER co-pilot only.`);
+      return NextResponse.json(await payload());
+    }
+
+    case "demote_v3_strategy": {
+      if (typeof body.strategy !== "string" || !body.strategy.trim()) {
+        return NextResponse.json({ error: "strategy must be a non-empty strategy id." }, { status: 422 });
+      }
+      const strategyId = body.strategy.trim();
+      const previous = store.v3Promotion(strategyId);
+      if (!previous) return NextResponse.json({ error: "strategy has no promotion state." }, { status: 404 });
+      store.setV3Promotion(strategyId, { ...previous, ready: false, ts: new Date().toISOString(), last_reason: "Manually demoted from the operator dashboard." });
+      store.appendActivity("control", `Operator demoted V3 ${strategyId} from the PAPER co-pilot.`);
+      return NextResponse.json(await payload());
+    }
+
     default:
       return NextResponse.json(
-        { error: 'action must be one of "kill", "release", "set_mode", "set_caps", "set_watched_wallets".' },
+        { error: 'action must be one of "kill", "release", "set_mode", "set_caps", "set_watched_wallets", "set_tier_b_denylist", "confirm_v3_promotion", "demote_v3_strategy".' },
         { status: 400 },
       );
   }
@@ -328,6 +442,8 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
       latest_note: null,
       calibration: calibrate([]),
       promotion: evaluateV3Promotion(calibrate([])),
+      by_strategy: {},
+      bp_timing: { veto_samples: 0, veto_mean_30m_bps: null, taken_samples: 0, taken_mean_30m_bps: null, ready: false },
       carry: summarizeCarryBook({ positions: {}, realized_usd: 0, round_trips: 0, history: [] }, Date.now()),
     },
     live_wallet: { provisioned: readiness.wallet_provisioned, pubkey: readiness.wallet_pubkey },
@@ -337,6 +453,7 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
       report_cards: [],
       api_budget: checkBudget({ month_key: "", used: 0 }, solanaTrackerBudget(), Date.now()),
     },
+    tier_b: { active: [], denylist: [], last_rotation_at: null },
     data_boundary: DATA_BOUNDARY,
   };
 }

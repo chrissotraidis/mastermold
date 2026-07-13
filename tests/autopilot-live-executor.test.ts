@@ -12,7 +12,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { setMode } from "../src/autopilot/control";
-import { jupiterLiveExecutor, MAX_PRICE_IMPACT_PCT, planFromQuote, USDC_MINT } from "../src/autopilot/live-executor";
+import { Keypair } from "@solana/web3.js";
+import { buildSignedSwap, jupiterLiveExecutor, MAX_PRICE_IMPACT_PCT, planFromQuote, USDC_MINT } from "../src/autopilot/live-executor";
 import type { TradeIntent } from "../src/autopilot/intent";
 import { __resetAutopilotStoreForTests, autopilotStore } from "../src/autopilot/store";
 
@@ -100,6 +101,30 @@ describe("planFromQuote", () => {
 });
 
 describe("jupiter-live executor guards", () => {
+  test("GIVEN cached Tier B decimals THEN the live swap builder reaches the quote path; unknown decimals fail before fetch", async () => {
+    const mint = "DynamicMint111111111111111111111111111111111";
+    const intent = { action: "buy" as const, mint, symbol: "DYN", notional_usd: 15, qty: null };
+    let calls = 0;
+    const fetch500 = async () => {
+      calls += 1;
+      return new Response("no", { status: 500 });
+    };
+    const unknown = await buildSignedSwap(intent, Keypair.generate(), [], fetch500);
+    expect(unknown.ok).toBe(false);
+    if (!unknown.ok) expect(unknown.error).toContain("no known decimals");
+    expect(calls).toBe(0);
+
+    const cached = await buildSignedSwap(
+      intent,
+      Keypair.generate(),
+      [{ mint, symbol: "DYN", decimals: 6, resolved_at: "2026-07-12T00:00:00Z" }],
+      fetch500,
+    );
+    expect(cached.ok).toBe(false);
+    if (!cached.ok) expect(cached.error).toContain("/swap/v1/quote 500");
+    expect(calls).toBe(1);
+  });
+
   test("GIVEN a paper intent THEN the live executor refuses it", async () => {
     const result = await jupiterLiveExecutor({ reserve_floor_sol: 0.05 }).execute(liveIntent({ mode: "paper" }));
     expect(result.ok).toBe(false);

@@ -24,6 +24,7 @@ export type ExecutionFill = {
   price_usd: number;
   value_usd: number;
   fee_usd: number;
+  fill_basis?: "quoted" | "flat_fallback";
   /** Live fills only: the confirmed Solana transaction signature. */
   signature?: string;
 };
@@ -39,6 +40,8 @@ export type PaperExecutorOptions = {
   /** Per-mint fee tier; defaults to the flat majors rate. The daemon passes a
    * classifier so off-universe fills pay the honest memecoin rate. */
   feeRateForMint?: (mint: string) => number;
+  /** A fresh executable quote. Null preserves the existing flat model. */
+  fillFor?: (intent: TradeIntent) => { price_usd: number; fee_usd: number } | null;
 };
 
 /** Simulated fills at the reference price; the only executor that exists today. */
@@ -50,21 +53,39 @@ export function paperExecutor(options: PaperExecutorOptions = {}): Executor {
       if (intent.mode !== "paper") {
         return { ok: false, error: `paper executor refuses ${intent.mode} intents` };
       }
+      const quotedFill = options.fillFor?.(intent) ?? null;
+      const fillPrice = quotedFill?.price_usd ?? intent.price_usd;
+      const fillBasis = quotedFill ? "quoted" : "flat_fallback";
+      if (!Number.isFinite(fillPrice) || fillPrice <= 0 || (quotedFill && (!Number.isFinite(quotedFill.fee_usd) || quotedFill.fee_usd < 0))) {
+        return { ok: false, error: "paper executor received an invalid modeled fill" };
+      }
       const feeRate = feeRateFor(intent.mint);
       if (intent.action === "buy") {
-        const qty = intent.notional_usd / intent.price_usd;
+        const qty = intent.notional_usd / fillPrice;
         return {
           ok: true,
-          fill: { qty, price_usd: intent.price_usd, value_usd: intent.notional_usd, fee_usd: intent.notional_usd * feeRate },
+          fill: {
+            qty,
+            price_usd: fillPrice,
+            value_usd: intent.notional_usd,
+            fee_usd: quotedFill?.fee_usd ?? intent.notional_usd * feeRate,
+            fill_basis: fillBasis,
+          },
         };
       }
       if (intent.qty === null || intent.qty <= 0) {
         return { ok: false, error: "sell intent has no quantity" };
       }
-      const value = intent.qty * intent.price_usd;
+      const value = intent.qty * fillPrice;
       return {
         ok: true,
-        fill: { qty: intent.qty, price_usd: intent.price_usd, value_usd: value, fee_usd: value * feeRate },
+        fill: {
+          qty: intent.qty,
+          price_usd: fillPrice,
+          value_usd: value,
+          fee_usd: quotedFill?.fee_usd ?? value * feeRate,
+          fill_basis: fillBasis,
+        },
       };
     },
   };

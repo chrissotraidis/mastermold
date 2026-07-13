@@ -47,7 +47,7 @@ const FAILURE_COOLDOWN_MS = 60_000;
 export const TRENDING_MAX_TOKENS = 12;
 
 /** Stablecoins and wrapped majors are never "trending" in a useful sense. */
-const EXCLUDED_MINTS = new Set([
+export const EXCLUDED_MINTS = new Set([
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
   "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
   "So11111111111111111111111111111111111111112", // SOL (the quote side)

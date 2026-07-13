@@ -7,11 +7,11 @@
     "node": ">=22.5"
   },
   "scripts": {
-    "dev": "next dev --port 4002",
+    "dev": "next dev --hostname 127.0.0.1 --port 4002",
     "up": "bin/up",
     "build": "next build",
     "postbuild": "node scripts/prepare-standalone.mjs && node scripts/release-artifact-audit.mjs",
-    "start": "PORT=${PORT:-4002} node .next/standalone/server.js",
+    "start": "HOSTNAME=${HOSTNAME:-127.0.0.1} PORT=${PORT:-4002} node .next/standalone/server.js",
     "seed": "bun run scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "smoke:app": "node scripts/runtime-smoke.mjs",
@@ -20,10 +20,14 @@
     "test": "bun run typecheck && bun test tests",
     "daily": "bin/daily-run",
     "autopilot": "bin/autopilot-daemon",
+    "paper:check": "bun run scripts/paper-evidence-check.ts",
     "backup": "bun run scripts/backup-data.ts",
     "autopilot:drill": "bun run scripts/autopilot-live-drill.ts",
     "autopilot:provision": "bun run scripts/autopilot-provision.ts",
-    "v3:backtest": "bun run scripts/v3-backtest.ts"
+    "v3:backtest": "bun run scripts/v3-backtest.ts",
+    "replay": "bun run scripts/replay.ts",
+    "replay:fetch": "bun run scripts/fetch-replay-data.ts",
+    "ml:train": "cd engine && PATH=\".venv/bin:$PATH\" UV_CACHE_DIR=out/cache/uv uv run --active python -m ml.train"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -34,6 +38,8 @@
     "@solana/web3.js": "^1.98.4",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "hyparquet": "1.26.0",
+    "hyparquet-compressors": "1.1.1",
     "lightweight-charts": "^5.2.0",
     "lucide-react": "latest",
     "next": "^16.2.9",

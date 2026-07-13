@@ -30,16 +30,23 @@ export type TradeIntent = {
   qty: number | null;
   /** Buy only: volatility-scaled stop distance chosen at entry (percent). */
   stop_pct: number | null;
+  tp_pct?: number | null;
+  deadline_ts?: string | null;
   reason: string;
   strategy: "v2-trend-pullback" | "v3-alpha-router";
+  /** Concrete V3 module; absent for v2. */
+  strategy_id?: string;
   signals: DecisionSignals;
+  /** Executable venue reference captured when the intent was built. */
+  quote_price?: number;
+  quote_ts_ms?: number;
 };
 
 /** Structural mirror of the daemon's Decision union (kept structural so the
  * daemon can import this module without a cycle). */
 export type DecisionLike =
-  | { action: "buy"; mint: string; symbol: string; price: number; value_usd: number; stop_pct: number; reason: string; signals: DecisionSignals }
-  | { action: "sell"; mint: string; symbol: string; price: number; reason: string; signals: DecisionSignals };
+  | { action: "buy"; mint: string; symbol: string; price: number; value_usd: number; stop_pct: number; tp_pct?: number; deadline_ts?: string; reason: string; signals: DecisionSignals; strategy_id?: string }
+  | { action: "sell"; mint: string; symbol: string; price: number; reason: string; signals: DecisionSignals; strategy_id?: string };
 
 /**
  * Lift a strategy decision into a typed intent. Sells resolve their quantity
@@ -51,6 +58,7 @@ export function intentFromDecision(
   positions: BotPositionRow[],
   mode: "paper" | "live" = "paper",
   strategy: TradeIntent["strategy"] = "v2-trend-pullback",
+  quote?: { price_usd: number; quote_ts_ms: number } | null,
 ): TradeIntent | null {
   const base = {
     id: `int_${randomUUID()}`,
@@ -61,10 +69,20 @@ export function intentFromDecision(
     price_usd: decision.price,
     reason: decision.reason,
     strategy,
+    ...(decision.strategy_id ? { strategy_id: decision.strategy_id } : {}),
     signals: decision.signals,
+    ...(quote ? { quote_price: quote.price_usd, quote_ts_ms: quote.quote_ts_ms } : {}),
   };
   if (decision.action === "buy") {
-    return { ...base, action: "buy", notional_usd: decision.value_usd, qty: null, stop_pct: decision.stop_pct };
+    return {
+      ...base,
+      action: "buy",
+      notional_usd: decision.value_usd,
+      qty: null,
+      stop_pct: decision.stop_pct,
+      tp_pct: decision.tp_pct ?? null,
+      deadline_ts: decision.deadline_ts ?? null,
+    };
   }
   const position = positions.find((row) => row.mint === decision.mint);
   if (!position || position.qty <= 0) return null;
@@ -74,5 +92,7 @@ export function intentFromDecision(
     notional_usd: position.qty * decision.price,
     qty: position.qty,
     stop_pct: null,
+    tp_pct: null,
+    deadline_ts: null,
   };
 }
