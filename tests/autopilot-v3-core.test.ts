@@ -9,10 +9,17 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  __resetExecutionQuoteCacheForTests,
   conservativeCost,
+  costFromRoundTripQuotes,
   costFromImpact,
+  fetchExecutionQuote,
   impactFromQuoteBody,
   memecoinConservativeCost,
+  fetchExecutionCost,
+  quoteNeedsRefresh,
+  routeFeeBps,
+  slippageP95Bps,
   CONSERVATIVE_TOTAL_BPS,
   MEMECOIN_CONSERVATIVE_TOTAL_BPS,
 } from "../src/autopilot/v3/execution-cost";
@@ -45,6 +52,71 @@ describe("execution-cost model", () => {
     const sum =
       cost.dex_fee_bps + cost.price_impact_bps + cost.spread_bps + cost.slippage_bps + cost.priority_fee_bps + cost.failed_tx_bps;
     expect(sum).toBeCloseTo(cost.total_bps, 5);
+  });
+
+  test("GIVEN cached Tier B decimals THEN quote-derived execution cost no longer fails closed", async () => {
+    __resetExecutionQuoteCacheForTests();
+    const mint = "DynamicMint111111111111111111111111111111111";
+    const bodies = [
+      { inputMint: "usdc", outputMint: mint, inAmount: "15000000", outAmount: "30000000", priceImpactPct: "0.0005" },
+      { inputMint: mint, outputMint: "usdc", inAmount: "30000000", outAmount: "14850000", priceImpactPct: "0.0005" },
+    ];
+    const cost = await fetchExecutionCost(
+      mint,
+      15,
+      async () => new Response(JSON.stringify(bodies.shift()), { status: 200 }),
+      [{ mint, symbol: "DYN", decimals: 6, resolved_at: "2026-07-12T00:00:00Z" }],
+    );
+    expect(cost.total_bps).not.toBe(CONSERVATIVE_TOTAL_BPS);
+    expect(cost.price_impact_bps).toBeCloseTo(10, 6);
+  });
+
+  test("GIVEN forward and reverse quotes THEN components exactly partition the embedded round-trip loss", () => {
+    // Jupiter documents outAmount as fee-inclusive. A live verification against
+    // SOL/JUP/RAY therefore treats route fees as attribution, never an add-on.
+    const forward = {
+      inputMint: "usdc", outputMint: "token", inAmount: "10000000", outAmount: "20000000", priceImpactPct: "0.001",
+      routePlan: [{ swapInfo: { feeMint: "usdc", feeAmount: "10000" } }],
+    };
+    const reverse = {
+      inputMint: "token", outputMint: "usdc", inAmount: "20000000", outAmount: "9900000", priceImpactPct: "0.001",
+      routePlan: [{ swapInfo: { feeMint: "token", feeAmount: "20000" } }],
+    };
+    const cost = costFromRoundTripQuotes(forward, reverse, 20);
+    expect(routeFeeBps(forward)).toBeCloseTo(10, 8);
+    expect(cost).toMatchObject({ price_impact_bps: 20, dex_fee_bps: 20, spread_bps: 60, slippage_bps: 20, total_bps: 127 });
+    if (!cost) throw new Error("expected cost");
+    expect(cost.dex_fee_bps + cost.price_impact_bps + cost.spread_bps + cost.slippage_bps + cost.priority_fee_bps + cost.failed_tx_bps)
+      .toBeCloseTo(cost.total_bps, 8);
+  });
+
+  test("GIVEN rehearsal evidence THEN p95 replaces the tier fallback only at ten samples", () => {
+    const rows = Array.from({ length: 10 }, (_, index) => ({
+      id: `r${index}`, ts: new Date(2026, 0, index + 1).toISOString(), mint: "m", symbol: "M", side: "buy" as const,
+      notional_usd: 25, live_cost_vs_paper_pct: index / 100, reference_basis: "flat_fallback" as const, price_impact_pct: 0, status: "quoted" as const,
+    }));
+    expect(slippageP95Bps(rows.slice(0, 9), "m", "B")).toBe(60);
+    expect(slippageP95Bps(rows, "m", "B")).toBe(9);
+  });
+
+  test("GIVEN a fresh quote THEN its paper price is the executable amount ratio and route cost is not double-charged", async () => {
+    __resetExecutionQuoteCacheForTests();
+    const mint = "DynamicMint222222222222222222222222222222222";
+    const bodies = [
+      { inputMint: "usdc", outputMint: mint, inAmount: "15000000", outAmount: "30000000", priceImpactPct: "0" },
+      { inputMint: mint, outputMint: "usdc", inAmount: "30000000", outAmount: "14900000", priceImpactPct: "0" },
+    ];
+    const quote = await fetchExecutionQuote({
+      mint, side: "buy", notional_usd: 15, now_ms: 1_000,
+      mint_meta: [{ mint, symbol: "DYN", decimals: 6, resolved_at: "2026-07-12T00:00:00Z" }],
+    }, async () => new Response(JSON.stringify(bodies.shift()), { status: 200 }));
+    expect(quote).toMatchObject({ price_usd: 0.5, fee_usd: 0, qty: 30, value_usd: 15, quote_ts_ms: 1_000 });
+  });
+
+  test("requote boundaries are strictly over 5bp or older than 20 seconds", () => {
+    expect(quoteNeedsRefresh(100, 1_000, 100.05, 21_000)).toBe(false);
+    expect(quoteNeedsRefresh(100, 1_000, 100.05001, 21_000)).toBe(true);
+    expect(quoteNeedsRefresh(100, 1_000, 100, 21_001)).toBe(true);
   });
 });
 

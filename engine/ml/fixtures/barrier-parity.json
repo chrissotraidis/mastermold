@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "cases": [
+    {"name":"target","entry_price":100,"max_loss_bps":440,"horizon_bars":24,"bars":[{"h":103,"l":99,"c":102},{"h":105,"l":101,"c":104.5}],"expected":{"label":1,"hit_index":1,"vertical":false,"reason":"take_profit"}},
+    {"name":"stop","entry_price":100,"max_loss_bps":440,"horizon_bars":24,"bars":[{"h":101,"l":95,"c":96}],"expected":{"label":-1,"hit_index":0,"vertical":false,"reason":"stop"}},
+    {"name":"pessimistic-tie","entry_price":100,"max_loss_bps":440,"horizon_bars":24,"bars":[{"h":105,"l":95,"c":101}],"expected":{"label":-1,"hit_index":0,"vertical":false,"reason":"stop_same_bar_tie"}},
+    {"name":"vertical-positive","entry_price":100,"max_loss_bps":440,"horizon_bars":24,"bars":[{"h":101,"l":99,"c":100.04},{"h":101,"l":99,"c":100.08},{"h":101,"l":99,"c":100.12},{"h":101,"l":99,"c":100.16},{"h":101,"l":99,"c":100.2},{"h":101,"l":99,"c":100.24},{"h":101,"l":99,"c":100.28},{"h":101,"l":99,"c":100.32},{"h":101,"l":99,"c":100.36},{"h":101,"l":99,"c":100.4},{"h":101,"l":99,"c":100.44},{"h":101,"l":99,"c":100.48},{"h":101,"l":99,"c":100.52},{"h":101,"l":99,"c":100.56},{"h":101,"l":99,"c":100.6},{"h":101,"l":99,"c":100.64},{"h":101,"l":99,"c":100.68},{"h":101,"l":99,"c":100.72},{"h":101,"l":99,"c":100.76},{"h":101,"l":99,"c":100.8},{"h":101,"l":99,"c":100.84},{"h":101,"l":99,"c":100.88},{"h":101,"l":99,"c":100.92},{"h":101,"l":99,"c":101}],"expected":{"label":1,"hit_index":23,"vertical":true,"reason":"vertical"}}
+  ]
+}

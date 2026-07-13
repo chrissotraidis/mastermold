@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { buildAttribution } from "../src/autopilot/attribution";
-import { decide, dueExitWatchMarks, UNIVERSE, type DecisionInput } from "../src/autopilot/daemon";
+import { decide, dueExitWatchMarks, processVetoWatches, UNIVERSE, type DecisionInput } from "../src/autopilot/daemon";
 import type { MarketFeedRow } from "../src/autopilot/feed";
 import {
   DEFAULT_STRATEGY_PARAMS,
@@ -179,6 +179,19 @@ describe("post-exit counterfactuals", () => {
     store.updateExitWatch({ ...row, mark_30m_usd: 101, mark_2h_usd: 102, mark_4h_usd: 103, done: true });
     expect(store.openExitWatches()).toHaveLength(0);
     expect(store.exitWatches()[0].mark_2h_usd).toBe(102);
+  });
+});
+
+describe("BP veto counterfactuals", () => {
+  test("a veto receives exactly one 30m mark from the shared tick price map", () => {
+    const store = autopilotStore();
+    store.appendVetoWatch({
+      ts: new Date(NOW).toISOString(), mint: SOL.mint, symbol: "SOL", price_at_veto_usd: 100, bp: 0.8,
+    });
+    expect(processVetoWatches(store, new Map([[SOL.mint, 99]]), NOW + 29 * 60_000)).toBe(0);
+    expect(processVetoWatches(store, new Map([[SOL.mint, 98.5]]), NOW + 30 * 60_000)).toBe(1);
+    expect(processVetoWatches(store, new Map([[SOL.mint, 97]]), NOW + 31 * 60_000)).toBe(0);
+    expect(store.vetoWatches()[0]).toMatchObject({ mark_30m_usd: 98.5, done: true });
   });
 });
 

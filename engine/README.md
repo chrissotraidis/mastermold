@@ -89,6 +89,45 @@ LLM spend**, and writes a bundle whose single card is `nothing_actionable`.
 
 `bin/engine-briefing` (repo root) is a thin wrapper around the run entry point.
 
+## CUSUM ML sidecar
+
+The strategy ML package is deliberately separate from the advisory engine and
+from the trading daemon. Python acquires/caches OHLCV, recreates CUSUM events and
+triple-barrier labels, trains/scores the ResNet–LSTM, and appends probabilities.
+TypeScript remains the only decision/policy/execution authority.
+
+Use Python 3.12 for the full local ML environment, then:
+
+```bash
+cd engine
+uv venv --python 3.12
+uv sync --extra dev
+
+# Prepare one source into Parquet plus an NPZ training set.
+uv run python -m ml.data \
+  --coinbase-product SOL-USD --symbol SOL-USD \
+  --from 2023-07-12T00:00:00Z --to 2026-07-12T00:00:00Z \
+  --granularity 60 --asset-class major
+
+# From the repository root; Hyperband runs only on the first validation split.
+npm run ml:train -- --data out/ml/training-data.npz
+
+# A supervisor tails exact daemon event keys and refreshes the Coinbase cache
+# before scoring. The daemon never starts training or this scorer.
+uv run python -m ml.infer --watch-events out/ml/events.jsonl \
+  --model out/ml/models/<id>.pt --cache out/cache/ohlcv/SOL-USD.parquet \
+  --product SOL-USD --mint <sol-mint>
+```
+
+Artifacts live under ignored `engine/out/ml/`. A real model affects candidates
+only after both conditions are independently true: at least 28 days of persisted
+`cusum_tb` shadow history, and an operator-reviewed exact model ID in
+`engine/out/ml/APPROVED_MODEL` whose matching training result is real,
+data-contract compliant, and criterion-passing. Scores older than 60 seconds, models trained more
+than 100 days ago, mismatched event timestamps, absent approval, malformed lines,
+or a missing scorer all degrade to the unchanged rule-based path. Fixture model
+cards say `FIXTURE ONLY — NOT DEPLOYABLE`.
+
 ## TradingAgents graph smoke
 
 The engine has two agent paths:

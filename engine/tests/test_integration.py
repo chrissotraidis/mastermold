@@ -28,6 +28,7 @@ this isolates and proves the integration seam without them. Run:
 import importlib.util
 import json
 import sys
+import pytest
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -52,6 +53,8 @@ _TA_SCHEMAS = REPO / "ref" / "TradingAgents" / "tradingagents" / "agents" / "sch
 
 
 def _load_real_ta_schemas():
+    if not _TA_SCHEMAS.exists():
+        pytest.skip("optional ignored ref/TradingAgents checkout is not installed")
     spec = importlib.util.spec_from_file_location("ta_schemas_real", _TA_SCHEMAS)
     module = importlib.util.module_from_spec(spec)
     # Register before exec so the module's own globals (PortfolioRating, etc.) are

@@ -42,6 +42,8 @@ export const PERP_MARKET_BY_MINT: Record<string, string> = {
   So11111111111111111111111111111111111111112: "SOL-PERP",
   "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": "ETH-PERP",
   "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh": "BTC-PERP",
+  DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263: "1MBONK-PERP",
+  EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm: "WIF-PERP",
 };
 
 function asNum(value: unknown): number | null {

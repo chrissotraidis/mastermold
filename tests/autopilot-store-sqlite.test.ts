@@ -106,6 +106,42 @@ function legacyFixture() {
     web3_memory: [
       { id: "w3m-1", ts: "2026-07-01T11:00:00.000Z", symbol: "SOL", kind: "lesson", summary: "Fixture lesson survives migration" },
     ],
+    rehearsals: [
+      {
+        id: "rhs-1",
+        ts: "2026-07-01T11:30:00.000Z",
+        mint: "So11111111111111111111111111111111111111112",
+        symbol: "SOL",
+        side: "buy",
+        notional_usd: 15,
+        live_cost_vs_paper_pct: 0.21,
+        price_impact_pct: 0.04,
+        status: "quoted",
+      },
+    ],
+    tier_b: [
+      {
+        symbol: "DYN",
+        mint: "DynamicMint111111111111111111111111111111111",
+        liquidity_usd: 1_000_000,
+        volume_h24_usd: 2_000_000,
+        first_seen_ts: "2026-06-01T00:00:00.000Z",
+        added_ts: "2026-06-20T00:00:00.000Z",
+        below_exit_floor_days: 0,
+      },
+    ],
+    mint_meta: [
+      {
+        mint: "DynamicMint111111111111111111111111111111111",
+        symbol: "DYN",
+        decimals: 6,
+        resolved_at: "2026-06-20T00:00:00.000Z",
+      },
+    ],
+    tier_b_denylist: ["DeniedMint1111111111111111111111111111111111"],
+    tier_b_first_seen: {
+      DynamicMint111111111111111111111111111111111: "2026-06-01T00:00:00.000Z",
+    },
     decisions: [
       {
         id: "dec-1",
@@ -147,6 +183,18 @@ function legacyFixture() {
         mark_2h_usd: null,
         mark_4h_usd: null,
         done: false,
+      },
+    ],
+    veto_watches: [
+      {
+        id: "vtw-1",
+        ts: "2026-07-02T09:00:00.000Z",
+        mint: "So11111111111111111111111111111111111111112",
+        symbol: "SOL",
+        price_at_veto_usd: 150,
+        bp: 0.8,
+        mark_30m_usd: 149.5,
+        done: true,
       },
     ],
     analyst_memo: { ts: "2026-07-02T00:00:05.000Z", memo: "Fixture analyst memo" },
@@ -216,6 +264,11 @@ describe("JSON → SQLite migration (lossless)", () => {
 
     // web3 memory, decisions (with full signal snapshots), changelog.
     expect(store.web3Memory()).toEqual(fixture.web3_memory as ReturnType<typeof store.web3Memory>);
+    expect(store.rehearsals()).toEqual(fixture.rehearsals as ReturnType<typeof store.rehearsals>);
+    expect(store.tierB()).toEqual(fixture.tier_b as ReturnType<typeof store.tierB>);
+    expect(store.mintMeta()).toEqual(fixture.mint_meta as ReturnType<typeof store.mintMeta>);
+    expect(store.tierBDenylist()).toEqual(fixture.tier_b_denylist);
+    expect(store.tierBFirstSeen()).toEqual(fixture.tier_b_first_seen);
     expect(store.decisions()).toEqual(fixture.decisions as ReturnType<typeof store.decisions>);
     expect(store.paramChangelog()).toEqual(fixture.param_changelog as ReturnType<typeof store.paramChangelog>);
 
@@ -225,6 +278,8 @@ describe("JSON → SQLite migration (lossless)", () => {
     // exit watches, analyst memo, candidate snapshots (features + labels).
     expect(store.exitWatches()).toEqual(fixture.exit_watches as ReturnType<typeof store.exitWatches>);
     expect(store.openExitWatches()).toHaveLength(1);
+    expect(store.vetoWatches()).toEqual(fixture.veto_watches as ReturnType<typeof store.vetoWatches>);
+    expect(store.openVetoWatches()).toHaveLength(0);
     expect(store.analystMemo()).toEqual(fixture.analyst_memo);
     expect(store.candidateSnapshots()).toEqual(fixture.candidate_snapshots as ReturnType<typeof store.candidateSnapshots>);
 
@@ -326,5 +381,75 @@ describe("price history rolling cap", () => {
     expect(rows).toHaveLength(2_016);
     expect(rows[0].prices.mint).toBe(50); // the oldest 50 aged out
     expect(rows[rows.length - 1].prices.mint).toBe(2_065);
+  });
+});
+
+describe("CUSUM strategy state", () => {
+  test("per-strategy promotion, edge calibration, and triple-barrier positions persist independently", () => {
+    const store = autopilotStore();
+    store.setV3Promotion("xsec", { ready: false, ts: "2026-07-12T00:00:00.000Z" });
+    store.setV3Promotion("cusum_tb", { ready: true, ts: "2026-07-12T01:00:00.000Z" });
+    store.setCusumEdgeRatio(0.22, Date.parse("2026-07-12T02:00:00.000Z"));
+    store.setBarPortionEdgeRatio(0.35, Date.parse("2026-07-12T03:00:00.000Z"));
+    expect(store.ensureCusumObservationStartedAt(Date.parse("2026-07-12T00:00:00.000Z"))).toBe("2026-07-12T00:00:00.000Z");
+    store.appendCusumEventObservation({
+      ts: "2026-07-12T01:30:00.000Z", ts_ms: Date.parse("2026-07-12T01:30:00.000Z"),
+      mint: "cusum-mint", symbol: "CUS", direction: "up", magnitude: .025,
+      h_pct: 2.5, sigma_daily_pct: 5,
+    });
+    store.setReplayConfirmation("cusum_tb", {
+      config_hash: "abc", report_path: "docs/private/replay-reports/test.md", data_months: 12,
+      positive_walk_forward_quarters: 2, doubled_cost_positive: true, base_mean_net_bps: 25,
+      ts: "2026-07-12T04:00:00.000Z",
+    });
+    store.upsertPosition({
+      mint: "cusum-mint", symbol: "CUS", qty: 1, avg_cost_usd: 100,
+      stop_pct: 4.4, tp_pct: 4.4, deadline_ts: "2026-07-13T00:00:00.000Z",
+      opened_at: "2026-07-12T00:00:00.000Z", updated_at: "2026-07-12T00:00:00.000Z",
+    });
+    __resetAutopilotStoreForTests();
+    const reopened = autopilotStore();
+    expect(reopened.v3Promotion("xsec")?.ready).toBe(false);
+    expect(reopened.v3Promotion("cusum_tb")?.ready).toBe(true);
+    expect(reopened.cusumEdgeRatio()).toEqual({ value: 0.22, updated_at: "2026-07-12T02:00:00.000Z" });
+    expect(reopened.barPortionEdgeRatio()).toEqual({ value: 0.35, updated_at: "2026-07-12T03:00:00.000Z" });
+    expect(reopened.ensureCusumObservationStartedAt(Date.parse("2026-07-13T00:00:00.000Z"))).toBe("2026-07-12T00:00:00.000Z");
+    expect(reopened.cusumEventObservations()).toMatchObject([{ mint: "cusum-mint", symbol: "CUS", direction: "up", h_pct: 2.5 }]);
+    expect(reopened.replayConfirmation("cusum_tb")).toMatchObject({ config_hash: "abc", doubled_cost_positive: true });
+    expect(reopened.positions()[0]).toMatchObject({ stop_pct: 4.4, tp_pct: 4.4, deadline_ts: "2026-07-13T00:00:00.000Z" });
+  });
+});
+
+describe("BP veto evidence", () => {
+  test("veto watches append, update, and persist without requiring a trade id", () => {
+    const store = autopilotStore();
+    const watch = store.appendVetoWatch({
+      ts: "2026-07-12T00:00:00.000Z", mint: "m", symbol: "M", price_at_veto_usd: 100, bp: 0.75,
+    });
+    expect(store.openVetoWatches()).toHaveLength(1);
+    store.updateVetoWatch({ ...watch, mark_30m_usd: 99, done: true });
+    __resetAutopilotStoreForTests();
+    expect(autopilotStore().openVetoWatches()).toHaveLength(0);
+    expect(autopilotStore().vetoWatches()[0]).toMatchObject({ mark_30m_usd: 99, done: true, bp: 0.75 });
+    expect("trade_id" in autopilotStore().vetoWatches()[0]).toBe(false);
+  });
+});
+
+describe("CEX gap evidence", () => {
+  test("listing truth and measurement rows persist independently of candidates", () => {
+    const store = autopilotStore();
+    store.setCexListings({ "coinbase:SOL": { symbol: "SOL", venue: "coinbase", pair: "SOL-USD", listed: true, checked_at: "2026-07-12T00:00:00Z" } });
+    store.appendCexGapObservation({ ts: "2026-07-12T00:05:00Z", symbol: "SOL", venue: "coinbase", pair: "SOL-USD", direction: "buy_dex_sell_cex", gap_bps: 100, net_bps: 10, jup_cost_bps: 20, cex_mid: 100, jup_eff: 99, cex_taker_fee_bps: 60, fee_verified_on: "2026-07-12" });
+    __resetAutopilotStoreForTests();
+    expect(autopilotStore().cexListings()["coinbase:SOL"]).toMatchObject({ listed: true, pair: "SOL-USD" });
+    expect(autopilotStore().cexGapObservations()).toHaveLength(1);
+    expect(autopilotStore().cexGapWeeklyAggregates()).toEqual([{
+      key: "2026-07-06:coinbase:SOL", week: "2026-07-06", symbol: "SOL", venue: "coinbase",
+      observations: 1, positive_count: 1, over_25_count: 0,
+    }]);
+    autopilotStore().appendCexGapObservation({ ts: "2026-07-12T00:10:00Z", symbol: "SOL", venue: "coinbase", pair: "SOL-USD", direction: "buy_cex_sell_dex", gap_bps: 80, net_bps: 30, jup_cost_bps: 20, cex_mid: 100, jup_eff: 101, cex_taker_fee_bps: 60, fee_verified_on: "2026-07-12" });
+    __resetAutopilotStoreForTests();
+    expect(autopilotStore().cexGapWeeklyAggregates()[0]).toMatchObject({ observations: 2, positive_count: 2, over_25_count: 1 });
+    expect(autopilotStore().candidateSnapshots()).toHaveLength(0);
   });
 });

@@ -18,6 +18,8 @@
 
 import { UNIVERSE } from "./universe";
 
+type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
 export type MarketFeedRow = {
   symbol: string;
   price_usd: number;
@@ -162,7 +164,7 @@ export async function fetchTokenSummary(mint: string, doFetch: typeof fetch = fe
   }
 }
 
-let cache: { rows: MarketFeedRow[]; fetchedAtMs: number; ok: boolean } | null = null;
+let cache: { key: string; rows: MarketFeedRow[]; fetchedAtMs: number; ok: boolean } | null = null;
 
 /** Test seam: forget the cached feed so the next fetchMarketFeed() hits the network. */
 export function __resetMarketFeedCacheForTests(): void {
@@ -174,16 +176,21 @@ export function __resetMarketFeedCacheForTests(): void {
  * failure (timeout, non-200, bad JSON) returns [] and backs off 15s. Never
  * throws — callers can `market_feed: await fetchMarketFeed()` safely.
  */
-export async function fetchMarketFeed(nowMs: number = Date.now()): Promise<MarketFeedRow[]> {
-  if (cache && nowMs - cache.fetchedAtMs < (cache.ok ? CACHE_TTL_MS : FAILURE_COOLDOWN_MS)) {
+export async function fetchMarketFeed(
+  nowMs: number = Date.now(),
+  universe: UniverseAsset[] = UNIVERSE,
+  doFetch: FetchLike = fetch,
+): Promise<MarketFeedRow[]> {
+  const key = universe.map((asset) => `${asset.symbol}:${asset.mint}`).join("|");
+  if (cache && cache.key === key && nowMs - cache.fetchedAtMs < (cache.ok ? CACHE_TTL_MS : FAILURE_COOLDOWN_MS)) {
     return cache.rows;
   }
 
   try {
     // Per-mint fan-out; one slow or failed mint never blanks the others.
     const settled = await Promise.allSettled(
-      UNIVERSE.map(async (asset) => {
-        const response = await fetch(`${FEED_URL}${asset.mint}`, {
+      universe.map(async (asset) => {
+        const response = await doFetch(`${FEED_URL}${asset.mint}`, {
           headers: { Accept: "application/json" },
           signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
@@ -193,11 +200,11 @@ export async function fetchMarketFeed(nowMs: number = Date.now()): Promise<Marke
       }),
     );
     const pairs = settled.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
-    const rows = parseMarketFeed({ pairs });
-    cache = { rows, fetchedAtMs: nowMs, ok: rows.length > 0 };
+    const rows = parseMarketFeed({ pairs }, universe);
+    cache = { key, rows, fetchedAtMs: nowMs, ok: rows.length > 0 };
     return rows;
   } catch {
-    cache = { rows: [], fetchedAtMs: nowMs, ok: false };
+    cache = { key, rows: [], fetchedAtMs: nowMs, ok: false };
     return [];
   }
 }
