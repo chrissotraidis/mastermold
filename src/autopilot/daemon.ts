@@ -426,7 +426,14 @@ export function decide(input: DecisionInput): DecisionOutput {
     // minimum viable size — capital earns trust before it earns size.
     const canaryCap = input.live_canary ? CANARY_TRADE_USD : Infinity;
     const tierCap = best.tier === "B" ? 15 : Infinity;
-    const size = Math.min(state.caps.max_trade_usd, cash_usd * 0.25, canaryCap, tierCap);
+    // Risk-based sizing (2026-07-16): target a constant dollar risk per entry
+    // (~2% of the notional cap) so a wide-stop, volatile setup takes less size
+    // than a tight-stop one. The notional cap still binds, so this only ever
+    // sizes DOWN marginal setups — a cleaner equity curve and a truer
+    // expectancy read, never more risk than the flat size took.
+    const targetRiskUsd = state.caps.max_trade_usd * 0.02;
+    const riskBasedNotional = best.stopPct > 0 ? targetRiskUsd / (best.stopPct / 100) : state.caps.max_trade_usd;
+    const size = Math.min(state.caps.max_trade_usd, cash_usd * 0.25, canaryCap, tierCap, riskBasedNotional);
     if (size >= 5) {
       decisions.push({
         action: "buy",
@@ -1888,7 +1895,11 @@ async function tick(context: TickContext): Promise<void> {
       const position = store.positions().find((row) => row.mint === intent.mint);
       if (!position) continue;
       const pnl = fill.value_usd - position.qty * position.avg_cost_usd;
-      const sellRow = store.appendTrade({ side: "sell", mint: intent.mint, symbol: intent.symbol, qty: fill.qty, price_usd: fill.price_usd, value_usd: fill.value_usd, fee_usd: fill.fee_usd, reason: intent.reason, mode: intent.mode, signature: fill.signature, strategy_id: intent.strategy_id ?? position.strategy_id, ...latencyFields });
+      // Net of BOTH sides' fees (buy fee estimated from cost basis) — same
+      // basis the exit watch uses for was_loss, recorded on the row so
+      // attribution reads P&L directly instead of re-pairing trades.
+      const realizedPnlUsd = pnl - fill.fee_usd - position.qty * position.avg_cost_usd * paperFeeRateFor(intent.mint);
+      const sellRow = store.appendTrade({ side: "sell", mint: intent.mint, symbol: intent.symbol, qty: fill.qty, price_usd: fill.price_usd, value_usd: fill.value_usd, fee_usd: fill.fee_usd, reason: intent.reason, mode: intent.mode, signature: fill.signature, strategy_id: intent.strategy_id ?? position.strategy_id, realized_pnl_usd: realizedPnlUsd, ...latencyFields });
       store.closePosition(intent.mint);
       context.cooldownUntilMs.set(intent.mint, nowMs + params.cooldown_ms);
       // Keep watching this exit: the +30m/+2h/+4h marks are the counterfactual

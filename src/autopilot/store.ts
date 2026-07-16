@@ -132,6 +132,10 @@ export type BotTradeRow = {
   t_decision_ms?: number;
   t_quote_ms?: number;
   t_fill_ms?: number;
+  /** Sell fills only: net-of-fees realized P&L for the closed round trip.
+   * Recorded at exit (2026-07-16) so per-trade attribution reads straight off
+   * the row instead of re-pairing buys and sells after the fact. */
+  realized_pnl_usd?: number;
 };
 
 /** Ledger input: id/ts are generated when omitted; mode defaults to "paper". */

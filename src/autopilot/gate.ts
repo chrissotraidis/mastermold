@@ -10,8 +10,15 @@
 import type { BotDecisionRow, BotTradeRow, EquityPointRow } from "./store";
 
 export const GATE_WINDOW_DAYS = 5;
-export const GATE_MIN_ROUND_TRIPS = 5;
+// Raised 2026-07-16 (operator audit): 5 round trips is noise, not evidence —
+// a lucky handful could unlock a live wallet. 30 completed round trips is the
+// floor for a meaningful expectancy read before real capital is ever at risk.
+export const GATE_MIN_ROUND_TRIPS = 30;
 export const GATE_MAX_DRAWDOWN_PCT = 10;
+// The window gain must clear a real edge, not merely end a cent above where it
+// started: +1% over the window is ~1.7x a single round-trip's cost, so noise
+// alone can't pass the performance check.
+export const GATE_MIN_EDGE_PCT = 1.0;
 
 export type GateCheck = {
   key: "window" | "traced" | "performance" | "drawdown" | "wallet";
@@ -115,10 +122,11 @@ export function evaluateGoLiveGate(input: GateInput): GoLiveGate {
       ? ((endEquity - startEquity) / startEquity) * 100
       : null;
   const beatsBenchmark = solReturnPct === null || (equityReturnPct !== null && equityReturnPct >= solReturnPct);
+  const clearsEdgeFloor = equityReturnPct !== null && equityReturnPct >= GATE_MIN_EDGE_PCT;
   const performance: GateCheck = {
     key: "performance",
-    label: "equity above the window start and ahead of SOL buy-and-hold",
-    pass: startEquity !== null && endEquity !== null && endEquity > startEquity && beatsBenchmark,
+    label: `equity up ≥${GATE_MIN_EDGE_PCT}% over the window and ahead of SOL buy-and-hold`,
+    pass: startEquity !== null && endEquity !== null && clearsEdgeFloor && beatsBenchmark,
     detail:
       startEquity === null || endEquity === null
         ? "no equity marks in the window yet"

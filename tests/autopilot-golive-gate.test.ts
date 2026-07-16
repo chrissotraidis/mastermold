@@ -67,7 +67,10 @@ function tracedRoundTrip(msAgo: number, symbol = "SOL"): { trades: BotTradeRow[]
 }
 
 function passingInput(): GateInput {
-  const trips = Array.from({ length: GATE_MIN_ROUND_TRIPS }, (_, index) => tracedRoundTrip((index + 1) * 8 * 60 * 60_000));
+  // Pack every round trip inside the window so all GATE_MIN_ROUND_TRIPS of
+  // them count toward the check (each trip's buy sits 1h before its sell).
+  const spacingMs = Math.floor((GATE_WINDOW_DAYS * DAY_MS * 0.9) / GATE_MIN_ROUND_TRIPS);
+  const trips = Array.from({ length: GATE_MIN_ROUND_TRIPS }, (_, index) => tracedRoundTrip((index + 1) * spacingMs));
   const equity: EquityPointRow[] = Array.from({ length: 20 }, (_, index) => ({
     ts: iso((GATE_WINDOW_DAYS + 2) * DAY_MS - index * 8 * 60 * 60_000),
     equity_usd: 1_000 + index * 2, // steadily up, no drawdown
