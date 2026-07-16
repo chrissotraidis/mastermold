@@ -68,7 +68,7 @@ describe("runDailyBackup", () => {
     const remaining = readdirSync(backupRoot).sort();
     expect(remaining).toEqual(["snapshot-2026-07-03", "snapshot-2026-07-10"].map((n) => n.replace("2026-07-10", "2026-07-10")));
     expect(remaining).toHaveLength(2);
-    expect(DEFAULT_BACKUP_KEEP).toBe(14);
+    expect(DEFAULT_BACKUP_KEEP).toBe(60);
   });
 
   test("GIVEN a missing data dir or unwritable target THEN it degrades without throwing", () => {

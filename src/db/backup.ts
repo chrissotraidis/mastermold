@@ -11,7 +11,7 @@
  * always a complete document). Restore is `cp` back into `.data/`.
  *
  *   MASTERMOLD_BACKUP_DIR   default ~/.mastermold/backups
- *   MASTERMOLD_BACKUP_KEEP  snapshots retained, default 14
+ *   MASTERMOLD_BACKUP_KEEP  snapshots retained, default 60
  */
 
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, unlinkSync } from "node:fs";
@@ -20,7 +20,7 @@ import { basename, join } from "node:path";
 
 import { openSqliteDatabase, resolveSqlitePath } from "../autopilot/sqlite";
 
-export const DEFAULT_BACKUP_KEEP = 14;
+export const DEFAULT_BACKUP_KEEP = 60;
 
 export type BackupResult = {
   /** Absolute path of the snapshot directory, or null when skipped. */
