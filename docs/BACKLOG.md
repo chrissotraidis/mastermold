@@ -3,6 +3,19 @@
 Known gaps and deliberately deferred work, so nothing lives only in someone's
 head. Items leave this list by being built or by being rejected with a reason.
 
+## Planned
+
+- **System expansion: prediction-market venue (Polymarket) and strategy
+  rebuild** — operator decision 2026-08-01, motivated by the
+  [August 2026 strategy review](STRATEGY-REVIEW-2026-08.md): the current
+  trend-pullback book shows no edge, so the next generation rebuilds
+  entry/exit geometry around the one calibrated-positive signal (`cusum_tb`)
+  and adds a prediction-market lane. Constraints already decided: new venues
+  enter shadow-first on the existing v3 promotion plumbing, the risk
+  constitution and gates stay untouched, and all runtime history (paper book,
+  labels, calibration) must be migrated, never reset. Runtime stores are
+  private and are snapshotted off-repo before any structural change.
+
 ## Waiting on evidence (the system unlocks these itself)
 
 - **xsec signal re-derivation** — calibration currently reads the hand-scored
