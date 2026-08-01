@@ -172,8 +172,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(alertDrawer).toContain('data-testid="alert-drawer-card"');
     // Redesign: every alert is a one-line disclosure row — severity dot with an
     // sr-only tier label, single truncated message, quiet symbol on the right —
-    // and the whole 44px row is the toggle. No per-card badges or chips.
-    expect(alertFeed).toContain("flex min-h-11 w-full cursor-pointer items-center gap-3 px-3 py-2 text-left");
+    // the toggle fills the 44px row except a one-tap dismiss button docked at
+    // the right edge (also a 44px target on phones). No per-card badges or chips.
+    expect(alertFeed).toContain("flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2 text-left");
+    expect(alertFeed).toContain("min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-outline");
     expect(alertDrawer).toContain("flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2");
     for (const surfaceSource of [alertFeed, alertDrawer]) {
       expect(surfaceSource).toContain("size-2 shrink-0 rounded-full");

@@ -140,6 +140,45 @@ export function AlertFeed({ initialAlerts, replayAsOf = null, initialFilter = "A
     });
   }
 
+  function dismissAll() {
+    const targets = visibleAlerts;
+    if (targets.length === 0) return;
+    markBrowserAction("dismiss-all-alerts");
+    setSavedJournalId(null);
+    setLastDismissedId(null);
+    targets.forEach((alert) => updateAlert(alert.id, { acknowledged: true }));
+    setMessage(`Dismissed ${targets.length} item${targets.length === 1 ? "" : "s"}.`);
+    setLastAction(`Dismissed all ${targets.length} visible activity items.`);
+    setActionSequence((current) => current + 1);
+    startTransition(async () => {
+      const results = await Promise.allSettled(
+        targets.map(async (alert) => {
+          const response = await fetch(`/api/alerts/${encodeURIComponent(alert.id)}/acknowledge`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ acknowledged: true }),
+          });
+          if (!response.ok) {
+            throw new Error("Dismiss request failed");
+          }
+          return (await response.json()) as PublicAlert;
+        }),
+      );
+      let failed = 0;
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          replaceAlert(result.value);
+        } else {
+          failed += 1;
+          updateAlert(targets[index].id, { acknowledged: targets[index].acknowledged });
+        }
+      });
+      if (failed > 0) {
+        setMessage(`Couldn't dismiss ${failed} of ${targets.length}. Try again.`);
+      }
+    });
+  }
+
   function restore(alert: PublicAlert) {
     markBrowserAction(`restore-alert-${alert.id}`);
     setSavedJournalId(null);
@@ -288,6 +327,9 @@ export function AlertFeed({ initialAlerts, replayAsOf = null, initialFilter = "A
         setActionSequence={setActionSequence}
         setFilter={setFilter}
         setLastAction={setLastAction}
+        dismissAllCount={isReplay ? 0 : visibleAlerts.length}
+        dismissAllDisabled={isPending}
+        onDismissAll={dismissAll}
       />
 
       <p className="sr-only" aria-live="polite">
@@ -409,28 +451,43 @@ function AlertRow({
 }) {
   return (
     <div className="min-w-0" data-testid="alert-card">
-      <button
-        type="button"
-        onClick={onToggleDetails}
-        data-rds-action="toggle"
-        data-action-state={isExpanded ? `changed-${actionSequence}` : "idle"}
-        aria-expanded={isExpanded}
-        aria-controls={`${alert.id}-rationale`}
-        className="flex min-h-11 w-full cursor-pointer items-center gap-3 px-3 py-2 text-left transition hover:bg-surface-high/25"
-      >
-        <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", severityDot[alert.severity])} />
-        <span className="sr-only">{alert.severity}:</span>
-        <span className="min-w-0 flex-1 truncate text-sm text-on-surface">{cleanAlertMessage(alert.message)}</span>
-        {alert.asset_symbol && alert.asset_symbol !== "Unknown" ? (
-          <span className="shrink-0 text-xs text-outline">{alert.asset_symbol}</span>
-        ) : null}
-        <span
-          aria-hidden="true"
-          className={cn("shrink-0 text-xs text-outline transition-transform", isExpanded && "rotate-90")}
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={onToggleDetails}
+          data-rds-action="toggle"
+          data-action-state={isExpanded ? `changed-${actionSequence}` : "idle"}
+          aria-expanded={isExpanded}
+          aria-controls={`${alert.id}-rationale`}
+          className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2 text-left transition hover:bg-surface-high/25"
         >
-          ›
-        </span>
-      </button>
+          <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", severityDot[alert.severity])} />
+          <span className="sr-only">{alert.severity}:</span>
+          <span className="min-w-0 flex-1 truncate text-sm text-on-surface">{cleanAlertMessage(alert.message)}</span>
+          {alert.asset_symbol && alert.asset_symbol !== "Unknown" ? (
+            <span className="shrink-0 text-xs text-outline">{alert.asset_symbol}</span>
+          ) : null}
+          <span
+            aria-hidden="true"
+            className={cn("shrink-0 text-xs text-outline transition-transform", isExpanded && "rotate-90")}
+          >
+            ›
+          </span>
+        </button>
+        {!isReplay ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            disabled={isBusy}
+            data-rds-action="submit"
+            aria-label={`Dismiss: ${cleanAlertMessage(alert.message)}`}
+            title="Dismiss"
+            className="mr-1.5 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-high/40 hover:text-on-surface disabled:opacity-50 sm:min-h-9 sm:min-w-9"
+          >
+            <CheckCircle2 aria-hidden="true" className="size-4" />
+          </button>
+        ) : null}
+      </div>
       {isExpanded ? (
         <div id={`${alert.id}-rationale`} className="px-3 pb-3" data-testid="activity-details-panel">
           <p className="text-sm leading-6 text-on-surface">{buildAlertSuggestedResponse(alert)}</p>
@@ -517,6 +574,9 @@ function ActivityFilterControls({
   setActionSequence,
   setFilter,
   setLastAction,
+  dismissAllCount,
+  dismissAllDisabled,
+  onDismissAll,
 }: {
   activeCount: number;
   actionSequence: number;
@@ -524,7 +584,24 @@ function ActivityFilterControls({
   setActionSequence: React.Dispatch<React.SetStateAction<number>>;
   setFilter: React.Dispatch<React.SetStateAction<SeverityFilter>>;
   setLastAction: React.Dispatch<React.SetStateAction<string>>;
+  dismissAllCount: number;
+  dismissAllDisabled: boolean;
+  onDismissAll: () => void;
 }) {
+  const dismissAllButton =
+    dismissAllCount > 1 ? (
+      <button
+        type="button"
+        onClick={onDismissAll}
+        disabled={dismissAllDisabled}
+        data-rds-action="submit"
+        title={filter === "All" ? "Dismiss every active item" : `Dismiss all ${filter} items`}
+        className="inline-flex min-h-11 items-center justify-center gap-1 rounded-md border border-outline-variant/40 px-2.5 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-high/45 hover:text-on-surface disabled:opacity-50 sm:min-h-8"
+      >
+        <CheckCircle2 aria-hidden="true" className="size-3.5" />
+        Dismiss all ({dismissAllCount})
+      </button>
+    ) : null;
   const controls = filters.map((item) => (
     <button
       key={item}
@@ -559,6 +636,7 @@ function ActivityFilterControls({
         <div className="grid grid-cols-2 gap-2 border-t border-outline-variant/25 py-3" role="group" aria-label="Filter activity">
           {controls}
         </div>
+        {dismissAllButton ? <div className="border-t border-outline-variant/25 py-3">{dismissAllButton}</div> : null}
       </details>
       <div className="hidden items-center justify-between gap-3 border-b border-outline-variant/20 pb-3 sm:flex">
         <div
@@ -568,9 +646,10 @@ function ActivityFilterControls({
         >
           {controls}
         </div>
-        <span className="shrink-0 text-xs text-outline">
-          {activeCount} active
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {dismissAllButton}
+          <span className="text-xs text-outline">{activeCount} active</span>
+        </div>
       </div>
     </>
   );

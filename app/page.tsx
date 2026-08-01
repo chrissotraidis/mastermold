@@ -6,6 +6,8 @@ import { DailyReportRefreshButton } from "@/components/daily-report-refresh-butt
 import { TodayMemoryRefresh } from "@/components/today-memory-refresh";
 import { TodayReadTimer } from "@/components/today-metrics";
 import { productProvenanceLabel } from "@/lib/provenance-copy";
+import { toPublicAlert } from "@/lib/public-api-copy";
+import { TodayAlertList } from "@/components/today-alert-list";
 import { parseAsOf } from "@/src/db/bitemporal";
 import { describeTrackRecord, gradePlayHistory, playTrackRecord } from "@/src/db/play-outcomes";
 import { store } from "@/src/db/store";
@@ -175,10 +177,14 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             </Link>
           </div>
           <div className="mt-2 divide-y divide-outline-variant/20 rounded-md border border-outline-variant/25">
-            {alerts.length > 0 ? (
-              alerts.map((alert) => <AlertLine key={alert.id} alert={alert} />)
+            {asOf ? (
+              alerts.length > 0 ? (
+                alerts.map((alert) => <AlertLine key={alert.id} alert={alert} />)
+              ) : (
+                <p className="p-3 text-sm text-on-surface-variant">No unreviewed activity.</p>
+              )
             ) : (
-              <p className="p-3 text-sm text-on-surface-variant">No unreviewed activity.</p>
+              <TodayAlertList initialAlerts={alerts.map(toPublicAlert)} />
             )}
           </div>
         </section>
