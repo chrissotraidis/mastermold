@@ -35,9 +35,8 @@ Exit-reason breakdown (the story is here):
 |---|---|---|
 | Hard stops (-1.2% legacy, up to -3.0% dynamic) | 18 | **-$8.24** |
 | Take profits (2R target, +2.4% to +6.4%) | 6 | +$3.03 |
-| Armed trails | 14 | +$0.30 |
+| Armed trails | 15 | +$0.30 |
 | Time stops (24h) | 4 | -$0.08 |
-| Neutral/other | 1 | ~0 |
 
 The nightly analyst memo (2026-08-01) on the most recent window: 17 round
 trips, 52.9% win rate, expectancy +0.11bp — statistically zero. One meme-tier
