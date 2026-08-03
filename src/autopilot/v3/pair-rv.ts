@@ -5,7 +5,8 @@
  * (now in scope): long the underpriced token, short the overpriced one.
  *
  * Pure z-score logic here; the spread history + beta come from the daemon's
- * rolling data, and the perp leg executes through the perps adapter. Enabled in
+ * rolling data. No synchronized two-leg execution adapter exists, so this stays
+ * shadow-only even if its statistical evidence improves. Enabled in
  * chop and risk-off (mean reversion), disabled in strong risk-on trends where
  * divergence can persist.
  */
@@ -63,7 +64,7 @@ export function pairCandidate(input: PairInput): CandidateSignal | null {
   if (evBps <= 0) return null;
 
   // z>0: A rich vs B → short A, long B. Represent the candidate on the leg we
-  // BUY (long B). The daemon pairs it with the short A perp leg.
+  // BUY (long B) for research labeling. No paired paper execution occurs.
   const longIsA = z < 0;
   return {
     strategy_id: "pair_rv",

@@ -88,7 +88,7 @@ function normalizeOutcomeInput(body: OutcomeRequest): {
     errors.push("Result score must be a number from 0 to 10.");
   }
   if (!resultNote) {
-    errors.push("Result note is required.");
+    errors.push("Outcome and lesson are required.");
   }
 
   return {

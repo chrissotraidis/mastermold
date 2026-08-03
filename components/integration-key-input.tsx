@@ -69,7 +69,12 @@ export function IntegrationKeyInput({
   const actionCopy = service === "live_chat" ? liveChatCopy(values.provider) : null;
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(storageKey);
+    const persisted = window.localStorage.getItem(storageKey);
+    const saved = window.sessionStorage.getItem(storageKey) ?? persisted;
+    if (persisted) {
+      window.sessionStorage.setItem(storageKey, persisted);
+      window.localStorage.removeItem(storageKey);
+    }
     const parsed = saved ? safeParse(saved) : {};
     const defaults = Object.fromEntries(
       fields.map((field) => [field.name, parsed[field.name] ?? field.options?.[0]?.value ?? ""]),
@@ -106,7 +111,7 @@ export function IntegrationKeyInput({
   function updateValue(fieldName: string, nextValue: string) {
     const nextValues = { ...values, [fieldName]: nextValue };
     setValues(nextValues);
-    window.localStorage.setItem(storageKey, JSON.stringify(nextValues));
+    window.sessionStorage.setItem(storageKey, JSON.stringify(nextValues));
     setTestState("idle");
     setImportState("idle");
     setEvidence("");
@@ -291,8 +296,8 @@ export function IntegrationKeyInput({
         </a>
       ) : null}
       <p className="text-xs leading-5 text-outline">
-        {permissionScope} These entries are saved in this browser and sent through this
-        local app only when you press a test or import action.{" "}
+        {permissionScope} These entries stay only in this browser tab and are sent through
+        the local app only when you press a test or import action. Closing the tab clears them.{" "}
         {service === "live_chat"
           ? "Live chat sends the question plus visible app context to the selected chat service."
           : "Importing copies holdings into Portfolio and still cannot trade."}

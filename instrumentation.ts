@@ -10,6 +10,7 @@
  */
 
 const CHECK_EVERY_MS = 5 * 60 * 1000;
+const POLYMARKET_CHECK_EVERY_MS = 5 * 60 * 1000;
 // The morning read fires after this LOCAL time. On a UTC-clocked VPS, set
 // MASTERMOLD_READ_AFTER (e.g. "12:15" for 7:15 ET) instead of changing the
 // system timezone. Malformed values fall back to the 7:15 default.
@@ -52,8 +53,13 @@ export async function register(): Promise<void> {
       if (getLatestDailyReport()?.run_date === today) return;
 
       running = true;
-      const { runMarketScan, scanRunnerAvailable } = await import("@/src/db/scan");
+      const { refreshPortfolioContext, runMarketScan, scanRunnerAvailable } = await import("@/src/db/scan");
       console.log(`[mastermold] in-app scheduler: running the ${today} morning read`);
+      // Portfolio freshness is part of the core decision loop and must not depend
+      // on the optional Python analysis engine being installed. Missing MCP
+      // configuration is a truthful no-op; a failed sync keeps the last snapshot.
+      const portfolioSync = await refreshPortfolioContext(now.toISOString());
+      console.log(`[mastermold] in-app scheduler: portfolio preflight ${portfolioSync.status} — ${portfolioSync.message}`);
       if (scanRunnerAvailable()) {
         await runMarketScan({ trigger: "scheduled" });
       }
@@ -69,4 +75,35 @@ export async function register(): Promise<void> {
   setInterval(() => void check(), CHECK_EVERY_MS);
   // One immediate check so a server booted after 07:15 still gets its read.
   setTimeout(() => void check(), 15_000);
+
+  let polymarketRunning = false;
+  const checkPolymarket = async () => {
+    if (polymarketRunning) return;
+    polymarketRunning = true;
+    try {
+      const { runPolymarketBrainCycle, runPolymarketPaperCycle } = await import("@/src/polymarket/engine");
+      const brainResult = await runPolymarketBrainCycle("scheduled");
+      if (brainResult.action === "unavailable") {
+        console.error("[mastermold] Polymarket brain cycle failed:", brainResult.detail);
+      }
+
+      // Archive public weather rules/forecasts/resolutions independently of
+      // whether anyone has the Polymarket tab open. This remains shadow-only.
+      const { fetchPolymarketWeatherReport } = await import("@/src/polymarket/weather");
+      await fetchPolymarketWeatherReport(true);
+
+      const { polymarketStore } = await import("@/src/polymarket/store");
+      const state = polymarketStore().state();
+      if (state.mode !== "paper" || state.kill_switch) return;
+      const result = await runPolymarketPaperCycle("scheduled");
+      if (result.action === "opened") console.log("[mastermold] Polymarket paper cycle:", result.detail);
+    } catch (error) {
+      console.error("[mastermold] Polymarket scheduler failed:", error);
+    } finally {
+      polymarketRunning = false;
+    }
+  };
+
+  setInterval(() => void checkPolymarket(), POLYMARKET_CHECK_EVERY_MS);
+  setTimeout(() => void checkPolymarket(), 30_000);
 }

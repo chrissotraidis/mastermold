@@ -6,9 +6,10 @@
 # autopilot daemon, crash restarts, log trimming). Kept as its own entrypoint
 # so the Service command never has to change when bin/up grows.
 #
-# Binding stays 127.0.0.1 (bin/up's default) — this app has NO authentication.
-# Reach it over an SSH tunnel or Tailscale; only set MASTERMOLD_BIND=0.0.0.0
-# behind an authenticating reverse proxy, knowingly.
+# Binding stays 127.0.0.1 by default. Loopback is the local operator; remote
+# access is denied unless long operator/viewer credentials are configured. Use
+# HTTPS (Tailscale Serve or a TLS proxy) before any remote Basic Auth session,
+# and set MASTERMOLD_BIND=0.0.0.0 only when that proxy is intentional.
 #
 # See docs/ZO-MIGRATION.md for the full cutover checklist.
 set -euo pipefail

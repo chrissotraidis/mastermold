@@ -570,7 +570,7 @@ function EntryList({
                           <Metric label="Review quality" value={entry.result.review_quality.toFixed(1)} />
                           <Metric label="Result score" value={entry.result.result_score.toFixed(1)} />
                           <Metric label="Closed" value={formatTimestamp(entry.result.resolved_at)} />
-                          <Metric label="Result note" value={plainJournalText(entry.result.result_note)} />
+                          <Metric label="Outcome / lesson" value={plainJournalText(entry.result.result_note)} />
                         </div>
                       </div>
                     ) : (
@@ -780,7 +780,7 @@ function ResolveOutcomeForm({
         </FieldBlock>
       </div>
 
-      <FieldBlock id={`${entry.id}-result-note`} label="What happened" error={errors.result_note}>
+      <FieldBlock id={`${entry.id}-result-note`} label="Outcome and lesson" error={errors.result_note}>
         <textarea
           id={`${entry.id}-result-note`}
           value={form.result_note}
@@ -1048,7 +1048,7 @@ function validateOutcomeForm(form: OutcomeFormState): OutcomeFormErrors {
   }
 
   if (!form.result_note.trim()) {
-    nextErrors.result_note = "Add a result note.";
+    nextErrors.result_note = "Add what happened and what should change next.";
   }
 
   return nextErrors;

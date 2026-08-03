@@ -15,6 +15,9 @@ export const STRATEGY_NAME = "v2 trend-pullback";
 
 export const STRATEGY_SUMMARY =
   "Buys an established uptrend during a short pullback — never into a spike — with volatility-scaled stops and a hard cost gate.";
+export const STRATEGY_ENTRY_AUTHORITY = "retired" as const;
+export const STRATEGY_RETIREMENT_REASON =
+  "Retired from new entries after negative completed replay and realized paper evidence. Protective exits and isolated research experiments remain active.";
 
 /** One universe symbol's live verdict this tick. `status` drives the chip. */
 export type SymbolEvaluation = {

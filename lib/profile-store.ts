@@ -65,19 +65,11 @@ export function markWelcomeSeen(): void {
 
 /** Read saved local fields for every known integration service. */
 export function loadIntegrationsBackup(): IntegrationBackup[] {
-  if (!isBrowser()) return [];
-  return INTEGRATION_SERVICES.map((service) => ({
-    service,
-    connected: false,
-    key: window.localStorage.getItem(fieldsFor(service)) ?? "",
-  }));
+  return [];
 }
 
-export function applyIntegrationsBackup(integrations: IntegrationBackup[]): void {
-  if (!isBrowser()) return;
-  for (const item of integrations) {
-    window.localStorage.setItem(fieldsFor(item.service), item.key);
-  }
+export function applyIntegrationsBackup(_integrations: IntegrationBackup[]): void {
+  return;
 }
 
 /** Snapshot the local setup (profile + saved test fields) into a backup envelope. */
@@ -121,5 +113,6 @@ export function resetEverything(): void {
   window.localStorage.removeItem(WELCOME_SEEN_KEY);
   for (const service of INTEGRATION_SERVICES) {
     window.localStorage.removeItem(fieldsFor(service));
+    window.sessionStorage.removeItem(fieldsFor(service));
   }
 }

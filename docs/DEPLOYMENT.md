@@ -60,13 +60,22 @@ these right if you run the server any other way:
    `server.js` chdirs into `.next/standalone`.** Run it bare and the web app
    silently creates a second, empty store inside the artifact while the
    daemon trades in the real one, with no API keys loaded. `bin/up` sources
-   `.env.local` and exports absolute `MASTERMOLD_DB` / `AUTOPILOT_DB` /
-   `ENGINE_OUT_DIR` paths so both processes share one `.data/`.
-2. **There is no authentication on any route.** The dashboard exposes your
-   holdings, and POST `/api/autopilot` controls the bot. `bin/up` binds the
-   production server to `127.0.0.1`; reach it over an SSH tunnel or
-   Tailscale, or front it with an authenticating reverse proxy and set
-   `MASTERMOLD_BIND=0.0.0.0` only once that is in place.
+   `.env.local` and exports absolute `MASTERMOLD_DB` / `AUTOPILOT_DB` / `POLYMARKET_DB` /
+   `POLYMARKET_BRAIN_DB` / `ENGINE_OUT_DIR` paths so both processes share one `.data/`.
+2. **Remote requests fail closed.** `bin/up` binds to `127.0.0.1` by default,
+   and a localhost or SSH-tunnel session has operator access. Any non-loopback
+   Host receives an authentication challenge unless
+   `MASTERMOLD_OPERATOR_PASSWORD` or `MASTERMOLD_VIEWER_PASSWORD` is configured.
+   Use Basic Auth username `operator` for ordinary app writes or `viewer` for safe
+   GET/HEAD access; viewer mutations return 403. Bot-control endpoints retain their stricter loopback-only checks. Browser mutations also require an
+   exact same-origin request. Use these credentials only over HTTPS, such as
+   Tailscale Serve or a TLS reverse proxy. Basic Auth does not encrypt transport.
+   Keep both passwords distinct, random, and at least 16 characters (32+ is
+   recommended). Set `MASTERMOLD_BIND=0.0.0.0` only behind that HTTPS proxy;
+   doing so disables the localhost Host shortcut so spoofing `Host: localhost`
+   cannot bypass authentication. State-changing routes are rate-limited in process, with tighter budgets for scans, imports, connection tests, notifications, chat, and autonomous-lane controls.
+
+`/api/health` separates process health from decision readiness. A 200 `status: ok` means the local service and trading stores are operational; inspect `readiness.status`, `readiness.reasons`, and the individual checks before treating its data as current or useful.
 
 Checklist for a new host:
 
@@ -81,4 +90,4 @@ Checklist for a new host:
   (UTC on most VPSes). On a UTC host, set `MASTERMOLD_READ_AFTER=HH:MM` in
   `.env.local` (e.g. `12:15` for 7:15 ET) instead of changing the system
   timezone.
-- Logs in `.data/logs/` self-trim at ~5MB; snapshots keep 14 days by default.
+- Logs in `.data/logs/` self-trim at ~5MB; snapshots keep 60 dated copies by default. A same-host snapshot is not disaster recovery: copy verified snapshots to a separately controlled off-host destination.

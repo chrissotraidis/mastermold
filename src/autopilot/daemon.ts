@@ -40,7 +40,7 @@ import { DEFAULT_STRATEGY_PARAMS, type StrategyParams } from "./params";
 import { MAX_TIER_B_POSITIONS, validateIntent } from "./policy";
 import { describeRehearsal, rehearseFill, rehearsalRowFromSwap } from "./rehearsal";
 import { medianRoundTripCostPct } from "./rehearsal-stats";
-import type { SymbolEvaluation } from "./strategy-view";
+import { STRATEGY_RETIREMENT_REASON, type SymbolEvaluation } from "./strategy-view";
 import { priceSeriesFromHistory } from "./v3/candidate-store";
 import {
   atrBps,
@@ -184,6 +184,21 @@ export type DecisionOutput = {
   /** Every universe symbol's verdict this tick, for the strategy panel. */
   evaluations: SymbolEvaluation[];
 };
+
+/** Keep v2 measurable in isolated experiment accounts, but remove its new
+ * entries from the primary paper/live book after its evidence gate failed.
+ * Existing positions retain every protective sell path. */
+export function retireV2PrimaryEntries(output: DecisionOutput): DecisionOutput {
+  const entry = output.decisions.find((decision) => decision.action === "buy");
+  if (!entry) return output;
+  return {
+    decisions: output.decisions.filter((decision) => decision.action !== "buy"),
+    skipped: { symbol: entry.symbol, reason: STRATEGY_RETIREMENT_REASON, signals: entry.signals },
+    evaluations: output.evaluations.map((evaluation) => evaluation.status === "entering"
+      ? { ...evaluation, status: "blocked", reason: STRATEGY_RETIREMENT_REASON }
+      : evaluation),
+  };
+}
 
 export function windowReturnPct(prices: number[]): number | null {
   if (prices.length < WINDOW_TICKS) return null;
@@ -841,10 +856,9 @@ async function tick(context: TickContext): Promise<void> {
   const tSignalMs = Date.now();
   const store = autopilotStore();
   // Heartbeat first, before any gate: it proves the daemon PROCESS is alive
-  // even while the bot itself is halted or off. The patch stays minimal
-  // ({ last_tick_at } only) because the Next server does read-modify-write on
-  // the same JSON file — a small patch shrinks the race window.
-  store.updateBotState({ last_tick_at: new Date().toISOString() });
+  // even while the bot itself is halted or off. Refreshing the PID also
+  // self-heals a stale value left by an interrupted older process.
+  store.updateBotState({ last_tick_at: new Date().toISOString(), daemon_pid: process.pid });
   const state = store.botState();
   if (!state.kill_switch && state.mode === "off") {
     const nowMs = Date.now();
@@ -1135,8 +1149,10 @@ async function tick(context: TickContext): Promise<void> {
     const previous = store.v3Promotion(strategyId);
     if (!previous) {
       store.setV3Promotion(strategyId, { ready: false, eligible: promotion.ready, ts: new Date(nowMs).toISOString(), operator_confirmed_at: null });
-    } else if (previous.eligible !== promotion.ready) {
-      store.setV3Promotion(strategyId, { ...previous, eligible: promotion.ready, ts: new Date(nowMs).toISOString() });
+    } else if (previous.eligible !== promotion.ready || (previous.ready && !promotion.ready)) {
+      store.setV3Promotion(strategyId, promotion.ready
+        ? { ...previous, eligible: true, ts: new Date(nowMs).toISOString() }
+        : { ...previous, ready: false, eligible: false, operator_confirmed_at: null, ts: new Date(nowMs).toISOString(), last_reason: "Evidence or execution eligibility closed; automatically demoted." });
       const transition = promotion.ready
         ? `V3 ${strategyId} is ELIGIBLE for paper promotion; awaiting explicit operator confirmation.`
         : `V3 ${strategyId} promotion eligibility closed: ${promotion.checks.filter((check) => !check.pass).map((check) => check.detail).join("; ")}.`;
@@ -1278,6 +1294,8 @@ async function tick(context: TickContext): Promise<void> {
           cost: conservativeCost(),
           liquidity_usd: feed.get(asset.symbol)?.liquidity_usd ?? null,
           funding_persistence_windows: snapshot.persistence_windows,
+          funding_rate_8h_stdev_pct: snapshot.funding_rate_8h_stdev_pct,
+          basis_stress_pct: snapshot.basis_stress_pct,
         };
         fundingByMint.set(mint, input);
         fundingByMarket.set(market, input);
@@ -1531,6 +1549,8 @@ async function tick(context: TickContext): Promise<void> {
       ({ decisions, skipped, evaluations } = decide({ ...decisionInput, modeledRoundTripCostPctByMint }));
     }
   }
+  ({ decisions, skipped, evaluations } = retireV2PrimaryEntries({ decisions, skipped, evaluations }));
+
 
   try {
     const experiments = experimentStore();

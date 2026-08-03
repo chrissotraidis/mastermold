@@ -14,7 +14,7 @@ import { z } from "zod";
  */
 
 export const BACKUP_SCHEMA = "mastermold.profile" as const;
-export const BACKUP_VERSION = 1 as const;
+export const BACKUP_VERSION = 2 as const;
 
 /** The connection test surfaces a profile can remember. Mirrors the integration services in src/db/integrations.ts. */
 export const INTEGRATION_SERVICES = ["coinbase", "robinhood", "onchain_wallet", "llm"] as const;
@@ -44,11 +44,13 @@ export const profileSchema = z.object({
 });
 export type Profile = z.infer<typeof profileSchema>;
 
-export const integrationBackupSchema = z.object({
-  service: z.string(),
-  connected: z.boolean().catch(false),
-  key: z.string().catch(""),
-});
+export const integrationBackupSchema = z
+  .object({
+    service: z.string(),
+    connected: z.boolean().catch(false),
+    key: z.string().optional(),
+  })
+  .transform(({ service, connected }) => ({ service, connected }));
 export type IntegrationBackup = z.infer<typeof integrationBackupSchema>;
 
 export const backupSchema = z.object({
@@ -146,8 +148,6 @@ export function parseBackup(json: string): ParseResult {
 }
 
 /** Human summary of how many connection-test fields a backup carries — used in import confirmation copy. */
-export function summarizeBackup(backup: Backup): string {
-  const withKeys = backup.integrations.filter((i) => i.key.length > 0).length;
-  if (withKeys === 0) return "no saved connection-test fields";
-  return `${withKeys} saved connection-test field${withKeys === 1 ? "" : "s"}`;
+export function summarizeBackup(_backup: Backup): string {
+  return "profile preferences only";
 }

@@ -1032,7 +1032,7 @@ describe("API routes serve engine output end to end", () => {
       expect(body.max_tokens).toBe(700);
       expect(JSON.stringify(body.messages)).toContain("inference_budget");
       expect(JSON.stringify(body.messages)).toContain("local size limit");
-      expect(JSON.stringify(body.messages)).toContain("Short questions can use a saved chat key");
+      expect(JSON.stringify(body.messages)).toContain("Short questions can use a tab-scoped chat key");
       expect(JSON.stringify(body.messages)).toContain("The Today Save context for chat action only saves or refreshes local app context for chat");
 
       return Promise.resolve(

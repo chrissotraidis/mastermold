@@ -13,6 +13,7 @@ import {
   Loader2,
   NotebookPen,
   Power,
+  Radar,
   Send,
   Settings,
   ShieldAlert,
@@ -45,7 +46,7 @@ import type { ChatPageContext } from "@/src/db/chat";
 
 type DataModeLabel = ProductProvenanceLabel;
 
-type Zone = "observe" | "advise" | "act" | "system";
+type Zone = "observe" | "advise" | "act" | "research" | "system";
 
 type NavItem = { href: string; label: string; icon: LucideIcon; zone: Zone };
 type AppRouter = ReturnType<typeof useRouter>;
@@ -61,21 +62,25 @@ const NAV: NavItem[] = [
   { href: "/", label: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", icon: LineChart, zone: "observe" },
   { href: "/journal", label: "Journal", icon: NotebookPen, zone: "observe" },
-  { href: "/trading", label: "Autopilot", icon: Bot, zone: "act" },
+  { href: "/trading", label: "Web3 lab", icon: Bot, zone: "research" },
+  { href: "/polymarket", label: "Polymarket lab", icon: Radar, zone: "research" },
   { href: "/settings", label: "Settings", icon: Settings, zone: "system" },
 ];
 
-const WARM_ROUTES = ["/", "/portfolio", "/journal", "/trading", "/settings", "/chat"] as const;
+const WARM_ROUTES = ["/", "/portfolio", "/journal", "/trading", "/polymarket", "/settings", "/chat"] as const;
 
 const ZONE_ACCENT: Record<Zone, string> = {
   observe: "text-outline",
   advise: "text-violet",
   act: "text-caution",
+  research: "text-outline",
   system: "text-on-surface-variant",
 };
 
 function isActivePath(pathname: string, href: string) {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/briefing");
+  if (href === "/") {
+    return pathname === "/" || pathname === "/today" || pathname === "/dashboard" || pathname.startsWith("/briefing");
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -221,7 +226,7 @@ export function AppShell({
       <main className="mx-auto w-full max-w-deck px-margin-mobile pb-[calc(7rem+env(safe-area-inset-bottom))] pt-20 md:pl-16 md:pr-margin-desktop md:pb-12">
         {children}
         <p className="mt-12 text-center text-xs leading-5 text-outline">
-          Advisory only — Master Mold never places trades or moves funds.
+          Advisory by default — live execution requires an explicit operator action and passing evidence gates.
         </p>
       </main>
       <MobileNav />
@@ -369,9 +374,9 @@ function labelAppShellCommandAction(action: string) {
 }
 
 function TopBarFallback({ dataMode }: { dataMode: DataModeLabel }) {
-  const isLive = dataMode === "Saved read" || dataMode === "Live DEX read";
+  const isLive = dataMode === "Saved read" || dataMode === "Live DEX read" || dataMode === "Live market read";
   const isPersonal = dataMode === "Manual portfolio" || dataMode === "Imported portfolio";
-  const label = dataMode === "Live DEX read" ? "Live DEX" : dataMode === "Imported portfolio" ? "Imported" : dataMode;
+  const label = dataMode === "Live DEX read" ? "Live DEX" : dataMode === "Live market read" ? "Live market" : dataMode === "Imported portfolio" ? "Imported" : dataMode;
 
   return (
     <header className="fixed top-0 left-0 z-50 flex h-14 w-full items-center justify-between border-b border-outline-variant/25 bg-surface-dim/85 px-margin-mobile backdrop-blur-xl md:px-margin-desktop">
@@ -418,9 +423,10 @@ function TopBar({
   const locationKey = `${pathname}?${searchParams.toString()}`;
   const isEngine = dataMode === "Saved read";
   const isLiveDex = dataMode === "Live DEX read";
+  const isLiveMarket = dataMode === "Live market read";
   const isManual = dataMode === "Manual portfolio";
   const isImported = dataMode === "Imported portfolio";
-  const dataModeLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX" : isManual ? "Manual portfolio" : isImported ? "Imported" : "Sample";
+  const dataModeLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX" : isLiveMarket ? "Live market" : isManual ? "Manual portfolio" : isImported ? "Imported" : "Sample";
   const firstName = profile?.name.trim().split(/\s+/)[0] ?? "";
   // The command bar duplicates the hero console on the deck and the chat page itself.
   const showCommandBar = pathname !== "/" && pathname !== "/chat";
@@ -505,11 +511,11 @@ function TopBar({
         <span
           className={cn(
             "hidden items-center gap-1.5 rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-wide sm:inline-flex",
-            isEngine || isLiveDex ? "text-engine" : isManual || isImported ? "text-violet" : "text-demo",
-            isEngine || isLiveDex ? "border-engine/25 bg-engine/10" : isManual || isImported ? "border-violet/25 bg-violet/10" : "border-demo/25 bg-demo/10",
+            isEngine || isLiveDex || isLiveMarket ? "text-engine" : isManual || isImported ? "text-violet" : "text-demo",
+            isEngine || isLiveDex || isLiveMarket ? "border-engine/25 bg-engine/10" : isManual || isImported ? "border-violet/25 bg-violet/10" : "border-demo/25 bg-demo/10",
           )}
         >
-          <span className={cn("size-1.5 rounded-full", isEngine || isLiveDex ? "bg-engine animate-pulse" : isManual || isImported ? "bg-violet" : "bg-demo")} />
+          <span className={cn("size-1.5 rounded-full", isEngine || isLiveDex || isLiveMarket ? "bg-engine animate-pulse" : isManual || isImported ? "bg-violet" : "bg-demo")} />
           {dataModeLabel}
         </span>
         <ScanStatusLine />
@@ -640,7 +646,7 @@ function TopBar({
               className="flex items-center gap-1.5 bg-critical px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-telemetry text-void chamfer-sm active:scale-95"
             >
               <Power className="size-4" />
-              Halted
+              Drill active
             </button>
           ) : (
             <button
@@ -700,7 +706,16 @@ function pageContextForShellPath(pathname: string, route = pathname): ChatPageCo
       surface: "Trade",
       route,
       summary:
-        "The user is looking at wallet status, the next required trade action, portfolio/net-worth movement, active positions, test trades, and technical setup details. The current app signs nothing.",
+        "The user is looking at wallet status, the next required trade action, portfolio/net-worth movement, active positions, test trades, and technical setup details. Signing is possible only inside the separately gated local live-execution path.",
+    };
+  }
+
+  if (pathname.startsWith("/polymarket")) {
+    return {
+      surface: "Polymarket",
+      route,
+      summary:
+        "The user is looking at live public Polymarket markets, experimental watch setups, separate simulator positions, paper automation controls, and the locked live-order boundary.",
     };
   }
 
@@ -849,7 +864,6 @@ const MOBILE: Array<NavItem & { shortLabel: string }> = [
   { href: "/", label: "Today", shortLabel: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: LineChart, zone: "observe" },
   { href: "/journal", label: "Journal", shortLabel: "Journal", icon: NotebookPen, zone: "observe" },
-  { href: "/trading", label: "Autopilot", shortLabel: "Autopilot", icon: Bot, zone: "act" },
   { href: "/settings", label: "Settings", shortLabel: "Settings", icon: Settings, zone: "system" },
 ];
 
@@ -923,8 +937,8 @@ function KillSwitchDialog({
         </h2>
         <p className="mt-2 text-sm leading-6 text-on-surface-variant">
           {engaged
-            ? "Nothing live was running, and no keys or funds were touched. Today's read keeps working."
-            : "In a future automated-trading setup, this would pause strategies and revoke session keys. Here, it only records the drill."}
+            ? "This UI drill did not inspect or change either trading runtime. No keys or funds were touched."
+            : "This is a UI-only rehearsal. It does not pause either trading runtime or revoke keys. Use the real controls in each lane."}
         </p>
         <div className="mt-6 flex justify-end gap-3">
           <button onClick={onClose} className="min-h-11 px-4 py-2 font-mono text-[12px] uppercase tracking-telemetry text-on-surface-variant hover:text-on-surface">
@@ -932,7 +946,7 @@ function KillSwitchDialog({
           </button>
           {engaged ? (
             <button onClick={onRearm} className="min-h-11 bg-engine px-4 py-2 font-mono text-[12px] font-bold uppercase tracking-telemetry text-void chamfer-sm hover:brightness-110">
-              Re-arm system
+              End drill
             </button>
           ) : (
             <button onClick={onConfirm} className="min-h-11 bg-critical px-4 py-2 font-mono text-[12px] font-bold uppercase tracking-telemetry text-void chamfer-sm hover:brightness-110">
@@ -952,9 +966,9 @@ function KillBanner({ onRearm }: { onRearm: () => void }) {
       data-testid="kill-switch-drill-banner"
     >
       <ShieldAlert className="size-4 text-critical" />
-      <span className="font-mono text-[11px] uppercase tracking-telemetry text-critical">Drill mode active · signs nothing</span>
+      <span className="font-mono text-[11px] uppercase tracking-telemetry text-critical">Drill overlay active · runtime unchanged</span>
       <button onClick={onRearm} className="font-mono text-[11px] uppercase tracking-telemetry text-on-surface underline-offset-2 hover:underline">
-        Re-arm
+        End drill
       </button>
     </div>
   );
@@ -980,8 +994,8 @@ export function FirstRunBanner() {
     <div className="mb-gutter flex items-start gap-3 border border-outline-variant/40 bg-surface-dim/50 p-4 chamfer-sm backdrop-blur-sm inner-glow">
       <Info className="mt-0.5 size-4 shrink-0 text-violet" />
       <p className="text-sm leading-6 text-on-surface-variant">
-        <strong className="text-on-surface">Advisory only.</strong> Master Mold can't move your
-        equity or crypto. Trade is paper-gated, and live movement stays off until reviewed.
+        <strong className="text-on-surface">Advisory by default.</strong> Portfolio actions never trade.
+        Autonomous lanes are separate; current authority and evidence gates are visible in their control rooms.
       </p>
       <Link
         href="/settings#health"

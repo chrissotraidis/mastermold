@@ -1,3 +1,4 @@
+import { deriveAutomaticDecisionOutcomes } from "./decision-outcomes";
 import { getEngineRunHistory } from "./engine-data";
 import { recordProductMetric } from "./metrics";
 import { store, type ProductMetricEventRow } from "./store";
@@ -28,6 +29,8 @@ export type ForwardProofStatus = {
   counts: {
     logged_calls: number;
     resolved_calls: number;
+    manual_outcomes: number;
+    automatic_price_outcomes: number;
     saved_scans: number;
   };
   progress: {
@@ -57,14 +60,23 @@ export function getForwardProofStatus(): ForwardProofStatus {
   const localOutcomes = store()
     .outcomeScores()
     .filter((score) => localEntryIds.has(score.journal_entry_id));
+  const dailyReports = store().dailyReports(500);
+  const automaticOutcomes = deriveAutomaticDecisionOutcomes(localEntries, dailyReports);
   const loggedBeforeOutcome = localEntries.every((entry) => {
     const outcome = localOutcomes.find((score) => score.journal_entry_id === entry.id);
     if (!outcome) return true;
     return Date.parse(entry.logged_at) <= Date.parse(outcome.resolved_at);
   });
   const loggedCalls = localEntries.length;
-  const resolvedCalls = localOutcomes.length;
-  const savedScans = history.length;
+  const resolvedEntryIds = new Set([
+    ...localOutcomes.map((outcome) => outcome.journal_entry_id),
+    ...automaticOutcomes.map((outcome) => outcome.journal_entry_id),
+  ]);
+  const resolvedCalls = resolvedEntryIds.size;
+  const savedScans = new Set([
+    ...history.map((run) => run.run_date),
+    ...dailyReports.map((report) => report.run_date),
+  ]).size;
   const gates: ForwardProofGate[] = [
     {
       id: "pre_outcome_log",
@@ -142,6 +154,8 @@ export function getForwardProofStatus(): ForwardProofStatus {
     counts: {
       logged_calls: loggedCalls,
       resolved_calls: resolvedCalls,
+      manual_outcomes: localOutcomes.length,
+      automatic_price_outcomes: automaticOutcomes.length,
       saved_scans: savedScans,
     },
     progress: buildForwardProgress({

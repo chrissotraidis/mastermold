@@ -76,7 +76,7 @@ describe("review capability truth surface", () => {
     expect(textForReviewSurface).toMatch(/Monarch snapshot, imported holdings, manual holdings, or sample fallback context/i);
     expect(textForReviewSurface).toMatch(/visible risk driver/i);
     expect(textForReviewSurface).toMatch(/concentration, daily movement, and asset-class exposure/i);
-    expect(textForReviewSurface).toMatch(/Trade page is explicitly Web3 autonomy only/i);
+    expect(textForReviewSurface).toMatch(/Web3 lab is explicitly a separate autonomy.*research lane/i);
     expect(textForReviewSurface).toMatch(/read-only context there/i);
     expect(textForReviewSurface).toMatch(/cannot create Robinhood or brokerage orders/i);
     expect(textForReviewSurface).toMatch(/cannot place brokerage trades/i);

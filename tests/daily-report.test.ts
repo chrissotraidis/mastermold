@@ -207,7 +207,7 @@ describe("today's plays", () => {
       ETH: quote(4_000, 3_995, 30_000, 31_000),
     });
 
-  test("GIVEN real holdings and moves WHEN the report runs without an LLM key THEN 2-4 rules plays cite weights, moves, and memory", async () => {
+  test("GIVEN real holdings and moves WHEN the report runs without an LLM key THEN 1-4 rules plays cite weights, moves, and memory", async () => {
     seedPortfolio();
     store().upsertMarketMemoryFact({
       id: "fact_2026-06-30_TCAI_signal",
@@ -232,7 +232,7 @@ describe("today's plays", () => {
     if (!result.ok) throw new Error(result.detail);
 
     const plays = result.report.plays;
-    expect(plays.length).toBeGreaterThanOrEqual(2);
+    expect(plays.length).toBeGreaterThanOrEqual(1);
     expect(plays.length).toBeLessThanOrEqual(4);
     expect(plays.every((play) => play.source === "rules")).toBe(true);
     expect(plays.every((play) => ["trim", "add", "hold", "watch"].includes(play.action))).toBe(true);
@@ -260,7 +260,7 @@ describe("today's plays", () => {
     expect(getLatestDailyReport()?.plays.length).toBe(plays.length);
   });
 
-  test("GIVEN a quiet tape WHEN no symbol moves past the threshold THEN the backfill still suggests at least two plays", async () => {
+  test("GIVEN a quiet tape WHEN only concentration is actionable THEN no filler hold is manufactured", async () => {
     seedPortfolio();
     const result = await runDailyReportRefresh({
       now: new Date("2026-07-01T14:00:00.000Z"),
@@ -276,10 +276,11 @@ describe("today's plays", () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.detail);
-    expect(result.report.plays.length).toBeGreaterThanOrEqual(2);
+    expect(result.report.plays).toHaveLength(1);
     // TCAI is still >25% of the portfolio, so the concentration trim stays.
-    expect(result.report.plays.some((play) => play.symbol === "TCAI" && play.action === "trim")).toBe(true);
-    expect(result.report.plays.some((play) => play.action === "hold")).toBe(true);
+    expect(result.report.plays[0]?.symbol).toBe("TCAI");
+    expect(result.report.plays[0]?.action).toBe("trim");
+    expect(result.report.plays.some((play) => play.action === "hold")).toBe(false);
   });
 
   test("GIVEN an LLM key WHEN the plays writer returns valid strict JSON THEN validated LLM plays replace the rules plays", async () => {
@@ -331,7 +332,7 @@ describe("today's plays", () => {
       });
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error(result.detail);
-      expect(result.report.plays.length).toBeGreaterThanOrEqual(2);
+      expect(result.report.plays.length).toBeGreaterThanOrEqual(1);
       expect(result.report.plays.every((play) => play.source === "rules")).toBe(true);
     }
   });
@@ -351,15 +352,20 @@ describe("today's plays", () => {
       },
     });
     expect(getLatestDailyReport()?.plays).toEqual([]);
+    expect(getLatestDailyReport()?.freshness).toMatchObject({
+      portfolio_stale: true,
+      market_partial: true,
+      stale: true,
+    });
   });
 
-  test("GIVEN Today renders the briefing WHEN source copy is checked THEN Today's plays is the centerpiece and stays advisory", () => {
+  test("GIVEN Today renders the briefing WHEN source copy is checked THEN the decision inbox is bounded and stays advisory", () => {
     const todayPage = readFileSync(join(process.cwd(), "app/page.tsx"), "utf8");
-    expect(todayPage).toContain("Today&apos;s plays");
+    expect(todayPage).toContain("Decision inbox");
     expect(todayPage).toContain('data-testid="today-play"');
-    expect(todayPage).toContain("Master Mold never places trades");
+    expect(todayPage).toContain("One to three decisions, ranked from the latest saved inputs.");
     expect(todayPage).toContain("horizon: {play.horizon} · confidence: {play.confidence}");
-    // The plays section renders above the prose brief.
+    // The decision inbox renders above the prose brief.
     expect(todayPage.indexOf('aria-labelledby="today-plays-title"')).toBeLessThan(
       todayPage.indexOf('aria-labelledby="today-brief-title"'),
     );

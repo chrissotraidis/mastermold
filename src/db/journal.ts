@@ -88,6 +88,7 @@ export type CreateDecisionInput = {
   conviction: number;
   horizon: string;
   falsification_condition: string;
+  decision_source?: DecisionJournalEntry["decision_source"];
 };
 
 export type CreateOutcomeInput = {
@@ -166,6 +167,7 @@ export function createDecisionJournalEntry(input: CreateDecisionInput): JournalE
     conviction: input.conviction,
     horizon: input.horizon,
     falsification_condition: input.falsification_condition,
+    decision_source: input.decision_source,
     logged_at: now,
     event_time: now,
     knowledge_time: now,

@@ -94,8 +94,11 @@ describe("evaluateV3Promotion", () => {
   });
 
   test("Drift-perp observations never count toward or enter the paper co-pilot", () => {
-    expect(isPaperCopilotCandidate({ features: { venue: "drift_perp" } })).toBe(false);
+    expect(isPaperCopilotCandidate({ strategy_id: "cusum_tb", features: { venue: "drift_perp" } })).toBe(false);
     expect(paperPromotionSnapshots([{ strategy_id: "cusum_tb", features: { venue: "drift_perp" } } as never], "cusum_tb")).toEqual([]);
+    expect(isPaperCopilotCandidate({ strategy_id: "funding_basis", features: {} })).toBe(false);
+    expect(isPaperCopilotCandidate({ strategy_id: "pair_rv", features: {} })).toBe(false);
+    expect(paperPromotionSnapshots([{ strategy_id: "funding_basis", features: {} } as never], "funding_basis")).toEqual([]);
   });
 });
 
@@ -109,5 +112,10 @@ describe("V3 live-routing candidacy", () => {
     expect(evaluateModuleLiveCandidate({ trades, strategy_id: "cusum_tb", now_ms: now, existing_go_live_gate_passes: true, module_risk_halts: 0 })).toMatchObject({ ready: true, paper_round_trips: 1, paper_net_bps: 300 });
     expect(evaluateModuleLiveCandidate({ trades, strategy_id: "cusum_tb", now_ms: now, existing_go_live_gate_passes: true, module_risk_halts: 1 }).ready).toBe(false);
     expect(evaluateModuleLiveCandidate({ trades, strategy_id: "cusum_tb", now_ms: now, existing_go_live_gate_passes: false, module_risk_halts: 0 }).ready).toBe(false);
+    const funding = trades.map((trade) => ({ ...trade, strategy_id: "funding_basis" }));
+    expect(evaluateModuleLiveCandidate({ trades: funding, strategy_id: "funding_basis", now_ms: now, existing_go_live_gate_passes: true, module_risk_halts: 0 })).toMatchObject({
+      ready: false,
+      reasons: expect.arrayContaining(["no synchronized paper execution adapter for this strategy"]),
+    });
   });
 });

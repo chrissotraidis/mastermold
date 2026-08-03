@@ -90,7 +90,7 @@ export function ProfileSettings() {
           and alert preferences, or restore a profile you exported elsewhere.
         </p>
         <p className="mt-1 text-xs leading-5 text-outline">
-          Restoring reads a Master Mold JSON backup from your disk: preferences plus saved connection-test fields.
+          Restoring reads a Master Mold JSON backup from your disk: profile preferences only. Integration credentials are never restored.
           It does not fetch live account data.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -128,7 +128,7 @@ export function ProfileSettings() {
   function handleExport() {
     setError("");
     exportProfile();
-    setStatus("Downloaded a backup of your profile and saved connection-test fields.");
+    setStatus("Downloaded a secret-free backup of your profile preferences.");
   }
 
   function handleImportResult(result: Awaited<ReturnType<typeof importBackupFile>>) {
@@ -233,8 +233,8 @@ export function ProfileSettings() {
           </summary>
           <div className="border-t border-outline-variant/15 px-3 py-3">
             <p className="text-xs leading-5 text-outline">
-              One file holds your preferences and saved connection-test fields; import it on another
-              machine to restore the local setup.
+              One file holds your profile preferences only; integration credentials are never exported.
+              Import it on another machine to restore those preferences.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button

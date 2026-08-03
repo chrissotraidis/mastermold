@@ -142,16 +142,27 @@ answers without you starting anything by hand.
 
 ## Phase 5 — Reach it from your devices
 
-The server binds 127.0.0.1 on purpose — there is no login screen, so it
-must never face the open internet. Two good options:
+The server binds 127.0.0.1 on purpose. Remote access is fail-closed, so it
+must still use HTTPS and configured credentials. Before exposing a remote URL, add distinct random values (32+ characters recommended) to `.env.local` and restart:
 
-- **Tailscale (recommended, works from the phone):** install on Zo and on
-  your devices, then browse to `http://<zo-tailscale-ip>:4002`. Add it to
-  the phone's home screen — the PWA manifest gives it an app icon.
-- **SSH tunnel (quick check from a laptop):**
+```bash
+MASTERMOLD_OPERATOR_PASSWORD=
+MASTERMOLD_VIEWER_PASSWORD=
+```
+
+Use Basic Auth username `operator` or `viewer` with the matching password. Two good options:
+
+- **Tailscale Serve (recommended for phone status):** install Tailscale on Zo
+  and your devices, then run `tailscale serve --bg 4002`. Open the HTTPS URL
+  printed by `tailscale serve status` and add it to the phone's home screen.
+  This can keep Master Mold bound to loopback. Configure distinct operator and
+  viewer passwords (16+ characters). Viewer requests are read-only; remote operator
+  mutations require an exact same Origin. Bot-control routes remain loopback-only. Never use Tailscale Funnel for this private dashboard.
+- **SSH tunnel (required for bot controls from a laptop):**
   `ssh -N -L 4002:127.0.0.1:4002 zo`, then open `http://localhost:4002`.
 
-**Done when:** the Today page loads on your phone.
+**Done when:** the Today page loads with the intended viewer or operator role on your phone and a tunneled
+`http://localhost:4002` session exposes the stricter bot controls on your laptop.
 
 ## Phase 6 — Telegram (required on Linux)
 
