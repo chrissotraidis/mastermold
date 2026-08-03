@@ -5,6 +5,7 @@ import { AutomationHealthBanner } from "@/components/automation-health-banner";
 import { DailyReportRefreshButton } from "@/components/daily-report-refresh-button";
 import { TodayMemoryRefresh } from "@/components/today-memory-refresh";
 import { TodayReadTimer } from "@/components/today-metrics";
+import { TodayDecisionControls } from "@/components/today-decision-controls";
 import { productProvenanceLabel } from "@/lib/provenance-copy";
 import { toPublicAlert } from "@/lib/public-api-copy";
 import { TodayAlertList } from "@/components/today-alert-list";
@@ -19,6 +20,12 @@ import {
   type DailyReport,
   type DailyReportPlay,
 } from "@/src/db/daily-report";
+import {
+  getTodayDecisionResponses,
+  playCanCreateJournalCall,
+  todayDecisionInbox,
+  type TodayDecisionResponse,
+} from "@/src/db/today-decisions";
 import { getDataMode } from "@/src/db/engine-data";
 import { getPortfolio } from "@/src/db/portfolio";
 import {
@@ -40,13 +47,14 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const portfolio = getPortfolio(asOf);
   const autoRefresh = asOf ? null : await ensureDailyReportAutoRefresh();
   const report = asOf ? null : autoRefresh?.report ?? getLatestDailyReport();
+  const decisionPlays = todayDecisionInbox(report);
+  const decisionResponses = report ? getTodayDecisionResponses(report.id) : new Map();
   const recommendations = getPortfolioRecommendations(asOf, 5);
   const alerts = getAlerts(asOf).filter((alert) => !alert.acknowledged).slice(0, 5);
   const topHolding = portfolio.holdings[0] ?? null;
-  const pageDataMode =
-    portfolio.provenance.label === "Manual portfolio" || portfolio.provenance.label === "Imported portfolio"
-      ? portfolio.provenance.label
-      : dataMode.label;
+  const hasPersonalPortfolio =
+    portfolio.provenance.label === "Manual portfolio" || portfolio.provenance.label === "Imported portfolio";
+  const pageDataMode = hasPersonalPortfolio ? portfolio.provenance.label : dataMode.label;
   const movers = topMovers(report);
   // Accountability: every directional play is graded against what the price
   // actually did (pure derivation over stored reports; see play-outcomes.ts).
@@ -75,41 +83,62 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             <AutomationHealthBanner />
           </div>
           <p className="mt-2 text-lg text-on-surface" data-testid="today-pulse">
-            <span className="font-semibold tabular-nums">{formatCurrency(portfolio.total_market_value)}</span>
-            <span className="text-sm text-on-surface-variant">
-              {" · "}
-              {formatChange(portfolio.daily_change_value, portfolio.daily_change_pct)} today
-              {topHolding ? ` · ${topHolding.symbol} is your largest position at ${topHolding.weight_pct.toFixed(0)}%` : ""}
-            </span>
+            {hasPersonalPortfolio ? (
+              <>
+                <span className="font-semibold tabular-nums">{formatCurrency(portfolio.total_market_value)}</span>
+                <span className="text-sm text-on-surface-variant">
+                  {" · "}
+                  {formatChange(portfolio.daily_change_value, portfolio.daily_change_pct)} today
+                  {topHolding ? ` · ${topHolding.symbol} is your largest position at ${topHolding.weight_pct.toFixed(0)}%` : ""}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">Sample portfolio</span>
+                <span className="text-sm text-on-surface-variant">
+                  {" · "}
+                  <Link href="/portfolio#add-holdings" className="font-semibold text-violet hover:text-tertiary">
+                    Add or import your holdings
+                  </Link>{" "}
+                  before treating this brief as personal.
+                </span>
+              </>
+            )}
           </p>
         </header>
 
         <section aria-labelledby="today-plays-title">
           <div className="flex items-center justify-between gap-3">
             <h2 id="today-plays-title" className="text-xs font-semibold uppercase tracking-telemetry text-outline">
-              Today&apos;s plays
+              Decision inbox
             </h2>
-            {report && report.plays.length > 0 ? (
+            {decisionPlays.length > 0 ? (
               <span className="text-[10px] uppercase tracking-wide text-outline">
-                {report.plays[0].source === "llm" ? "model-written · validated" : "rules from your data"}
+                {decisionPlays[0].source === "llm" ? "model-written · validated" : "rules from your data"}
               </span>
             ) : null}
           </div>
-          {report && report.plays.length > 0 ? (
+          {decisionPlays.length > 0 ? (
             <>
               <div className="mt-2 divide-y divide-outline-variant/20 rounded-md border border-violet/25 bg-violet/[0.04]">
-                {report.plays.map((play) => (
-                  <PlayLine key={play.id} play={play} />
+                {decisionPlays.map((play) => (
+                  <PlayLine
+                    key={play.id}
+                    play={play}
+                    reportId={report!.id}
+                    canSaveCall={playCanCreateJournalCall(report!, play)}
+                    initialResponse={decisionResponses.get(play.id) ?? null}
+                  />
                 ))}
               </div>
               <p className="mt-1.5 text-xs leading-5 text-outline">
-                Suggestions from your holdings, today&apos;s moves, and saved memory — Master Mold never places trades.
+                One to three decisions, ranked from the latest saved inputs. Responses persist locally; sample or stale context cannot become a scored journal call.
                 {trackRecordLine ? <> {trackRecordLine}</> : null}
               </p>
             </>
           ) : (
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              No plays saved yet for today. Refresh the daily read to build them from your holdings and today&apos;s moves.
+              No decision inbox is saved yet. Refresh the daily read to build it from your holdings and today&apos;s moves.
             </p>
           )}
         </section>
@@ -200,7 +229,12 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   );
 }
 
-function PlayLine({ play }: { play: DailyReportPlay }) {
+function PlayLine({ play, reportId, canSaveCall, initialResponse }: {
+  play: DailyReportPlay;
+  reportId: string;
+  canSaveCall: boolean;
+  initialResponse: TodayDecisionResponse | null;
+}) {
   return (
     <details className="group" data-testid="today-play">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 marker:hidden [&::-webkit-details-marker]:hidden">
@@ -221,6 +255,12 @@ function PlayLine({ play }: { play: DailyReportPlay }) {
         <p className="mt-2 text-[10px] uppercase tracking-wide text-outline">
           horizon: {play.horizon} · confidence: {play.confidence}
         </p>
+        <TodayDecisionControls
+          reportId={reportId}
+          play={play}
+          canSaveCall={canSaveCall}
+          initialResponse={initialResponse}
+        />
       </div>
     </details>
   );

@@ -1,11 +1,8 @@
 /**
- * Synthetic carry book (2026-07-09): the funding_basis module has the best
- * risk-adjusted evidence of any signal we run (delta-neutral carry on Solana
- * perps, ~8–20% APY documented), but the shadow's forward PRICE labels can't
- * measure it — carry earns the funding stream, not price movement. This book
- * tracks what a $100-per-market delta-neutral position would have earned from
- * the actual funding snapshots the daemon already fetches, so the strategy's
- * evidence becomes a visible, cumulative P&L series instead of a hope.
+ * Synthetic funding monitor (2026-07-09): records what a fixed hypothetical
+ * notional would accrue from observed Drift funding alone. It does not model or
+ * fill the required spot and perpetual legs, so its total is not executable P&L,
+ * delta-neutral evidence, or a return claim. It exists to test rate persistence.
  *
  * Pure math over (bookState, fundingInputs, now); the daemon persists the
  * returned state each V3 cycle. Synthetic only — nothing here touches Drift.
@@ -15,7 +12,7 @@ import { expectedCarryBps, MIN_FUNDING_PERSISTENCE, type FundingInput } from "./
 
 /** Fixed synthetic notional per market — comparability over cleverness. */
 export const CARRY_NOTIONAL_USD = 100;
-/** Round-trip cost to open+close both legs, charged at open (bps). */
+/** Placeholder friction haircut, not measured two-leg execution cost. */
 export const CARRY_ROUND_TRIP_BPS = 20;
 /** Close after this many consecutive cycles without a fresh positive read. */
 export const CARRY_STALE_CYCLES_TO_CLOSE = 6;
@@ -123,7 +120,7 @@ export function markCarryBook(
       stale_cycles: 0,
     };
     notes.push(
-      `Carry shadow opened ${market}: funding ${input.funding_rate_8h_pct?.toFixed(4)}%/8h held ${input.funding_persistence_windows} windows ($${CARRY_NOTIONAL_USD} synthetic, delta-neutral).`,
+      `Carry shadow opened ${market}: funding ${input.funding_rate_8h_pct?.toFixed(4)}%/8h held ${input.funding_persistence_windows} windows (${CARRY_NOTIONAL_USD} funding-only monitor; no legs filled).`,
     );
   }
 

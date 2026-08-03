@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/runtime-smoke.mjs — repeatable runtime proof for the core product loop.
 //
-// Starts a dev server against a temp MASTERMOLD_DB and an empty ENGINE_OUT_DIR,
+// Starts the standalone release server against temporary stores and an empty ENGINE_OUT_DIR,
 // then asserts the truths that stabilization established:
 //   1. /api/health is core-only (no web3_* receipt keys, details_url present);
 //   2. adding a manual holding through /api/portfolio flips Portfolio, Today,
@@ -14,13 +14,22 @@
 //
 // Usage: node scripts/runtime-smoke.mjs [--port=4031]
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const port = Number((process.argv.find((arg) => arg.startsWith("--port=")) ?? "--port=4031").split("=")[1]);
 const base = `http://127.0.0.1:${port}`;
+const repoRoot = process.cwd();
+const standaloneDir = join(repoRoot, ".next", "standalone");
+const serverPath = join(standaloneDir, "server.js");
+
+if (!existsSync(serverPath)) {
+  console.error("Standalone release artifact is missing — run npm run build first.");
+  process.exit(1);
+}
+
 const dbDir = mkdtempSync(join(tmpdir(), "mm-smoke-db-"));
 const engineDir = mkdtempSync(join(tmpdir(), "mm-smoke-engine-"));
 
@@ -41,29 +50,24 @@ async function fetchText(path, init) {
   return { status: response.status, body: await response.text() };
 }
 
-// bun may not be on PATH (fresh VPS shells often miss ~/.bun/bin) — prefer
-// the copy npm install vendors into node_modules/.bin, then known homes.
-const bunBin =
-  [join(process.cwd(), "node_modules", ".bin", "bun"), join(process.env.HOME ?? "", ".bun", "bin", "bun")].find(
-    existsSync,
-  ) ?? (spawnSync("bun", ["--version"], { stdio: "ignore" }).error === undefined ? "bun" : null);
-
-if (!bunBin) {
-  console.error("bun not found (node_modules/.bin, ~/.bun/bin, PATH) — run npm install first.");
-  process.exit(1);
-}
-
 const server = spawn(
-  bunBin,
-  ["run", "--bun", "dev", "-H", "127.0.0.1", "-p", String(port)],
+  process.execPath,
+  [serverPath],
   {
+    cwd: standaloneDir,
     env: {
       ...process.env,
+      HOSTNAME: "127.0.0.1",
+      PORT: String(port),
+      MASTERMOLD_ROOT: repoRoot,
       MASTERMOLD_DB: join(dbDir, "mastermold.db"),
       AUTOPILOT_DB: join(dbDir, "autopilot.db.json"),
+      POLYMARKET_DB: join(dbDir, "polymarket.db.json"),
+      POLYMARKET_BRAIN_DB: join(dbDir, "polymarket-brain.db"),
+      MASTERMOLD_DISABLE_SCHEDULER: "1",
       ENGINE_OUT_DIR: engineDir,
     },
-    stdio: "ignore",
+    stdio: "inherit",
     detached: true,
   },
 );
@@ -97,8 +101,7 @@ async function waitForServer(timeoutMs = 60_000) {
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
   throw new Error(
-    `dev server did not answer on ${base} within ${timeoutMs / 1000}s. ` +
-      "Next dev allows one instance per machine — stop any other `next dev` (e.g. the port-4002 app) and rerun.",
+    `standalone release server did not answer on ${base} within ${timeoutMs / 1000}s; inspect startup output above.`,
   );
 }
 

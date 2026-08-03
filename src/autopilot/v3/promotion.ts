@@ -21,13 +21,21 @@ export const PROMOTION_MIN_NET_EXPECTANCY_BPS = 20;
 export const PROMOTION_MIN_CALIBRATION_SLOPE = 0.3;
 export const PROMOTION_MAX_CALIBRATION_SLOPE = 1.5;
 
-/** Perp shorts are shadow evidence only until a Drift paper adapter exists. */
+/** Multi-leg ideas have no synchronized execution adapter and cannot be promoted. */
+export const NON_EXECUTABLE_PAPER_STRATEGIES = new Set(["funding_basis", "pair_rv", "quote_arb"]);
+
+export function paperStrategyHasExecutionAdapter(strategyId: string): boolean {
+  return !NON_EXECUTABLE_PAPER_STRATEGIES.has(strategyId);
+}
+
+/** Perp and multi-leg observations are shadow evidence only until an adapter exists. */
 export function paperPromotionSnapshots(rows: CandidateSnapshotRow[], strategyId: string): CandidateSnapshotRow[] {
+  if (!paperStrategyHasExecutionAdapter(strategyId)) return [];
   return rows.filter((row) => row.strategy_id === strategyId && row.features.venue !== "drift_perp");
 }
 
-export function isPaperCopilotCandidate(candidate: { features: Record<string, number | string | boolean> }): boolean {
-  return candidate.features.venue !== "drift_perp";
+export function isPaperCopilotCandidate(candidate: { strategy_id: string; features: Record<string, number | string | boolean> }): boolean {
+  return paperStrategyHasExecutionAdapter(candidate.strategy_id) && candidate.features.venue !== "drift_perp";
 }
 
 export type PromotionCheck = {
@@ -203,9 +211,11 @@ export function evaluateModuleLiveCandidate(input: {
     paper_net_bps: net ?? -Infinity,
     module_risk_halts: input.module_risk_halts,
   });
+  const hasExecutionAdapter = paperStrategyHasExecutionAdapter(input.strategy_id);
+  if (!hasExecutionAdapter) verdict.reasons.unshift("no synchronized paper execution adapter for this strategy");
   if (returns.length === 0) verdict.reasons.push("no completed module-attributed paper round trips");
   return {
-    ...verdict, ready: verdict.ready && returns.length > 0,
+    ...verdict, ready: verdict.ready && returns.length > 0 && hasExecutionAdapter,
     paper_observation_days: Math.round(days * 100) / 100,
     paper_round_trips: returns.length,
     paper_net_bps: net === null ? null : Math.round(net * 100) / 100,

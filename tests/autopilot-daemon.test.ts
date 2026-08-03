@@ -14,6 +14,7 @@ import {
   PAPER_STARTING_CASH_USD,
   realizedRoundTrips,
   requoteEntryEdgeVerdict,
+  retireV2PrimaryEntries,
   stopPctFromRange,
   TAKE_PROFIT_R,
   UNIVERSE,
@@ -114,6 +115,22 @@ describe("autopilot v2 trend-pullback strategy", () => {
     expect(buy.signals.h24_pct).toBe(5.0);
     expect(buy.signals.cost_source).toBe("flat");
     expect(buy.signals.round_trip_cost_pct).toBe(0.6);
+  });
+
+  test("GIVEN retired v2 evidence THEN primary entries are blocked but protective exits remain", () => {
+    const entry = retireV2PrimaryEntries(decide(input({
+      windows: new Map([[SOL.mint, window(100.4, 100)]]),
+    })));
+    expect(entry.decisions.some((decision) => decision.action === "buy")).toBe(false);
+    expect(entry.skipped?.reason).toContain("Retired from new entries");
+    expect(entry.evaluations.find((row) => row.symbol === "SOL")?.status).toBe("blocked");
+
+    const exit = retireV2PrimaryEntries(decide(input({
+      positions: [solPosition(100)],
+      windows: new Map([[SOL.mint, window(99, 98)]]),
+    })));
+    expect(exit.decisions).toHaveLength(1);
+    expect(exit.decisions[0]).toMatchObject({ action: "sell" });
   });
 
   test("GIVEN no measured route evidence THEN an explicit empty cost map is behavior-identical", () => {

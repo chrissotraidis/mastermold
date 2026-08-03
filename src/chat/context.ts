@@ -32,7 +32,7 @@ export function contextWithInferenceBudget(llmContext: string, budget: ChatBudge
     max_response_tokens: budget.maxResponseTokens,
     max_total_tokens: budget.maxTotalTokens,
     user_facing_summary:
-      "Live chat has a local size limit. Short questions can use a saved chat key; oversized questions stop before any live chat request.",
+      "Live chat has a local size limit. Short questions can use a tab-scoped chat key; oversized questions stop before any live chat request.",
   };
 
   try {

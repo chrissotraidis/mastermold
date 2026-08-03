@@ -199,7 +199,7 @@ export function WelcomeFlow() {
               Restore from a backup
             </button>
             <p className="text-xs leading-5 text-outline">
-              Imports a Master Mold JSON backup: preferences plus saved connection-test fields.
+              Imports a Master Mold JSON backup: profile preferences only. Integration credentials are never restored.
               It does not fetch live account data.
             </p>
           </div>

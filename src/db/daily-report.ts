@@ -78,6 +78,10 @@ export type DailyReport = {
   freshness: {
     portfolio_as_of: string;
     market_as_of: string;
+    /** Portfolio snapshot age only; partial symbol coverage is tracked separately. */
+    portfolio_stale: boolean;
+    /** True when at least one requested symbol could not refresh. */
+    market_partial: boolean;
     stale: boolean;
     skipped_symbols: string[];
   };
@@ -200,7 +204,9 @@ export async function runDailyReportRefresh(input: {
   // on the report, so Today's plays always renders without a key.
   const playsCompletion =
     input.playsCompletion === undefined ? defaultPlaysCompletion() : input.playsCompletion;
-  if (playsCompletion) {
+  // The model may rewrite a rules-backed decision, but it may not manufacture
+  // activity on a day when the deterministic pass found nothing actionable.
+  if (playsCompletion && report.plays.length > 0) {
     const llmPlays = await tryLlmPlays(report, portfolio.holdings, playsCompletion);
     if (llmPlays) report.plays = llmPlays;
   }
@@ -344,6 +350,12 @@ export function buildDailyReport(input: {
   rows: DailyReportMarketRow[];
 }): DailyReport {
   const { createdAt, portfolio, rows } = input;
+  const portfolioStale = portfolioSnapshotIsStale({
+    asOf: portfolio.provenance.as_of,
+    reportCreatedAt: createdAt,
+    importedSnapshotStale: portfolio.import_snapshot.is_stale,
+    staleAfterHours: portfolio.import_snapshot.stale_after_hours,
+  });
   const portfolioContext = getPortfolioBrainScanContext(new Date(createdAt));
   const holdingSymbols = new Set(portfolio.holdings.map((holding) => holding.symbol));
   const refreshedRows = rows.filter((row) => row.status === "refreshed");
@@ -399,7 +411,9 @@ export function buildDailyReport(input: {
     freshness: {
       portfolio_as_of: portfolio.provenance.as_of,
       market_as_of: latestMarketTime(rows) ?? createdAt,
-      stale: skipped.length > 0 || portfolio.import_snapshot.is_stale,
+      portfolio_stale: portfolioStale,
+      market_partial: skipped.length > 0,
+      stale: portfolioStale,
       skipped_symbols: skipped,
     },
     market_rows: rows,
@@ -642,6 +656,20 @@ function reportRiskLine(portfolio: ReturnType<typeof getPortfolio>, skipped: str
   return `Review prompt only, not a trade instruction: ${topLine}.${skippedLine}`;
 }
 
+function portfolioSnapshotIsStale(input: {
+  asOf: string;
+  reportCreatedAt: string;
+  importedSnapshotStale: boolean;
+  staleAfterHours: number;
+}) {
+  if (input.importedSnapshotStale) return true;
+  const asOf = Date.parse(input.asOf);
+  const reportCreatedAt = Date.parse(input.reportCreatedAt);
+  if (!Number.isFinite(asOf) || !Number.isFinite(reportCreatedAt)) return true;
+  const ageHours = Math.max(0, reportCreatedAt - asOf) / 3_600_000;
+  return ageHours >= input.staleAfterHours;
+}
+
 function latestMarketTime(rows: DailyReportMarketRow[]) {
   const sorted = rows
     .map((row) => row.fetched_at)
@@ -742,14 +770,37 @@ function normalizeDailyReport(value: unknown): DailyReport | null {
   ) {
     return null;
   }
-  // Reports saved before Today's plays existed stay readable with an empty list.
+  // Reports saved before Today's plays or split freshness existed stay readable.
   if (!Array.isArray(report.plays)) report.plays = [];
+  if (!report.freshness) {
+    report.freshness = {
+      portfolio_as_of: report.created_at,
+      market_as_of: report.created_at,
+      portfolio_stale: true,
+      market_partial: true,
+      stale: true,
+      skipped_symbols: [],
+    };
+  } else {
+    const freshness = report.freshness as DailyReport["freshness"] & {
+      portfolio_stale?: boolean;
+      market_partial?: boolean;
+    };
+    freshness.market_partial ??= freshness.skipped_symbols.length > 0;
+    freshness.portfolio_stale ??= portfolioSnapshotIsStale({
+      asOf: typeof freshness.portfolio_as_of === "string" ? freshness.portfolio_as_of : report.created_at,
+      reportCreatedAt: report.created_at,
+      importedSnapshotStale: freshness.stale && !freshness.market_partial,
+      staleAfterHours: 24,
+    });
+    freshness.stale = freshness.portfolio_stale;
+  }
   return report;
 }
 
 // --- Today's plays -----------------------------------------------------------
 //
-// The centerpiece of the briefing: 2-4 concrete, advisory-only suggestions
+// The centerpiece of the briefing: zero to four concrete, advisory-only suggestions
 // built from real local data — the operator's holdings, the day's refreshed
 // price/volume rows, and dated market_memory facts. A deterministic rules
 // pass always produces plays; when OPENROUTER_API_KEY is present one LLM call
@@ -894,28 +945,6 @@ export function buildTodaysPlays(input: {
     });
   }
 
-  // 4. Quiet-day backfill: always give the operator at least two plays with a
-  //    plain reason, even when nothing moved.
-  if (plays.length < 2) {
-    for (const holding of byWeight) {
-      if (plays.length >= 2) break;
-      if (used.has(holding.symbol.toUpperCase())) continue;
-      const row = rowBySymbol.get(holding.symbol.toUpperCase());
-      push({
-        symbol: holding.symbol,
-        action: "hold",
-        headline: `Hold ${holding.symbol}; today's read shows no unusual move to act on.`,
-        why: [
-          weightWhy(holding),
-          row?.status === "refreshed" ? moveWhy(row) : `${holding.symbol} did not refresh from the market source today.`,
-          memoryWhy(facts, holding.symbol) ?? "",
-        ],
-        horizon: "months",
-        confidence: "medium",
-      });
-    }
-  }
-
   return plays;
 }
 
@@ -931,7 +960,7 @@ const PLAYS_SYSTEM_PROMPT = [
   "- Output STRICT JSON only, no markdown fences, matching:",
   '{"plays": [{"symbol": "AAPL", "action": "trim|add|hold|watch", "headline": "one advisory sentence",',
   ' "why": ["cites a provided number or dated fact"], "horizon": "days|weeks|months", "confidence": "low|medium|high"}]}',
-  "Return 2 to 4 plays.",
+  "Return 1 to 4 plays. Do not introduce a symbol or decision absent from the rules-pass plays.",
 ].join("\n");
 
 /** Compact structured context: the LLM sees exactly what the rules pass saw. */
@@ -994,7 +1023,7 @@ export function parsePlaysOutput(text: string, allowedSymbols: Set<string>): Dai
           source: "llm",
         });
       }
-      if (plays.length < 2 || plays.length > 4) return null;
+      if (plays.length < 1 || plays.length > 4) return null;
       return plays;
     } catch {
       continue;

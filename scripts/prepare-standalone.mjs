@@ -36,6 +36,7 @@ const localOnlyPaths = [
   ".agents",
   ".codex",
   ".codex-audits",
+  "ref",
 ];
 
 for (const localPath of localOnlyPaths) {

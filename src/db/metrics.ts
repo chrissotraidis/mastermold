@@ -11,6 +11,7 @@ export type ProductMetricEvent =
   | "alert_reopened"
   | "alert_feedback"
   | "decision_logged"
+  | "today_decision_response"
   | "calibration_outcome"
   | "brain_schedule_config"
   | "brain_schedule_check"
@@ -70,6 +71,7 @@ const knownEvents: ProductMetricEvent[] = [
   "alert_reopened",
   "alert_feedback",
   "decision_logged",
+  "today_decision_response",
   "calibration_outcome",
   "brain_schedule_config",
   "brain_schedule_check",
@@ -81,8 +83,16 @@ const knownEvents: ProductMetricEvent[] = [
   "portfolio_import",
 ];
 
+let lastProductMetricTimestamp = 0;
+
+function nextProductMetricTimestamp() {
+  const timestamp = Math.max(Date.now(), lastProductMetricTimestamp + 1);
+  lastProductMetricTimestamp = timestamp;
+  return new Date(timestamp).toISOString();
+}
+
 export function recordProductMetric(input: ProductMetricInput): ProductMetricEventRow {
-  const now = new Date().toISOString();
+  const now = nextProductMetricTimestamp();
   const row: ProductMetricEventRow = {
     id: `metric_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     event: input.event,

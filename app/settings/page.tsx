@@ -13,6 +13,7 @@ import {
   getDailyReportAutoRefreshStatus,
   getLatestDailyReport,
 } from "@/src/db/daily-report";
+import { getBackupStatus } from "@/src/db/backup";
 import { getDataMode } from "@/src/db/engine-data";
 import { getIntegrationStatuses, type IntegrationStatusJson } from "@/src/db/integrations";
 import { getMonarchMcpPublicConfig } from "@/src/db/monarch-mcp";
@@ -58,6 +59,7 @@ export default async function SettingsPage() {
 
   // System health (absorbed from /review).
   const dataMode = getDataMode();
+  const backup = getBackupStatus();
   const autoRefresh = await ensureDailyReportAutoRefresh();
   const dailyReport = autoRefresh.report ?? getLatestDailyReport();
   const autoRefreshStatus = getDailyReportAutoRefreshStatus();
@@ -80,7 +82,7 @@ export default async function SettingsPage() {
   const safetyStatus = autopilot.runtime_unavailable
     ? "Autopilot read-only · live off"
     : `Max trade ${formatSettingsCurrency(autopilot.caps.max_trade_usd)} · cap ${formatSettingsCurrency(autopilot.caps.daily_spend_limit_usd)}/day · live ${autopilotLive ? "on" : "off"}`;
-  const healthStatus = `${publicDataMode} · report ${dailyReport ? dailyReport.run_date : "not saved"}`;
+  const healthStatus = `${publicDataMode} · ${portfolioSource.source_label} · report ${dailyReport ? dailyReport.run_date : "not saved"} · backup ${backup.status}`;
 
   return (
     <AppShell dataMode={publicProvenanceLabel}>
@@ -172,12 +174,17 @@ export default async function SettingsPage() {
 
           <SettingsSection
             id="autopilot"
-            title="Autopilot"
+            title="Research labs"
             status={autopilotStatus}
             statusTone={autopilot.runtime_unavailable ? "muted" : autopilot.kill_switch ? "watch" : autopilot.daemon === "live" ? "ok" : "muted"}
             aliases={["web3-wallet-trading"]}
           >
             <span id="web3-wallet-trading" aria-hidden="true" className="block scroll-mt-24" />
+            <p className="mb-2 text-xs leading-5 text-outline">
+              These are separate paper/research lanes, not the core Today → Portfolio → Journal loop and not evidence of profit.
+              Open the <Link href="/trading" className="font-semibold text-violet hover:text-tertiary">Web3 lab</Link> or the{" "}
+              <Link href="/polymarket" className="font-semibold text-violet hover:text-tertiary">Polymarket lab</Link>.
+            </p>
             <div className="grid gap-2">
               <AutopilotSettingsSummary state={autopilot} />
               <details className="rounded-md border border-outline-variant/25 px-3 py-2">
@@ -188,7 +195,7 @@ export default async function SettingsPage() {
                 <p className="border-t border-outline-variant/15 pt-2 text-xs leading-5 text-outline">
                   Trade controls, daemon status, wallet provisioning, and go-live evidence live in{" "}
                   <Link href="/trading" className="font-semibold text-violet hover:text-tertiary">
-                    Autopilot
+                    Web3 lab
                   </Link>
                   . Raw troubleshooting payload:{" "}
                   <a href="/api/autopilot" className="font-semibold text-violet hover:text-tertiary">
@@ -259,8 +266,21 @@ export default async function SettingsPage() {
                     : "Use Refresh today on Today to save the first report."
                 }
               />
-              <HealthRow label="Credentials" value="Local reviewer" detail="No secrets required for local review." />
-              <HealthRow label="Live trading" value="Locked" detail="No swaps, signatures, or fund movement." />
+              <HealthRow
+                label="Evidence backup"
+                value={backup.status === "fresh" ? "Fresh" : backup.status === "stale" ? "Stale" : backup.status === "missing" ? "Missing" : "Unavailable"}
+                detail={backup.created_at
+                  ? `${backup.files.length} stores · created ${formatStatusTime(backup.created_at)} · verify recovery with npm run backup:verify`
+                  : `${backup.detail} Run npm run backup, then npm run backup:verify.`}
+              />
+              <HealthRow label="Access" value="Loopback operator" detail="Remote access is fail-closed and requires configured operator or read-only viewer credentials." />
+              <HealthRow
+                label="Web3 live runtime"
+                value={autopilotLive ? "Enabled" : "Off or locked"}
+                detail={autopilotLive
+                  ? "Autopilot reports live mode. Confirm the wallet, caps, and real lane controls before relying on this state."
+                  : "The current Web3 runtime is not live. Polymarket live execution remains unavailable."}
+              />
             </dl>
           </SettingsSection>
         </div>
@@ -428,7 +448,7 @@ function DataPrivacyCard() {
     {
       label: "Stays in this browser",
       detail:
-        "Profile preferences and saved connection-test fields stay in local browser storage unless you export a backup or press a test/import/live chat action.",
+        "Profile preferences persist in this browser. Integration credentials stay only in the current tab, are never exported, and are sent only when you press a test, import, or live-chat action.",
     },
     {
       label: "Sent to this local app",
@@ -442,7 +462,7 @@ function DataPrivacyCard() {
     },
     {
       label: "Never sent by this app",
-      detail: "Master Mold has no order endpoint, cannot sign transactions, and never asks for private wallet keys.",
+      detail: "Advisory, portfolio, and Settings actions never place orders or ask for wallet keys. The separate Autopilot signer can use only an environment-provisioned wallet after its runtime gates pass.",
     },
   ];
 

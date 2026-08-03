@@ -2,7 +2,7 @@
  * Module `funding_basis` — funding/basis arbitrage (V3 plan module 2, report §9).
  * The highest-EV path for a small operator now that Solana perps are in scope.
  *
- * Delta-neutral: long spot + short perp when funding is positive and the carry
+ * Research hypothesis: long spot + short perp when funding is positive. The carry
  * over the hold clears round-trip cost with a basis-risk buffer. Direction of
  * SOL price is offset, so this earns the funding stream, not a price bet. Pure
  * candidate logic here; the perps venue adapter (Drift / Jupiter Perps reads)
@@ -28,12 +28,17 @@ export type FundingInput = {
   liquidity_usd: number | null;
   /** How many recent 8h windows funding has stayed the same sign (persistence). */
   funding_persistence_windows: number;
+  /** Standard deviation of recent non-overlapping 8h rates, in percent. */
+  funding_rate_8h_stdev_pct?: number | null;
+  /** Largest absolute mark/oracle basis observed in the recent funding window. */
+  basis_stress_pct?: number | null;
 };
 
 /** Require funding to have held its sign this many 8h windows before trusting it. */
 export const MIN_FUNDING_PERSISTENCE = 2;
 /** Basis-risk buffer added to cost before a carry trade is worthwhile (bps). */
 export const BASIS_RISK_BUFFER_BPS = 15;
+export const MAX_BASIS_STRESS_PCT = 1.5;
 
 /** funding_basis is market-neutral — it runs regardless of directional regime. */
 export function fundingEnabledIn(_regime: MarketRegime): boolean {
@@ -52,15 +57,28 @@ export function expectedCarryBps(input: FundingInput): number | null {
   return Math.round((fundingBps - basisGiveback) * 100) / 100;
 }
 
+export function stressAdjustedCarryBps(input: FundingInput): number | null {
+  if (input.funding_rate_8h_pct === null) return null;
+  const dispersion = Math.max(0, input.funding_rate_8h_stdev_pct ?? 0);
+  const stressedRate = Math.max(0, input.funding_rate_8h_pct - dispersion);
+  const windows = input.hold_hours / 8;
+  const fundingBps = stressedRate * 100 * windows;
+  const basisStress = Math.max(Math.abs(input.basis_pct ?? 0), Math.abs(input.basis_stress_pct ?? 0));
+  return Math.round((fundingBps - basisStress * 100) * 100) / 100;
+}
+
 /**
- * Build a delta-neutral candidate. Positive funding → long spot / short perp.
+ * Build a shadow-only two-leg hypothesis. Positive funding → long spot / short perp.
  * Returns null when funding is unknown, too fresh (not persistent), or the
  * carry doesn't clear cost + buffer.
  */
 export function fundingCandidate(input: FundingInput): CandidateSignal | null {
   if (input.funding_rate_8h_pct === null || input.funding_rate_8h_pct <= 0) return null; // only harvest positive funding for now
   if (input.funding_persistence_windows < MIN_FUNDING_PERSISTENCE) return null;
-  const carry = expectedCarryBps(input);
+  if (Math.abs(input.basis_stress_pct ?? 0) > MAX_BASIS_STRESS_PCT) return null;
+  const carry = input.funding_rate_8h_stdev_pct === undefined && input.basis_stress_pct === undefined
+    ? expectedCarryBps(input)
+    : stressAdjustedCarryBps(input);
   if (carry === null) return null;
   const evBps = Math.round((carry - input.cost.total_bps - BASIS_RISK_BUFFER_BPS) * 100) / 100;
   if (evBps <= 0) return null;
@@ -73,7 +91,7 @@ export function fundingCandidate(input: FundingInput): CandidateSignal | null {
     expected_return_bps: carry,
     cost: input.cost,
     expected_value_bps: evBps,
-    // Delta-neutral: confidence is high when funding is persistent, capped.
+    // Hypothesis confidence reflects rate persistence only, not execution confidence.
     confidence: Math.min(0.9, 0.6 + 0.1 * (input.funding_persistence_windows - MIN_FUNDING_PERSISTENCE)),
     // Max loss is basis blowout, not a directional stop — bounded by basis buffer.
     max_loss_bps: Math.max(30, Math.round(Math.abs(input.basis_pct ?? 0.3) * 100 * 2)),
@@ -84,7 +102,9 @@ export function fundingCandidate(input: FundingInput): CandidateSignal | null {
       basis_pct: input.basis_pct ?? 0,
       persistence: input.funding_persistence_windows,
       carry_bps: carry,
+      funding_stdev_8h_pct: input.funding_rate_8h_stdev_pct ?? 0,
+      basis_stress_pct: input.basis_stress_pct ?? Math.abs(input.basis_pct ?? 0),
     },
-    reason: `funding carry: +${input.funding_rate_8h_pct.toFixed(3)}%/8h × ${(input.hold_hours / 8).toFixed(1)} windows = ${carry.toFixed(0)}bp, EV ${evBps.toFixed(0)}bp after cost+basis buffer.`,
+    reason: `funding-only shadow hypothesis: +${input.funding_rate_8h_pct.toFixed(3)}%/8h × ${(input.hold_hours / 8).toFixed(1)} windows = ${carry.toFixed(0)}bp, EV ${evBps.toFixed(0)}bp after cost+basis buffer.`,
   };
 }

@@ -1639,7 +1639,7 @@ function decodeActionHeader(value: string | null): ChatAction[] {
  * win on the other side; this only upgrades the no-env-key case. */
 function browserChatKeyHeaders(): Record<string, string> {
   try {
-    const saved = window.localStorage.getItem("financial-copilot.integration-fields.live_chat");
+    const saved = window.sessionStorage.getItem("financial-copilot.integration-fields.live_chat");
     const fields = saved ? (JSON.parse(saved) as Record<string, unknown>) : null;
     const apiKey = typeof fields?.api_key === "string" ? fields.api_key.trim() : "";
     if (!apiKey || !/^[\x21-\x7e]+$/.test(apiKey)) return {};
@@ -1706,14 +1706,14 @@ function chatFailure(body: { error?: string; code?: string; provider?: string } 
   }
   if (body?.code === "auth") {
     return {
-      message: "The saved chat key was rejected. No account action happened.",
+      message: "The tab-scoped chat key was rejected. No account action happened.",
       recovery: "Check the local chat key before trusting live chat.",
     };
   }
   if (body?.code === "quota") {
     return {
-      message: "The saved chat key has no available credits or quota. The app context is still visible, but live chat paused.",
-      recovery: "Add credits or choose another saved chat key to resume live analysis.",
+      message: "The tab-scoped chat key has no available credits or quota. The app context is still visible, but live chat paused.",
+      recovery: "Add credits or choose another tab-scoped chat key to resume live analysis.",
     };
   }
   if (body?.code === "rate_limit") {

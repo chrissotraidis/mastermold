@@ -65,6 +65,8 @@ type AutopilotApiPayload = {
   strategy?: {
     name: string;
     summary: string;
+    entry_authority: "retired";
+    retirement_reason: string;
     rules: string[];
     evaluations: {
       ts: string;
@@ -387,7 +389,7 @@ export function AutopilotPanel() {
               onClick={() => handleModeClick("paper")}
               className="inline-flex min-h-11 items-center justify-center rounded-md bg-engine/15 px-3 text-xs font-semibold text-engine transition-colors hover:bg-engine/25 disabled:opacity-50 sm:min-h-8"
             >
-              Arm paper trading
+              Run paper research
             </button>
           ) : null}
           {!runtimeUnavailable && !killEngaged && (state.mode === "paper" || state.mode === "live") ? (
@@ -483,13 +485,13 @@ export function AutopilotPanel() {
                 </span>
               ) : null}
               {data.v3.carry ? (
-                <span title="Synthetic $100-per-market delta-neutral funding carry, marked from live Drift funding — the strategy's evidence, never a live position.">
+                <span title="Funding-only accrual monitor from public Drift rates. It excludes synchronized spot/perp fills, margin, liquidation, and realized execution, so it is not P&L or delta-neutral evidence.">
                   {" · "}
-                  carry shadow{" "}
+                  funding monitor{" "}
                   <span className={data.v3.carry.total_usd >= 0 ? "text-engine" : "text-critical"}>
                     {data.v3.carry.total_usd >= 0 ? "+" : ""}${data.v3.carry.total_usd.toFixed(2)}
                   </span>
-                  {` (${data.v3.carry.open_markets} open${data.v3.carry.apr_pct !== null ? `, ~${data.v3.carry.apr_pct.toFixed(1)}% APR` : ""})`}
+                  {` modeled accrual (${data.v3.carry.open_markets} open; no legs filled)`}
                 </span>
               ) : null}
             </p>
@@ -1087,11 +1089,13 @@ function StrategyCard({ strategy }: { strategy: NonNullable<AutopilotApiPayload[
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Strategy</h3>
         <span className="text-xs font-semibold text-on-surface">{strategy.name}</span>
+        <span className="rounded-full border border-caution/35 px-2 py-0.5 text-[10px] font-semibold text-caution">Entries retired</span>
         {snapshot ? (
           <span className="text-[11px] text-outline">verdicts from {formatAgo(snapshot.ts)}</span>
         ) : null}
       </div>
       <p className="mt-0.5 text-xs leading-5 text-on-surface-variant">{strategy.summary}</p>
+      <p className="mt-0.5 text-xs leading-5 text-caution">{strategy.retirement_reason}</p>
 
       {snapshot && snapshot.evaluations.length > 0 ? (
         <ul className="mt-1.5 divide-y divide-outline-variant/15">

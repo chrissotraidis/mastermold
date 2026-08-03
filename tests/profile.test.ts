@@ -16,9 +16,9 @@ import {
 const NOW = "2026-06-07T12:00:00.000Z";
 
 const sampleIntegrations: IntegrationBackup[] = [
-  { service: "coinbase", connected: true, key: "cb-key" },
-  { service: "robinhood", connected: false, key: "" },
-  { service: "llm", connected: false, key: "sk-test" },
+  { service: "coinbase", connected: true },
+  { service: "robinhood", connected: false },
+  { service: "llm", connected: false },
 ];
 
 describe("profile core", () => {
@@ -61,7 +61,7 @@ describe("profile core", () => {
     expect(result.backup.profile.preferences.asset_focus).toBe("crypto");
     expect(result.backup.profile.preferences.alert_sensitivity).toBe("urgent_only");
     expect(result.backup.integrations).toHaveLength(3);
-    expect(result.backup.integrations[0]).toEqual({ service: "coinbase", connected: true, key: "cb-key" });
+    expect(result.backup.integrations[0]).toEqual({ service: "coinbase", connected: true });
   });
 
   test("parseBackup rejects non-JSON input", () => {
@@ -93,7 +93,7 @@ describe("profile core", () => {
         exported_at: NOW,
         future_field: "ignored",
         profile: { name: "Grace", preferences: {}, created_at: NOW, updated_at: NOW },
-        integrations: [{ service: "coinbase" }],
+        integrations: [{ service: "coinbase", key: "legacy-secret" }],
       }),
     );
     expect(result.ok).toBe(true);
@@ -102,7 +102,8 @@ describe("profile core", () => {
     expect(result.backup.profile.preferences.risk_posture).toBe("balanced");
     expect(result.backup.profile.preferences.alert_sensitivity).toBe("balanced");
     expect(result.backup.integrations[0].connected).toBe(false);
-    expect(result.backup.integrations[0].key).toBe("");
+    expect(result.backup.integrations[0]).toEqual({ service: "coinbase", connected: false });
+    expect(JSON.stringify(result.backup)).not.toContain("legacy-secret");
   });
 
   test("normalizeProfile repairs partial data and rejects non-objects", () => {
@@ -114,9 +115,9 @@ describe("profile core", () => {
     expect(normalizeProfile(null, NOW)).toBeNull();
   });
 
-  test("summarizeBackup counts saved connection-test fields without implying imported accounts", () => {
+  test("profile backups never summarize or carry connection credentials", () => {
     const profile = createDefaultProfile({ name: "Ada" }, NOW);
     const backup = buildBackup(profile, sampleIntegrations, NOW);
-    expect(summarizeBackup(backup)).toBe("2 saved connection-test fields");
+    expect(summarizeBackup(backup)).toBe("profile preferences only");
   });
 });

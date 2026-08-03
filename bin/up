@@ -15,12 +15,33 @@
 # This supervises PROCESSES only. Whether the bot trades is still the mode
 # set from the Autopilot page — a supervised daemon in mode "off" just idles.
 set -uo pipefail
+umask 077
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 mkdir -p .data/logs
+# Personal holdings, journals, evidence, logs, and backups are private to the
+# runtime account even when the host has other local users.
+find .data -type d -exec chmod 700 {} +
+find .data -type f -exec chmod 600 {} +
+
 
 BUN="node_modules/.bin/bun"
 [ -x "$BUN" ] || BUN="bun"
+
+# Load local runtime configuration before deciding whether the web process is
+# already running. The daemon must receive the same absolute stores and
+# optional read-only data credentials in both launch branches.
+set -a
+[ -f .env.local ] && . ./.env.local
+set +a
+export MASTERMOLD_DB="${MASTERMOLD_DB:-$ROOT/.data/mastermold.db}"
+export AUTOPILOT_DB="${AUTOPILOT_DB:-$ROOT/.data/autopilot.db.json}"
+export POLYMARKET_DB="${POLYMARKET_DB:-$ROOT/.data/polymarket.db.json}"
+export POLYMARKET_BRAIN_DB="${POLYMARKET_BRAIN_DB:-$ROOT/.data/polymarket-brain.db}"
+export POLYMARKET_WEATHER_DB="${POLYMARKET_WEATHER_DB:-$ROOT/.data/polymarket-weather-research.db}"
+export ENGINE_OUT_DIR="${ENGINE_OUT_DIR:-$ROOT/engine/out}"
+export MASTERMOLD_ROOT="${MASTERMOLD_ROOT:-$ROOT}"
+export HELIUS_FIREWALL_LEDGER="${HELIUS_FIREWALL_LEDGER:-$ROOT/.data/helius-firewall.json}"
 
 MAX_LOG_BYTES=$((5 * 1024 * 1024))
 
@@ -72,22 +93,14 @@ else
     # daemon writes (a relative default would silently create a second,
     # empty store inside the artifact).
     #
-    # Binding: 127.0.0.1 by default — this app has NO authentication, and a
-    # VPS must never expose the dashboard (or its control POSTs) to the open
-    # internet. Reach it over an SSH tunnel or Tailscale, or front it with an
-    # authenticating reverse proxy and set MASTERMOLD_BIND=0.0.0.0 knowingly.
-    set -a
-    [ -f .env.local ] && . ./.env.local
-    set +a
+    # Binding: 127.0.0.1 by default. Loopback is treated as the local
+    # operator; remote requests require configured operator/viewer credentials.
+    # Never send Basic Auth over plain HTTP. Use an SSH tunnel, Tailscale Serve,
+    # or a TLS proxy, and set MASTERMOLD_BIND=0.0.0.0 only intentionally.
     export PORT=4002
     export HOSTNAME="${MASTERMOLD_BIND:-127.0.0.1}"
-    export MASTERMOLD_DB="${MASTERMOLD_DB:-$ROOT/.data/mastermold.db}"
-    export AUTOPILOT_DB="${AUTOPILOT_DB:-$ROOT/.data/autopilot.db.json}"
-    export ENGINE_OUT_DIR="${ENGINE_OUT_DIR:-$ROOT/engine/out}"
     # Anchors engine spawning (venv, wrapper, spawn cwd) and the Helius
     # firewall ledger to the repo, not the artifact's chdir'd cwd.
-    export MASTERMOLD_ROOT="${MASTERMOLD_ROOT:-$ROOT}"
-    export HELIUS_FIREWALL_LEDGER="${HELIUS_FIREWALL_LEDGER:-$ROOT/.data/helius-firewall.json}"
     supervise web node .next/standalone/server.js &
     echo "up: web (production standalone) starting at http://${HOSTNAME}:4002"
   else

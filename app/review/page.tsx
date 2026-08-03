@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { reviewCapabilitySections } from "@/src/product/capabilities";
 import { autopilotStore } from "@/src/autopilot/store";
+import { safeWeatherResearchReport } from "@/src/polymarket/weather-research";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,7 @@ function strategyReality() {
 
 export default function ReviewPage() {
   const reality = strategyReality();
+  const weather = safeWeatherResearchReport();
   const mlEligible = reality.cusumSpanDays >= 28 && reality.latestModelPassed && reality.latestModelCompliant && reality.approvedModel === reality.latestModelId;
 
   return (
@@ -67,6 +69,36 @@ export default function ReviewPage() {
             and what is still missing. Paper results and replay results are evidence—not claims of future profit.
           </p>
         </header>
+
+        <Card className="border-sky-400/25 bg-sky-400/[0.035]">
+          <CardHeader className="p-5 pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle as="h2" className="text-lg">Polymarket weather research truth</CardTitle>
+              <Badge variant="outline" className="border-violet/30 text-violet">Shadow only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-5 pt-2 text-sm leading-6 text-on-surface-variant md:grid-cols-2">
+            <div>
+              <p className="font-semibold text-on-surface">What is working</p>
+              <p>Immutable local snapshots store audited rules, station metadata, forecast members, source hashes, observations, and market resolutions. Historical resolutions are backfilled only when one final winning bucket is unambiguous.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-on-surface">What is not proven</p>
+              <p>Current ensemble captures lack a stable issuance identifier and are excluded from calibration. No historical forecast is reconstructed from outcomes, and no station-observation backfill is presented as settlement truth.</p>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-outline-variant/30 p-3 md:col-span-2 md:grid-cols-6">
+              <dt>Rule snapshots</dt><dd className="font-semibold text-on-surface">{weather.counts.rule_snapshots}</dd>
+              <dt>Forecast runs</dt><dd className="font-semibold text-on-surface">{weather.counts.forecast_runs}</dd>
+              <dt>Qualified runs</dt><dd className="font-semibold text-on-surface">{weather.counts.complete_forecast_runs}</dd>
+              <dt>Resolutions</dt><dd className="font-semibold text-on-surface">{weather.counts.resolutions}</dd>
+              <dt>Held-out cases</dt><dd className="font-semibold text-on-surface">{weather.counts.heldout_cases}</dd>
+              <dt>Evidence gate</dt><dd className="font-semibold text-on-surface">{weather.evidence_gate.passed ? "Passed; not promoted" : "Insufficient"}</dd>
+            </dl>
+            <p className="md:col-span-2">
+              {weather.detail} The evaluator uses only prior cases for each held-out date and compares station/kind climatology, raw ensemble frequency, and a simple EMOS calibration with Brier and CRPS scores. This database cannot enable paper or live execution.
+            </p>
+          </CardContent>
+        </Card>
 
         <Card className="border-caution/35 bg-caution/[0.045]">
           <CardHeader className="p-5 pb-2">
@@ -114,7 +146,7 @@ export default function ReviewPage() {
               the 2.0 CUSUM events/day figure came from a deterministic fixture, not live markets. The first reviewed paper sample was roughly 9.8/day/mint—above the written 0.5–5 band. The corrected daemon now stores every event durably and warns after six observed hours; it never retunes thresholds automatically. Quote-derived fill rehearsals are also excluded from self-comparison slippage estimates.
             </p>
             <p className="md:col-span-2">
-              Local bot-control POSTs require a loopback Host and an exact loopback Origin, the development server binds to <code>127.0.0.1</code>, and cap edits cannot weaken any of the six defaults. Review access does not grant live-wallet or remote-control authority.
+              Local bot-control POSTs require a loopback Host and an exact loopback Origin, the development server binds to <code>127.0.0.1</code>, and cap edits cannot weaken any of the six defaults. Remote requests require configured operator or viewer credentials; viewer mutations are blocked, and remote operator mutations require an exact matching Origin. Bot-control routes keep their stricter loopback rule, so an SSH tunnel remains required to change runtime authority.
             </p>
             {reality.mode === "off" ? (
               <p className="md:col-span-2 font-semibold text-caution">

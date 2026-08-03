@@ -117,6 +117,15 @@ export type DecisionJournalEntry = BitemporalFields & {
   horizon: string;
   falsification_condition: string;
   logged_at: string;
+  decision_source?: {
+    kind: "today";
+    report_id: string;
+    play_id: string;
+    symbol: string;
+    action: "trim" | "add" | "hold" | "watch";
+    market_as_of: string;
+    entry_close: number;
+  };
 };
 
 export type OutcomeScore = BitemporalFields & {

@@ -14,7 +14,7 @@ import { buildAttribution, type AttributionSummary } from "@/src/autopilot/attri
 import { summarizeBpTimingEvidence, type BpTimingEvidence } from "@/src/autopilot/bp-evidence";
 import { calibrate, calibrateStrategy, type CalibrationSummary } from "@/src/autopilot/v3/calibration";
 import { summarizeCarryBook, type CarrySummary } from "@/src/autopilot/v3/carry-book";
-import { evaluateModuleLiveCandidate, evaluateV3Promotion, paperPromotionSnapshots, type V3LiveCandidate, type V3Promotion } from "@/src/autopilot/v3/promotion";
+import { evaluateModuleLiveCandidate, evaluateV3Promotion, paperPromotionSnapshots, paperStrategyHasExecutionAdapter, type V3LiveCandidate, type V3Promotion } from "@/src/autopilot/v3/promotion";
 import {
   isPlausibleSolanaAddress,
   walletReportCards,
@@ -33,7 +33,9 @@ import type { ExperimentId, ExperimentSummary } from "@/src/autopilot/experiment
 import { DEFAULT_STRATEGY_PARAMS, type ParamChangelogEntry, type StrategyParams } from "@/src/autopilot/params";
 import {
   describeStrategyRules,
+  STRATEGY_ENTRY_AUTHORITY,
   STRATEGY_NAME,
+  STRATEGY_RETIREMENT_REASON,
   STRATEGY_SUMMARY,
   type EvaluationSnapshot,
 } from "@/src/autopilot/strategy-view";
@@ -73,6 +75,8 @@ export type AutopilotApiPayload = {
   strategy: {
     name: string;
     summary: string;
+    entry_authority: typeof STRATEGY_ENTRY_AUTHORITY;
+    retirement_reason: string;
     rules: string[];
     evaluations: EvaluationSnapshot | null;
   };
@@ -194,6 +198,8 @@ async function payload(): Promise<AutopilotApiPayload> {
     strategy: {
       name: STRATEGY_NAME,
       summary: STRATEGY_SUMMARY,
+      entry_authority: STRATEGY_ENTRY_AUTHORITY,
+      retirement_reason: STRATEGY_RETIREMENT_REASON,
       rules: describeStrategyRules(store.strategyParams()),
       evaluations: store.lastEvaluations(),
     },
@@ -222,8 +228,8 @@ async function payload(): Promise<AutopilotApiPayload> {
           return [strategyId, {
             calibration: strategyCalibration,
             promotion: evaluateV3Promotion(strategyCalibration, store.replayConfirmation(strategyId)),
-            stored_ready: store.v3Promotion(strategyId)?.ready ?? false,
-            stored_eligible: store.v3Promotion(strategyId)?.eligible ?? false,
+            stored_ready: paperStrategyHasExecutionAdapter(strategyId) && (store.v3Promotion(strategyId)?.ready ?? false),
+            stored_eligible: paperStrategyHasExecutionAdapter(strategyId) && (store.v3Promotion(strategyId)?.eligible ?? false),
             operator_confirmed_at: store.v3Promotion(strategyId)?.operator_confirmed_at ?? null,
             live_candidate: evaluateModuleLiveCandidate({
               trades: allTrades, strategy_id: strategyId, now_ms: Date.now(),
@@ -461,6 +467,8 @@ function unavailablePayload(state: AutopilotStateView, marketFeed: MarketFeedRow
     strategy: {
       name: STRATEGY_NAME,
       summary: STRATEGY_SUMMARY,
+      entry_authority: STRATEGY_ENTRY_AUTHORITY,
+      retirement_reason: STRATEGY_RETIREMENT_REASON,
       rules: describeStrategyRules({ ...DEFAULT_STRATEGY_PARAMS }),
       evaluations: null,
     },

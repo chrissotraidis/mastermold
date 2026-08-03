@@ -86,18 +86,18 @@ let inFlight: Promise<ScanRunResult> | null = null;
 // MASTERMOLD_ROOT anchors them when the server's cwd is not the repo root —
 // the production standalone server chdir()s into .next/standalone, where the
 // engine does not exist (bin/up exports it; VPS deployment, 2026-07-10).
-function repoRoot(): string {
-  return process.env.MASTERMOLD_ROOT ?? /* turbopackIgnore: true */ process.cwd();
+function runtimePath(rel: string): string {
+  const configuredRoot = process.env.MASTERMOLD_ROOT;
+  if (configuredRoot) return join(configuredRoot, ...rel.split("/"));
+  return join(/*turbopackIgnore: true*/ process.cwd(), ...rel.split("/"));
 }
 
 function enginePythonPath(): string {
-  const rel = process.env.MASTERMOLD_ENGINE_PYTHON ?? "engine/.venv/bin/python";
-  return join(repoRoot(), ...rel.split("/"));
+  return runtimePath(process.env.MASTERMOLD_ENGINE_PYTHON ?? "engine/.venv/bin/python");
 }
 
 function engineWrapperPath(): string {
-  const rel = process.env.MASTERMOLD_ENGINE_WRAPPER ?? "bin/engine-briefing";
-  return join(repoRoot(), ...rel.split("/"));
+  return runtimePath(process.env.MASTERMOLD_ENGINE_WRAPPER ?? "bin/engine-briefing");
 }
 
 /** True when this machine can run the engine at all (venv or uv present). */
@@ -122,7 +122,7 @@ async function executeScan(trigger: string): Promise<ScanRunResult> {
   const startedAt = new Date().toISOString();
   const runDate = startedAt.slice(0, 10);
   const attemptId = `scan_${Date.now().toString(36)}`;
-  const portfolioSync = await syncPortfolioContextForScan(startedAt);
+  const portfolioSync = await refreshPortfolioContext(startedAt);
   const portfolioContext = getPortfolioBrainScanContext(new Date());
 
   recordAttempt({
@@ -220,7 +220,7 @@ async function executeScan(trigger: string): Promise<ScanRunResult> {
   };
 }
 
-async function syncPortfolioContextForScan(startedAt: string): Promise<ScanPortfolioSync> {
+export async function refreshPortfolioContext(startedAt: string = new Date().toISOString()): Promise<ScanPortfolioSync> {
   const config = getMonarchMcpPublicConfig();
   const boundary = "Read-only portfolio preflight. This cannot place brokerage trades, sign transactions, or move funds.";
   if (config.transport === "missing") {
@@ -295,7 +295,7 @@ function writePortfolioWatchlist(): string | null {
 }
 
 function spawnEngine(runDate: string): Promise<{ ok: true } | { ok: false; detail: string }> {
-  const root = repoRoot();
+  const root = process.env.MASTERMOLD_ROOT ?? process.cwd();
   const venvPython = enginePythonPath();
   const useVenv = existsSync(venvPython);
   const command = useVenv ? venvPython : engineWrapperPath();

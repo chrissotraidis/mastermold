@@ -542,9 +542,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(`${journal}\n${journalPage}`).not.toMatch(/Temporary public outcome API check|Legacy call body still works|Saved local verification call|Result saved during local verification/i);
     expect(journal).toContain("Used for this call");
     expect(journal).toContain("Choose whether the call was right.");
-    expect(journal).toContain("Add a result note.");
+    expect(journal).toContain("Add what happened and what should change next.");
     expect(outcomeRoute).toContain("Choose whether the call was right.");
-    expect(outcomeRoute).toContain("Result note is required.");
+    expect(outcomeRoute).toContain("Outcome and lesson are required.");
     expect(journal).toContain("journalSignalGroups(entry.reasons)");
     expect(journal).toContain("isJournalSourceSignal(signal)");
     expect(journal).toContain('/^(market read|portfolio|memory|source):/i');
@@ -560,7 +560,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain('<HealthRow label="Data mode"');
     expect(settingsPage).toContain('label="Portfolio source"');
     expect(settingsPage).toContain('label="Daily report"');
-    expect(settingsPage).toContain('<HealthRow label="Credentials" value="Local reviewer" detail="No secrets required for local review." />');
+    expect(settingsPage).toContain('<HealthRow label="Access" value="Loopback operator" detail="Remote access is fail-closed');
     expect(source("lib/public-api-copy.ts")).toContain('briefing_feedback: "Today rated"');
     expect(settingsPage).not.toMatch(/today_read_target|median_today_read_seconds|briefing_feedback\.usefulness_rate|alert_feedback\.fatigue_rate|calibration_outcomes|mean_abs_error|within_confidence_band|Briefing ratings|Briefing rated|opens · no ratings|opens`,/i);
   });
@@ -611,8 +611,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain('label="Daily report"');
     expect(settingsPage).toContain("auto-refresh");
     expect(dailyReport).toContain('market_scope: "market data only"');
-    expect(settingsPage).toContain("No swaps, signatures, or fund movement.");
-    expect(reviewSurface).toContain("Short questions can use a saved chat key");
+    expect(settingsPage).toContain("The current Web3 runtime is not live.");
+    expect(reviewSurface).toContain("Short questions can use a tab-scoped chat key");
     expect(reviewSurface).toContain("Saved market reads can inform Today, Alerts, Paper, and chat.");
     expect(reviewCopy).toContain("optional market check");
     expect(`${reviewSurface}\n${reviewCopy}`).not.toMatch(
@@ -635,7 +635,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(chatContext).toContain("MASTERMOLD_CHAT_MAX_RESPONSE_TOKENS");
     expect(route).toContain("contextWithInferenceBudget");
     expect(chatContext).toContain("live chat has a size limit");
-    expect(chatContext).toContain("Short questions can use a saved chat key");
+    expect(chatContext).toContain("Short questions can use a tab-scoped chat key");
     expect(chatContext).toContain("The Today Save context for chat action only saves or refreshes local app context");
     expect(chatContext).toContain("Do not say live chat requests never happen");
     expect(source("lib/chat-copy.ts")).toContain("Begin with `Today readiness:`");
@@ -653,7 +653,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(chat).toContain("Ask a shorter question or narrow the page context.");
     expect(chat).toContain('return "Live chat"');
     expect(chat).toContain('return "Kept short"');
-    expect(chat).toContain("The saved chat key was rejected. No account action happened.");
+    expect(chat).toContain("The tab-scoped chat key was rejected. No account action happened.");
     expect(chat).toContain("The selected chat model is unavailable. The app kept the decision flow read-only.");
     // friendlyChatError translates raw provider/model wording; the raw phrases
     // may only appear inside its replace() patterns.
@@ -709,21 +709,22 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewPage).toContain("Paper results and replay results are evidence—not claims of future profit.");
     expect(reviewPage).toContain("Review credentials never include private keys, seed phrases, or wallet authority.");
     expect(reviewPage).toContain("Paper evidence clocks are paused because mode is off.");
-    expect(appShell).toContain("Advisory only — Master Mold never places trades or moves funds.");
+    expect(appShell).toContain("Advisory by default — live execution requires an explicit operator action and passing evidence gates.");
     expect(appShell).toContain('href="/settings#health"');
     expect(settingsPage).toContain("System health");
     expect(settingsPage).toContain('label="Portfolio source"');
     expect(settingsPage).toContain("portfolioSource.source_label");
-    expect(settingsPage).toContain('<HealthRow label="Live trading" value="Locked" detail="No swaps, signatures, or fund movement." />');
+    expect(settingsPage).toContain('label="Web3 live runtime"');
++    expect(settingsPage).toContain('value={autopilotLive ? "Enabled" : "Off or locked"}');
     expect(settingsPage).toContain('label="Daily report"');
-    expect(settingsPage).toContain('value="Local reviewer"');
-    expect(settingsPage).toContain("No secrets required for local review.");
+    expect(settingsPage).toContain('value="Loopback operator"');
+    expect(settingsPage).toContain("Remote access is fail-closed");
     expect(reviewSurface).toContain("Chat context saves what the app can remember");
     expect(reviewSurface).toContain("supporting notes, and alerts come from the saved read");
     expect(reviewSurface).toContain("Saved market reads can inform Today, Alerts, Paper, and chat.");
     expect(reviewSurface).toContain("They cannot touch accounts or move money.");
     expect(reviewSurface).toContain("chat context snapshots");
-    expect(reviewSurface).toContain("Live chat can be tested and used when a key is saved.");
+    expect(reviewSurface).toContain("Live chat can be tested and used while a tab-scoped key is present.");
     expect(reviewSurface).not.toMatch(/Performance & trust|still sample before you trust|Safe to inspect|trust score|black box|Manual or sample only|real portfolio money|scanner reads|drivers, and alerts|OpenRouter, Anthropic, or OpenAI|always-on Brain described in the PRD|brain runs|Ask about this scan|Review the current Master Mold scan|What it learned|Confidence \\$\\{Math\\.round|seeded local account|Last scan|Scan date|Scan type|Scan details|Not needed for this scan|duplicate scan/i);
   });
 
@@ -761,7 +762,7 @@ describe("mobile ergonomics source contracts", () => {
     // Redesign: TradeScopeBanner was replaced by the global AppShell footer;
     // Trade's own header still pins the live-money lock.
     expect(tradingPage).toContain("Live money stays locked.");
-    expect(source("components/app-shell.tsx")).toContain("Advisory only — Master Mold never places trades or moves funds.");
+    expect(source("components/app-shell.tsx")).toContain("Advisory by default — live execution requires an explicit operator action and passing evidence gates.");
     expect(tradingPage).not.toContain("showSuggestions: false");
     expect(tradingPage).not.toContain('className: "hidden sm:block"');
     expect(tradingPage).not.toContain("Web3 desk status, next test trade, and live-money locks.");
@@ -991,7 +992,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(integrations).toContain("Brokerages via SnapTrade");
     expect(integrations).toContain("Coinbase read-only");
     expect(integrations).toContain("Web3 wallets via Zerion");
-    expect(settingsPage).toContain("Master Mold has no order endpoint, cannot sign transactions, and never asks for private wallet keys.");
+    expect(settingsPage).toContain("Advisory, portfolio, and Settings actions never place orders or ask for wallet keys. The separate Autopilot signer can use only an environment-provisioned wallet after its runtime gates pass.");
     expect(settingsPage).not.toMatch(/SettingsWeb3CredentialConsole|credential wall|receipt wall/i);
     expect(input).toContain("Import holdings");
     expect(input).toContain("Test read-only access");

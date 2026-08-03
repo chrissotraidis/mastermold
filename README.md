@@ -11,7 +11,7 @@ The draw is the paper-to-live path for autonomous Web3 trading: Master Mold
 tracks a liquid Solana universe, records the bot's decisions, rehearses Jupiter
 routes against live DEX quotes, and keeps any live swap behind local wallet
 provisioning, hard caps, a kill switch, and an evidence-based go-live gate.
-Today, the public build is paper-first and advisory by default. It never places
+Today, both autonomous lanes start off and the public build is advisory by default. It never places
 brokerage trades, and Solana execution stays off unless a spare local wallet is
 deliberately provisioned and the go-live gate passes.
 
@@ -31,13 +31,24 @@ workspace.
 - A Solana/Web3 Autopilot page for SOL, JUP, BONK, WIF, JTO, WETH, WBTC, RAY,
   and PYTH, with live market watching, paper equity, decision logs, caps, a kill
   switch, wallet readiness, and a go-live gate.
+- A separate Polymarket tab with live public market discovery, a momentum-only
+  local paper bot, simulator positions and P&L, and a locked live-order boundary.
+  Paper entries and exits walk displayed CLOB depth and fail closed when the
+  full simulated size is unavailable.
+  Its separate SQLite research brain samples executable CLOB quotes and depth,
+  tracks momentum, book-pressure, binary-parity, and maker-spread hypotheses,
+  labels execution-adjusted forward markouts, and grades selected probabilities
+  against decisive final outcomes with Brier scores. New hypotheses stay shadow-only
+  until a hard paper-candidate evidence gate passes; none can unlock live orders.
+  A station-matched weather lab displays raw ECMWF ensemble bucket probabilities
+  for upcoming daily-temperature events, but it has no paper or live authority.
 - Guarded Solana execution plumbing for the operator path: Jupiter quote/swap
   building, local wallet signing from ignored environment variables, Solana RPC
   resolution, and a Helius credit firewall.
 - Local stores under `.data/` for imported holdings, notes, reports, paper bot
   state, and other user-created data.
 
-The default bot mode is paper. Live Solana execution is not the public default;
+The default bot mode is off. Paper mode requires an explicit local operator action, and live Solana execution is not the public default;
 it requires local wallet provisioning, passing go-live evidence, and deliberate
 operator action.
 
@@ -54,7 +65,7 @@ Ignored local files are where personal state belongs:
 
 The autopilot daemon snapshots `.data/` once a day to `~/.mastermold/backups`
 (outside the repo; override with `MASTERMOLD_BACKUP_DIR`, retention with
-`MASTERMOLD_BACKUP_KEEP`, default 14 days). `npm run backup` takes today's
+`MASTERMOLD_BACKUP_KEEP`, default 60 snapshots). `npm run backup` takes today's
 snapshot on demand. Restoring is copying a snapshot's files back into `.data/`.
 
 Before publishing, pushing, or preparing a release, run:
@@ -70,7 +81,7 @@ bun install
 bun run dev
 ```
 
-Open http://localhost:4002. The app pins port 4002 so the daily-run script,
+Open http://localhost:4002. Loopback access is treated as the local operator. The app pins port 4002 so the daily-run script,
 scheduler templates, and integration tests line up without configuration. The
 app starts in sample mode and runs without external accounts, API keys, or a
 wallet. Connecting accounts or preparing a Solana wallet is optional and must
@@ -109,6 +120,9 @@ Common local paths:
 ```bash
 MASTERMOLD_DB=.data/mastermold.db
 AUTOPILOT_DB=.data/autopilot.db.json
+POLYMARKET_DB=.data/polymarket.db.json
+POLYMARKET_BRAIN_DB=.data/polymarket-brain.db
+POLYMARKET_STREAM_ENABLED=1
 ENGINE_OUT_DIR=engine/out
 ```
 
@@ -155,7 +169,7 @@ npm run privacy:audit
 npm run smoke:app
 ```
 
-`npm run smoke:app` expects a local app server to be running.
+`npm run smoke:app` starts an isolated standalone server from the current build and never touches the real `.data/` store. `npm run ops:check` is the read-only check for an already running deployment.
 
 ## Repository Map
 
@@ -165,6 +179,7 @@ components/          UI components
 src/db/              Local app store, sample data, portfolio imports, reports
 src/chat/            Chat providers, context, and bounded local actions
 src/autopilot/       Solana/Web3 paper bot, go-live gate, and executor logic
+src/polymarket/      Market reads, isolated paper simulator, and research brain
 src/helius/          Optional Helius/Solana RPC credit firewall
 engine/              Optional Python briefing engine
 public/              Public app assets
@@ -180,6 +195,7 @@ docs/                Public documentation only
 - [Privacy](docs/PRIVACY.md)
 - [Security](docs/SECURITY.md)
 - [Deployment](docs/DEPLOYMENT.md)
+- [Polymarket and Web3 research](docs/POLYMARKET-WEB3-RESEARCH-2026-08.md)
 - [Operations](docs/OPERATIONS.md)
 - [Backlog](docs/BACKLOG.md)
 

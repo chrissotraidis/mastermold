@@ -69,6 +69,7 @@ const blockedPrefixes = [
   "docs/research/",
   "docs/roadmap/",
   "docs/design/",
+  "ref/",
   "engine/out/",
 ];
 

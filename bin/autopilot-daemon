@@ -7,6 +7,16 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+mkdir -p .data
+if ! command -v flock >/dev/null 2>&1; then
+  echo "autopilot-daemon: flock is required for the single-instance guard" >&2
+  exit 1
+fi
+exec 9>.data/autopilot-daemon.lock
+if ! flock -n 9; then
+  echo "autopilot-daemon: another daemon already holds .data/autopilot-daemon.lock" >&2
+  exit 1
+fi
 if command -v bun >/dev/null 2>&1; then
   exec bun run src/autopilot/daemon.ts
 fi

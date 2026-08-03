@@ -29,6 +29,10 @@ export type FundingSnapshot = {
   funding_rate_8h_pct: number | null;
   /** Consecutive recent 8h windows with the same sign as the latest rate. */
   persistence_windows: number;
+  /** Dispersion of recent non-overlapping 8h funding windows, percent. */
+  funding_rate_8h_stdev_pct?: number | null;
+  /** Largest recent absolute mark/oracle divergence, percent. */
+  basis_stress_pct?: number | null;
   /** Mark vs oracle TWAP divergence, percent — the basis. */
   basis_pct: number | null;
 };
@@ -90,18 +94,41 @@ export function fundingSnapshotFromRecords(market: string, records: DriftFunding
   const meanHourly = recent.reduce((a, r) => a + r.funding_rate_hourly_frac, 0) / recent.length;
   const rate8hPct = meanHourly * 8 * 100;
 
-  // Persistence: count consecutive 8-record windows whose mean keeps the sign.
+  // Persistence and dispersion from non-overlapping 8h windows. A variable
+  // funding stream is discounted by funding-basis.ts instead of extrapolated.
   const sign = Math.sign(rate8hPct);
   let persistence = 0;
-  for (let start = 0; start + 8 <= records.length && persistence < 6; start += 8) {
+  const windowRatesPct: number[] = [];
+  for (let start = 0; start + 8 <= records.length && windowRatesPct.length < 6; start += 8) {
     const window = records.slice(start, start + 8);
     const mean = window.reduce((a, r) => a + r.funding_rate_hourly_frac, 0) / window.length;
-    if (Math.sign(mean) === sign && sign !== 0) persistence += 1;
-    else break;
+    const windowRatePct = mean * 8 * 100;
+    windowRatesPct.push(windowRatePct);
+    if (Math.sign(mean) === sign && sign !== 0 && persistence === windowRatesPct.length - 1) persistence += 1;
   }
+  const fundingMean = windowRatesPct.length
+    ? windowRatesPct.reduce((sum, value) => sum + value, 0) / windowRatesPct.length
+    : rate8hPct;
+  const fundingVariance = windowRatesPct.length
+    ? windowRatesPct.reduce((sum, value) => sum + (value - fundingMean) ** 2, 0) / windowRatesPct.length
+    : 0;
+  const fundingStdevPct = Math.sqrt(fundingVariance);
 
+  const recentBasis = records.slice(0, 24).flatMap((record) =>
+    record.oracle_twap > 0 ? [Math.abs(((record.mark_twap - record.oracle_twap) / record.oracle_twap) * 100)] : [],
+  );
   const basisPct = latest.oracle_twap > 0 ? ((latest.mark_twap - latest.oracle_twap) / latest.oracle_twap) * 100 : null;
-  return { market, fresh: true, latest_ts_ms: latest.ts_ms, funding_rate_8h_pct: rate8hPct, persistence_windows: persistence, basis_pct: basisPct };
+  const basisStressPct = recentBasis.length ? Math.max(...recentBasis) : null;
+  return {
+    market,
+    fresh: true,
+    latest_ts_ms: latest.ts_ms,
+    funding_rate_8h_pct: rate8hPct,
+    funding_rate_8h_stdev_pct: fundingStdevPct,
+    persistence_windows: persistence,
+    basis_pct: basisPct,
+    basis_stress_pct: basisStressPct,
+  };
 }
 
 // --- fetch shell (cached, never throws) ----------------------------------------
