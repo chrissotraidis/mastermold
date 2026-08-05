@@ -9,6 +9,7 @@ export type ProductMetricEvent =
   | "chat_followup_clicked"
   | "alert_acknowledged"
   | "alert_reopened"
+  | "alerts_cleared_all"
   | "alert_feedback"
   | "decision_logged"
   | "today_decision_response"
@@ -69,6 +70,7 @@ const knownEvents: ProductMetricEvent[] = [
   "chat_followup_clicked",
   "alert_acknowledged",
   "alert_reopened",
+  "alerts_cleared_all",
   "alert_feedback",
   "decision_logged",
   "today_decision_response",

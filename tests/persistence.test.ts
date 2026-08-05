@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { __resetStoreForTests, store } from "../src/db/store";
 import { createDecisionJournalEntry, getJournal } from "../src/db/journal";
 import { createPaperPrediction, getPaperPageData } from "../src/db/paper";
-import { acknowledgeAlert, getAlerts } from "../src/db/alerts";
+import { acknowledgeAlert, acknowledgeAllAlerts, getAlerts } from "../src/db/alerts";
 import { ingestEngineRun, type EngineBundle } from "../src/db/engine-data";
 import { __resetAutopilotStoreForTests } from "../src/autopilot/store";
 
@@ -166,6 +166,20 @@ describe("durable persistence (Phase 1.5)", () => {
 
     const after = getAlerts().find((a) => a.id === first.id);
     expect(after?.acknowledged).toBe(true);
+  });
+
+  test("GIVEN active alerts WHEN cleared all at once THEN every ack survives a restart", () => {
+    const before = getAlerts().filter((a) => !a.acknowledged);
+    expect(before.length).toBeGreaterThan(1);
+
+    const { cleared, alerts } = acknowledgeAllAlerts();
+    expect(cleared).toBe(before.length);
+    expect(alerts.every((a) => a.acknowledged)).toBe(true);
+
+    restart();
+    expect(getAlerts().every((a) => a.acknowledged)).toBe(true);
+
+    expect(acknowledgeAllAlerts().cleared).toBe(0);
   });
 
   test("GIVEN an engine run WHEN imported twice for the same date THEN ingestion is idempotent", () => {
