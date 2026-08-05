@@ -1,24 +1,24 @@
-import { CloudSun, ExternalLink, FlaskConical } from "lucide-react";
+import { CloudSun, ExternalLink } from "lucide-react";
 
 import type { PolymarketWeatherReport } from "@/src/polymarket/weather";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function PolymarketWeatherPanel({ weather }: { weather: PolymarketWeatherReport }) {
+export function PolymarketWeatherSection({ weather }: { weather: PolymarketWeatherReport }) {
+  const gate = weather.research.evidence_gate.passed ? "evidence evaluated" : "evidence insufficient";
   return (
-    <Card className="border-sky-400/20 bg-sky-400/[0.025]">
-      <CardHeader className="flex-row items-start justify-between gap-3 p-4 pb-2">
-        <div>
-          <CardTitle as="h2" className="flex items-center gap-2 text-base"><CloudSun className="size-4 text-sky-300" /> Weather shadow lab</CardTitle>
-          <p className="mt-1 max-w-3xl text-xs leading-5 text-on-surface-variant">
-            Upcoming Polymarket daily-temperature buckets are matched to the event&apos;s stated Wunderground station. Official station coordinates feed raw ECMWF ensemble members. Nothing here can open a paper or live position.
-          </p>
-        </div>
-        <Badge variant="outline" className="shrink-0 border-violet/30 text-violet"><FlaskConical /> Observe only</Badge>
-      </CardHeader>
-      <CardContent className="space-y-3 p-4 pt-2">
-        <p className="text-[11px] leading-4 text-outline">{weather.detail}</p>
+    <details className="border-t border-outline-variant/20 px-3">
+      <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-on-surface">
+        <CloudSun className="size-3.5 text-sky-300" /> Weather shadow lab
+        <span className="font-normal text-outline">
+          observe only · {gate} · {weather.events.length} upcoming event{weather.events.length === 1 ? "" : "s"}
+        </span>
+      </summary>
+      <div className="space-y-3 pb-3">
+        <p className="text-xs leading-5 text-on-surface-variant">
+          Upcoming Polymarket daily-temperature buckets are matched to the event&apos;s stated Wunderground station; official station
+          coordinates feed raw ECMWF ensemble members. Nothing here can open a paper or live position. {weather.detail}
+        </p>
         <section className="rounded-md border border-violet/20 bg-violet/[0.025] p-3" aria-label="Weather research evidence status">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -80,8 +80,8 @@ export function PolymarketWeatherPanel({ weather }: { weather: PolymarketWeather
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </details>
   );
 }
 
