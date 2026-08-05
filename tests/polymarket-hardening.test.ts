@@ -47,12 +47,12 @@ describe("Polymarket hardening contracts", () => {
         promotion_detail: "150/100 labels; mean -330bp; hit 3%.",
       }],
     } as unknown as PolymarketBrainReport;
-    expect(evaluatePolymarketPaperAuthority(report).available).toBe(false);
+    expect(evaluatePolymarketPaperAuthority(report, {}).available).toBe(false);
     const passing = {
       ...report,
       strategies: [{ ...report.strategies[0], mean_1h_bps: 25, hit_rate_1h: 0.56, paper_candidate: true }],
     };
-    expect(evaluatePolymarketPaperAuthority(passing).available).toBe(true);
+    expect(evaluatePolymarketPaperAuthority(passing, {}).available).toBe(true);
   });
 
   test("audits only station-specific whole-degree temperature events", () => {

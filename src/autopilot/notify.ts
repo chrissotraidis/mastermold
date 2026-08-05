@@ -40,7 +40,7 @@ export type NotifyConfig = {
   webhook_url: string | null;
 };
 
-export function notifyConfigFromEnv(env: NodeJS.ProcessEnv = process.env): NotifyConfig {
+export function notifyConfigFromEnv(env: Record<string, string | undefined> = process.env): NotifyConfig {
   return {
     telegram_token: env.NOTIFY_TELEGRAM_BOT_TOKEN?.trim() || null,
     telegram_chat_id: env.NOTIFY_TELEGRAM_CHAT_ID?.trim() || null,
@@ -108,6 +108,26 @@ function sendDesktop(config: NotifyConfig, text: string): void {
   } catch {
     // Same contract: never throw.
   }
+}
+
+/**
+ * Web3 (Solana) lane trade chatter — entries, exits, tier rotations, experiment
+ * transitions, daily reviews — can be muted with NOTIFY_WEB3_TRADES=0 without
+ * touching safety alerts (halt/daemon/error), which always send. The lane is
+ * exits-and-research-only, so its trade alerts are optional operator noise.
+ */
+export function web3AlertsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.NOTIFY_WEB3_TRADES !== "0";
+}
+
+/** notifyOperator, gated for Web3-lane trade/experiment chatter. */
+export function notifyWeb3(
+  kind: NotifyKind,
+  message: string,
+  options: { nowMs?: number; config?: NotifyConfig; fetchImpl?: typeof fetch; env?: Record<string, string | undefined> } = {},
+): void {
+  if (!web3AlertsEnabled(options.env ?? process.env)) return;
+  notifyOperator(kind, message, options);
 }
 
 const lastSentByKey = new Map<string, number>();

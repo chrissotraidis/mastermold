@@ -1,18 +1,57 @@
 import {
-  buildPolymarketWatchSignals,
   fetchPolymarketMarkets,
   fetchPolymarketResolutions,
   hasPolymarketEntryHorizon,
   type PolymarketResolution,
   type PolymarketMarketSnapshot,
 } from "./markets";
-import { evaluatePolymarketPaperAuthority } from "./authority";
-import { polymarketBrain, safePolymarketBrainReport } from "./brain";
+import { notifyOperator } from "@/src/autopilot/notify";
+import {
+  evaluatePolymarketPaperAuthority,
+  POLYMARKET_EXPLORATION_MAX_OPEN_PER_STRATEGY,
+  POLYMARKET_EXPLORATION_STAKE_USD,
+  strategyName,
+} from "./authority";
+import { polymarketBrain, safePolymarketBrainReport, type PolymarketBrainReport } from "./brain";
 import { fetchPolymarketOrderBooks, quotePolymarketPaperBuy, quotePolymarketPaperSell } from "./orderbook";
 import { validatePolymarketPaperEntry } from "./policy";
-import { polymarketStore } from "./store";
+import { polymarketStore, type PolymarketPaperPosition } from "./store";
 import { startOrUpdatePolymarketStream } from "./stream";
-import { buildPolymarketBrainCandidates } from "./strategies";
+import { buildPolymarketBrainCandidates, type PolymarketStrategyId } from "./strategies";
+
+const ENTRY_MAX_SPREAD_BPS = 500;
+
+function journalPaperClose(
+  position: PolymarketPaperPosition,
+  closed: { exit_value_usd: number; pnl_usd: number },
+  exitPrice: number,
+  reason: string,
+) {
+  try {
+    polymarketBrain().recordPaperTrade({
+      event: "close",
+      position_id: position.id,
+      strategy_id: (position.strategy_id as PolymarketStrategyId | undefined) ?? null,
+      tier: position.tier ?? null,
+      market_id: position.market_id,
+      token_id: position.token_id,
+      outcome: position.outcome,
+      question: position.question,
+      slug: position.slug,
+      price: exitPrice,
+      stake_usd: position.stake_usd,
+      pnl_usd: closed.pnl_usd,
+      reason,
+    });
+  } catch {
+    // The JSON store remains the fallback record; a ledger write failure must not block exits.
+  }
+  const pnl = closed.pnl_usd;
+  notifyOperator(
+    "exit",
+    `Polymarket paper close ${position.outcome} ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} at ${(exitPrice * 100).toFixed(1)}¢ · ${reason}`,
+  );
+}
 
 export type PolymarketSnapshotView = PolymarketMarketSnapshot | {
   markets: PolymarketMarketSnapshot["markets"];
@@ -40,6 +79,14 @@ export async function getPolymarketSnapshot(force = false): Promise<PolymarketSn
 
 export async function runPolymarketBrainCycle(trigger: "scheduled" | "manual" = "scheduled") {
   const brain = polymarketBrain();
+  let previouslyPromoted: Set<PolymarketStrategyId> | null = null;
+  try {
+    previouslyPromoted = new Set(
+      brain.report().strategies.filter((strategy) => strategy.paper_candidate).map((strategy) => strategy.strategy_id),
+    );
+  } catch {
+    // A failed pre-read only suppresses the promotion-transition alert for this cycle.
+  }
   try {
     const snapshot = await getPolymarketSnapshot(true);
     const pendingResolutionIds = brain.pendingResolutionMarketIds();
@@ -70,10 +117,21 @@ export async function runPolymarketBrainCycle(trigger: "scheduled" | "manual" = 
       markets: researchMarkets,
       candidates,
     });
+    const report = brain.report();
+    if (previouslyPromoted) {
+      for (const strategy of report.strategies) {
+        if (strategy.paper_candidate && !previouslyPromoted.has(strategy.strategy_id)) {
+          notifyOperator(
+            "analyst",
+            `Polymarket: ${strategyName(strategy.strategy_id)} cleared the shadow promotion gate (${strategy.labels_1h} one-hour labels, mean ${strategy.mean_1h_bps}bp, hit ${Math.round((strategy.hit_rate_1h ?? 0) * 100)}%). Paper entries may now use it.`,
+          );
+        }
+      }
+    }
     return {
       action: "learned" as const,
       detail: `${trigger === "manual" ? "Manual" : "Scheduled"} brain cycle recorded ${candidates.length} candidates, advanced ${labeled} due markouts, and graded ${resolutionSummary.graded_observations} resolved observations.${resolutionNote}`,
-      report: brain.report(),
+      report,
     };
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Polymarket brain cycle failed.";
@@ -94,11 +152,9 @@ export function settleResolvedPolymarketPaperPositions(resolutions: PolymarketRe
     const resolution = byMarket.get(position.market_id);
     if (resolution?.status !== "resolved" || resolution.winning_outcome_index === null) continue;
     const won = position.outcome_index === resolution.winning_outcome_index;
-    store.closePosition(
-      position.id,
-      won ? 1 : 0,
-      `Market resolved · ${won ? "selected outcome won" : "selected outcome lost"}`,
-    );
+    const reason = `Market resolved · ${won ? "selected outcome won" : "selected outcome lost"}`;
+    const closed = store.closePosition(position.id, won ? 1 : 0, reason);
+    if (closed) journalPaperClose(position, closed, won ? 1 : 0, reason);
     settled += 1;
   }
   return settled;
@@ -126,10 +182,27 @@ export async function runPolymarketPaperCycle(trigger: "scheduled" | "manual" = 
   }
 
   const marketsById = new Map(snapshot.markets.map((market) => [market.id, market]));
-  const signals = buildPolymarketWatchSignals(snapshot.markets);
+  const paperAuthority = evaluatePolymarketPaperAuthority(safePolymarketBrainReport());
+  let brainReport: PolymarketBrainReport;
+  try {
+    brainReport = polymarketBrain().report(30);
+  } catch {
+    brainReport = safePolymarketBrainReport();
+  }
+  // Entries come from the brain's journaled candidates so every simulator
+  // position is attributable to a measured strategy hypothesis. Only markout
+  // (taker-testable) candidates are tradable; maker and structural stay shadow.
+  const entryCandidates = brainReport.recent_candidates.filter((candidate) =>
+    candidate.label_kind === "markout"
+    && paperAuthority.entry_strategies.includes(candidate.strategy_id)
+    && candidate.executable_entry_price !== null
+    && (candidate.spread_bps === null || candidate.spread_bps <= ENTRY_MAX_SPREAD_BPS));
   let books;
   try {
-    const tokens = [...store.positions().map((position) => position.token_id), ...signals.slice(0, 20).map((signal) => signal.token_id)];
+    const tokens = [
+      ...store.positions().map((position) => position.token_id),
+      ...entryCandidates.slice(0, 20).map((candidate) => candidate.token_id),
+    ];
     books = await fetchPolymarketOrderBooks(tokens, true);
   } catch (error) {
     const detail = error instanceof Error ? error.message : "CLOB order books are unavailable.";
@@ -150,11 +223,12 @@ export async function runPolymarketPaperCycle(trigger: "scheduled" | "manual" = 
           ? "4-hour paper hold limit reached"
           : null;
     if (exitReason) {
-      store.closePosition(position.id, exitQuote.average_price, `${exitReason} · displayed CLOB depth walk`);
+      const reason = `${exitReason} · displayed CLOB depth walk`;
+      const closed = store.closePosition(position.id, exitQuote.average_price, reason);
+      if (closed) journalPaperClose(position, closed, exitQuote.average_price, reason);
     }
   }
 
-  const paperAuthority = evaluatePolymarketPaperAuthority(safePolymarketBrainReport());
   if (!paperAuthority.available) {
     if (trigger === "manual") store.markCycle(`Research-only cycle: ${paperAuthority.detail}`);
     return {
@@ -164,17 +238,29 @@ export async function runPolymarketPaperCycle(trigger: "scheduled" | "manual" = 
   }
 
   const account = store.account(snapshot.markets);
-  for (const signal of signals) {
-    const market = marketsById.get(signal.market_id);
+  const openByStrategy = new Map<string, number>();
+  for (const position of store.positions()) {
+    if (position.strategy_id) openByStrategy.set(position.strategy_id, (openByStrategy.get(position.strategy_id) ?? 0) + 1);
+  }
+  for (const candidate of entryCandidates) {
+    const market = marketsById.get(candidate.market_id);
     if (!market) continue;
-    const stake = Math.min(5, store.state().caps.max_trade_usd);
-    const entryQuote = quotePolymarketPaperBuy(books.get(signal.token_id)!, stake);
+    if (
+      paperAuthority.tier === "exploration"
+      && (openByStrategy.get(candidate.strategy_id) ?? 0) >= POLYMARKET_EXPLORATION_MAX_OPEN_PER_STRATEGY
+    ) {
+      continue;
+    }
+    const stake = Math.min(POLYMARKET_EXPLORATION_STAKE_USD, store.state().caps.max_trade_usd);
+    const book = books.get(candidate.token_id);
+    if (!book) continue;
+    const entryQuote = quotePolymarketPaperBuy(book, stake);
     if (!entryQuote) continue;
     const policy = validatePolymarketPaperEntry({
       state: store.state(),
       positions: store.positions(),
-      market_id: signal.market_id,
-      outcome_index: signal.outcome_index,
+      market_id: candidate.market_id,
+      outcome_index: candidate.outcome_index,
       stake_usd: stake,
       entry_price: entryQuote.average_price,
       available_cash_usd: account.cash_usd,
@@ -182,22 +268,55 @@ export async function runPolymarketPaperCycle(trigger: "scheduled" | "manual" = 
     });
     if (!policy.ok) continue;
 
-    store.openPosition({
+    const tierLabel = paperAuthority.tier === "exploration" ? "exploration" : "promoted";
+    const position = store.openPosition({
       market_id: market.id,
-      token_id: signal.token_id,
-      question: signal.question,
-      slug: signal.slug,
-      outcome_index: signal.outcome_index,
-      outcome: signal.outcome,
+      token_id: candidate.token_id,
+      question: candidate.question,
+      slug: candidate.slug,
+      outcome_index: candidate.outcome_index,
+      outcome: candidate.outcome,
       stake_usd: stake,
       entry_price: entryQuote.average_price,
-      thesis: `${trigger === "manual" ? "Manual" : "Scheduled"} paper cycle · displayed CLOB ask depth walk across ${entryQuote.levels_used} level(s) · ${signal.thesis}`,
+      strategy_id: candidate.strategy_id,
+      tier: tierLabel,
+      thesis: `${trigger === "manual" ? "Manual" : "Scheduled"} ${tierLabel} entry (${strategyName(candidate.strategy_id)}, score ${candidate.score}) · displayed CLOB ask depth walk across ${entryQuote.levels_used} level(s) · ${candidate.thesis}`,
     });
+    try {
+      polymarketBrain().recordPaperTrade({
+        event: "open",
+        position_id: position.id,
+        strategy_id: candidate.strategy_id,
+        tier: tierLabel,
+        market_id: candidate.market_id,
+        token_id: candidate.token_id,
+        outcome: candidate.outcome,
+        question: candidate.question,
+        slug: candidate.slug,
+        price: entryQuote.average_price,
+        stake_usd: stake,
+        pnl_usd: null,
+        reason: position.thesis,
+      });
+    } catch {
+      // The JSON store remains the fallback record; a ledger write failure must not block the entry.
+    }
+    notifyOperator(
+      "entry",
+      `Polymarket paper buy ${candidate.outcome} $${stake.toFixed(2)} at ${(entryQuote.average_price * 100).toFixed(1)}¢ · ${strategyName(candidate.strategy_id)} (${tierLabel}) · ${truncate(candidate.question, 80)}`,
+    );
     store.markCycle();
-    return { action: "opened" as const, detail: `Opened a $${stake.toFixed(2)} paper position on ${signal.outcome}.` };
+    return {
+      action: "opened" as const,
+      detail: `Opened a $${stake.toFixed(2)} ${tierLabel} paper position on ${candidate.outcome} via ${strategyName(candidate.strategy_id)}.`,
+    };
   }
 
   const settlementDetail = settled > 0 ? ` Settled ${settled} resolved paper position${settled === 1 ? "" : "s"}.` : "";
   store.markCycle(trigger === "manual" ? `Paper cycle completed; no eligible new setup cleared the fixed risk filters.${settlementDetail}` : undefined);
   return { action: "no-signal" as const, detail: `No eligible new setup cleared the fixed risk filters.${settlementDetail}` };
+}
+
+function truncate(value: string, max: number) {
+  return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 }

@@ -59,6 +59,10 @@ export type PolymarketBrainStrategyMetric = {
   mean_brier_score: number | null;
   paper_candidate: boolean;
   promotion_detail: string;
+  paper_open_positions: number;
+  paper_round_trips: number;
+  paper_win_rate: number | null;
+  paper_pnl_usd: number | null;
 };
 
 export type PolymarketBrainReport = {
@@ -214,6 +218,50 @@ class PolymarketBrain {
       this.db.exec("ROLLBACK");
       throw error;
     }
+  }
+
+  /** Durable decision journal: every simulator open/close lands here with
+   * strategy attribution so realized outcomes feed back into the evidence the
+   * promotion gate and the operator both read. The JSON store trims history;
+   * this ledger is retained. */
+  recordPaperTrade(input: {
+    event: "open" | "close";
+    position_id: string;
+    strategy_id: PolymarketStrategyId | null;
+    tier: string | null;
+    market_id: string;
+    token_id: string;
+    outcome: string;
+    question: string;
+    slug: string;
+    price: number;
+    stake_usd: number;
+    pnl_usd: number | null;
+    reason: string;
+    ts?: string;
+  }) {
+    this.db.prepare(`
+      INSERT INTO polymarket_paper_trades (
+        id, ts, event, position_id, strategy_id, tier, market_id, token_id,
+        outcome, question, slug, price, stake_usd, pnl_usd, reason
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      randomUUID(),
+      input.ts ?? new Date().toISOString(),
+      input.event,
+      input.position_id,
+      input.strategy_id,
+      input.tier,
+      input.market_id,
+      input.token_id,
+      input.outcome,
+      input.question,
+      input.slug,
+      input.price,
+      input.stake_usd,
+      input.pnl_usd,
+      input.reason,
+    );
   }
 
   labelDue(books: Map<string, PolymarketOrderBook>, nowMs = Date.now()) {
@@ -563,10 +611,28 @@ class PolymarketBrain {
       resolved_labels: number;
       mean_brier_score: number | null;
     }>;
+    const paperRows = this.db.prepare(`
+      SELECT strategy_id,
+             SUM(CASE WHEN event = 'open' THEN 1 ELSE 0 END) - SUM(CASE WHEN event = 'close' THEN 1 ELSE 0 END) AS open_positions,
+             SUM(CASE WHEN event = 'close' THEN 1 ELSE 0 END) AS round_trips,
+             AVG(CASE WHEN pnl_usd > 0 THEN 1.0 ELSE 0.0 END) FILTER (WHERE event = 'close') AS win_rate,
+             SUM(pnl_usd) FILTER (WHERE event = 'close') AS pnl_usd
+      FROM polymarket_paper_trades
+      WHERE strategy_id IS NOT NULL
+      GROUP BY strategy_id
+    `).all() as Array<{
+      strategy_id: PolymarketStrategyId;
+      open_positions: number;
+      round_trips: number;
+      win_rate: number | null;
+      pnl_usd: number | null;
+    }>;
+    const paperByStrategy = new Map(paperRows.map((row) => [row.strategy_id, row]));
     const strategies = rows.map((row) => {
       const ready = row.labels_1h >= PROMOTION_MIN_LABELS
         && (row.mean_1h_bps ?? -Infinity) > 0
         && (row.hit_rate_1h ?? 0) >= PROMOTION_MIN_HIT_RATE;
+      const paper = paperByStrategy.get(row.strategy_id);
       return {
         ...row,
         mean_1h_bps: roundOrNull(row.mean_1h_bps),
@@ -576,6 +642,10 @@ class PolymarketBrain {
         promotion_detail: ready
           ? "Clears the minimum shadow gate for operator review; no live authority."
           : `${row.labels_1h}/${PROMOTION_MIN_LABELS} one-hour labels; mean ${formatBps(row.mean_1h_bps)}; hit ${formatRate(row.hit_rate_1h)}.`,
+        paper_open_positions: Math.max(0, Number(paper?.open_positions ?? 0)),
+        paper_round_trips: Number(paper?.round_trips ?? 0),
+        paper_win_rate: roundOrNull(paper?.win_rate ?? null),
+        paper_pnl_usd: paper?.pnl_usd === null || paper?.pnl_usd === undefined ? null : Math.round(paper.pnl_usd * 100) / 100,
       } satisfies PolymarketBrainStrategyMetric;
     });
 
@@ -727,6 +797,26 @@ class PolymarketBrain {
       CREATE INDEX IF NOT EXISTS idx_polymarket_observations_due ON polymarket_observations(label_kind, due_1h_ms);
       CREATE INDEX IF NOT EXISTS idx_polymarket_observations_strategy ON polymarket_observations(strategy_id, ts DESC);
       CREATE INDEX IF NOT EXISTS idx_polymarket_observations_token ON polymarket_observations(token_id, ts DESC);
+
+      CREATE TABLE IF NOT EXISTS polymarket_paper_trades (
+        id TEXT PRIMARY KEY,
+        ts TEXT NOT NULL,
+        event TEXT NOT NULL,
+        position_id TEXT NOT NULL,
+        strategy_id TEXT,
+        tier TEXT,
+        market_id TEXT NOT NULL,
+        token_id TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        question TEXT NOT NULL,
+        slug TEXT NOT NULL,
+        price REAL NOT NULL,
+        stake_usd REAL NOT NULL,
+        pnl_usd REAL,
+        reason TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_polymarket_paper_trades_strategy
+        ON polymarket_paper_trades(strategy_id, event, ts DESC);
 
       CREATE TABLE IF NOT EXISTS polymarket_market_resolutions (
         market_id TEXT PRIMARY KEY,

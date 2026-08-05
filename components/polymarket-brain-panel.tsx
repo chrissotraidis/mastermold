@@ -102,6 +102,11 @@ export function PolymarketBrainPanel({
                 <p className="mt-1 font-mono text-[11px] text-outline">
                   {strategy.observations} observations · {strategy.labels_1h} markouts · {signedBps(strategy.mean_1h_bps)} mean · {formatPercent(strategy.hit_rate_1h)} hit · {strategy.resolved_labels} resolved · {formatBrier(strategy.mean_brier_score)} Brier
                 </p>
+                {strategy.paper_round_trips > 0 || strategy.paper_open_positions > 0 ? (
+                  <p className="mt-1 font-mono text-[11px] text-violet">
+                    Paper: {strategy.paper_open_positions} open · {strategy.paper_round_trips} closed · {formatPercent(strategy.paper_win_rate)} win · {strategy.paper_pnl_usd === null ? "$0.00" : `${strategy.paper_pnl_usd >= 0 ? "+" : ""}$${strategy.paper_pnl_usd.toFixed(2)}`} realized
+                  </p>
+                ) : null}
                 <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{strategy.promotion_detail}</p>
               </div>
             ))}
