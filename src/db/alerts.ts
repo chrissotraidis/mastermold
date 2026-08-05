@@ -159,6 +159,25 @@ export function acknowledgeAlert(id: string): AlertJson | null {
   return setAlertAcknowledged(id, true);
 }
 
+/**
+ * Bulk-dismiss every unacknowledged alert from the live source. The synthetic
+ * daemon-health alert is not part of the store-backed set, so it stays visible
+ * until the underlying condition clears — clearing the inbox must not hide an
+ * operational warning.
+ */
+export function acknowledgeAllAlerts(): { cleared: number; alerts: AlertJson[] } {
+  const { alerts } = activeAlerts();
+  let cleared = 0;
+  for (const alert of alerts) {
+    const state = currentState(alert);
+    if (!state.acknowledged) {
+      store().setAlertState(alert.id, { acknowledged: true, useful_feedback: state.useful_feedback });
+      cleared += 1;
+    }
+  }
+  return { cleared, alerts: getAlerts() };
+}
+
 export function saveAlertFeedback(id: string, useful_feedback: UsefulFeedback): AlertJson | null {
   const alert = findAlert(id);
   if (!alert) {

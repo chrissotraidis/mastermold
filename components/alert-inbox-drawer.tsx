@@ -40,6 +40,8 @@ const severityDot: Record<PublicAlert["severity"], string> = {
 
 export const MASTER_MOLD_ACTIVITY_EVENT = "mastermold:open-activity";
 
+const CLEAR_ALL_PENDING_ID = "__clear_all__";
+
 export function openMasterMoldActivity() {
   window.dispatchEvent(new CustomEvent(MASTER_MOLD_ACTIVITY_EVENT));
 }
@@ -251,6 +253,35 @@ function AlertInboxDrawerContent({
     });
   }
 
+  function dismissAll() {
+    const clearedIds = activeAlerts.map((alert) => alert.id);
+    if (clearedIds.length === 0) return;
+    setSavedJournalId(null);
+    setLastDismissedId(null);
+    setAlerts((current) =>
+      current.map((alert) => (alert.acknowledged ? alert : { ...alert, acknowledged: true })),
+    );
+    setPendingId(CLEAR_ALL_PENDING_ID);
+    setMessage(`Cleared ${clearedIds.length} item${clearedIds.length === 1 ? "" : "s"}.`);
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/alerts/acknowledge-all", { method: "PATCH" });
+        if (!response.ok) throw new Error("Clear all failed");
+        const payload = (await response.json()) as { alerts: PublicAlert[] };
+        setAlerts(payload.alerts);
+      } catch {
+        setAlerts((current) =>
+          current.map((alert) =>
+            clearedIds.includes(alert.id) ? { ...alert, acknowledged: false } : alert,
+          ),
+        );
+        setMessage("Couldn't clear everything. Try again.");
+      } finally {
+        setPendingId(null);
+      }
+    });
+  }
+
   function restore(alert: PublicAlert) {
     setSavedJournalId(null);
     patchAlert(alert.id, { acknowledged: false });
@@ -391,6 +422,20 @@ function AlertInboxDrawerContent({
                 Undo
               </button>
             ) : null}
+          </div>
+        ) : null}
+
+        {loaded && activeAlerts.length > 0 ? (
+          <div className="mb-2 flex justify-end">
+            <button
+              type="button"
+              onClick={dismissAll}
+              disabled={pendingId === CLEAR_ALL_PENDING_ID}
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline-variant/40 px-3 text-xs font-semibold text-on-surface-variant transition hover:text-on-surface disabled:opacity-50 sm:min-h-8"
+              data-testid="alert-clear-all"
+            >
+              Clear all
+            </button>
           </div>
         ) : null}
 
