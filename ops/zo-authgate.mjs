@@ -59,7 +59,7 @@ const server = http.createServer((req, res) => {
 
   const headers = {};
   for (const [k, v] of Object.entries(req.headers)) {
-    if (!HOP.has(k) && k !== "authorization") headers[k] = v;
+    if (!HOP.has(k)) headers[k] = v;
   }
   headers["x-forwarded-proto"] = "https";
 
