@@ -11,8 +11,7 @@ export default function PolymarketPage() {
           <p className="text-[10px] font-semibold uppercase tracking-telemetry text-outline">Research lab · separate lane</p>
           <h1 className="font-display text-lg font-semibold text-on-surface">Polymarket lab</h1>
           <p className="mt-0.5 max-w-3xl text-xs leading-5 text-outline">
-            Separate prediction-market lane: momentum-only paper automation, shadow strategy research, and station-matched weather observation.
-            It does not use the Solana wallet, portfolio imports, or advisory account data. Weather betting and all live orders are locked.
+            Promotion-gated paper automation, shadow strategy research, and weather observation. Live orders are locked.
           </p>
         </header>
         <PolymarketPanel />

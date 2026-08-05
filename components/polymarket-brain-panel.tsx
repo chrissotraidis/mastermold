@@ -45,20 +45,18 @@ export function PolymarketBrainPanel({
           />
           <BrainMetric label="Last learning cycle" value={brain.latest_cycle_at ? formatRelative(brain.latest_cycle_at) : "Not run"} />
         </div>
-        <p className="text-[11px] leading-4 text-outline">
-          Brier scores the selected market probability against the final outcome (0 is best); it measures calibration, not trading profit.
-        </p>
-
-        <div className="rounded-md border border-outline-variant/25 bg-void/20 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="flex items-center gap-2 text-sm font-semibold text-on-surface">
-              <Radio className="size-4 text-violet" /> Public CLOB stream
-            </p>
+        <details className="rounded-md border border-outline-variant/25 bg-void/20 px-3">
+          <summary className="flex min-h-10 cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-on-surface">
+            <Radio className="size-3.5 text-violet" /> Public CLOB stream
             <Badge variant="outline" className={brain.stream.status === "live" ? "border-engine/35 text-engine" : "text-outline"}>
               {brain.stream.status}
             </Badge>
-          </div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <span className="font-normal text-outline">
+              {brain.stream.subscribed_tokens} tokens · {brain.stream.labeled_trades_1m} 1m labels
+              {brain.stream.last_message_at ? ` · last message ${formatRelative(brain.stream.last_message_at)}` : " · no message yet"}
+            </span>
+          </summary>
+          <div className="mb-3 mt-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <BrainMetric label="Subscribed tokens" value={String(brain.stream.subscribed_tokens)} />
             <BrainMetric label="Retained events" value={String(brain.stream.event_count_24h)} detail={`${brain.stream.retained_coverage_hours.toFixed(2)}h coverage`} />
             <BrainMetric label="Trade labels · 1m" value={String(brain.stream.labeled_trades_1m)} />
@@ -67,12 +65,12 @@ export function PolymarketBrainPanel({
               value={signedBps(brain.stream.mean_reported_side_markout_1m_bps)}
             />
           </div>
-          <p className="mt-2 text-[11px] leading-4 text-outline">
-            {brain.stream.last_message_at ? `Last message ${formatRelative(brain.stream.last_message_at)}. ` : "No message received yet. "}
+          <p className="mb-3 text-[11px] leading-4 text-outline">
             The public feed&apos;s BUY/SELL field does not prove maker or taker role; this markout is research evidence only.
+            Brier scores the selected market probability against the final outcome (0 is best); it measures calibration, not trading profit.
           </p>
-          {brain.stream.error ? <p className="mt-1 text-[11px] leading-4 text-caution">{brain.stream.error}</p> : null}
-        </div>
+          {brain.stream.error ? <p className="mb-3 text-[11px] leading-4 text-caution">{brain.stream.error}</p> : null}
+        </details>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-[11px] leading-4 text-outline">
@@ -111,8 +109,12 @@ export function PolymarketBrainPanel({
         )}
 
         {brain.recent_candidates.length > 0 ? (
-          <div className="space-y-2">
-            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Latest research candidates</p>
+          <details className="rounded-md border border-outline-variant/25 bg-void/20 px-3">
+            <summary className="flex min-h-10 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
+              Latest research candidates
+              <span className="font-normal text-outline">{Math.min(brain.recent_candidates.length, 5)} most recent</span>
+            </summary>
+            <div className="mb-3 mt-1 space-y-2">
             {brain.recent_candidates.slice(0, 5).map((candidate) => (
               <div key={candidate.id} className="flex flex-col gap-2 rounded-md border border-outline-variant/20 px-3 py-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
@@ -131,7 +133,8 @@ export function PolymarketBrainPanel({
                 </Button>
               </div>
             ))}
-          </div>
+            </div>
+          </details>
         ) : null}
       </CardContent>
     </Card>

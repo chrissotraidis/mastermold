@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { ExternalLink, LockKeyhole, OctagonAlert, Play, RefreshCw, ShieldCheck, Square } from "lucide-react";
 
-import { PolymarketStrategyPanel } from "@/components/polymarket-strategy-panel";
-import { PolymarketWeatherPanel } from "@/components/polymarket-weather-panel";
+import { PolySniperCoverage, TradeContractCard } from "@/components/polymarket-strategy-panel";
+import { PolymarketWeatherSection } from "@/components/polymarket-weather-panel";
 import type { PolymarketApiPayload } from "@/app/api/polymarket/route";
 import { PolymarketBrainPanel } from "@/components/polymarket-brain-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type ControlBody = Record<string, string | number>;
@@ -69,6 +69,8 @@ export function PolymarketPanel() {
   const halted = data.state.kill_switch || data.state.mode === "halted";
   const canControl = data.control_access.available;
   const paperAuthority = data.paper_authority.available;
+  const topSignalScore = data.signals.length > 0 ? Math.max(...data.signals.map((signal) => signal.score)) : null;
+  const lastActivityAt = data.activity.length > 0 ? data.activity[0].ts : null;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -79,18 +81,18 @@ export function PolymarketPanel() {
       ) : null}
 
       {!canControl ? (
-        <div className="rounded-md border border-caution/35 bg-caution/5 px-4 py-3 text-sm text-caution">
-          <LockKeyhole className="mr-2 inline size-4" /> {data.control_access.detail}
-        </div>
+        <p className="rounded-md border border-caution/35 bg-caution/5 px-4 py-2 text-xs leading-5 text-caution">
+          <LockKeyhole className="mr-2 inline size-3.5" /> {data.control_access.detail}
+        </p>
       ) : null}
 
       <Card className="border-outline-variant/30 bg-surface-low/75">
-        <CardContent className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <span className={cn("mt-1 size-2.5 shrink-0 rounded-full", halted ? "bg-critical" : armed ? "bg-engine animate-pulse" : "bg-outline")} />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-display text-base font-semibold text-on-surface">Promotion-gated Polymarket research</h2>
+                <h2 className="font-display text-base font-semibold text-on-surface">Polymarket paper lane</h2>
                 <Badge variant="outline" className={cn(halted ? "border-critical/40 text-critical" : armed ? "border-engine/35 text-engine" : "text-outline")}>
                   {halted ? "Halted" : armed ? "Paper armed" : "Off"}
                 </Badge>
@@ -98,11 +100,7 @@ export function PolymarketPanel() {
                   {data.market_read.source === "live" ? "Live public read" : "Cached read"}
                 </Badge>
               </div>
-              <p className="mt-1 max-w-2xl text-xs leading-5 text-on-surface-variant">
-                Momentum remains a shadow baseline and cannot open new simulator positions unless its forward-label promotion gate passes.
-                Research, resolution scoring, weather observation, and protective exits continue without entry authority.
-              </p>
-              <p className="mt-1 text-[11px] text-caution">{data.paper_authority.detail}</p>
+              <p className="mt-1 text-[11px] leading-4 text-caution">{data.paper_authority.detail}</p>
               <p className="mt-1 text-[11px] text-outline">
                 Market read {formatRelative(data.market_read.fetched_at)} · Last cycle {data.state.last_cycle_at ? formatRelative(data.state.last_cycle_at) : "not run"}
               </p>
@@ -140,22 +138,48 @@ export function PolymarketPanel() {
         <Metric label="Realized P&L" value={signedMoney(data.account.realized_pnl_usd)} detail={`${signedMoney(data.account.realized_today_usd)} today`} />
       </div>
 
-      <PolymarketStrategyPanel contract={data.paper_contract} catalog={data.strategy_catalog} />
-
-      <PolymarketWeatherPanel weather={data.weather} />
-
       <PolymarketBrainPanel brain={data.brain} pending={pending} controlAvailable={canControl} onResearch={() => control({ action: "run_brain_cycle" })} />
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(19rem,0.8fr)]">
+      <TradeContractCard contract={data.paper_contract} />
+
+      {data.positions.length > 0 ? (
         <Card className="border-outline-variant/30 bg-surface-low/70">
-          <CardHeader className="flex-row items-start justify-between gap-3 p-4 pb-2">
-            <div>
-              <CardTitle as="h2" className="text-base">Sniper watch</CardTitle>
-              <p className="mt-1 text-xs leading-5 text-on-surface-variant">Shadow momentum setups for measurement. They become paper-eligible only after the evidence gate passes; displayed prices remain indicative.</p>
-            </div>
-            <Badge variant="outline">{data.signals.length} setups</Badge>
-          </CardHeader>
-          <CardContent className="space-y-2 p-4 pt-2">
+          <CardContent className="space-y-2 p-4">
+            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Open paper positions</p>
+            {data.positions.map((position) => (
+              <div key={position.id} className="flex flex-col gap-3 rounded-md border border-outline-variant/25 bg-void/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="outline" className="text-violet">{position.outcome}</Badge>
+                    <span className="font-mono text-outline">Entry {(position.entry_price * 100).toFixed(1)}¢</span>
+                    <span className="font-mono text-outline">Indicative {(position.current_price * 100).toFixed(1)}¢</span>
+                    <span className={cn("font-mono", position.pnl_usd >= 0 ? "text-engine" : "text-critical")}>{signedMoney(position.pnl_usd)}</span>
+                  </div>
+                  <p className="mt-1 truncate text-sm font-semibold text-on-surface">{position.question}</p>
+                  <p className="mt-1 text-[11px] text-outline">Opened {formatRelative(position.opened_at)} · {money(position.stake_usd)} stake</p>
+                </div>
+                <Button variant="outline" size="sm" disabled={pending || !canControl} onClick={() => control({ action: "close_position", position_id: position.id })}>
+                  Close paper position
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Watch lists, observation labs, activity, and reference prose live in
+          collapsed rows: the lab reads in one screen and detail is one click away. */}
+      <Card className="border-outline-variant/30 bg-surface-low/70 py-1">
+        <details className="px-3">
+          <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-on-surface">
+            Sniper watch
+            <span className="font-normal text-outline">
+              {data.signals.length === 0
+                ? "no market clears the filters right now"
+                : `${data.signals.length} shadow setup${data.signals.length === 1 ? "" : "s"}${topSignalScore !== null ? ` · top score ${topSignalScore}` : ""} · indicative prices`}
+            </span>
+          </summary>
+          <div className="space-y-2 pb-3">
             {data.signals.length === 0 ? (
               <EmptyState>No market currently clears the fee, liquidity, volume, move, and price filters.</EmptyState>
             ) : data.signals.slice(0, 8).map((signal) => (
@@ -187,65 +211,51 @@ export function PolymarketPanel() {
                 </div>
               </article>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </details>
 
-        <div className="space-y-3">
-          <Card className="border-caution/30 bg-caution/5">
-            <CardHeader className="p-4 pb-2">
-              <CardTitle as="h2" className="flex items-center gap-2 text-base"><LockKeyhole className="size-4 text-caution" /> Live execution locked</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 p-4 pt-1 text-xs leading-5 text-on-surface-variant">
+        <PolymarketWeatherSection weather={data.weather} />
+
+        <details className="border-t border-outline-variant/20 px-3">
+          <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-on-surface">
+            Recent lane activity
+            <span className="font-normal text-outline">
+              {lastActivityAt ? `last event ${formatRelative(lastActivityAt)}` : "no paper controls or trades recorded"}
+            </span>
+          </summary>
+          <div className="space-y-1 pb-3">
+            {data.activity.length === 0 ? <EmptyState>No paper controls or trades have been recorded.</EmptyState> : data.activity.slice(0, 10).map((row) => (
+              <div key={row.id} className="flex items-start justify-between gap-3 border-b border-outline-variant/20 py-2 last:border-0">
+                <p className="text-xs leading-5 text-on-surface-variant">{row.message}</p>
+                <time className="shrink-0 font-mono text-[10px] text-outline">{formatRelative(row.ts)}</time>
+              </div>
+            ))}
+          </div>
+        </details>
+
+        <details className="border-t border-outline-variant/20 px-3">
+          <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-on-surface">
+            Reference
+            <span className="font-normal text-outline">strategy coverage · live-execution lock · lane boundary</span>
+          </summary>
+          <div className="space-y-3 pb-3">
+            <PolySniperCoverage catalog={data.strategy_catalog} />
+            <div className="rounded-md border border-caution/30 bg-caution/5 p-3 text-xs leading-5 text-on-surface-variant">
+              <p className="mb-1 flex items-center gap-2 font-semibold text-on-surface">
+                <LockKeyhole className="size-3.5 text-caution" /> Live execution locked
+              </p>
               <p>{data.live_execution.detail}</p>
-              <p>
+              <p className="mt-2">
                 The PolySniper reference informed the research plan, but its strategy labels overstate the completeness of several execution paths and its legacy order client was not copied.
                 A future live pass must use Polymarket CLOB V2, an isolated Polygon signer/deposit wallet, local-only credentials, allowance checks, and an evidence gate.
               </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-outline-variant/30 bg-surface-low/70">
-            <CardHeader className="p-4 pb-2"><CardTitle as="h2" className="text-base">Lane boundary</CardTitle></CardHeader>
-            <CardContent className="p-4 pt-1 text-xs leading-5 text-on-surface-variant">
+            </div>
+            <div className="rounded-md border border-outline-variant/25 bg-void/20 p-3 text-xs leading-5 text-on-surface-variant">
+              <p className="mb-1 font-semibold text-on-surface">Lane boundary</p>
               {data.data_boundary} The Solana autopilot, portfolio store, and Polymarket simulator remain separate.
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <Card className="border-outline-variant/30 bg-surface-low/70">
-        <CardHeader className="p-4 pb-2"><CardTitle as="h2" className="text-base">Open paper positions</CardTitle></CardHeader>
-        <CardContent className="space-y-2 p-4 pt-2">
-          {data.positions.length === 0 ? <EmptyState>No Polymarket paper positions are open.</EmptyState> : data.positions.map((position) => (
-            <div key={position.id} className="flex flex-col gap-3 rounded-md border border-outline-variant/25 bg-void/20 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <Badge variant="outline" className="text-violet">{position.outcome}</Badge>
-                  <span className="font-mono text-outline">Entry {(position.entry_price * 100).toFixed(1)}¢</span>
-                  <span className="font-mono text-outline">Indicative {(position.current_price * 100).toFixed(1)}¢</span>
-                  <span className={cn("font-mono", position.pnl_usd >= 0 ? "text-engine" : "text-critical")}>{signedMoney(position.pnl_usd)}</span>
-                </div>
-                <p className="mt-1 truncate text-sm font-semibold text-on-surface">{position.question}</p>
-                <p className="mt-1 text-[11px] text-outline">Opened {formatRelative(position.opened_at)} · {money(position.stake_usd)} stake</p>
-              </div>
-              <Button variant="outline" size="sm" disabled={pending || !canControl} onClick={() => control({ action: "close_position", position_id: position.id })}>
-                Close paper position
-              </Button>
             </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card className="border-outline-variant/30 bg-surface-low/70">
-        <CardHeader className="p-4 pb-2"><CardTitle as="h2" className="text-base">Recent lane activity</CardTitle></CardHeader>
-        <CardContent className="space-y-2 p-4 pt-2">
-          {data.activity.length === 0 ? <EmptyState>No paper controls or trades have been recorded.</EmptyState> : data.activity.slice(0, 10).map((row) => (
-            <div key={row.id} className="flex items-start justify-between gap-3 border-b border-outline-variant/20 py-2 last:border-0">
-              <p className="text-xs leading-5 text-on-surface-variant">{row.message}</p>
-              <time className="shrink-0 font-mono text-[10px] text-outline">{formatRelative(row.ts)}</time>
-            </div>
-          ))}
-        </CardContent>
+          </div>
+        </details>
       </Card>
     </div>
   );
