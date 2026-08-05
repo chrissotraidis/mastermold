@@ -35,7 +35,7 @@ import { jupiterLiveExecutor } from "./live-executor";
 import { decimalsFor, fetchMintDecimals } from "./mint-meta";
 import { fetchMarketFeed, fetchTokenSummary, type MarketFeedRow, type TokenSummary } from "./feed";
 import { intentFromDecision } from "./intent";
-import { notifyOperator } from "./notify";
+import { notifyOperator, notifyWeb3 } from "./notify";
 import { DEFAULT_STRATEGY_PARAMS, type StrategyParams } from "./params";
 import { MAX_TIER_B_POSITIONS, validateIntent } from "./policy";
 import { describeRehearsal, rehearseFill, rehearsalRowFromSwap } from "./rehearsal";
@@ -710,13 +710,13 @@ export async function rotateTierB(
   for (const token of selection.added) {
     const message = `Tier B added ${token.symbol}: liquidity $${Math.round(token.liquidity_usd).toLocaleString()}, volume $${Math.round(token.volume_h24_usd).toLocaleString()}.`;
     store.appendActivity("tier-b", message);
-    notifyOperator("v3", message);
+    notifyWeb3("v3", message);
   }
   for (const { token, reason } of selection.dropped) {
     const exitOnly = held.has(token.mint) ? " Open position remains priced and exit-only." : "";
     const message = `Tier B dropped ${token.symbol}: ${reason}.${exitOnly}`;
     store.appendActivity("tier-b", message);
-    notifyOperator("v3", message);
+    notifyWeb3("v3", message);
   }
   return selection;
 }
@@ -1157,7 +1157,7 @@ async function tick(context: TickContext): Promise<void> {
         ? `V3 ${strategyId} is ELIGIBLE for paper promotion; awaiting explicit operator confirmation.`
         : `V3 ${strategyId} promotion eligibility closed: ${promotion.checks.filter((check) => !check.pass).map((check) => check.detail).join("; ")}.`;
       store.appendActivity("v3-shadow", transition);
-      notifyOperator("v3", transition);
+      notifyWeb3("v3", transition);
     }
     return store.v3Promotion(strategyId)?.ready ?? false;
   };
@@ -1337,7 +1337,7 @@ async function tick(context: TickContext): Promise<void> {
             if (crossed !== null) {
               const message = `SolanaTracker API budget at ${Math.round(crossed * 100)}%: ${after.used}/${after.limit} requests this month.`;
               store.appendActivity("copy", message);
-              notifyOperator("v3", message);
+              notifyWeb3("v3", message);
             }
           },
         });
@@ -1909,7 +1909,7 @@ async function tick(context: TickContext): Promise<void> {
       spendToday += fill.value_usd;
       store.appendDecision({ symbol: intent.symbol, verdict: "enter", reason: intent.reason, signals: intent.signals });
       store.appendActivity("entry", `Paper buy ${intent.symbol}: $${fill.value_usd.toFixed(2)} at $${fill.price_usd.toFixed(4)}. ${intent.reason}`);
-      notifyOperator("entry", `${isLive ? "LIVE" : "Paper"} buy ${intent.symbol}: $${fill.value_usd.toFixed(2)} at $${fill.price_usd.toFixed(4)}`);
+      notifyWeb3("entry", `${isLive ? "LIVE" : "Paper"} buy ${intent.symbol}: $${fill.value_usd.toFixed(2)} at $${fill.price_usd.toFixed(4)}`);
       store.appendWeb3Memory({ symbol: intent.symbol, kind: "entry", summary: `Entered ${intent.symbol} at $${fill.price_usd.toFixed(4)}. ${intent.reason}` });
     } else {
       const position = store.positions().find((row) => row.mint === intent.mint);
@@ -1936,7 +1936,7 @@ async function tick(context: TickContext): Promise<void> {
       freeCash += fill.value_usd - fill.fee_usd;
       store.appendDecision({ symbol: intent.symbol, verdict: "exit", reason: intent.reason, signals: intent.signals });
       store.appendActivity("exit", `Paper sell ${intent.symbol}: $${fill.value_usd.toFixed(2)} at $${fill.price_usd.toFixed(4)} (${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} before fees). ${intent.reason}`);
-      notifyOperator("exit", `${isLive ? "LIVE" : "Paper"} sell ${intent.symbol}: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} before fees. ${intent.reason}`);
+      notifyWeb3("exit", `${isLive ? "LIVE" : "Paper"} sell ${intent.symbol}: ${pnl >= 0 ? "+" : ""}$${pnl.toFixed(2)} before fees. ${intent.reason}`);
       store.appendWeb3Memory({ symbol: intent.symbol, kind: "exit", summary: `Exited ${intent.symbol} at $${fill.price_usd.toFixed(4)}, ${pnl >= 0 ? "gain" : "loss"} $${Math.abs(pnl).toFixed(2)} before fees. ${intent.reason}` });
     }
   }
@@ -2009,7 +2009,7 @@ async function tick(context: TickContext): Promise<void> {
     if (recentActivity.some((row) => row.kind === "model-drift" && row.message.startsWith(driftMarker))) continue;
     const message = `${driftMarker} ${drift.symbol} rehearsal median gap ${drift.median_gap_bps >= 0 ? "+" : ""}${drift.median_gap_bps.toFixed(2)}bp exceeds 25bp.`;
     store.appendActivity("model-drift", message);
-    notifyOperator("v3", message);
+    notifyWeb3("v3", message);
   }
 
   // Daily Tier B rotation shares the daemon's once-a-day operating layer but
@@ -2046,7 +2046,7 @@ async function tick(context: TickContext): Promise<void> {
       const message = `V3 ${strategyId} automatically demoted from paper: ${demotion.reasons.join("; ")}.`;
       store.setV3Promotion(strategyId, { ...promotionState, ready: false, eligible: false, ts: new Date(nowMs).toISOString(), last_reason: message });
       store.appendActivity("v3-shadow", message);
-      notifyOperator("v3", message);
+      notifyWeb3("v3", message);
     }
     const edgeState = store.cusumEdgeRatio();
     if (edgeState.updated_at === null || nowMs - Date.parse(edgeState.updated_at) >= 7 * 24 * 60 * 60_000) {

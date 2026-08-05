@@ -15,7 +15,7 @@
 
 import { buildAttribution, type AttributionSummary } from "./attribution";
 import { describeBpTimingEvidence, summarizeBpTimingEvidence } from "./bp-evidence";
-import { notifyOperator } from "./notify";
+import { notifyWeb3 } from "./notify";
 import { calibrate, calibrateStrategy, describeCalibration } from "./v3/calibration";
 import { priceSeriesFromHistory } from "./v3/candidate-store";
 import { ANTI_OVERFIT_CONSTITUTION } from "./v3/replay/constitution";
@@ -388,7 +388,7 @@ export async function runAnalyst(
   store.appendActivity("analyst", `Daily review: ${output.review.slice(0, 180)}`);
   // The one daily "here's what I learned" should reach the operator's pocket,
   // not just the panel — fills and halts already do.
-  notifyOperator("analyst", `Daily review: ${output.review.slice(0, 240)}`);
+  notifyWeb3("analyst", `Daily review: ${output.review.slice(0, 240)}`);
   for (const lesson of output.lessons.slice(0, 5)) {
     store.appendWeb3Memory({ symbol: lesson.symbol.slice(0, 12), kind: "lesson", summary: lesson.summary });
   }
@@ -400,7 +400,7 @@ export async function runAnalyst(
     proposalApplied = applied.ok;
     if (applied.ok) {
       store.appendActivity("analyst", `Param change applied: ${output.proposal.reason.slice(0, 160)}`);
-      notifyOperator("analyst", `Param change applied: ${output.proposal.reason.slice(0, 200)}`);
+      notifyWeb3("analyst", `Param change applied: ${output.proposal.reason.slice(0, 200)}`);
     } else {
       proposalError = applied.error;
       store.appendActivity("analyst", `Param proposal REFUSED by the rails: ${applied.error}`);

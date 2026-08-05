@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { evaluatePolymarketPaperAuthority, type PolymarketPaperAuthority } from "@/src/polymarket/authority";
 import { POLYMARKET_PAPER_CONTRACT, POLYMARKET_STRATEGY_CATALOG } from "@/src/polymarket/catalog";
-import { safePolymarketBrainReport, type PolymarketBrainReport } from "@/src/polymarket/brain";
+import { polymarketBrain, safePolymarketBrainReport, type PolymarketBrainReport } from "@/src/polymarket/brain";
+import type { PolymarketStrategyId } from "@/src/polymarket/strategies";
 import { getPolymarketSnapshot, runPolymarketBrainCycle, runPolymarketPaperCycle, type PolymarketSnapshotView } from "@/src/polymarket/engine";
 import { fetchPolymarketOrderBooks, quotePolymarketPaperBuy, quotePolymarketPaperSell } from "@/src/polymarket/orderbook";
 import { buildPolymarketWatchSignals, type PolymarketMarket } from "@/src/polymarket/markets";
@@ -33,6 +34,7 @@ export type PolymarketApiPayload = {
   };
   paper_contract: typeof POLYMARKET_PAPER_CONTRACT;
   paper_authority: PolymarketPaperAuthority;
+  equity_curve: Array<{ ts: string; realized_pnl_usd: number; action: "open" | "close" }>;
   strategy_catalog: typeof POLYMARKET_STRATEGY_CATALOG;
   weather: PolymarketWeatherReport;
   brain: PolymarketBrainReport;
@@ -132,7 +134,7 @@ export async function POST(request: Request): Promise<NextResponse<PolymarketApi
         }
         const signal = buildPolymarketWatchSignals(snapshot.markets)
           .find((candidate) => candidate.market_id === market.id && candidate.outcome_index === outcomeIndex);
-        if (!signal) return NextResponse.json({ error: "Paper entries are restricted to the current momentum strategy contract." }, { status: 409 });
+        if (!signal) return NextResponse.json({ error: "Manual paper entries are restricted to current momentum watch setups." }, { status: 409 });
         const stake = typeof body.stake_usd === "number" ? body.stake_usd : POLYMARKET_PAPER_CONTRACT.default_stake_usd;
         const books = await fetchPolymarketOrderBooks([signal.token_id], true);
         const entryQuote = quotePolymarketPaperBuy(books.get(signal.token_id)!, stake);
@@ -149,7 +151,7 @@ export async function POST(request: Request): Promise<NextResponse<PolymarketApi
           realized_today_usd: account.realized_today_usd,
         });
         if (!policy.ok) return NextResponse.json({ error: policy.error }, { status: 409 });
-        store.openPosition({
+        const opened = store.openPosition({
           market_id: market.id,
           token_id: market.token_ids[outcomeIndex],
           question: market.question,
@@ -158,8 +160,29 @@ export async function POST(request: Request): Promise<NextResponse<PolymarketApi
           outcome: market.outcomes[outcomeIndex],
           stake_usd: stake,
           entry_price: entryQuote.average_price,
+          strategy_id: "momentum",
+          tier: "manual",
           thesis: `Operator-selected momentum paper entry using displayed CLOB ask depth across ${entryQuote.levels_used} level(s).`,
         });
+        try {
+          polymarketBrain().recordPaperTrade({
+            event: "open",
+            position_id: opened.id,
+            strategy_id: "momentum",
+            tier: "manual",
+            market_id: market.id,
+            token_id: market.token_ids[outcomeIndex],
+            outcome: market.outcomes[outcomeIndex],
+            question: market.question,
+            slug: market.slug,
+            price: entryQuote.average_price,
+            stake_usd: stake,
+            pnl_usd: null,
+            reason: opened.thesis,
+          });
+        } catch {
+          // Ledger write failure must not block the operator's entry.
+        }
         break;
       }
       case "close_position": {
@@ -175,7 +198,29 @@ export async function POST(request: Request): Promise<NextResponse<PolymarketApi
         const books = await fetchPolymarketOrderBooks([position.token_id], true);
         const exitQuote = quotePolymarketPaperSell(books.get(position.token_id)!, position.shares);
         if (!exitQuote) return NextResponse.json({ error: "Displayed CLOB bid depth cannot close the full paper position." }, { status: 409 });
-        store.closePosition(position.id, exitQuote.average_price, `Operator close using displayed CLOB bid depth across ${exitQuote.levels_used} level(s)`);
+        const reason = `Operator close using displayed CLOB bid depth across ${exitQuote.levels_used} level(s)`;
+        const closed = store.closePosition(position.id, exitQuote.average_price, reason);
+        if (closed) {
+          try {
+            polymarketBrain().recordPaperTrade({
+              event: "close",
+              position_id: position.id,
+              strategy_id: (position.strategy_id as PolymarketStrategyId | undefined) ?? null,
+              tier: position.tier ?? null,
+              market_id: position.market_id,
+              token_id: position.token_id,
+              outcome: position.outcome,
+              question: position.question,
+              slug: position.slug,
+              price: exitQuote.average_price,
+              stake_usd: position.stake_usd,
+              pnl_usd: closed.pnl_usd,
+              reason,
+            });
+          } catch {
+            // Ledger write failure must not block the operator's close.
+          }
+        }
         break;
       }
       default:
@@ -207,6 +252,7 @@ async function payload(request: Request): Promise<PolymarketApiPayload> {
     paper_authority: evaluatePolymarketPaperAuthority(brain),
     strategy_catalog: POLYMARKET_STRATEGY_CATALOG,
     weather,
+    equity_curve: buildEquityCurve(store.trades(200)),
     trades: store.trades(50),
     activity: store.activity(50),
     markets: snapshot.markets.slice(0, 40),
@@ -231,6 +277,16 @@ async function payload(request: Request): Promise<PolymarketApiPayload> {
     },
     data_boundary: "This lane reads public Polymarket, Aviation Weather Center, and Open-Meteo data and writes only simulator/research state under the ignored local .data directory.",
   };
+}
+
+/** Chronological realized-P&L curve derived from the trade log for the lab's
+ * activity sparkline. trades() returns newest-first, so replay oldest-first. */
+function buildEquityCurve(trades: PolymarketPaperTrade[]): Array<{ ts: string; realized_pnl_usd: number; action: "open" | "close" }> {
+  let realized = 0;
+  return [...trades].reverse().map((trade) => {
+    if (trade.action === "close") realized += trade.pnl_usd ?? 0;
+    return { ts: trade.ts, realized_pnl_usd: Math.round(realized * 100) / 100, action: trade.action };
+  });
 }
 
 export function isAuthorizedLocalPolymarketControl(request: Request): boolean {

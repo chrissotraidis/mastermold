@@ -1,5 +1,6 @@
 import { ClipboardCheck, LockKeyhole } from "lucide-react";
 
+import type { PolymarketPaperAuthority } from "@/src/polymarket/authority";
 import type { PolymarketStrategyCapability } from "@/src/polymarket/catalog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,16 +16,20 @@ type PaperContract = {
   fill_model: string;
 };
 
-export function TradeContractCard({ contract }: { contract: PaperContract }) {
+export function TradeContractCard({ contract, authority }: { contract: PaperContract; authority: PolymarketPaperAuthority }) {
   return (
     <Card className="border-engine/25 bg-engine/[0.035]">
       <CardContent className="space-y-2 p-4 text-xs leading-5 text-on-surface-variant">
         <p className="flex items-center gap-2 text-sm font-semibold text-on-surface">
           <ClipboardCheck className="size-4 text-engine" /> What the bot trades now
+          {authority.tier ? (
+            <Badge variant="outline" className={authority.tier === "promoted" ? "border-engine/35 text-engine" : "border-violet/30 text-violet"}>
+              {authority.tier === "promoted" ? "Promoted" : "Exploration"}
+            </Badge>
+          ) : null}
         </p>
         <p>
-          <strong className="text-on-surface">No strategy currently has paper-entry authority.</strong>{" "}
-          Momentum is a measured, promotion-gated shadow baseline. {contract.entry}
+          <strong className="text-on-surface">{authority.detail}</strong> {contract.entry}
         </p>
         <p className="text-outline">
           ${contract.default_stake_usd} default · one new position per {contract.cadence_minutes}-minute cycle · exits at {contract.exits.join(", ")}.

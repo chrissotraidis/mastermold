@@ -43,6 +43,8 @@ export type PolymarketPaperPosition = {
   entry_price: number;
   opened_at: string;
   thesis: string;
+  strategy_id?: string | null;
+  tier?: string | null;
 };
 
 export type PolymarketPaperTrade = {

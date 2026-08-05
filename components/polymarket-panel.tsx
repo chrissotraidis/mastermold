@@ -99,8 +99,11 @@ export function PolymarketPanel() {
                 <Badge variant="outline" className="border-violet/30 text-violet">
                   {data.market_read.source === "live" ? "Live public read" : "Cached read"}
                 </Badge>
+                {data.paper_authority.tier === "exploration" ? (
+                  <Badge variant="outline" className="border-violet/30 text-violet">Exploration entries</Badge>
+                ) : null}
               </div>
-              <p className="mt-1 text-[11px] leading-4 text-caution">{data.paper_authority.detail}</p>
+              <p className={cn("mt-1 text-[11px] leading-4", data.paper_authority.available ? "text-on-surface-variant" : "text-caution")}>{data.paper_authority.detail}</p>
               <p className="mt-1 text-[11px] text-outline">
                 Market read {formatRelative(data.market_read.fetched_at)} · Last cycle {data.state.last_cycle_at ? formatRelative(data.state.last_cycle_at) : "not run"}
               </p>
@@ -138,9 +141,11 @@ export function PolymarketPanel() {
         <Metric label="Realized P&L" value={signedMoney(data.account.realized_pnl_usd)} detail={`${signedMoney(data.account.realized_today_usd)} today`} />
       </div>
 
+      <EquityCurve curve={data.equity_curve} />
+
       <PolymarketBrainPanel brain={data.brain} pending={pending} controlAvailable={canControl} onResearch={() => control({ action: "run_brain_cycle" })} />
 
-      <TradeContractCard contract={data.paper_contract} />
+      <TradeContractCard contract={data.paper_contract} authority={data.paper_authority} />
 
       {data.positions.length > 0 ? (
         <Card className="border-outline-variant/30 bg-surface-low/70">
@@ -258,6 +263,53 @@ export function PolymarketPanel() {
         </details>
       </Card>
     </div>
+  );
+}
+
+function EquityCurve({ curve }: { curve: Array<{ ts: string; realized_pnl_usd: number; action: "open" | "close" }> }) {
+  const closes = curve.filter((point) => point.action === "close");
+  if (closes.length < 2) {
+    return (
+      <Card className="border-outline-variant/30 bg-surface-low/70">
+        <CardContent className="p-4">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Realized P&L curve</p>
+          <p className="mt-1 text-xs text-outline">
+            {curve.length === 0 ? "No paper trades yet — the curve draws itself once the bot starts closing positions." : "Waiting for at least two closed trades to draw the curve."}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const width = 720;
+  const height = 72;
+  const pad = 4;
+  const values = closes.map((point) => point.realized_pnl_usd);
+  const min = Math.min(0, ...values);
+  const max = Math.max(0, ...values);
+  const range = max - min || 1;
+  const x = (index: number) => pad + (index / (closes.length - 1)) * (width - pad * 2);
+  const y = (value: number) => pad + (1 - (value - min) / range) * (height - pad * 2);
+  const path = closes.map((point, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(point.realized_pnl_usd).toFixed(1)}`).join(" ");
+  const last = values[values.length - 1];
+  const zeroY = y(0);
+
+  return (
+    <Card className="border-outline-variant/30 bg-surface-low/70">
+      <CardContent className="p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Realized P&L curve · {closes.length} closes</p>
+          <p className={cn("font-mono text-xs", last >= 0 ? "text-engine" : "text-critical")}>{last >= 0 ? "+" : ""}${last.toFixed(2)}</p>
+        </div>
+        <svg viewBox={`0 0 ${width} ${height}`} className="mt-2 h-[72px] w-full" preserveAspectRatio="none" role="img" aria-label="Cumulative realized paper P&L over closed trades">
+          <line x1={pad} x2={width - pad} y1={zeroY} y2={zeroY} className="stroke-outline-variant/40" strokeDasharray="3 4" strokeWidth="1" />
+          <path d={path} fill="none" strokeWidth="1.5" className={last >= 0 ? "stroke-engine" : "stroke-critical"} />
+          {closes.map((point, index) => (
+            <circle key={`${point.ts}-${index}`} cx={x(index)} cy={y(point.realized_pnl_usd)} r="2" className={point.realized_pnl_usd >= (index > 0 ? closes[index - 1].realized_pnl_usd : 0) ? "fill-engine" : "fill-critical"} />
+          ))}
+        </svg>
+      </CardContent>
+    </Card>
   );
 }
 
