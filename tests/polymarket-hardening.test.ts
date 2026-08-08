@@ -28,7 +28,9 @@ describe("Polymarket hardening contracts", () => {
   test("keeps momentum shadow-only until its evidence gate passes", () => {
     expect(POLYMARKET_PAPER_CONTRACT.strategy_id).toBe("momentum");
     expect(POLYMARKET_PAPER_CONTRACT.live_authority).toBe(false);
-    expect(POLYMARKET_STRATEGY_CATALOG.filter((strategy) => strategy.authority === "paper")).toEqual([]);
+    // The analyst lane is the sole paper-authority holder (operator env opt-in,
+    // forecast-driven entries only); every price-signal strategy stays shadow.
+    expect(POLYMARKET_STRATEGY_CATALOG.filter((strategy) => strategy.authority === "paper").map((strategy) => strategy.id)).toEqual(["analyst"]);
     expect(POLYMARKET_STRATEGY_CATALOG.find((strategy) => strategy.id === "weather")?.authority).toBe("observe");
     expect(POLYMARKET_STRATEGY_CATALOG.find((strategy) => strategy.id === "copy_trading")?.authority).toBe("missing");
 
@@ -48,6 +50,9 @@ describe("Polymarket hardening contracts", () => {
       }],
     } as unknown as PolymarketBrainReport;
     expect(evaluatePolymarketPaperAuthority(report, {}).available).toBe(false);
+    const analystOnly = evaluatePolymarketPaperAuthority(report, { POLYMARKET_ANALYST: "1" });
+    expect(analystOnly.available).toBe(true);
+    expect(analystOnly.entry_strategies).toEqual([]);
     const passing = {
       ...report,
       strategies: [{ ...report.strategies[0], mean_1h_bps: 25, hit_rate_1h: 0.56, paper_candidate: true }],

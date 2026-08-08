@@ -31,6 +31,13 @@ export const POLYMARKET_PAPER_CONTRACT = {
 
 export const POLYMARKET_STRATEGY_CATALOG: readonly PolymarketStrategyCapability[] = [
   {
+    id: "analyst",
+    name: "LLM probability analyst",
+    authority: "paper",
+    reference_intent: "Research-backed lane (Halawi et al. 2024; market-prior conditioning): an LLM prices resolution criteria independently and bets only on large divergence.",
+    master_mold_reality: "Prices up to 5 filtered binary markets every few hours, journals every forecast for Brier grading against resolution, and opens $5 hold-to-resolution paper entries only when model-vs-ask edge is at least 10 points at medium+ confidence.",
+  },
+  {
     id: "momentum",
     name: "24-hour momentum",
     authority: "shadow",

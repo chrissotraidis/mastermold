@@ -92,6 +92,18 @@ export async function register(): Promise<void> {
       const { fetchPolymarketWeatherReport } = await import("@/src/polymarket/weather");
       await fetchPolymarketWeatherReport(true);
 
+      // The analyst lane forecasts (and grades) even when paper mode is off —
+      // calibration evidence accumulates regardless; entries still require an
+      // armed paper mode via the shared entry policy.
+      try {
+        const { runPolymarketAnalystCycle } = await import("@/src/polymarket/analyst");
+        const analystResult = await runPolymarketAnalystCycle("scheduled");
+        if (analystResult.action === "forecasted") console.log("[mastermold] Polymarket analyst cycle:", analystResult.detail);
+        if (analystResult.action === "error") console.error("[mastermold] Polymarket analyst cycle failed:", analystResult.detail);
+      } catch (error) {
+        console.error("[mastermold] Polymarket analyst scheduler failed:", error);
+      }
+
       const { polymarketStore } = await import("@/src/polymarket/store");
       const state = polymarketStore().state();
       if (state.mode !== "paper" || state.kill_switch) return;

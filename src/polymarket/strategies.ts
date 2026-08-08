@@ -1,7 +1,7 @@
 import { buildPolymarketWatchSignals, hasPolymarketEntryHorizon, type PolymarketMarket } from "./markets";
 import { summarizePolymarketBook, type PolymarketOrderBook } from "./orderbook";
 
-export type PolymarketStrategyId = "momentum" | "book_pressure" | "binary_parity" | "maker_spread";
+export type PolymarketStrategyId = "momentum" | "book_pressure" | "binary_parity" | "maker_spread" | "analyst";
 export type PolymarketLabelKind = "markout" | "structural" | "maker";
 
 export type PolymarketBrainCandidate = {

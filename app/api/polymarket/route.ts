@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { runPolymarketAnalystCycle, safePolymarketAnalystReport, type AnalystReport } from "@/src/polymarket/analyst";
 import { evaluatePolymarketPaperAuthority, type PolymarketPaperAuthority } from "@/src/polymarket/authority";
 import { POLYMARKET_PAPER_CONTRACT, POLYMARKET_STRATEGY_CATALOG } from "@/src/polymarket/catalog";
 import { polymarketBrain, safePolymarketBrainReport, type PolymarketBrainReport } from "@/src/polymarket/brain";
@@ -38,6 +39,7 @@ export type PolymarketApiPayload = {
   strategy_catalog: typeof POLYMARKET_STRATEGY_CATALOG;
   weather: PolymarketWeatherReport;
   brain: PolymarketBrainReport;
+  analyst: AnalystReport;
   control_access: {
     available: boolean;
     scope: "loopback-only";
@@ -114,6 +116,9 @@ export async function POST(request: Request): Promise<NextResponse<PolymarketApi
         break;
       case "run_brain_cycle":
         await runPolymarketBrainCycle("manual");
+        break;
+      case "run_analyst_cycle":
+        await runPolymarketAnalystCycle("manual");
         break;
       case "paper_buy": {
         const authority = evaluatePolymarketPaperAuthority(safePolymarketBrainReport());
@@ -252,6 +257,7 @@ async function payload(request: Request): Promise<PolymarketApiPayload> {
     paper_authority: evaluatePolymarketPaperAuthority(brain),
     strategy_catalog: POLYMARKET_STRATEGY_CATALOG,
     weather,
+    analyst: safePolymarketAnalystReport(),
     equity_curve: buildEquityCurve(store.trades(200)),
     trades: store.trades(50),
     activity: store.activity(50),

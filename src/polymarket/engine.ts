@@ -211,6 +211,9 @@ export async function runPolymarketPaperCycle(trigger: "scheduled" | "manual" = 
   }
 
   for (const position of store.positions()) {
+    // Analyst positions test a probability estimate, not a price path: they
+    // hold to resolution and exit only via resolved-market settlement above.
+    if (position.tier === "analyst") continue;
     const exitQuote = quotePolymarketPaperSell(books.get(position.token_id)!, position.shares);
     if (!exitQuote) continue;
     const returnPct = exitQuote.average_price / position.entry_price - 1;

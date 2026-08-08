@@ -52,6 +52,19 @@ export function evaluatePolymarketPaperAuthority(
     };
   }
 
+  // The analyst lane opens its own forecast-driven entries outside the brain
+  // candidate path, so paper mode stays armable while every price-signal
+  // strategy remains shadow-only (entry_strategies stays empty).
+  if (env.POLYMARKET_ANALYST === "1") {
+    return {
+      available: true,
+      tier: "exploration",
+      strategy_id: null,
+      entry_strategies: [],
+      detail: "Analyst lane active: LLM forecast-driven paper entries only; all price-signal strategies remain shadow-only after the 2026-08 falsification.",
+    };
+  }
+
   const momentum = report.strategies.find((strategy) => strategy.strategy_id === "momentum");
   return {
     available: false,
