@@ -40,6 +40,44 @@ Analyst positions hold to resolution (no price stop, no hold limit): the
 hypothesis under test is the probability estimate, not a price path. Settlement
 happens through the existing resolved-market path in the paper engine.
 
+## Inference — where the model comes from
+
+The lane uses the `OPENROUTER_API_KEY` already configured in `.env.local`.
+That key predates this lane: it has powered the Master Mold chat fallback and
+the Web3 autopilot Analyst since those shipped (see `.env.example`). No new
+provider or credential was added for this lane; usage is billed to the same
+OpenRouter account and is visible in its dashboard.
+
+- Model: `POLYMARKET_ANALYST_MODEL`, default `deepseek/deepseek-v4-flash:online`.
+  The `:online` suffix is OpenRouter's web-grounding plugin — each call
+  retrieves current web results so forecasts are not stale-knowledge guesses.
+- Budget ceiling: at most 5 calls per cycle, cycles every 3 hours — <= ~40
+  calls/day on a cheap model. Swap models by changing the env var and
+  restarting; no code change needed.
+
+## The learning loop (idea log -> iteration)
+
+Every forecast is an idea logged to the database, and the loop is closed
+deterministically:
+
+1. `polymarket_analyst_forecasts` stores each estimate with its rationale,
+   the market prior, and the asks at forecast time — whether or not it bet.
+2. Resolution grading writes the outcome and Brier scores (model vs market)
+   back onto the same row.
+3. Each new forecast batch feeds the model its own graded track record
+   (overall calibration plus the latest resolved calls) so it can correct
+   systematic bias — chronic overconfidence, a category it keeps misreading.
+   Track record is context, not precedent; the rails (edge threshold, stake,
+   caps) are never model-adjustable.
+
+"Participate only where it can win" is enforced structurally: the candidate
+filter keeps it out of markets it cannot beat (extreme prices, thin books,
+fee-bearing, too-near or too-far resolution), and the >= 10pt edge gate means
+agreeing with the market — the common case — produces a journal entry, not a
+bet. Category-level win/loss stats (which market types it actually beats) come
+out of the same table once the resolved sample is large enough, and can then
+tighten the filter to proven-winnable categories.
+
 ## Constraints
 
 - Paper only. Live execution stays locked; no wallet/CLOB credentials exist in

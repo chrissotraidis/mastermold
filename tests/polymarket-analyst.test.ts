@@ -4,6 +4,7 @@ import {
   brierScore,
   buildAnalystForecastPrompt,
   decideAnalystBet,
+  formatAnalystTrackRecord,
   parseAnalystForecast,
   selectAnalystCandidates,
   POLYMARKET_ANALYST_EDGE_MIN,
@@ -123,5 +124,27 @@ describe("buildAnalystForecastPrompt", () => {
     expect(prompt).toContain("Current market price for YES: 0.420 (this is your prior).");
     expect(prompt).toContain("Resolves YES if X is officially announced.");
     expect(prompt).toContain("days away");
+    expect(prompt).not.toContain("track record");
+  });
+
+  test("includes the graded track record when provided", () => {
+    const trackRecord = formatAnalystTrackRecord({
+      resolved_count: 12,
+      mean_brier_model: 0.181,
+      mean_brier_market: 0.2045,
+      recent: [{ question: "Did Y happen?", probability: 0.7, yes_price: 0.55, winning_outcome_index: 0, brier_model: 0.09 }],
+    });
+    expect(trackRecord).toContain("12 resolved forecasts. Mean Brier: you 0.181 vs market 0.204");
+    expect(trackRecord).toContain('"Did Y happen?" you 0.70, market 0.55, resolved YES (your Brier 0.090)');
+    const prompt = buildAnalystForecastPrompt({
+      question: "Will X happen?",
+      description: "",
+      endDate: null,
+      yesPrice: 0.5,
+      nowIso: new Date().toISOString(),
+      trackRecord,
+    });
+    expect(prompt).toContain("Your recent track record on this venue:");
+    expect(formatAnalystTrackRecord({ resolved_count: 0, mean_brier_model: null, mean_brier_market: null, recent: [] })).toBeUndefined();
   });
 });

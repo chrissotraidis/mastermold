@@ -112,6 +112,7 @@ export const ANALYST_FORECAST_SYSTEM_PROMPT = [
   "- Mind the clock: if the remaining time is short, weigh how much can still change before the deadline.",
   "- No motivated rounding: 0.5 is not a safe default, and 0.99/0.01 require overwhelming evidence.",
   "- If your evidence is thin or conflicting, stay near the market prior and mark confidence low.",
+  "- If your recent track record is provided, use it to correct systematic bias (chronic over- or under-confidence, a category you keep misreading). It is context, not precedent.",
   'Output STRICT JSON only, no markdown fences, matching:',
   '{"probability": <number 0..1 that the YES outcome occurs>,',
   ' "confidence": "low" | "medium" | "high",',
@@ -124,6 +125,7 @@ export function buildAnalystForecastPrompt(input: {
   endDate: string | null;
   yesPrice: number;
   nowIso: string;
+  trackRecord?: string;
 }): string {
   const horizon = input.endDate
     ? `${input.endDate} (${Math.max(0, Math.round((Date.parse(input.endDate) - Date.parse(input.nowIso)) / 86_400_000))} days away)`
@@ -134,8 +136,30 @@ export function buildAnalystForecastPrompt(input: {
     `Resolution criteria: ${truncate(input.description || "(none provided — price the question text literally)", 1_500)}`,
     `Market end date: ${horizon}`,
     `Current market price for YES: ${input.yesPrice.toFixed(3)} (this is your prior).`,
+    ...(input.trackRecord ? [`Your recent track record on this venue:\n${input.trackRecord}`] : []),
     "Estimate the probability that this market resolves YES.",
   ].join("\n");
+}
+
+/** Compact self-review context: overall calibration plus the latest graded
+ * calls, so the model can iterate on its own logged ideas across cycles. */
+export function formatAnalystTrackRecord(input: {
+  resolved_count: number;
+  mean_brier_model: number | null;
+  mean_brier_market: number | null;
+  recent: Array<{ question: string; probability: number; yes_price: number; winning_outcome_index: number | null; brier_model: number | null }>;
+}): string | undefined {
+  if (input.resolved_count === 0 || input.recent.length === 0) return undefined;
+  const lines = [
+    `${input.resolved_count} resolved forecasts. Mean Brier: you ${fmt(input.mean_brier_model)} vs market ${fmt(input.mean_brier_market)} (lower is better).`,
+    ...input.recent.map((row) =>
+      `- "${row.question.length <= 90 ? row.question : `${row.question.slice(0, 89)}…`}" you ${row.probability.toFixed(2)}, market ${row.yes_price.toFixed(2)}, resolved ${row.winning_outcome_index === 0 ? "YES" : "NO"} (your Brier ${fmt(row.brier_model)})`),
+  ];
+  return lines.join("\n");
+}
+
+function fmt(value: number | null): string {
+  return value === null ? "n/a" : value.toFixed(3);
 }
 
 /** Tolerates fenced or prose-wrapped JSON; clamps and validates the result. */
@@ -345,6 +369,12 @@ class PolymarketAnalystStore {
     return rows.map((row) => row.market_id);
   }
 
+  resolvedTrackRecord(limit = 8): Array<{ question: string; probability: number; yes_price: number; winning_outcome_index: number | null; brier_model: number | null }> {
+    return this.db.prepare(
+      "SELECT question, probability, yes_price, winning_outcome_index, brier_model FROM polymarket_analyst_forecasts WHERE status = 'resolved' ORDER BY resolved_at DESC LIMIT ?",
+    ).all(limit) as Array<{ question: string; probability: number; yes_price: number; winning_outcome_index: number | null; brier_model: number | null }>;
+  }
+
   recentlyForecastedMarketIds(sinceIso: string): Set<string> {
     const rows = this.db.prepare(
       "SELECT DISTINCT market_id FROM polymarket_analyst_forecasts WHERE ts >= ?",
@@ -539,6 +569,18 @@ async function runCycleLocked(
   }
 
   const model = polymarketAnalystModel();
+  let trackRecord: string | undefined;
+  try {
+    const summary = analystStore.report(model, true, 0);
+    trackRecord = formatAnalystTrackRecord({
+      resolved_count: summary.resolved_count,
+      mean_brier_model: summary.mean_brier_model,
+      mean_brier_market: summary.mean_brier_market,
+      recent: analystStore.resolvedTrackRecord(),
+    });
+  } catch {
+    // A summary failure only omits self-review context from this batch.
+  }
   let forecasts = 0;
   let bets = 0;
   for (const market of candidates) {
@@ -552,6 +594,7 @@ async function runCycleLocked(
           endDate: market.end_date,
           yesPrice: market.outcome_prices[0],
           nowIso,
+          trackRecord,
         }),
       );
     } catch {
