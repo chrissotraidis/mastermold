@@ -92,23 +92,55 @@ describe("selectAnalystCandidates", () => {
     const positioned = market({ id: "6" });
     const good = market({ id: "7", volume_24h_usd: 90_000 });
     const negRisk = market({ id: "8", neg_risk: true });
+    const feeMarket = market({ id: "9", fees_enabled: true, volume_24h_usd: 10_000 });
 
     const picked = selectAnalystCandidates(
-      [tooSoon, tooFar, thin, extreme, repeat, positioned, good, negRisk],
+      [tooSoon, tooFar, thin, extreme, repeat, positioned, good, negRisk, feeMarket],
       { recentlyForecastedMarketIds: new Set(["5"]), openPositionMarketIds: new Set(["6"]), nowMs: now },
     );
-    expect(picked.map((m) => m.id)).toEqual(["7"]);
+    expect(picked.map((m) => m.id)).toEqual(["7", "9"]);
   });
 
-  test("caps the batch at five, ordered by 24h volume", () => {
-    const markets = Array.from({ length: 8 }, (_, index) =>
+  test("caps the batch at ten, ordered by 24h volume within the slow tier", () => {
+    const markets = Array.from({ length: 12 }, (_, index) =>
       market({ id: String(index + 1), volume_24h_usd: (index + 1) * 1_000 }));
     const picked = selectAnalystCandidates(markets, {
       recentlyForecastedMarketIds: new Set(),
       openPositionMarketIds: new Set(),
     });
-    expect(picked).toHaveLength(5);
-    expect(picked[0].volume_24h_usd).toBe(8_000);
+    expect(picked).toHaveLength(10);
+    expect(picked[0].volume_24h_usd).toBe(12_000);
+  });
+
+  test("fast-resolving markets take priority slots soonest-first, slow markets keep the rest", () => {
+    const now = Date.now();
+    const hours = (n: number) => new Date(now + n * 60 * 60 * 1_000).toISOString();
+    const fast = Array.from({ length: 9 }, (_, index) =>
+      market({ id: `fast-${index + 1}`, end_date: hours(4 + index), volume_24h_usd: 1_000 }));
+    const slow = Array.from({ length: 4 }, (_, index) =>
+      market({ id: `slow-${index + 1}`, end_date: hours(24 * 5), volume_24h_usd: (index + 1) * 10_000 }));
+    const picked = selectAnalystCandidates([...slow, ...fast], {
+      recentlyForecastedMarketIds: new Set(),
+      openPositionMarketIds: new Set(),
+      nowMs: now,
+    });
+    expect(picked).toHaveLength(10);
+    expect(picked.slice(0, 7).map((m) => m.id)).toEqual(
+      ["fast-1", "fast-2", "fast-3", "fast-4", "fast-5", "fast-6", "fast-7"],
+    );
+    expect(picked.slice(7).map((m) => m.id)).toEqual(["slow-4", "slow-3", "slow-2"]);
+  });
+
+  test("a market three hours out is eligible; two hours out is not", () => {
+    const now = Date.now();
+    const eligible = market({ id: "soon", end_date: new Date(now + 3.5 * 60 * 60 * 1_000).toISOString() });
+    const tooSoon = market({ id: "too-soon", end_date: new Date(now + 2 * 60 * 60 * 1_000).toISOString() });
+    const picked = selectAnalystCandidates([eligible, tooSoon], {
+      recentlyForecastedMarketIds: new Set(),
+      openPositionMarketIds: new Set(),
+      nowMs: now,
+    });
+    expect(picked.map((m) => m.id)).toEqual(["soon"]);
   });
 });
 

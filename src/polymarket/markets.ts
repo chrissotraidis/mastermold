@@ -89,6 +89,38 @@ export async function fetchPolymarketMarkets(force = false): Promise<PolymarketM
   }
 }
 
+/** Markets ending within `maxHorizonMs`, ranked by 24h volume. The top-100
+ * snapshot is dominated by long-dated mega-markets, so the analyst pulls this
+ * supplemental set to keep its resolution velocity up: same-day sports,
+ * esports, and daily crypto markets that grade the calibration clock in hours
+ * instead of weeks. Failures return an empty list — the main snapshot alone
+ * is always enough to run a cycle. */
+export async function fetchPolymarketFastResolvers(maxHorizonMs: number): Promise<PolymarketMarket[]> {
+  const url = new URL("https://gamma-api.polymarket.com/markets");
+  url.searchParams.set("active", "true");
+  url.searchParams.set("closed", "false");
+  url.searchParams.set("limit", "300");
+  url.searchParams.set("order", "volume24hr");
+  url.searchParams.set("ascending", "false");
+  url.searchParams.set("end_date_max", new Date(Date.now() + maxHorizonMs).toISOString());
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "MasterMold/0.1 (local Polymarket monitor)",
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return [];
+    const body = await response.json() as unknown;
+    if (!Array.isArray(body)) return [];
+    return body.map(parseMarket).filter((market): market is PolymarketMarket => market !== null);
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchPolymarketResolutions(marketIds: string[]): Promise<PolymarketResolution[]> {
   const ids = [...new Set(marketIds)].filter((id) => /^\d+$/.test(id)).slice(0, 50);
   if (ids.length === 0) return [];

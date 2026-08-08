@@ -22,9 +22,9 @@ import { notifyOperator } from "../autopilot/notify";
 import type { SqliteDatabase } from "../autopilot/sqlite";
 import { polymarketBrain } from "./brain";
 import {
+  fetchPolymarketFastResolvers,
   fetchPolymarketMarkets,
   fetchPolymarketResolutions,
-  hasPolymarketEntryHorizon,
   type PolymarketMarket,
 } from "./markets";
 import { fetchPolymarketOrderBooks, quotePolymarketPaperBuy, summarizePolymarketBook } from "./orderbook";
@@ -33,14 +33,23 @@ import { openPolymarketSqlite } from "./sqlite";
 import { polymarketStore } from "./store";
 
 export const POLYMARKET_ANALYST_STAKE_USD = 5;
-export const POLYMARKET_ANALYST_MAX_OPEN = 3;
+export const POLYMARKET_ANALYST_MAX_OPEN = 5;
 export const POLYMARKET_ANALYST_EDGE_MIN = 0.1;
-const MAX_FORECASTS_PER_CYCLE = 5;
-const MIN_HORIZON_MS = 24 * 60 * 60 * 1_000;
+const MAX_FORECASTS_PER_CYCLE = 10;
+const MIN_HORIZON_MS = 3 * 60 * 60 * 1_000;
 const MAX_HORIZON_MS = 14 * 24 * 60 * 60 * 1_000;
+/** Markets ending inside this window are the calibration accelerant: they
+ * resolve in hours, so they get priority slots ordered soonest-first. */
+const FAST_TRACK_HORIZON_MS = 48 * 60 * 60 * 1_000;
+const FAST_TRACK_SLOTS = 7;
+/** Analyst positions hold to resolution, so unlike the retired price
+ * strategies (4h max hold) a bet a few hours before resolution is safe. The
+ * floor sits below MIN_HORIZON_MS only to absorb the minutes between
+ * candidate selection and bet placement. */
+const MIN_ENTRY_HORIZON_MS = 2 * 60 * 60 * 1_000;
 const REFORECAST_COOLDOWN_MS = 20 * 60 * 60 * 1_000;
 const MIN_LIQUIDITY_USD = 20_000;
-const DEFAULT_CYCLE_HOURS = 3;
+const DEFAULT_CYCLE_HOURS = 2;
 
 export type AnalystConfidence = "low" | "medium" | "high";
 
@@ -216,21 +225,35 @@ export function selectAnalystCandidates(
   options: { recentlyForecastedMarketIds: Set<string>; openPositionMarketIds: Set<string>; nowMs?: number },
 ): PolymarketMarket[] {
   const nowMs = options.nowMs ?? Date.now();
-  return markets
-    .filter((market) => {
-      if (!market.accepting_orders || !market.order_book_enabled || market.neg_risk || market.fees_enabled) return false;
-      if (market.outcomes.length !== 2 || market.token_ids.length !== 2 || market.outcome_prices.length !== 2) return false;
-      if (market.liquidity_usd < MIN_LIQUIDITY_USD) return false;
-      if (!market.end_date) return false;
-      const endMs = Date.parse(market.end_date);
-      if (!Number.isFinite(endMs) || endMs - nowMs < MIN_HORIZON_MS || endMs - nowMs > MAX_HORIZON_MS) return false;
-      const yes = market.outcome_prices[0];
-      if (!Number.isFinite(yes) || yes < 0.05 || yes > 0.95) return false;
-      if (options.recentlyForecastedMarketIds.has(market.id)) return false;
-      if (options.openPositionMarketIds.has(market.id)) return false;
-      return true;
-    })
-    .sort((a, b) => b.volume_24h_usd - a.volume_24h_usd)
+  // Fee-bearing markets (most same-day sports/esports/crypto supply) are
+  // forecastable — a journaled probability costs nothing and grades the same —
+  // but never bet: paper fills don't model taker fees, so fee markets would
+  // corrupt the realized-P&L leg of the promotion gate.
+  const eligible = markets.filter((market) => {
+    if (!market.accepting_orders || !market.order_book_enabled || market.neg_risk) return false;
+    if (market.outcomes.length !== 2 || market.token_ids.length !== 2 || market.outcome_prices.length !== 2) return false;
+    if (market.liquidity_usd < MIN_LIQUIDITY_USD) return false;
+    if (!market.end_date) return false;
+    const endMs = Date.parse(market.end_date);
+    if (!Number.isFinite(endMs) || endMs - nowMs < MIN_HORIZON_MS || endMs - nowMs > MAX_HORIZON_MS) return false;
+    const yes = market.outcome_prices[0];
+    if (!Number.isFinite(yes) || yes < 0.05 || yes > 0.95) return false;
+    if (options.recentlyForecastedMarketIds.has(market.id)) return false;
+    if (options.openPositionMarketIds.has(market.id)) return false;
+    return true;
+  });
+  // Fast-resolving markets fill most of the batch soonest-first (they grade
+  // the calibration record in hours), while the remaining slots stay with the
+  // highest-volume longer-dated markets — the news-driven territory where a
+  // grounded forecast has the best shot at a real edge.
+  const horizon = (market: PolymarketMarket) => Date.parse(market.end_date ?? "") - nowMs;
+  const fast = eligible
+    .filter((market) => horizon(market) <= FAST_TRACK_HORIZON_MS)
+    .sort((a, b) => horizon(a) - horizon(b));
+  const slow = eligible
+    .filter((market) => horizon(market) > FAST_TRACK_HORIZON_MS)
+    .sort((a, b) => b.volume_24h_usd - a.volume_24h_usd);
+  return [...fast.slice(0, FAST_TRACK_SLOTS), ...slow, ...fast.slice(FAST_TRACK_SLOTS)]
     .slice(0, MAX_FORECASTS_PER_CYCLE);
 }
 
@@ -543,7 +566,11 @@ async function runCycleLocked(
 
   const store = polymarketStore();
   const openMarketIds = new Set(store.positions().map((position) => position.market_id));
-  const candidates = selectAnalystCandidates(snapshot.markets, {
+  const universe = new Map(snapshot.markets.map((market) => [market.id, market]));
+  for (const market of await fetchPolymarketFastResolvers(FAST_TRACK_HORIZON_MS)) {
+    if (!universe.has(market.id)) universe.set(market.id, market);
+  }
+  const candidates = selectAnalystCandidates([...universe.values()], {
     recentlyForecastedMarketIds: analystStore.recentlyForecastedMarketIds(new Date(nowMs - REFORECAST_COOLDOWN_MS).toISOString()),
     openPositionMarketIds: openMarketIds,
     nowMs,
@@ -636,7 +663,7 @@ async function runCycleLocked(
       brier_market: null,
     };
 
-    if (decision && hasPolymarketEntryHorizon(market, nowMs)) {
+    if (decision && !market.fees_enabled && Date.parse(market.end_date ?? "") - nowMs >= MIN_ENTRY_HORIZON_MS) {
       const openAnalyst = store.positions().filter((position) => position.tier === "analyst").length;
       const state = store.state();
       const stake = Math.min(POLYMARKET_ANALYST_STAKE_USD, state.caps.max_trade_usd);
