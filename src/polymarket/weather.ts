@@ -53,8 +53,17 @@ type Station = { icaoId?: unknown; site?: unknown; lat?: unknown; lon?: unknown;
 
 const DAILY_TEMPERATURE_TAG_ID = 103040;
 const WEATHER_CACHE_MS = 5 * 60_000;
-const MAX_EVENTS = 4;
+/** All listed cities, today and tomorrow — day-ahead runs are the only
+ * captures a real bet could ever act on, and per-station bias correction
+ * needs every station accumulating history. (Was 4, which kept the archive
+ * on the same few nearest-to-close cities.) */
+const MAX_EVENTS = 20;
+/** The daemon force-refreshes every ~5 minutes to keep grading fresh, but a
+ * full enrichment sweep is ~2 upstream calls per event; ensemble runs only
+ * change a few times a day, so full sweeps are throttled. */
+const FULL_CAPTURE_MS = 30 * 60_000;
 let cache: { report: PolymarketWeatherReport; cached_at: number } | null = null;
+let lastFullCaptureAt = 0;
 let lastResolutionBackfillAt = 0;
 let resolutionBackfill: Promise<void> | null = null;
 
@@ -63,13 +72,19 @@ export async function fetchPolymarketWeatherReport(force = false): Promise<Polym
   if (!force && cache && now - cache.cached_at < WEATHER_CACHE_MS) {
     return { ...cache.report, status: "cached", research: safeWeatherResearchReport() };
   }
+  if (force && cache && now - lastFullCaptureAt < FULL_CAPTURE_MS) {
+    // Resolutions still backfill on the throttled ticks so same-day markets
+    // grade promptly; only the enrichment sweep is rate-limited.
+    await backfillWeatherResolutions();
+    return { ...cache.report, status: "cached", research: safeWeatherResearchReport() };
+  }
 
   try {
     const url = new URL("https://gamma-api.polymarket.com/events");
     url.searchParams.set("tag_id", String(DAILY_TEMPERATURE_TAG_ID));
     url.searchParams.set("active", "true");
     url.searchParams.set("closed", "false");
-    url.searchParams.set("limit", "20");
+    url.searchParams.set("limit", "40");
     url.searchParams.set("end_date_min", new Date(now).toISOString());
     url.searchParams.set("order", "endDate");
     url.searchParams.set("ascending", "true");
@@ -98,6 +113,7 @@ export async function fetchPolymarketWeatherReport(force = false): Promise<Polym
         : "No upcoming daily-temperature event with usable bucket metadata was returned.",
     };
     cache = { report, cached_at: now };
+    lastFullCaptureAt = now;
     return report;
   } catch (error) {
     if (cache) {
@@ -167,26 +183,43 @@ export function parseWeatherEvent(value: unknown): PolymarketWeatherEvent | null
   };
 }
 
+/** Station coordinates never change; caching them keeps the 20-event sweep
+ * at one aviationweather call per station per process lifetime. */
+const stationInfoCache = new Map<string, { latitude: number; longitude: number; name: string; elev: number | null }>();
+
+async function lookupStation(stationCode: string) {
+  const cached = stationInfoCache.get(stationCode);
+  if (cached) return cached;
+  const stationUrl = new URL("https://aviationweather.gov/api/data/stationinfo");
+  stationUrl.searchParams.set("ids", stationCode);
+  stationUrl.searchParams.set("format", "json");
+  const stationResponse = await fetch(stationUrl, {
+    cache: "no-store",
+    headers: { Accept: "application/json", "User-Agent": "MasterMold/0.1 (weather station audit)" },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!stationResponse.ok) throw new Error(`station lookup ${stationResponse.status}`);
+  const stationBody = await stationResponse.json() as unknown;
+  const station = Array.isArray(stationBody) ? stationBody[0] as Station | undefined : undefined;
+  const latitude = numeric(station?.lat);
+  const longitude = numeric(station?.lon);
+  if (!station || !Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) {
+    throw new Error("station coordinates missing");
+  }
+  const info = {
+    latitude,
+    longitude,
+    name: text(station.site) || stationCode,
+    elev: Number.isFinite(numeric(station.elev)) ? numeric(station.elev) : null,
+  };
+  stationInfoCache.set(stationCode, info);
+  return info;
+}
+
 async function enrichWeatherEvent(event: PolymarketWeatherEvent): Promise<PolymarketWeatherEvent> {
   if (event.rules_status !== "auditable" || !event.station_code) return event;
   try {
-    const stationUrl = new URL("https://aviationweather.gov/api/data/stationinfo");
-    stationUrl.searchParams.set("ids", event.station_code);
-    stationUrl.searchParams.set("format", "json");
-    const stationResponse = await fetch(stationUrl, {
-      cache: "no-store",
-      headers: { Accept: "application/json", "User-Agent": "MasterMold/0.1 (weather station audit)" },
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!stationResponse.ok) throw new Error(`station lookup ${stationResponse.status}`);
-    const stationBody = await stationResponse.json() as unknown;
-    const station = Array.isArray(stationBody) ? stationBody[0] as Station | undefined : undefined;
-    const latitude = numeric(station?.lat);
-    const longitude = numeric(station?.lon);
-    if (!station || !Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) {
-      throw new Error("station coordinates missing");
-    }
-    const stationName = text(station.site) || event.station_code;
+    const { latitude, longitude, name: stationName, elev: stationElev } = await lookupStation(event.station_code);
 
     const forecastUrl = new URL("https://ensemble-api.open-meteo.com/v1/ensemble");
     forecastUrl.searchParams.set("latitude", String(latitude));
@@ -222,7 +255,7 @@ async function enrichWeatherEvent(event: PolymarketWeatherEvent): Promise<Polyma
     });
     const topBucket = [...buckets].sort((a, b) => (b.raw_model_probability ?? -1) - (a.raw_model_probability ?? -1))[0] ?? null;
     const timezone = text(forecast.timezone) || null;
-    const elevation = Number.isFinite(numeric(forecast.elevation)) ? numeric(forecast.elevation) : Number.isFinite(numeric(station.elev)) ? numeric(station.elev) : null;
+    const elevation = Number.isFinite(numeric(forecast.elevation)) ? numeric(forecast.elevation) : stationElev;
     const ruleFingerprint = captureRule(event, {
       station_name: stationName,
       latitude,

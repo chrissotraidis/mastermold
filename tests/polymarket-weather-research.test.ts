@@ -5,7 +5,9 @@ import { join } from "node:path";
 
 import {
   __resetWeatherResearchForTests,
+  computeWeatherMarketRelative,
   weatherResearchStore,
+  type EvaluationCase,
 } from "@/src/polymarket/weather-research";
 
 let scratch: string | null = null;
@@ -119,6 +121,73 @@ describe("Polymarket weather evidence store", () => {
     expect(report.models.raw_ensemble.mean_crps_celsius).not.toBeNull();
     expect(report.models.simple_emos.mean_crps_celsius).toBeLessThan(report.models.raw_ensemble.mean_crps_celsius as number);
     expect(report.evidence_gate.passed).toBe(false);
+  });
+});
+
+describe("computeWeatherMarketRelative", () => {
+  const baseCase = (overrides: Partial<EvaluationCase>): EvaluationCase => ({
+    event_id: "e1",
+    date: "2026-01-01",
+    retrieved_at: "2025-12-31T06:00:00.000Z",
+    station_code: "KORD",
+    temperature_kind: "maximum",
+    members: [30, 30, 31, 31, 31, 32],
+    buckets: [
+      { market_id: "b1", label: "30°C or below", market_yes_price: 0.5 },
+      { market_id: "b2", label: "31°C", market_yes_price: 0.3 },
+      { market_id: "b3", label: "32°C or above", market_yes_price: 0.2 },
+    ],
+    outcome: 31,
+    ...overrides,
+  });
+
+  test("scores first-run briers, station bias, and virtual max-gap bets", () => {
+    // members put 3/6 on 31°C vs market 0.3 → max gap on the winning bucket
+    const win = baseCase({});
+    // model favors 32+ (gap on b3), outcome 30 → losing $1 bet
+    const lose = baseCase({
+      event_id: "e2",
+      station_code: "RJTT",
+      members: [32, 32, 33, 33, 34, 34],
+      outcome: 30,
+    });
+    const report = computeWeatherMarketRelative([win, lose]);
+    expect(report.evaluated_events).toBe(2);
+    expect(report.virtual_max_gap_bets.n).toBe(2);
+    expect(report.virtual_max_gap_bets.hits).toBe(1);
+    // win pays (1-0.3)/0.3 = 2.3333, loss -1 → total 1.3333
+    expect(report.virtual_max_gap_bets.total_pnl_per_dollar).toBeCloseTo(1.3333, 3);
+    expect(report.first_run_brier_model).not.toBeNull();
+    expect(report.first_run_brier_market).not.toBeNull();
+    const rjtt = report.per_station_bias.find((row) => row.station_code === "RJTT");
+    // median 33 vs outcome 30 → +3C warm bias
+    expect(rjtt).toEqual({ station_code: "RJTT", n: 1, mean_bias_c: 3 });
+  });
+
+  test("skips near-zero-priced buckets and events without prices", () => {
+    const longshot = baseCase({
+      buckets: [
+        { market_id: "b1", label: "30°C or below", market_yes_price: 0.0005 },
+        { market_id: "b2", label: "31°C", market_yes_price: 0.999 },
+      ],
+    });
+    const unpriced = baseCase({
+      event_id: "e3",
+      buckets: [
+        { market_id: "b1", label: "31°C", market_yes_price: null },
+        { market_id: "b2", label: "32°C or above", market_yes_price: null },
+      ],
+    });
+    const report = computeWeatherMarketRelative([longshot, unpriced]);
+    expect(report.virtual_max_gap_bets.n).toBe(0);
+    expect(report.first_run_brier_market).not.toBeNull();
+  });
+
+  test("empty input produces an empty report", () => {
+    const report = computeWeatherMarketRelative([]);
+    expect(report.evaluated_events).toBe(0);
+    expect(report.first_run_brier_model).toBeNull();
+    expect(report.virtual_max_gap_bets.avg_pnl_per_dollar).toBeNull();
   });
 });
 

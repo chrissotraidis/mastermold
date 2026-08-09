@@ -24,6 +24,25 @@ export type WeatherResearchModelScore = {
   mean_crps_celsius: number | null;
 };
 
+/** Market-relative research computed from ALL forecast runs (including
+ * partial provenance): the strict calibration evaluator requires complete
+ * issuance provenance that Open-Meteo does not provide, so without this view
+ * the archive produces no decision evidence at all. Shadow-only; measures the
+ * model against the market rather than against absolute calibration. */
+export type WeatherMarketRelativeReport = {
+  evaluated_events: number;
+  first_run_brier_model: number | null;
+  first_run_brier_market: number | null;
+  per_station_bias: Array<{ station_code: string; n: number; mean_bias_c: number }>;
+  virtual_max_gap_bets: {
+    n: number;
+    hits: number;
+    total_pnl_per_dollar: number;
+    avg_pnl_per_dollar: number | null;
+    note: string;
+  };
+};
+
 export type WeatherResearchReport = {
   status: "insufficient" | "evaluated-not-promoted" | "unavailable";
   authority: "shadow-only";
@@ -52,6 +71,7 @@ export type WeatherResearchReport = {
     raw_ensemble: WeatherResearchModelScore;
     simple_emos: WeatherResearchModelScore;
   };
+  market_relative: WeatherMarketRelativeReport | null;
   detail: string;
   warnings: string[];
   error: string | null;
@@ -140,7 +160,7 @@ type ResolutionRow = {
   exact_value_celsius: number | null;
 };
 
-type EvaluationCase = {
+export type EvaluationCase = {
   event_id: string;
   date: string;
   retrieved_at: string;
@@ -339,11 +359,13 @@ export class WeatherResearchStore {
         passed: gatePassed,
       },
       models: evaluated,
+      market_relative: computeWeatherMarketRelative(this.evaluationCases("any")),
       detail: gatePassed
         ? "Chronological scores are available, but no execution authority is granted. Promotion still requires stability and dependency audits."
         : `Insufficient evidence: ${cases.length}/${MIN_INDEPENDENT_OUTCOMES} aligned forecasts with exact outcomes; the smallest station/kind cell has ${smallestCell}/${MIN_CELL_OUTCOMES}.`,
       warnings: [
         "Current Open-Meteo ensemble responses do not identify a stable issuance time, so captures without that provenance are retained but excluded from calibration.",
+        "market_relative stats include partial-provenance runs and use mid prices without fees or depth; they measure the model against the market, not absolute calibration, and grant no authority.",
         "Historical Polymarket resolutions are not substitutes for historical forecast runs; no forecast backfill is synthesized.",
         "Market settlement labels are separate from source-station observations and may be revised; both are append-only records.",
         "Research status never enables paper or live trading.",
@@ -365,12 +387,12 @@ export class WeatherResearchStore {
     };
   }
 
-  private evaluationCases(): EvaluationCase[] {
+  private evaluationCases(provenance: "complete" | "any" = "complete"): EvaluationCase[] {
     const forecasts = this.db.prepare(`
       SELECT event_id, retrieved_at, target_date, temperature_kind, station_code,
              member_values_json, buckets_json
       FROM weather_forecast_runs
-      WHERE provenance_status = 'complete'
+      ${provenance === "complete" ? "WHERE provenance_status = 'complete'" : ""}
       ORDER BY target_date ASC, retrieved_at ASC
     `).all() as unknown as ForecastRow[];
     const resolutions = this.db.prepare(`
@@ -478,6 +500,68 @@ export function __resetWeatherResearchForTests() {
 
 export function weatherPayloadSha256(value: unknown) {
   return sha256(stableJson(value));
+}
+
+/** Pure computation behind `market_relative`. First run per event only — the
+ * earliest capture is the only moment a day-ahead bet could realistically be
+ * placed; later runs converge on the thermometer, which the market watches
+ * live and a forecast model cannot beat. Buckets priced <= 0.1c are skipped
+ * in the virtual bets: they are unfillable in size and a longshot hit there
+ * would fabricate expectancy. */
+export function computeWeatherMarketRelative(cases: EvaluationCase[]): WeatherMarketRelativeReport {
+  const stationErrors = new Map<string, number[]>();
+  const briersModel: number[] = [];
+  const briersMarket: number[] = [];
+  let bets = 0;
+  let hits = 0;
+  let pnl = 0;
+  for (const item of cases) {
+    if (item.station_code && item.members.length > 0) {
+      const sorted = [...item.members].sort((a, b) => a - b);
+      const mid = sorted.length % 2 === 1
+        ? sorted[(sorted.length - 1) / 2]
+        : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+      const list = stationErrors.get(item.station_code) ?? [];
+      list.push(mid - item.outcome);
+      stationErrors.set(item.station_code, list);
+    }
+    const priced = item.buckets.filter((bucket) => typeof bucket.market_yes_price === "number");
+    if (priced.length < 2) continue;
+    briersModel.push(categoricalBrier(item.buckets, item.outcome, (bucket) => empiricalBucketProbability(bucket.label, item.members)));
+    briersMarket.push(categoricalBrier(item.buckets, item.outcome, (bucket) =>
+      typeof bucket.market_yes_price === "number" ? bucket.market_yes_price : 0));
+    let best: { gap: number; price: number; label: string } | null = null;
+    for (const bucket of item.buckets) {
+      const price = bucket.market_yes_price;
+      if (typeof price !== "number" || price <= 0.001 || price >= 1) continue;
+      const gap = empiricalBucketProbability(bucket.label, item.members) - price;
+      if (!best || gap > best.gap) best = { gap, price, label: bucket.label };
+    }
+    if (!best || best.gap <= 0) continue;
+    const won = empiricalBucketProbability(best.label, [item.outcome]) === 1;
+    bets += 1;
+    if (won) hits += 1;
+    pnl += won ? (1 - best.price) / best.price : -1;
+  }
+  return {
+    evaluated_events: cases.length,
+    first_run_brier_model: briersModel.length ? round4(average(briersModel)) : null,
+    first_run_brier_market: briersMarket.length ? round4(average(briersMarket)) : null,
+    per_station_bias: [...stationErrors.entries()]
+      .map(([station_code, errors]) => ({ station_code, n: errors.length, mean_bias_c: round4(average(errors)) }))
+      .sort((a, b) => a.station_code.localeCompare(b.station_code)),
+    virtual_max_gap_bets: {
+      n: bets,
+      hits,
+      total_pnl_per_dollar: round4(pnl),
+      avg_pnl_per_dollar: bets ? round4(pnl / bets) : null,
+      note: "Hypothetical $1 on the model's most-underpriced bucket per event at first capture, at mid price with no fees or depth. Research signal only.",
+    },
+  };
+}
+
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
 }
 
 function evaluateChronologically(cases: EvaluationCase[]): WeatherResearchReport["models"] {
@@ -610,6 +694,7 @@ function emptyReport(error: string): WeatherResearchReport {
     counts: { rule_snapshots: 0, stations: 0, forecast_runs: 0, complete_forecast_runs: 0, partial_forecast_runs: 0, observations: 0, resolutions: 0, exact_resolutions: 0, aligned_complete_cases: 0, heldout_cases: 0 },
     evidence_gate: { required_independent_outcomes: MIN_INDEPENDENT_OUTCOMES, required_per_station_lead_kind_cell: MIN_CELL_OUTCOMES, smallest_cell: 0, passed: false },
     models: { climatology: { ...emptyScore }, raw_ensemble: { ...emptyScore }, simple_emos: { ...emptyScore } },
+    market_relative: null,
     detail: "The local weather research database is unavailable; no trading authority was granted.", warnings: [], error,
   };
 }

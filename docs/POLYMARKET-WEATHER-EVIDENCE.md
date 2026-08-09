@@ -33,6 +33,43 @@ forecast importer may mark a run `complete` only when provider, model, issuance
 time, retrieval time, target date, station/grid, units, and member values are all
 known.
 
+## Market-relative research view (added 2026-08-09)
+
+The strict evaluator below requires complete issuance provenance that
+Open-Meteo does not provide, so on its own the archive produced no decision
+evidence. The `market_relative` block in the research report closes that gap:
+computed over ALL runs (including partial provenance), first run per event
+only, it reports first-run model-vs-market Brier, per-station ensemble-median
+bias against resolved values, and the expectancy of hypothetical $1 bets on
+the model's most-underpriced bucket (buckets at or below 0.1c are excluded as
+unfillable). It measures the model against the market, not absolute
+calibration, and grants no authority.
+
+### First findings (4 days of capture, 14 resolved events, 2026-08-05..09)
+
+- The ensemble median is close to truth (overall bias about -0.1 C, sd about
+  1.0 C) but station biases are systematic: RJTT about +1.4 C, RKSI about
+  -1.0 C, LFPB about -0.5 C. With whole-degree buckets, a half-degree bias
+  moves confident probability mass into the wrong adjacent bucket.
+- Raw-ensemble gap betting loses: first-run virtual bets came out about
+  -0.30/$1 (n=12), and the model's first-run Brier trails the market's
+  (about 0.059 vs 0.041 per-bucket-averaged). Later-in-day captures are
+  worse: the market watches the live thermometer, so late "gaps" are traps,
+  not edge.
+- Leave-one-out mean-shift debiasing on 2-4 outcomes per station made scores
+  worse — noisy bias estimates overcorrect. Debiasing needs the evidence
+  volumes the gate already demands; the gate's conservatism is validated, not
+  bureaucratic.
+- Coverage was the binding constraint: enrichment was capped at the 4
+  nearest-to-close events, concentrating the archive on late-day captures of
+  a few cities. Raised to 20 events (all listed cities, including tomorrow's
+  markets) with a 30-minute full-sweep throttle and cached station lookups.
+
+Consequence for any betting ambition: weather is not a "bet and always win"
+lane. The plausible path is per-station bias correction learned from weeks of
+day-ahead archive, evaluated by the strict walk-forward gate below, against
+markets that carry taker fees and thin books. Nothing shorter is honest.
+
 ## Offline evaluator
 
 Only complete forecast runs aligned to exact resolved temperatures enter the
