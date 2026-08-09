@@ -26,18 +26,25 @@ Per cycle (default every 2 hours, `POLYMARKET_ANALYST_CYCLE_HOURS`):
    Grading also runs on every 5-minute scheduler tick between cycles, so
    same-day markets are scored within minutes of resolution.
 2. Select up to 10 candidates: active binary CLOB markets, no neg-risk,
-   >= $20k liquidity, YES between 5c and 95c, resolution 3 hours to 14
-   days out, not forecasted in the last 20h, no open position on the market.
+   YES between 5c and 95c, resolution 3 hours to 14 days out, not forecasted
+   in the last 20h, no open position on the market. Liquidity floor is $10k
+   for news markets (to widen the small news pool; entries are still guarded
+   by a live book quote and the paper policy) and $20k for heartbeat markets.
    Fee-bearing markets (most same-day sports/esports/crypto supply) are
    forecastable but never bet — paper fills don't model taker fees, so fee
    markets would corrupt the realized-P&L gate leg.
-   Markets resolving within 48h fill up to 7 slots soonest-first (they grade
-   the calibration record in hours — same-day sports, esports, daily crypto);
-   the remaining slots go to the highest-volume longer-dated markets, where a
-   news-grounded forecast has the best shot at a real edge. The universe is
-   the top-100-by-volume snapshot plus a dedicated fast-resolver fetch
-   (`end_date_max` within 48h), since long-dated mega-markets crowd fast
-   resolvers out of the top 100.
+   Every market is classified deterministically from its question and slug
+   (`classifyAnalystMarket`): sports, esports, handicap/total, and daily
+   crypto-direction markets are **heartbeat**; everything else is **news**.
+   The 2026-08-09 split exists because the first ~60-forecast sample filled
+   with esports coin-flips where the model added noise to a sharp price —
+   fast markets prove calibration *speed*, not *edge*. News markets fill up
+   to 7 slots soonest-ending-first (the gate sample must resolve quickly);
+   heartbeat markets fill the remaining slots soonest-first to keep
+   exercising the pipeline; each side spills into the other's unused slots.
+   The universe is the top-100-by-volume snapshot plus two wider fetches:
+   `end_date_max` within 48h (fast movers) and within 14 days (mid-volume
+   news markets that never make the top 100).
 3. For each, fetch the Gamma resolution criteria and ask the model
    (`POLYMARKET_ANALYST_MODEL`, default `deepseek/deepseek-v4-flash:online` via
    OpenRouter with web grounding) for strict-JSON `{probability, confidence,
@@ -104,23 +111,37 @@ tighten the filter to proven-winnable categories.
 
 ## Promotion gate (to any live-money discussion)
 
-1. >= 50 resolved forecasts.
-2. Mean model Brier <= mean market Brier (the market's own price at forecast
-   time, scored on the same markets).
+Judged on **news-category forecasts only** (split 2026-08-09):
+
+1. >= 40 resolved news forecasts.
+2. Mean news-market model Brier <= mean news-market market Brier (the
+   market's own price at forecast time, scored on the same markets).
 3. Positive realized paper P&L on `tier='analyst'` closes.
 
-### The one-week clock (2026-08-08 acceleration)
+Heartbeat forecasts (sports/esports/daily-crypto) verify that selection,
+inference, journaling, and grading run reliably, and feed the edge-bucket
+research below — but they never gate. A blended gate would be decided by
+coin-flip markets where no forecaster edge exists, including ours.
 
-The gate is unchanged; the calendar compressed. With the original 1-14 day
-horizon and 5 forecasts per 3h cycle, 50 *resolved* forecasts took 3+ weeks.
-The fast-track selection (same-day sports/esports/crypto markets, which exist
-in ~30+ eligible supply at any moment) turns most forecasts into same-day
-resolutions: ~30-40 forecasts/day with the bulk grading within 24h reaches 50
-resolved in ~3-4 days and a gate verdict around day 5, leaving the back half
-of the week for live wiring if it passes. Fast markets are sharply priced, so
-they mostly exercise the calibration legs (1-2); edge-driven P&L (leg 3) is
-still expected to come from the longer-dated news markets holding their
-reserved slots.
+### Edge-bucket research (virtual $1 bets)
+
+Every resolved forecast — bet or not, fee market or not — is graded at report
+time as a hypothetical $1 taker buy on the model's preferred side at the ask
+recorded at forecast time (win pays `(1-ask)/ask`, loss pays −1), bucketed by
+divergence (<2pt, 2-5pt, 5-10pt, >=10pt) per category. This answers, from
+data rather than argument, whether divergence predicts profit and where the
+real bet threshold should sit. The 10pt real-bet threshold only changes if
+the buckets show positive expectancy at a lower band on a meaningful sample.
+
+### The one-week clock (2026-08-08 acceleration, re-aimed 2026-08-09)
+
+The first acceleration filled the sample with fast sports markets and proved
+calibration *speed*, not *edge* — day-2 data showed the model at
+market-parity on 51 heartbeat forecasts with zero bets placed. The re-aim
+points the same velocity machinery at the sample that decides the gate: news
+markets get 7 of 10 slots soonest-ending-first, a $10k liquidity floor, and a
+14-day-wide volume fetch, so the 40-resolved-news target is reachable in
+roughly 5-8 days. Heartbeat throughput continues in the background slots.
 
 Approved live canary, once the gate passes and the operator provides the
 exported Polymarket key + funder address: $200 bankroll, $10 max per position,

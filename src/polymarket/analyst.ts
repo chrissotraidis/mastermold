@@ -10,8 +10,11 @@
  * because the hypothesis under test is the probability estimate, not a path.
  *
  * Promotion gate to any live-money discussion (docs/analyst-lane.md):
- * >= 50 resolved forecasts, mean model Brier <= mean market Brier, and
- * positive realized paper P&L on tier="analyst" closes.
+ * >= 40 resolved NEWS-category forecasts, news-market model Brier <= the
+ * market's own news-market Brier, and positive realized paper P&L on
+ * tier="analyst" closes. Heartbeat markets (sports/esports/daily-crypto)
+ * exercise the pipeline and feed the edge-bucket research but never gate:
+ * they are sharply priced coin-flips where no forecaster edge exists.
  */
 
 import { randomUUID } from "node:crypto";
@@ -38,18 +41,41 @@ export const POLYMARKET_ANALYST_EDGE_MIN = 0.1;
 const MAX_FORECASTS_PER_CYCLE = 10;
 const MIN_HORIZON_MS = 3 * 60 * 60 * 1_000;
 const MAX_HORIZON_MS = 14 * 24 * 60 * 60 * 1_000;
-/** Markets ending inside this window are the calibration accelerant: they
- * resolve in hours, so they get priority slots ordered soonest-first. */
+/** Supplemental fetch window for high-churn markets the top-100 snapshot
+ * misses; also reused with MAX_HORIZON_MS to widen the news pool. */
 const FAST_TRACK_HORIZON_MS = 48 * 60 * 60 * 1_000;
-const FAST_TRACK_SLOTS = 7;
+/** News markets — the only category where the retrieval-grounded edge thesis
+ * applies — get most of the batch, soonest-ending first so the gate sample
+ * resolves quickly. Sports/esports/daily-crypto are a pipeline heartbeat. */
+const NEWS_SLOTS = 7;
 /** Analyst positions hold to resolution, so unlike the retired price
  * strategies (4h max hold) a bet a few hours before resolution is safe. The
  * floor sits below MIN_HORIZON_MS only to absorb the minutes between
  * candidate selection and bet placement. */
 const MIN_ENTRY_HORIZON_MS = 2 * 60 * 60 * 1_000;
 const REFORECAST_COOLDOWN_MS = 20 * 60 * 60 * 1_000;
-const MIN_LIQUIDITY_USD = 20_000;
+/** News markets take a lower liquidity floor to widen the small news pool;
+ * entries are still guarded by a live book quote and the paper policy. */
+const MIN_LIQUIDITY_NEWS_USD = 10_000;
+const MIN_LIQUIDITY_HEARTBEAT_USD = 20_000;
 const DEFAULT_CYCLE_HOURS = 2;
+
+export type AnalystCategory = "news" | "heartbeat";
+
+const HEARTBEAT_SLUG_PREFIX =
+  /^(cs2|csgo|lol|dota2?|val|valorant|ow|owl|rl|sc2|mlb|nba|wnba|nfl|nhl|epl|ucl|uel|laliga|seriea|bundesliga|ligue1|mls|kbo|npb|cfb|cbb|atp|wta|ufc|mma|box|f1|nascar|bitcoin|ethereum|solana|xrp|doge)-/i;
+const HEARTBEAT_QUESTION =
+  /(\bvs\.?\s)|(game handicap|map handicap|set handicap)|(\bo\/u\b)|(up or down on)/i;
+
+/** Sports, esports, and daily-crypto markets are sharply priced coin-flips
+ * where no retrievable evidence gives a forecaster an edge; they verify the
+ * pipeline (a heartbeat) but must not decide the promotion gate. Everything
+ * else is treated as a news market, where the edge thesis lives. */
+export function classifyAnalystMarket(question: string, slug: string): AnalystCategory {
+  if (HEARTBEAT_SLUG_PREFIX.test(slug)) return "heartbeat";
+  if (HEARTBEAT_QUESTION.test(question)) return "heartbeat";
+  return "news";
+}
 
 export type AnalystConfidence = "low" | "medium" | "high";
 
@@ -65,6 +91,7 @@ export type AnalystForecastRow = {
   market_id: string;
   question: string;
   slug: string;
+  category: AnalystCategory;
   end_date: string | null;
   yes_price: number;
   yes_ask: number | null;
@@ -86,6 +113,27 @@ export type AnalystForecastRow = {
   brier_market: number | null;
 };
 
+export type AnalystCategorySummary = {
+  forecast_count: number;
+  resolved_count: number;
+  pending_count: number;
+  bet_count: number;
+  mean_brier_model: number | null;
+  mean_brier_market: number | null;
+};
+
+/** Hypothetical expectancy of a $1 taker buy on the model's preferred side at
+ * the ask recorded at forecast time, grouped by how far the model diverged
+ * from the price. This turns every resolved forecast — bet or not — into
+ * P&L-shaped evidence about where a real edge threshold should sit. */
+export type AnalystEdgeBucket = {
+  category: AnalystCategory;
+  bucket: "<2pt" | "2-5pt" | "5-10pt" | ">=10pt";
+  n: number;
+  hits: number;
+  avg_pnl_per_dollar: number;
+};
+
 export type AnalystReport = {
   enabled: boolean;
   model: string;
@@ -98,6 +146,8 @@ export type AnalystReport = {
   realized_pnl_usd: number;
   last_cycle_at: string | null;
   recent_forecasts: AnalystForecastRow[];
+  categories: Record<AnalystCategory, AnalystCategorySummary>;
+  edge_buckets: AnalystEdgeBucket[];
   gate: { target_resolved: number; detail: string };
 };
 
@@ -220,6 +270,59 @@ export function brierScore(probability: number, yesWon: boolean): number {
   return (probability - outcome) ** 2;
 }
 
+export type AnalystVirtualBetInput = {
+  category: AnalystCategory;
+  probability: number;
+  yes_ask: number | null;
+  no_ask: number | null;
+  winning_outcome_index: number | null;
+};
+
+function edgeBucketLabel(edge: number): AnalystEdgeBucket["bucket"] {
+  if (edge >= 0.1) return ">=10pt";
+  if (edge >= 0.05) return "5-10pt";
+  if (edge >= 0.02) return "2-5pt";
+  return "<2pt";
+}
+
+/** Grades the hypothetical $1 bet implied by each resolved forecast: buy the
+ * side with the larger (estimate − ask) divergence at its recorded ask; a win
+ * pays (1 − ask)/ask, a loss pays −1. Fee markets are included — the buckets
+ * are threshold research, not the gate's fee-clean realized P&L. */
+export function computeAnalystEdgeBuckets(rows: AnalystVirtualBetInput[]): AnalystEdgeBucket[] {
+  const cells = new Map<string, { category: AnalystCategory; bucket: AnalystEdgeBucket["bucket"]; n: number; hits: number; pnl: number }>();
+  for (const row of rows) {
+    if (row.winning_outcome_index !== 0 && row.winning_outcome_index !== 1) continue;
+    const yesOk = row.yes_ask !== null && row.yes_ask > 0 && row.yes_ask < 1;
+    const noOk = row.no_ask !== null && row.no_ask > 0 && row.no_ask < 1;
+    if (!yesOk && !noOk) continue;
+    const yesEdge = yesOk ? row.probability - (row.yes_ask as number) : -Infinity;
+    const noEdge = noOk ? 1 - row.probability - (row.no_ask as number) : -Infinity;
+    const side = yesEdge >= noEdge ? 0 : 1;
+    const edge = side === 0 ? yesEdge : noEdge;
+    const ask = side === 0 ? (row.yes_ask as number) : (row.no_ask as number);
+    const won = row.winning_outcome_index === side;
+    const pnl = won ? (1 - ask) / ask : -1;
+    const bucket = edgeBucketLabel(edge);
+    const key = `${row.category}|${bucket}`;
+    const cell = cells.get(key) ?? { category: row.category, bucket, n: 0, hits: 0, pnl: 0 };
+    cell.n += 1;
+    if (won) cell.hits += 1;
+    cell.pnl += pnl;
+    cells.set(key, cell);
+  }
+  const order: AnalystEdgeBucket["bucket"][] = [">=10pt", "5-10pt", "2-5pt", "<2pt"];
+  return [...cells.values()]
+    .map((cell) => ({
+      category: cell.category,
+      bucket: cell.bucket,
+      n: cell.n,
+      hits: cell.hits,
+      avg_pnl_per_dollar: Math.round((cell.pnl / cell.n) * 10_000) / 10_000,
+    }))
+    .sort((a, b) => (a.category === b.category ? order.indexOf(a.bucket) - order.indexOf(b.bucket) : a.category === "news" ? -1 : 1));
+}
+
 export function selectAnalystCandidates(
   markets: PolymarketMarket[],
   options: { recentlyForecastedMarketIds: Set<string>; openPositionMarketIds: Set<string>; nowMs?: number },
@@ -232,7 +335,10 @@ export function selectAnalystCandidates(
   const eligible = markets.filter((market) => {
     if (!market.accepting_orders || !market.order_book_enabled || market.neg_risk) return false;
     if (market.outcomes.length !== 2 || market.token_ids.length !== 2 || market.outcome_prices.length !== 2) return false;
-    if (market.liquidity_usd < MIN_LIQUIDITY_USD) return false;
+    const floor = classifyAnalystMarket(market.question, market.slug) === "news"
+      ? MIN_LIQUIDITY_NEWS_USD
+      : MIN_LIQUIDITY_HEARTBEAT_USD;
+    if (market.liquidity_usd < floor) return false;
     if (!market.end_date) return false;
     const endMs = Date.parse(market.end_date);
     if (!Number.isFinite(endMs) || endMs - nowMs < MIN_HORIZON_MS || endMs - nowMs > MAX_HORIZON_MS) return false;
@@ -242,18 +348,19 @@ export function selectAnalystCandidates(
     if (options.openPositionMarketIds.has(market.id)) return false;
     return true;
   });
-  // Fast-resolving markets fill most of the batch soonest-first (they grade
-  // the calibration record in hours), while the remaining slots stay with the
-  // highest-volume longer-dated markets — the news-driven territory where a
-  // grounded forecast has the best shot at a real edge.
+  // News markets get the bulk of the batch, soonest-ending first, because the
+  // promotion gate is now judged on news forecasts only — the sample that
+  // matters has to resolve fast. Heartbeat (sports/esports/daily-crypto)
+  // markets fill the remaining slots to keep exercising the pipeline; each
+  // side spills over into unused slots from the other.
   const horizon = (market: PolymarketMarket) => Date.parse(market.end_date ?? "") - nowMs;
-  const fast = eligible
-    .filter((market) => horizon(market) <= FAST_TRACK_HORIZON_MS)
+  const news = eligible
+    .filter((market) => classifyAnalystMarket(market.question, market.slug) === "news")
     .sort((a, b) => horizon(a) - horizon(b));
-  const slow = eligible
-    .filter((market) => horizon(market) > FAST_TRACK_HORIZON_MS)
-    .sort((a, b) => b.volume_24h_usd - a.volume_24h_usd);
-  return [...fast.slice(0, FAST_TRACK_SLOTS), ...slow, ...fast.slice(FAST_TRACK_SLOTS)]
+  const heartbeat = eligible
+    .filter((market) => classifyAnalystMarket(market.question, market.slug) === "heartbeat")
+    .sort((a, b) => horizon(a) - horizon(b));
+  return [...news.slice(0, NEWS_SLOTS), ...heartbeat, ...news.slice(NEWS_SLOTS)]
     .slice(0, MAX_FORECASTS_PER_CYCLE);
 }
 
@@ -355,6 +462,20 @@ class PolymarketAnalystStore {
         value TEXT NOT NULL
       );
     `);
+    const columns = this.db.prepare("PRAGMA table_info(polymarket_analyst_forecasts)").all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === "category")) {
+      this.db.exec("ALTER TABLE polymarket_analyst_forecasts ADD COLUMN category TEXT");
+    }
+    // Rows written before the category split are classified retroactively —
+    // the classifier is deterministic on question+slug, so old and new rows
+    // grade identically.
+    const unclassified = this.db.prepare(
+      "SELECT id, question, slug FROM polymarket_analyst_forecasts WHERE category IS NULL",
+    ).all() as Array<{ id: string; question: string; slug: string }>;
+    for (const row of unclassified) {
+      this.db.prepare("UPDATE polymarket_analyst_forecasts SET category = ? WHERE id = ?")
+        .run(classifyAnalystMarket(row.question, row.slug), row.id);
+    }
   }
 
   lastCycleAt(): string | null {
@@ -373,15 +494,15 @@ class PolymarketAnalystStore {
   insertForecast(row: AnalystForecastRow) {
     this.db.prepare(`
       INSERT INTO polymarket_analyst_forecasts (
-        id, ts, market_id, question, slug, end_date, yes_price, yes_ask, no_ask, model,
+        id, ts, market_id, question, slug, category, end_date, yes_price, yes_ask, no_ask, model,
         probability, confidence, rationale, side, edge, bet, position_id, stake_usd, entry_price,
         status, winning_outcome_index, resolved_at, brier_model, brier_market
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      row.id, row.ts, row.market_id, row.question, row.slug, row.end_date, row.yes_price, row.yes_ask,
-      row.no_ask, row.model, row.probability, row.confidence, row.rationale, row.side, row.edge, row.bet,
-      row.position_id, row.stake_usd, row.entry_price, row.status, row.winning_outcome_index, row.resolved_at,
-      row.brier_model, row.brier_market,
+      row.id, row.ts, row.market_id, row.question, row.slug, row.category, row.end_date, row.yes_price,
+      row.yes_ask, row.no_ask, row.model, row.probability, row.confidence, row.rationale, row.side, row.edge,
+      row.bet, row.position_id, row.stake_usd, row.entry_price, row.status, row.winning_outcome_index,
+      row.resolved_at, row.brier_model, row.brier_market,
     );
   }
 
@@ -449,6 +570,39 @@ class PolymarketAnalystStore {
       "SELECT * FROM polymarket_analyst_forecasts ORDER BY ts DESC LIMIT ?",
     ).all(limit) as AnalystForecastRow[];
     const resolved = totals.resolved_count ?? 0;
+
+    const emptySummary = (): AnalystCategorySummary => ({
+      forecast_count: 0, resolved_count: 0, pending_count: 0, bet_count: 0,
+      mean_brier_model: null, mean_brier_market: null,
+    });
+    const categories: Record<AnalystCategory, AnalystCategorySummary> = { news: emptySummary(), heartbeat: emptySummary() };
+    const perCategory = this.db.prepare(`
+      SELECT
+        category,
+        COUNT(*) AS forecast_count,
+        SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved_count,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count,
+        SUM(bet) AS bet_count,
+        AVG(CASE WHEN status = 'resolved' THEN brier_model END) AS mean_brier_model,
+        AVG(CASE WHEN status = 'resolved' THEN brier_market END) AS mean_brier_market
+      FROM polymarket_analyst_forecasts GROUP BY category
+    `).all() as Array<{ category: string } & { [K in keyof AnalystCategorySummary]: AnalystCategorySummary[K] }>;
+    for (const row of perCategory) {
+      if (row.category !== "news" && row.category !== "heartbeat") continue;
+      categories[row.category] = {
+        forecast_count: row.forecast_count,
+        resolved_count: row.resolved_count ?? 0,
+        pending_count: row.pending_count ?? 0,
+        bet_count: row.bet_count ?? 0,
+        mean_brier_model: round4(row.mean_brier_model),
+        mean_brier_market: round4(row.mean_brier_market),
+      };
+    }
+
+    const virtualRows = this.db.prepare(
+      "SELECT category, probability, yes_ask, no_ask, winning_outcome_index FROM polymarket_analyst_forecasts WHERE status = 'resolved'",
+    ).all() as AnalystVirtualBetInput[];
+    const news = categories.news;
     return {
       enabled,
       model,
@@ -461,9 +615,11 @@ class PolymarketAnalystStore {
       realized_pnl_usd: Math.round(pnl.realized * 100) / 100,
       last_cycle_at: this.lastCycleAt(),
       recent_forecasts: recent,
+      categories,
+      edge_buckets: computeAnalystEdgeBuckets(virtualRows),
       gate: {
-        target_resolved: 50,
-        detail: `Live-money discussion requires >= 50 resolved forecasts (${resolved} so far), mean model Brier <= market Brier, and positive realized analyst paper P&L.`,
+        target_resolved: 40,
+        detail: `Live-money discussion requires >= 40 resolved NEWS forecasts (${news.resolved_count} so far), news-market model Brier <= news-market market Brier (now ${fmt(news.mean_brier_model)} vs ${fmt(news.mean_brier_market)}), and positive realized analyst paper P&L. Heartbeat forecasts (${categories.heartbeat.resolved_count} resolved) verify the pipeline but do not gate.`,
       },
     };
   }
@@ -500,7 +656,12 @@ export function safePolymarketAnalystReport(): AnalystReport {
       realized_pnl_usd: 0,
       last_cycle_at: null,
       recent_forecasts: [],
-      gate: { target_resolved: 50, detail: "Analyst store is unavailable." },
+      categories: {
+        news: { forecast_count: 0, resolved_count: 0, pending_count: 0, bet_count: 0, mean_brier_model: null, mean_brier_market: null },
+        heartbeat: { forecast_count: 0, resolved_count: 0, pending_count: 0, bet_count: 0, mean_brier_model: null, mean_brier_market: null },
+      },
+      edge_buckets: [],
+      gate: { target_resolved: 40, detail: "Analyst store is unavailable." },
     };
   }
 }
@@ -569,6 +730,16 @@ async function runCycleLocked(
   const universe = new Map(snapshot.markets.map((market) => [market.id, market]));
   for (const market of await fetchPolymarketFastResolvers(FAST_TRACK_HORIZON_MS)) {
     if (!universe.has(market.id)) universe.set(market.id, market);
+  }
+  // Second, wider pass over the full eligible horizon: the top-100 snapshot
+  // under-samples mid-volume news markets, and the gate now depends on news
+  // resolution velocity.
+  try {
+    for (const market of await fetchPolymarketFastResolvers(MAX_HORIZON_MS)) {
+      if (!universe.has(market.id)) universe.set(market.id, market);
+    }
+  } catch {
+    // The narrower universe still forecasts; width is an accelerant, not a dependency.
   }
   const candidates = selectAnalystCandidates([...universe.values()], {
     recentlyForecastedMarketIds: analystStore.recentlyForecastedMarketIds(new Date(nowMs - REFORECAST_COOLDOWN_MS).toISOString()),
@@ -642,6 +813,7 @@ async function runCycleLocked(
       market_id: market.id,
       question: market.question,
       slug: market.slug,
+      category: classifyAnalystMarket(market.question, market.slug),
       end_date: market.end_date,
       yes_price: market.outcome_prices[0],
       yes_ask: yesAsk,
