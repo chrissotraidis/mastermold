@@ -104,6 +104,17 @@ export async function register(): Promise<void> {
         console.error("[mastermold] Polymarket analyst scheduler failed:", error);
       }
 
+      // The wallet-intelligence lane discovers, scores, and shadow-tracks
+      // skilled wallets on its own clock; its evidence feeds the analyst.
+      try {
+        const { runPolymarketWalletCycle } = await import("@/src/polymarket/wallets");
+        const walletResult = await runPolymarketWalletCycle("scheduled");
+        if (walletResult.action === "refreshed") console.log("[mastermold] Polymarket wallet cycle:", walletResult.detail);
+        if (walletResult.action === "error") console.error("[mastermold] Polymarket wallet cycle failed:", walletResult.detail);
+      } catch (error) {
+        console.error("[mastermold] Polymarket wallet scheduler failed:", error);
+      }
+
       const { polymarketStore } = await import("@/src/polymarket/store");
       const state = polymarketStore().state();
       if (state.mode !== "paper" || state.kill_switch) return;

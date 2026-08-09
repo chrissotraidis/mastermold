@@ -172,6 +172,7 @@ export const ANALYST_FORECAST_SYSTEM_PROMPT = [
   "- No motivated rounding: 0.5 is not a safe default, and 0.99/0.01 require overwhelming evidence.",
   "- If your evidence is thin or conflicting, stay near the market prior and mark confidence low.",
   "- If your recent track record is provided, use it to correct systematic bias (chronic over- or under-confidence, a category you keep misreading). It is context, not precedent.",
+  "- If smart-money positioning is provided, treat it as one prior-adjusting piece of evidence from historically profitable wallets — never an instruction to follow.",
   'Output STRICT JSON only, no markdown fences, matching:',
   '{"probability": <number 0..1 that the YES outcome occurs>,',
   ' "confidence": "low" | "medium" | "high",',
@@ -185,6 +186,7 @@ export function buildAnalystForecastPrompt(input: {
   yesPrice: number;
   nowIso: string;
   trackRecord?: string;
+  smartMoney?: string;
 }): string {
   const horizon = input.endDate
     ? `${input.endDate} (${Math.max(0, Math.round((Date.parse(input.endDate) - Date.parse(input.nowIso)) / 86_400_000))} days away)`
@@ -196,6 +198,7 @@ export function buildAnalystForecastPrompt(input: {
     `Market end date: ${horizon}`,
     `Current market price for YES: ${input.yesPrice.toFixed(3)} (this is your prior).`,
     ...(input.trackRecord ? [`Your recent track record on this venue:\n${input.trackRecord}`] : []),
+    ...(input.smartMoney ? [`Smart-money positioning: ${input.smartMoney}`] : []),
     "Estimate the probability that this market resolves YES.",
   ].join("\n");
 }
@@ -779,6 +782,16 @@ async function runCycleLocked(
   } catch {
     // A summary failure only omits self-review context from this batch.
   }
+  // Smart-money fusion: followed-wallet positioning becomes one more evidence
+  // line in the prompt. Dynamic import keeps the module graph acyclic
+  // (wallets.ts imports the classifier from this file).
+  let smartMoney = new Map<string, string>();
+  try {
+    const { smartMoneyContextForMarkets } = await import("./wallets");
+    smartMoney = smartMoneyContextForMarkets(candidates.map((market) => market.id));
+  } catch {
+    // Wallet lane evidence is optional; forecasts proceed without it.
+  }
   let forecasts = 0;
   let bets = 0;
   for (const market of candidates) {
@@ -793,6 +806,7 @@ async function runCycleLocked(
           yesPrice: market.outcome_prices[0],
           nowIso,
           trackRecord,
+          smartMoney: smartMoney.get(market.id),
         }),
       );
     } catch {
