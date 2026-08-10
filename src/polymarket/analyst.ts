@@ -65,16 +65,41 @@ export type AnalystCategory = "news" | "heartbeat";
 const HEARTBEAT_SLUG_PREFIX =
   /^(cs2|csgo|lol|dota2?|val|valorant|ow|owl|rl|sc2|mlb|nba|wnba|nfl|nhl|epl|ucl|uel|laliga|seriea|bundesliga|ligue1|mls|kbo|npb|cfb|cbb|atp|wta|ufc|mma|box|f1|nascar|bitcoin|ethereum|solana|xrp|doge)-/i;
 const HEARTBEAT_QUESTION =
-  /(\bvs\.?\s)|(game handicap|map handicap|set handicap)|(\bo\/u\b)|(up or down on)/i;
+  /(\bvs\.?\s)|(game handicap|map handicap|set handicap)|(\bo\/u\b)|(up or down on)|(^will .{1,60} (win|draw|advance) on \d{4}-\d{2}-\d{2}\?)|(^spread: )|(^will (bitcoin|btc|ethereum|eth|solana|sol|xrp|dogecoin|doge) (reach|hit|dip|close|be) )/i;
 
 /** Sports, esports, and daily-crypto markets are sharply priced coin-flips
  * where no retrievable evidence gives a forecaster an edge; they verify the
  * pipeline (a heartbeat) but must not decide the promotion gate. Everything
- * else is treated as a news market, where the edge thesis lives. */
+ * else is treated as a news market, where the edge thesis lives.
+ *
+ * Bump CLASSIFIER_VERSION whenever these rules change so stored rows are
+ * reclassified once at boot — gate stats must reflect the current taxonomy.
+ * v2 (2026-08-10 audit): soccer match-winner markets ("Will CF América win on
+ * 2026-08-09?") carry no league slug prefix and no "vs", so 119 of 137
+ * resolved wallet "news" signals and several analyst rows were sports in
+ * disguise. Match-winner, "Spread:", and crypto-threshold question shapes are
+ * now heartbeat regardless of slug. */
+export const ANALYST_CLASSIFIER_VERSION = "2";
+
 export function classifyAnalystMarket(question: string, slug: string): AnalystCategory {
   if (HEARTBEAT_SLUG_PREFIX.test(slug)) return "heartbeat";
   if (HEARTBEAT_QUESTION.test(question)) return "heartbeat";
   return "news";
+}
+
+/** Collapses date/number variants of one underlying event ("US announces end
+ * of Iranian blockade by August 12/13/14/15…") into a single cluster key so
+ * selection can cap correlated forecasts instead of filling the gate sample
+ * with eleven copies of the same geopolitical outcome. */
+export function analystEventClusterKey(question: string): string {
+  return question
+    .toLowerCase()
+    .replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(st|nd|rd|th)?(,\s*\d{4})?/g, "<date>")
+    .replace(/\d{4}-\d{2}-\d{2}/g, "<date>")
+    .replace(/\d[\d,.]*/g, "<n>")
+    .replace(/[^a-z<>\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export type AnalystConfidence = "low" | "medium" | "high";
@@ -326,11 +351,23 @@ export function computeAnalystEdgeBuckets(rows: AnalystVirtualBetInput[]): Analy
     .sort((a, b) => (a.category === b.category ? order.indexOf(a.bucket) - order.indexOf(b.bucket) : a.category === "news" ? -1 : 1));
 }
 
+/** Max unresolved forecasts per event cluster: eleven Iranian-blockade date
+ * ladders resolving together are one observation, not eleven, so letting them
+ * fill the batch would make the news gate sample look large while carrying
+ * almost no independent information. */
+const MAX_PENDING_PER_CLUSTER = 3;
+
 export function selectAnalystCandidates(
   markets: PolymarketMarket[],
-  options: { recentlyForecastedMarketIds: Set<string>; openPositionMarketIds: Set<string>; nowMs?: number },
+  options: {
+    recentlyForecastedMarketIds: Set<string>;
+    openPositionMarketIds: Set<string>;
+    pendingClusterCounts?: Map<string, number>;
+    nowMs?: number;
+  },
 ): PolymarketMarket[] {
   const nowMs = options.nowMs ?? Date.now();
+  const clusterCounts = new Map(options.pendingClusterCounts ?? []);
   // Fee-bearing markets (most same-day sports/esports/crypto supply) are
   // forecastable — a journaled probability costs nothing and grades the same —
   // but never bet: paper fills don't model taker fees, so fee markets would
@@ -357,9 +394,19 @@ export function selectAnalystCandidates(
   // markets fill the remaining slots to keep exercising the pipeline; each
   // side spills over into unused slots from the other.
   const horizon = (market: PolymarketMarket) => Date.parse(market.end_date ?? "") - nowMs;
+  // The cluster cap applies across pending forecasts AND within this batch,
+  // so a fresh date-ladder can't monopolize a cycle either.
+  const underClusterCap = (market: PolymarketMarket) => {
+    const key = analystEventClusterKey(market.question);
+    const count = clusterCounts.get(key) ?? 0;
+    if (count >= MAX_PENDING_PER_CLUSTER) return false;
+    clusterCounts.set(key, count + 1);
+    return true;
+  };
   const news = eligible
     .filter((market) => classifyAnalystMarket(market.question, market.slug) === "news")
-    .sort((a, b) => horizon(a) - horizon(b));
+    .sort((a, b) => horizon(a) - horizon(b))
+    .filter(underClusterCap);
   const heartbeat = eligible
     .filter((market) => classifyAnalystMarket(market.question, market.slug) === "heartbeat")
     .sort((a, b) => horizon(a) - horizon(b));
@@ -469,15 +516,26 @@ class PolymarketAnalystStore {
     if (!columns.some((column) => column.name === "category")) {
       this.db.exec("ALTER TABLE polymarket_analyst_forecasts ADD COLUMN category TEXT");
     }
-    // Rows written before the category split are classified retroactively —
-    // the classifier is deterministic on question+slug, so old and new rows
-    // grade identically.
-    const unclassified = this.db.prepare(
-      "SELECT id, question, slug FROM polymarket_analyst_forecasts WHERE category IS NULL",
-    ).all() as Array<{ id: string; question: string; slug: string }>;
-    for (const row of unclassified) {
-      this.db.prepare("UPDATE polymarket_analyst_forecasts SET category = ? WHERE id = ?")
-        .run(classifyAnalystMarket(row.question, row.slug), row.id);
+    // Stored categories are recomputed whenever the classifier changes (and
+    // for rows written before the split): the classifier is deterministic on
+    // question+slug, so reclassification keeps history and gate stats on one
+    // consistent taxonomy instead of freezing old mistakes into the sample.
+    const versionRow = this.db.prepare("SELECT value FROM polymarket_analyst_meta WHERE key = 'classifier_version'").get() as
+      | { value: string }
+      | undefined;
+    if (versionRow?.value !== ANALYST_CLASSIFIER_VERSION) {
+      const rows = this.db.prepare(
+        "SELECT id, question, slug, category FROM polymarket_analyst_forecasts",
+      ).all() as Array<{ id: string; question: string; slug: string; category: string | null }>;
+      for (const row of rows) {
+        const category = classifyAnalystMarket(row.question, row.slug);
+        if (category !== row.category) {
+          this.db.prepare("UPDATE polymarket_analyst_forecasts SET category = ? WHERE id = ?").run(category, row.id);
+        }
+      }
+      this.db.prepare(
+        "INSERT INTO polymarket_analyst_meta (key, value) VALUES ('classifier_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      ).run(ANALYST_CLASSIFIER_VERSION);
     }
   }
 
@@ -527,6 +585,18 @@ class PolymarketAnalystStore {
       "SELECT DISTINCT market_id FROM polymarket_analyst_forecasts WHERE ts >= ?",
     ).all(sinceIso) as Array<{ market_id: string }>;
     return new Set(rows.map((row) => row.market_id));
+  }
+
+  pendingClusterCounts(): Map<string, number> {
+    const rows = this.db.prepare(
+      "SELECT question FROM polymarket_analyst_forecasts WHERE status = 'pending'",
+    ).all() as Array<{ question: string }>;
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const key = analystEventClusterKey(row.question);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
   }
 
   gradeResolution(marketId: string, winningOutcomeIndex: number | null, status: "resolved" | "invalid", resolvedAt: string) {
@@ -747,6 +817,7 @@ async function runCycleLocked(
   const candidates = selectAnalystCandidates([...universe.values()], {
     recentlyForecastedMarketIds: analystStore.recentlyForecastedMarketIds(new Date(nowMs - REFORECAST_COOLDOWN_MS).toISOString()),
     openPositionMarketIds: openMarketIds,
+    pendingClusterCounts: analystStore.pendingClusterCounts(),
     nowMs,
   });
   if (candidates.length === 0) {

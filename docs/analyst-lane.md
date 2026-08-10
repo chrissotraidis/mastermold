@@ -38,10 +38,21 @@ Per cycle (default every 2 hours, `POLYMARKET_ANALYST_CYCLE_HOURS`):
    crypto-direction markets are **heartbeat**; everything else is **news**.
    The 2026-08-09 split exists because the first ~60-forecast sample filled
    with esports coin-flips where the model added noise to a sharp price —
-   fast markets prove calibration *speed*, not *edge*. News markets fill up
-   to 7 slots soonest-ending-first (the gate sample must resolve quickly);
-   heartbeat markets fill the remaining slots soonest-first to keep
-   exercising the pipeline; each side spills into the other's unused slots.
+   fast markets prove calibration *speed*, not *edge*. Classifier **v2**
+   (2026-08-10, `ANALYST_CLASSIFIER_VERSION`) added match-winner ("Will CF
+   América win on 2026-08-09?"), "Spread:", and crypto-threshold question
+   shapes after the wallet audit showed slug-prefix matching missed all
+   non-US soccer; stored rows in both the analyst and wallet stores are
+   reclassified once at boot whenever the version changes. News candidates
+   are also capped at 3 unresolved forecasts per event cluster
+   (`analystEventClusterKey`, which strips dates/numbers) so date-ladder
+   families — eleven "US announces end of Iranian blockade by August N"
+   markets — count as one correlated outcome, not eleven gate samples. News
+   markets fill up to 7 slots soonest-ending-first (the gate sample must
+   resolve quickly); heartbeat markets fill the remaining slots soonest-first
+   to keep exercising the pipeline; each side spills into the other's unused
+   slots. Wallet-lane evidence and the paper follow-arm are documented in
+   `docs/POLYMARKET-WALLET-EVIDENCE.md`.
    The universe is the top-100-by-volume snapshot plus two wider fetches:
    `end_date_max` within 48h (fast movers) and within 14 days (mid-volume
    news markets that never make the top 100).

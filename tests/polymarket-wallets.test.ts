@@ -1,11 +1,18 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  computeWalletEvidence,
   computeWalletExpectancy,
   formatSmartMoneyContext,
   gradeSignalPnl,
   scoreWalletPositions,
   selectNewSignalTrades,
+  walletFollowDecision,
+  walletFollowFeeUsd,
+  walletFollowPnlUsd,
+  walletPriceBand,
+  walletSignalKind,
+  WALLET_FOLLOW_MAX_OPEN,
   WALLET_MIN_SETTLED,
   type DataApiClosedPosition,
   type DataApiTrade,
@@ -222,5 +229,77 @@ describe("formatSmartMoneyContext", () => {
   test("no pending signals means no context line at all", () => {
     expect(formatSmartMoneyContext([signal({ status: "resolved" })])).toBeUndefined();
     expect(formatSmartMoneyContext([])).toBeUndefined();
+  });
+});
+
+describe("walletSignalKind and walletPriceBand", () => {
+  test("match winners and spreads are identified from question shape", () => {
+    expect(walletSignalKind("Will CF América win on 2026-08-09?", "heartbeat")).toBe("match_winner");
+    expect(walletSignalKind("Will CF América win on 2026-08-09?", "news")).toBe("match_winner");
+    expect(walletSignalKind("Spread: IK Sirius (-1.5)", "heartbeat")).toBe("spread");
+    expect(walletSignalKind("Counter-Strike: Liquid vs Metizport", "heartbeat")).toBe("esports_crypto");
+    expect(walletSignalKind("US x Iran Effective Ceasefire by August 14?", "news")).toBe("news");
+  });
+
+  test("bands split at 35, 55, and 75 cents", () => {
+    expect(walletPriceBand(0.2)).toBe("<35c");
+    expect(walletPriceBand(0.45)).toBe("35-55c");
+    expect(walletPriceBand(0.6)).toBe("55-75c");
+    expect(walletPriceBand(0.9)).toBe(">=75c");
+  });
+});
+
+describe("computeWalletEvidence", () => {
+  test("market-level EV weights each market once, defeating DCA clustering", () => {
+    // One bot-wallet accumulates the same winning market three times (+2/$
+    // each) while a different market loses once: signal-level EV is skewed
+    // positive (+1.25), market-level is the honest (2 + -1) / 2 = +0.5.
+    const rows = [
+      signal({ id: "a1", market_id: "m1", question: "Will CF América win on 2026-08-09?", status: "resolved", won: 1, pnl_our_per_dollar: 2, our_ask: 0.4 }),
+      signal({ id: "a2", market_id: "m1", question: "Will CF América win on 2026-08-09?", status: "resolved", won: 1, pnl_our_per_dollar: 2, our_ask: 0.4 }),
+      signal({ id: "a3", market_id: "m1", question: "Will CF América win on 2026-08-09?", status: "resolved", won: 1, pnl_our_per_dollar: 2, our_ask: 0.4 }),
+      signal({ id: "b1", market_id: "m2", question: "Will Rangers FC win on 2026-08-09?", status: "resolved", won: 0, pnl_our_per_dollar: -1, our_ask: 0.5 }),
+    ];
+    const evidence = computeWalletEvidence(rows);
+    const all = evidence.find((cell) => cell.kind === "match_winner" && cell.band === "all");
+    expect(all?.signals).toBe(4);
+    expect(all?.markets).toBe(2);
+    expect(all?.signal_ev_our).toBeCloseTo(1.25, 4);
+    expect(all?.market_ev_our).toBeCloseTo(0.5, 4);
+    const band = evidence.find((cell) => cell.kind === "match_winner" && cell.band === "35-55c");
+    expect(band?.signals).toBe(4);
+  });
+});
+
+describe("wallet follow arm", () => {
+  test("fee model: rate × min(p, 1−p) × shares", () => {
+    // $5 at 45¢ = 11.11 shares; 1000bps × 0.45 × 11.11 ≈ $0.50
+    expect(walletFollowFeeUsd(5, 0.45, 1_000)).toBeCloseTo(0.5, 2);
+    expect(walletFollowFeeUsd(5, 0.45, 0)).toBe(0);
+  });
+
+  test("net P&L subtracts the fee on wins and adds it to losses", () => {
+    const row = { stake_usd: 5, entry_ask: 0.5, fee_usd: 0.5 };
+    expect(walletFollowPnlUsd(row, true)).toBeCloseTo(4.5, 2);
+    expect(walletFollowPnlUsd(row, false)).toBeCloseTo(-5.5, 2);
+  });
+
+  test("decision enforces kind, band, dedupe, and the open cap", () => {
+    const base = {
+      kind: "match_winner" as const,
+      ourAsk: 0.5,
+      openFollowMarketIds: new Set<string>(),
+      marketId: "m1",
+      openCount: 0,
+      enabled: true,
+    };
+    expect(walletFollowDecision(base)).toEqual({ follow: true });
+    expect(walletFollowDecision({ ...base, enabled: false }).follow).toBe(false);
+    expect(walletFollowDecision({ ...base, kind: "news" }).follow).toBe(false);
+    expect(walletFollowDecision({ ...base, ourAsk: 0.2 }).follow).toBe(false);
+    expect(walletFollowDecision({ ...base, ourAsk: 0.8 }).follow).toBe(false);
+    expect(walletFollowDecision({ ...base, ourAsk: null }).follow).toBe(false);
+    expect(walletFollowDecision({ ...base, openFollowMarketIds: new Set(["m1"]) }).follow).toBe(false);
+    expect(walletFollowDecision({ ...base, openCount: WALLET_FOLLOW_MAX_OPEN }).follow).toBe(false);
   });
 });

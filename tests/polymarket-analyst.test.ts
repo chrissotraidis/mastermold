@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  analystEventClusterKey,
   brierScore,
   buildAnalystForecastPrompt,
   classifyAnalystMarket,
@@ -98,6 +99,25 @@ describe("classifyAnalystMarket", () => {
     expect(classifyAnalystMarket("Will Kai and Speed beat the Minecraft challenge by August 17?", "will-kai-and-speed-beat")).toBe("news");
     expect(classifyAnalystMarket("Will the Fed cut rates in September?", "fed-cut-september-2026")).toBe("news");
   });
+
+  test("v2: match winners, spreads, and crypto thresholds are heartbeat even without a league slug", () => {
+    expect(classifyAnalystMarket("Will CF América win on 2026-08-09?", "will-cf-america-win-on-2026-08-09")).toBe("heartbeat");
+    expect(classifyAnalystMarket("Will Djurgardens IF win on 2026-08-10?", "swe-djur-xyz-2026-08-10-djur")).toBe("heartbeat");
+    expect(classifyAnalystMarket("Spread: IK Sirius (-1.5)", "swe-sir-bro-2026-08-10-spread")).toBe("heartbeat");
+    expect(classifyAnalystMarket("Will Bitcoin reach $66,000 August 3-9?", "will-bitcoin-reach-66000-august-3-9")).toBe("heartbeat");
+    expect(classifyAnalystMarket("Will Russia target Kyiv by August 14, 2026?", "will-russia-target-kyiv")).toBe("news");
+  });
+});
+
+describe("analystEventClusterKey", () => {
+  test("collapses date-ladder variants of one event", () => {
+    const a = analystEventClusterKey("US announces end of Iranian blockade by August 12, 2026?");
+    const b = analystEventClusterKey("US announces end of Iranian blockade by August 15, 2026?");
+    const c = analystEventClusterKey("US announces end of Iranian blockade by August 9?");
+    expect(a).toBe(b);
+    expect(b).toBe(c);
+    expect(analystEventClusterKey("Will Russia target Kyiv by August 14, 2026?")).not.toBe(a);
+  });
 });
 
 describe("computeAnalystEdgeBuckets", () => {
@@ -119,6 +139,8 @@ describe("computeAnalystEdgeBuckets", () => {
     ]);
   });
 });
+
+const WORDS = ["alpha", "bravo", "cielo", "delta", "echo", "forte", "golf", "hotel", "india", "julia", "kilo", "lima"];
 
 describe("selectAnalystCandidates", () => {
   test("filters horizon, liquidity, extremes, repeats, and open positions", () => {
@@ -156,11 +178,33 @@ describe("selectAnalystCandidates", () => {
     expect(picked.map((m) => m.id)).toEqual(["thin-news"]);
   });
 
+  test("caps correlated news clusters at three across pending and batch", () => {
+    const now = Date.now();
+    const days = (n: number) => new Date(now + n * 24 * 60 * 60 * 1_000).toISOString();
+    const ladder = Array.from({ length: 5 }, (_, index) =>
+      market({
+        id: `iran-${index + 1}`,
+        question: `US announces end of Iranian blockade by August ${10 + index}, 2026?`,
+        end_date: days(1 + index),
+      }));
+    const other = market({ id: "kyiv", question: "Will Russia target Kyiv by August 14, 2026?", end_date: days(3) });
+    const pending = new Map([[analystEventClusterKey(ladder[0].question), 2]]);
+    const picked = selectAnalystCandidates([...ladder, other], {
+      recentlyForecastedMarketIds: new Set(),
+      openPositionMarketIds: new Set(),
+      pendingClusterCounts: pending,
+      nowMs: now,
+    });
+    // Two pending + one fresh hits the cap of three; the other four ladder
+    // variants are excluded while the unrelated market still qualifies.
+    expect(picked.map((m) => m.id)).toEqual(["iran-1", "kyiv"]);
+  });
+
   test("caps the batch at ten, news soonest-first", () => {
     const now = Date.now();
     const days = (n: number) => new Date(now + n * 24 * 60 * 60 * 1_000).toISOString();
     const markets = Array.from({ length: 12 }, (_, index) =>
-      market({ id: String(index + 1), end_date: days(13 - index) }));
+      market({ id: String(index + 1), question: `Will the ${WORDS[index]} accord be signed?`, end_date: days(13 - index) }));
     const picked = selectAnalystCandidates(markets, {
       recentlyForecastedMarketIds: new Set(),
       openPositionMarketIds: new Set(),
@@ -174,7 +218,7 @@ describe("selectAnalystCandidates", () => {
     const now = Date.now();
     const hours = (n: number) => new Date(now + n * 60 * 60 * 1_000).toISOString();
     const news = Array.from({ length: 9 }, (_, index) =>
-      market({ id: `news-${index + 1}`, end_date: hours(24 + index * 12) }));
+      market({ id: `news-${index + 1}`, question: `Will the ${WORDS[index]} accord be signed?`, end_date: hours(24 + index * 12) }));
     const heartbeat = Array.from({ length: 4 }, (_, index) =>
       market({
         id: `hb-${index + 1}`,
@@ -198,7 +242,7 @@ describe("selectAnalystCandidates", () => {
     const now = Date.now();
     const days = (n: number) => new Date(now + n * 24 * 60 * 60 * 1_000).toISOString();
     const news = Array.from({ length: 9 }, (_, index) =>
-      market({ id: `news-${index + 1}`, end_date: days(1 + index) }));
+      market({ id: `news-${index + 1}`, question: `Will the ${WORDS[index]} accord be signed?`, end_date: days(1 + index) }));
     const picked = selectAnalystCandidates(news, {
       recentlyForecastedMarketIds: new Set(),
       openPositionMarketIds: new Set(),

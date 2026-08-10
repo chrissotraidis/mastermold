@@ -362,7 +362,7 @@ export class WeatherResearchStore {
       market_relative: computeWeatherMarketRelative(this.evaluationCases("any")),
       detail: gatePassed
         ? "Chronological scores are available, but no execution authority is granted. Promotion still requires stability and dependency audits."
-        : `Insufficient evidence: ${cases.length}/${MIN_INDEPENDENT_OUTCOMES} aligned forecasts with exact outcomes; the smallest station/kind cell has ${smallestCell}/${MIN_CELL_OUTCOMES}.`,
+        : `Insufficient evidence: ${cases.length}/${MIN_INDEPENDENT_OUTCOMES} aligned forecasts with exact outcomes; the smallest station/kind cell has ${smallestCell}/${MIN_CELL_OUTCOMES}.${counts.complete_forecast_runs === 0 && counts.forecast_runs > 0 ? " NOTE: every captured run is partial-provenance (Open-Meteo publishes no issuance id), so this strict gate cannot fill from the current provider — market_relative below is the operative evidence view." : ""}`,
       warnings: [
         "Current Open-Meteo ensemble responses do not identify a stable issuance time, so captures without that provenance are retained but excluded from calibration.",
         "market_relative stats include partial-provenance runs and use mid prices without fees or depth; they measure the model against the market, not absolute calibration, and grant no authority.",

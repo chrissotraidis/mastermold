@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 
 import { notifyOperator } from "../autopilot/notify";
 import type { SqliteDatabase } from "../autopilot/sqlite";
-import { classifyAnalystMarket, type AnalystCategory } from "./analyst";
+import { ANALYST_CLASSIFIER_VERSION, classifyAnalystMarket, type AnalystCategory } from "./analyst";
 import { fetchPolymarketResolutions } from "./markets";
 import { fetchPolymarketOrderBooks, summarizePolymarketBook } from "./orderbook";
 import { openPolymarketSqlite } from "./sqlite";
@@ -39,6 +39,17 @@ export const WALLET_STAKE_BAND_USD: readonly [number, number] = [2, 5_000];
 /** Shadow signals ignore trades below this size — sub-$20 flow is noise. */
 export const WALLET_SIGNAL_MIN_USD = 20;
 
+/* Paper follow-arm policy (POLYMARKET_WALLET_FOLLOW=1). Derived from the
+ * 2026-08-10 resolved-signal audit: the only robustly positive cell was
+ * match-winner markets entered between 35¢ and 75¢ (+$1.10/$ at 35-55¢,
+ * +$0.30/$ at 55-75¢ over 35 distinct markets); longshots (<35¢) and heavy
+ * favorites (>=75¢) were both negative. That derivation is IN-SAMPLE — this
+ * arm exists to test it forward on money-shaped paper P&L, fees modeled. */
+export const WALLET_FOLLOW_STAKE_USD = 5;
+export const WALLET_FOLLOW_MAX_OPEN = 10;
+export const WALLET_FOLLOW_BAND: readonly [number, number] = [0.35, 0.75];
+export const WALLET_FOLLOW_KINDS: readonly WalletSignalKind[] = ["match_winner"];
+
 const DEFAULT_CYCLE_MINUTES = 30;
 const DISCOVERY_EVERY_MS = 6 * 60 * 60 * 1_000;
 const RESCORE_EVERY_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -51,6 +62,38 @@ const USER_AGENT = "MasterMold/0.1 (local Polymarket wallet research)";
 
 export function polymarketWalletsEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.POLYMARKET_WALLETS === "1";
+}
+
+export function polymarketWalletFollowEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.POLYMARKET_WALLET_FOLLOW === "1";
+}
+
+/* ------------------------------------------------------------------ */
+/* Signal kinds and price bands — the evidence taxonomy.               */
+/* ------------------------------------------------------------------ */
+
+/** Finer-grained than AnalystCategory because the 2026-08-10 audit showed the
+ * followed wallets' edge concentrated in exactly one segment (soccer/team
+ * match-winner markets) that the binary news/heartbeat split had been hiding
+ * inside "news". Derived from the question text, so it is stable across
+ * classifier versions and needs no schema change. */
+export type WalletSignalKind = "match_winner" | "spread" | "esports_crypto" | "news";
+
+const MATCH_WINNER_QUESTION = /^will .{1,60} (win|draw|advance) on \d{4}-\d{2}-\d{2}\?/i;
+
+export function walletSignalKind(question: string, category: AnalystCategory): WalletSignalKind {
+  if (MATCH_WINNER_QUESTION.test(question)) return "match_winner";
+  if (/^spread: /i.test(question)) return "spread";
+  return category === "heartbeat" ? "esports_crypto" : "news";
+}
+
+export type WalletPriceBand = "<35c" | "35-55c" | "55-75c" | ">=75c";
+
+export function walletPriceBand(price: number): WalletPriceBand {
+  if (price < 0.35) return "<35c";
+  if (price < 0.55) return "35-55c";
+  if (price < 0.75) return "55-75c";
+  return ">=75c";
 }
 
 /* ------------------------------------------------------------------ */
@@ -141,6 +184,55 @@ export type WalletExpectancy = {
   avg_lag_seconds: number | null;
 };
 
+/** Signal-level averages overstate independence: one wallet-bot accumulating
+ * a soccer position in $45 clips for 14 hours produced 20 "signals" that were
+ * a single decision (observed live: CF América, 2026-08-09). The market-level
+ * view collapses each market to one observation first; treat it as the honest
+ * headline and the signal-level number as execution detail. */
+export type WalletEvidenceCell = {
+  kind: WalletSignalKind;
+  band: WalletPriceBand | "all";
+  signals: number;
+  markets: number;
+  wins: number;
+  signal_ev_our: number | null;
+  market_ev_our: number | null;
+};
+
+export type WalletFollowRow = {
+  id: string;
+  opened_at: string;
+  signal_id: string;
+  wallet: string;
+  market_id: string;
+  condition_id: string;
+  question: string;
+  slug: string;
+  kind: WalletSignalKind;
+  outcome_index: number;
+  outcome: string;
+  entry_ask: number;
+  stake_usd: number;
+  taker_fee_bps: number;
+  status: "pending" | "resolved" | "invalid";
+  winning_outcome_index: number | null;
+  resolved_at: string | null;
+  won: 0 | 1 | null;
+  fee_usd: number;
+  pnl_usd: number | null;
+};
+
+export type WalletFollowSummary = {
+  enabled: boolean;
+  open_n: number;
+  resolved_n: number;
+  wins: number;
+  staked_usd: number;
+  realized_pnl_usd: number;
+  fee_usd: number;
+  policy: string;
+};
+
 export type WalletIntelligenceReport = {
   enabled: boolean;
   followed_count: number;
@@ -150,6 +242,8 @@ export type WalletIntelligenceReport = {
   pending_signal_count: number;
   expectancy: WalletExpectancy;
   news_expectancy: WalletExpectancy;
+  evidence: WalletEvidenceCell[];
+  follow: WalletFollowSummary;
   followed: Array<Pick<WalletRow, "address" | "settled_n" | "volume_usd" | "pnl_usd" | "return_per_dollar" | "early_return" | "late_return" | "median_stake_usd" | "news_share" | "last_scored_at">>;
   recent_signals: WalletSignalRow[];
   last_cycle_at: string | null;
@@ -272,6 +366,87 @@ export function computeWalletExpectancy(rows: WalletSignalRow[]): WalletExpectan
   };
 }
 
+/** Kind × band evidence matrix over resolved signals, with per-kind "all"
+ * rollups. market_ev_our weights each distinct market once (see
+ * WalletEvidenceCell on why signal-level averages lie). */
+export function computeWalletEvidence(rows: WalletSignalRow[]): WalletEvidenceCell[] {
+  const resolved = rows.filter((row) => row.status === "resolved" && row.won !== null);
+  type Acc = { signals: number; wins: number; evSum: number; evN: number; markets: Map<string, { sum: number; n: number }> };
+  const cells = new Map<string, Acc>();
+  const add = (key: string, row: WalletSignalRow) => {
+    const cell = cells.get(key) ?? { signals: 0, wins: 0, evSum: 0, evN: 0, markets: new Map() };
+    cell.signals += 1;
+    if (row.won === 1) cell.wins += 1;
+    if (row.pnl_our_per_dollar !== null) {
+      cell.evSum += row.pnl_our_per_dollar;
+      cell.evN += 1;
+      const market = cell.markets.get(row.market_id) ?? { sum: 0, n: 0 };
+      market.sum += row.pnl_our_per_dollar;
+      market.n += 1;
+      cell.markets.set(row.market_id, market);
+    }
+    cells.set(key, cell);
+  };
+  for (const row of resolved) {
+    const kind = walletSignalKind(row.question, row.category);
+    const price = row.our_ask ?? row.their_price;
+    add(`${kind}|all`, row);
+    add(`${kind}|${walletPriceBand(price)}`, row);
+  }
+  const out: WalletEvidenceCell[] = [];
+  for (const [key, cell] of cells) {
+    const [kind, band] = key.split("|") as [WalletSignalKind, WalletPriceBand | "all"];
+    const marketMeans = [...cell.markets.values()].map((market) => market.sum / market.n);
+    out.push({
+      kind,
+      band,
+      signals: cell.signals,
+      markets: cell.markets.size,
+      wins: cell.wins,
+      signal_ev_our: cell.evN > 0 ? round4(cell.evSum / cell.evN) : null,
+      market_ev_our: marketMeans.length > 0 ? round4(marketMeans.reduce((sum, value) => sum + value, 0) / marketMeans.length) : null,
+    });
+  }
+  const kindOrder: WalletSignalKind[] = ["match_winner", "news", "esports_crypto", "spread"];
+  const bandOrder = ["all", "<35c", "35-55c", "55-75c", ">=75c"];
+  return out.sort((a, b) => kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) || bandOrder.indexOf(a.band) - bandOrder.indexOf(b.band));
+}
+
+/** Modeled taker fee for a paper follow, charged at entry win or lose —
+ * Polymarket's documented CLOB formula: rate × min(p, 1−p) × shares. The bps
+ * is stored on the row so P&L can be recomputed if the fee model is wrong. */
+export function walletFollowFeeUsd(stakeUsd: number, ask: number, takerFeeBps: number): number {
+  if (ask <= 0 || ask >= 1) return 0;
+  const shares = stakeUsd / ask;
+  return round2((takerFeeBps / 10_000) * Math.min(ask, 1 - ask) * shares);
+}
+
+/** Net paper P&L for a resolved follow: win pays shares×(1−ask) − fee, a
+ * loss costs the stake plus the fee already paid. */
+export function walletFollowPnlUsd(row: Pick<WalletFollowRow, "stake_usd" | "entry_ask" | "fee_usd">, won: boolean): number {
+  const gross = won ? (row.stake_usd / row.entry_ask) * (1 - row.entry_ask) : -row.stake_usd;
+  return round2(gross - row.fee_usd);
+}
+
+export function walletFollowDecision(input: {
+  kind: WalletSignalKind;
+  ourAsk: number | null;
+  openFollowMarketIds: Set<string>;
+  marketId: string;
+  openCount: number;
+  enabled: boolean;
+}): { follow: true } | { follow: false; reason: string } {
+  if (!input.enabled) return { follow: false, reason: "disabled" };
+  if (!WALLET_FOLLOW_KINDS.includes(input.kind)) return { follow: false, reason: `kind ${input.kind} outside policy` };
+  if (input.ourAsk === null) return { follow: false, reason: "no executable ask at detection" };
+  if (input.ourAsk < WALLET_FOLLOW_BAND[0] || input.ourAsk > WALLET_FOLLOW_BAND[1]) {
+    return { follow: false, reason: `ask ${input.ourAsk} outside ${WALLET_FOLLOW_BAND[0]}-${WALLET_FOLLOW_BAND[1]} band` };
+  }
+  if (input.openFollowMarketIds.has(input.marketId)) return { follow: false, reason: "already following this market" };
+  if (input.openCount >= WALLET_FOLLOW_MAX_OPEN) return { follow: false, reason: `open-follow cap ${WALLET_FOLLOW_MAX_OPEN} reached` };
+  return { follow: true };
+}
+
 /** Evidence line for the analyst prompt. Aggregated, attributed to the
  * selection method rather than addresses, and phrased as evidence — the
  * analyst's system prompt governs how much weight it gets. */
@@ -356,6 +531,7 @@ type GammaMarketLite = {
   closed: boolean;
   outcomes: string[];
   token_ids: string[];
+  taker_fee_bps: number;
 };
 
 /** Signals arrive keyed by conditionId; grading and fusion need the Gamma
@@ -382,6 +558,7 @@ async function fetchGammaByConditionIds(conditionIds: string[]): Promise<Map<str
       closed: raw.closed === true,
       outcomes: parseJsonStringArray(raw.outcomes),
       token_ids: parseJsonStringArray(raw.clobTokenIds),
+      taker_fee_bps: typeof raw.takerBaseFee === "number" && Number.isFinite(raw.takerBaseFee) ? raw.takerBaseFee : 0,
     });
   }
   return out;
@@ -456,7 +633,46 @@ class PolymarketWalletStore {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS polymarket_wallet_follows (
+        id TEXT PRIMARY KEY,
+        opened_at TEXT NOT NULL,
+        signal_id TEXT NOT NULL,
+        wallet TEXT NOT NULL,
+        market_id TEXT NOT NULL,
+        condition_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        slug TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        outcome_index INTEGER NOT NULL,
+        outcome TEXT NOT NULL,
+        entry_ask REAL NOT NULL,
+        stake_usd REAL NOT NULL,
+        taker_fee_bps INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        winning_outcome_index INTEGER,
+        resolved_at TEXT,
+        won INTEGER,
+        fee_usd REAL NOT NULL,
+        pnl_usd REAL
+      );
+      CREATE INDEX IF NOT EXISTS idx_polymarket_wallet_follows_status
+        ON polymarket_wallet_follows(status, opened_at DESC);
     `);
+    // Reclassify stored signals whenever the shared classifier changes, so
+    // category-scoped stats (news_expectancy, discovery, fusion) reflect one
+    // taxonomy. kind/band evidence derives from question text at read time
+    // and needs no migration.
+    if (this.meta("classifier_version") !== ANALYST_CLASSIFIER_VERSION) {
+      const rows = this.db.prepare("SELECT id, question, slug, category FROM polymarket_wallet_signals")
+        .all() as Array<{ id: string; question: string; slug: string; category: string }>;
+      for (const row of rows) {
+        const category = classifyAnalystMarket(row.question, row.slug);
+        if (category !== row.category) {
+          this.db.prepare("UPDATE polymarket_wallet_signals SET category = ? WHERE id = ?").run(category, row.id);
+        }
+      }
+      this.setMeta("classifier_version", ANALYST_CLASSIFIER_VERSION);
+    }
   }
 
   meta(key: string): string | null {
@@ -563,6 +779,67 @@ class PolymarketWalletStore {
     ).get() as { total: number; pending: number | null };
     return { total: row.total, pending: row.pending ?? 0 };
   }
+
+  insertFollow(row: WalletFollowRow) {
+    this.db.prepare(`
+      INSERT INTO polymarket_wallet_follows (
+        id, opened_at, signal_id, wallet, market_id, condition_id, question, slug, kind,
+        outcome_index, outcome, entry_ask, stake_usd, taker_fee_bps, status,
+        winning_outcome_index, resolved_at, won, fee_usd, pnl_usd
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      row.id, row.opened_at, row.signal_id, row.wallet, row.market_id, row.condition_id, row.question,
+      row.slug, row.kind, row.outcome_index, row.outcome, row.entry_ask, row.stake_usd, row.taker_fee_bps,
+      row.status, row.winning_outcome_index, row.resolved_at, row.won, row.fee_usd, row.pnl_usd,
+    );
+  }
+
+  openFollows(): WalletFollowRow[] {
+    return this.db.prepare("SELECT * FROM polymarket_wallet_follows WHERE status = 'pending' ORDER BY opened_at ASC").all() as WalletFollowRow[];
+  }
+
+  gradeFollowResolution(marketId: string, winningOutcomeIndex: number | null, status: "resolved" | "invalid", resolvedAt: string): number {
+    const rows = this.db.prepare(
+      "SELECT * FROM polymarket_wallet_follows WHERE market_id = ? AND status = 'pending'",
+    ).all(marketId) as WalletFollowRow[];
+    for (const row of rows) {
+      if (status === "resolved" && winningOutcomeIndex !== null) {
+        const won = row.outcome_index === winningOutcomeIndex;
+        this.db.prepare(
+          "UPDATE polymarket_wallet_follows SET status = 'resolved', winning_outcome_index = ?, resolved_at = ?, won = ?, pnl_usd = ? WHERE id = ?",
+        ).run(winningOutcomeIndex, resolvedAt, won ? 1 : 0, walletFollowPnlUsd(row, won), row.id);
+      } else {
+        // An invalid market returns the stake; only the modeled fee is lost.
+        this.db.prepare(
+          "UPDATE polymarket_wallet_follows SET status = 'invalid', resolved_at = ?, pnl_usd = ? WHERE id = ?",
+        ).run(resolvedAt, -row.fee_usd, row.id);
+      }
+    }
+    return rows.length;
+  }
+
+  followSummary(enabled: boolean): WalletFollowSummary {
+    const row = this.db.prepare(`
+      SELECT
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS open_n,
+        SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved_n,
+        SUM(CASE WHEN status = 'resolved' AND won = 1 THEN 1 ELSE 0 END) AS wins,
+        COALESCE(SUM(stake_usd), 0) AS staked_usd,
+        COALESCE(SUM(CASE WHEN status != 'pending' THEN pnl_usd END), 0) AS realized_pnl_usd,
+        COALESCE(SUM(fee_usd), 0) AS fee_usd
+      FROM polymarket_wallet_follows
+    `).get() as { open_n: number | null; resolved_n: number | null; wins: number | null; staked_usd: number; realized_pnl_usd: number; fee_usd: number };
+    return {
+      enabled,
+      open_n: row.open_n ?? 0,
+      resolved_n: row.resolved_n ?? 0,
+      wins: row.wins ?? 0,
+      staked_usd: round2(row.staked_usd),
+      realized_pnl_usd: round2(row.realized_pnl_usd),
+      fee_usd: round2(row.fee_usd),
+      policy: `Paper-follows ${WALLET_FOLLOW_KINDS.join("/")} signals at our detected ask within ${WALLET_FOLLOW_BAND[0]}-${WALLET_FOLLOW_BAND[1]}, $${WALLET_FOLLOW_STAKE_USD} stake, max ${WALLET_FOLLOW_MAX_OPEN} open, one per market, taker fees modeled at entry. Band derived in-sample 2026-08-10; forward results are the out-of-sample test.`,
+    };
+  }
 }
 
 let singleton: PolymarketWalletStore | null = null;
@@ -634,14 +911,17 @@ async function runWalletCycleLocked(trigger: "scheduled" | "manual"): Promise<{ 
     return { action: "idle", detail: "Wallet cycle is not due yet." };
   }
 
-  // 1) Grade pending shadow signals against resolutions — the out-of-sample
-  // verdict data this lane exists to produce.
+  // 1) Grade pending shadow signals (and any paper follows riding them)
+  // against resolutions — the out-of-sample verdict data this lane exists to
+  // produce.
   let graded = 0;
-  const pendingIds = store.pendingSignalMarketIds();
+  let followsSettled = 0;
+  const pendingIds = [...new Set([...store.pendingSignalMarketIds(), ...store.openFollows().map((follow) => follow.market_id)])];
   if (pendingIds.length > 0) {
     try {
       for (const resolution of await fetchPolymarketResolutions(pendingIds)) {
         graded += store.gradeResolution(resolution.market_id, resolution.winning_outcome_index, resolution.status, resolution.closed_at ?? nowIso);
+        followsSettled += store.gradeFollowResolution(resolution.market_id, resolution.winning_outcome_index, resolution.status, resolution.closed_at ?? nowIso);
       }
     } catch {
       // Grading retries next cycle.
@@ -680,7 +960,7 @@ async function runWalletCycleLocked(trigger: "scheduled" | "manual"): Promise<{ 
   store.setMeta("last_cycle_at", nowIso);
   return {
     action: "refreshed",
-    detail: `Graded ${graded} signal resolution${graded === 1 ? "" : "s"}, captured ${newSignals} new signal${newSignals === 1 ? "" : "s"}, followed ${discovered} new wallet${discovered === 1 ? "" : "s"}, dropped ${dropped}.`,
+    detail: `Graded ${graded} signal resolution${graded === 1 ? "" : "s"} (${followsSettled} paper follow${followsSettled === 1 ? "" : "s"} settled), captured ${newSignals} new signal${newSignals === 1 ? "" : "s"}, followed ${discovered} new wallet${discovered === 1 ? "" : "s"}, dropped ${dropped}.`,
   };
 }
 
@@ -714,8 +994,9 @@ async function captureWalletSignals(store: ReturnType<typeof polymarketWalletSto
 
     const category = classifyAnalystMarket(market.question || trade.title, market.slug || trade.slug);
     const usd = round2(trade.size * trade.price);
+    const signalId = randomUUID();
     store.insertSignal({
-      id: randomUUID(),
+      id: signalId,
       detected_at: new Date(nowMs).toISOString(),
       trade_ts: trade.timestamp,
       wallet: wallet.address,
@@ -744,6 +1025,49 @@ async function captureWalletSignals(store: ReturnType<typeof polymarketWalletSto
         `Smart-money signal: ${shortAddress(wallet.address)} bought ${market.outcomes[outcomeIndex]} $${usd.toFixed(0)} at ${(trade.price * 100).toFixed(0)}¢ · ${truncate(market.question, 80)}`,
       );
     }
+
+    // Paper follow-arm: stake $5 at OUR detected ask when the signal falls in
+    // the audited positive cell. Fees are modeled at entry so the realized
+    // P&L stream stays money-shaped.
+    const kind = walletSignalKind(market.question || trade.title, category);
+    const openFollows = store.openFollows();
+    const decision = walletFollowDecision({
+      kind,
+      ourAsk,
+      openFollowMarketIds: new Set(openFollows.map((follow) => follow.market_id)),
+      marketId: market.id,
+      openCount: openFollows.length,
+      enabled: polymarketWalletFollowEnabled(),
+    });
+    if (decision.follow && ourAsk !== null) {
+      const fee = walletFollowFeeUsd(WALLET_FOLLOW_STAKE_USD, ourAsk, market.taker_fee_bps);
+      store.insertFollow({
+        id: randomUUID(),
+        opened_at: new Date(nowMs).toISOString(),
+        signal_id: signalId,
+        wallet: wallet.address,
+        market_id: market.id,
+        condition_id: trade.conditionId,
+        question: market.question || trade.title,
+        slug: market.slug || trade.slug,
+        kind,
+        outcome_index: outcomeIndex,
+        outcome: market.outcomes[outcomeIndex] ?? trade.outcome,
+        entry_ask: ourAsk,
+        stake_usd: WALLET_FOLLOW_STAKE_USD,
+        taker_fee_bps: market.taker_fee_bps,
+        status: "pending",
+        winning_outcome_index: null,
+        resolved_at: null,
+        won: null,
+        fee_usd: fee,
+        pnl_usd: null,
+      });
+      notifyOperator(
+        "entry",
+        `Wallet follow (paper): ${market.outcomes[outcomeIndex]} $${WALLET_FOLLOW_STAKE_USD} at ${(ourAsk * 100).toFixed(0)}¢ behind ${shortAddress(wallet.address)} · ${truncate(market.question, 80)}`,
+      );
+    }
   }
   store.setCheckpoint(wallet.address, maxTs);
   return inserted;
@@ -754,15 +1078,20 @@ async function discoverWallets(store: ReturnType<typeof polymarketWalletStore>, 
   if (followedCount >= POLYMARKET_WALLETS_MAX_FOLLOWED || budget.remaining <= 0) return 0;
 
   const trades = await fetchRecentTakerTrades();
-  // Candidate flow: meaningful-size buys in news-classified markets — the
-  // segment where informed positioning is even possible.
+  // Candidate flow: meaningful-size buys in news or match-winner markets.
+  // News is where informed positioning was assumed to live; match-winner is
+  // where the 2026-08-10 audit actually FOUND it (+$0.24/$ market-level on 46
+  // markets) — the v2 classifier moved those to heartbeat, so discovery
+  // filters by kind, not category, to keep sampling that flow.
   const candidates: string[] = [];
   const seen = new Set<string>();
   for (const trade of trades) {
     if (trade.side !== "BUY") continue;
     const usd = trade.size * trade.price;
     if (usd < WALLET_SIGNAL_MIN_USD || usd > WALLET_STAKE_BAND_USD[1]) continue;
-    if (classifyAnalystMarket(trade.title, trade.slug) !== "news") continue;
+    const category = classifyAnalystMarket(trade.title, trade.slug);
+    const kind = walletSignalKind(trade.title, category);
+    if (kind !== "news" && kind !== "match_winner") continue;
     if (seen.has(trade.proxyWallet) || store.wallet(trade.proxyWallet)) continue;
     seen.add(trade.proxyWallet);
     candidates.push(trade.proxyWallet);
@@ -855,6 +1184,8 @@ export function safePolymarketWalletReport(): WalletIntelligenceReport {
     pending_signal_count: 0,
     expectancy: { resolved_n: 0, wins: 0, avg_pnl_our_per_dollar: null, avg_pnl_their_per_dollar: null, avg_lag_seconds: null },
     news_expectancy: { resolved_n: 0, wins: 0, avg_pnl_our_per_dollar: null, avg_pnl_their_per_dollar: null, avg_lag_seconds: null },
+    evidence: [],
+    follow: { enabled: polymarketWalletFollowEnabled(), open_n: 0, resolved_n: 0, wins: 0, staked_usd: 0, realized_pnl_usd: 0, fee_usd: 0, policy: "" },
     followed: [],
     recent_signals: [],
     last_cycle_at: null,
@@ -876,6 +1207,8 @@ export function safePolymarketWalletReport(): WalletIntelligenceReport {
       pending_signal_count: counts.pending,
       expectancy: computeWalletExpectancy(signals),
       news_expectancy: computeWalletExpectancy(signals.filter((signal) => signal.category === "news")),
+      evidence: computeWalletEvidence(store.signals(2_000)),
+      follow: store.followSummary(polymarketWalletFollowEnabled()),
       followed: wallets
         .filter((wallet) => wallet.status === "followed")
         .map((wallet) => ({
