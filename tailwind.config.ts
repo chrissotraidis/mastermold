@@ -54,29 +54,36 @@ const config: Config = {
         // --- Sentinel direct tokens (Industrial Glassmorphism) ---
         // Palette 2026-07-05: classic Sentinel identity — deep magenta/crimson
         // helmet primary, gold crest accents, silver-gray neutrals over the void.
-        void: "#0f090b",
+        void: "#09060a",
         surface: {
-          DEFAULT: "#211318",
-          dim: "#1f1116",
-          lowest: "#1c0e13",
-          low: "#2a1c21",
-          container: "#2e2025",
-          high: "#382b30",
-          highest: "#44363b",
+          DEFAULT: "#181016",
+          dim: "#130c11",
+          lowest: "#0f0a0e",
+          low: "#1d1319",
+          container: "#23171e",
+          high: "#2e2029",
+          highest: "#3b2a34",
         },
-        panel: "#1f1116",
-        "on-surface": "#f5e5eb",
-        "on-surface-variant": "#d2c9cc",
+        panel: "#140d12",
+        "on-surface": "#f8edf2",
+        "on-surface-variant": "#cdbdc6",
         outline: {
-          DEFAULT: "#9c9296",
-          variant: "#50484b",
+          DEFAULT: "#978591",
+          variant: "#43333d",
         },
         // Legacy token name kept so hundreds of `*-violet` classes keep working;
-        // the VALUES are now the Sentinel helmet magenta family.
+        // the VALUES are the Master Mold magenta family (2026-09 overhaul).
         violet: {
-          DEFAULT: "#f5adc8",
-          dim: "#d65c87",
-          deep: "#8e2e52",
+          DEFAULT: "#f2559f",
+          soft: "#ff9cc9",
+          dim: "#c62f7a",
+          deep: "#6f1743",
+        },
+        magenta: {
+          DEFAULT: "#f2559f",
+          soft: "#ff9cc9",
+          dim: "#c62f7a",
+          deep: "#6f1743",
         },
         tertiary: {
           DEFAULT: "#e4cb8b", // gold crest highlight
@@ -104,6 +111,31 @@ const config: Config = {
         body: ["var(--font-body)", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+      },
+      boxShadow: {
+        panel: "inset 0 1px 0 hsl(330 80% 85% / 0.05), 0 18px 40px -24px rgb(0 0 0 / 0.75)",
+        glow: "0 0 0 1px hsl(330 86% 64% / 0.35), 0 10px 30px -10px hsl(330 86% 55% / 0.45)",
+      },
+      keyframes: {
+        "mm-enter": {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "mm-sheet-in": {
+          from: { transform: "translateX(100%)" },
+          to: { transform: "translateX(0)" },
+        },
+        "mm-sheet-up": {
+          from: { transform: "translateY(100%)" },
+          to: { transform: "translateY(0)" },
+        },
+        "mm-fade": { from: { opacity: "0" }, to: { opacity: "1" } },
+      },
+      animation: {
+        "mm-enter": "mm-enter 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "mm-sheet-in": "mm-sheet-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "mm-sheet-up": "mm-sheet-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "mm-fade": "mm-fade 180ms ease-out both",
       },
       letterSpacing: {
         // Design pass: near-normal tracking so uppercase labels read as quiet

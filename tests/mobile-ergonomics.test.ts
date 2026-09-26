@@ -383,8 +383,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(appShell).toContain("fixed top-0 left-0 z-50 flex h-14 w-full");
     expect(appShell).toContain("flex min-h-11 shrink-0 items-center whitespace-nowrap");
     expect(appShell).not.toContain("hidden min-h-11 items-center whitespace-nowrap font-display text-base font-bold tracking-tight text-violet md:flex");
-    expect(appShell).toContain("hidden h-full w-14 flex-col");
-    expect(appShell).toContain("pt-20 md:pl-16");
+    expect(appShell).toContain("hidden h-full w-16 flex-col");
+    expect(appShell).toContain("pt-20 md:pl-24");
     expect(source("components/reviewer-evidence-panel.tsx")).toContain('"Today and activity"');
     expect(chatPage).not.toMatch(/your alerts, holdings, and record/i);
   });

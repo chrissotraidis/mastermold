@@ -58,7 +58,7 @@ describe("Master Mold responsiveness contracts", () => {
     expect(appShell).toContain("openMasterMoldChat(undefined, pageContext)");
     expect(appShell).toContain("md:hidden");
     expect(appShell).toContain("fixed top-0 left-0 z-50 flex h-14 w-full");
-    expect(appShell).toContain("hidden h-full w-14 flex-col");
+    expect(appShell).toContain("hidden h-full w-16 flex-col");
     // Redesign: Master Mold persists via the floating launcher only — Today has
     // no embedded chat block, just the legacy anchor for old #today-chat links.
     expect(source("app/page.tsx")).toContain('id="today-chat"');
@@ -317,10 +317,10 @@ describe("Master Mold responsiveness contracts", () => {
     expect(appShell).toContain("Keep asking from any Master Mold command box.");
     expect(appShell).not.toContain("You can keep asking from the chat button.");
     expect(appShell).toContain('data-testid="topbar-command-status"');
-    expect(appShell).toContain("flex min-h-10 items-center gap-2 rounded-md border border-violet/25");
+    expect(appShell).toContain("flex min-h-10 items-center gap-2 rounded-full border border-outline-variant/70");
     expect(appShell).toContain("min-h-9 w-52 bg-transparent text-sm font-medium");
     expect(appShell).toContain("xl:w-64");
-    expect(appShell).toContain("flex size-9 shrink-0 items-center justify-center rounded-md bg-violet");
+    expect(appShell).toContain("flex size-8 shrink-0 items-center justify-center rounded-full bg-violet");
     expect(appShell).toContain("w-[22rem]");
     expect(appShell).toContain("const locationKey = `${pathname}?${searchParams.toString()}`;");
     expect(appShell).toContain("useEffect(() => setCommandStatus(undefined), [locationKey]);");
