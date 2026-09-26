@@ -89,8 +89,9 @@ export function WelcomeFlow() {
       <div className="mx-auto grid min-h-screen w-full max-w-5xl gap-4 px-5 pb-10 pt-6 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,0.78fr)_minmax(26rem,1fr)] lg:items-center lg:gap-8">
         <div className="space-y-4">
           <header className="flex flex-col items-center text-center lg:items-start lg:text-left">
-            <div className="relative mb-2 size-16 sm:mb-3 sm:size-24">
-              <SentinelFace state="idle" />
+            <div className="relative mb-2 size-32 sm:mb-3 sm:size-44">
+              <span aria-hidden="true" className="absolute inset-[14%] rounded-full bg-violet/25 blur-3xl" />
+              <SentinelFace state="idle" detail="hero" />
             </div>
             <p className="font-mono text-[11px] uppercase tracking-telemetry text-violet">
               Local financial cockpit

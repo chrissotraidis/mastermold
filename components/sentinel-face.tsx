@@ -81,9 +81,12 @@ export function SentinelFace({
   className,
   speaking = false,
   hovered = false,
+  detail = "avatar",
 }: {
   state?: SystemState;
   className?: string;
+  /** "hero" for big placements: smoother geometry, sharper render. */
+  detail?: "hero" | "avatar";
   reduceMotion?: boolean;
   /** Flicker his vocal grille like he's talking (e.g. while streaming a reply). */
   speaking?: boolean;
@@ -115,7 +118,7 @@ export function SentinelFace({
         <StaticFace />
       </div>
       <div className="absolute inset-0 opacity-0 transition-opacity duration-500 [&:has(canvas)]:opacity-100">
-        <MasterMoldHead3D state={state} speaking={speaking} hovered={hovered || selfHover} fallback={null} />
+        <MasterMoldHead3D state={state} speaking={speaking} hovered={hovered || selfHover} fallback={null} detail={detail} />
       </div>
     </div>
   );

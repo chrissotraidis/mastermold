@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Inbox, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AutomationHealthBanner } from "@/components/automation-health-banner";
+import { MasterMoldHero } from "@/components/master-mold-hero";
 import { DailyReportRefreshButton } from "@/components/daily-report-refresh-button";
 import { TodayMemoryRefresh } from "@/components/today-memory-refresh";
 import { TodayReadTimer } from "@/components/today-metrics";
@@ -94,10 +95,13 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       {/* [&>*]:min-w-0 — keeps one long headline from widening grid tracks
           past the phone viewport. */}
       <div className="grid w-full grid-cols-1 gap-6 [&>*]:min-w-0">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <p className="mm-eyebrow">{todayDateLine(report)}</p>
-            <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Today</h1>
+        <header className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <MasterMoldHero state={openItemsState(decisionPlays.length)} className="w-20 shrink-0 sm:w-28" />
+            <div className="min-w-0">
+              <p className="mm-eyebrow">{todayDateLine(report)}</p>
+              <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Today</h1>
+            </div>
           </div>
           <DailyReportRefreshButton variant="ghost" />
         </header>
@@ -261,6 +265,10 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       </div>
     </AppShell>
   );
+}
+
+function openItemsState(decisionCount: number) {
+  return decisionCount > 0 ? ("suggestion" as const) : ("idle" as const);
 }
 
 function PlayLine({ play, reportId, canSaveCall, initialResponse, brief, extraWhy }: {
