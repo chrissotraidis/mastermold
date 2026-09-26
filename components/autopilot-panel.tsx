@@ -459,53 +459,36 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
       {/* Autonomy status: gate, shadow learning, and carry evidence as ONE
           block — three separate bordered rows read as clutter. */}
       {data.go_live_gate || data.v3 ? (
-        <div className="border-t border-outline-variant/20 px-3 py-1.5">
+        <>
+        <div className="grid gap-4 border-t border-outline-variant/20 px-3 py-3 lg:grid-cols-2">
           {data.go_live_gate ? (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-outline">
-                Go-live gate {data.go_live_gate.ready ? "OPEN" : "locked"}
-              </span>
-              {data.go_live_gate.checks.map((check) => (
-                <span key={check.key} className="flex items-center gap-1.5 text-[11px] text-on-surface-variant" title={check.detail}>
-                  <span
-                    aria-hidden="true"
-                    className={`size-1.5 rounded-full ${check.pass ? "bg-engine" : "bg-outline/60"}`}
-                  />
-                  {check.key}
-                  <span className={check.pass ? "text-engine" : "text-outline"}>{check.pass ? "✓" : "✗"}</span>
-                </span>
-              ))}
-            </div>
+            <CheckList
+              title="Go-live gate"
+              status={data.go_live_gate.ready ? "Open" : "Locked"}
+              tone={data.go_live_gate.ready ? "up" : "muted"}
+              note="Real money needs every check. Nothing here arms live trading."
+              checks={data.go_live_gate.checks.map((check) => ({ key: check.key, label: check.key, pass: check.pass, detail: check.detail }))}
+            />
           ) : null}
-          {data.v3 ? (
-            <p className="mt-1 text-[11px] text-outline" title={data.v3.latest_note ?? undefined}>
-              <span className="text-[10px] font-semibold uppercase tracking-widest">V3 shadow</span>
-              {" · "}
-              {data.v3.snapshot_count} observations · {data.v3.labeled_count} labeled ·{" "}
-              {data.v3.calibration.verdict}
-              {data.v3.promotion ? (
-                <span
-                  className={data.v3.promotion.ready ? "text-engine" : undefined}
-                  title={data.v3.promotion.checks.map((check) => `${check.pass ? "✓" : "✗"} ${check.label} — ${check.detail}`).join("\n")}
-                >
-                  {" · "}
-                  {data.v3.promotion.ready
-                    ? "eligible for operator review"
-                    : `paper promotion ${data.v3.promotion.checks.filter((check) => check.pass).length}/${data.v3.promotion.checks.length} checks`}
-                </span>
-              ) : null}
-              {data.v3.carry ? (
-                <span title="Funding-only accrual monitor from public Drift rates. It excludes synchronized spot/perp fills, margin, liquidation, and realized execution, so it is not P&L or delta-neutral evidence.">
-                  {" · "}
-                  funding monitor{" "}
-                  <span className={data.v3.carry.total_usd >= 0 ? "text-engine" : "text-critical"}>
-                    {data.v3.carry.total_usd >= 0 ? "+" : ""}${data.v3.carry.total_usd.toFixed(2)}
-                  </span>
-                  {` modeled accrual (${data.v3.carry.open_markets} open; no legs filled)`}
-                </span>
-              ) : null}
+          {data.v3?.promotion ? (
+            <CheckList
+              title="Shadow learning"
+              status={data.v3.promotion.ready ? "Eligible for review" : `${data.v3.snapshot_count} seen · ${data.v3.labeled_count} labeled`}
+              tone={data.v3.promotion.ready ? "up" : "muted"}
+              note={data.v3.calibration.verdict}
+              checks={data.v3.promotion.checks.map((check, index) => ({ key: `${index}`, label: check.label, pass: check.pass, detail: check.detail }))}
+            />
+          ) : null}
+          {data.v3?.carry ? (
+            <p className="text-[11px] leading-5 text-outline lg:col-span-2">
+              <span className="font-semibold text-on-surface-variant">Funding monitor:</span>{" "}
+              {data.v3.carry.total_usd >= 0 ? "+" : ""}${data.v3.carry.total_usd.toFixed(2)} modeled accrual across{" "}
+              {data.v3.carry.open_markets} market{data.v3.carry.open_markets === 1 ? "" : "s"}. Public Drift rates only, with no
+              filled legs, margin or liquidation, so it is not P&L.
             </p>
           ) : null}
+        </div>
+        <div className="border-t border-outline-variant/20 px-3 py-2">
           {data.v3?.by_strategy && Object.keys(data.v3.by_strategy).length > 0 ? (
             <div className="mt-1 flex flex-wrap gap-2">
               {Object.entries(data.v3.by_strategy).map(([strategyId, row]) => (
@@ -537,10 +520,12 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
               ))}
             </div>
           ) : null}
+          <h3 className="mt-1 text-xs font-semibold uppercase tracking-telemetry text-outline">Paper equity</h3>
           <div className="mt-1">
             <EquitySparkline points={equity} />
           </div>
         </div>
+        </>
       ) : null}
     </>
   );
@@ -1391,5 +1376,46 @@ function StripStat({ label, value }: { label: string; value: string }) {
       <dt className="mm-eyebrow truncate">{label}</dt>
       <dd className="mm-num mt-1 truncate font-display text-base font-semibold text-on-surface">{value}</dd>
     </div>
+  );
+}
+
+function CheckList({
+  title,
+  status,
+  tone,
+  note,
+  checks,
+}: {
+  title: string;
+  status: string;
+  tone: "up" | "muted";
+  note: string;
+  checks: Array<{ key: string; label: string; pass: boolean; detail: string }>;
+}) {
+  const passed = checks.filter((check) => check.pass).length;
+  return (
+    <section className="min-w-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">
+          {title} · {passed}/{checks.length}
+        </h3>
+        <span className={`text-xs font-semibold ${tone === "up" ? "text-engine" : "text-on-surface-variant"}`}>{status}</span>
+      </div>
+      <ul className="mt-2 grid gap-1">
+        {checks.map((check) => (
+          <li key={check.key} className="flex gap-2 text-xs leading-5">
+            <span aria-hidden="true" className={check.pass ? "text-engine" : "text-outline"}>
+              {check.pass ? "✓" : "○"}
+            </span>
+            <span className="min-w-0">
+              <span className="font-semibold text-on-surface">{check.label}</span>
+              <span className="sr-only">{check.pass ? " passed" : " not yet"}</span>
+              <span className="text-outline"> · {check.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[11px] leading-4 text-outline">{note}</p>
+    </section>
   );
 }
