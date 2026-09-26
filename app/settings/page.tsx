@@ -103,7 +103,10 @@ export default async function SettingsPage() {
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Settings</h1>
         </header>
 
-        <section aria-label="Status overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <section
+          aria-label="Status overview"
+          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3 [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto"
+        >
           <StatusCard
             icon={Wallet}
             title="Your money"
@@ -380,7 +383,7 @@ function StatusCard({
   action: { href: string; label: string };
 }) {
   return (
-    <div className="mm-panel flex min-w-0 items-start gap-3 p-4">
+    <div className="mm-panel flex min-w-0 flex-wrap items-start gap-3 p-4 sm:flex-nowrap">
       <span
         className={cn(
           "flex size-10 shrink-0 items-center justify-center rounded-xl",
@@ -389,14 +392,14 @@ function StatusCard({
       >
         <Icon aria-hidden="true" className="size-5" />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-auto">
         <p className="mm-eyebrow">{title}</p>
         <p className="mt-0.5 truncate font-display text-base font-semibold text-on-surface">{value}</p>
         <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-outline">{detail}</p>
       </div>
       <Link
         href={action.href}
-        className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-outline-variant/60 px-3 text-xs font-semibold text-on-surface transition hover:border-violet/50 hover:text-violet sm:min-h-9"
+        className="ml-[3.25rem] inline-flex min-h-11 shrink-0 items-center rounded-xl border border-outline-variant/60 px-3 text-xs font-semibold text-on-surface transition hover:border-violet/50 hover:text-violet sm:ml-0 sm:min-h-9"
       >
         {action.label}
       </Link>

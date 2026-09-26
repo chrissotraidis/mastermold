@@ -54,6 +54,7 @@ export const reviewCapabilitySections = [
       "Helius Credit Firewall: every Helius call flows through one fail-closed choke point (master switch, DAS/Enhanced opt-ins, unknown methods blocked, daily credit budget); execution paths fall back to the public RPC while Helius is disabled.",
       "Chat",
       "Live chat has a local size limit. Short questions can use a tab-scoped chat key; oversized questions stop before any live chat request.",
+      "Model routing: chat and the daily report use the server provider chain (OpenCode Go deepseek-v4-flash first, OpenRouter only as fallback). A server-env Anthropic or OpenAI key is used only when that chain is not configured. Settings > Chat names the active provider and can test it. The daily report does not ask the model about sample holdings.",
       "Executor preview",
       "Connection tests and explicit holdings snapshot imports",
       "Chat context saves what the app can remember; import holdings again when balances matter",
