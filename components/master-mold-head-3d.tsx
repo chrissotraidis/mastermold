@@ -189,19 +189,22 @@ function useHeadGeometry(detail: HeadDetail) {
 
 function useMaterials() {
   const materials = useMemo(() => {
+    // Classic Sentinel palette: deep violet helmet, magenta secondary panels,
+    // pale lavender metal faceplate, red eyes.
     const paint = new THREE.MeshPhysicalMaterial({
-      color: "#a11d5f",
-      metalness: 0.55,
-      roughness: 0.36,
+      color: "#4a2378",
+      metalness: 0.5,
+      roughness: 0.34,
       clearcoat: 1,
-      clearcoatRoughness: 0.1,
+      clearcoatRoughness: 0.08,
     });
     const paintDeep = paint.clone();
-    paintDeep.color.set("#5c1036");
-    const gold = new THREE.MeshPhysicalMaterial({ color: "#d6a13c", metalness: 1, roughness: 0.26, clearcoat: 0.3, clearcoatRoughness: 0.25 });
-    const silver = new THREE.MeshPhysicalMaterial({ color: "#aeb4c0", metalness: 1, roughness: 0.3, clearcoat: 0.25, clearcoatRoughness: 0.3 });
-    const gunmetal = new THREE.MeshStandardMaterial({ color: "#2a2230", metalness: 0.9, roughness: 0.42 });
-    const recess = new THREE.MeshStandardMaterial({ color: "#0c070a", metalness: 0.5, roughness: 0.7 });
+    paintDeep.color.set("#2b1247");
+    // "gold" keeps its name for the geometry wiring; it is the magenta accent.
+    const gold = new THREE.MeshPhysicalMaterial({ color: "#c02a83", metalness: 0.7, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.12 });
+    const silver = new THREE.MeshPhysicalMaterial({ color: "#c9b4d2", metalness: 0.85, roughness: 0.32, clearcoat: 0.4, clearcoatRoughness: 0.25 });
+    const gunmetal = new THREE.MeshStandardMaterial({ color: "#241a2e", metalness: 0.9, roughness: 0.45 });
+    const recess = new THREE.MeshStandardMaterial({ color: "#0a060e", metalness: 0.5, roughness: 0.7 });
     return { paint, paintDeep, gold, silver, gunmetal, recess };
   }, []);
   useEffect(() => () => Object.values(materials).forEach((material) => material.dispose()), [materials]);
@@ -465,10 +468,10 @@ export default function MasterMoldHead3D({
       fallback={fallback}
     >
       <Environment intensity={0.75} />
-      <hemisphereLight args={["#ffe9f1", "#2a0a18", 0.5]} />
+      <hemisphereLight args={["#f1e9ff", "#1a0a2a", 0.55]} />
       <directionalLight position={[2.6, 3.4, 4]} intensity={2.2} color="#fff2e6" />
       <directionalLight position={[-3.2, 1.4, -2.6]} intensity={2.4} color="#ff4f8f" />
-      <directionalLight position={[0.5, -2.6, 2.4]} intensity={0.7} color="#e8b35c" />
+      <directionalLight position={[0.5, -2.6, 2.4]} intensity={0.7} color="#b98cff" />
       <HeadRig state={state} speaking={speaking} hovered={hovered} track={finePointer && !reducedMotion} soft={reducedMotion} detail={detail} />
     </Canvas>
   );

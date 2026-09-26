@@ -500,7 +500,10 @@ export function PortfolioHub({
                           type="checkbox"
                           aria-label="Select all visible"
                           className="size-4 accent-[#f2559f]"
-                          checked={shownRows.length > 0 && shownRows.filter((row) => row.editable).every((row) => selected.has(row.id))}
+                          // every() on an empty list is true, which showed the box
+                          // checked on read-only sample rows.
+                          disabled={!shownRows.some((row) => row.editable)}
+                          checked={shownRows.some((row) => row.editable) && shownRows.filter((row) => row.editable).every((row) => selected.has(row.id))}
                           onChange={(event) => setSelected(event.target.checked ? new Set(shownRows.filter((row) => row.editable).map((row) => row.id)) : new Set())}
                         />
                       </th>

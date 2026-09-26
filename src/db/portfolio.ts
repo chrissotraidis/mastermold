@@ -573,25 +573,29 @@ function buildNetWorthSeries(
     barsByAsset.set(bar.asset_id, list);
   }
 
-  return Array.from({ length: 7 }, (_, index) => {
-    const daysBack = 6 - index;
-    const day = new Date(end);
-    day.setUTCDate(end.getUTCDate() - daysBack);
-    day.setUTCHours(23, 59, 59, 999);
-
-    if (daysBack === 0) {
-      return { date: day.toISOString().slice(0, 10), value: roundMoney(total) };
-    }
-
-    const value = holdings.reduce((sum, holding) => {
+  const valueAt = (day: Date) =>
+    holdings.reduce((sum, holding) => {
       const assetId = assetIdBySymbol.get(holding.symbol);
       const bars = assetId ? barsByAsset.get(assetId) : undefined;
       const bar = bars ? lastBarAtOrBefore(bars, day.getTime()) : null;
       return sum + (bar ? holding.quantity * bar.close : holding.market_value);
     }, 0);
 
-    return { date: day.toISOString().slice(0, 10), value: Math.max(roundMoney(value), 0) };
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(end);
+    day.setUTCDate(end.getUTCDate() - (6 - index));
+    day.setUTCHours(23, 59, 59, 999);
+    return day;
   });
+  // Demo bars are a fixed seed, so today's live-priced total and the seed's
+  // closes disagree in level. Scale the seed shape onto today's total so the
+  // chart shows the bars' relative moves instead of a fake drop into today.
+  const seedToday = valueAt(days[6]);
+  const scale = seedToday > 0 ? total / seedToday : 1;
+  return days.map((day, index) => ({
+    date: day.toISOString().slice(0, 10),
+    value: index === 6 ? roundMoney(total) : Math.max(roundMoney(valueAt(day) * scale), 0),
+  }));
 }
 
 function buildReportBackedSeries(
