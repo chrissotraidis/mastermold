@@ -57,9 +57,10 @@ Per cycle (default every 2 hours, `POLYMARKET_ANALYST_CYCLE_HOURS`):
    `end_date_max` within 48h (fast movers) and within 14 days (mid-volume
    news markets that never make the top 100).
 3. For each, fetch the Gamma resolution criteria and ask the model
-   (`POLYMARKET_ANALYST_MODEL`, default `deepseek/deepseek-v4-flash:online` via
-   OpenRouter with web grounding) for strict-JSON `{probability, confidence,
-   rationale}`, with the market price given explicitly as the prior.
+   (shared provider chain, default OpenCode Go `deepseek-v4-flash`;
+   `POLYMARKET_ANALYST_MODEL` overrides it and must stay unset) for
+   strict-JSON `{probability, confidence, rationale}`, with the market price
+   given explicitly as the prior. No web-search plugin.
 4. Journal every forecast to `polymarket_analyst_forecasts` (in the brain
    sqlite DB) whether or not it bets — the calibration record is the product.
 5. Bet only when model-vs-executable-ask edge >= 10 points and confidence is
@@ -75,19 +76,22 @@ happens through the existing resolved-market path in the paper engine.
 
 ## Inference — where the model comes from
 
-The lane uses the `OPENROUTER_API_KEY` already configured in `.env.local`.
-That key predates this lane: it has powered the Master Mold chat fallback and
-the Web3 autopilot Analyst since those shipped (see `.env.example`). No new
-provider or credential was added for this lane; usage is billed to the same
-OpenRouter account and is visible in its dashboard.
+The lane uses `src/llm/completion.ts`, the same chain as the other
+non-streaming calls. Primary is OpenCode Go (`OPENCODE_GO_API_KEY`,
+`deepseek-v4-flash`). OpenRouter (`OPENROUTER_API_KEY`) is the fallback and
+is reached only when the primary fails. If only the OpenRouter key is set,
+it becomes the primary.
 
-- Model: `POLYMARKET_ANALYST_MODEL`, default `deepseek/deepseek-v4-flash:online`.
-  The `:online` suffix is OpenRouter's web-grounding plugin — each call
-  retrieves current web results so forecasts are not stale-knowledge guesses.
+- Model: whatever that chain resolves. Leave `POLYMARKET_ANALYST_MODEL`
+  unset. Its old value, `deepseek/deepseek-v4-flash:online`, turned on
+  OpenRouter web search. Over 779 resolved forecasts that search scored
+  worse than the market prior (Brier 0.2289 vs 0.2066). Do not put it back.
+  Without web search the analyst has no live information, so it stays near
+  the market prior at low confidence, and low confidence does not bet.
 - Budget ceiling: at most 10 calls per cycle, cycles every 2 hours — <= ~120
   calls/day ceiling, realistically 30-60/day after cooldown and supply, on a
-  cheap model. Swap models by changing the env var and restarting; no code
-  change needed.
+  cheap model. Swap models with `LLM_MODEL` and restart. Leave
+  `POLYMARKET_ANALYST_MODEL` unset.
 
 ## The learning loop (idea log -> iteration)
 
@@ -160,6 +164,8 @@ max 2 open, hard kill at $50 total drawdown. Not before.
 
 ## Open questions
 
-- Whether `:online` grounding is fresh enough for fast-moving geopolitical
-  markets, or whether those should be filtered out by category.
+- `:online` web search was measured worse than the market prior and is off.
+  Fast-moving geopolitical markets still have no live information in the
+  prompt. Filter them, or bring a cheaper evidence source, before treating
+  this lane as informed.
 - Per-event concentration caps if the volume-ranked universe clusters again.

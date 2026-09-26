@@ -126,17 +126,31 @@ POLYMARKET_STREAM_ENABLED=1
 ENGINE_OUT_DIR=engine/out
 ```
 
-Three separate surfaces read LLM keys — set only what you use:
+Non-streaming calls (Polymarket analyst, autopilot Analyst, brain, daily
+report) go through `src/llm/completion.ts`. Trust that module over older
+notes that name OpenRouter as the only provider.
 
-- Chat: `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, or `OPENAI_API_KEY` in
-  `.env.local` (restart the server after changing them), or paste a
-  browser-scoped key in Settings → Chat.
-- Today-page play refinement and the autopilot's daily Analyst:
-  `OPENROUTER_API_KEY` in `.env.local`. Without it the Analyst runs a built-in
-  rule-based review, so the learning loop still works.
-- The Python briefing engine: its own keys in `engine/.env`. The engine is
-  optional; to enable richer daily scans, set it up once with
-  `cd engine && uv venv && uv pip install -e .` (see `engine/README.md`).
+- Primary: `OPENCODE_GO_API_KEY` in `.env.local`. Default model is
+  `deepseek-v4-flash`. Optional overrides are `LLM_MODEL` and
+  `LLM_COMPAT_BASE_URL`.
+- Fallback: `OPENROUTER_API_KEY`, used only when the primary call fails.
+  `OPENROUTER_MODEL` still selects that fallback model. Default is
+  `deepseek/deepseek-v4-flash`. Do not append `:online`. That web-search
+  plugin scored worse than the market prior and stays off.
+- If only `OPENROUTER_API_KEY` is set, OpenRouter becomes the primary.
+- Leave `POLYMARKET_ANALYST_MODEL` unset. Setting it overrides the shared
+  model. The old `deepseek/deepseek-v4-flash:online` value must not be copied
+  back. With no key at all, the autopilot Analyst falls back to its built-in
+  rule-based review.
+
+Chat (`/api/chat`) checks keys in this order: `ANTHROPIC_API_KEY`, then the
+same OpenCode Go / OpenRouter chain, then `OPENAI_API_KEY`. Restart the
+server after changing env keys. A browser-scoped key in Settings → Chat is
+used only when the matching server key is absent.
+
+The Python briefing engine is separate and still reads `engine/.env`. It is
+optional; to enable richer daily scans, set it up once with
+`cd engine && uv venv && uv pip install -e .` (see `engine/README.md`).
 
 Monarch Money import is available through a local MCP server: set
 `MONARCH_MCP_COMMAND` (stdio) or `MONARCH_MCP_URL` (HTTP) in `.env.local`.
