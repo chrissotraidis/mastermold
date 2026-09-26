@@ -30,7 +30,7 @@ A live Gamma snapshot of the top 100 markets by 24h volume, taken 2026-09-26, sh
 - `wallets.ts` `walletFollowFeeUsd` computes `(takerBaseFee/10000) × min(p, 1−p) × shares`. At 50¢ in sports that gives 5¢/share, while the documented formula gives 1.25¢, so it **overstates the fee by about 4×**. The error is conservative for the follow-arm, but the stored bps are wrong. Recompute the stored rows with the documented formula.
 - `strategies.ts` `binary_parity` skips fee markets and all neg-risk markets. `maker_spread` selects 2–8¢ spreads, yet 95% of top markets quote at 1¢ or less, so it samples exactly the thin, wide books where adverse selection is worst. No code reads reward settings (`rewardsMinSize`, `rewardsMaxSpread`, `clobRewards`).
 - `stream.ts` has the public market channel (50-token cap). There is no user channel, no order lifecycle, and no event-level neg-risk model (`catalog.ts` lists `cross_market_arbitrage` as missing).
-- Earlier results still apply. The public-signal momentum/book-pressure lane lost money (-$28.47 over 173 trips), and the LLM analyst scored worse than the market prior. Structural edges are the remaining category that does not require being smarter than the price.
+- Earlier results still apply. The public-signal momentum/book-pressure lane lost money over 173 paper trips, and the LLM analyst scored worse than the market prior. Structural edges are the remaining category that does not require being smarter than the price.
 
 ## 4. BUILD (shadow only)
 

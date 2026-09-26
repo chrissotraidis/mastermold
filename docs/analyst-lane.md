@@ -1,7 +1,7 @@
 # Polymarket Analyst Lane
 
 > Decision date: 2026-08-08. Supersedes the momentum/book_pressure exploration
-> lane, whose 2026-08-05..08 sample (173 round trips, -$28.47, negative forward
+> lane, whose 2026-08-05..08 sample (173 round trips with a net paper loss, negative forward
 > returns at every horizon across 2,087 labeled observations) falsified
 > price-chasing signals on this venue. `POLYMARKET_EXPLORATION` is now off.
 

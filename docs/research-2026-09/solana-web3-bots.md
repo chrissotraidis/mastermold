@@ -31,7 +31,7 @@ Date: 2026-09-26. Scope: Master Mold Web3 lab (`src/autopilot/v3/*`).
 | CEX gap (`cex-gap.ts`) | Fee-adjusted DEX–CEX observations with a 3-consecutive-week graduation rule. | Nothing needed; it self-archives to monthly if no edge. |
 | Execution cost (`execution-cost.ts`) | Quote-first Jupiter cost; `priority_fee_bps`/`failed_tx_bps` fields exist. | Tip, priority fee, and failure costs are not measured from real landings; paper fills cannot observe sandwiching. |
 
-The known results — v2 −$4.97 over 43 trips, `xsec` −25bp inverted, `trending` −227bp inverted, `bar_portion` ~0 — are consistent with the external picture: fast directional signals on public data carry no demonstrated edge after cost.
+The known results — v2 net negative over 43 paper trips, `xsec` −25bp inverted, `trending` −227bp inverted, `bar_portion` ~0 — are consistent with the external picture: fast directional signals on public data carry no demonstrated edge after cost.
 
 ## 4. BUILD list (shadow only)
 
