@@ -63,7 +63,7 @@ describe("mobile ergonomics source contracts", () => {
     const replayControl = source("components/as-of-replay-control.tsx");
 
     expect(replayControl).toContain('data-testid="as-of-replay-control"');
-    expect(replayControl).toContain("Optional timeline check");
+    expect(replayControl).toContain("See what Master Mold knew on an earlier date");
     expect(replayControl).not.toContain("open={Boolean(activeAsOf)}");
     expect(replayControl).not.toContain("See this page at an earlier time");
   });
@@ -334,7 +334,7 @@ describe("mobile ergonomics source contracts", () => {
     const globalAssistant = source("components/global-assistant.tsx");
 
     expect(chatPage).toContain(
-      "Ask Master Mold to open routes, check status, pull context, or explain what to do next.",
+      "Ask about your money, a holding, or what to do next.",
     );
     expect(chatPage).toContain("parseAsOf(params?.as_of ?? null)");
     expect(chatPage).not.toContain("getChatPrompts");
@@ -546,7 +546,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(dashboardPage).not.toMatch(/export \{ dynamic \}|redirect|Loading this view/i);
     expect(settingsPage).toContain("export default async function SettingsPage()");
     expect(integrationsRedirect).toContain("redirect(`/settings${suffix}`);");
-    expect(reviewPage).toContain("Build truth and review readiness");
+    expect(reviewPage).toContain("What works today");
     expect(reviewPage).toContain("reviewCapabilitySections.map");
     expect(settingsPage).not.toMatch(/Settings route loaded|reviewer and operator flows/i);
   });
@@ -676,7 +676,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewPage).toContain("Paper results and replay results are evidence—not claims of future profit.");
     expect(reviewPage).toContain("Review credentials never include private keys, seed phrases, or wallet authority.");
     expect(reviewPage).toContain("Paper evidence clocks are paused because mode is off.");
-    expect(appShell).toContain("Advisory by default — live execution requires an explicit operator action and passing evidence gates.");
+    expect(appShell).toContain("Master Mold advises. It never moves your money, and live trading stays locked.");
     expect(appShell).toContain('href="/settings#health"');
     expect(settingsPage).toContain("System health");
     expect(settingsPage).toContain('label="Portfolio source"');
@@ -729,7 +729,7 @@ describe("mobile ergonomics source contracts", () => {
     // Redesign: TradeScopeBanner was replaced by the global AppShell footer;
     // Trade's own header still pins the live-money lock.
     expect(tradingPage).toContain("Live money stays locked.");
-    expect(source("components/app-shell.tsx")).toContain("Advisory by default — live execution requires an explicit operator action and passing evidence gates.");
+    expect(source("components/app-shell.tsx")).toContain("Master Mold advises. It never moves your money, and live trading stays locked.");
     expect(tradingPage).not.toContain("showSuggestions: false");
     expect(tradingPage).not.toContain('className: "hidden sm:block"');
     expect(tradingPage).not.toContain("Web3 desk status, next test trade, and live-money locks.");

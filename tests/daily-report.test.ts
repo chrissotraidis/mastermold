@@ -560,8 +560,8 @@ describe("simple daily auto-refresh", () => {
     const settingsPage = readFileSync(join(process.cwd(), "app/settings/page.tsx"), "utf8");
     const dailyReport = readFileSync(join(process.cwd(), "src/db/daily-report.ts"), "utf8");
 
-    expect(reviewPage).toContain("Build truth and review readiness");
-    expect(reviewPage).toContain("Capability truth");
+    expect(reviewPage).toContain("What works today");
+    expect(reviewPage).toContain("By feature");
     // The simple app-load check: Settings itself triggers the auto-refresh.
     expect(settingsPage).toContain("ensureDailyReportAutoRefresh");
     expect(settingsPage).toContain("getDailyReportAutoRefreshStatus");

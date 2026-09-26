@@ -50,7 +50,7 @@ describe("Portfolio Brain product UI contracts", () => {
     const tradingPage = source("app/trading/page.tsx");
     const appShell = source("components/app-shell.tsx");
 
-    expect(appShell).toContain("Advisory by default — live execution requires an explicit operator action and passing evidence gates.");
+    expect(appShell).toContain("Master Mold advises. It never moves your money, and live trading stays locked.");
     expect(tradingPage).toContain("Live money stays locked.");
     expect(tradingPage).not.toMatch(/Monarch|SnapTrade|Coinbase|Robinhood|brokerage/i);
   });

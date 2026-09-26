@@ -230,7 +230,7 @@ export function AppShell({
       <main className="mx-auto w-full max-w-[88rem] animate-mm-enter px-margin-mobile pb-[calc(7rem+env(safe-area-inset-bottom))] pt-20 md:pl-24 md:pr-8 md:pb-12 lg:pl-[17rem] xl:pr-12">
         {children}
         <p className="mt-12 text-center text-[11px] leading-5 text-outline lg:hidden">
-          Advisory by default — live execution requires an explicit operator action and passing evidence gates.
+          Master Mold advises. It never moves your money, and live trading stays locked.
         </p>
       </main>
       <CommandPalette pageContext={pageContextForShellPath(pathname)} />
@@ -887,7 +887,7 @@ function SideRail() {
           className="hidden items-start gap-2 rounded-xl px-3 py-2 text-[11px] leading-4 text-outline transition-colors hover:text-on-surface-variant lg:flex"
         >
           <ShieldCheck aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-engine" />
-          <span>Advisory by default — live execution requires an explicit operator action and passing evidence gates.</span>
+          <span>Master Mold advises. It never moves your money, and live trading stays locked.</span>
         </Link>
       </div>
     </nav>
@@ -1028,7 +1028,7 @@ export function FirstRunBanner() {
     <div className="mb-gutter flex items-start gap-3 border border-outline-variant/40 bg-surface-dim/50 p-4 chamfer-sm backdrop-blur-sm inner-glow">
       <Info className="mt-0.5 size-4 shrink-0 text-violet" />
       <p className="text-sm leading-6 text-on-surface-variant">
-        <strong className="text-on-surface">Advisory by default.</strong> Portfolio actions never trade.
+        <strong className="text-on-surface">Advice only.</strong> Portfolio actions never trade.
         Autonomous lanes are separate; current authority and evidence gates are visible in their control rooms.
       </p>
       <Link

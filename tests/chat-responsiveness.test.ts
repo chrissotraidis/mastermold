@@ -253,7 +253,7 @@ describe("Master Mold responsiveness contracts", () => {
     expect(chatPage).not.toContain("getDataMode");
     expect(chatPage).not.toContain("productProvenanceLabel");
     expect(chatPage).toContain("<AppShell>");
-    expect(chatPage).toContain("Ask Master Mold to open routes, check status, pull context, or explain what to do next.");
+    expect(chatPage).toContain("Ask about your money, a holding, or what to do next.");
     expect(chatPage).toContain("buildChatRoute(initialQuery, asOf?.iso ?? null)");
     expect(chatPage).toContain("Answer only from the context known by then.");
     expect(chatPage).not.toContain("prompts={");
