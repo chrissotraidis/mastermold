@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ResearchBoard } from "@/components/polymarket-research-board";
 import { cn } from "@/lib/utils";
+import { Tabs } from "@/components/ui/tabs";
 
 type ControlBody = Record<string, string | number>;
 
@@ -73,14 +74,8 @@ export function PolymarketPanel() {
   const topSignalScore = data.signals.length > 0 ? Math.max(...data.signals.map((signal) => signal.score)) : null;
   const lastActivityAt = data.activity.length > 0 ? data.activity[0].ts : null;
 
-  return (
-    <div className="space-y-3 sm:space-y-4">
-      {error ? (
-        <div role="alert" className="rounded-md border border-critical/40 bg-critical/10 px-4 py-3 text-sm text-critical">
-          {error}
-        </div>
-      ) : null}
-
+  const researchBlock = (
+    <>
       <ResearchBoard
         program={data.research_program}
         onRunResearch={() => control({ action: "run_brain_cycle" })}
@@ -88,15 +83,10 @@ export function PolymarketPanel() {
         canControl={canControl}
         lastCycleAt={data.brain.latest_cycle_at}
       />
-
-      <h2 className="mm-eyebrow pt-4">Paper lane and live market read</h2>
-
-      {!canControl ? (
-        <p className="rounded-md border border-caution/35 bg-caution/5 px-4 py-2 text-xs leading-5 text-caution">
-          <LockKeyhole className="mr-2 inline size-3.5" /> {data.control_access.detail}
-        </p>
-      ) : null}
-
+    </>
+  );
+  const statusBlock = (
+    <>
       <Card className="border-outline-variant/30 bg-surface-low/75">
         <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
@@ -150,20 +140,35 @@ export function PolymarketPanel() {
           </div>
         </CardContent>
       </Card>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    </>
+  );
+  const metricsBlock = (
+    <>
+      <dl className="mm-panel grid grid-cols-2 gap-px overflow-hidden bg-outline-variant/20 sm:grid-cols-4">
         <Metric label="Paper equity" value={money(data.account.equity_usd)} detail={`${signedMoney(data.account.unrealized_pnl_usd)} open P&L`} />
         <Metric label="Available cash" value={money(data.account.cash_usd)} detail={`${money(data.account.deployed_usd)} deployed`} />
         <Metric label="Open positions" value={`${data.positions.length} / ${data.state.caps.max_positions}`} detail={`${money(data.state.caps.max_trade_usd)} max per paper entry`} />
         <Metric label="Realized P&L" value={signedMoney(data.account.realized_pnl_usd)} detail={`${signedMoney(data.account.realized_today_usd)} today`} />
-      </div>
-
+      </dl>
+    </>
+  );
+  const equityBlock = (
+    <>
       <EquityCurve curve={data.equity_curve} />
-
+    </>
+  );
+  const brainBlock = (
+    <>
       <PolymarketBrainPanel brain={data.brain} pending={pending} controlAvailable={canControl} onResearch={() => control({ action: "run_brain_cycle" })} />
-
+    </>
+  );
+  const contractBlock = (
+    <>
       <TradeContractCard contract={data.paper_contract} authority={data.paper_authority} />
-
+    </>
+  );
+  const positionsBlock = (
+    <>
       {data.positions.length > 0 ? (
         <Card className="border-outline-variant/30 bg-surface-low/70">
           <CardContent className="space-y-2 p-4">
@@ -188,11 +193,11 @@ export function PolymarketPanel() {
           </CardContent>
         </Card>
       ) : null}
-
-      {/* Watch lists, observation labs, activity, and reference prose live in
-          collapsed rows: the lab reads in one screen and detail is one click away. */}
-      <Card className="border-outline-variant/30 bg-surface-low/70 py-1">
-        <details className="px-3">
+    </>
+  );
+  const sniperBlock = (
+    <>
+        <details open className="px-3">
           <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-on-surface">
             Sniper watch
             <span className="font-normal text-outline">
@@ -201,44 +206,67 @@ export function PolymarketPanel() {
                 : `${data.signals.length} shadow setup${data.signals.length === 1 ? "" : "s"}${topSignalScore !== null ? ` · top score ${topSignalScore}` : ""} · indicative prices`}
             </span>
           </summary>
-          <div className="space-y-2 pb-3">
+          <div className="pb-3">
             {data.signals.length === 0 ? (
               <EmptyState>No market currently clears the fee, liquidity, volume, move, and price filters.</EmptyState>
-            ) : data.signals.slice(0, 8).map((signal) => (
-              <article key={signal.id} className="rounded-md border border-outline-variant/25 bg-void/20 p-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="border-engine/30 text-engine">Score {signal.score}</Badge>
-                      <span className="font-mono text-xs text-violet">{signal.outcome} {(signal.price * 100).toFixed(1)}¢</span>
-                      <span className="font-mono text-xs text-engine">+{(signal.move_24h * 100).toFixed(1)}% / 24h</span>
-                    </div>
-                    <h3 className="mt-2 text-sm font-semibold leading-5 text-on-surface">{signal.question}</h3>
-                    <p className="mt-1 text-xs leading-5 text-outline">{signal.thesis}</p>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    <Button size="sm" variant="outline" asChild>
-                      <a href={`https://polymarket.com/event/${signal.slug}`} target="_blank" rel="noreferrer">
-                        Market <ExternalLink />
-                      </a>
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={pending || !armed || !canControl || !paperAuthority}
-                      onClick={() => control({ action: "paper_buy", market_id: signal.market_id, outcome_index: signal.outcome_index, stake_usd: 5 })}
+            ) : (
+              <>
+                <p className="pb-2 text-xs leading-5 text-outline">
+                  Setup scores rank recent moves that clear the fee, liquidity and volume filters. They are not fair-value estimates, and paper entries need a promoted strategy.
+                </p>
+                <ul className="divide-y divide-outline-variant/20 rounded-xl border border-outline-variant/30">
+                  {data.signals.slice(0, 12).map((signal) => (
+                    <li
+                      key={signal.id}
+                      className="grid grid-cols-[3rem_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5"
+                      title={signal.thesis}
                     >
-                      Paper $5
-                    </Button>
-                  </div>
-                </div>
-              </article>
-            ))}
+                      <span className="mm-num text-center font-display text-lg font-semibold text-engine">{signal.score}</span>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold text-on-surface">{signal.question}</h3>
+                        <p className="mm-num text-xs text-on-surface-variant">
+                          <span className="text-violet">{signal.outcome} {(signal.price * 100).toFixed(1)}¢</span>
+                          {" · "}
+                          <span className="text-engine">+{(signal.move_24h * 100).toFixed(1)}% in 24h</span>
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-1.5">
+                        <Button size="sm" variant="ghost" asChild>
+                          <a
+                            href={`https://polymarket.com/event/${signal.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={`Open ${signal.question} on Polymarket`}
+                          >
+                            <ExternalLink />
+                          </a>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={pending || !armed || !canControl || !paperAuthority}
+                          onClick={() => control({ action: "paper_buy", market_id: signal.market_id, outcome_index: signal.outcome_index, stake_usd: 5 })}
+                        >
+                          Paper $5
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         </details>
-
+    </>
+  );
+  const weatherBlock = (
+    <>
         <PolymarketWeatherSection weather={data.weather} />
-
-        <details className="border-t border-outline-variant/20 px-3">
+    </>
+  );
+  const activityBlock = (
+    <>
+        <details open className="border-t border-outline-variant/20 px-3">
           <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-on-surface">
             Recent lane activity
             <span className="font-normal text-outline">
@@ -254,8 +282,11 @@ export function PolymarketPanel() {
             ))}
           </div>
         </details>
-
-        <details className="border-t border-outline-variant/20 px-3">
+    </>
+  );
+  const referenceBlock = (
+    <>
+        <details open className="border-t border-outline-variant/20 px-3">
           <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-on-surface">
             Reference
             <span className="font-normal text-outline">strategy coverage · live-execution lock · lane boundary</span>
@@ -278,7 +309,58 @@ export function PolymarketPanel() {
             </div>
           </div>
         </details>
-      </Card>
+    </>
+  );
+
+  const rows = "mm-panel overflow-hidden py-1 [&>*:first-child]:border-t-0";
+
+  return (
+    <div className="grid min-w-0 gap-4">
+      {error ? (
+        <div role="alert" className="rounded-md border border-critical/40 bg-critical/10 px-4 py-3 text-sm text-critical">
+          {error}
+        </div>
+      ) : null}
+      {!canControl ? (
+        <p className="rounded-md border border-caution/35 bg-caution/5 px-4 py-2 text-xs leading-5 text-caution">
+          <LockKeyhole className="mr-2 inline size-3.5" /> {data.control_access.detail}
+        </p>
+      ) : null}
+      <div className="grid gap-3">
+        {statusBlock}
+        {metricsBlock}
+      </div>
+      <Tabs
+        label="Polymarket lab sections"
+        items={[
+          { id: "research", label: "Research", content: researchBlock },
+          {
+            id: "markets",
+            label: "Markets",
+            badge: data.signals.length || undefined,
+            content: (
+              <div className={rows}>
+                {sniperBlock}
+                {weatherBlock}
+              </div>
+            ),
+          },
+          {
+            id: "paper",
+            label: "Paper lane",
+            content: (
+              <div className="grid gap-3">
+                {equityBlock}
+                {positionsBlock}
+                {contractBlock}
+                <div className={rows}>{activityBlock}</div>
+              </div>
+            ),
+          },
+          { id: "brain", label: "Brain", content: brainBlock },
+          { id: "reference", label: "Reference", content: <div className={rows}>{referenceBlock}</div> },
+        ]}
+      />
     </div>
   );
 }
@@ -332,13 +414,11 @@ function EquityCurve({ curve }: { curve: Array<{ ts: string; realized_pnl_usd: n
 
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <Card className="border-outline-variant/30 bg-surface-low/70">
-      <CardContent className="p-4">
-        <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">{label}</p>
-        <p className="mt-1 font-display text-xl font-semibold text-on-surface">{value}</p>
-        <p className="mt-1 text-xs text-on-surface-variant">{detail}</p>
-      </CardContent>
-    </Card>
+    <div className="min-w-0 bg-surface-low/80 px-4 py-3">
+      <dt className="mm-eyebrow truncate">{label}</dt>
+      <dd className="mm-num mt-1 truncate font-display text-base font-semibold text-on-surface">{value}</dd>
+      <dd className="truncate text-xs text-outline">{detail}</dd>
+    </div>
   );
 }
 
