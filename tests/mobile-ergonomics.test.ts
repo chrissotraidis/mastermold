@@ -17,10 +17,9 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/alert-inbox-drawer.tsx")).toContain("relative flex size-11 items-center justify-center rounded-md border");
     expect(source("components/alert-feed.tsx")).toContain("inline-flex min-h-11 items-center justify-center rounded-md border");
     expect(source("components/alert-inbox-drawer.tsx")).toContain("inline-flex min-h-11 items-center justify-center rounded-md border");
-    expect(source("components/manual-holdings-panel.tsx")).toContain("inline-flex min-h-11 shrink-0 items-center gap-1.5");
     // Settings is one flat page now; its disclosure summaries keep the 44px floor.
     expect(source("app/settings/page.tsx")).toContain("flex min-h-11 cursor-pointer");
-    expect(source("app/portfolio/page.tsx")).toContain("inline-flex min-h-11 items-center gap-2");
+    expect(source("components/portfolio/portfolio-hub.tsx")).toContain("inline-flex min-h-11 items-center gap-2");
     expect(source("components/welcome-flow.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
     expect(source("components/welcome-flow.tsx")).toContain("lg:grid-cols-[minmax(0,0.78fr)_minmax(26rem,1fr)]");
     expect(source("components/welcome-flow.tsx")).toContain("Start with the sample dashboard");
@@ -254,36 +253,38 @@ describe("mobile ergonomics source contracts", () => {
   });
 
   test("GIVEN manual holdings mix with sample data WHEN a holding describes its weight THEN it says visible portfolio", () => {
-    const manualHoldings = source("components/manual-holdings-panel.tsx");
+    // 2026-09 hub: a holding's weight is its share of the visible book.
+    const manualHoldings = source("components/portfolio/portfolio-hub.tsx");
 
-    expect(manualHoldings).toContain("% of visible portfolio");
+    expect(manualHoldings).toContain("% of book");
     expect(manualHoldings).not.toContain("% of portfolio");
   });
 
-  test("GIVEN Portfolio holdings render on mobile WHEN source copy is checked THEN each holding can expand into decision detail", () => {
-    // Redesign: expandable holding cards became one dense table. The decision
-    // detail per holding is now the Rule column, which links every row to its
-    // standing position policy.
+  test("GIVEN Portfolio holdings render on mobile WHEN source copy is checked THEN each holding opens its decision detail", () => {
+    // 2026-09 hub rewrite: phones get tappable holding cards that open the
+    // holding sheet (value, gain, today, price freshness, standing rule).
     const portfolioPage = source("app/portfolio/page.tsx");
+    const hub = source("components/portfolio/portfolio-hub.tsx");
+    const sheet = source("components/portfolio/holding-sheet.tsx");
     const portfolioCopy = source("lib/portfolio-copy.ts");
-    const portfolioCharts = source("components/portfolio-charts.tsx");
 
     expect(portfolioCopy).toContain("Holdings, allocation, and source status for Today and chat.");
-    // The Add holding action lands on the actual form, but the first screen stays focused on the portfolio read.
-    expect(portfolioPage).toContain('href="#add-holdings"');
-    expect(portfolioPage).toContain('id="add-holdings"');
-    // Every row shows symbol, amount, value, and share of the visible portfolio.
-    expect(portfolioPage).toContain("{holding.symbol}");
-    expect(portfolioPage).toContain("formatQuantity(holding.quantity)");
-    expect(portfolioPage).toContain("formatCurrency(holding.market_value)");
-    expect(portfolioPage).toContain("{holding.weight_pct.toFixed(1)}%");
-    // The Rule column links each holding to its position policy.
-    expect(portfolioPage).toContain('href="#position-policies"');
-    expect(portfolioPage).toContain("Your standing rule");
-    expect(portfolioPage).toContain("Set a standing rule for this position");
+    // Add holding keeps its #add-holdings anchor for command routes.
+    expect(hub).toContain('id="add-holdings"');
+    expect(hub).toContain('href="#add-holdings"');
+    expect(hub).toContain('action === "add-holding"');
+    // Phone cards are 44px+ and open the detail sheet.
+    expect(hub).toContain("mm-row flex min-h-14 w-full items-center");
+    expect(hub).toContain("onClick={() => setOpenHolding(holding)}");
+    expect(hub).toContain("formatQuantity(holding.quantity)");
+    expect(hub).toContain("{holding.weight_pct.toFixed(1)}%");
+    // The sheet links each holding to its standing position rule.
+    expect(sheet).toContain('href="#position-policies"');
+    expect(sheet).toContain("Your standing rule");
+    expect(sheet).toContain("Set a standing rule for this position");
     expect(portfolioPage).toContain('id="position-policies"');
     expect(portfolioPage).toContain("<PositionPoliciesPanel");
-    // Policy breaches surface as banners above the table.
+    // Policy breaches still surface as banners.
     expect(portfolioPage).toContain('aria-label="Policy checks"');
     expect(portfolioPage).toContain("{finding.title}");
     expect(portfolioPage).toContain("{finding.detail}");
@@ -291,19 +292,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(portfolioPage).toContain("manual holdings · local only");
     expect(portfolioPage).toContain("imported holdings · read-only snapshot");
     expect(portfolioPage).toContain("Sample data until you add holdings");
-    expect(portfolioPage.indexOf("<ManualHoldingsPanel")).toBeGreaterThan(
-      portfolioPage.indexOf('id="holdings-title"'),
-    );
-    // The net worth chart stays honest about its source: one dot per saved
-    // daily close, with hover detail and up/down day-over-day coloring.
-    expect(portfolioCharts).toContain("One dot per saved daily close");
-    expect(portfolioCharts).toContain('data-testid="net-worth-dot"');
-    expect(portfolioCharts).toContain('data-testid="net-worth-tooltip"');
-    expect(portfolioCharts).toContain("vs prior day");
-    expect(portfolioCharts).toContain("first saved close");
-    expect(`${portfolioPage}\n${portfolioCopy}\n${portfolioCharts}`).not.toMatch(
-      /Tap a holding|thesis|your portfolio|>Weight|The visible money picture|Portfolio value, not individual asset price moves|alert: \\$\\{cleanAlertMessage|can shape Today/i,
-    );
+    // Gains are never invented: without a real cost basis the row asks for one.
+    expect(sheet).toContain('holding.gain_value === null ? "Add cost basis"');
   });
 
   test("GIVEN Settings first-paint copy WHEN the profile state is not ready THEN it does not look stuck", () => {

@@ -372,7 +372,7 @@ describe("Master Mold responsiveness contracts", () => {
     const briefingCard = source("components/briefing-card.tsx");
     const saveCall = source("components/save-briefing-call-button.tsx");
     const alertFeed = source("components/alert-feed.tsx");
-    const manualHoldings = source("components/manual-holdings-panel.tsx");
+    const manualHoldings = source("components/portfolio/portfolio-hub.tsx");
     const integrationKeyInput = source("components/integration-key-input.tsx");
     const appShell = source("components/app-shell.tsx");
     const asOfReplayControl = source("components/as-of-replay-control.tsx");
@@ -454,13 +454,9 @@ describe("Master Mold responsiveness contracts", () => {
     expect(alertFeed).toContain('action === "mark-top-activity-useful"');
     expect(alertFeed).toContain("submitFeedback(topAlert, true);");
     expect(alertFeed).toContain("submitFeedback(topAlert, false);");
-    expect(manualHoldings).toContain("useSearchParams");
-    expect(manualHoldings).toContain("const actionQuery = searchParams.toString();");
-    expect(manualHoldings).toContain("handledCommandActionRef.current === actionQuery");
-    expect(manualHoldings).toContain('params.get("action") !== "add-holding"');
-    expect(manualHoldings).toContain('symbolInputRef.current?.scrollIntoView({ block: "center", inline: "nearest" });');
-    expect(manualHoldings).toContain("symbolInputRef.current?.focus({ preventScroll: true });");
-    expect(manualHoldings).toContain('data-testid="manual-holdings-command-status"');
+    // 2026-09: the Portfolio hub owns add-holding; the route opens the add sheet once and drops the param.
+    expect(manualHoldings).toContain('if (action === "add-holding") setAddOpen(true);');
+    expect(manualHoldings).toContain('url.searchParams.delete("action");');
     // Redesign: Settings is one flat page; sections are always visible and the
     // first connection card in each group auto-runs the routed command action.
     expect(settingsPage).toContain("commandPrimary={index === 0}");

@@ -32,6 +32,7 @@ import {
 } from "@/src/db/today-decisions";
 import { getDataMode } from "@/src/db/engine-data";
 import { getPortfolio } from "@/src/db/portfolio";
+import { getMoneySummary } from "@/src/db/money";
 import {
   getPortfolioRecommendations,
   type PortfolioRecommendation,
@@ -82,7 +83,9 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const hiddenAlertCount = alerts.length - freshAlerts.length;
   const focusSymbol = report?.focus.symbol?.toUpperCase() ?? null;
   const briefFoldsIntoDecision = Boolean(focusSymbol && decisionPlays.some((play) => play.symbol.toUpperCase() === focusSymbol));
-  const trend = portfolio.net_worth_series.map((point) => point.value);
+  // Net worth is assets minus debts from the money hub, not just holdings.
+  const money = hasPersonalPortfolio ? getMoneySummary(portfolio) : null;
+  const trend = (money?.history ?? portfolio.net_worth_series).map((point) => point.value);
   const openItems = decisionPlays.length + extraRecommendations.length;
 
   return (
@@ -108,7 +111,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
               <StatTile
                 emphasis
                 label="Net worth"
-                value={formatCurrency(portfolio.total_market_value)}
+                value={formatCurrency(money?.net_worth ?? portfolio.total_market_value)}
                 trend={trend}
                 deltaTone={portfolio.daily_change_value >= 0 ? "up" : "down"}
                 delta={`${formatChange(portfolio.daily_change_value, portfolio.daily_change_pct)} today`}

@@ -81,7 +81,7 @@ export function SettingsSection({
       onToggle={(event) => setOpen(event.currentTarget.open)}
       className="group scroll-mt-24"
     >
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 marker:hidden [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-2 transition-colors hover:bg-surface-high/30 marker:hidden [&::-webkit-details-marker]:hidden">
         <h2 id={`${id}-title`} className="shrink-0 text-sm font-semibold text-on-surface">
           {title}
         </h2>
@@ -92,7 +92,7 @@ export function SettingsSection({
           ›
         </span>
       </summary>
-      <div className="border-t border-outline-variant/15 px-3 pb-3 pt-2">{children}</div>
+      <div className="border-t border-outline-variant/40 px-4 pb-4 pt-3">{children}</div>
     </details>
   );
 }

@@ -168,7 +168,8 @@ function buildPortfolio(asOf: AsOfFilter | null = null): PortfolioJson {
     })
     .filter((holding): holding is PortfolioHoldingJson => holding !== null);
 
-  const manualHoldings = manualRows.map(manualRowToHolding);
+  const accountNames = new Map(asOf ? [] : store().financialAccounts().map((account) => [account.id, account.name] as const));
+  const manualHoldings = manualRows.map((row) => manualRowToHolding(row, accountNames));
   const importedHoldings = importedRows.map(importedRowToHolding);
   const brainHoldings = portfolioBrainSnapshot ? portfolioBrainHoldingsForPortfolio(portfolioBrainSnapshot) : [];
   const totalMarketValue = roundMoney(
@@ -417,7 +418,7 @@ export function replaceImportedHoldings(
   return getPortfolio();
 }
 
-function invalidatePortfolioCache() {
+export function invalidatePortfolioCache() {
   portfolioCache.clear();
 }
 
@@ -464,8 +465,9 @@ function getPriceChartAssets(priceBars: PriceBar[]): PriceChartAssetJson[] {
     .sort((a, b) => a.asset.symbol.localeCompare(b.asset.symbol));
 }
 
-function manualRowToHolding(row: ManualHoldingRow): PortfolioHoldingJson {
+function manualRowToHolding(row: ManualHoldingRow, accountNames: Map<string, string> = new Map()): PortfolioHoldingJson {
   const marketValue = roundMoney(row.quantity * row.price);
+  const accountName = row.account_id ? accountNames.get(row.account_id) : undefined;
   return {
     id: row.id,
     symbol: row.symbol,
@@ -478,12 +480,12 @@ function manualRowToHolding(row: ManualHoldingRow): PortfolioHoldingJson {
     daily_change_pct: row.daily_change_pct,
     daily_change_value: roundMoney(marketValue * (row.daily_change_pct / 100)),
     weight_pct: 0,
-    as_of: row.updated_at,
+    as_of: row.price_as_of ?? row.updated_at,
     source: "manual",
     account: {
-      id: "acct_manual",
+      id: accountName && row.account_id ? row.account_id : "acct_manual",
       kind: "manual",
-      label: "Manual entry",
+      label: accountName ?? "Manual entry",
       integration_status: "manual",
       scope: "read_only",
     },

@@ -5,7 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { __resetStoreForTests, store } from "../src/db/store";
+import { __resetStoreForTests, resolveStoreBackend, store } from "../src/db/store";
 import { createDecisionJournalEntry, getJournal } from "../src/db/journal";
 import { createPaperPrediction, getPaperPageData } from "../src/db/paper";
 import { acknowledgeAlert, acknowledgeAllAlerts, getAlerts } from "../src/db/alerts";
@@ -48,8 +48,22 @@ function restart() {
 }
 
 describe("durable persistence (Phase 1.5)", () => {
-  test("uses the bun:sqlite backend under Bun", () => {
-    expect(store().backend).toBe("sqlite");
+  test("GIVEN a fresh store WHEN Bun opens it THEN it uses the same JSON book the Node web server uses", () => {
+    expect(store().backend).toBe("json-file");
+  });
+
+  test("GIVEN existing store files WHEN the backend is resolved THEN every runtime lands on one book", () => {
+    const has = (files: string[]) => (file: string) => files.includes(file);
+    // The JSON book exists: Bun and Node both use it, even if a stray SQLite file is present.
+    expect(resolveStoreBackend("/d/mm.db", true, undefined, has(["/d/mm.db.json", "/d/mm.db"]))).toBe("json-file");
+    expect(resolveStoreBackend("/d/mm.db", false, undefined, has(["/d/mm.db.json"]))).toBe("json-file");
+    // A store that only ever lived in SQLite keeps using SQLite where it can.
+    expect(resolveStoreBackend("/d/mm.db", true, undefined, has(["/d/mm.db"]))).toBe("sqlite");
+    // Nothing yet: JSON, because the web server can only read JSON.
+    expect(resolveStoreBackend("/d/mm.db", true, undefined, has([]))).toBe("json-file");
+    // Explicit override wins.
+    expect(resolveStoreBackend("/d/mm.db", true, "sqlite", has(["/d/mm.db.json"]))).toBe("sqlite");
+    expect(resolveStoreBackend(":memory:", true, undefined, has([]))).toBe("sqlite");
   });
 
   test("GIVEN a logged journal entry WHEN the server restarts THEN the entry survives", () => {

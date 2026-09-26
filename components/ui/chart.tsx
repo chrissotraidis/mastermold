@@ -145,19 +145,26 @@ export function DonutChart({
   centerLabel,
   className,
   onSelect,
+  onPick,
+  picked = null,
 }: {
   slices: DonutSlice[];
   format?: (value: number) => string;
   centerLabel?: string;
   className?: string;
+  /** Hover/focus changes (preview only). */
   onSelect?: (key: string | null) => void;
+  /** Click/tap: a deliberate choice, e.g. to filter a table. */
+  onPick?: (key: string | null) => void;
+  picked?: string | null;
 }) {
   const [active, setActive] = useState<string | null>(null);
   const total = slices.reduce((sum, slice) => sum + Math.max(0, slice.value), 0) || 1;
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
-  const focused = slices.find((slice) => slice.key === active) ?? null;
+  const focusKey = active ?? picked;
+  const focused = slices.find((slice) => slice.key === focusKey) ?? null;
 
   function focus(key: string | null) {
     setActive(key);
@@ -181,14 +188,14 @@ export function DonutChart({
                 r={radius}
                 fill="none"
                 stroke={color}
-                strokeWidth={active === slice.key ? 14 : 11}
+                strokeWidth={focusKey === slice.key ? 14 : 11}
                 strokeDasharray={`${Math.max(0, dash - 0.6)} ${circumference}`}
                 strokeDashoffset={-offset}
-                opacity={active && active !== slice.key ? 0.35 : 1}
+                opacity={focusKey && focusKey !== slice.key ? 0.35 : 1}
                 className="cursor-pointer transition-all duration-200"
                 onPointerEnter={() => focus(slice.key)}
                 onPointerLeave={() => focus(null)}
-                onClick={() => focus(active === slice.key ? null : slice.key)}
+                onClick={() => onPick?.(picked === slice.key ? null : slice.key)}
               />
             );
             offset += dash;
@@ -202,7 +209,7 @@ export function DonutChart({
           <span className="max-w-24 truncate text-[11px] text-outline">{focused ? focused.label : centerLabel ?? "Total"}</span>
         </div>
       </div>
-      <ul className="grid w-full min-w-0 gap-1">
+      <ul className="grid w-full min-w-0 grid-cols-1 gap-1 [&>*]:min-w-0">
         {slices.map((slice, index) => {
           const color = slice.color ?? SLICE_COLORS[index % SLICE_COLORS.length];
           const pct = (Math.max(0, slice.value) / total) * 100;
@@ -214,9 +221,12 @@ export function DonutChart({
                 onPointerLeave={() => focus(null)}
                 onFocus={() => focus(slice.key)}
                 onBlur={() => focus(null)}
+                onClick={() => onPick?.(picked === slice.key ? null : slice.key)}
+                aria-pressed={onPick ? picked === slice.key : undefined}
                 className={cn(
                   "mm-row flex min-h-10 w-full items-center gap-3 px-2 text-left text-sm",
-                  active === slice.key && "bg-surface-high/60",
+                  focusKey === slice.key && "bg-surface-high/60",
+                  picked === slice.key && "ring-1 ring-violet/50",
                 )}
               >
                 <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
