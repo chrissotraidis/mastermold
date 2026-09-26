@@ -105,6 +105,24 @@ npm run daily       # one proactive daily read (the app also self-schedules a
 Production-style `npm run start` requires Node 22.5 or newer; local development
 uses Bun's built-in SQLite support.
 
+### First run
+
+The first visit opens a short welcome page with three steps, and Today keeps
+the same checklist until each one is done:
+
+1. **Add your money.** Portfolio → Import accepts the `manual_holdings` JSON
+   book as-is, a CSV with column mapping, or one holding at a time. Every
+   import shows a preview and can be undone.
+2. **Add accounts and debts.** Portfolio → Add account covers brokerages,
+   wallets, banks, cards, loans, mortgages and property, so net worth is
+   assets minus debts.
+3. **Log your first call** in Journal before the outcome is known; it is graded
+   later.
+
+Until step 1 is done every page shows clearly labeled sample data. Your
+entries live only in the local, git-ignored `.data/` store. The Web3 and
+Polymarket labs are separate paper-research lanes and never touch your money.
+
 ## Optional Local Configuration
 
 Use `.env.local` for app settings and `engine/.env` for engine settings. Start
@@ -143,10 +161,12 @@ notes that name OpenRouter as the only provider.
   back. With no key at all, the autopilot Analyst falls back to its built-in
   rule-based review.
 
-Chat (`/api/chat`) checks keys in this order: `ANTHROPIC_API_KEY`, then the
-same OpenCode Go / OpenRouter chain, then `OPENAI_API_KEY`. Restart the
-server after changing env keys. A browser-scoped key in Settings → Chat is
-used only when the matching server key is absent.
+Chat (`/api/chat`) uses a provider picked in Settings → Chat first (for
+example a browser-scoped Anthropic key). Otherwise it uses the same OpenCode
+Go / OpenRouter chain, and only falls back to a server `ANTHROPIC_API_KEY` or
+`OPENAI_API_KEY` when that chain has no key. Settings → Chat names the active
+provider and its "Server default" test runs one call through the chain.
+Restart the server after changing env keys.
 
 The Python briefing engine is separate and still reads `engine/.env`. It is
 optional; to enable richer daily scans, set it up once with
