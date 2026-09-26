@@ -80,7 +80,16 @@ const patterns = [
   ["private artifact reference", /(^|[\s"'(])docs\/(?:ui-passes|ref|review|history)\b|(^|[\s"'(])\.(?:scaffold|rds|claude)(?:\/|\b)/i],
   [
     "live secret token",
-    /sk-proj-[A-Za-z0-9_-]{20,}|sk-or-v1-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[A-Za-z0-9-]{20,}|-----BEGIN (?:RSA|OPENSSH|EC|DSA|PRIVATE) KEY-----/,
+    /sk-proj-[A-Za-z0-9_-]{20,}|sk-or-v1-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|\bsk-[A-Za-z0-9]{40,}|github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[A-Za-z0-9-]{20,}|-----BEGIN (?:RSA|OPENSSH|EC|DSA|PRIVATE) KEY-----/,
+  ],
+];
+
+// Paper/bot dollar results belong in the private session log, not public docs.
+// Checked only in Markdown so code fixtures and fee math stay unaffected.
+const docPatterns = [
+  [
+    "paper P&L figure",
+    /(?:realiz\w*|net)\s+(?:P&L|pnl|loss|gain)?[^\n]{0,24}[+−-]\$\d+\.\d{2}|[+−-]\$\d+\.\d{2}\s+(?:over|across)\s+\d+\s+(?:round\s+)?trips|realizing\s+[+−-]\$\d/i,
   ],
 ];
 
@@ -118,6 +127,11 @@ for (const file of candidates) {
     for (const [label, regex] of patterns) {
       if (file === "scripts/prepare-standalone.mjs" && label === "private artifact reference") continue;
       if (regex.test(line)) findings.push(`${file}:${index + 1}: ${label}`);
+    }
+    if (ext === ".md") {
+      for (const [label, regex] of docPatterns) {
+        if (regex.test(line)) findings.push(`${file}:${index + 1}: ${label}`);
+      }
     }
   });
 }
