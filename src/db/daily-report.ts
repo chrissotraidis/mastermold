@@ -207,7 +207,10 @@ export async function runDailyReportRefresh(input: {
     input.playsCompletion === undefined ? defaultPlaysCompletion() : input.playsCompletion;
   // The model may rewrite a rules-backed decision, but it may not manufacture
   // activity on a day when the deterministic pass found nothing actionable.
-  if (playsCompletion && report.plays.length > 0) {
+  // Nor does it write advice about demo holdings: sample rows keep the rules
+  // plays (clearly labeled on Today) and spend no model call.
+  const personalPortfolio = portfolio.provenance.label !== "Demo data";
+  if (playsCompletion && report.plays.length > 0 && personalPortfolio) {
     const llmPlays = await tryLlmPlays(report, portfolio.holdings, playsCompletion);
     if (llmPlays) report.plays = llmPlays;
   }

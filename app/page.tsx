@@ -88,6 +88,13 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const money = hasPersonalPortfolio ? getMoneySummary(portfolio) : null;
   const trend = (money?.history ?? portfolio.net_worth_series).map((point) => point.value);
   const openItems = decisionPlays.length + extraRecommendations.length;
+  const marketRows = marketTable(report);
+  const lede = todayLede({
+    decisions: openItems,
+    changes: freshAlerts.length,
+    personal: hasPersonalPortfolio,
+    reportAt: report?.created_at ?? null,
+  });
 
   return (
     <AppShell dataMode={productProvenanceLabel(pageDataMode)}>
@@ -101,6 +108,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             <div className="min-w-0">
               <p className="mm-eyebrow">{todayDateLine(report)}</p>
               <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Today</h1>
+              <p className="mt-1 text-sm leading-5 text-on-surface-variant" data-testid="today-lede">{lede}</p>
             </div>
           </div>
           <DailyReportRefreshButton variant="ghost" />
@@ -152,7 +160,11 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
           <Panel className="min-w-0 overflow-hidden lg:col-span-7" aria-labelledby="today-plays-title">
             <PanelHeader
               titleId="today-plays-title"
-              eyebrow={decisionPlays[0]?.source === "llm" ? "Model-written · validated" : "Rules from your data"}
+              eyebrow={
+                hasPersonalPortfolio
+                  ? `01 · ${decisionPlays[0]?.source === "llm" ? "Model-written, validated" : "Rules from your data"}`
+                  : "01 · Demo on sample holdings"
+              }
               title="Decision inbox"
               description="One to three decisions, ranked from the latest saved inputs."
             />
@@ -186,32 +198,42 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
                   ) : null}
                 </div>
               )}
-              {trackRecordLine ? <p className="px-3 pt-3 text-xs leading-5 text-outline">{trackRecordLine}</p> : null}
             </div>
           </Panel>
 
           <div className="grid grid-cols-1 content-start gap-6 lg:col-span-5 [&>*]:min-w-0">
             <Panel aria-labelledby="today-brief-title">
-              <PanelHeader titleId="today-brief-title" title={"Today’s read"} />
+              <PanelHeader titleId="today-brief-title" eyebrow="02 · Market read" title="Markets" />
               <div className="space-y-4 p-5 pt-3">
                 {report ? (
                   <>
                     {briefFoldsIntoDecision ? null : <p className="text-sm leading-6 text-on-surface">{briefProse(report)}</p>}
                     {movers.length > 0 ? (
-                      <div data-testid="today-movers">
-                        <p className="mm-eyebrow mb-2">Moving today</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {movers.map((mover) => (
-                            <div key={mover.symbol} className="flex items-center justify-between rounded-xl border border-outline-variant/50 bg-surface-lowest/60 px-3 py-2">
-                              <span className="text-sm font-semibold text-on-surface">{mover.symbol}</span>
-                              <span className={`mm-num text-sm font-semibold ${mover.move >= 0 ? "text-engine" : "text-critical"}`}>
-                                {mover.move >= 0 ? "+" : ""}
-                                {mover.move.toFixed(1)}%
-                              </span>
-                            </div>
+                      <table className="w-full text-sm" data-testid="today-movers">
+                        <thead>
+                          <tr className="text-left text-[11px] uppercase tracking-wide text-outline">
+                            <th className="pb-2 font-medium">Symbol</th>
+                            <th className="pb-2 text-right font-medium">Last</th>
+                            <th className="pb-2 text-right font-medium">Day</th>
+                            <th className="pb-2 text-right font-medium">Volume</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketRows.map((row) => (
+                            <tr key={row.symbol} className="border-t border-outline-variant/40">
+                              <td className="py-2 font-semibold text-on-surface">{row.symbol}</td>
+                              <td className="mm-num py-2 text-right text-on-surface-variant">{formatPrice(row.last)}</td>
+                              <td className={`mm-num py-2 text-right font-semibold ${row.move >= 0 ? "text-engine" : "text-critical"}`}>
+                                {row.move >= 0 ? "+" : ""}
+                                {row.move.toFixed(1)}%
+                              </td>
+                              <td className="mm-num py-2 text-right text-on-surface-variant">
+                                {row.volumeRatio === null ? "—" : `${row.volumeRatio.toFixed(1)}×`}
+                              </td>
+                            </tr>
                           ))}
-                        </div>
-                      </div>
+                        </tbody>
+                      </table>
                     ) : briefFoldsIntoDecision ? (
                       <p className="text-sm text-on-surface-variant">No refreshed price moves in the latest read.</p>
                     ) : null}
@@ -227,6 +249,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             <Panel aria-labelledby="today-changes-title">
               <PanelHeader
                 titleId="today-changes-title"
+                eyebrow="03 · Activity"
                 title="What changed"
                 action={
                   <Link href="/activity" className="inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-violet hover:text-violet-soft">
@@ -259,7 +282,8 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             #today-chat links landing sensibly. */}
         <span id="today-chat" aria-hidden="true" className="block" />
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/40 pt-4">
+          <p className="text-xs leading-5 text-outline">{trackRecordLine ?? "Calls you save are graded against the price three days later."}</p>
           <TodayMemoryRefresh compact />
         </div>
       </div>
@@ -388,6 +412,39 @@ function topMovers(report: DailyReport | null) {
     .map((row) => ({ symbol: row.symbol, move: row.daily_move_pct as number }))
     .sort((a, b) => Math.abs(b.move) - Math.abs(a.move))
     .slice(0, 4);
+}
+
+/** Every refreshed row, biggest move first, for the compact market table. */
+function marketTable(report: DailyReport | null) {
+  if (!report) return [];
+  return report.market_rows
+    .filter((row) => row.daily_move_pct !== null && row.status === "refreshed")
+    .map((row) => ({
+      symbol: row.symbol,
+      last: row.latest_close,
+      move: row.daily_move_pct as number,
+      volumeRatio: row.volume_ratio,
+    }))
+    .sort((a, b) => Math.abs(b.move) - Math.abs(a.move))
+    .slice(0, 8);
+}
+
+function formatPrice(value: number | null) {
+  if (value === null) return "—";
+  return value >= 1000
+    ? value.toLocaleString("en-US", { maximumFractionDigits: 0 })
+    : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** One sentence that says what the page holds before any panel does. */
+function todayLede(input: { decisions: number; changes: number; personal: boolean; reportAt: string | null }) {
+  const parts = [
+    input.decisions === 0 ? "Nothing to decide" : `${input.decisions} decision${input.decisions === 1 ? "" : "s"} waiting`,
+    input.changes === 0 ? "no new activity" : `${input.changes} new change${input.changes === 1 ? "" : "s"}`,
+  ];
+  if (!input.reportAt) parts.push("no market read yet");
+  const sentence = `${parts.join(", ")}.`;
+  return input.personal ? sentence : `${sentence} Showing sample holdings until you add yours.`;
 }
 
 function todayDateLine(report: DailyReport | null) {

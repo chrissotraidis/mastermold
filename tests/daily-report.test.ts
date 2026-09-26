@@ -318,6 +318,22 @@ describe("today's plays", () => {
     expect(getLatestDailyReport()?.plays.every((play) => play.source === "llm")).toBe(true);
   });
 
+  test("GIVEN only demo holdings WHEN the report runs with an LLM key THEN no model call is made and rules plays stay", async () => {
+    let calls = 0;
+    const result = await runDailyReportRefresh({
+      now: new Date("2026-07-01T14:00:00.000Z"),
+      quoteFetcher: playQuotes(),
+      playsCompletion: async () => {
+        calls += 1;
+        return "{}";
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.detail);
+    expect(calls).toBe(0);
+    expect(result.report.plays.every((play) => play.source !== "llm")).toBe(true);
+  });
+
   test("GIVEN the LLM returns garbage or invented symbols WHEN plays are validated THEN the rules plays stay canonical", async () => {
     seedPortfolio();
     for (const badOutput of [
