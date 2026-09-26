@@ -347,16 +347,22 @@ export function AutopilotPanel() {
   const runtimeUnavailable = Boolean(state.runtime_unavailable);
 
   return (
-    <div className="rounded-md border border-outline-variant/25">
-      {/* Terminal tape first, right under the page title: the bot's current
-          activity (ticks, entries, exits, skips, blocks, analyst notes). */}
-      <div className="px-3 pt-2">
-        <AutopilotTerminal
-          activity={recentActivity}
-          decisions={data.recent_decisions ?? []}
-          gate={data.go_live_gate ?? null}
-        />
-      </div>
+    <div className="mm-panel overflow-hidden">
+      {/* The terminal tape only appears once the bot has something to say;
+          an empty black box read as broken. */}
+      {recentActivity.length > 0 || (data.recent_decisions ?? []).length > 0 ? (
+        <div className="px-3 pt-2">
+          <AutopilotTerminal
+            activity={recentActivity}
+            decisions={data.recent_decisions ?? []}
+            gate={data.go_live_gate ?? null}
+          />
+        </div>
+      ) : (
+        <p className="border-b border-outline-variant/40 px-4 py-3 text-sm text-on-surface-variant">
+          No bot activity recorded yet. The daemon writes its tape here when it runs (<code className="text-xs">npm run autopilot</code>; mode stays off).
+        </p>
+      )}
       {/* Cockpit row: mode, wallet, heartbeat, equity, kill switch. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
         <span className="flex items-center gap-2">

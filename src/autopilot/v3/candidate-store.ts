@@ -52,6 +52,12 @@ export type CandidateSnapshotRow = {
   max_favorable_2h_bps: number | null;
   /** True once the forward labels above have been computed. */
   labeled: boolean;
+  /**
+   * cusum_tb only: directional outcome of the traded 24h triple barrier —
+   * +barrier or −barrier at first touch, else the 24h return. Undefined
+   * until the 24h window has been observed (W1, docs/research-2026-09).
+   */
+  barrier_24h_bps?: number | null;
 };
 
 /** Input to appendCandidateSnapshot: id/ts generated when omitted; labels start null. */

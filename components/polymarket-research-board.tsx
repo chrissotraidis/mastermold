@@ -6,15 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
-import type { ResearchProgram, ResearchStatus } from "@/src/polymarket/research-program";
+/** Shared by both labs: any program with experiments, gates and retired ideas. */
+export type BoardStatus = "done" | "idle" | "measuring" | "insufficient" | "pass" | "fail" | "planned";
+export type BoardProgram = {
+  summary: string;
+  decision_doc: string;
+  experiments: Array<{ id: string; name: string; question: string; status: BoardStatus; evidence: string[]; gate: string; next: string }>;
+  retired: Array<{ name: string; reason: string }>;
+};
 
-const STATUS: Record<ResearchStatus, { label: string; variant: "up" | "muted" | "magenta" | "caution" | "down" }> = {
+const STATUS: Record<BoardStatus, { label: string; variant: "up" | "muted" | "magenta" | "caution" | "down" }> = {
   done: { label: "Done", variant: "up" },
   idle: { label: "Not collecting", variant: "muted" },
   measuring: { label: "Measuring", variant: "magenta" },
   insufficient: { label: "Not enough data", variant: "caution" },
   pass: { label: "Passed gate", variant: "up" },
   fail: { label: "Failed gate", variant: "down" },
+  planned: { label: "Planned", variant: "muted" },
 };
 
 /** The lab's research program: one card per pre-registered experiment. */
@@ -24,12 +32,18 @@ export function ResearchBoard({
   pending,
   canControl,
   lastCycleAt,
+  runLabel = "Run research cycle",
+  runTitle = "Reads markets and books and records shadow observations. Places no orders.",
+  statusLine,
 }: {
-  program: ResearchProgram;
+  program: BoardProgram;
   onRunResearch: () => void;
   pending: boolean;
   canControl: boolean;
   lastCycleAt: string | null;
+  runLabel?: string;
+  runTitle?: string;
+  statusLine?: string;
 }) {
   const [showRetired, setShowRetired] = useState(false);
   return (
@@ -42,12 +56,12 @@ export function ResearchBoard({
           <h2 id="research-program-title" className="font-display text-base font-semibold text-on-surface">Research program</h2>
           <p className="mt-1 text-sm leading-6 text-on-surface-variant">{program.summary}</p>
           <p className="mt-1 text-xs text-outline">
-            Last research cycle {lastCycleAt ? new Date(lastCycleAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "not run"} · paper
-            mode off · live orders locked · decision record: <code className="text-[11px]">{program.decision_doc}</code>
+            {statusLine ?? `Last research cycle ${lastCycleAt ? new Date(lastCycleAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "not run"} · paper mode off · live orders locked`} · decision record:{" "}
+            <code className="text-[11px]">{program.decision_doc}</code>
           </p>
         </div>
-        <Button variant="outline" disabled={pending || !canControl} onClick={onRunResearch} title="Reads markets and books and records shadow observations. Places no orders.">
-          <RefreshCw className={cn(pending && "animate-spin")} /> Run research cycle
+        <Button variant="outline" disabled={pending || !canControl} onClick={onRunResearch} title={runTitle}>
+          <RefreshCw className={cn(pending && "animate-spin")} /> {runLabel}
         </Button>
       </Panel>
 

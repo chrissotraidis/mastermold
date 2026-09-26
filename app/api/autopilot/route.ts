@@ -146,12 +146,18 @@ export function isAuthorizedLocalControlRequest(request: Request): boolean {
     const hostHeader = request.headers.get("host");
     if (hostHeader) {
       const headerUrl = new URL(`http://${hostHeader}`);
-      if (!loopbackHost(headerUrl.hostname) || headerUrl.host !== target.host) return false;
+      // Loopback aliases (localhost vs 127.0.0.1) may differ; the port may not.
+      if (!loopbackHost(headerUrl.hostname) || headerUrl.port !== target.port) return false;
     }
     const originHeader = request.headers.get("origin");
     if (!originHeader) return false;
     const origin = new URL(originHeader);
-    return loopbackHost(origin.hostname) && origin.origin === target.origin;
+    if (!loopbackHost(origin.hostname)) return false;
+    // The dev server can report request.url as localhost while the browser
+    // used 127.0.0.1; both are loopback. The browser's own Host header is the
+    // authority to match, so the Origin must equal it exactly.
+    if (hostHeader) return origin.host === hostHeader;
+    return origin.origin === target.origin;
   } catch {
     return false;
   }
