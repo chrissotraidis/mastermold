@@ -4,8 +4,9 @@ import { IntegrationKeyInput } from "@/components/integration-key-input";
 import { MonarchMcpPanel } from "@/components/monarch-mcp-panel";
 import { NotificationTestButton } from "@/components/notification-test-button";
 import { ProfileSettings } from "@/components/profile-settings";
-import { SettingsSection } from "@/components/settings-section";
 import { Badge } from "@/components/ui/badge";
+import { Panel } from "@/components/ui/panel";
+import { Bell, DatabaseBackup, MessageSquare, ShieldCheck, Sun, Wallet, type LucideIcon } from "lucide-react";
 import { productProvenanceLabel } from "@/lib/provenance-copy";
 import { cn } from "@/lib/utils";
 import {
@@ -84,32 +85,98 @@ export default async function SettingsPage() {
     : `Max trade ${formatSettingsCurrency(autopilot.caps.max_trade_usd)} · cap ${formatSettingsCurrency(autopilot.caps.daily_spend_limit_usd)}/day · live ${autopilotLive ? "on" : "off"}`;
   const healthStatus = `${publicDataMode} · ${portfolioSource.source_label} · report ${dailyReport ? dailyReport.run_date : "not saved"} · backup ${backup.status}`;
 
+  const moneyValue =
+    portfolio.provenance.label === "Demo data"
+      ? "Sample data"
+      : `${portfolio.holdings.length} holdings`;
+  const moneyDetail =
+    portfolio.provenance.label === "Demo data"
+      ? "Import your book or add holdings to make every page personal."
+      : `${portfolioSource.source_label} · as of ${formatStatusTime(portfolio.provenance.as_of)}`;
+
   return (
     <AppShell dataMode={publicProvenanceLabel}>
-      <div className="mx-auto grid w-full max-w-4xl gap-3 [&>*]:min-w-0">
+      <div className="grid w-full grid-cols-1 gap-6 [&>*]:min-w-0">
         <header>
-          <h1 className="font-display text-lg font-semibold text-on-surface">Settings</h1>
-          <p className="mt-0.5 text-xs text-outline">
-            Choose what to connect. Nothing here places trades, signs transactions, or moves funds.
-          </p>
+          <p className="mm-eyebrow">Choose what to connect. Nothing here places trades, signs transactions, or moves funds.</p>
+          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Settings</h1>
         </header>
+
+        <section aria-label="Status overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <StatusCard
+            icon={Wallet}
+            title="Your money"
+            value={moneyValue}
+            detail={moneyDetail}
+            tone={portfolio.provenance.label === "Demo data" ? "watch" : "ok"}
+            action={
+              portfolio.provenance.label === "Demo data"
+                ? { href: "/portfolio?action=import-holdings", label: "Import your book" }
+                : { href: "/portfolio", label: "Open Portfolio" }
+            }
+          />
+          <StatusCard
+            icon={MessageSquare}
+            title="Chat"
+            value={chatStatus}
+            detail="Optional. Needed only for model-written answers."
+            tone={chatIntegrations[0]?.status === "connected" ? "ok" : "muted"}
+            action={{ href: "#chat", label: chatIntegrations[0]?.status === "connected" ? "Manage" : "Add a key" }}
+          />
+          <StatusCard
+            icon={Sun}
+            title="Daily read"
+            value={dailyReport ? `Saved ${dailyReport.run_date}` : "Not saved yet"}
+            detail={
+              dailyReport
+                ? `${dailyReport.market_rows.filter((row) => row.status === "refreshed").length} symbols priced · next ${formatStatusTime(autoRefreshStatus.next_refresh_after)}`
+                : "Refresh Today to save the first report."
+            }
+            tone={dailyReport ? "ok" : "watch"}
+            action={{ href: "/?action=run-scan#run-scan", label: "Refresh now" }}
+          />
+          <StatusCard
+            icon={DatabaseBackup}
+            title="Backups"
+            value={backup.status === "fresh" ? "Fresh" : backup.status === "stale" ? "Stale" : backup.status === "missing" ? "Missing" : "Unavailable"}
+            detail={backup.created_at ? `Last ${formatStatusTime(backup.created_at)}` : "Run npm run backup, then npm run backup:verify."}
+            tone={backup.status === "fresh" ? "ok" : "watch"}
+            action={{ href: "#health", label: "Details" }}
+          />
+          <StatusCard
+            icon={Bell}
+            title="Notifications"
+            value={notificationsEnabled ? "On" : "Off"}
+            detail={notificationsStatus}
+            tone={notificationsEnabled ? "ok" : "muted"}
+            action={{ href: "#notifications", label: notificationsEnabled ? "Test" : "Set up" }}
+          />
+          <StatusCard
+            icon={ShieldCheck}
+            title="Research labs"
+            value={autopilotLive ? "Live enabled" : "Live locked"}
+            detail={autopilotStatus}
+            tone={autopilotLive ? "watch" : "ok"}
+            action={{ href: "#autopilot", label: "Details" }}
+          />
+        </section>
 
         <nav
           aria-label="First-run setup path"
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-outline-variant/25 px-3 py-2 text-xs leading-5 text-outline"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-outline-variant/50 px-4 py-3 text-xs leading-5 text-outline"
         >
           <span className="font-semibold text-on-surface">New here?</span>
-          <Link href="#profile" className="font-semibold text-violet hover:text-tertiary">
+          <Link href="#profile" className="font-semibold text-violet hover:text-violet-soft">
             Save local preferences
           </Link>
           <span aria-hidden="true">/</span>
-          <Link href="/portfolio" className="font-semibold text-violet hover:text-tertiary">
+          <Link href="/portfolio" className="font-semibold text-violet hover:text-violet-soft">
             {portfolio.provenance.label === "Manual portfolio" ? "review manual holdings" : "add holdings manually"}
           </Link>
           {chatIntegrations[0]?.status !== "connected" ? (
             <>
               <span aria-hidden="true">/</span>
-              <Link href="#chat" className="font-semibold text-violet hover:text-tertiary">
+              <Link href="#chat" className="font-semibold text-violet hover:text-violet-soft">
                 add a chat key if you want live answers
               </Link>
             </>
@@ -121,136 +188,106 @@ export default async function SettingsPage() {
           </span>
         </nav>
 
-        <div className="divide-y divide-outline-variant/15 rounded-md border border-outline-variant/25">
-          <SettingsSection
-            id="connections"
-            title="Connections"
-            status={connectionsStatus}
-            statusTone={connectedCount > 0 ? "ok" : "muted"}
-            aliases={["investment-awareness", "portfolio-connections"]}
-          >
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+          <SettingsPanel id="connections" title="Connections" status={connectionsStatus} className="lg:col-span-2">
             <span id="investment-awareness" aria-hidden="true" className="block scroll-mt-24" />
             <p className="text-xs leading-5 text-outline">
-              Read-only portfolio sources. Manual holdings are often the fastest first setup; to add
-              or edit them by hand, use{" "}
-              <Link href="/portfolio#add-holdings" className="text-violet hover:text-tertiary">
+              Read-only portfolio sources. The fastest setup is importing your book on{" "}
+              <Link href="/portfolio?action=import-holdings" className="text-violet hover:text-violet-soft">
                 Portfolio
               </Link>
               . Imports are snapshots only, not automatic brokerage trading.
             </p>
-            <div id="portfolio-connections" className="mt-2 grid scroll-mt-24 gap-2">
+            <div id="portfolio-connections" className="mt-3 grid scroll-mt-24 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
               <MonarchMcpPanel initialState={portfolioBrain} config={monarchConfig} />
-              <PortfolioImportStatusCard portfolio={portfolio} />
-              <ConnectionChecks integrations={portfolioIntegrations} commandGroup="portfolio" />
+              <div className="grid content-start gap-3">
+                <PortfolioImportStatusCard portfolio={portfolio} />
+                <ConnectionChecks integrations={portfolioIntegrations} commandGroup="portfolio" />
+              </div>
             </div>
-          </SettingsSection>
+          </SettingsPanel>
 
-          <SettingsSection id="profile" title="Profile" status="Saved in this browser">
-            <ProfileSettings />
-          </SettingsSection>
-
-          <SettingsSection
-            id="chat"
-            title="Chat"
-            status={chatStatus}
-            statusTone={chatIntegrations[0]?.status === "connected" ? "ok" : "muted"}
-            aliases={["ai-chat-keys"]}
-          >
+          <SettingsPanel id="chat" title="Chat" status={chatStatus}>
             <span id="ai-chat-keys" aria-hidden="true" className="block scroll-mt-24" />
             <p className="text-xs leading-5 text-outline">
-              Optional. App commands and sample screens work without a chat key. Add an OpenRouter,
-              OpenAI, or Anthropic key only if you want model-written answers using visible app context.
+              Optional. App commands and sample screens work without a chat key. Add a key only if you want model-written answers using visible app context.
             </p>
-            <div className="mt-2">
+            <div className="mt-3">
               {chatIntegrations.length > 0 ? (
                 <ConnectionChecks integrations={chatIntegrations} commandGroup="chat" />
               ) : (
-                <p className="rounded-md border border-outline-variant/25 px-3 py-2 text-xs leading-5 text-outline">
+                <p className="rounded-xl border border-outline-variant/50 px-3 py-2 text-xs leading-5 text-outline">
                   No live chat provider is configured in this build.
                 </p>
               )}
             </div>
-          </SettingsSection>
+          </SettingsPanel>
 
-          <SettingsSection
-            id="autopilot"
-            title="Research labs"
-            status={autopilotStatus}
-            statusTone={autopilot.runtime_unavailable ? "muted" : autopilot.kill_switch ? "watch" : autopilot.daemon === "live" ? "ok" : "muted"}
-            aliases={["web3-wallet-trading"]}
-          >
+          <SettingsPanel id="profile" title="Profile" status="Saved in this browser">
+            <ProfileSettings />
+          </SettingsPanel>
+
+          <SettingsPanel id="autopilot" title="Research labs" status={autopilotStatus}>
             <span id="web3-wallet-trading" aria-hidden="true" className="block scroll-mt-24" />
-            <p className="mb-2 text-xs leading-5 text-outline">
+            <p className="mb-3 text-xs leading-5 text-outline">
               These are separate paper/research lanes, not the core Today → Portfolio → Journal loop and not evidence of profit.
-              Open the <Link href="/trading" className="font-semibold text-violet hover:text-tertiary">Web3 lab</Link> or the{" "}
-              <Link href="/polymarket" className="font-semibold text-violet hover:text-tertiary">Polymarket lab</Link>.
+              Open the <Link href="/trading" className="font-semibold text-violet hover:text-violet-soft">Web3 lab</Link> or the{" "}
+              <Link href="/polymarket" className="font-semibold text-violet hover:text-violet-soft">Polymarket lab</Link>.
             </p>
-            <div className="grid gap-2">
+            <div className="grid gap-3">
               <AutopilotSettingsSummary state={autopilot} />
-              <details className="rounded-md border border-outline-variant/25 px-3 py-2">
+              <details className="rounded-xl border border-outline-variant/50 px-3 py-2">
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-on-surface marker:hidden [&::-webkit-details-marker]:hidden">
                   <span>Technical details</span>
                   <span className="text-outline">Bot room and raw status</span>
                 </summary>
-                <p className="border-t border-outline-variant/15 pt-2 text-xs leading-5 text-outline">
+                <p className="border-t border-outline-variant/40 pt-2 text-xs leading-5 text-outline">
                   Trade controls, daemon status, wallet provisioning, and go-live evidence live in{" "}
-                  <Link href="/trading" className="font-semibold text-violet hover:text-tertiary">
+                  <Link href="/trading" className="font-semibold text-violet hover:text-violet-soft">
                     Web3 lab
                   </Link>
                   . Raw troubleshooting payload:{" "}
-                  <a href="/api/autopilot" className="font-semibold text-violet hover:text-tertiary">
+                  <a href="/api/autopilot" className="font-semibold text-violet hover:text-violet-soft">
                     status JSON
                   </a>
                   .
                 </p>
               </details>
             </div>
-          </SettingsSection>
+          </SettingsPanel>
 
-          <SettingsSection
-            id="notifications"
-            title="Notifications"
-            status={notificationsStatus}
-            statusTone={notificationsEnabled ? "ok" : "muted"}
-          >
+          <SettingsPanel id="notifications" title="Notifications" status={notificationsStatus}>
             <p className="text-xs leading-5 text-outline">
-              Optional. The bot pushes fills, halts, the daily Analyst review, and backup failures to
-              Telegram and/or the desktop. Configuration lives in <code>.env.local</code> because the
-              daemon reads it too — the browser can&apos;t own this key:
+              Optional. The bot pushes fills, halts, the daily Analyst review, and backup failures to Telegram and/or the desktop. Configuration lives in{" "}
+              <code>.env.local</code> because the daemon reads it too — the browser can&apos;t own this key:
             </p>
-            <pre className="mt-2 overflow-x-auto rounded-md border border-outline-variant/25 bg-surface-dim/40 px-3 py-2 text-xs leading-5 text-on-surface-variant">
+            <pre className="mt-2 overflow-x-auto rounded-xl border border-outline-variant/50 bg-surface-lowest/70 px-3 py-2 text-xs leading-5 text-on-surface-variant">
               {"NOTIFY_TELEGRAM_BOT_TOKEN=   # from @BotFather\nNOTIFY_TELEGRAM_CHAT_ID=     # your chat id\nNOTIFY_DESKTOP=false         # macOS notification center"}
             </pre>
-            <p className="mt-1 text-xs leading-5 text-outline">
+            <p className="mt-2 text-xs leading-5 text-outline">
               Restart <code>npm run up</code> after editing, then prove the pipe:
             </p>
             <div className="mt-2">
               <NotificationTestButton />
             </div>
-          </SettingsSection>
+          </SettingsPanel>
 
-          <SettingsSection
-            id="safety"
-            title="Safety and privacy"
-            status={safetyStatus}
-            statusTone={autopilotLive ? "watch" : "muted"}
-            aliases={["safety-limits", "data-privacy"]}
-          >
+          <SettingsPanel id="safety" title="Safety and privacy" status={safetyStatus}>
             <span id="safety-limits" aria-hidden="true" className="block scroll-mt-24" />
-            <div className="grid gap-2">
+            <div className="grid gap-3">
               <SafetyLimitsSettingsCard caps={autopilot.caps} liveExecutionPermitted={autopilotLive} />
               <DataPrivacyCard />
             </div>
-          </SettingsSection>
+          </SettingsPanel>
 
-          <SettingsSection id="health" title="System health" status={healthStatus}>
+          <SettingsPanel id="health" title="System health" status={healthStatus} className="lg:col-span-2">
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-xs leading-5 text-outline">Data mode, sources, and report freshness.</p>
-              <a href="/api/health" className="text-xs font-semibold text-violet hover:text-tertiary">
+              <a href="/api/health" className="text-xs font-semibold text-violet hover:text-violet-soft">
                 Health JSON
               </a>
             </div>
-            <dl className="mt-2 divide-y divide-outline-variant/15 rounded-md border border-outline-variant/25">
+            <dl className="mt-3 grid divide-y divide-outline-variant/30 rounded-xl border border-outline-variant/50 md:grid-cols-2 md:divide-y-0">
               <HealthRow label="Data mode" value={publicDataMode} />
               <HealthRow
                 label="Portfolio source"
@@ -282,16 +319,82 @@ export default async function SettingsPage() {
                   : "The current Web3 runtime is not live. Polymarket live execution remains unavailable."}
               />
             </dl>
-          </SettingsSection>
+          </SettingsPanel>
         </div>
       </div>
     </AppShell>
   );
 }
 
+function SettingsPanel({
+  id,
+  title,
+  status,
+  className,
+  children,
+}: {
+  id: string;
+  title: string;
+  status?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Panel id={id} aria-labelledby={`${id}-title`} className={cn("scroll-mt-24", className)}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-5">
+        <h2 id={`${id}-title`} className="font-display text-base font-semibold text-on-surface">
+          {title}
+        </h2>
+        {status ? <span className="min-w-0 truncate text-xs text-outline">{status}</span> : null}
+      </div>
+      <div className="p-5 pt-3">{children}</div>
+    </Panel>
+  );
+}
+
+function StatusCard({
+  icon: Icon,
+  title,
+  value,
+  detail,
+  tone,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  value: string;
+  detail: string;
+  tone: "ok" | "watch" | "muted";
+  action: { href: string; label: string };
+}) {
+  return (
+    <div className="mm-panel flex min-w-0 items-start gap-3 p-4">
+      <span
+        className={cn(
+          "flex size-10 shrink-0 items-center justify-center rounded-xl",
+          tone === "ok" ? "bg-engine/10 text-engine" : tone === "watch" ? "bg-caution/10 text-caution" : "bg-surface-high/70 text-outline",
+        )}
+      >
+        <Icon aria-hidden="true" className="size-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="mm-eyebrow">{title}</p>
+        <p className="mt-0.5 truncate font-display text-base font-semibold text-on-surface">{value}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-outline">{detail}</p>
+      </div>
+      <Link
+        href={action.href}
+        className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-outline-variant/60 px-3 text-xs font-semibold text-on-surface transition hover:border-violet/50 hover:text-violet sm:min-h-9"
+      >
+        {action.label}
+      </Link>
+    </div>
+  );
+}
+
 function HealthRow({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="px-3 py-2">
+    <div className="px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
         <dt className="text-sm text-on-surface-variant">{label}</dt>
         <dd className="text-right text-sm font-semibold text-on-surface">{value}</dd>
@@ -310,7 +413,7 @@ function ConnectionChecks({
 }) {
   // One status row per provider; the key-entry form only appears on demand.
   return (
-    <div className="divide-y divide-outline-variant/15 rounded-md border border-outline-variant/25">
+    <div className="divide-y divide-outline-variant/15 rounded-xl border border-outline-variant/50">
       {integrations.map((integration, index) => (
         // The primary provider stays open so routed command actions
         // (action=test-portfolio-connection) land on a visible form.
@@ -352,7 +455,7 @@ function PortfolioImportStatusCard({ portfolio }: { portfolio: ReturnType<typeof
       : "No account holdings imported yet. Check account access, then press Import holdings.";
 
   return (
-    <div className="rounded-md border border-outline-variant/25 px-3 py-2">
+    <div className="rounded-xl border border-outline-variant/50 px-3 py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-on-surface">Import status</h3>
         <span className="text-xs text-outline">
@@ -364,7 +467,7 @@ function PortfolioImportStatusCard({ portfolio }: { portfolio: ReturnType<typeof
         {statusNote} One-time import; import again for current balances.
       </p>
       {hasImportIssues ? (
-        <details className="mt-2 rounded-md border border-outline-variant/25 px-3 py-1">
+        <details className="mt-2 rounded-xl border border-outline-variant/50 px-3 py-1">
           <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-on-surface">
             Import issues
           </summary>
@@ -385,7 +488,7 @@ function PortfolioImportStatusCard({ portfolio }: { portfolio: ReturnType<typeof
 
 function AutopilotSettingsSummary({ state }: { state: ReturnType<typeof getAutopilotState> }) {
   return (
-    <div className="rounded-md border border-outline-variant/25 px-3 py-2">
+    <div className="rounded-xl border border-outline-variant/50 px-3 py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-on-surface">Autopilot paper bot · {modeCopy(state.mode)}</h3>
         <Badge
@@ -428,7 +531,7 @@ function SafetyLimitsSettingsCard({
   liveExecutionPermitted: boolean;
 }) {
   return (
-    <div className="rounded-md border border-outline-variant/25 px-3 py-2">
+    <div className="rounded-xl border border-outline-variant/50 px-3 py-2">
       <p className="text-sm text-on-surface">
         <span className="font-semibold">Safety limits</span>
         <span className="text-on-surface-variant">
@@ -466,22 +569,21 @@ function DataPrivacyCard() {
     },
   ];
 
-  // Read-once boilerplate lives behind one row.
   return (
-    <details id="data-privacy" className="scroll-mt-24 rounded-md border border-outline-variant/25">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 marker:hidden [&::-webkit-details-marker]:hidden">
+    <div id="data-privacy" className="scroll-mt-24 rounded-xl border border-outline-variant/50">
+      <p className="flex min-h-11 items-center justify-between gap-3 px-3 py-2">
         <span className="text-sm font-semibold text-on-surface">Data privacy</span>
         <span className="text-xs text-outline">What stays local, what can leave</span>
-      </summary>
-      <div className="grid gap-3 border-t border-outline-variant/15 px-3 py-3 sm:grid-cols-2">
+      </p>
+      <div className="grid gap-3 border-t border-outline-variant/40 px-3 py-3 sm:grid-cols-2">
         {items.map((item) => (
           <div key={item.label} className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-telemetry text-outline">{item.label}</p>
+            <p className="mm-eyebrow">{item.label}</p>
             <p className="mt-1 text-xs leading-5 text-on-surface-variant">{item.detail}</p>
           </div>
         ))}
       </div>
-    </details>
+    </div>
   );
 }
 
@@ -503,7 +605,8 @@ function StatusBadge({ status }: { status: IntegrationStatusJson["status"] }) {
 }
 
 function integrationStatusLabel(integration: SettingsIntegrationStatus) {
-  if (integration.status === "connected") return "Test passed";
+  // A server key being present is not the same as a passed test.
+  if (integration.status === "connected") return integration.service === "live_chat" ? "Server key set" : "Test passed";
   if (integration.status === "stubbed") return integration.service === "live_chat" ? "No chat key" : "Sample mode";
   if (integration.service === "live_chat") return "Chat key missing";
   return "Key needed";

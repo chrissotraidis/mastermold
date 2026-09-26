@@ -943,7 +943,7 @@ describe("mobile ergonomics source contracts", () => {
     const imports = source("src/db/portfolio-imports.ts");
 
     expect(settingsPage).toContain("Read-only portfolio sources.");
-    expect(settingsPage).toContain("Manual holdings are often the fastest first setup");
+    expect(settingsPage).toContain("The fastest setup is importing your book on");
     expect(settingsPage).toContain("Stays in this browser");
     expect(settingsPage).toContain("Sent to this local app");
     expect(settingsPage).toContain("Can leave this app");
