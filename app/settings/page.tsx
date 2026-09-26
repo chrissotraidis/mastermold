@@ -22,6 +22,7 @@ import { getPortfolio } from "@/src/db/portfolio";
 import { notifyConfigFromEnv, notifyEnabled } from "@/src/autopilot/notify";
 import { getPortfolioBrainScanContext, getPortfolioBrainState } from "@/src/db/portfolio-brain";
 import { getAutopilotState } from "@/src/autopilot/control";
+import { Tabs } from "@/components/ui/tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -161,166 +162,177 @@ export default async function SettingsPage() {
           />
         </section>
 
-        <nav
-          aria-label="First-run setup path"
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-outline-variant/50 px-4 py-3 text-xs leading-5 text-outline"
-        >
-          <span className="font-semibold text-on-surface">New here?</span>
-          <Link href="#profile" className="font-semibold text-violet hover:text-violet-soft">
-            Save local preferences
-          </Link>
-          <span aria-hidden="true">/</span>
-          <Link href="/portfolio" className="font-semibold text-violet hover:text-violet-soft">
-            {portfolio.provenance.label === "Manual portfolio" ? "review manual holdings" : "add holdings manually"}
-          </Link>
-          {chatIntegrations[0]?.status !== "connected" ? (
-            <>
-              <span aria-hidden="true">/</span>
-              <Link href="#chat" className="font-semibold text-violet hover:text-violet-soft">
-                add a chat key if you want live answers
-              </Link>
-            </>
-          ) : null}
-          <span className="basis-full text-outline sm:basis-auto">
-            {portfolio.provenance.label === "Manual portfolio"
-              ? "Manual portfolio active. Account connections remain separate."
-              : "Sample data stays separate until you add your own context."}
-          </span>
-        </nav>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
-          <SettingsPanel id="connections" title="Connections" status={connectionsStatus} className="lg:col-span-2">
-            <span id="investment-awareness" aria-hidden="true" className="block scroll-mt-24" />
-            <p className="text-xs leading-5 text-outline">
-              Read-only portfolio sources. The fastest setup is importing your book on{" "}
-              <Link href="/portfolio?action=import-holdings" className="text-violet hover:text-violet-soft">
-                Portfolio
-              </Link>
-              . Imports are snapshots only, not automatic brokerage trading.
-            </p>
-            <div id="portfolio-connections" className="mt-3 grid scroll-mt-24 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
-              <MonarchMcpPanel initialState={portfolioBrain} config={monarchConfig} />
-              <div className="grid content-start gap-3">
-                <PortfolioImportStatusCard portfolio={portfolio} />
-                <ConnectionChecks integrations={portfolioIntegrations} commandGroup="portfolio" />
-              </div>
-            </div>
-          </SettingsPanel>
-
-          <SettingsPanel id="chat" title="Chat" status={chatStatus}>
-            <span id="ai-chat-keys" aria-hidden="true" className="block scroll-mt-24" />
-            <p className="text-xs leading-5 text-outline">
-              Optional. App commands and sample screens work without a chat key. Add a key only if you want model-written answers using visible app context.
-            </p>
-            <div className="mt-3">
-              {chatIntegrations.length > 0 ? (
-                <ConnectionChecks integrations={chatIntegrations} commandGroup="chat" />
-              ) : (
-                <p className="rounded-xl border border-outline-variant/50 px-3 py-2 text-xs leading-5 text-outline">
-                  No live chat provider is configured in this build.
-                </p>
-              )}
-            </div>
-          </SettingsPanel>
-
-          <SettingsPanel id="profile" title="Profile" status="Saved in this browser">
-            <ProfileSettings />
-          </SettingsPanel>
-
-          <SettingsPanel id="autopilot" title="Research labs" status={autopilotStatus}>
-            <span id="web3-wallet-trading" aria-hidden="true" className="block scroll-mt-24" />
+        <Tabs
+          label="Settings sections"
+          items={[
+            {
+              id: "connections",
+              label: "Accounts",
+              anchors: ["investment-awareness", "portfolio-connections"],
+              content: (
+                <SettingsPanel id="connections" title="Connections" status={connectionsStatus}>
+                  <span id="investment-awareness" aria-hidden="true" className="block scroll-mt-24" />
+                  <p className="text-xs leading-5 text-outline">
+                    Read-only portfolio sources. The fastest setup is importing your book on{" "}
+                    <Link href="/portfolio?action=import-holdings" className="text-violet hover:text-violet-soft">
+                      Portfolio
+                    </Link>
+                    . Imports are snapshots only, not automatic brokerage trading.
+                  </p>
+                  <div id="portfolio-connections" className="mt-3 grid scroll-mt-24 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
+                    <MonarchMcpPanel initialState={portfolioBrain} config={monarchConfig} />
+                    <div className="grid content-start gap-3">
+                      <PortfolioImportStatusCard portfolio={portfolio} />
+                      <ConnectionChecks integrations={portfolioIntegrations} commandGroup="portfolio" />
+                    </div>
+                  </div>
+                </SettingsPanel>
+              ),
+            },
+            {
+              id: "chat",
+              label: "Chat",
+              anchors: ["ai-chat-keys"],
+              content: (
+                <SettingsPanel id="chat" title="Chat" status={chatStatus}>
+                  <span id="ai-chat-keys" aria-hidden="true" className="block scroll-mt-24" />
+                  <p className="text-xs leading-5 text-outline">
+                    Optional. App commands and sample screens work without a chat key. Add a key only if you want model-written answers using visible app context.
+                  </p>
+                  <div className="mt-3">
+                    {chatIntegrations.length > 0 ? (
+                      <ConnectionChecks integrations={chatIntegrations} commandGroup="chat" />
+                    ) : (
+                      <p className="rounded-xl border border-outline-variant/50 px-3 py-2 text-xs leading-5 text-outline">
+                        No live chat provider is configured in this build.
+                      </p>
+                    )}
+                  </div>
+                </SettingsPanel>
+              ),
+            },
+            {
+              id: "profile",
+              label: "Profile",
+              content: (
+                <SettingsPanel id="profile" title="Profile" status="Saved in this browser">
+                  <ProfileSettings />
+                </SettingsPanel>
+              ),
+            },
+            {
+              id: "autopilot",
+              label: "Labs & safety",
+              anchors: ["web3-wallet-trading", "safety", "safety-limits", "data-privacy"],
+              content: (
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+                  <SettingsPanel id="autopilot" title="Research labs" status={autopilotStatus}>
+                    <span id="web3-wallet-trading" aria-hidden="true" className="block scroll-mt-24" />
             <p className="mb-3 text-xs leading-5 text-outline">
-              These are separate paper/research lanes, not the core Today → Portfolio → Journal loop and not evidence of profit.
-              Open the <Link href="/trading" className="font-semibold text-violet hover:text-violet-soft">Web3 lab</Link> or the{" "}
+              Paper research lanes, separate from your money and not evidence of profit. Open the{" "}
+              <Link href="/trading" className="font-semibold text-violet hover:text-violet-soft">Web3 lab</Link> or the{" "}
               <Link href="/polymarket" className="font-semibold text-violet hover:text-violet-soft">Polymarket lab</Link>.
             </p>
-            <div className="grid gap-3">
-              <AutopilotSettingsSummary state={autopilot} />
-              <details className="rounded-xl border border-outline-variant/50 px-3 py-2">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-on-surface marker:hidden [&::-webkit-details-marker]:hidden">
-                  <span>Technical details</span>
-                  <span className="text-outline">Bot room and raw status</span>
-                </summary>
-                <p className="border-t border-outline-variant/40 pt-2 text-xs leading-5 text-outline">
-                  Trade controls, daemon status, wallet provisioning, and go-live evidence live in{" "}
-                  <Link href="/trading" className="font-semibold text-violet hover:text-violet-soft">
-                    Web3 lab
-                  </Link>
-                  . Raw troubleshooting payload:{" "}
-                  <a href="/api/autopilot" className="font-semibold text-violet hover:text-violet-soft">
-                    status JSON
-                  </a>
-                  .
-                </p>
-              </details>
-            </div>
-          </SettingsPanel>
-
-          <SettingsPanel id="notifications" title="Notifications" status={notificationsStatus}>
-            <p className="text-xs leading-5 text-outline">
-              Optional. The bot pushes fills, halts, the daily Analyst review, and backup failures to Telegram and/or the desktop. Configuration lives in{" "}
-              <code>.env.local</code> because the daemon reads it too — the browser can&apos;t own this key:
-            </p>
-            <pre className="mt-2 overflow-x-auto rounded-xl border border-outline-variant/50 bg-surface-lowest/70 px-3 py-2 text-xs leading-5 text-on-surface-variant">
-              {"NOTIFY_TELEGRAM_BOT_TOKEN=   # from @BotFather\nNOTIFY_TELEGRAM_CHAT_ID=     # your chat id\nNOTIFY_DESKTOP=false         # macOS notification center"}
-            </pre>
-            <p className="mt-2 text-xs leading-5 text-outline">
-              Restart <code>npm run up</code> after editing, then prove the pipe:
-            </p>
-            <div className="mt-2">
-              <NotificationTestButton />
-            </div>
-          </SettingsPanel>
-
-          <SettingsPanel id="safety" title="Safety and privacy" status={safetyStatus}>
-            <span id="safety-limits" aria-hidden="true" className="block scroll-mt-24" />
-            <div className="grid gap-3">
-              <SafetyLimitsSettingsCard caps={autopilot.caps} liveExecutionPermitted={autopilotLive} />
-              <DataPrivacyCard />
-            </div>
-          </SettingsPanel>
-
-          <SettingsPanel id="health" title="System health" status={healthStatus} className="lg:col-span-2">
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="text-xs leading-5 text-outline">Data mode, sources, and report freshness.</p>
-              <a href="/api/health" className="text-xs font-semibold text-violet hover:text-violet-soft">
-                Health JSON
-              </a>
-            </div>
-            <dl className="mt-3 grid divide-y divide-outline-variant/30 rounded-xl border border-outline-variant/50 md:grid-cols-2 md:divide-y-0">
-              <HealthRow label="Data mode" value={publicDataMode} />
-              <HealthRow
-                label="Portfolio source"
-                value={portfolioSource.source_label}
-                detail={`${portfolioSource.holdings_count} visible holding${portfolioSource.holdings_count === 1 ? "" : "s"}${portfolioSource.as_of ? ` · as of ${formatStatusTime(portfolioSource.as_of)}` : ""}`}
-              />
-              <HealthRow
-                label="Daily report"
-                value={dailyReport ? dailyReport.run_date : "Not saved yet"}
-                detail={
-                  dailyReport
-                    ? `${dailyReport.market_rows.filter((row) => row.status === "refreshed").length} symbols refreshed, ${dailyReport.freshness.skipped_symbols.length} skipped · auto-refresh ${autoRefreshStatus.due ? "due" : "on"}, next ${formatStatusTime(autoRefreshStatus.next_refresh_after)}`
-                    : "Use Refresh today on Today to save the first report."
-                }
-              />
-              <HealthRow
-                label="Evidence backup"
-                value={backup.status === "fresh" ? "Fresh" : backup.status === "stale" ? "Stale" : backup.status === "missing" ? "Missing" : "Unavailable"}
-                detail={backup.created_at
-                  ? `${backup.files.length} stores · created ${formatStatusTime(backup.created_at)} · verify recovery with npm run backup:verify`
-                  : `${backup.detail} Run npm run backup, then npm run backup:verify.`}
-              />
-              <HealthRow label="Access" value="Loopback operator" detail="Remote access is fail-closed and requires configured operator or read-only viewer credentials." />
-              <HealthRow
-                label="Web3 live runtime"
-                value={autopilotLive ? "Enabled" : "Off or locked"}
-                detail={autopilotLive
-                  ? "Autopilot reports live mode. Confirm the wallet, caps, and real lane controls before relying on this state."
-                  : "The current Web3 runtime is not live. Polymarket live execution remains unavailable."}
-              />
-            </dl>
-          </SettingsPanel>
-        </div>
+                    <div className="grid gap-3">
+                      <AutopilotSettingsSummary state={autopilot} />
+                      <details className="rounded-xl border border-outline-variant/50 px-3 py-2">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-on-surface marker:hidden [&::-webkit-details-marker]:hidden">
+                          <span>Technical details</span>
+                          <span className="text-outline">Bot room and raw status</span>
+                        </summary>
+                        <p className="border-t border-outline-variant/40 pt-2 text-xs leading-5 text-outline">
+                          Trade controls, daemon status, wallet provisioning, and go-live evidence live in{" "}
+                          <Link href="/trading" className="font-semibold text-violet hover:text-violet-soft">
+                            Web3 lab
+                          </Link>
+                          . Raw troubleshooting payload:{" "}
+                          <a href="/api/autopilot" className="font-semibold text-violet hover:text-violet-soft">
+                            status JSON
+                          </a>
+                          .
+                        </p>
+                      </details>
+                    </div>
+                  </SettingsPanel>
+                  <SettingsPanel id="safety" title="Safety and privacy" status={safetyStatus}>
+                    <span id="safety-limits" aria-hidden="true" className="block scroll-mt-24" />
+                    <div className="grid gap-3">
+                      <SafetyLimitsSettingsCard caps={autopilot.caps} liveExecutionPermitted={autopilotLive} />
+                      <DataPrivacyCard />
+                    </div>
+                  </SettingsPanel>
+                </div>
+              ),
+            },
+            {
+              id: "notifications",
+              label: "Notifications",
+              content: (
+                <SettingsPanel id="notifications" title="Notifications" status={notificationsStatus}>
+                  <p className="text-xs leading-5 text-outline">
+                    Optional. The bot pushes fills, halts, the daily Analyst review, and backup failures to Telegram and/or the desktop. Configuration lives in{" "}
+                    <code>.env.local</code> because the daemon reads it too — the browser can&apos;t own this key:
+                  </p>
+                  <pre className="mt-2 overflow-x-auto rounded-xl border border-outline-variant/50 bg-surface-lowest/70 px-3 py-2 text-xs leading-5 text-on-surface-variant">
+                    {"NOTIFY_TELEGRAM_BOT_TOKEN=   # from @BotFather\nNOTIFY_TELEGRAM_CHAT_ID=     # your chat id\nNOTIFY_DESKTOP=false         # macOS notification center"}
+                  </pre>
+                  <p className="mt-2 text-xs leading-5 text-outline">
+                    Restart <code>npm run up</code> after editing, then prove the pipe:
+                  </p>
+                  <div className="mt-2">
+                    <NotificationTestButton />
+                  </div>
+                </SettingsPanel>
+              ),
+            },
+            {
+              id: "health",
+              label: "System",
+              content: (
+                <SettingsPanel id="health" title="System health" status={healthStatus}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-xs leading-5 text-outline">Data mode, sources, and report freshness.</p>
+                    <a href="/api/health" className="text-xs font-semibold text-violet hover:text-violet-soft">
+                      Health JSON
+                    </a>
+                  </div>
+                  <dl className="mt-3 grid divide-y divide-outline-variant/30 rounded-xl border border-outline-variant/50 md:grid-cols-2 md:divide-y-0">
+                    <HealthRow label="Data mode" value={publicDataMode} />
+                    <HealthRow
+                      label="Portfolio source"
+                      value={portfolioSource.source_label}
+                      detail={`${portfolioSource.holdings_count} visible holding${portfolioSource.holdings_count === 1 ? "" : "s"}${portfolioSource.as_of ? ` · as of ${formatStatusTime(portfolioSource.as_of)}` : ""}`}
+                    />
+                    <HealthRow
+                      label="Daily report"
+                      value={dailyReport ? dailyReport.run_date : "Not saved yet"}
+                      detail={
+                        dailyReport
+                          ? `${dailyReport.market_rows.filter((row) => row.status === "refreshed").length} symbols refreshed, ${dailyReport.freshness.skipped_symbols.length} skipped · auto-refresh ${autoRefreshStatus.due ? "due" : "on"}, next ${formatStatusTime(autoRefreshStatus.next_refresh_after)}`
+                          : "Use Refresh today on Today to save the first report."
+                      }
+                    />
+                    <HealthRow
+                      label="Evidence backup"
+                      value={backup.status === "fresh" ? "Fresh" : backup.status === "stale" ? "Stale" : backup.status === "missing" ? "Missing" : "Unavailable"}
+                      detail={backup.created_at
+                        ? `${backup.files.length} stores · created ${formatStatusTime(backup.created_at)} · verify recovery with npm run backup:verify`
+                        : `${backup.detail} Run npm run backup, then npm run backup:verify.`}
+                    />
+                    <HealthRow label="Access" value="Loopback operator" detail="Remote access is fail-closed and requires configured operator or read-only viewer credentials." />
+                    <HealthRow
+                      label="Web3 live runtime"
+                      value={autopilotLive ? "Enabled" : "Off or locked"}
+                      detail={autopilotLive
+                        ? "Autopilot reports live mode. Confirm the wallet, caps, and real lane controls before relying on this state."
+                        : "The current Web3 runtime is not live. Polymarket live execution remains unavailable."}
+                    />
+                  </dl>
+                </SettingsPanel>
+              ),
+            },
+          ]}
+        />
       </div>
     </AppShell>
   );

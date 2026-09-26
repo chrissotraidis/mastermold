@@ -306,7 +306,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(profileSettings).toContain("Profile settings live in this browser");
     expect(profileSettings).toContain("<summary className=\"flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 marker:hidden [&::-webkit-details-marker]:hidden\">");
     expect(settingsPage).toContain("Choose what to connect. Nothing here places trades, signs transactions, or moves funds.");
-    expect(settingsPage).toContain("New here?");
+    expect(settingsPage).toContain('label="Settings sections"');
     expect(settingsPage).toContain('id="connections"');
     expect(settingsPage).toContain('id="profile"');
     expect(settingsPage).toContain('id="chat"');
@@ -894,7 +894,7 @@ describe("mobile ergonomics source contracts", () => {
     const imports = source("src/db/portfolio-imports.ts");
 
     expect(settingsPage).toContain("Choose what to connect. Nothing here places trades, signs transactions, or moves funds.");
-    expect(settingsPage).toContain("New here?");
+    expect(settingsPage).toContain('label="Settings sections"');
     expect(settingsPage).toContain('id="connections"');
     expect(settingsPage).toContain('id="profile"');
     expect(settingsPage).toContain('id="chat"');

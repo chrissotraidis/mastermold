@@ -27,7 +27,7 @@ describe("product hierarchy truthfulness", () => {
 
     expect(shell).toContain('label: "Web3 lab"');
     expect(shell).toContain('label: "Polymarket lab"');
-    expect(settings).toContain("not the core Today → Portfolio → Journal loop and not evidence of profit");
+    expect(settings).toContain("separate from your money and not evidence of profit");
     expect(settings).toContain('href="/trading"');
     expect(settings).toContain('href="/polymarket"');
     expect(web3).toContain("Research lab · separate lane");
