@@ -10,6 +10,7 @@ import { PolymarketBrainPanel } from "@/components/polymarket-brain-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ResearchBoard } from "@/components/polymarket-research-board";
 import { cn } from "@/lib/utils";
 
 type ControlBody = Record<string, string | number>;
@@ -80,6 +81,16 @@ export function PolymarketPanel() {
         </div>
       ) : null}
 
+      <ResearchBoard
+        program={data.research_program}
+        onRunResearch={() => control({ action: "run_brain_cycle" })}
+        pending={pending}
+        canControl={canControl}
+        lastCycleAt={data.brain.latest_cycle_at}
+      />
+
+      <h2 className="mm-eyebrow pt-4">Paper lane and live market read</h2>
+
       {!canControl ? (
         <p className="rounded-md border border-caution/35 bg-caution/5 px-4 py-2 text-xs leading-5 text-caution">
           <LockKeyhole className="mr-2 inline size-3.5" /> {data.control_access.detail}
@@ -127,7 +138,13 @@ export function PolymarketPanel() {
             <Button variant="outline" disabled={pending || !armed || !canControl} onClick={() => control({ action: "run_cycle" })}>
               <RefreshCw className={cn(pending && "animate-spin")} /> Run cycle
             </Button>
-            <Button variant="destructive" disabled={pending || halted || !canControl} onClick={() => control({ action: "kill" })}>
+            <Button
+              variant={armed ? "destructive" : "outline"}
+              className={cn(!armed && "text-critical hover:text-critical")}
+              disabled={pending || halted || !canControl}
+              onClick={() => control({ action: "kill" })}
+              title={armed ? "Stop the paper bot and engage the kill switch" : "Engage the kill switch (paper mode is already off)"}
+            >
               <OctagonAlert /> Halt lane
             </Button>
           </div>

@@ -135,10 +135,12 @@ export function negRiskCandidate(result: NegRiskBasketResult, event: NegRiskEven
   };
 }
 
-let lastScan: { at: string; results: NegRiskBasketResult[] } | null = null;
+// Process-wide so a dev-server module reload doesn't forget the last scan.
+const SCAN_KEY = Symbol.for("mastermold.polymarket.lastNegRiskScan");
+type ScanHolder = { [SCAN_KEY]?: { at: string; results: NegRiskBasketResult[] } | null };
 
 export function lastNegRiskScan() {
-  return lastScan;
+  return (globalThis as ScanHolder)[SCAN_KEY] ?? null;
 }
 
 /** Read up to `limit` events in full and evaluate each basket. */
@@ -163,7 +165,7 @@ export async function scanNegRiskBaskets(eventIds: string[], limit = 3): Promise
   const candidates = results
     .map((result, index) => negRiskCandidate(result, events[index]))
     .filter((candidate): candidate is PolymarketBrainCandidate => candidate !== null);
-  lastScan = { at: new Date().toISOString(), results };
+  (globalThis as ScanHolder)[SCAN_KEY] = { at: new Date().toISOString(), results };
   return { results, candidates };
 }
 
