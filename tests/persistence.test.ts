@@ -84,6 +84,24 @@ describe("durable persistence (Phase 1.5)", () => {
     expect(found?.signals).toEqual(["signal-a", "signal-b"]);
   });
 
+  test("GIVEN an empty journal WHEN the first call is logged THEN sample calls drop out and the journal is the user's", () => {
+    const before = getJournal();
+    expect(before.provenance.label).toBe("Demo data");
+    expect(before.entries.length).toBeGreaterThan(0);
+
+    const created = createDecisionJournalEntry({
+      thesis: "First real call",
+      signals: ["own read"],
+      conviction: 6,
+      horizon: "1 week",
+      falsification_condition: "Price closes below last week's low.",
+    });
+
+    const after = getJournal();
+    expect(after.provenance.label).toBe("Manual journal");
+    expect(after.entries.map((entry) => entry.id)).toEqual([created.id]);
+  });
+
   test("GIVEN the same alert is saved more than once WHEN the journal loads THEN only the newest alert call is shown", () => {
     createDecisionJournalEntry({
       thesis: "Review alert: NVDA volume 2.1x avg",

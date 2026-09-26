@@ -71,6 +71,8 @@ export function JournalWorkspace({
   holdingSymbols?: string[];
 }) {
   const [entries, setEntries] = useState(initialJournal.entries);
+  // Sample calls fill an empty journal; the first real call replaces them.
+  const [sampleMode, setSampleMode] = useState(initialJournal.provenance.label === "Sample data");
   const [form, setForm] = useState<FormState>(() => ({ ...initialFormState, ...initialDraft }));
   const [message, setMessage] = useState("Log a call before the outcome lands.");
   const [errors, setErrors] = useState<FormErrors>({});
@@ -165,7 +167,8 @@ export function JournalWorkspace({
         }
 
         const entry = body as JournalEntryData;
-        setEntries((current) => [entry, ...current]);
+        setEntries((current) => (sampleMode ? [entry] : [entry, ...current]));
+        setSampleMode(false);
         setForm(initialFormState);
         setRecordOpen(false);
         setLastLoggedId(entry.id);
@@ -188,7 +191,7 @@ export function JournalWorkspace({
   return (
     <div className="grid w-full min-w-0 grid-cols-1 gap-6 [&>*]:min-w-0" data-journal-task-first>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Open calls" value={String(openCount)} hint="waiting on the market" />
+        <StatTile label="Open calls" value={String(openCount)} hint="waiting for their time frame" />
         <button type="button" onClick={() => setFilter("due")} className="text-left" aria-label="Show calls due to score">
           <StatTile
             label="Due to score"
@@ -202,9 +205,9 @@ export function JournalWorkspace({
         <StatTile
           label="Hit rate"
           value={scored.length ? `${Math.round((rightCount / scored.length) * 100)}%` : "—"}
-          hint={`${rightCount}/${scored.length} right`}
+          hint={`${rightCount} of ${scored.length} scored calls right`}
         />
-        <StatTile label="Thinking quality" value={avgThinking === null ? "—" : `${avgThinking.toFixed(1)}/10`} hint="your own review score" />
+        <StatTile label="Reasoning score" value={avgThinking === null ? "—" : `${avgThinking.toFixed(1)}/10`} hint="your 1–10 review of the thinking" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
@@ -351,6 +354,7 @@ export function JournalWorkspace({
             onFilter={setFilter}
             symbolSet={symbolSet}
             dueCount={dueCount}
+            sample={sampleMode}
           />
         </div>
 
@@ -440,7 +444,9 @@ function EntryList({
   onFilter,
   symbolSet,
   dueCount,
+  sample = false,
 }: {
+  sample?: boolean;
   entries: JournalEntryData[];
   systemEntries: SystemJournalEntry[];
   focusedEntryId?: string;
@@ -489,6 +495,13 @@ function EntryList({
           ]}
         />
       </div>
+
+      {sample ? (
+        <p className="rounded-xl border border-violet/30 bg-violet/[0.06] px-4 py-3 text-xs leading-5 text-on-surface-variant" data-testid="journal-sample-note">
+          <span className="font-semibold text-on-surface">These calls are samples.</span> They show how scoring works. Your first
+          logged call replaces them, and every number on this page becomes yours.
+        </p>
+      ) : null}
 
       {visible.length === 0 ? (
         <EmptyState
@@ -571,7 +584,7 @@ function CallRow({
             <Badge variant="muted" data-testid="journal-author-you">You</Badge>
             {justLogged ? <Badge variant="magenta">Just logged</Badge> : null}
             <Badge variant={entry.confidence >= 7 ? "up" : entry.confidence >= 4 ? "caution" : "muted"} title={entry.confidence_band.label}>
-              {entry.confidence}/10
+              {entry.confidence}/10 sure
             </Badge>
             <span className="text-[11px] text-outline">{entry.horizon}</span>
             {status === "due" ? <Badge variant="caution">Score it</Badge> : null}

@@ -25,10 +25,10 @@ export function ProvenanceChip({
 }) {
   const isEngine = label === "Engine output" || label === "Saved scan" || label === "Saved read";
   const isLiveDex = label === "Live DEX read";
-  const isManual = label === "Manual portfolio";
+  const isManual = label === "Manual portfolio" || label === "Your entries";
   const isImported = label === "Imported portfolio";
   const Icon = isEngine ? ScanSearch : isLiveDex ? Activity : isManual ? PencilLine : isImported ? Download : Database;
-  const displayLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX read" : isManual ? "Manual portfolio" : isImported ? "Imported portfolio" : "Sample";
+  const displayLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX read" : isManual ? (label === "Your entries" ? "Your entries" : "Manual portfolio") : isImported ? "Imported portfolio" : "Sample";
   const titleText = cleanProvenanceTitle(label, title);
   return (
     <span

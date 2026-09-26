@@ -43,14 +43,19 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
       <div className="grid w-full min-w-0 grid-cols-1 gap-6">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="mm-eyebrow">Your calls and Master Mold&apos;s own lessons — every entry says who wrote it</p>
+            <p className="mm-eyebrow">Decisions, written down before the market answers</p>
             <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Journal</h1>
+            <ol className="mt-3 grid max-w-3xl gap-2 text-xs leading-5 text-on-surface-variant sm:grid-cols-3" aria-label="How the journal works">
+              <li className="flex gap-2 rounded-xl border border-outline-variant/40 px-3 py-2"><span className="mm-num font-semibold text-violet">1</span> Log a call: what you think, how sure (1–10), and the time frame.</li>
+              <li className="flex gap-2 rounded-xl border border-outline-variant/40 px-3 py-2"><span className="mm-num font-semibold text-violet">2</span> When the time frame ends it comes due.</li>
+              <li className="flex gap-2 rounded-xl border border-outline-variant/40 px-3 py-2"><span className="mm-num font-semibold text-violet">3</span> Score it: right or wrong, and how good the reasoning was.</li>
+            </ol>
           </div>
           <a
             href="/paper"
             className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-outline-variant/70 bg-surface-low/60 px-4 text-sm font-semibold text-on-surface transition hover:border-violet/45 sm:min-h-9"
           >
-            Test a call in the simulator →
+            Practice in paper trading →
           </a>
         </header>
 

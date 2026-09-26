@@ -381,7 +381,7 @@ function labelAppShellCommandAction(action: string) {
 
 function TopBarFallback({ dataMode }: { dataMode: DataModeLabel }) {
   const isLive = dataMode === "Saved read" || dataMode === "Live DEX read" || dataMode === "Live market read";
-  const isPersonal = dataMode === "Manual portfolio" || dataMode === "Imported portfolio";
+  const isPersonal = dataMode === "Manual portfolio" || dataMode === "Imported portfolio" || dataMode === "Your entries";
   const label = dataMode === "Live DEX read" ? "Live DEX" : dataMode === "Live market read" ? "Live market" : dataMode === "Imported portfolio" ? "Imported" : dataMode;
 
   return (
@@ -430,9 +430,9 @@ function TopBar({
   const isEngine = dataMode === "Saved read";
   const isLiveDex = dataMode === "Live DEX read";
   const isLiveMarket = dataMode === "Live market read";
-  const isManual = dataMode === "Manual portfolio";
+  const isManual = dataMode === "Manual portfolio" || dataMode === "Your entries";
   const isImported = dataMode === "Imported portfolio";
-  const dataModeLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX" : isLiveMarket ? "Live market" : isManual ? "Manual portfolio" : isImported ? "Imported" : "Sample";
+  const dataModeLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX" : isLiveMarket ? "Live market" : isManual ? dataMode : isImported ? "Imported" : "Sample";
   const firstName = profile?.name.trim().split(/\s+/)[0] ?? "";
   // The command bar duplicates the hero console on the deck and the chat page itself.
   const showCommandBar = pathname !== "/" && pathname !== "/chat";
