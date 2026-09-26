@@ -58,6 +58,9 @@ export const reviewCapabilitySections = [
       "Connection tests and explicit holdings snapshot imports",
       "Chat context saves what the app can remember; import holdings again when balances matter",
       "Rewind controls: Portfolio, Decision journal, Paper, and Executor can replay local data as of an earlier moment",
+      "Money hub (Portfolio): accounts, cash, debts (credit cards, loans, mortgages) and property roll up to net worth = assets − debts, with a saved daily history. Holdings import in one step from the manual_holdings JSON book, the POST body shape, or a CSV with column mapping; every import shows a preview and can be undone. Inline and bulk edits, account moves, and cost basis are local-only writes.",
+      "Price refresh on request quotes every holding (Yahoo for stocks and crypto, CoinGecko fallback for tokens Yahoo lacks) and shows per-row freshness; typed-in prices stay marked as typed.",
+      "Research programs in both labs show each pre-registered experiment's evidence against its gate (docs/research-2026-09/STRATEGY-DECISION.md). They observe only; nothing in them can place an order.",
     ],
   },
   {
@@ -120,6 +123,8 @@ export const reviewCapabilitySections = [
       "Dollar amounts are seeded sample data, local manual entries, or explicit holdings snapshots.",
     items: [
       "Manual holdings are local entries you type in. Monarch holdings appear after a manual sync or the configured morning read-only refresh; other imported holdings appear only after you press their import button.",
+      "Net worth subtracts debts you enter as liability accounts. Account balances you type are local figures, not synced bank data.",
+      "Gains appear only for holdings with a cost basis you entered; a basis that simply equals today's value is treated as unknown.",
       "All connected holdings remain read-only snapshots. Configured Monarch can refresh each morning; other account imports must be rerun before relying on changed balances.",
       "Daily portfolio recommendations compare the visible portfolio against saved or sample Today cards. They are prompts for review and paper testing, not personalized financial advice or executable orders.",
       "Seeded sample amounts exist so concentration, past-call review, and paper results are reviewable with no setup.",
@@ -180,10 +185,12 @@ export const reviewCapabilitySections = [
       "A separate promotion-gated Polymarket research lane and station-matched weather observer inspired by PolySniper, implemented natively without importing its runtime database or legacy live client.",
     items: [
       "Working: Gamma discovery, batch CLOB books, and a bounded public market WebSocket feed momentum, book-pressure, binary-parity, and maker-spread hypotheses. The SQLite brain records executable quotes, depth, microstructure events, forward markouts, decisive outcomes, and Brier calibration; brain strategies remain shadow-only.",
+      "Fees come from each market's feeSchedule (shares × rate × p × (1 − p)); takerBaseFee is not treated as a rate. Research cycles add a fee-inclusive parity control, a liquidity-reward shadow maker, and a neg-risk basket monitor, all observation-only.",
+      "The wallet lane's v2 follow-arm pairs every paper follow with a no-signal control and judges follow minus control with a pre-registered, market-clustered gate. The wallet lane and follow-arm stay off unless the operator enables them.",
       "Promotion-gated: 24-hour momentum is a retired paper baseline and currently has no entry authority. Manual and automatic entries fail closed until its forward-label gate passes; any existing simulator position can still settle or take a protective executable-depth exit.",
       "Weather observe-only: the lane discovers upcoming daily-temperature events by numeric tag, audits each stated resolution source and ICAO station, resolves official station coordinates, and displays raw ECMWF ensemble bucket fractions. It cannot place weather paper bets because those fractions are uncalibrated and omit fees, executable depth, station anomalies, source revisions, and settlement risk.",
       "Sample/simulator and data boundary: the $500 paper book in ignored .data/polymarket.db.json and research evidence in ignored .data/polymarket-brain.db are local evidence only, not a Polymarket balance or profit claim. Neither store reads portfolio holdings, the Solana wallet, advisory data, or the ignored PolySniper database.",
-      "Missing from the PolySniper intent: linked-market correlation divergence, cross-market logic clusters and multi-leg execution, wallet copy trading, weather forecast-change/observation/exit automation, counting theta, and economic-event trading. Sports latency is unsupported.",
+      "Missing from the PolySniper intent: linked-market correlation divergence, cross-market logic clusters beyond neg-risk baskets and any multi-leg execution, weather forecast-change/observation/exit automation, counting theta, and economic-event trading. Sports latency is unsupported.",
       "Credential-gated and missing: live orders remain unavailable. A future pass must review CLOB V2 signing, dynamic fees, funder/deposit-wallet handling, allowances, geographic eligibility, heartbeat/cancel-all behavior, and a separate operator live gate.",
     ],
   },
@@ -203,6 +210,9 @@ export const reviewCapabilitySections = [
       "Long-horizon live/out-of-sample forward evaluation with external baselines, real route costs, enough resolved calls, and pre-written pass/fail gates.",
       "A live autopilot fill with real funds: quote, build, sign, and simulate are proven against mainnet, but no transaction has ever been broadcast. The operator-run provisioning swap (--send) is deliberately the first.",
       "Tax sign-off before any real capital goes in.",
+      "Polymarket: the pessimistic-queue fill ledger the reward-maker gate needs, and any multi-leg execution for baskets.",
+      "Web3: the two-leg spot + perp carry ledger with margin and liquidation stress (the carry book is a funding monitor only).",
+      "Bank transactions, budgets, and automatic balance sync for cash and debt accounts.",
     ],
   },
 ] as const satisfies readonly ReviewCapabilitySection[];
