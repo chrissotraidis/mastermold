@@ -74,11 +74,17 @@ describe("shared LLM provider chain", () => {
     const goHeaders = llmRequestHeaders(go, "Master Mold Analyst", {});
     expect(goHeaders["X-Title"]).toBeUndefined();
     expect(goHeaders["HTTP-Referer"]).toBeUndefined();
+    // OpenCode Go returns 400 MissingSessionID without this header.
+    expect(goHeaders["x-opencode-session"]).toMatch(/^mastermold-/);
+    expect(orHeaders["x-opencode-session"]).toBeUndefined();
   });
 
   test("thinking is disabled per provider so tokens are not spent on hidden reasoning", () => {
     const go = llmPrimary({ OPENCODE_GO_API_KEY: "k" })!;
-    expect(llmReasoningPayload(go)).toEqual({ thinking: { type: "disabled" } });
+    expect(llmReasoningPayload(go)).toEqual({
+      thinking: { type: "disabled" },
+      chat_template_kwargs: { thinking: false },
+    });
 
     const or = llmFallback({ OPENROUTER_API_KEY: "k" })!;
     expect(llmReasoningPayload(or)).toEqual({ reasoning: { effort: "none", exclude: true } });

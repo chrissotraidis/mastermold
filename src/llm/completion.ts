@@ -28,6 +28,13 @@ const OPENROUTER_MODEL = "deepseek/deepseek-v4-flash";
 
 type Env = Record<string, string | undefined>;
 
+/**
+ * OpenCode Go rejects requests without an `x-opencode-session` header
+ * ("MissingSessionID", verified 2026-09-26). One id per server process keeps
+ * its routing/caching sticky without leaking anything about the caller.
+ */
+const OPENCODE_SESSION_ID = `mastermold-${globalThis.crypto.randomUUID()}`;
+
 function endpointLabel(baseUrl: string): LlmProviderLabel {
   if (baseUrl.includes("opencode.ai")) return "opencode-go";
   if (baseUrl.includes("openrouter.ai")) return "openrouter";
@@ -108,6 +115,9 @@ export function llmRequestHeaders(
     headers["HTTP-Referer"] = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4002";
     headers["X-Title"] = title;
   }
+  if (endpoint.baseUrl.includes("opencode.ai")) {
+    headers["x-opencode-session"] = env.OPENCODE_SESSION_ID?.trim() || OPENCODE_SESSION_ID;
+  }
   return headers;
 }
 
@@ -121,9 +131,12 @@ export function llmReasoningPayload(endpoint: LlmEndpoint): Record<string, unkno
     return { reasoning: { effort: "none", exclude: true } };
   }
   if (endpoint.baseUrl.includes("opencode.ai") && endpoint.model.toLowerCase().includes("deepseek")) {
-    // OpenCode Go/Zen serve DeepSeek with thinking on by default; this is the
-    // only param their proxy honors for disabling it (verified 2026-08-08).
-    return { thinking: { type: "disabled" } };
+    // OpenCode Go/Zen serve DeepSeek with thinking on by default. As of
+    // 2026-09-26 deepseek-v4-flash ignores `thinking` alone and burns the
+    // whole max_tokens budget on reasoning (empty content); the chat-template
+    // switch is what actually turns it off. Both are sent so either proxy
+    // behavior yields a short answer.
+    return { thinking: { type: "disabled" }, chat_template_kwargs: { thinking: false } };
   }
   return {};
 }

@@ -64,10 +64,10 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  if (anthropicKey) {
+  const anthropic = (key: string) => {
     const model = process.env.ANTHROPIC_MODEL ?? (browserProvider === "anthropic" ? browserModel : null) ?? "claude-3-5-haiku-latest";
     return streamAnthropicResponse(
-      anthropicKey,
+      key,
       model,
       userMessage,
       llmContext,
@@ -75,7 +75,14 @@ export async function POST(request: Request): Promise<Response> {
       responseMode,
       budget,
     );
-  }
+  };
+
+  // An Anthropic key picked in Settings → Chat is an explicit per-session
+  // choice and wins. A server-env Anthropic key does not: it is metered, and
+  // a metered provider must never be the default when the flat-rate chain is
+  // configured (AGENTS.md → LLM Providers). A shell that merely exports
+  // ANTHROPIC_API_KEY used to hijack every chat turn.
+  if (browserProvider === "anthropic" && browserKey) return anthropic(browserKey);
 
   // Shared provider chain: OpenCode Go first (flat-rate), OpenRouter only as
   // its fallback. A browser-supplied OpenRouter key still wins, since that is
@@ -95,6 +102,8 @@ export async function POST(request: Request): Promise<Response> {
       budget,
     );
   }
+
+  if (anthropicKey) return anthropic(anthropicKey);
 
   if (openaiKey) {
     const model = process.env.OPENAI_MODEL ?? (browserProvider === "openai" ? browserModel : null) ?? "gpt-4.1-mini";
