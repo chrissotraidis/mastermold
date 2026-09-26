@@ -22,7 +22,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/portfolio/portfolio-hub.tsx")).toContain("inline-flex min-h-11 items-center gap-2");
     expect(source("components/welcome-flow.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
     expect(source("components/welcome-flow.tsx")).toContain("lg:grid-cols-[minmax(0,0.78fr)_minmax(26rem,1fr)]");
-    expect(source("components/welcome-flow.tsx")).toContain("Start with the sample dashboard");
+    expect(source("components/welcome-flow.tsx")).toContain("Three steps make it yours");
     expect(source("components/welcome-flow.tsx")).toContain("Before you start");
     expect(source("components/welcome-flow.tsx")).toContain("Save preferences");
     expect(source("components/welcome-flow.tsx")).not.toContain("Set up profile");

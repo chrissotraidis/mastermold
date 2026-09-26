@@ -16,6 +16,7 @@ import {
   type RiskPosture,
 } from "@/src/profile/profile";
 import { cn } from "@/lib/utils";
+import { GET_STARTED_STEPS } from "@/lib/get-started";
 
 const RISK_LABELS: Record<RiskPosture, string> = {
   conservative: "Conservative",
@@ -71,6 +72,12 @@ export function WelcomeFlow() {
     router.push("/");
   }
 
+  // A step counts as leaving the welcome screen, so first launch never loops back here.
+  function go(href: string) {
+    dismissWelcome();
+    router.push(href);
+  }
+
   async function handleImportFile(file: File) {
     setImportError("");
     setImportNote("");
@@ -94,31 +101,52 @@ export function WelcomeFlow() {
               <SentinelFace state="idle" detail="hero" />
             </div>
             <p className="font-mono text-[11px] uppercase tracking-telemetry text-violet">
-              Local financial cockpit
+              Your local money hub
             </p>
             <h1 className="mt-2 font-display text-2xl font-semibold text-on-surface sm:text-3xl">
               Welcome to Master Mold
             </h1>
             <p className="mt-2 max-w-md text-sm leading-6 text-on-surface-variant">
-              Start with the sample dashboard, or save a few local preferences first. No account
-              data is pulled in until you connect or import it.
+              Three steps make it yours. Until you add your money, every page is a tour on sample
+              data. Nothing connects to an account or moves funds.
             </p>
           </header>
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:max-w-md">
-            <button
-              type="button"
-              onClick={handleSkip}
-              className="flex min-h-11 items-center justify-center gap-2 bg-violet px-4 py-3 text-sm font-semibold text-void chamfer-sm transition hover:brightness-110"
-            >
-              Open sample dashboard
-              <ArrowRight aria-hidden="true" className="size-4" />
+          <ol className="grid gap-2 lg:max-w-md" data-testid="welcome-steps">
+            {GET_STARTED_STEPS.map((step, index) => (
+              <li key={step.id}>
+                <button
+                  type="button"
+                  onClick={() => go(step.href)}
+                  className={cn(
+                    "group flex w-full min-h-11 items-start gap-3 rounded-xl border p-3 text-left transition",
+                    index === 0 ? "border-violet/60 bg-violet/10 hover:border-violet" : "border-outline-variant/50 hover:border-violet/50",
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                      index === 0 ? "bg-violet text-void" : "bg-surface-high text-outline",
+                    )}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-on-surface">{step.title}</span>
+                    <span className="block text-xs leading-5 text-on-surface-variant">{step.detail}</span>
+                  </span>
+                  <ArrowRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-outline transition group-hover:text-violet" />
+                </button>
+              </li>
+            ))}
+          </ol>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm lg:max-w-md">
+            <button type="button" onClick={handleSkip} className="min-h-11 font-semibold text-violet hover:text-violet-soft">
+              Look around with sample data first
             </button>
-            <Link
-              href="/review"
-              className="inline-flex min-h-11 items-center justify-center rounded-md border border-outline-variant/45 px-3 text-sm font-semibold text-on-surface-variant transition hover:border-violet/50 hover:text-violet"
-            >
-              Review app limits
+            <Link href="/review" className="min-h-11 content-center text-on-surface-variant hover:text-violet">
+              What works today
             </Link>
           </div>
 
@@ -129,7 +157,7 @@ export function WelcomeFlow() {
           <div className="mb-4 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Sparkles aria-hidden="true" className="size-5 text-violet" />
-              <h2 className="font-display text-lg font-semibold text-on-surface">Save local preferences</h2>
+              <h2 className="font-display text-lg font-semibold text-on-surface">Personalize (optional)</h2>
             </div>
           </div>
           <p className="mb-4 text-xs leading-5 text-outline">

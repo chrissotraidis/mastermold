@@ -39,7 +39,9 @@ describe("product hierarchy truthfulness", () => {
 
     expect(today).toContain("const hasPersonalPortfolio");
     expect(today).toContain("{hasPersonalPortfolio ? (");
-    expect(today).toContain("Sample portfolio");
-    expect(today).toContain("before treating this brief as personal");
+    // Without personal holdings Today shows the get-started checklist, which
+    // says plainly that pages show sample data until step 1 is done.
+    expect(today).toContain("<GetStartedChecklist progress={onboarding} />");
+    expect(source("components/get-started-checklist.tsx")).toContain("every page shows sample data");
   });
 });

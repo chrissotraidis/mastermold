@@ -100,6 +100,7 @@ export function PortfolioHub({
     if (search) setQuery(search);
     if (action === "add-holding") setAddOpen(true);
     if (action === "import-holdings") setImportOpen(true);
+    if (action === "add-account") setAccountSheet({ open: true, account: null });
     if (action) {
       url.searchParams.delete("action");
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);

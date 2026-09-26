@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Inbox, Sparkles } from "lucide-react";
+import { ArrowRight, Inbox } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AutomationHealthBanner } from "@/components/automation-health-banner";
 import { MasterMoldHero } from "@/components/master-mold-hero";
@@ -34,6 +34,8 @@ import {
 import { getDataMode } from "@/src/db/engine-data";
 import { getPortfolio } from "@/src/db/portfolio";
 import { getMoneySummary } from "@/src/db/money";
+import { getStartedProgress } from "@/src/db/get-started";
+import { GetStartedChecklist } from "@/components/get-started-checklist";
 import {
   getPortfolioRecommendations,
   type PortfolioRecommendation,
@@ -88,6 +90,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const money = hasPersonalPortfolio ? getMoneySummary(portfolio) : null;
   const trend = (money?.history ?? portfolio.net_worth_series).map((point) => point.value);
   const openItems = decisionPlays.length + extraRecommendations.length;
+  const onboarding = asOf ? null : getStartedProgress();
   const marketRows = marketTable(report);
   const lede = todayLede({
     decisions: openItems,
@@ -117,6 +120,8 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
           <AutomationHealthBanner />
         </div>
 
+        {hasPersonalPortfolio && onboarding && !onboarding.complete ? <GetStartedChecklist progress={onboarding} /> : null}
+
         <div data-testid="today-pulse">
           {hasPersonalPortfolio ? (
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -137,22 +142,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
               <StatTile label="New activity" value={String(freshAlerts.length)} hint="unreviewed" />
             </div>
           ) : (
-            <Panel className="flex flex-col gap-4 border-violet/30 p-5 sm:flex-row sm:items-center">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet/15 text-violet ring-1 ring-violet/30">
-                <Sparkles aria-hidden="true" className="size-5" />
-              </span>
-              <p className="min-w-0 flex-1 text-sm leading-6 text-on-surface-variant">
-                <span className="font-display text-base font-semibold text-on-surface">Sample portfolio</span>
-                <br />
-                Add or import your holdings before treating this brief as personal.
-              </p>
-              <Link
-                href="/portfolio#add-holdings"
-                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet px-4 text-sm font-semibold text-void shadow-glow transition hover:bg-violet/90"
-              >
-                Add your money <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-            </Panel>
+            onboarding ? <GetStartedChecklist progress={onboarding} /> : null
           )}
         </div>
 
