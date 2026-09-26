@@ -15,7 +15,7 @@ import type { DecisionJournalEntry, Driver, OutcomeScore, ReflectionUpdate, Stra
 import { demoDatabase } from "@/src/db/seed-data";
 
 type PublicProvenance = Omit<BriefingProvenance, "label"> & {
-  label: "Sample data" | "Saved read";
+  label: "Sample data" | "Saved read" | "Your entries";
 };
 
 export type PublicBriefingCard = Omit<
@@ -995,10 +995,10 @@ function publicReflectionUpdate(update: ReflectionUpdate): PublicReflectionUpdat
 function publicProvenance<T extends { label: string; source: string; as_of: string; notice?: string }>(
   provenance: T,
 ): PublicProvenance {
-  const label = provenance.label === "Engine output" ? "Saved read" : "Sample data";
+  const label = provenance.label === "Engine output" ? "Saved read" : provenance.label === "Manual journal" ? "Your entries" : "Sample data";
   return {
     label,
-    source: label === "Saved read" ? "Saved market read" : plainBriefingText(provenance.source),
+    source: label === "Saved read" ? "Saved market read" : label === "Your entries" ? "Calls you logged in this app" : plainBriefingText(provenance.source),
     as_of: provenance.as_of,
     notice: provenance.notice ? plainBriefingText(provenance.notice) : undefined,
   };

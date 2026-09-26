@@ -99,15 +99,36 @@ export function PolymarketBrainPanel({
                     {strategy.paper_candidate ? "Paper review candidate" : "Shadow only"}
                   </Badge>
                 </div>
-                <p className="mt-1 font-mono text-[11px] text-outline">
-                  {strategy.observations} observations · {strategy.labels_1h} markouts · {signedBps(strategy.mean_1h_bps)} mean · {formatPercent(strategy.hit_rate_1h)} hit · {strategy.resolved_labels} resolved · {formatBrier(strategy.mean_brier_score)} Brier
-                </p>
+                <div className="mt-2 flex items-center gap-2" aria-label={`${strategy.labels_1h} of 100 one-hour labels needed for review`}>
+                  <span className="h-1 flex-1 overflow-hidden rounded-full bg-surface-high">
+                    <span className="block h-full rounded-full bg-violet" style={{ width: `${Math.min(100, strategy.labels_1h)}%` }} />
+                  </span>
+                  <span className="mm-num shrink-0 text-[11px] text-outline">{strategy.labels_1h}/100 labels</span>
+                </div>
+                <dl className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                  <div>
+                    <dt className="text-outline">1h mean</dt>
+                    <dd className={`mm-num font-semibold ${(strategy.mean_1h_bps ?? 0) < 0 ? "text-critical" : "text-on-surface"}`}>{signedBps(strategy.mean_1h_bps)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-outline">Hit rate</dt>
+                    <dd className="mm-num font-semibold text-on-surface">{formatPercent(strategy.hit_rate_1h)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-outline">Seen</dt>
+                    <dd className="mm-num font-semibold text-on-surface">{strategy.observations}</dd>
+                  </div>
+                </dl>
                 {strategy.paper_round_trips > 0 || strategy.paper_open_positions > 0 ? (
                   <p className="mt-1 font-mono text-[11px] text-violet">
                     Paper: {strategy.paper_open_positions} open · {strategy.paper_round_trips} closed · {formatPercent(strategy.paper_win_rate)} win · {strategy.paper_pnl_usd === null ? "$0.00" : `${strategy.paper_pnl_usd >= 0 ? "+" : ""}$${strategy.paper_pnl_usd.toFixed(2)}`} realized
                   </p>
                 ) : null}
-                <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{strategy.promotion_detail}</p>
+                {strategy.resolved_labels > 0 ? (
+                  <p className="mt-1 text-[11px] leading-4 text-outline">
+                    {strategy.resolved_labels} resolved · {formatBrier(strategy.mean_brier_score)} Brier
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>

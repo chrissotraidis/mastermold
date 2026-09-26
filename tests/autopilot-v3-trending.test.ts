@@ -134,7 +134,8 @@ describe("trending candidate", () => {
     expect(trendingEnabledIn("risk_on")).toBe(true);
     expect(trendingEnabledIn("chop")).toBe(true);
     expect(trendingEnabledIn("risk_off")).toBe(false);
-    expect(enabledModulesFor("chop").has("trending")).toBe(true);
+    // Retired from the shadow set 2026-09-26 (inverted calibration).
+    expect(enabledModulesFor("chop").has("trending")).toBe(false);
     expect(enabledModulesFor("risk_off").has("trending")).toBe(false);
   });
 });

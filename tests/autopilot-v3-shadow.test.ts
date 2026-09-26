@@ -44,12 +44,15 @@ function risingWindow(): number[] {
 }
 
 describe("regime → module enablement", () => {
-  test("GIVEN regimes THEN inverted xsec never ranks, funding always, pair in chop/risk-off, attention modules outside risk-off", () => {
-    expect([...enabledModulesFor("risk_on")].sort()).toEqual(["bar_portion", "copy_wallets", "cusum_tb", "funding_basis", "trending"]);
-    expect([...enabledModulesFor("chop")].sort()).toEqual(["bar_portion", "copy_wallets", "cusum_tb", "funding_basis", "pair_rv", "trending"]);
+  test("GIVEN regimes THEN inverted xsec/trending and flat bar_portion never run, funding always, pair in chop/risk-off", () => {
+    // 2026-09-26 retirement: trending (inverted) and bar_portion (flat) stop spending labels.
+    expect([...enabledModulesFor("risk_on")].sort()).toEqual(["copy_wallets", "cusum_tb", "funding_basis"]);
+    expect([...enabledModulesFor("chop")].sort()).toEqual(["copy_wallets", "cusum_tb", "funding_basis", "pair_rv"]);
     expect([...enabledModulesFor("risk_off")].sort()).toEqual(["funding_basis", "pair_rv"]);
     for (const regime of ["risk_on", "chop", "risk_off"] as const) {
       expect(enabledModulesFor(regime).has("xsec")).toBe(false);
+      expect(enabledModulesFor(regime).has("trending")).toBe(false);
+      expect(enabledModulesFor(regime).has("bar_portion")).toBe(false);
     }
   });
 });
@@ -136,18 +139,16 @@ describe("evaluateV3Shadow", () => {
     expect(store.trades()).toHaveLength(0);
   });
 
-  test("GIVEN an extreme down bar THEN one standalone bar_portion snapshot carries exact bar features", () => {
+  test("GIVEN an extreme down bar THEN retired bar_portion records no snapshot", () => {
     const store = autopilotStore();
     const result = evaluateV3Shadow(input({
       barMetricsByMint: new Map([[SOL.mint, { bp: -0.8, atr_bps: 800, ema_close: risingWindow().at(-1)! }]]),
       heldMints: new Set(),
       barPortionEdgeRatio: 0.25,
     }));
-    expect(result.candidates.filter((row) => row.strategy_id === "bar_portion")).toHaveLength(1);
+    expect(result.candidates.filter((row) => row.strategy_id === "bar_portion")).toHaveLength(0);
     recordV3Shadow(store, result, new Map([[SOL.mint, risingWindow().at(-1)!], [JUP.mint, 100]]));
-    const rows = store.candidateSnapshots().filter((row) => row.strategy_id === "bar_portion");
-    expect(rows).toHaveLength(1);
-    expect(rows[0].features).toMatchObject({ bp: -0.8, atr_bps: 800, edge_ratio: 0.25, direction: "buy" });
+    expect(store.candidateSnapshots().filter((row) => row.strategy_id === "bar_portion")).toHaveLength(0);
   });
 });
 

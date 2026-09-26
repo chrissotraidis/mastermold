@@ -574,6 +574,5 @@ export function getScanStatusLine(): string {
     }
     return `Market read from ${age}.`;
   }
-  if (lastAttempt?.status === "failed") return "Last scan attempt failed; showing sample data.";
-  return "No market scan saved yet.";
+  return "Showing sample data. Add holdings on Portfolio to make it yours.";
 }

@@ -72,7 +72,7 @@ export function evaluatePolymarketPaperAuthority(
     strategy_id: null,
     entry_strategies: [],
     detail: momentum
-      ? `Momentum remains shadow-only: ${momentum.promotion_detail}`
+      ? `Best candidate (momentum) is still watch-only: ${momentum.promotion_detail}`
       : "All strategies remain shadow-only until a forward-label promotion gate is measured and passed.",
   };
 }

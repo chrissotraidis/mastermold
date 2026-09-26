@@ -34,15 +34,16 @@ export const SHADOW_MIN_LIQUIDITY_USD = 250_000;
 
 /** Which modules run in a given regime (plan §Modules). funding is always on;
  * pair runs in chop/risk-off. xsec remains a labeled observation stream but
- * is retired from ranking while its calibration is inverted. */
+ * is retired from ranking while its calibration is inverted. trending
+ * (inverted, −227bp separation) and bar_portion (flat) were retired
+ * 2026-09-26 per docs/research-2026-09/STRATEGY-DECISION.md: they stop
+ * spending labels so cusum_tb's sample grows faster. */
 export function enabledModulesFor(regime: MarketRegime): Set<StrategyId> {
   const enabled = new Set<StrategyId>();
   if (fundingEnabledIn(regime)) enabled.add("funding_basis");
   if (pairEnabledIn(regime)) enabled.add("pair_rv");
-  if (trendingEnabledIn(regime)) enabled.add("trending");
   if (copyWalletsEnabledIn(regime)) enabled.add("copy_wallets");
   if (regime === "risk_on" || regime === "chop") enabled.add("cusum_tb");
-  if (regime === "risk_on" || regime === "chop") enabled.add("bar_portion");
   return enabled;
 }
 

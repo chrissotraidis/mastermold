@@ -58,7 +58,7 @@ describe("Master Mold responsiveness contracts", () => {
     expect(appShell).toContain("openMasterMoldChat(undefined, pageContext)");
     expect(appShell).toContain("md:hidden");
     expect(appShell).toContain("fixed top-0 left-0 z-50 flex h-14 w-full");
-    expect(appShell).toContain("hidden h-full w-14 flex-col");
+    expect(appShell).toContain("hidden h-full w-16 flex-col");
     // Redesign: Master Mold persists via the floating launcher only — Today has
     // no embedded chat block, just the legacy anchor for old #today-chat links.
     expect(source("app/page.tsx")).toContain('id="today-chat"');
@@ -253,7 +253,7 @@ describe("Master Mold responsiveness contracts", () => {
     expect(chatPage).not.toContain("getDataMode");
     expect(chatPage).not.toContain("productProvenanceLabel");
     expect(chatPage).toContain("<AppShell>");
-    expect(chatPage).toContain("Ask Master Mold to open routes, check status, pull context, or explain what to do next.");
+    expect(chatPage).toContain("Ask about your money, a holding, or what to do next.");
     expect(chatPage).toContain("buildChatRoute(initialQuery, asOf?.iso ?? null)");
     expect(chatPage).toContain("Answer only from the context known by then.");
     expect(chatPage).not.toContain("prompts={");
@@ -317,10 +317,10 @@ describe("Master Mold responsiveness contracts", () => {
     expect(appShell).toContain("Keep asking from any Master Mold command box.");
     expect(appShell).not.toContain("You can keep asking from the chat button.");
     expect(appShell).toContain('data-testid="topbar-command-status"');
-    expect(appShell).toContain("flex min-h-10 items-center gap-2 rounded-md border border-violet/25");
+    expect(appShell).toContain("flex min-h-10 items-center gap-2 rounded-full border border-outline-variant/70");
     expect(appShell).toContain("min-h-9 w-52 bg-transparent text-sm font-medium");
     expect(appShell).toContain("xl:w-64");
-    expect(appShell).toContain("flex size-9 shrink-0 items-center justify-center rounded-md bg-violet");
+    expect(appShell).toContain("flex size-8 shrink-0 items-center justify-center rounded-full bg-violet");
     expect(appShell).toContain("w-[22rem]");
     expect(appShell).toContain("const locationKey = `${pathname}?${searchParams.toString()}`;");
     expect(appShell).toContain("useEffect(() => setCommandStatus(undefined), [locationKey]);");
@@ -372,7 +372,7 @@ describe("Master Mold responsiveness contracts", () => {
     const briefingCard = source("components/briefing-card.tsx");
     const saveCall = source("components/save-briefing-call-button.tsx");
     const alertFeed = source("components/alert-feed.tsx");
-    const manualHoldings = source("components/manual-holdings-panel.tsx");
+    const manualHoldings = source("components/portfolio/portfolio-hub.tsx");
     const integrationKeyInput = source("components/integration-key-input.tsx");
     const appShell = source("components/app-shell.tsx");
     const asOfReplayControl = source("components/as-of-replay-control.tsx");
@@ -454,13 +454,9 @@ describe("Master Mold responsiveness contracts", () => {
     expect(alertFeed).toContain('action === "mark-top-activity-useful"');
     expect(alertFeed).toContain("submitFeedback(topAlert, true);");
     expect(alertFeed).toContain("submitFeedback(topAlert, false);");
-    expect(manualHoldings).toContain("useSearchParams");
-    expect(manualHoldings).toContain("const actionQuery = searchParams.toString();");
-    expect(manualHoldings).toContain("handledCommandActionRef.current === actionQuery");
-    expect(manualHoldings).toContain('params.get("action") !== "add-holding"');
-    expect(manualHoldings).toContain('symbolInputRef.current?.scrollIntoView({ block: "center", inline: "nearest" });');
-    expect(manualHoldings).toContain("symbolInputRef.current?.focus({ preventScroll: true });");
-    expect(manualHoldings).toContain('data-testid="manual-holdings-command-status"');
+    // 2026-09: the Portfolio hub owns add-holding; the route opens the add sheet once and drops the param.
+    expect(manualHoldings).toContain('if (action === "add-holding") setAddOpen(true);');
+    expect(manualHoldings).toContain('url.searchParams.delete("action");');
     // Redesign: Settings is one flat page; sections are always visible and the
     // first connection card in each group auto-runs the routed command action.
     expect(settingsPage).toContain("commandPrimary={index === 0}");
@@ -529,7 +525,7 @@ describe("Master Mold responsiveness contracts", () => {
     const tradingPage = source("app/trading/page.tsx");
     const tradingLoading = source("app/trading/loading.tsx");
 
-    expect(tradingPage).toContain("<AutopilotPanel />");
+    expect(tradingPage).toContain("<AutopilotPanel research={<Web3ResearchBoard />} />");
     expect(tradingLoading).toContain("Loading autopilot status");
     expect(tradingLoading).toContain('role="status"');
   });

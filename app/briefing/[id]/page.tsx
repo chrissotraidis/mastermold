@@ -167,7 +167,7 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
           <aside className="space-y-4">
             <Card className="border-violet/30 bg-violet/[0.06]">
               <CardHeader className="p-5">
-                <CardDescription className="text-violet">Next in the loop</CardDescription>
+                <CardDescription className="text-violet">Next step</CardDescription>
                 <CardTitle className="text-lg leading-6 text-on-surface">
                   Save the call before judging the result.
                 </CardTitle>

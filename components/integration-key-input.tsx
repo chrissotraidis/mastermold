@@ -326,6 +326,9 @@ function commandHashForGroup(commandGroup: "portfolio" | "chat") {
 }
 
 function liveChatCopy(provider: string | undefined) {
+  if (!provider || provider === "server") {
+    return "Tests the server's own provider chain (OpenCode Go first, OpenRouter as fallback). No key needed here.";
+  }
   const name =
     provider === "openai" ? "OpenAI" :
     provider === "anthropic" ? "Anthropic" :

@@ -27,7 +27,7 @@ describe("product hierarchy truthfulness", () => {
 
     expect(shell).toContain('label: "Web3 lab"');
     expect(shell).toContain('label: "Polymarket lab"');
-    expect(settings).toContain("not the core Today → Portfolio → Journal loop and not evidence of profit");
+    expect(settings).toContain("separate from your money and not evidence of profit");
     expect(settings).toContain('href="/trading"');
     expect(settings).toContain('href="/polymarket"');
     expect(web3).toContain("Research lab · separate lane");
@@ -39,7 +39,9 @@ describe("product hierarchy truthfulness", () => {
 
     expect(today).toContain("const hasPersonalPortfolio");
     expect(today).toContain("{hasPersonalPortfolio ? (");
-    expect(today).toContain("Sample portfolio");
-    expect(today).toContain("before treating this brief as personal");
+    // Without personal holdings Today shows the get-started checklist, which
+    // says plainly that pages show sample data until step 1 is done.
+    expect(today).toContain("<GetStartedChecklist progress={onboarding} />");
+    expect(source("components/get-started-checklist.tsx")).toContain("every page shows sample data");
   });
 });

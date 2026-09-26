@@ -169,7 +169,8 @@ describe("copyWalletCandidate", () => {
     expect(candidate?.strategy_id).toBe("copy_wallets");
     expect(candidate?.horizon_sec).toBe(24 * 60 * 60);
     expect(candidate?.features.wallets).toBe(2);
-    expect(candidate?.expected_return_bps).toBe(180);
+    // W4: no literature prior; copy EV starts at zero until forward results earn it.
+    expect(candidate?.expected_return_bps).toBe(0);
   });
 
   test("GIVEN thin liquidity or no price THEN no candidate", () => {

@@ -17,17 +17,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/alert-inbox-drawer.tsx")).toContain("relative flex size-11 items-center justify-center rounded-md border");
     expect(source("components/alert-feed.tsx")).toContain("inline-flex min-h-11 items-center justify-center rounded-md border");
     expect(source("components/alert-inbox-drawer.tsx")).toContain("inline-flex min-h-11 items-center justify-center rounded-md border");
-    expect(source("components/manual-holdings-panel.tsx")).toContain("inline-flex min-h-11 shrink-0 items-center gap-1.5");
     // Settings is one flat page now; its disclosure summaries keep the 44px floor.
     expect(source("app/settings/page.tsx")).toContain("flex min-h-11 cursor-pointer");
-    expect(source("app/portfolio/page.tsx")).toContain("inline-flex min-h-11 items-center gap-2");
+    expect(source("components/portfolio/portfolio-hub.tsx")).toContain("inline-flex min-h-11 items-center gap-2");
     expect(source("components/welcome-flow.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
     expect(source("components/welcome-flow.tsx")).toContain("lg:grid-cols-[minmax(0,0.78fr)_minmax(26rem,1fr)]");
-    expect(source("components/welcome-flow.tsx")).toContain("Start with the sample dashboard");
+    expect(source("components/welcome-flow.tsx")).toContain("Three steps make it yours");
     expect(source("components/welcome-flow.tsx")).toContain("Before you start");
     expect(source("components/welcome-flow.tsx")).toContain("Save preferences");
     expect(source("components/welcome-flow.tsx")).not.toContain("Set up profile");
-    expect(source("components/journal-workspace.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
+    expect(source("components/journal-workspace.tsx")).toContain("inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-4");
     expect(source("components/as-of-replay-control.tsx")).toContain("flex min-h-11 cursor-pointer");
     expect(source("components/command-console.tsx")).toContain("flex size-11 shrink-0");
     expect(source("components/command-console.tsx")).toContain("className=\"min-h-11 w-full bg-transparent");
@@ -64,7 +63,7 @@ describe("mobile ergonomics source contracts", () => {
     const replayControl = source("components/as-of-replay-control.tsx");
 
     expect(replayControl).toContain('data-testid="as-of-replay-control"');
-    expect(replayControl).toContain("Optional timeline check");
+    expect(replayControl).toContain("See what Master Mold knew on an earlier date");
     expect(replayControl).not.toContain("open={Boolean(activeAsOf)}");
     expect(replayControl).not.toContain("See this page at an earlier time");
   });
@@ -93,8 +92,8 @@ describe("mobile ergonomics source contracts", () => {
       expect(surfaceSource).toContain('aria-label="Save as decision"');
       // Plain-language button labels: what the tap does, not jargon.
       expect(surfaceSource).toContain('title="Save this as a call in your journal"');
-      expect(surfaceSource).toContain("To journal");
-      expect(surfaceSource).toContain("Test trade");
+      expect(surfaceSource).toContain("Save to Journal");
+      expect(surfaceSource).toContain("Paper test");
       expect(surfaceSource).toContain('aria-label="Paper trade"');
       expect(surfaceSource).toContain('title="Try this idea with simulator dollars"');
       expect(surfaceSource).toContain('aria-label="Dismiss activity"');
@@ -254,36 +253,38 @@ describe("mobile ergonomics source contracts", () => {
   });
 
   test("GIVEN manual holdings mix with sample data WHEN a holding describes its weight THEN it says visible portfolio", () => {
-    const manualHoldings = source("components/manual-holdings-panel.tsx");
+    // 2026-09 hub: a holding's weight is its share of the visible book.
+    const manualHoldings = source("components/portfolio/portfolio-hub.tsx");
 
-    expect(manualHoldings).toContain("% of visible portfolio");
+    expect(manualHoldings).toContain("% of book");
     expect(manualHoldings).not.toContain("% of portfolio");
   });
 
-  test("GIVEN Portfolio holdings render on mobile WHEN source copy is checked THEN each holding can expand into decision detail", () => {
-    // Redesign: expandable holding cards became one dense table. The decision
-    // detail per holding is now the Rule column, which links every row to its
-    // standing position policy.
+  test("GIVEN Portfolio holdings render on mobile WHEN source copy is checked THEN each holding opens its decision detail", () => {
+    // 2026-09 hub rewrite: phones get tappable holding cards that open the
+    // holding sheet (value, gain, today, price freshness, standing rule).
     const portfolioPage = source("app/portfolio/page.tsx");
+    const hub = source("components/portfolio/portfolio-hub.tsx");
+    const sheet = source("components/portfolio/holding-sheet.tsx");
     const portfolioCopy = source("lib/portfolio-copy.ts");
-    const portfolioCharts = source("components/portfolio-charts.tsx");
 
     expect(portfolioCopy).toContain("Holdings, allocation, and source status for Today and chat.");
-    // The Add holding action lands on the actual form, but the first screen stays focused on the portfolio read.
-    expect(portfolioPage).toContain('href="#add-holdings"');
-    expect(portfolioPage).toContain('id="add-holdings"');
-    // Every row shows symbol, amount, value, and share of the visible portfolio.
-    expect(portfolioPage).toContain("{holding.symbol}");
-    expect(portfolioPage).toContain("formatQuantity(holding.quantity)");
-    expect(portfolioPage).toContain("formatCurrency(holding.market_value)");
-    expect(portfolioPage).toContain("{holding.weight_pct.toFixed(1)}%");
-    // The Rule column links each holding to its position policy.
-    expect(portfolioPage).toContain('href="#position-policies"');
-    expect(portfolioPage).toContain("Your standing rule");
-    expect(portfolioPage).toContain("Set a standing rule for this position");
+    // Add holding keeps its #add-holdings anchor for command routes.
+    expect(hub).toContain('id="add-holdings"');
+    expect(hub).toContain('href="#add-holdings"');
+    expect(hub).toContain('action === "add-holding"');
+    // Phone cards are 44px+ and open the detail sheet.
+    expect(hub).toContain("mm-row flex min-h-14 w-full items-center");
+    expect(hub).toContain("onClick={() => setOpenHolding(holding)}");
+    expect(hub).toContain("formatQuantity(holding.quantity)");
+    expect(hub).toContain("{holding.weight_pct.toFixed(1)}%");
+    // The sheet links each holding to its standing position rule.
+    expect(sheet).toContain('href="#position-policies"');
+    expect(sheet).toContain("Your standing rule");
+    expect(sheet).toContain("Set a standing rule for this position");
     expect(portfolioPage).toContain('id="position-policies"');
     expect(portfolioPage).toContain("<PositionPoliciesPanel");
-    // Policy breaches surface as banners above the table.
+    // Policy breaches still surface as banners.
     expect(portfolioPage).toContain('aria-label="Policy checks"');
     expect(portfolioPage).toContain("{finding.title}");
     expect(portfolioPage).toContain("{finding.detail}");
@@ -291,19 +292,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(portfolioPage).toContain("manual holdings · local only");
     expect(portfolioPage).toContain("imported holdings · read-only snapshot");
     expect(portfolioPage).toContain("Sample data until you add holdings");
-    expect(portfolioPage.indexOf("<ManualHoldingsPanel")).toBeGreaterThan(
-      portfolioPage.indexOf('id="holdings-title"'),
-    );
-    // The net worth chart stays honest about its source: one dot per saved
-    // daily close, with hover detail and up/down day-over-day coloring.
-    expect(portfolioCharts).toContain("One dot per saved daily close");
-    expect(portfolioCharts).toContain('data-testid="net-worth-dot"');
-    expect(portfolioCharts).toContain('data-testid="net-worth-tooltip"');
-    expect(portfolioCharts).toContain("vs prior day");
-    expect(portfolioCharts).toContain("first saved close");
-    expect(`${portfolioPage}\n${portfolioCopy}\n${portfolioCharts}`).not.toMatch(
-      /Tap a holding|thesis|your portfolio|>Weight|The visible money picture|Portfolio value, not individual asset price moves|alert: \\$\\{cleanAlertMessage|can shape Today/i,
-    );
+    // Gains are never invented: without a real cost basis the row asks for one.
+    expect(sheet).toContain('holding.gain_value === null ? "Add cost basis"');
   });
 
   test("GIVEN Settings first-paint copy WHEN the profile state is not ready THEN it does not look stuck", () => {
@@ -316,7 +306,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(profileSettings).toContain("Profile settings live in this browser");
     expect(profileSettings).toContain("<summary className=\"flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 marker:hidden [&::-webkit-details-marker]:hidden\">");
     expect(settingsPage).toContain("Choose what to connect. Nothing here places trades, signs transactions, or moves funds.");
-    expect(settingsPage).toContain("New here?");
+    expect(settingsPage).toContain('label="Settings sections"');
     expect(settingsPage).toContain('id="connections"');
     expect(settingsPage).toContain('id="profile"');
     expect(settingsPage).toContain('id="chat"');
@@ -344,7 +334,7 @@ describe("mobile ergonomics source contracts", () => {
     const globalAssistant = source("components/global-assistant.tsx");
 
     expect(chatPage).toContain(
-      "Ask Master Mold to open routes, check status, pull context, or explain what to do next.",
+      "Ask about your money, a holding, or what to do next.",
     );
     expect(chatPage).toContain("parseAsOf(params?.as_of ?? null)");
     expect(chatPage).not.toContain("getChatPrompts");
@@ -383,8 +373,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(appShell).toContain("fixed top-0 left-0 z-50 flex h-14 w-full");
     expect(appShell).toContain("flex min-h-11 shrink-0 items-center whitespace-nowrap");
     expect(appShell).not.toContain("hidden min-h-11 items-center whitespace-nowrap font-display text-base font-bold tracking-tight text-violet md:flex");
-    expect(appShell).toContain("hidden h-full w-14 flex-col");
-    expect(appShell).toContain("pt-20 md:pl-16");
+    expect(appShell).toContain("hidden h-full w-16 flex-col");
+    expect(appShell).toContain("pt-20 md:pl-24");
     expect(source("components/reviewer-evidence-panel.tsx")).toContain('"Today and activity"');
     expect(chatPage).not.toMatch(/your alerts, holdings, and record/i);
   });
@@ -433,30 +423,25 @@ describe("mobile ergonomics source contracts", () => {
     expect(journalPage).toContain("call?: string;");
     expect(journalRoute).toContain("call?: unknown;");
     expect(journalRoute).toContain("normalizeText(body.call) || normalizeText(body.thesis)");
+    // 2026-09 journal rewrite: an always-open composer records in one step;
+    // #record-call still focuses it and prepared drafts still prefill it.
     expect(journal).toContain("call: string;");
     expect(journal).toContain('id="journal-call"');
     expect(journal).toContain("call: form.call");
     expect(journal).toContain('const statusText = isPending ? "Logging decision." : message;');
     expect(journal).toContain("const [recordOpen, setRecordOpen] = useState(Boolean(initialDraft));");
     expect(journal).toContain('window.location.hash === "#record-call"');
-    expect(journal).toContain('open={recordOpen}');
     expect(journal).toContain('<p aria-live="polite" className="text-sm leading-5 text-outline">');
-    // The outcome form pairs an sr-only live region with a visible message; the
-    // status must never be screen-reader-only without a visible counterpart.
-    expect(journal).toContain('{message ? <p className="text-sm text-outline">{message}</p> : null}');
+    // Scoring is inline and still sends the full outcome payload.
     expect(journal).toContain("call_was_right: form.call_was_right");
     expect(journal).toContain("review_quality: Number(form.review_quality)");
     expect(journal).toContain("result_score: Number(form.result_score)");
     expect(journal).toContain("result_note: form.result_note");
-    // Redesign: the page-level ScoreAccuracyBars duplicated the workspace's
-    // "Review scores" section and was removed; the workspace owns score bands.
+    expect(journal).toContain('{message ? <p className="text-sm text-outline">{message}</p> : <span />}');
     expect(journalPage).not.toContain("<ScoreAccuracyBars");
+    expect(journal.indexOf('id="record-call"')).toBeLessThan(journal.indexOf("<EntryList"));
     expect(journal.indexOf("<EntryList")).toBeLessThan(journal.indexOf("<TrackRecordSection"));
-    expect(journal.indexOf("<TrackRecordSection")).toBeLessThan(journal.indexOf("<aside"));
     expect(journal).toContain("data-journal-task-first");
-    expect(journal).toContain('className="min-w-0 scroll-mt-24 xl:sticky xl:top-6"');
-    expect(journalPage).toContain('className="mx-auto w-full min-w-0 max-w-4xl overflow-hidden"');
-    expect(journal).toContain('className="grid w-full min-w-0 gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start"');
     expect(journal).toContain('id="record-call"');
     expect(journal).toContain("Save a new decision before the result is obvious.");
     expect(outcomeRoute).toContain("call_was_right?: unknown;");
@@ -470,39 +455,23 @@ describe("mobile ergonomics source contracts", () => {
     expect(saveCallButton).toContain("confidence: Math.max");
     expect(`${alertLoop}\n${briefingDraft}\n${saveCallButton}`).not.toMatch(/conviction: String|thesis: card\.decision_journal_entry|thesis: headline|conviction: Math\.max/i);
     expect(journal).toContain("type JournalWorkspaceData = PublicJournal");
-    expect(journal).toContain("entry.confidence_band.label");
-    // Redesign: score bands live only in the workspace's Review scores region.
+    expect(journal).toContain("title={entry.confidence_band.label}");
     expect(journal).toContain("Review scores");
     expect(journal).toContain('{entry.result.call_was_right ? "Right" : "Missed"}');
-    // Redesign: provenance-gated sample-vs-saved wording lives in the
-    // workspace's Review scores region (the page-level duplicate was removed).
+    // Sample-vs-saved honesty stays in the Review scores panel.
     expect(journal).toContain('const isSample = provenance.label === "Sample data";');
     expect(journal).toContain("Seeded and locally saved calls. Use this to check the scoring workflow; it is not evidence that future calls will work.");
     expect(journal).toContain("Compares higher-scored saved calls with later results. Useful for review, not proof that future calls will work.");
     expect(journalPage).not.toMatch(/CalibrationCurve|calibration-title/i);
     expect(journalPage).not.toMatch(/Score accuracy|Confidence accuracy|higher-confidence|actually been right more often/i);
-    expect(journal).toContain("Review scores");
-    expect(journal).toContain("const INITIAL_JOURNAL_ENTRY_LIMIT = 1;");
-    expect(journal).toContain("entries.slice(0, INITIAL_JOURNAL_ENTRY_LIMIT)");
-    expect(journal).toContain("Showing {visibleEntries.length} of {entries.length} saved calls.");
-    expect(journal).toContain("Show ${hiddenEntryCount} older calls");
-    expect(journal).toContain("Show recent only");
-    expect(journal).toContain("Older calls stay in the archive until review time.");
     expect(journal).toContain("aria-expanded={showDetails}");
     expect(journal).toContain('aria-controls="strategy-belief-detail"');
     expect(journal).toContain("Show lesson details");
-    expect(journal).toContain("{showDetails ? (");
     expect(journal).toContain('id="strategy-belief-detail"');
     expect(journal).toContain("<TrackRecordSection tiers={trackRecord} provenance={initialJournal.provenance} />");
     expect(journal).toContain("<ProvenanceChip label={provenance.label} title={provenance.source} />");
     expect(journal).toContain("data-journal-score-strip");
-    expect(journal).toContain("Open when you are checking your process.");
-    expect(journal).toContain('<span className="sr-only">Score details</span>');
-    expect(journal).toContain('className="grid gap-2 sm:gap-4"');
-    expect(journal).toContain('className="group cursor-pointer list-none space-y-1.5 p-2.5 marker:hidden sm:space-y-3 sm:p-5 [&::-webkit-details-marker]:hidden"');
-    // Redesign: the entry list is one journal stream with author attribution —
-    // human calls carry a "You" chip, Master Mold's analyst memo and lessons
-    // interleave as read-only violet-accented rows.
+    // One stream, two authors.
     expect(journal).toContain("Journal stream");
     expect(journal).toContain('data-testid="journal-author-you"');
     expect(journal).toContain('data-testid="journal-author-master-mold"');
@@ -510,13 +479,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(journal).toContain('entry.kind === "lesson" ? "lesson" : "daily review"');
     expect(journalPage).toContain('import { autopilotStore } from "@/src/autopilot/store";');
     expect(journalPage).toContain('.filter((row) => row.kind === "lesson")');
-    expect(journal).toContain('<ChevronDown aria-hidden="true" className="size-4" />');
-    expect(journal).toContain('<span className="sr-only">Details</span>');
     expect(journal).toContain("formatCompactTierResultCount(tier)");
     expect(journal).toContain("{entries.length} saved");
-    expect(journal).toContain("line-clamp-2 text-sm leading-5");
-    expect(journal).toContain("grid min-h-16 content-center gap-1 rounded-md");
-    expect(journal).toContain("flex min-h-14 cursor-pointer list-none items-center justify-between gap-3");
+    expect(journal).toContain("line-clamp-2 block text-sm font-medium leading-5");
+    expect(journal).toContain("formatCompactTierResultCount(tier)");
+    expect(journal).toContain("{entries.length} saved");
     expect(journal).toContain("Seeded and locally saved calls. Use this to check the scoring workflow; it is not evidence that future calls will work.");
     expect(journal).toContain("Compares higher-scored saved calls with later results. Useful for review, not proof that future calls will work.");
     expect(journal).toContain("formatCompactTierResultCount(tier)");
@@ -560,7 +527,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain('<HealthRow label="Data mode"');
     expect(settingsPage).toContain('label="Portfolio source"');
     expect(settingsPage).toContain('label="Daily report"');
-    expect(settingsPage).toContain('<HealthRow label="Access" value="Loopback operator" detail="Remote access is fail-closed');
+    expect(settingsPage).toContain('<HealthRow label="Access" value="This computer only"');
     expect(source("lib/public-api-copy.ts")).toContain('briefing_feedback: "Today rated"');
     expect(settingsPage).not.toMatch(/today_read_target|median_today_read_seconds|briefing_feedback\.usefulness_rate|alert_feedback\.fatigue_rate|calibration_outcomes|mean_abs_error|within_confidence_band|Briefing ratings|Briefing rated|opens · no ratings|opens`,/i);
   });
@@ -579,7 +546,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(dashboardPage).not.toMatch(/export \{ dynamic \}|redirect|Loading this view/i);
     expect(settingsPage).toContain("export default async function SettingsPage()");
     expect(integrationsRedirect).toContain("redirect(`/settings${suffix}`);");
-    expect(reviewPage).toContain("Build truth and review readiness");
+    expect(reviewPage).toContain("What works today");
     expect(reviewPage).toContain("reviewCapabilitySections.map");
     expect(settingsPage).not.toMatch(/Settings route loaded|reviewer and operator flows/i);
   });
@@ -611,7 +578,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain('label="Daily report"');
     expect(settingsPage).toContain("auto-refresh");
     expect(dailyReport).toContain('market_scope: "market data only"');
-    expect(settingsPage).toContain("The current Web3 runtime is not live.");
+    expect(settingsPage).toContain("Neither lab can place real trades.");
     expect(reviewSurface).toContain("Short questions can use a tab-scoped chat key");
     expect(reviewSurface).toContain("Saved market reads can inform Today, Alerts, Paper, and chat.");
     expect(reviewCopy).toContain("optional market check");
@@ -709,16 +676,16 @@ describe("mobile ergonomics source contracts", () => {
     expect(reviewPage).toContain("Paper results and replay results are evidence—not claims of future profit.");
     expect(reviewPage).toContain("Review credentials never include private keys, seed phrases, or wallet authority.");
     expect(reviewPage).toContain("Paper evidence clocks are paused because mode is off.");
-    expect(appShell).toContain("Advisory by default — live execution requires an explicit operator action and passing evidence gates.");
+    expect(appShell).toContain("Master Mold advises. It never moves your money, and live trading stays locked.");
     expect(appShell).toContain('href="/settings#health"');
     expect(settingsPage).toContain("System health");
     expect(settingsPage).toContain('label="Portfolio source"');
     expect(settingsPage).toContain("portfolioSource.source_label");
-    expect(settingsPage).toContain('label="Web3 live runtime"');
-+    expect(settingsPage).toContain('value={autopilotLive ? "Enabled" : "Off or locked"}');
+    expect(settingsPage).toContain('label="Live trading"');
++    expect(settingsPage).toContain('value={autopilotLive ? "Enabled" : "Locked"}');
     expect(settingsPage).toContain('label="Daily report"');
-    expect(settingsPage).toContain('value="Loopback operator"');
-    expect(settingsPage).toContain("Remote access is fail-closed");
+    expect(settingsPage).toContain('value="This computer only"');
+    expect(settingsPage).toContain("Other devices are blocked");
     expect(reviewSurface).toContain("Chat context saves what the app can remember");
     expect(reviewSurface).toContain("supporting notes, and alerts come from the saved read");
     expect(reviewSurface).toContain("Saved market reads can inform Today, Alerts, Paper, and chat.");
@@ -734,7 +701,7 @@ describe("mobile ergonomics source contracts", () => {
     const tradingPage = source("app/trading/page.tsx");
 
     // Redesign: the Paper header is hand-rolled "Simulator" copy now.
-    expect(paperPage).toContain("Test calls with simulator dollars before risking anything.");
+    expect(paperPage).toContain("Try a call with pretend money");
     expect(paperPage).toContain("Ideas to test");
     expect(paperPage).not.toContain("showSuggestions: false");
     expect(paperPage).not.toContain('className: "hidden sm:block"');
@@ -742,7 +709,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperPage.indexOf("<MasterMoldPaperIdeas")).toBeGreaterThan(-1);
     expect(paperWorkspace).toContain("Open tests");
     expect(paperWorkspace).toContain("Use simulator dollars to test a call");
-    expect(paperWorkspace).toContain("Test a paper trade");
+    expect(paperWorkspace).toContain("New paper test");
     expect(paperWorkspace).toContain("Paper trades use this simulator balance only. No connected account is touched.");
     expect(paperWorkspace).toContain("const INITIAL_CLOSED_ROUND_LIMIT = 3;");
     expect(paperWorkspace).toContain("rounds.slice(0, INITIAL_CLOSED_ROUND_LIMIT)");
@@ -758,11 +725,11 @@ describe("mobile ergonomics source contracts", () => {
 
     // Retirement 2026-07-05: the supervised test-trade workspace is gone; the
     // Trade page is the autonomous Autopilot lane only.
-    expect(tradingPage).toContain("<AutopilotPanel />");
+    expect(tradingPage).toContain("<AutopilotPanel research={<Web3ResearchBoard />} />");
     // Redesign: TradeScopeBanner was replaced by the global AppShell footer;
     // Trade's own header still pins the live-money lock.
     expect(tradingPage).toContain("Live money stays locked.");
-    expect(source("components/app-shell.tsx")).toContain("Advisory by default — live execution requires an explicit operator action and passing evidence gates.");
+    expect(source("components/app-shell.tsx")).toContain("Master Mold advises. It never moves your money, and live trading stays locked.");
     expect(tradingPage).not.toContain("showSuggestions: false");
     expect(tradingPage).not.toContain('className: "hidden sm:block"');
     expect(tradingPage).not.toContain("Web3 desk status, next test trade, and live-money locks.");
@@ -776,12 +743,12 @@ describe("mobile ergonomics source contracts", () => {
     const paperWorkspace = source("components/paper-workspace.tsx");
 
     // Redesign: the Paper header is hand-rolled "Simulator" copy now.
-    expect(paperPage).toContain(">Simulator</h1>");
-    expect(paperPage).toContain("Test calls with simulator dollars before risking anything.");
+    expect(paperPage).toContain(">Paper trading</h1>");
+    expect(paperPage).toContain("Try a call with pretend money");
     expect(paperPage).toContain("Back to Journal");
     expect(paperPage).toContain("Ideas to test");
     expect(paperPage).toContain("Saved market ideas you can try with simulator dollars");
-    expect(paperPage).toContain("New test");
+    expect(paperPage).toContain("Start a paper test");
     expect(paperPage).toContain("hiddenMobileCount");
     expect(paperPage).toContain("index >= 2 ? \"hidden sm:block\" : \"\"");
     expect(paperPage).toContain("more ideas appear on wider screens");
@@ -793,7 +760,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperWorkspace).toContain("Paper trading only. Compare the result after the close date.");
     expect(paperWorkspace).toContain("Nothing here places a real trade.");
     expect(paperWorkspace).toContain("Simulator dollars reserved until the close date.");
-    expect(paperWorkspace).toContain("Test a paper trade");
+    expect(paperWorkspace).toContain("New paper test");
     expect(paperWorkspace).toContain('window.location.hash === "#paper-trade-form"');
     expect(paperWorkspace).toContain("open={open}");
     expect(paperWorkspace).toContain('onToggle={(event) => setOpen(event.currentTarget.open)}');
@@ -927,7 +894,7 @@ describe("mobile ergonomics source contracts", () => {
     const imports = source("src/db/portfolio-imports.ts");
 
     expect(settingsPage).toContain("Choose what to connect. Nothing here places trades, signs transactions, or moves funds.");
-    expect(settingsPage).toContain("New here?");
+    expect(settingsPage).toContain('label="Settings sections"');
     expect(settingsPage).toContain('id="connections"');
     expect(settingsPage).toContain('id="profile"');
     expect(settingsPage).toContain('id="chat"');
@@ -938,7 +905,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage.indexOf('id="autopilot"')).toBeLessThan(settingsPage.indexOf('id="safety"'));
     expect(settingsPage).toContain('import { MonarchMcpPanel } from "@/components/monarch-mcp-panel";');
     expect(settingsPage).toContain("<MonarchMcpPanel");
-    expect(source("components/monarch-mcp-panel.tsx")).toContain("Test MCP connection");
+    expect(source("components/monarch-mcp-panel.tsx")).toContain("Test Monarch connection");
     expect(source("components/monarch-mcp-panel.tsx")).toContain("Sync Monarch now");
     expect(source("app/api/portfolio-brain/monarch/route.ts")).toContain("monarch-mcp-portfolio-brain");
     expect(source("app/api/portfolio-brain/monarch/test/route.ts")).toContain("testMonarchMcpConnection");
@@ -976,7 +943,7 @@ describe("mobile ergonomics source contracts", () => {
     const imports = source("src/db/portfolio-imports.ts");
 
     expect(settingsPage).toContain("Read-only portfolio sources.");
-    expect(settingsPage).toContain("Manual holdings are often the fastest first setup");
+    expect(settingsPage).toContain("The fastest setup is importing your book on");
     expect(settingsPage).toContain("Stays in this browser");
     expect(settingsPage).toContain("Sent to this local app");
     expect(settingsPage).toContain("Can leave this app");

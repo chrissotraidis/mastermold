@@ -45,6 +45,53 @@ export type ManualHoldingRow = {
   daily_change_pct: number;
   created_at: string;
   updated_at: string;
+  /** Optional account link; missing on rows entered before accounts existed. */
+  account_id?: string | null;
+  /** When the price was last refreshed from a quote source (null = typed in). */
+  price_as_of?: string | null;
+  price_source?: string | null;
+  /** False when cost_basis was defaulted from quantity × price, not entered. */
+  cost_basis_known?: boolean;
+};
+
+/**
+ * An account in the money map. Holdings point at it by account_id; accounts
+ * with no holdings (checking, a mortgage, a house) carry their own balance.
+ * Liabilities store a positive balance and subtract from net worth.
+ */
+export type FinancialAccountRow = {
+  id: string;
+  name: string;
+  institution: string;
+  type:
+    | "brokerage"
+    | "retirement"
+    | "crypto_exchange"
+    | "wallet"
+    | "bank"
+    | "cash"
+    | "credit_card"
+    | "loan"
+    | "mortgage"
+    | "property"
+    | "vehicle"
+    | "other";
+  kind: "asset" | "liability";
+  currency: string;
+  /** Used when the account has no holdings (bank, loan, property). */
+  balance: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** One saved net-worth point per day. */
+export type NetWorthHistoryRow = {
+  date: string;
+  assets: number;
+  liabilities: number;
+  net_worth: number;
+  recorded_at: string;
 };
 
 export type ImportedHoldingRow = {
@@ -124,6 +171,13 @@ export interface PersistAdapter {
   manualHoldings(): ManualHoldingRow[];
   upsertManualHolding(holding: ManualHoldingRow): void;
   deleteManualHolding(id: string): void;
+  /** Replace every manual holding in one write (imports, bulk edits, undo). */
+  replaceManualHoldings(holdings: ManualHoldingRow[]): void;
+  financialAccounts(): FinancialAccountRow[];
+  upsertFinancialAccount(account: FinancialAccountRow): void;
+  deleteFinancialAccount(id: string): void;
+  netWorthHistory(): NetWorthHistoryRow[];
+  upsertNetWorthPoint(point: NetWorthHistoryRow): void;
   importedHoldings(): ImportedHoldingRow[];
   replaceImportedHoldings(service: ImportedHoldingRow["service"], holdings: ImportedHoldingRow[]): void;
   positionPolicies(): PositionPolicyRow[];
@@ -156,6 +210,8 @@ type StoreSnapshot = {
   paper_rounds: PaperTradingRound[];
   round_scores: RoundScore[];
   manual_holdings: ManualHoldingRow[];
+  financial_accounts: FinancialAccountRow[];
+  net_worth_history: NetWorthHistoryRow[];
   imported_holdings: ImportedHoldingRow[];
   position_policies: PositionPolicyRow[];
   alerts: Record<string, AlertStateRow>;
@@ -179,6 +235,8 @@ const emptySnapshot = (): StoreSnapshot => ({
   paper_rounds: [],
   round_scores: [],
   manual_holdings: [],
+  financial_accounts: [],
+  net_worth_history: [],
   imported_holdings: [],
   position_policies: [],
   alerts: {},
@@ -272,6 +330,15 @@ class SqliteAdapter implements PersistAdapter {
         id TEXT PRIMARY KEY,
         symbol TEXT NOT NULL,
         updated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS financial_accounts (
+        id TEXT PRIMARY KEY,
+        updated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS net_worth_history (
+        date TEXT PRIMARY KEY,
         data TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS imported_holdings (
@@ -441,6 +508,47 @@ class SqliteAdapter implements PersistAdapter {
 
   deleteManualHolding(id: string): void {
     this.db.query("DELETE FROM manual_holdings WHERE id = ?").run(id);
+  }
+
+  replaceManualHoldings(holdings: ManualHoldingRow[]): void {
+    this.db.run("BEGIN");
+    try {
+      this.db.run("DELETE FROM manual_holdings");
+      const insert = this.db.query("INSERT OR REPLACE INTO manual_holdings (id, symbol, updated_at, data) VALUES (?, ?, ?, ?)");
+      for (const holding of holdings) insert.run(holding.id, holding.symbol, holding.updated_at, JSON.stringify(holding));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
+  }
+
+  financialAccounts(): FinancialAccountRow[] {
+    return this.db
+      .query("SELECT data FROM financial_accounts ORDER BY updated_at ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as FinancialAccountRow);
+  }
+
+  upsertFinancialAccount(account: FinancialAccountRow): void {
+    this.db
+      .query("INSERT OR REPLACE INTO financial_accounts (id, updated_at, data) VALUES (?, ?, ?)")
+      .run(account.id, account.updated_at, JSON.stringify(account));
+  }
+
+  deleteFinancialAccount(id: string): void {
+    this.db.query("DELETE FROM financial_accounts WHERE id = ?").run(id);
+  }
+
+  netWorthHistory(): NetWorthHistoryRow[] {
+    return this.db
+      .query("SELECT data FROM net_worth_history ORDER BY date ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as NetWorthHistoryRow);
+  }
+
+  upsertNetWorthPoint(point: NetWorthHistoryRow): void {
+    this.db.query("INSERT OR REPLACE INTO net_worth_history (date, data) VALUES (?, ?)").run(point.date, JSON.stringify(point));
   }
 
   importedHoldings(): ImportedHoldingRow[] {
@@ -687,6 +795,8 @@ class MemoryAdapter implements PersistAdapter {
   private paperRoundRows: PaperTradingRound[] = [];
   private roundScoreRows: RoundScore[] = [];
   private manualHoldingRows: ManualHoldingRow[] = [];
+  private financialAccountRows: FinancialAccountRow[] = [];
+  private netWorthRows: NetWorthHistoryRow[] = [];
   private importedHoldingRows: ImportedHoldingRow[] = [];
   private positionPolicyRows: PositionPolicyRow[] = [];
   private alerts = new Map<string, AlertStateRow>();
@@ -741,6 +851,26 @@ class MemoryAdapter implements PersistAdapter {
   }
   deleteManualHolding(id: string) {
     this.manualHoldingRows = this.manualHoldingRows.filter((item) => item.id !== id);
+  }
+  replaceManualHoldings(holdings: ManualHoldingRow[]) {
+    this.manualHoldingRows = [...holdings];
+  }
+  financialAccounts() {
+    return [...this.financialAccountRows];
+  }
+  upsertFinancialAccount(account: FinancialAccountRow) {
+    this.financialAccountRows = this.financialAccountRows.filter((item) => item.id !== account.id);
+    this.financialAccountRows.push(account);
+  }
+  deleteFinancialAccount(id: string) {
+    this.financialAccountRows = this.financialAccountRows.filter((item) => item.id !== id);
+  }
+  netWorthHistory() {
+    return [...this.netWorthRows].sort((a, b) => a.date.localeCompare(b.date));
+  }
+  upsertNetWorthPoint(point: NetWorthHistoryRow) {
+    this.netWorthRows = this.netWorthRows.filter((item) => item.date !== point.date);
+    this.netWorthRows.push(point);
   }
   importedHoldings() {
     return [...this.importedHoldingRows];
@@ -907,6 +1037,34 @@ class JsonFileAdapter implements PersistAdapter {
     snapshot.manual_holdings.push(holding);
     this.write(snapshot);
   }
+  replaceManualHoldings(holdings: ManualHoldingRow[]) {
+    const snapshot = this.read();
+    snapshot.manual_holdings = [...holdings];
+    this.write(snapshot);
+  }
+  financialAccounts() {
+    return [...this.read().financial_accounts];
+  }
+  upsertFinancialAccount(account: FinancialAccountRow) {
+    const snapshot = this.read();
+    snapshot.financial_accounts = snapshot.financial_accounts.filter((item) => item.id !== account.id);
+    snapshot.financial_accounts.push(account);
+    this.write(snapshot);
+  }
+  deleteFinancialAccount(id: string) {
+    const snapshot = this.read();
+    snapshot.financial_accounts = snapshot.financial_accounts.filter((item) => item.id !== id);
+    this.write(snapshot);
+  }
+  netWorthHistory() {
+    return [...this.read().net_worth_history].sort((a, b) => a.date.localeCompare(b.date));
+  }
+  upsertNetWorthPoint(point: NetWorthHistoryRow) {
+    const snapshot = this.read();
+    snapshot.net_worth_history = snapshot.net_worth_history.filter((item) => item.date !== point.date);
+    snapshot.net_worth_history.push(point);
+    this.write(snapshot);
+  }
   deleteManualHolding(id: string) {
     const snapshot = this.read();
     snapshot.manual_holdings = snapshot.manual_holdings.filter((item) => item.id !== id);
@@ -1041,6 +1199,8 @@ class JsonFileAdapter implements PersistAdapter {
         paper_rounds: Array.isArray(parsed.paper_rounds) ? parsed.paper_rounds : [],
         round_scores: Array.isArray(parsed.round_scores) ? parsed.round_scores : [],
         manual_holdings: Array.isArray(parsed.manual_holdings) ? parsed.manual_holdings : [],
+        financial_accounts: Array.isArray(parsed.financial_accounts) ? parsed.financial_accounts : [],
+        net_worth_history: Array.isArray(parsed.net_worth_history) ? parsed.net_worth_history : [],
         imported_holdings: Array.isArray(parsed.imported_holdings) ? parsed.imported_holdings : [],
         position_policies: Array.isArray(parsed.position_policies) ? parsed.position_policies : [],
         alerts: parsed.alerts && typeof parsed.alerts === "object" ? parsed.alerts : {},
@@ -1082,8 +1242,32 @@ class JsonFileAdapter implements PersistAdapter {
 
 let cached: PersistAdapter | null = null;
 
+/**
+ * One book for every runtime. The Next server runs on Node, which has no
+ * bun:sqlite, so it can only use the JSON file; Bun scripts and the daemon
+ * used to open the SQLite file instead and silently saw a different (often
+ * empty) portfolio. Rule: if the JSON book exists, or nothing exists yet,
+ * everyone uses JSON. SQLite is kept only for a store that already lives
+ * there alone. MASTERMOLD_STORE=json|sqlite forces a backend.
+ */
+export function resolveStoreBackend(
+  path: string,
+  sqliteAvailable: boolean,
+  forced: string | undefined = process.env.MASTERMOLD_STORE,
+  exists: (file: string) => boolean = existsSync,
+): "sqlite" | "json-file" | "memory" {
+  if (path === ":memory:") return sqliteAvailable ? "sqlite" : "memory";
+  if (forced === "json") return "json-file";
+  if (forced === "sqlite" && sqliteAvailable) return "sqlite";
+  if (exists(`${path}.json`)) return "json-file";
+  if (sqliteAvailable && exists(path)) return "sqlite";
+  return "json-file";
+}
+
 function build(): PersistAdapter {
   const sqlite = loadSqlite();
+  const backend = resolveStoreBackend(dbPath(), Boolean(sqlite));
+  if (backend === "json-file") return new JsonFileAdapter(`${dbPath()}.json`);
   if (sqlite) {
     try {
       const path = dbPath();

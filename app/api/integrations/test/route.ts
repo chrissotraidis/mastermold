@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
+import { llmCompletion, llmProviderDisplayName, type LlmProviderLabel } from "@/src/llm/completion";
 
 type IntegrationService = "coinbase" | "robinhood" | "onchain_wallet" | "llm";
 type PublicIntegrationService = Exclude<IntegrationService, "llm"> | "live_chat";
@@ -115,9 +116,11 @@ async function testZerion(body: Record<string, unknown> | null): Promise<TestRes
 }
 
 async function testModel(body: Record<string, unknown> | null): Promise<TestResult> {
-  const provider = (text(body?.provider) || "openrouter") as ModelProvider;
+  const requested = text(body?.provider) || "server";
+  if (requested === "server") return testServerChain();
+  const provider = requested as ModelProvider;
   if (!["openrouter", "openai", "anthropic"].includes(provider)) {
-    throw new Error("Choose OpenRouter, OpenAI, or Anthropic.");
+    throw new Error("Choose Server default, OpenRouter, OpenAI, or Anthropic.");
   }
   const apiKey = text(body?.api_key) || envKey(provider);
   if (!apiKey) throw new Error(`No ${providerLabel(provider)} key was provided or found in the server environment.`);
@@ -137,6 +140,20 @@ async function testModel(body: Record<string, unknown> | null): Promise<TestResu
     checked_at: new Date().toISOString(),
     docs_url: provider === "anthropic" ? "https://docs.claude.com/en/api/messages" : provider === "openai" ? "https://platform.openai.com/docs/api-reference/authentication" : docsByService.llm,
   };
+}
+
+/** Tests the exact provider chain chat and the daily report use. */
+async function testServerChain(): Promise<TestResult> {
+  const result = await llmCompletion({
+    system: "You are a connection test. Reply with the single word OK.",
+    user: "Reply with OK.",
+    maxTokens: 8,
+    temperature: 0,
+    timeoutMs: TEST_TIMEOUT_MS,
+    title: "Master Mold connection test",
+  });
+  const name = llmProviderDisplayName(result.provider as LlmProviderLabel);
+  return ok("llm", `Server chat works through ${name}.`, `${result.model} replied "${result.content.slice(0, 24)}".`);
 }
 
 async function testOpenRouter(apiKey: string, model: string) {

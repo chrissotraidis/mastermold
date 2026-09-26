@@ -32,7 +32,7 @@ describe("Polymarket hardening contracts", () => {
     // forecast-driven entries only); every price-signal strategy stays shadow.
     expect(POLYMARKET_STRATEGY_CATALOG.filter((strategy) => strategy.authority === "paper").map((strategy) => strategy.id)).toEqual(["analyst"]);
     expect(POLYMARKET_STRATEGY_CATALOG.find((strategy) => strategy.id === "weather")?.authority).toBe("observe");
-    expect(POLYMARKET_STRATEGY_CATALOG.find((strategy) => strategy.id === "copy_trading")?.authority).toBe("missing");
+    expect(POLYMARKET_STRATEGY_CATALOG.find((strategy) => strategy.id === "copy_trading")?.authority).toBe("shadow");
 
     const report = {
       strategies: [{

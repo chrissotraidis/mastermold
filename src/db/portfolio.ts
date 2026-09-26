@@ -168,7 +168,8 @@ function buildPortfolio(asOf: AsOfFilter | null = null): PortfolioJson {
     })
     .filter((holding): holding is PortfolioHoldingJson => holding !== null);
 
-  const manualHoldings = manualRows.map(manualRowToHolding);
+  const accountNames = new Map(asOf ? [] : store().financialAccounts().map((account) => [account.id, account.name] as const));
+  const manualHoldings = manualRows.map((row) => manualRowToHolding(row, accountNames));
   const importedHoldings = importedRows.map(importedRowToHolding);
   const brainHoldings = portfolioBrainSnapshot ? portfolioBrainHoldingsForPortfolio(portfolioBrainSnapshot) : [];
   const totalMarketValue = roundMoney(
@@ -417,7 +418,7 @@ export function replaceImportedHoldings(
   return getPortfolio();
 }
 
-function invalidatePortfolioCache() {
+export function invalidatePortfolioCache() {
   portfolioCache.clear();
 }
 
@@ -464,8 +465,9 @@ function getPriceChartAssets(priceBars: PriceBar[]): PriceChartAssetJson[] {
     .sort((a, b) => a.asset.symbol.localeCompare(b.asset.symbol));
 }
 
-function manualRowToHolding(row: ManualHoldingRow): PortfolioHoldingJson {
+function manualRowToHolding(row: ManualHoldingRow, accountNames: Map<string, string> = new Map()): PortfolioHoldingJson {
   const marketValue = roundMoney(row.quantity * row.price);
+  const accountName = row.account_id ? accountNames.get(row.account_id) : undefined;
   return {
     id: row.id,
     symbol: row.symbol,
@@ -478,12 +480,12 @@ function manualRowToHolding(row: ManualHoldingRow): PortfolioHoldingJson {
     daily_change_pct: row.daily_change_pct,
     daily_change_value: roundMoney(marketValue * (row.daily_change_pct / 100)),
     weight_pct: 0,
-    as_of: row.updated_at,
+    as_of: row.price_as_of ?? row.updated_at,
     source: "manual",
     account: {
-      id: "acct_manual",
+      id: accountName && row.account_id ? row.account_id : "acct_manual",
       kind: "manual",
-      label: "Manual entry",
+      label: accountName ?? "Manual entry",
       integration_status: "manual",
       scope: "read_only",
     },
@@ -571,25 +573,29 @@ function buildNetWorthSeries(
     barsByAsset.set(bar.asset_id, list);
   }
 
-  return Array.from({ length: 7 }, (_, index) => {
-    const daysBack = 6 - index;
-    const day = new Date(end);
-    day.setUTCDate(end.getUTCDate() - daysBack);
-    day.setUTCHours(23, 59, 59, 999);
-
-    if (daysBack === 0) {
-      return { date: day.toISOString().slice(0, 10), value: roundMoney(total) };
-    }
-
-    const value = holdings.reduce((sum, holding) => {
+  const valueAt = (day: Date) =>
+    holdings.reduce((sum, holding) => {
       const assetId = assetIdBySymbol.get(holding.symbol);
       const bars = assetId ? barsByAsset.get(assetId) : undefined;
       const bar = bars ? lastBarAtOrBefore(bars, day.getTime()) : null;
       return sum + (bar ? holding.quantity * bar.close : holding.market_value);
     }, 0);
 
-    return { date: day.toISOString().slice(0, 10), value: Math.max(roundMoney(value), 0) };
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(end);
+    day.setUTCDate(end.getUTCDate() - (6 - index));
+    day.setUTCHours(23, 59, 59, 999);
+    return day;
   });
+  // Demo bars are a fixed seed, so today's live-priced total and the seed's
+  // closes disagree in level. Scale the seed shape onto today's total so the
+  // chart shows the bars' relative moves instead of a fake drop into today.
+  const seedToday = valueAt(days[6]);
+  const scale = seedToday > 0 ? total / seedToday : 1;
+  return days.map((day, index) => ({
+    date: day.toISOString().slice(0, 10),
+    value: index === 6 ? roundMoney(total) : Math.max(roundMoney(valueAt(day) * scale), 0),
+  }));
 }
 
 function buildReportBackedSeries(

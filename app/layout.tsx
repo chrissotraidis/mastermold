@@ -1,9 +1,14 @@
 // Root layout — Master Mold "Sentinel" theme.
 // Keep `import "./globals.css"` and the design-token classes on body.
 import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ProfileProvider } from "@/components/profile-provider";
 import { FaceActivityProvider } from "@/components/face-activity";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk", display: "swap" });
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Master Mold",
@@ -20,7 +25,7 @@ export const metadata: Metadata = {
 
 /** Dark status/address bar on mobile, matching the Void background. */
 export const viewport: Viewport = {
-  themeColor: "#0f090b",
+  themeColor: "#09060a",
 };
 
 export default function RootLayout({
@@ -31,7 +36,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className="dark"
+      className={`dark ${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
       style={{ margin: 0, maxWidth: "100vw", overflowX: "hidden", width: "100%" }}
       suppressHydrationWarning
     >

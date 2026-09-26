@@ -75,7 +75,7 @@ export type JournalJson = {
   strategy_beliefs: StrategyBeliefJson[];
   reflection_updates: ReflectionUpdate[];
   provenance: {
-    label: "Demo data" | "Engine output";
+    label: "Demo data" | "Engine output" | "Manual journal";
     source: string;
     as_of: string;
     replay_as_of: string | null;
@@ -120,7 +120,10 @@ export function getJournal(asOf: AsOfFilter | null = null): JournalJson {
 
   // Engine decisions (when live) replace seeded decisions; operator-logged entries
   // from the durable store are always included on top.
-  const baseEntries = bundle ? engineAllJournalEntries(bundle) : demoDatabase.decisionJournalEntries;
+  // Seeded sample calls only fill an empty journal; once the operator logs a
+  // call, the samples drop out so hit rate and scores are theirs alone.
+  const hasLoggedCalls = store().loggedJournalEntries().length > 0;
+  const baseEntries = bundle ? engineAllJournalEntries(bundle) : hasLoggedCalls ? [] : demoDatabase.decisionJournalEntries;
   const entries = buildEntries(baseEntries, asOf, outcomeScores);
 
   const reflectionUpdates = bundle
@@ -149,8 +152,8 @@ export function getJournal(asOf: AsOfFilter | null = null): JournalJson {
     strategy_beliefs: strategyBeliefs,
     reflection_updates: reflectionUpdates,
     provenance: {
-      label: engineLive ? "Engine output" : "Demo data",
-      source: engineLive ? engineRunSummary(bundle!) : "Seeded decision journal",
+      label: engineLive ? "Engine output" : hasLoggedCalls ? "Manual journal" : "Demo data",
+      source: engineLive ? engineRunSummary(bundle!) : hasLoggedCalls ? "Calls you logged in this app" : "Seeded decision journal",
       as_of: asOf?.iso ?? (bundle ? bundle.run.knowledge_time : latestKnowledgeTime(asOf)),
       replay_as_of: asOf?.iso ?? null,
     },
