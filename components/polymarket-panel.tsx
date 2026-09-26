@@ -117,12 +117,12 @@ export function PolymarketPanel() {
               </Button>
             ) : (
               <Button
-                variant={armed ? "outline" : "default"}
+                variant={armed || !paperAuthority ? "outline" : "default"}
                 disabled={pending || !canControl || (!armed && !paperAuthority)}
                 onClick={() => control({ action: "set_mode", mode: armed ? "off" : "paper" })}
               >
-                {armed ? <Square /> : <Play />}
-                {armed ? "Stop paper bot" : paperAuthority ? "Arm promoted paper bot" : "No strategy promoted"}
+                {armed ? <Square /> : paperAuthority ? <Play /> : <LockKeyhole />}
+                {armed ? "Stop paper bot" : paperAuthority ? "Arm promoted paper bot" : "Paper locked: no strategy promoted"}
               </Button>
             )}
             <Button variant="outline" disabled={pending || !armed || !canControl} onClick={() => control({ action: "run_cycle" })}>
@@ -328,7 +328,16 @@ export function PolymarketPanel() {
       ) : null}
       <div className="grid gap-3">
         {statusBlock}
-        {metricsBlock}
+        <dl className="mm-panel grid grid-cols-2 gap-px overflow-hidden bg-outline-variant/20 sm:grid-cols-4">
+          <Metric label="Paper lane" value={halted ? "Halted" : armed ? "Armed" : "Off"} detail={paperAuthority ? "strategy promoted" : "no strategy promoted"} />
+          <Metric
+            label="Research"
+            value={`${data.research_program.experiments.filter((row) => row.status === "measuring").length} measuring`}
+            detail={`of ${data.research_program.experiments.length} experiments`}
+          />
+          <Metric label="Market setups" value={String(data.signals.length)} detail="clear the filters now" />
+          <Metric label="Brain" value={`${data.brain.observations} seen`} detail={`${data.brain.labeled_1h} one-hour labels`} />
+        </dl>
       </div>
       <Tabs
         label="Polymarket lab sections"
@@ -350,6 +359,7 @@ export function PolymarketPanel() {
             label: "Paper lane",
             content: (
               <div className="grid gap-3">
+                {metricsBlock}
                 {equityBlock}
                 {positionsBlock}
                 {contractBlock}
