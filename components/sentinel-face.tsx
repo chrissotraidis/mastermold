@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  *
  * The 3D module is lazy-loaded with next/dynamic (ssr: false) so three.js
  * stays out of the initial bundle. While it loads (or without WebGL) a
- * minimal CSS placeholder renders — a dark crimson silhouette with two
+ * minimal CSS placeholder renders — a dark violet silhouette with two
  * glowing red eyes — so the swap to 3D is a subtle fade, never a clashing
  * image flash while keeping the public app asset lightweight.
  */
@@ -38,7 +38,7 @@ export function stateLabel(state: SystemState): string {
 }
 
 /** Loading / no-WebGL placeholder: a quiet CSS-only sentinel silhouette
- * (crimson dome, gold crest hint, two glowing red eyes) that the 3D head
+ * (violet dome, magenta crest hint, two glowing red eyes) that the 3D head
  * fades in over — visually continuous with the real thing, no PNG. */
 function StaticFace() {
   return (
@@ -47,14 +47,14 @@ function StaticFace() {
       <div
         className="absolute left-1/2 top-1/2 h-[72%] w-[62%] -translate-x-1/2 -translate-y-1/2"
         style={{
-          background: "linear-gradient(180deg, #7c2544 0%, #591b31 55%, #3a1220 100%)",
+          background: "linear-gradient(180deg, #5a2c8f 0%, #3d1c63 55%, #24103e 100%)",
           borderRadius: "46% 46% 40% 40% / 58% 58% 34% 34%",
         }}
       />
-      {/* Gold crest hint */}
+      {/* Magenta crest hint */}
       <div
         className="absolute left-1/2 top-[12%] h-[14%] w-[10%] -translate-x-1/2"
-        style={{ background: "#c9a13b", borderRadius: "40% 40% 20% 20%" }}
+        style={{ background: "#c02a83", borderRadius: "40% 40% 20% 20%" }}
       />
       {/* Eyes */}
       <div

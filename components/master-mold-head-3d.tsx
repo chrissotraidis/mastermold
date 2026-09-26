@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Master Mold's head — a classic Sentinel (magenta armored helmet, gold crest
- * and trim, silver faceplate, glowing red eyes) built procedurally from
+ * Master Mold's head — a classic Sentinel (violet armored helmet, magenta crest
+ * and trim, pale metal faceplate, glowing red eyes) built procedurally from
  * three.js primitives: a lathe-turned dome, beveled extrusions bent to follow
  * the face, rounded boxes, and tube trims. Realism comes from physically
  * based materials (clear-coated candy paint, polished gold and silver) lit by
@@ -20,6 +20,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { SystemState } from "@/components/sentinel-face";
+import { FACE_REACTION_EVENT, type FaceReaction } from "@/lib/face-reactions";
 
 // @react-three/fiber (through 9.8) still constructs a THREE.Clock for its
 // store, and three r183+ logs a deprecation for every canvas. Route three's
@@ -44,6 +45,32 @@ const EYE_PROFILES: Record<SystemState, EyeProfile> = {
   degraded: { intensity: 1.4, speed: 0.8, color: "#c43030", blinks: true },
   kill: { intensity: 0.15, speed: 0, color: "#5f1414", blinks: false },
 };
+
+/** Eye shape per state. tilt > 0 slants the inner corners down (stern);
+ * squint < 1 narrows the slits; raise lifts the right eye (quizzical). */
+type Expression = { tilt: number; squint: number; raise: number };
+
+const EXPRESSIONS: Record<SystemState, Expression> = {
+  idle: { tilt: 0, squint: 1, raise: 0 },
+  thinking: { tilt: 0.03, squint: 0.8, raise: 0.035 },
+  suggestion: { tilt: -0.07, squint: 1.15, raise: 0 },
+  caution: { tilt: 0.12, squint: 0.82, raise: 0 },
+  alert: { tilt: 0.24, squint: 0.66, raise: 0 },
+  degraded: { tilt: -0.12, squint: 0.55, raise: -0.02 },
+  kill: { tilt: 0, squint: 0.22, raise: 0 },
+};
+
+/** How long each one-shot reaction plays, in seconds. */
+const REACTION_SECONDS: Record<FaceReaction, number> = {
+  nod: 0.9,
+  shake: 0.8,
+  surprise: 1.1,
+  happy: 1.4,
+  annoyed: 1.6,
+};
+
+/** After this long without pointer movement the idle head dozes off. */
+const DOZE_AFTER_SECONDS = 30;
 
 export type HeadDetail = "hero" | "avatar";
 
@@ -250,7 +277,18 @@ function HeadRig({
   const g = useHeadGeometry(detail);
   const m = useMaterials();
   const headRef = useRef<THREE.Group>(null);
+  const reactRef = useRef<THREE.Group>(null);
   const eyesRef = useRef<THREE.Group>(null);
+  const eyeLRef = useRef<THREE.Mesh>(null);
+  const eyeRRef = useRef<THREE.Mesh>(null);
+  const reaction = useRef<{ kind: FaceReaction | null; start: number }>({ kind: null, start: 0 });
+  const clockNow = useRef(0);
+  const lastMoveMs = useRef(typeof performance !== "undefined" ? performance.now() : 0);
+  const dozeAmt = useRef(0);
+  const eyeLook = useRef({ x: 0, y: 0 });
+  const expr = useRef<Expression>({ ...EXPRESSIONS.idle });
+  const pokes = useRef<number[]>([]);
+  const { gl } = useThree();
   const jawRef = useRef<THREE.Group>(null);
   const haloRefs = useRef<Array<THREE.Sprite | null>>([]);
   const glowRef = useRef<THREE.PointLight>(null);
@@ -290,20 +328,67 @@ function HeadRig({
     glowRef.current?.color.set(profile.color);
   }, [eyeMaterial, haloMaterial, profile]);
 
+  // One-shot reactions from anywhere in the app (toasts, pokes, waking up).
+  useEffect(() => {
+    const onReaction = (event: Event) => {
+      const kind = (event as CustomEvent<FaceReaction>).detail;
+      if (kind in REACTION_SECONDS) reaction.current = { kind, start: clockNow.current };
+    };
+    window.addEventListener(FACE_REACTION_EVENT, onReaction);
+    return () => window.removeEventListener(FACE_REACTION_EVENT, onReaction);
+  }, []);
+
+  // Poking the head: a flinch, a grin on the second, irritation if it keeps up.
+  useEffect(() => {
+    const element = gl.domElement;
+    const onPoke = () => {
+      const now = clockNow.current;
+      pokes.current = [...pokes.current.filter((at) => now - at < 2), now];
+      const count = pokes.current.length;
+      const kind: FaceReaction = count >= 4 ? "annoyed" : count === 2 ? "happy" : "surprise";
+      reaction.current = { kind, start: now };
+    };
+    element.addEventListener("pointerdown", onPoke);
+    return () => element.removeEventListener("pointerdown", onPoke);
+  }, [gl]);
+
   useEffect(() => {
     if (!track) return;
     const onMove = (event: PointerEvent) => {
       pointer.current.x = (event.clientX / window.innerWidth) * 2 - 1;
       pointer.current.y = (event.clientY / window.innerHeight) * 2 - 1;
+      // Waking from a doze gets a start, not a silent snap back.
+      if (dozeAmt.current > 0.6 && reaction.current.kind === null) {
+        reaction.current = { kind: "surprise", start: clockNow.current };
+      }
+      lastMoveMs.current = performance.now();
     };
     window.addEventListener("pointermove", onMove, { passive: true });
     return () => window.removeEventListener("pointermove", onMove);
   }, [track]);
 
   const amp = soft ? 0.5 : 1;
+  const eyeX = 0.33;
+  const eyeY = 0.155;
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
+    clockNow.current = t;
+
+    // Reaction envelope: 0..1 progress, eased out so it settles, not snaps.
+    const active = reaction.current.kind;
+    let rp = 1;
+    if (active) {
+      rp = (t - reaction.current.start) / REACTION_SECONDS[active];
+      if (rp >= 1) reaction.current.kind = null;
+    }
+    const env = active && rp < 1 ? Math.sin(Math.PI * Math.min(1, rp)) : 0;
+    const decay = active && rp < 1 ? 1 - rp : 0;
+
+    const idleSeconds = track ? (performance.now() - lastMoveMs.current) / 1000 : 0;
+    const wantsDoze = state === "idle" && !speaking && !hovered && idleSeconds > DOZE_AFTER_SECONDS ? 1 : 0;
+    dozeAmt.current += (wantsDoze - dozeAmt.current) * (wantsDoze ? 0.01 : 0.12);
+    const doze = dozeAmt.current;
     hoverAmt.current += ((hovered ? 1 : 0) - hoverAmt.current) * 0.12;
     speakAmt.current += ((speaking ? 1 : 0) - speakAmt.current) * 0.1;
 
@@ -322,12 +407,55 @@ function HeadRig({
       const lift = hoverAmt.current * 0.1 * amp;
       const nod = speakAmt.current * Math.sin(t * 3.2) * 0.045 * amp;
       head.rotation.y += (Math.sin(t * 0.4) * 0.18 * amp + trackX + glanceState.offset - head.rotation.y) * 0.06;
-      head.rotation.x += (Math.sin(t * 0.63) * 0.05 * amp + trackY - lift + nod - head.rotation.x) * 0.06;
+      head.rotation.x += (Math.sin(t * 0.63) * 0.05 * amp + trackY * (1 - doze) - lift + nod + doze * 0.16 - head.rotation.x) * 0.06;
       head.rotation.z = Math.sin(t * 0.3) * 0.03 * amp;
       head.position.y = Math.sin(t * 0.85) * 0.045 * amp + hoverAmt.current * 0.04;
     }
 
-    const flare = 1 + hoverAmt.current * 0.6 + speakAmt.current * 0.25;
+    // Reactions ride on their own group so they stay crisp over the smoothed idle.
+    const react = reactRef.current;
+    if (react) {
+      let pitch = 0;
+      let yaw = 0;
+      let roll = 0;
+      let rise = 0;
+      if (active === "nod") pitch = Math.sin(rp * Math.PI * 3) * 0.16 * decay;
+      if (active === "shake") yaw = Math.sin(rp * Math.PI * 4) * 0.22 * decay;
+      if (active === "surprise") {
+        pitch = -0.12 * env;
+        rise = 0.06 * env;
+      }
+      if (active === "happy") {
+        roll = Math.sin(rp * Math.PI * 2) * 0.1 * decay;
+        rise = Math.abs(Math.sin(rp * Math.PI * 3)) * 0.04 * decay;
+      }
+      if (active === "annoyed") {
+        yaw = Math.sin(rp * Math.PI * 6) * 0.07 * decay;
+        pitch = 0.06 * env;
+      }
+      react.rotation.set(pitch * amp, yaw * amp, roll * amp);
+      react.position.y = rise * amp;
+    }
+
+    // Blend the state's eye shape, then layer the reaction and doze on top.
+    const target = EXPRESSIONS[state];
+    expr.current.tilt += (target.tilt - expr.current.tilt) * 0.08;
+    expr.current.squint += (target.squint - expr.current.squint) * 0.08;
+    expr.current.raise += (target.raise - expr.current.raise) * 0.08;
+    let tilt = expr.current.tilt;
+    let squint = expr.current.squint;
+    if (active === "surprise") squint *= 1 + 0.45 * env;
+    if (active === "happy") {
+      squint *= 1 - 0.5 * env;
+      tilt -= 0.12 * env;
+    }
+    if (active === "annoyed") {
+      tilt += 0.26 * env;
+      squint *= 1 - 0.3 * env;
+    }
+    squint *= 1 - 0.72 * doze;
+
+    const flare = (1 + hoverAmt.current * 0.6 + speakAmt.current * 0.25 + (active === "surprise" || active === "annoyed" ? env * 0.9 : 0)) * (1 - 0.6 * doze);
     const pulse = profile.speed > 0 ? profile.intensity * (1 + Math.sin(t * profile.speed) * 0.3) : profile.intensity;
     eyeMaterial.emissiveIntensity = pulse * flare;
     const haloScale = (0.34 + pulse * 0.035) * flare;
@@ -341,7 +469,20 @@ function HeadRig({
       if (p >= 1) blink.current.nextAt = t + 2.6 + Math.random() * 4.5;
       else eyeScaleY = Math.max(0.06, 1 - 0.94 * Math.sin(Math.PI * p));
     }
-    eyesRef.current?.scale.set(1, eyeScaleY, 1);
+    const eyes = eyesRef.current;
+    if (eyes) {
+      eyes.scale.set(1, Math.max(0.05, eyeScaleY * squint), 1);
+      // The eyes aim at the cursor a beat ahead of the head.
+      eyeLook.current.x += (pointer.current.x * 0.035 * (1 - doze) - eyeLook.current.x) * 0.15;
+      eyeLook.current.y += (-pointer.current.y * 0.02 * (1 - doze) - eyeLook.current.y) * 0.15;
+      eyes.position.x = eyeLook.current.x;
+      eyes.position.y = eyeY + eyeLook.current.y;
+    }
+    if (eyeLRef.current) eyeLRef.current.rotation.z = -(0.2 + tilt);
+    if (eyeRRef.current) {
+      eyeRRef.current.rotation.z = 0.2 + tilt;
+      eyeRRef.current.position.y = expr.current.raise;
+    }
 
     // Jaw drops and the slot glows in a speech-like rhythm while talking.
     const syllable = speaking ? Math.abs(Math.sin(t * 11) * Math.sin(t * 4.3)) : 0;
@@ -349,11 +490,10 @@ function HeadRig({
     slotMaterial.emissiveIntensity = 0.05 + syllable * 2.4;
   });
 
-  const eyeX = 0.33;
-  const eyeY = 0.155;
 
   return (
     <group position={[0, -0.16, 0]} scale={0.9}>
+    <group ref={reactRef}>
     <group ref={headRef}>
       {/* Helmet dome + deep-magenta rear plate */}
       <mesh geometry={g.dome} material={m.paint} position={[0, 0.02, -0.12]} scale={[1, 1, 0.94]} />
@@ -375,8 +515,8 @@ function HeadRig({
 
       {/* Eyes: slanted inward, emissive, with additive halos */}
       <group ref={eyesRef} position={[0, eyeY, 0]}>
-        <mesh geometry={g.eye} material={eyeMaterial} position={[-eyeX, 0, faceZ(eyeX) + 0.075]} rotation={[0, -faceYaw(eyeX), -0.2]} scale={[-1, 1, 1]} />
-        <mesh geometry={g.eye} material={eyeMaterial} position={[eyeX, 0, faceZ(eyeX) + 0.075]} rotation={[0, faceYaw(eyeX), 0.2]} />
+        <mesh ref={eyeLRef} geometry={g.eye} material={eyeMaterial} position={[-eyeX, 0, faceZ(eyeX) + 0.075]} rotation={[0, -faceYaw(eyeX), -0.2]} scale={[-1, 1, 1]} />
+        <mesh ref={eyeRRef} geometry={g.eye} material={eyeMaterial} position={[eyeX, 0, faceZ(eyeX) + 0.075]} rotation={[0, faceYaw(eyeX), 0.2]} />
       </group>
       {g.halo ? (
         <>
@@ -420,6 +560,7 @@ function HeadRig({
       {/* Neck collar */}
       <mesh geometry={g.collar} material={m.gunmetal} position={[0, -0.02, -0.16]} scale={[0.92, 1, 0.9]} />
       <mesh geometry={g.collarBand} material={m.gold} position={[0, -1.02, -0.16]} rotation={[Math.PI / 2, 0, 0]} scale={[1.07, 0.97, 1]} />
+    </group>
     </group>
     </group>
   );

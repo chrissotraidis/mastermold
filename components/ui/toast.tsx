@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { emitFaceReaction } from "@/lib/face-reactions";
 
 export type ToastInput = {
   title: string;
@@ -21,6 +22,9 @@ let counter = 0;
 export function toast(input: ToastInput) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent<ToastItem>(TOAST_EVENT, { detail: { ...input, id: (counter += 1) } }));
+  // Master Mold reacts to outcomes: a nod for success, a head shake for errors.
+  if (input.tone === "error") emitFaceReaction("shake");
+  else if (input.tone !== "info") emitFaceReaction("nod");
 }
 
 export function Toaster() {
