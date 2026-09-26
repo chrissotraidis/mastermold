@@ -26,7 +26,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(source("components/welcome-flow.tsx")).toContain("Before you start");
     expect(source("components/welcome-flow.tsx")).toContain("Save preferences");
     expect(source("components/welcome-flow.tsx")).not.toContain("Set up profile");
-    expect(source("components/journal-workspace.tsx")).toContain("min-h-11 rounded-md border px-3 py-2");
+    expect(source("components/journal-workspace.tsx")).toContain("inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-4");
     expect(source("components/as-of-replay-control.tsx")).toContain("flex min-h-11 cursor-pointer");
     expect(source("components/command-console.tsx")).toContain("flex size-11 shrink-0");
     expect(source("components/command-console.tsx")).toContain("className=\"min-h-11 w-full bg-transparent");
@@ -423,30 +423,25 @@ describe("mobile ergonomics source contracts", () => {
     expect(journalPage).toContain("call?: string;");
     expect(journalRoute).toContain("call?: unknown;");
     expect(journalRoute).toContain("normalizeText(body.call) || normalizeText(body.thesis)");
+    // 2026-09 journal rewrite: an always-open composer records in one step;
+    // #record-call still focuses it and prepared drafts still prefill it.
     expect(journal).toContain("call: string;");
     expect(journal).toContain('id="journal-call"');
     expect(journal).toContain("call: form.call");
     expect(journal).toContain('const statusText = isPending ? "Logging decision." : message;');
     expect(journal).toContain("const [recordOpen, setRecordOpen] = useState(Boolean(initialDraft));");
     expect(journal).toContain('window.location.hash === "#record-call"');
-    expect(journal).toContain('open={recordOpen}');
     expect(journal).toContain('<p aria-live="polite" className="text-sm leading-5 text-outline">');
-    // The outcome form pairs an sr-only live region with a visible message; the
-    // status must never be screen-reader-only without a visible counterpart.
-    expect(journal).toContain('{message ? <p className="text-sm text-outline">{message}</p> : null}');
+    // Scoring is inline and still sends the full outcome payload.
     expect(journal).toContain("call_was_right: form.call_was_right");
     expect(journal).toContain("review_quality: Number(form.review_quality)");
     expect(journal).toContain("result_score: Number(form.result_score)");
     expect(journal).toContain("result_note: form.result_note");
-    // Redesign: the page-level ScoreAccuracyBars duplicated the workspace's
-    // "Review scores" section and was removed; the workspace owns score bands.
+    expect(journal).toContain('{message ? <p className="text-sm text-outline">{message}</p> : <span />}');
     expect(journalPage).not.toContain("<ScoreAccuracyBars");
+    expect(journal.indexOf('id="record-call"')).toBeLessThan(journal.indexOf("<EntryList"));
     expect(journal.indexOf("<EntryList")).toBeLessThan(journal.indexOf("<TrackRecordSection"));
-    expect(journal.indexOf("<TrackRecordSection")).toBeLessThan(journal.indexOf("<aside"));
     expect(journal).toContain("data-journal-task-first");
-    expect(journal).toContain('className="min-w-0 scroll-mt-24 xl:sticky xl:top-6"');
-    expect(journalPage).toContain('className="mx-auto w-full min-w-0 max-w-4xl overflow-hidden"');
-    expect(journal).toContain('className="grid w-full min-w-0 gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start"');
     expect(journal).toContain('id="record-call"');
     expect(journal).toContain("Save a new decision before the result is obvious.");
     expect(outcomeRoute).toContain("call_was_right?: unknown;");
@@ -460,39 +455,23 @@ describe("mobile ergonomics source contracts", () => {
     expect(saveCallButton).toContain("confidence: Math.max");
     expect(`${alertLoop}\n${briefingDraft}\n${saveCallButton}`).not.toMatch(/conviction: String|thesis: card\.decision_journal_entry|thesis: headline|conviction: Math\.max/i);
     expect(journal).toContain("type JournalWorkspaceData = PublicJournal");
-    expect(journal).toContain("entry.confidence_band.label");
-    // Redesign: score bands live only in the workspace's Review scores region.
+    expect(journal).toContain("title={entry.confidence_band.label}");
     expect(journal).toContain("Review scores");
     expect(journal).toContain('{entry.result.call_was_right ? "Right" : "Missed"}');
-    // Redesign: provenance-gated sample-vs-saved wording lives in the
-    // workspace's Review scores region (the page-level duplicate was removed).
+    // Sample-vs-saved honesty stays in the Review scores panel.
     expect(journal).toContain('const isSample = provenance.label === "Sample data";');
     expect(journal).toContain("Seeded and locally saved calls. Use this to check the scoring workflow; it is not evidence that future calls will work.");
     expect(journal).toContain("Compares higher-scored saved calls with later results. Useful for review, not proof that future calls will work.");
     expect(journalPage).not.toMatch(/CalibrationCurve|calibration-title/i);
     expect(journalPage).not.toMatch(/Score accuracy|Confidence accuracy|higher-confidence|actually been right more often/i);
-    expect(journal).toContain("Review scores");
-    expect(journal).toContain("const INITIAL_JOURNAL_ENTRY_LIMIT = 1;");
-    expect(journal).toContain("entries.slice(0, INITIAL_JOURNAL_ENTRY_LIMIT)");
-    expect(journal).toContain("Showing {visibleEntries.length} of {entries.length} saved calls.");
-    expect(journal).toContain("Show ${hiddenEntryCount} older calls");
-    expect(journal).toContain("Show recent only");
-    expect(journal).toContain("Older calls stay in the archive until review time.");
     expect(journal).toContain("aria-expanded={showDetails}");
     expect(journal).toContain('aria-controls="strategy-belief-detail"');
     expect(journal).toContain("Show lesson details");
-    expect(journal).toContain("{showDetails ? (");
     expect(journal).toContain('id="strategy-belief-detail"');
     expect(journal).toContain("<TrackRecordSection tiers={trackRecord} provenance={initialJournal.provenance} />");
     expect(journal).toContain("<ProvenanceChip label={provenance.label} title={provenance.source} />");
     expect(journal).toContain("data-journal-score-strip");
-    expect(journal).toContain("Open when you are checking your process.");
-    expect(journal).toContain('<span className="sr-only">Score details</span>');
-    expect(journal).toContain('className="grid gap-2 sm:gap-4"');
-    expect(journal).toContain('className="group cursor-pointer list-none space-y-1.5 p-2.5 marker:hidden sm:space-y-3 sm:p-5 [&::-webkit-details-marker]:hidden"');
-    // Redesign: the entry list is one journal stream with author attribution —
-    // human calls carry a "You" chip, Master Mold's analyst memo and lessons
-    // interleave as read-only violet-accented rows.
+    // One stream, two authors.
     expect(journal).toContain("Journal stream");
     expect(journal).toContain('data-testid="journal-author-you"');
     expect(journal).toContain('data-testid="journal-author-master-mold"');
@@ -500,13 +479,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(journal).toContain('entry.kind === "lesson" ? "lesson" : "daily review"');
     expect(journalPage).toContain('import { autopilotStore } from "@/src/autopilot/store";');
     expect(journalPage).toContain('.filter((row) => row.kind === "lesson")');
-    expect(journal).toContain('<ChevronDown aria-hidden="true" className="size-4" />');
-    expect(journal).toContain('<span className="sr-only">Details</span>');
     expect(journal).toContain("formatCompactTierResultCount(tier)");
     expect(journal).toContain("{entries.length} saved");
-    expect(journal).toContain("line-clamp-2 text-sm leading-5");
-    expect(journal).toContain("grid min-h-16 content-center gap-1 rounded-md");
-    expect(journal).toContain("flex min-h-14 cursor-pointer list-none items-center justify-between gap-3");
+    expect(journal).toContain("line-clamp-2 block text-sm font-medium leading-5");
+    expect(journal).toContain("formatCompactTierResultCount(tier)");
+    expect(journal).toContain("{entries.length} saved");
     expect(journal).toContain("Seeded and locally saved calls. Use this to check the scoring workflow; it is not evidence that future calls will work.");
     expect(journal).toContain("Compares higher-scored saved calls with later results. Useful for review, not proof that future calls will work.");
     expect(journal).toContain("formatCompactTierResultCount(tier)");

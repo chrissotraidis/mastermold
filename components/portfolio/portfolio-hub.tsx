@@ -96,6 +96,8 @@ export function PortfolioHub({
   useEffect(() => {
     const url = new URL(window.location.href);
     const action = url.searchParams.get("action");
+    const search = url.searchParams.get("q");
+    if (search) setQuery(search);
     if (action === "add-holding") setAddOpen(true);
     if (action === "import-holdings") setImportOpen(true);
     if (action) {
