@@ -140,10 +140,10 @@ export function buildPolymarketResearchProgram(input: {
 
   return {
     summary:
-      "No strategy has earned paper authority. The lab now measures edges that do not require out-predicting the market, with fees, fills and controls counted pessimistically.",
+      "No strategy has earned the right to paper trade yet. The lab tests edges that do not depend on out-guessing the market, and counts fees and fills pessimistically.",
     experiments,
     retired: [
-      { name: "24-hour momentum", reason: "Lost $28.47 over 173 paper trips with negative markouts at every horizon." },
+      { name: "24-hour momentum", reason: "Lost money over 173 paper trips, and prices moved against it at every horizon." },
       { name: "Order-book pressure", reason: "Same falsified exploration lane; resting depth did not predict price." },
       { name: "Displayed maker spread", reason: "Sampled the thin, wide books where adverse selection is worst; replaced by P2." },
       { name: "LLM analyst with :online search", reason: "Scored worse than the market prior over 779 forecasts (Brier 0.2289 vs 0.2066)." },

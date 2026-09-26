@@ -84,7 +84,7 @@ export default async function SettingsPage() {
   const safetyStatus = autopilot.runtime_unavailable
     ? "Autopilot read-only · live off"
     : `Max trade ${formatSettingsCurrency(autopilot.caps.max_trade_usd)} · cap ${formatSettingsCurrency(autopilot.caps.daily_spend_limit_usd)}/day · live ${autopilotLive ? "on" : "off"}`;
-  const healthStatus = `${publicDataMode} · ${portfolioSource.source_label} · report ${dailyReport ? dailyReport.run_date : "not saved"} · backup ${backup.status}`;
+  const healthStatus = `${publicDataMode} · report ${dailyReport ? dailyReport.run_date : "not saved"} · backup ${backup.status}`;
 
   const moneyValue =
     portfolio.provenance.label === "Demo data"
@@ -303,7 +303,7 @@ export default async function SettingsPage() {
                     <HealthRow label="Data mode" value={publicDataMode} />
                     <HealthRow
                       label="Portfolio source"
-                      value={portfolioSource.source_label}
+                      value={portfolioSource.source_label === "Sample fallback" ? "Sample data" : portfolioSource.source_label}
                       detail={`${portfolioSource.holdings_count} visible holding${portfolioSource.holdings_count === 1 ? "" : "s"}${portfolioSource.as_of ? ` · as of ${formatStatusTime(portfolioSource.as_of)}` : ""}`}
                     />
                     <HealthRow

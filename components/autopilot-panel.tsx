@@ -1240,7 +1240,7 @@ function DaemonHeartbeat({
 }) {
   const label =
     daemon === "offline"
-      ? "daemon offline — run npm run autopilot"
+      ? "bot not running · start it with npm run autopilot"
       : `${daemon} · ticked ${formatAgo(lastTickAt)}`;
   return (
     <span className="flex items-center gap-1.5">

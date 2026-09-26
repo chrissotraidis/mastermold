@@ -39,7 +39,7 @@ export function buildWeb3ResearchProgram(input: { snapshots: CandidateSnapshotRo
 
   return {
     summary:
-      "No Web3 strategy has shown a profit. The lab keeps the one signal with a directionally correct read (cusum_tb), scores it on what it actually trades, and measures costs instead of assuming them.",
+      "No Web3 strategy has made money yet. The lab keeps the one signal that pointed the right way (cusum_tb), scores it on the trades it would really make, and measures costs instead of guessing them.",
     daemon: input.daemon,
     decision_doc: "docs/research-2026-09/STRATEGY-DECISION.md",
     experiments: [
@@ -94,7 +94,7 @@ export function buildWeb3ResearchProgram(input: { snapshots: CandidateSnapshotRo
       },
     ],
     retired: [
-      { name: "v2 trend-pullback", reason: "Lost $4.97 over 43 paper round trips at a 37% win rate; hard stops ate the payoff." },
+      { name: "v2 trend-pullback", reason: "Lost money over 43 paper round trips at a 37% win rate; hard stops ate the payoff." },
       { name: "xsec cross-sectional score", reason: "Inverted: high-conviction picks lost 25bp more than low ones." },
       { name: "trending radar", reason: "Inverted by 227bp; retired from the shadow set 2026-09-26." },
       { name: "bar_portion", reason: "No separation either way; retired from the shadow set 2026-09-26." },

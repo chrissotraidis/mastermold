@@ -84,7 +84,10 @@ const patterns = [
   ],
 ];
 
-// Paper/bot dollar results belong in the private session log, not public docs.
+// Paper/bot dollar results belong in the private session log, not the public repo.
+// This one applies to every scanned file (tests excluded below).
+const resultPatterns = [["paper P&L figure", /\b(?:lost|made|gained|earned)\s+\$\d+\.\d{2}\s+(?:over|across|on)\b/i]];
+
 // Checked only in Markdown so code fixtures and fee math stay unaffected.
 const docPatterns = [
   [
@@ -127,6 +130,11 @@ for (const file of candidates) {
     for (const [label, regex] of patterns) {
       if (file === "scripts/prepare-standalone.mjs" && label === "private artifact reference") continue;
       if (regex.test(line)) findings.push(`${file}:${index + 1}: ${label}`);
+    }
+    if (!file.startsWith("tests/")) {
+      for (const [label, regex] of resultPatterns) {
+        if (regex.test(line)) findings.push(`${file}:${index + 1}: ${label}`);
+      }
     }
     if (ext === ".md") {
       for (const [label, regex] of docPatterns) {
