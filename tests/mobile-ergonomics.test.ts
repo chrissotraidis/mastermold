@@ -92,8 +92,8 @@ describe("mobile ergonomics source contracts", () => {
       expect(surfaceSource).toContain('aria-label="Save as decision"');
       // Plain-language button labels: what the tap does, not jargon.
       expect(surfaceSource).toContain('title="Save this as a call in your journal"');
-      expect(surfaceSource).toContain("To journal");
-      expect(surfaceSource).toContain("Test trade");
+      expect(surfaceSource).toContain("Save to Journal");
+      expect(surfaceSource).toContain("Paper test");
       expect(surfaceSource).toContain('aria-label="Paper trade"');
       expect(surfaceSource).toContain('title="Try this idea with simulator dollars"');
       expect(surfaceSource).toContain('aria-label="Dismiss activity"');
@@ -527,7 +527,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain('<HealthRow label="Data mode"');
     expect(settingsPage).toContain('label="Portfolio source"');
     expect(settingsPage).toContain('label="Daily report"');
-    expect(settingsPage).toContain('<HealthRow label="Access" value="Loopback operator" detail="Remote access is fail-closed');
+    expect(settingsPage).toContain('<HealthRow label="Access" value="This computer only"');
     expect(source("lib/public-api-copy.ts")).toContain('briefing_feedback: "Today rated"');
     expect(settingsPage).not.toMatch(/today_read_target|median_today_read_seconds|briefing_feedback\.usefulness_rate|alert_feedback\.fatigue_rate|calibration_outcomes|mean_abs_error|within_confidence_band|Briefing ratings|Briefing rated|opens · no ratings|opens`,/i);
   });
@@ -578,7 +578,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain('label="Daily report"');
     expect(settingsPage).toContain("auto-refresh");
     expect(dailyReport).toContain('market_scope: "market data only"');
-    expect(settingsPage).toContain("The current Web3 runtime is not live.");
+    expect(settingsPage).toContain("Neither lab can place real trades.");
     expect(reviewSurface).toContain("Short questions can use a tab-scoped chat key");
     expect(reviewSurface).toContain("Saved market reads can inform Today, Alerts, Paper, and chat.");
     expect(reviewCopy).toContain("optional market check");
@@ -681,11 +681,11 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("System health");
     expect(settingsPage).toContain('label="Portfolio source"');
     expect(settingsPage).toContain("portfolioSource.source_label");
-    expect(settingsPage).toContain('label="Web3 live runtime"');
-+    expect(settingsPage).toContain('value={autopilotLive ? "Enabled" : "Off or locked"}');
+    expect(settingsPage).toContain('label="Live trading"');
++    expect(settingsPage).toContain('value={autopilotLive ? "Enabled" : "Locked"}');
     expect(settingsPage).toContain('label="Daily report"');
-    expect(settingsPage).toContain('value="Loopback operator"');
-    expect(settingsPage).toContain("Remote access is fail-closed");
+    expect(settingsPage).toContain('value="This computer only"');
+    expect(settingsPage).toContain("Other devices are blocked");
     expect(reviewSurface).toContain("Chat context saves what the app can remember");
     expect(reviewSurface).toContain("supporting notes, and alerts come from the saved read");
     expect(reviewSurface).toContain("Saved market reads can inform Today, Alerts, Paper, and chat.");
@@ -905,7 +905,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage.indexOf('id="autopilot"')).toBeLessThan(settingsPage.indexOf('id="safety"'));
     expect(settingsPage).toContain('import { MonarchMcpPanel } from "@/components/monarch-mcp-panel";');
     expect(settingsPage).toContain("<MonarchMcpPanel");
-    expect(source("components/monarch-mcp-panel.tsx")).toContain("Test MCP connection");
+    expect(source("components/monarch-mcp-panel.tsx")).toContain("Test Monarch connection");
     expect(source("components/monarch-mcp-panel.tsx")).toContain("Sync Monarch now");
     expect(source("app/api/portfolio-brain/monarch/route.ts")).toContain("monarch-mcp-portfolio-brain");
     expect(source("app/api/portfolio-brain/monarch/test/route.ts")).toContain("testMonarchMcpConnection");

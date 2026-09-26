@@ -283,7 +283,7 @@ export function PortfolioHub({
         <StatTile
           label="Prices"
           value={`${summary.priced_count}/${summary.holdings.length}`}
-          hint={summary.last_priced_at ? `current · ${relativeTime(summary.last_priced_at)}` : "typed in — refresh"}
+          hint={summary.last_priced_at ? `current · ${relativeTime(summary.last_priced_at)}` : "typed in · press Refresh prices"}
           deltaTone={summary.stale_count ? "caution" : "up"}
         />
       </div>

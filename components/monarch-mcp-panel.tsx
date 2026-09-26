@@ -142,7 +142,7 @@ export function MonarchMcpPanel({ initialState, config }: MonarchMcpPanelProps) 
             data-action-state={testState}
           >
             {testState === "running" ? <Loader2 aria-hidden="true" className="animate-spin" /> : <PlugZap aria-hidden="true" />}
-            Test MCP connection
+            Test Monarch connection
           </Button>
           <Button
             type="button"
@@ -293,7 +293,7 @@ function buildChecklist({
     if (snapshotToolReady) return `Covered by snapshot tool ${config.snapshot_tool}.`;
     if (tools.length > 0 && tools.includes(toolName)) return `Found ${toolName}.`;
     if (tools.length > 0) return `Missing ${toolName}.`;
-    return `Required tool: ${toolName}. Run Test MCP connection after OAuth is complete.`;
+    return `Required tool: ${toolName}. Run Test Monarch connection after sign-in is complete.`;
   };
   const oauthState = config.fixture_configured || testState === "passed"
     ? "pass" as const

@@ -486,7 +486,7 @@ function AlertInboxDrawerContent({
                           data-testid={`alert-save-${alert.id}`}
                         >
                           <BookPlus aria-hidden="true" className="size-3.5" />
-                          To journal
+                          Save to Journal
                         </button>
                         <Link
                           href={buildAlertPaperHref(alert)}
@@ -496,7 +496,7 @@ function AlertInboxDrawerContent({
                           className={cn(drawerActionClass, "border-caution/35 text-caution hover:bg-caution/10")}
                         >
                           <Wallet aria-hidden="true" className="size-3.5" />
-                          Test trade
+                          Paper test
                         </Link>
                         <button
                           type="button"

@@ -520,7 +520,7 @@ function AlertRow({
                   className={cn(alertActionClass, "border-engine/35 text-engine hover:bg-engine/10")}
                 >
                   <BookPlus aria-hidden="true" className="size-3.5" />
-                  To journal
+                  Save to Journal
                 </button>
                 <Link
                   href={buildAlertPaperHref(alert)}
@@ -529,7 +529,7 @@ function AlertRow({
                   className={cn(alertActionClass, "border-caution/35 text-caution hover:bg-caution/10")}
                 >
                   <Wallet aria-hidden="true" className="size-3.5" />
-                  Test trade
+                  Paper test
                 </Link>
                 <button
                   type="button"

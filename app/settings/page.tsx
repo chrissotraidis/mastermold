@@ -316,19 +316,19 @@ export default async function SettingsPage() {
                       }
                     />
                     <HealthRow
-                      label="Evidence backup"
+                      label="Backup"
                       value={backup.status === "fresh" ? "Fresh" : backup.status === "stale" ? "Stale" : backup.status === "missing" ? "Missing" : "Unavailable"}
                       detail={backup.created_at
                         ? `${backup.files.length} stores · created ${formatStatusTime(backup.created_at)} · verify recovery with npm run backup:verify`
                         : `${backup.detail} Run npm run backup, then npm run backup:verify.`}
                     />
-                    <HealthRow label="Access" value="Loopback operator" detail="Remote access is fail-closed and requires configured operator or read-only viewer credentials." />
+                    <HealthRow label="Access" value="This computer only" detail="Other devices are blocked unless you configure an operator or read-only viewer login." />
                     <HealthRow
-                      label="Web3 live runtime"
-                      value={autopilotLive ? "Enabled" : "Off or locked"}
+                      label="Live trading"
+                      value={autopilotLive ? "Enabled" : "Locked"}
                       detail={autopilotLive
                         ? "Autopilot reports live mode. Confirm the wallet, caps, and real lane controls before relying on this state."
-                        : "The current Web3 runtime is not live. Polymarket live execution remains unavailable."}
+                        : "Neither lab can place real trades. Web3 needs every go-live check; Polymarket live orders are not built."}
                     />
                   </dl>
                 </SettingsPanel>
@@ -505,7 +505,7 @@ function AutopilotSettingsSummary({ state }: { state: ReturnType<typeof getAutop
   return (
     <div className="rounded-xl border border-outline-variant/50 px-3 py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold text-on-surface">Autopilot paper bot · {modeCopy(state.mode)}</h3>
+        <h3 className="text-sm font-semibold text-on-surface">Web3 paper bot · {modeCopy(state.mode)}</h3>
         <Badge
           variant="outline"
           className={cn(
@@ -517,22 +517,22 @@ function AutopilotSettingsSummary({ state }: { state: ReturnType<typeof getAutop
                 : "border-engine/30 bg-engine/10 text-engine",
           )}
         >
-          {state.runtime_unavailable ? "Read-only" : state.kill_switch ? "Locked" : "Ready"}
+          {state.runtime_unavailable ? "Read-only" : state.kill_switch ? "Halted" : "Not halted"}
         </Badge>
       </div>
       <p className="mt-1 text-xs leading-5 text-on-surface-variant">
-        Daemon {state.daemon} · {state.open_positions} open position{state.open_positions === 1 ? "" : "s"} · equity{" "}
-        {formatSettingsCurrency(state.equity_usd)} · kill switch {state.kill_switch ? "engaged" : "off"}
+        Bot process {state.daemon} · {state.open_positions} open position{state.open_positions === 1 ? "" : "s"} · paper balance{" "}
+        {formatSettingsCurrency(state.equity_usd)} · kill switch {state.kill_switch ? "on" : "off"}
       </p>
       <p className="mt-1 text-xs leading-5 text-outline">
         {state.runtime_unavailable
           ? "The local bot store is unavailable, so controls are locked and this section is read-only."
-          : "This lane is separate from Portfolio imports and connected-account snapshots. It can paper trade only when the daemon is running and the kill switch is released."}
+          : "Separate from your Portfolio. It paper trades only while the bot process runs (npm run autopilot) and the kill switch is off."}
       </p>
       <p className="mt-1 text-xs leading-5 text-outline">
         Wallet setup is server-side: set <code className="font-mono text-[11px] text-on-surface-variant">AUTOPILOT_WALLET_SECRET</code>{" "}
-        for a spare wallet. The browser never asks for private keys, and live mode still requires the
-        go-live gate on the Autopilot page.
+        for a spare wallet. The browser never asks for private keys, and live trading also needs every
+        go-live check in the Web3 lab to pass.
       </p>
     </div>
   );
