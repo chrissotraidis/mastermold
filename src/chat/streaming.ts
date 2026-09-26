@@ -3,7 +3,9 @@ import {
   type ChatTextCleanupMode,
 } from "@/lib/chat-copy";
 
-export type ChatProvider = "openai" | "openrouter" | "anthropic";
+/** "opencode-go" and "compat" are OpenAI-compatible endpoints reached through
+ * the shared provider chain; only Anthropic uses a different wire shape. */
+export type ChatProvider = "openai" | "openrouter" | "opencode-go" | "compat" | "anthropic";
 
 export async function providerErrorResponse(response: Response, provider: string, headers: Record<string, string>) {
   const detail = await response.text().catch(() => "");
@@ -171,11 +173,14 @@ export function parseProviderLine(line: string, provider: ChatProvider) {
       delta?: { text?: string };
     };
 
-    if (provider === "openai" || provider === "openrouter") {
-      return json.choices?.[0]?.delta?.content ?? "";
+    // Anthropic is the one non-OpenAI wire shape. Naming it explicitly means a
+    // new OpenAI-compatible provider defaults to the right parser instead of
+    // silently yielding empty deltas.
+    if (provider === "anthropic") {
+      return json.type === "content_block_delta" ? json.delta?.text ?? "" : "";
     }
 
-    return json.type === "content_block_delta" ? json.delta?.text ?? "" : "";
+    return json.choices?.[0]?.delta?.content ?? "";
   } catch {
     return "";
   }

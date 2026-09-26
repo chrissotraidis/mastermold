@@ -1,4 +1,5 @@
 import { getChatContext, type ChatPageContext } from "@/src/db/chat";
+import type { ChatProvider } from "@/src/chat/streaming";
 
 export type ChatBudget = {
   ok: boolean;
@@ -84,7 +85,7 @@ export function buildSystemPrompt(llmContext: string) {
 
 export function chatHeaders(
   context: ReturnType<typeof getChatContext>,
-  provider: "canned" | "openai" | "openrouter" | "anthropic",
+  provider: "canned" | ChatProvider,
   model: string,
   budget?: ChatBudget,
 ) {

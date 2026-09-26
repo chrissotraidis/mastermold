@@ -8,7 +8,8 @@ import {
 import { buildLocalCommandAnswer, localCommandHeaders } from "@/src/chat/local-commands";
 import { streamAnthropicResponse } from "@/src/chat/providers/anthropic";
 import { streamOpenAIResponse } from "@/src/chat/providers/openai";
-import { streamOpenRouterResponse } from "@/src/chat/providers/openrouter";
+import { streamCompatResponse } from "@/src/chat/providers/openrouter";
+import { llmProvider } from "@/src/llm/completion";
 import { parseChatRequest } from "@/src/chat/request";
 import { textStream } from "@/src/chat/streaming";
 import {
@@ -44,7 +45,6 @@ export async function POST(request: Request): Promise<Response> {
   const browserKey = request.headers.get("x-chat-api-key")?.trim() || null;
   const browserModel = request.headers.get("x-chat-model")?.trim() || null;
   const anthropicKey = process.env.ANTHROPIC_API_KEY || (browserProvider === "anthropic" ? browserKey : null);
-  const openrouterKey = process.env.OPENROUTER_API_KEY || (browserProvider === "openrouter" ? browserKey : null);
   const openaiKey = process.env.OPENAI_API_KEY || (browserProvider === "openai" ? browserKey : null);
 
   if (!budget.ok) {
@@ -77,14 +77,20 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  if (openrouterKey) {
-    const model = process.env.OPENROUTER_MODEL ?? (browserProvider === "openrouter" ? browserModel : null) ?? "deepseek/deepseek-chat";
-    return streamOpenRouterResponse(
-      openrouterKey,
-      model,
+  // Shared provider chain: OpenCode Go first (flat-rate), OpenRouter only as
+  // its fallback. A browser-supplied OpenRouter key still wins, since that is
+  // an explicit per-session choice rather than the deployment default.
+  const browserOpenrouter = browserProvider === "openrouter" && browserKey
+    ? { label: "openrouter" as const, baseUrl: "https://openrouter.ai/api/v1", apiKey: browserKey,
+        model: browserModel ?? process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-chat" }
+    : null;
+  const compatEndpoint = browserOpenrouter ?? llmProvider();
+  if (compatEndpoint) {
+    return streamCompatResponse(
+      compatEndpoint,
       userMessage,
       llmContext,
-      chatHeaders(context, "openrouter", model, budget),
+      chatHeaders(context, compatEndpoint.label, compatEndpoint.model, budget),
       responseMode,
       budget,
     );

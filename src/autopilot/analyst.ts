@@ -22,6 +22,7 @@ import { ANTI_OVERFIT_CONSTITUTION } from "./v3/replay/constitution";
 import { describeCexGapSummary, summarizeCexGaps } from "./v3/cex-gap";
 import { PARAM_CLAMPS, type Changeset, type ParamChangelogEntry, type ParamKey, type StrategyParams } from "./params";
 import { autopilotStore, type BotDecisionRow } from "./store";
+import { llmCompletionText, llmProvider } from "../llm/completion";
 
 export type AnalystOutput = {
   review: string;
@@ -262,30 +263,19 @@ export function ruleBasedAnalysis(input: {
   };
 }
 
-/** Default completion: one-shot OpenRouter chat call (no streaming). */
-export async function openRouterCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) throw new Error("OPENROUTER_API_KEY is not set");
-  const model = process.env.OPENROUTER_MODEL ?? "anthropic/claude-sonnet-4.5";
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: 1200,
-      temperature: 0.3,
-    }),
-    signal: AbortSignal.timeout(60_000),
+/**
+ * Default completion: one-shot call against the shared provider chain (no
+ * streaming). Primary is OpenCode Go; OpenRouter is only reached if that fails.
+ */
+export async function autopilotAnalystCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
+  return llmCompletionText({
+    system: systemPrompt,
+    user: userPrompt,
+    maxTokens: 1200,
+    temperature: 0.3,
+    timeoutMs: 60_000,
+    title: "Master Mold Autopilot Analyst",
   });
-  if (!response.ok) throw new Error(`analyst completion ${response.status}`);
-  const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const content = body.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("analyst completion returned no content");
-  return content;
 }
 
 /** The Analyst reads the v2 era only — never the retired v1 strategy's trades. */
@@ -308,7 +298,7 @@ export type AnalystRunResult = {
  * a garbage LLM response degrades to "no run" instead of corrupting state.
  */
 export async function runAnalyst(
-  complete: CompletionFn = openRouterCompletion,
+  complete: CompletionFn = autopilotAnalystCompletion,
   nowMs: number = Date.now(),
 ): Promise<AnalystRunResult> {
   const store = autopilotStore();
@@ -330,11 +320,12 @@ export async function runAnalyst(
     if (applied.ok) store.appendActivity("analyst", revert.reason);
   }
 
-  // No key and no injected completion → the deterministic reviewer, so the
+  // No provider configured and no injected completion → the deterministic
+  // reviewer, so the
   // learning loop works on a fresh clone instead of skipping for lack of an
   // LLM. An injected `complete` (tests, alt providers) always wins.
   let output: AnalystOutput | null;
-  if (complete === openRouterCompletion && !process.env.OPENROUTER_API_KEY) {
+  if (complete === autopilotAnalystCompletion && !llmProvider()) {
     output = ruleBasedAnalysis({
       params: store.strategyParams(),
       attribution: summary,

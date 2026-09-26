@@ -4,6 +4,7 @@ import { getPortfolioBrainScanContext } from "./portfolio-brain";
 import { recordProductMetric } from "./metrics";
 import type { MarketMemoryFact } from "./schema";
 import { store } from "./store";
+import { llmCompletionText, llmProvider } from "@/src/llm/completion";
 
 export type DailyReportSymbolStatus =
   | "refreshed"
@@ -1050,37 +1051,19 @@ async function tryLlmPlays(
   }
 }
 
-/** Env-driven default: one OpenRouter call when a key exists, otherwise none. */
+/** Env-driven default: one call against the shared provider chain when any
+ * provider is configured, otherwise none. */
 function defaultPlaysCompletion(): PlaysCompletionFn | null {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return null;
-  return async (systemPrompt, userPrompt) => {
-    const model = process.env.OPENROUTER_MODEL ?? "anthropic/claude-sonnet-4.5";
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4002",
-        "X-OpenRouter-Title": "Master Mold",
-      },
-      signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify({
-        model,
-        max_tokens: 900,
-        temperature: 0.3,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
+  if (!llmProvider()) return null;
+  return async (systemPrompt, userPrompt) =>
+    llmCompletionText({
+      system: systemPrompt,
+      user: userPrompt,
+      maxTokens: 900,
+      temperature: 0.3,
+      timeoutMs: 15_000,
+      title: "Master Mold",
     });
-    if (!response.ok) throw new Error(`plays completion ${response.status}`);
-    const body = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = body.choices?.[0]?.message?.content;
-    if (typeof content !== "string") throw new Error("plays completion returned no content");
-    return content;
-  };
 }
 
 function formatUsd(value: number) {

@@ -146,7 +146,9 @@ async function testOpenRouter(apiKey: string, model: string) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4002",
-      "X-OpenRouter-Title": "Master Mold",
+      // "X-Title" is the real attribution header; the old "X-OpenRouter-Title"
+      // was silently ignored, hiding this app's spend in the dashboard.
+      "X-Title": "Master Mold",
     },
     body: JSON.stringify({
       model,

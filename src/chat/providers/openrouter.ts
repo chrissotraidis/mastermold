@@ -9,10 +9,15 @@ import {
   providerErrorResponse,
   streamServerSentEvents,
 } from "@/src/chat/streaming";
+import { llmProviderDisplayName, llmRequestHeaders, type LlmEndpoint } from "@/src/llm/completion";
 
-export async function streamOpenRouterResponse(
-  apiKey: string,
-  model: string,
+/**
+ * Streams from any OpenAI-compatible chat endpoint. OpenCode Go and OpenRouter
+ * speak the same wire format, so one streamer serves both; the endpoint decides
+ * the URL, model, key, and which attribution headers apply.
+ */
+export async function streamCompatResponse(
+  endpoint: LlmEndpoint,
   message: string,
   llmContext: string,
   headers: Record<string, string>,
@@ -20,17 +25,12 @@ export async function streamOpenRouterResponse(
   budget?: ChatBudget,
 ) {
   const { upstream: response, error } = await connectToProvider(
-    "https://openrouter.ai/api/v1/chat/completions",
+    `${endpoint.baseUrl}/chat/completions`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4002",
-        "X-OpenRouter-Title": "Master Mold",
-      },
+      headers: llmRequestHeaders(endpoint, "Master Mold"),
       body: JSON.stringify({
-        model,
+        model: endpoint.model,
         max_tokens: budget?.maxResponseTokens ?? defaultMaxResponseTokens(),
         stream: true,
         temperature: 0.2,
@@ -46,14 +46,14 @@ export async function streamOpenRouterResponse(
         ],
       }),
     },
-    "OpenRouter",
+    llmProviderDisplayName(endpoint.label),
     headers,
   );
   if (error) return error;
 
   if (!response.ok || !response.body) {
-    return providerErrorResponse(response, "OpenRouter", headers);
+    return providerErrorResponse(response, llmProviderDisplayName(endpoint.label), headers);
   }
 
-  return streamServerSentEvents(response.body, "openrouter", headers, responseMode);
+  return streamServerSentEvents(response.body, endpoint.label, headers, responseMode);
 }

@@ -37,6 +37,8 @@ let prevDb: string | undefined;
 let prevBrainDailyScan: string | undefined;
 let prevChatMaxResponseTokens: string | undefined;
 let prevChatMaxTotalTokens: string | undefined;
+let prevOpencodeKey: string | undefined;
+let prevLlmKey: string | undefined;
 
 beforeEach(() => {
   prevEngine = process.env.ENGINE_OUT_DIR;
@@ -44,6 +46,10 @@ beforeEach(() => {
   prevBrainDailyScan = process.env.MASTERMOLD_BRAIN_DAILY_SCAN;
   prevChatMaxResponseTokens = process.env.MASTERMOLD_CHAT_MAX_RESPONSE_TOKENS;
   prevChatMaxTotalTokens = process.env.MASTERMOLD_CHAT_MAX_TOTAL_TOKENS;
+  prevOpencodeKey = process.env.OPENCODE_GO_API_KEY;
+  prevLlmKey = process.env.LLM_API_KEY;
+  delete process.env.OPENCODE_GO_API_KEY;
+  delete process.env.LLM_API_KEY;
   process.env.ENGINE_OUT_DIR = FIXTURES;
   process.env.MASTERMOLD_DB = join(mkdtempSync(join(tmpdir(), "mm-api-")), "db.sqlite");
   delete process.env.MASTERMOLD_BRAIN_DAILY_SCAN;
@@ -53,6 +59,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (prevOpencodeKey === undefined) delete process.env.OPENCODE_GO_API_KEY;
+  else process.env.OPENCODE_GO_API_KEY = prevOpencodeKey;
+  if (prevLlmKey === undefined) delete process.env.LLM_API_KEY;
+  else process.env.LLM_API_KEY = prevLlmKey;
   if (prevEngine === undefined) delete process.env.ENGINE_OUT_DIR;
   else process.env.ENGINE_OUT_DIR = prevEngine;
   if (prevDb === undefined) delete process.env.MASTERMOLD_DB;
@@ -1026,7 +1036,7 @@ describe("API routes serve engine output end to end", () => {
       expect((init?.headers as Record<string, string>).Authorization).toBe(
         "Bearer test-openrouter-key",
       );
-      expect((init?.headers as Record<string, string>)["X-OpenRouter-Title"]).toBe("Master Mold");
+      expect((init?.headers as Record<string, string>)["X-Title"]).toBe("Master Mold");
       const body = JSON.parse(String(init?.body));
       expect(body.model).toBe("deepseek/deepseek-chat");
       expect(body.max_tokens).toBe(700);
@@ -1368,7 +1378,7 @@ describe("API routes serve engine output end to end", () => {
       expect((init?.headers as Record<string, string>).Authorization).toBe(
         "Bearer test-openrouter-key",
       );
-      expect((init?.headers as Record<string, string>)["X-OpenRouter-Title"]).toBe("Master Mold");
+      expect((init?.headers as Record<string, string>)["X-Title"]).toBe("Master Mold");
       return Promise.resolve(
         Response.json({ choices: [{ message: { content: "OK" } }] }, { status: 200 }),
       );

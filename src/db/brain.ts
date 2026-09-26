@@ -8,6 +8,7 @@ import { getPortfolioBrainScanContext } from "./portfolio-brain";
 import { recordProductMetric } from "./metrics";
 import type { ProductMetricEventRow } from "./store";
 import { plainBriefingHeadline, plainBriefingText } from "@/lib/plain-finance-copy";
+import { llmCompletion, llmProvider } from "@/src/llm/completion";
 
 export type BrainState = {
   initialized: boolean;
@@ -583,9 +584,8 @@ async function summarizeWithModel(input: {
     };
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.OPENROUTER_MODEL ?? "deepseek/deepseek-chat";
-  if (!apiKey) {
+  const provider = llmProvider();
+  if (!provider) {
     return {
       model: "local-summary",
       summary: localSummary(input),
@@ -593,40 +593,22 @@ async function summarizeWithModel(input: {
   }
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4002",
-        "X-OpenRouter-Title": "Master Mold",
-      },
-      signal: AbortSignal.timeout(10000),
-      body: JSON.stringify({
-        model,
-        max_tokens: 140,
-        temperature: 0.2,
-        messages: [
-          {
-            role: "system",
-            content: "Summarize saved chat context for an advisory-only finance app in one direct sentence. Do not give trading instructions.",
-          },
-          {
-            role: "user",
-            content: JSON.stringify(input),
-          },
-        ],
-      }),
+    const result = await llmCompletion({
+      system:
+        "Summarize saved chat context for an advisory-only finance app in one direct sentence. Do not give trading instructions.",
+      user: JSON.stringify(input),
+      maxTokens: 140,
+      temperature: 0.2,
+      timeoutMs: 10_000,
+      title: "Master Mold",
     });
-    if (!response.ok) throw new Error(`OpenRouter HTTP ${response.status}`);
-    const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     return {
-      model,
-      summary: plainBriefingText(json.choices?.[0]?.message?.content?.trim() || localSummary(input)),
+      model: result.model,
+      summary: plainBriefingText(result.content || localSummary(input)),
     };
   } catch {
     return {
-      model: `${model} unavailable; local-summary`,
+      model: `${provider.model} unavailable; local-summary`,
       summary: localSummary(input),
     };
   }

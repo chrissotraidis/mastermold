@@ -23,6 +23,7 @@ import { tmpdir } from "node:os";
 
 import { notifyOperator } from "../autopilot/notify";
 import type { SqliteDatabase } from "../autopilot/sqlite";
+import { llmCompletionText, llmProvider } from "../llm/completion";
 import { polymarketBrain } from "./brain";
 import {
   fetchPolymarketFastResolvers,
@@ -183,8 +184,20 @@ export function polymarketAnalystEnabled(env: Record<string, string | undefined>
   return env.POLYMARKET_ANALYST === "1";
 }
 
+/**
+ * The model this lane will actually query. Defaults to whatever the shared
+ * provider chain resolves (OpenCode Go's deepseek-v4-flash), so the figure
+ * stored on each forecast row matches the endpoint that produced it.
+ * POLYMARKET_ANALYST_MODEL still overrides, and analystEnv() below makes sure
+ * that override reaches the request rather than being silently reported.
+ */
 export function polymarketAnalystModel(env: Record<string, string | undefined> = process.env): string {
-  return env.POLYMARKET_ANALYST_MODEL ?? "deepseek/deepseek-v4-flash:online";
+  return env.POLYMARKET_ANALYST_MODEL ?? llmProvider(env)?.model ?? "deepseek-v4-flash";
+}
+
+function analystEnv(env: Record<string, string | undefined> = process.env): Record<string, string | undefined> {
+  const override = env.POLYMARKET_ANALYST_MODEL;
+  return override ? { ...env, LLM_MODEL: override } : env;
 }
 
 export const ANALYST_FORECAST_SYSTEM_PROMPT = [
@@ -441,33 +454,18 @@ async function fetchMarketDescriptions(marketIds: string[]): Promise<Map<string,
   return out;
 }
 
-async function openrouterCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured.");
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4002",
-      "X-OpenRouter-Title": "Master Mold Analyst",
-    },
-    signal: AbortSignal.timeout(90_000),
-    body: JSON.stringify({
-      model: polymarketAnalystModel(),
-      max_tokens: 700,
+async function analystCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
+  return llmCompletionText(
+    {
+      system: systemPrompt,
+      user: userPrompt,
+      maxTokens: 700,
       temperature: 0.1,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }),
-  });
-  if (!response.ok) throw new Error(`OpenRouter HTTP ${response.status}`);
-  const json = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const content = json.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new Error("OpenRouter returned an empty completion.");
-  return content;
+      timeoutMs: 90_000,
+      title: "Master Mold Analyst",
+    },
+    analystEnv(),
+  );
 }
 
 class PolymarketAnalystStore {
@@ -743,7 +741,7 @@ let cycleInFlight = false;
 
 export async function runPolymarketAnalystCycle(
   trigger: "scheduled" | "manual" = "scheduled",
-  completion: AnalystCompletionFn = openrouterCompletion,
+  completion: AnalystCompletionFn = analystCompletion,
 ): Promise<{ action: "idle" | "graded-only" | "forecasted" | "error"; detail: string }> {
   if (!polymarketAnalystEnabled()) return { action: "idle", detail: "Analyst lane is not enabled (POLYMARKET_ANALYST=1)." };
   // Manual triggers and the scheduler share one process; overlapping cycles
