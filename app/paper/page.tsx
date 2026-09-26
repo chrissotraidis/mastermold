@@ -49,10 +49,10 @@ export default async function PaperPage({ searchParams }: PaperPageProps) {
   const publicProvenanceLabel = productProvenanceLabel(paper.provenance.label);
   return (
     <AppShell dataMode={publicProvenanceLabel}>
-      <div className="mx-auto max-w-5xl">
+      <div className="w-full">
         <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-display text-lg font-semibold text-on-surface">Simulator</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Simulator</h1>
             <p className="mt-0.5 text-xs text-outline">
               Test calls with simulator dollars before risking anything.{" "}
               <a href="/journal" className="text-violet hover:text-tertiary">

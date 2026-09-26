@@ -58,10 +58,10 @@ export default function ReviewPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto grid w-full max-w-5xl gap-4">
+      <main className="grid w-full gap-6">
         <header className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-2xl font-semibold text-on-surface">Build truth and review readiness</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Build truth and review readiness</h1>
             <Badge variant="outline">Local build</Badge>
           </div>
           <p className="max-w-3xl text-sm leading-6 text-on-surface-variant">

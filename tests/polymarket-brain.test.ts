@@ -228,7 +228,8 @@ function fixtureMarket(): PolymarketMarket {
     condition_id: "condition",
     question: "Will the research fixture resolve Yes?",
     slug: "research-fixture",
-    end_date: "2026-09-01T00:00:00Z",
+    // Relative, so the fixture never expires under the brain's end-date filter.
+    end_date: new Date(Date.now() + 30 * 86_400_000).toISOString(),
     outcomes: ["Yes", "No"],
     outcome_prices: [0.48, 0.52],
     token_ids: ["yes-token", "no-token"],
