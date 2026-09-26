@@ -12,19 +12,15 @@ export default function TradingPage() {
           <p className="mm-eyebrow">Research lab · separate lane</p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Web3 lab</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
-            Autopilot is a separate paper-bot experiment for live market watching. Live money stays locked.
-            Portfolio imports are not used here; server wallet setup and the go-live gate are
-            separate.
+            Paper research on Solana trading, kept apart from your portfolio. Live money stays locked.
           </p>
         </header>
 
-        <Web3ResearchBoard />
-
         <section aria-labelledby="autopilot-status-title">
-          <h2 id="autopilot-status-title" className="mm-eyebrow mb-3">
+          <h2 id="autopilot-status-title" className="sr-only">
             Bot room
           </h2>
-          <AutopilotPanel />
+          <AutopilotPanel research={<Web3ResearchBoard />} />
         </section>
       </div>
     </AppShell>

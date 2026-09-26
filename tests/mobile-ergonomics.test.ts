@@ -725,7 +725,7 @@ describe("mobile ergonomics source contracts", () => {
 
     // Retirement 2026-07-05: the supervised test-trade workspace is gone; the
     // Trade page is the autonomous Autopilot lane only.
-    expect(tradingPage).toContain("<AutopilotPanel />");
+    expect(tradingPage).toContain("<AutopilotPanel research={<Web3ResearchBoard />} />");
     // Redesign: TradeScopeBanner was replaced by the global AppShell footer;
     // Trade's own header still pins the live-money lock.
     expect(tradingPage).toContain("Live money stays locked.");

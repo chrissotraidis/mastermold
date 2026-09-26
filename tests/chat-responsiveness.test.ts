@@ -525,7 +525,7 @@ describe("Master Mold responsiveness contracts", () => {
     const tradingPage = source("app/trading/page.tsx");
     const tradingLoading = source("app/trading/loading.tsx");
 
-    expect(tradingPage).toContain("<AutopilotPanel />");
+    expect(tradingPage).toContain("<AutopilotPanel research={<Web3ResearchBoard />} />");
     expect(tradingLoading).toContain("Loading autopilot status");
     expect(tradingLoading).toContain('role="status"');
   });

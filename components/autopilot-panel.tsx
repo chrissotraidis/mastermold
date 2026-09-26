@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { Pause, Play } from "lucide-react";
+import { Tabs } from "@/components/ui/tabs";
 
 import { AutopilotTerminal } from "./autopilot-terminal";
 
@@ -229,7 +230,7 @@ const modeLabel: Record<AutopilotStateView["mode"], string> = {
   halted: "HALTED",
 };
 
-export function AutopilotPanel() {
+export function AutopilotPanel({ research = null }: { research?: ReactNode } = {}) {
   const [data, setData] = useState<AutopilotApiPayload | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -346,8 +347,8 @@ export function AutopilotPanel() {
   const killEngaged = state.kill_switch;
   const runtimeUnavailable = Boolean(state.runtime_unavailable);
 
-  return (
-    <div className="mm-panel overflow-hidden">
+  const tape = (
+    <>
       {/* The terminal tape only appears once the bot has something to say;
           an empty black box read as broken. */}
       {recentActivity.length > 0 || (data.recent_decisions ?? []).length > 0 ? (
@@ -363,6 +364,10 @@ export function AutopilotPanel() {
           No bot activity recorded yet. The daemon writes its tape here when it runs (<code className="text-xs">npm run autopilot</code>; mode stays off).
         </p>
       )}
+    </>
+  );
+  const cockpit = (
+    <>
       {/* Cockpit row: mode, wallet, heartbeat, equity, kill switch. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
         <span className="flex items-center gap-2">
@@ -384,10 +389,6 @@ export function AutopilotPanel() {
         )}
         <DaemonHeartbeat daemon={state.daemon} lastTickAt={state.last_tick_at} />
         <span className="ml-auto flex items-center gap-3">
-          <span className="inline-flex items-baseline gap-1 text-sm tabular-nums text-on-surface">
-            <span>{formatCurrency(state.equity_usd)}</span>
-            <span className="text-xs text-on-surface-variant">paper equity</span>
-          </span>
           {!runtimeUnavailable && !killEngaged && state.mode === "off" ? (
             <button
               type="button"
@@ -449,7 +450,10 @@ export function AutopilotPanel() {
           {message || error}
         </span>
       )}
-
+    </>
+  );
+  const strategyBlock = (
+    <>
       {data.strategy ? <StrategyCard strategy={data.strategy} /> : null}
 
       {/* Autonomy status: gate, shadow learning, and carry evidence as ONE
@@ -538,7 +542,10 @@ export function AutopilotPanel() {
           </div>
         </div>
       ) : null}
-
+    </>
+  );
+  const experimentsBlock = (
+    <>
       {data.experiments ? (
         <section className="border-t border-outline-variant/20 px-3 py-3" aria-labelledby="paper-experiments-title">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -596,10 +603,13 @@ export function AutopilotPanel() {
           </div>
         </section>
       ) : null}
-
+    </>
+  );
+  const feedBlock = (
+    <>
       {/* Reference tables live in collapsed sections: the cockpit stays one
           screen tall and the data is one click away when wanted. */}
-      <details className="border-t border-outline-variant/20 px-3">
+      <details open className="border-t border-outline-variant/20 px-3">
         <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
           Live market feed
           <span className="font-normal text-outline">{feedSummaryLine(data.market_feed ?? [])}</span>
@@ -663,9 +673,12 @@ export function AutopilotPanel() {
           </div>
         )}
       </details>
-
+    </>
+  );
+  const radarBlock = (
+    <>
       {(data.trending ?? []).length > 0 ? (
-        <details className="border-t border-outline-variant/20 px-3">
+        <details open className="border-t border-outline-variant/20 px-3">
           <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
             Solana radar
             <span className="font-normal text-outline">
@@ -728,7 +741,10 @@ export function AutopilotPanel() {
           </div>
         </details>
       ) : null}
-
+    </>
+  );
+  const bookBlock = (
+    <>
       {/* The book: a single quiet line until something is actually held or
           filled — two columns of empty states earned no space. */}
       {positions.length === 0 && recentTrades.length === 0 ? (
@@ -781,10 +797,10 @@ export function AutopilotPanel() {
           </div>
         </div>
       )}
-
-      {/* "Recent decisions" was the tape's activity stream rendered a second
-          time on the same page — pure duplication, removed. */}
-
+    </>
+  );
+  const learningBlock = (
+    <>
       {data.attribution || data.analyst ? (
         <div className="border-t border-outline-variant/20 px-3 py-2">
           <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Learning</h3>
@@ -819,7 +835,10 @@ export function AutopilotPanel() {
           ) : null}
         </div>
       ) : null}
-
+    </>
+  );
+  const tierBBlock = (
+    <>
       <details className="border-t border-outline-variant/20 px-3">
         <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
           Dynamic Tier B
@@ -875,7 +894,10 @@ export function AutopilotPanel() {
           </form>
         </div>
       </details>
-
+    </>
+  );
+  const walletsBlock = (
+    <>
       <details className="border-t border-outline-variant/20 px-3">
         <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
           Smart wallets
@@ -1013,7 +1035,10 @@ export function AutopilotPanel() {
           ) : null}
         </div>
       </details>
-
+    </>
+  );
+  const capsBlock = (
+    <>
       <details className="border-t border-outline-variant/20 px-3">
         <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-on-surface">
           Caps
@@ -1060,13 +1085,82 @@ export function AutopilotPanel() {
           </fieldset>
         </form>
       </details>
+    </>
+  );
 
-      <p className="border-t border-outline-variant/20 px-3 py-2 text-xs leading-5 text-outline">
-        {data.data_boundary}
-      </p>
+  const gateChecks = data.go_live_gate?.checks ?? [];
+  const running = (data.experiments?.summaries ?? []).filter((row) => !row.paused).length;
+  const experimentCount = (data.experiments?.summaries ?? []).length;
+  const tabPanel = "mm-panel overflow-hidden [&>*:first-child]:border-t-0";
+
+  return (
+    <div className="grid min-w-0 gap-4">
+      <div className="mm-panel overflow-hidden">
+        {cockpit}
+        <dl className="grid grid-cols-2 gap-px border-t border-outline-variant/30 bg-outline-variant/20 sm:grid-cols-4">
+          <StripStat label="Mode" value={modeLabel[state.mode]} />
+          <StripStat label="Paper equity" value={formatCurrency(state.equity_usd)} />
+          <StripStat
+            label="Go-live gate"
+            value={`${gateChecks.filter((check) => check.pass).length}/${gateChecks.length || 5} checks`}
+          />
+          <StripStat label="Experiments" value={`${running} of ${experimentCount} running`} />
+        </dl>
+      </div>
+      <Tabs
+        label="Web3 lab sections"
+        items={[
+          { id: "research", label: "Research", content: research },
+          {
+            id: "bot",
+            label: "Bot",
+            anchors: ["autopilot-status-title"],
+            content: (
+              <div className={tabPanel}>
+                {tape}
+                {strategyBlock}
+                {bookBlock}
+                {learningBlock}
+              </div>
+            ),
+          },
+          {
+            id: "experiments",
+            label: "Experiments",
+            badge: experimentCount || undefined,
+            anchors: ["paper-experiments-title"],
+            content: <div className={tabPanel}>{experimentsBlock}</div>,
+          },
+          {
+            id: "market",
+            label: "Market",
+            content: (
+              <div className={tabPanel}>
+                {feedBlock}
+                {radarBlock}
+                {tierBBlock}
+              </div>
+            ),
+          },
+          {
+            id: "controls",
+            label: "Controls",
+            content: (
+              <div className={tabPanel}>
+                {walletsBlock}
+                {capsBlock}
+                <p className="border-t border-outline-variant/20 px-3 py-2 text-xs leading-5 text-outline">
+                  {data.data_boundary}
+                </p>
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
+
 
 function ExperimentMetric({
   label,
@@ -1289,4 +1383,13 @@ function formatCurrency(value: number): string {
 
 function formatQuantity(value: number): string {
   return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+}
+
+function StripStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 bg-surface-low/80 px-4 py-3">
+      <dt className="mm-eyebrow truncate">{label}</dt>
+      <dd className="mm-num mt-1 truncate font-display text-base font-semibold text-on-surface">{value}</dd>
+    </div>
+  );
 }
