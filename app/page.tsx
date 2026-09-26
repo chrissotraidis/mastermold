@@ -105,8 +105,8 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       {/* [&>*]:min-w-0 — keeps one long headline from widening grid tracks
           past the phone viewport. */}
       <div className="grid w-full grid-cols-1 gap-6 [&>*]:min-w-0">
-        <header className="flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-[16rem] flex-1 items-center gap-4">
             <MasterMoldHero state={openItemsState(decisionPlays.length)} className="w-20 shrink-0 sm:w-28" />
             <div className="min-w-0">
               <p className="mm-eyebrow">{todayDateLine(report)}</p>

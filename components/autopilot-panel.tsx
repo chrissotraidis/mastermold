@@ -1084,7 +1084,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
         {cockpit}
         <dl className="grid grid-cols-2 gap-px border-t border-outline-variant/30 bg-outline-variant/20 sm:grid-cols-4">
           <StripStat label="Mode" value={modeLabel[state.mode]} />
-          <StripStat label="Paper equity" value={formatCurrency(state.equity_usd)} />
+          <StripStat label="Paper equity" value={state.equity_usd > 0 ? formatCurrency(state.equity_usd) : "Not started"} />
           <StripStat
             label="Go-live gate"
             value={`${gateChecks.filter((check) => check.pass).length}/${gateChecks.length || 5} checks`}
