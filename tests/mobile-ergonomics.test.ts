@@ -701,7 +701,7 @@ describe("mobile ergonomics source contracts", () => {
     const tradingPage = source("app/trading/page.tsx");
 
     // Redesign: the Paper header is hand-rolled "Simulator" copy now.
-    expect(paperPage).toContain("Test calls with simulator dollars before risking anything.");
+    expect(paperPage).toContain("Try a call with pretend money");
     expect(paperPage).toContain("Ideas to test");
     expect(paperPage).not.toContain("showSuggestions: false");
     expect(paperPage).not.toContain('className: "hidden sm:block"');
@@ -709,7 +709,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperPage.indexOf("<MasterMoldPaperIdeas")).toBeGreaterThan(-1);
     expect(paperWorkspace).toContain("Open tests");
     expect(paperWorkspace).toContain("Use simulator dollars to test a call");
-    expect(paperWorkspace).toContain("Test a paper trade");
+    expect(paperWorkspace).toContain("New paper test");
     expect(paperWorkspace).toContain("Paper trades use this simulator balance only. No connected account is touched.");
     expect(paperWorkspace).toContain("const INITIAL_CLOSED_ROUND_LIMIT = 3;");
     expect(paperWorkspace).toContain("rounds.slice(0, INITIAL_CLOSED_ROUND_LIMIT)");
@@ -743,12 +743,12 @@ describe("mobile ergonomics source contracts", () => {
     const paperWorkspace = source("components/paper-workspace.tsx");
 
     // Redesign: the Paper header is hand-rolled "Simulator" copy now.
-    expect(paperPage).toContain(">Simulator</h1>");
-    expect(paperPage).toContain("Test calls with simulator dollars before risking anything.");
+    expect(paperPage).toContain(">Paper trading</h1>");
+    expect(paperPage).toContain("Try a call with pretend money");
     expect(paperPage).toContain("Back to Journal");
     expect(paperPage).toContain("Ideas to test");
     expect(paperPage).toContain("Saved market ideas you can try with simulator dollars");
-    expect(paperPage).toContain("New test");
+    expect(paperPage).toContain("Start a paper test");
     expect(paperPage).toContain("hiddenMobileCount");
     expect(paperPage).toContain("index >= 2 ? \"hidden sm:block\" : \"\"");
     expect(paperPage).toContain("more ideas appear on wider screens");
@@ -760,7 +760,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(paperWorkspace).toContain("Paper trading only. Compare the result after the close date.");
     expect(paperWorkspace).toContain("Nothing here places a real trade.");
     expect(paperWorkspace).toContain("Simulator dollars reserved until the close date.");
-    expect(paperWorkspace).toContain("Test a paper trade");
+    expect(paperWorkspace).toContain("New paper test");
     expect(paperWorkspace).toContain('window.location.hash === "#paper-trade-form"');
     expect(paperWorkspace).toContain("open={open}");
     expect(paperWorkspace).toContain('onToggle={(event) => setOpen(event.currentTarget.open)}');

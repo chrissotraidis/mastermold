@@ -57,8 +57,8 @@ export function TodayDecisionControls({
               : response?.response === "pass"
                 ? "Pass recorded. You can change it while this report is current; an unchanged passed idea stays out of the next inbox."
                 : !canSaveCall
-                  ? "Watch or pass is available now. Add a fresh personal portfolio before saving a scored call."
-                  : "Save a call before acting elsewhere, or record watch/pass so the inbox has an outcome."}
+                  ? "Save call unlocks once you add your own holdings. Watch or Pass works now."
+                  : "Save call adds it to your Journal to be graded later. Watch keeps an eye on it; Pass hides it."}
       </p>
     </div>
   );

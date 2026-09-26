@@ -156,7 +156,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
                   : "01 · Demo on sample holdings"
               }
               title="Decision inbox"
-              description="One to three decisions, ranked from the latest saved inputs."
+              description="What to look at first, from your holdings and today’s prices. Suggestions only."
             />
             <div className="p-3 pt-4">
               {decisionPlays.length === 0 && extraRecommendations.length === 0 ? (
