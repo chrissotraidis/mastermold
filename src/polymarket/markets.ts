@@ -1,3 +1,5 @@
+import { chargesTakerFee, parseFeeSchedule, type FeeSchedule } from "./fees";
+
 export type PolymarketMarket = {
   id: string;
   condition_id: string;
@@ -13,7 +15,16 @@ export type PolymarketMarket = {
   accepting_orders: boolean;
   order_book_enabled: boolean;
   neg_risk: boolean;
+  /** True when a taker pays a fee here (or the schedule is unknown). */
   fees_enabled: boolean;
+  /** Parsed from feeSchedule; rate null = fees on but schedule missing. */
+  fee_schedule?: FeeSchedule;
+  /** Liquidity-reward program settings (null when the market has none). */
+  rewards?: PolymarketRewards | null;
+  /** Negative-risk grouping: the event basket this outcome belongs to. */
+  neg_risk_market_id?: string | null;
+  neg_risk_other?: boolean;
+  event_id?: string | null;
   minimum_order_size: number;
 };
 
@@ -261,7 +272,14 @@ function parseMarket(value: unknown): PolymarketMarket | null {
     accepting_orders: raw.acceptingOrders === true,
     order_book_enabled: raw.enableOrderBook === true,
     neg_risk: raw.negRisk === true,
-    fees_enabled: raw.feesEnabled === true || numeric(raw.takerBaseFee) > 0 || numeric(raw.makerBaseFee) > 0,
+    // takerBaseFee is not a rate (it is 1000 even on fee-free markets);
+    // the per-market feeSchedule is the truth.
+    fees_enabled: chargesTakerFee(parseFeeSchedule(raw)),
+    fee_schedule: parseFeeSchedule(raw),
+    rewards: parseRewards(raw),
+    neg_risk_market_id: typeof raw.negRiskMarketID === "string" && raw.negRiskMarketID ? raw.negRiskMarketID : null,
+    neg_risk_other: raw.negRiskOther === true,
+    event_id: eventIdOf(raw),
     minimum_order_size: numeric(raw.orderMinSize),
   };
 }
@@ -308,4 +326,30 @@ function nullableNumeric(value: unknown): number | null {
 
 export function __resetPolymarketMarketCacheForTests() {
   marketCache = null;
+}
+
+export type PolymarketRewards = {
+  min_size: number;
+  /** Max qualifying distance from the adjusted midpoint, in cents. */
+  max_spread_cents: number;
+  daily_rate_usd: number;
+};
+
+export function parseRewards(raw: Record<string, unknown>): PolymarketRewards | null {
+  const minSize = Number(raw.rewardsMinSize);
+  const maxSpread = Number(raw.rewardsMaxSpread);
+  if (!Number.isFinite(minSize) || !Number.isFinite(maxSpread) || maxSpread <= 0) return null;
+  const programs = Array.isArray(raw.clobRewards) ? raw.clobRewards : [];
+  const dailyRate = programs.reduce((sum: number, program) => {
+    const value = Number((program as Record<string, unknown>)?.rewardsDailyRate);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
+  return { min_size: minSize, max_spread_cents: maxSpread, daily_rate_usd: dailyRate };
+}
+
+function eventIdOf(raw: Record<string, unknown>): string | null {
+  const events = Array.isArray(raw.events) ? raw.events : [];
+  const first = events[0] as Record<string, unknown> | undefined;
+  const id = first?.id;
+  return typeof id === "string" ? id : typeof id === "number" ? String(id) : null;
 }

@@ -16,6 +16,7 @@
  * - No real money, no order routing. This is research state under .data only.
  */
 
+import { feeRateBps, parseFeeSchedule } from "./fees";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -415,10 +416,15 @@ export function computeWalletEvidence(rows: WalletSignalRow[]): WalletEvidenceCe
 /** Modeled taker fee for a paper follow, charged at entry win or lose —
  * Polymarket's documented CLOB formula: rate × min(p, 1−p) × shares. The bps
  * is stored on the row so P&L can be recomputed if the fee model is wrong. */
-export function walletFollowFeeUsd(stakeUsd: number, ask: number, takerFeeBps: number): number {
-  if (ask <= 0 || ask >= 1) return 0;
+export function walletFollowFeeUsd(stakeUsd: number, ask: number, feeRateBps: number | null): number {
+  // Documented Polymarket taker fee: shares × rate × p × (1 − p). The rate
+  // comes from the market's feeSchedule (stored as bps of the rate: 0.05 →
+  // 500). Unknown schedules (null or the stored -1) are charged at the highest
+  // current category rate (crypto, 0.07) so paper P&L is never flattered.
+  if (!(ask > 0) || !(ask < 1)) return 0;
   const shares = stakeUsd / ask;
-  return round2((takerFeeBps / 10_000) * Math.min(ask, 1 - ask) * shares);
+  const rate = feeRateBps === null || feeRateBps < 0 ? 0.07 : feeRateBps / 10_000;
+  return round2(shares * rate * ask * (1 - ask));
 }
 
 /** Net paper P&L for a resolved follow: win pays shares×(1−ask) − fee, a
@@ -531,7 +537,8 @@ type GammaMarketLite = {
   closed: boolean;
   outcomes: string[];
   token_ids: string[];
-  taker_fee_bps: number;
+  /** Fee rate in bps of the rate (0.05 → 500); null = schedule unknown. */
+  taker_fee_bps: number | null;
 };
 
 /** Signals arrive keyed by conditionId; grading and fusion need the Gamma
@@ -558,7 +565,7 @@ async function fetchGammaByConditionIds(conditionIds: string[]): Promise<Map<str
       closed: raw.closed === true,
       outcomes: parseJsonStringArray(raw.outcomes),
       token_ids: parseJsonStringArray(raw.clobTokenIds),
-      taker_fee_bps: typeof raw.takerBaseFee === "number" && Number.isFinite(raw.takerBaseFee) ? raw.takerBaseFee : 0,
+      taker_fee_bps: feeRateBps(parseFeeSchedule(raw)),
     });
   }
   return out;
@@ -1055,7 +1062,8 @@ async function captureWalletSignals(store: ReturnType<typeof polymarketWalletSto
         outcome: market.outcomes[outcomeIndex] ?? trade.outcome,
         entry_ask: ourAsk,
         stake_usd: WALLET_FOLLOW_STAKE_USD,
-        taker_fee_bps: market.taker_fee_bps,
+        // -1 records "schedule unknown" in the integer column.
+        taker_fee_bps: market.taker_fee_bps ?? -1,
         status: "pending",
         winning_outcome_index: null,
         resolved_at: null,

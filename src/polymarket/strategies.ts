@@ -1,7 +1,15 @@
+import { takerFeeUsd } from "./fees";
 import { buildPolymarketWatchSignals, hasPolymarketEntryHorizon, type PolymarketMarket } from "./markets";
 import { summarizePolymarketBook, type PolymarketOrderBook } from "./orderbook";
 
-export type PolymarketStrategyId = "momentum" | "book_pressure" | "binary_parity" | "maker_spread" | "analyst";
+export type PolymarketStrategyId =
+  | "momentum"
+  | "book_pressure"
+  | "binary_parity"
+  | "maker_spread"
+  | "analyst"
+  | "reward_maker"
+  | "neg_risk_basket";
 export type PolymarketLabelKind = "markout" | "structural" | "maker";
 
 export type PolymarketBrainCandidate = {
@@ -131,13 +139,22 @@ export function buildPolymarketBrainCandidates(
       }
     }
 
+    const reward = rewardMakerCandidate(market, metrics[0], books.get(market.token_ids[0]));
+    if (reward) candidates.push(reward);
+
     const yesBook = metrics[0];
     const noBook = metrics[1];
     if (yesBook?.best_ask !== null && yesBook?.best_ask !== undefined && noBook?.best_ask !== null && noBook?.best_ask !== undefined) {
       const combinedAsk = yesBook.best_ask + noBook.best_ask;
       const executableSize = Math.min(yesBook.executable_size_usd, noBook.executable_size_usd);
-      if (!market.fees_enabled && combinedAsk <= 0.995 && executableSize >= 5) {
-        const edgeBps = (1 - combinedAsk) * 10_000;
+      // Fee-inclusive: each leg pays rate × p × (1 − p) per share. Unknown
+      // schedules are skipped rather than assumed free.
+      const schedule = market.fee_schedule ?? { rate: market.fees_enabled ? null : 0, exponent: 1 };
+      const yesFee = takerFeeUsd(1, yesBook.best_ask, schedule);
+      const noFee = takerFeeUsd(1, noBook.best_ask, schedule);
+      const netEdge = yesFee === null || noFee === null ? null : 1 - combinedAsk - yesFee - noFee;
+      if (netEdge !== null && netEdge >= 0.005 && executableSize >= 5) {
+        const edgeBps = netEdge * 10_000;
         candidates.push({
           id: `binary_parity:${market.id}`,
           strategy_id: "binary_parity",
@@ -161,7 +178,7 @@ export function buildPolymarketBrainCandidates(
           move_24h: market.price_change_24h,
           score: Math.min(99, Math.round(60 + edgeBps / 2)),
           paper_eligible: false,
-          thesis: `Combined displayed asks are ${(combinedAsk * 100).toFixed(2)}¢ (${edgeBps.toFixed(0)}bp below payout) for about $${executableSize.toFixed(0)} top-level size. Atomicity, partial fills, settlement, and stale-book risk remain unmodeled.`,
+          thesis: `Combined displayed asks are ${(combinedAsk * 100).toFixed(2)}¢; after both legs' taker fees the pair is ${edgeBps.toFixed(0)}bp below the $1 payout for about $${executableSize.toFixed(0)} top-level size. A falsification control: leg risk, partial fills, and stale books usually erase it.`,
         });
       }
     }
@@ -205,4 +222,55 @@ function dedupe(candidates: PolymarketBrainCandidate[]) {
     seen.add(candidate.id);
     return true;
   });
+}
+
+/**
+ * Liquidity-reward shadow maker (docs/research-2026-09 P2). Scores a virtual
+ * two-sided quote at the reward minimum size, 1¢ from the midpoint, against
+ * the displayed competition using Polymarket's documented order score
+ * ((v − s) / v)² × size, and estimates our share of the daily pool. The share
+ * is an UPPER bound: hidden and future quoters are invisible. Fills, markouts
+ * and unwind fees are what the gate measures; this row only records the
+ * opportunity so the brain can label what would have happened to the quote.
+ */
+function rewardMakerCandidate(
+  market: PolymarketMarket,
+  metrics: ReturnType<typeof summarizePolymarketBook> | null,
+  book: PolymarketOrderBook | undefined,
+): PolymarketBrainCandidate | null {
+  const rewards = market.rewards;
+  if (!rewards || rewards.daily_rate_usd < 50 || !metrics || !book) return null;
+  if (metrics.midpoint === null || metrics.best_bid === null || metrics.best_ask === null) return null;
+  const mid = metrics.midpoint;
+  if (mid < 0.2 || mid > 0.8) return null;
+  const v = rewards.max_spread_cents;
+  const score = (price: number, size: number) => {
+    const distance = Math.abs(price - mid) * 100;
+    return distance >= v ? 0 : ((v - distance) / v) ** 2 * size;
+  };
+  const bidQ = book.bids.reduce((sum, level) => sum + score(level.price, level.size), 0);
+  const askQ = book.asks.reduce((sum, level) => sum + score(level.price, level.size), 0);
+  const competition = Math.min(bidQ, askQ);
+  const ours = ((v - 1) / v) ** 2 * rewards.min_size;
+  const share = ours / (ours + competition);
+  const dailyUpperBound = share * rewards.daily_rate_usd;
+  const quoteBid = Math.max(0.01, Math.round((mid - 0.01) * 100) / 100);
+  return {
+    id: `reward_maker:${market.id}`,
+    strategy_id: "reward_maker",
+    label_kind: "maker",
+    market_id: market.id,
+    token_id: market.token_ids[0],
+    outcome_index: 0,
+    question: market.question,
+    slug: market.slug,
+    outcome: market.outcomes[0],
+    market_price: market.outcome_prices[0],
+    executable_entry_price: quoteBid,
+    ...bookFields(metrics),
+    move_24h: market.price_change_24h,
+    score: Math.min(99, Math.round(40 + Math.min(40, dailyUpperBound))),
+    paper_eligible: false,
+    thesis: `Reward pool $${rewards.daily_rate_usd.toFixed(0)}/day, max spread ${v}¢, min size ${rewards.min_size}. A two-sided min-size quote 1¢ from mid would hold at most ${(share * 100).toFixed(1)}% of displayed reward score (≤ $${dailyUpperBound.toFixed(2)}/day, an upper bound). It only pays if that beats adverse fills and unwind fees.`,
+  };
 }

@@ -274,8 +274,12 @@ describe("computeWalletEvidence", () => {
 describe("wallet follow arm", () => {
   test("fee model: rate × min(p, 1−p) × shares", () => {
     // $5 at 45¢ = 11.11 shares; 1000bps × 0.45 × 11.11 ≈ $0.50
-    expect(walletFollowFeeUsd(5, 0.45, 1_000)).toBeCloseTo(0.5, 2);
+    // Documented formula: shares × rate × p × (1 − p). $5 at 50¢ = 10 shares;
+    // sports rate 0.05 (stored as 500 bps of the rate) → $0.125.
+    expect(walletFollowFeeUsd(5, 0.5, 500)).toBeCloseTo(0.13, 2);
     expect(walletFollowFeeUsd(5, 0.45, 0)).toBe(0);
+    // Unknown schedule is charged at the highest category rate, never zero.
+    expect(walletFollowFeeUsd(5, 0.5, null)).toBeCloseTo(0.18, 2);
   });
 
   test("net P&L subtracts the fee on wins and adds it to losses", () => {
