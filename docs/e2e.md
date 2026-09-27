@@ -91,10 +91,14 @@ worth range.
   always undoable. The header chip also said "Showing sample data. Add holdings…"
   after holdings existed; it describes the market read and now says so. Caught
   by `e2e/import-book.e2e.ts`.
+- Crawl of all 18 routes on desktop and phone (seeded data): no console errors,
+  page errors, failed requests, sideways scroll, or clipped short labels.
+  Journal logging, Chat without a key, and every Settings tab also ran clean.
+  `e2e/welcome.e2e.ts` now covers the first visit.
 
 ## Last run
 
-2026-09-27: 28 passed (23 desktop, 5 phone), 45 s.
+2026-09-27: 30 passed (25 desktop, 5 phone), 43 s.
 
 ## iPhone and iPad simulators (2026-09-27)
 
