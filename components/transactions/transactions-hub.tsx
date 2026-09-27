@@ -7,6 +7,7 @@ import { Panel, PanelHeader } from "@/components/ui/panel";
 import { Sheet } from "@/components/ui/sheet";
 import { StatTile } from "@/components/ui/stat";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { TransactionRow, TransactionRuleRow } from "@/src/db/store";
@@ -52,6 +53,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
   const [query, setQuery] = useState("");
   const [reviewOnly, setReviewOnly] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [spendBy, setSpendBy] = useState<"category" | "merchant">("category");
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [ruleFor, setRuleFor] = useState<TransactionRow | null>(null);
@@ -114,7 +116,20 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
   }, [data.transactions, data.month, query, reviewOnly, categoryFilter]);
 
   const flow = data.cash_flow;
-  const topSpend = flow.by_category.slice(0, 8);
+  const categoryType = useMemo(() => new Map(data.categories.map((category) => [category.id, category.type])), [data.categories]);
+  // Same rules as cash flow: this month's spending, hidden rows and transfers left out.
+  const merchantSpend = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const tx of data.transactions) {
+      if (!tx.date.startsWith(data.month) || tx.hidden || tx.amount >= 0) continue;
+      const type = tx.category_id ? categoryType.get(tx.category_id) : undefined;
+      if (type === "transfer" || type === "income") continue;
+      totals.set(tx.merchant, (totals.get(tx.merchant) ?? 0) - tx.amount);
+    }
+    return [...totals.entries()].map(([name, total]) => ({ key: name, name, total: Math.round(total * 100) / 100 })).sort((a, b) => b.total - a.total);
+  }, [data.transactions, data.month, categoryType]);
+  const topSpend =
+    spendBy === "category" ? flow.by_category.slice(0, 8).map((row) => ({ key: row.category_id, name: row.name, total: row.total })) : merchantSpend.slice(0, 8);
   const maxSpend = topSpend[0]?.total ?? 0;
   const hasAny = data.transactions.length > 0;
 
@@ -253,12 +268,38 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
 
             <div className="grid content-start gap-6 lg:col-span-4 [&>*]:min-w-0">
               <Panel aria-labelledby="spend-title">
-                <PanelHeader titleId="spend-title" title="Spending by category" description={monthLabel(data.month)} />
+                <PanelHeader
+                  titleId="spend-title"
+                  title="Spending"
+                  description={monthLabel(data.month)}
+                  action={
+                    <Segmented
+                      label="Group spending by"
+                      value={spendBy}
+                      onChange={setSpendBy}
+                      options={[
+                        { value: "category", label: "Category" },
+                        { value: "merchant", label: "Merchant" },
+                      ]}
+                    />
+                  }
+                />
                 <ul className="grid gap-3 p-5 pt-4">
                   {topSpend.length === 0 ? <li className="text-sm text-on-surface-variant">No spending this month.</li> : null}
-                  {topSpend.map((row) => (
-                    <li key={row.category_id}>
-                      <button type="button" onClick={() => setCategoryFilter(row.category_id)} className="w-full text-left">
+                  {topSpend.map((row) => {
+                    const picked = spendBy === "category" ? categoryFilter === row.key : query === row.key;
+                    return (
+                    <li key={row.key}>
+                      <button
+                        type="button"
+                        aria-pressed={picked}
+                        onClick={() => {
+                          // Tap again to clear; the list below follows the pick.
+                          if (spendBy === "category") setCategoryFilter(picked ? "" : row.key);
+                          else setQuery(picked ? "" : row.key);
+                        }}
+                        className={cn("w-full rounded-lg p-1 -m-1 text-left", picked && "bg-violet/10 ring-1 ring-violet/40")}
+                      >
                         <span className="flex items-baseline justify-between gap-2 text-sm">
                           <span className="truncate text-on-surface">{row.name}</span>
                           <span className="mm-num shrink-0 font-semibold text-on-surface">{money(row.total)}</span>
@@ -268,7 +309,8 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                         </span>
                       </button>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </Panel>
 
