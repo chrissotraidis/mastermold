@@ -18,9 +18,10 @@ source. See [monarch-research.md](monarch-research.md).
 
 ## Implementation status
 
-- [ ] 1. Transaction store + category tree
-- [ ] 2. Rules engine
-- [ ] 3. Transactions page with CSV import and hand entry
-- [ ] 4. Cash flow (on the Transactions page)
-- [ ] 5–9
+- [x] 1. Transaction store + category tree
+- [x] 2. Rules engine
+- [x] 3. Transactions page with CSV import and hand entry
+- [x] 4. Cash flow (on the Transactions page)
+- [ ] 5. Recurring bills
+- [ ] 6–9
 
