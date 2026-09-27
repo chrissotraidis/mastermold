@@ -78,7 +78,7 @@ worth range.
 
 ## Last run
 
-2026-09-27: 25 passed (20 desktop, 5 phone), 50 s.
+2026-09-27: 26 passed (21 desktop, 5 phone), 37 s.
 
 ## iPhone and iPad simulators (2026-09-27)
 

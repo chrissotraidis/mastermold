@@ -1089,7 +1089,11 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
             label="Go-live gate"
             value={`${gateChecks.filter((check) => check.pass).length}/${gateChecks.length || 5} checks`}
           />
-          <StripStat label="Experiments" value={`${running} of ${experimentCount} running`} />
+          {/* "Running" only when the bot is ticking; unpaused experiments do nothing while it is off. */}
+          <StripStat
+            label="Experiments"
+            value={state.daemon === "offline" ? `${running} of ${experimentCount} ready · bot off` : `${running} of ${experimentCount} running`}
+          />
         </dl>
       </div>
       <Tabs
