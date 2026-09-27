@@ -5,6 +5,7 @@ import {
   addManualTransaction,
   addRule,
   cashFlow,
+  detectRecurring,
   deleteRule,
   deleteTransactions,
   importTransactions,
@@ -32,6 +33,7 @@ function payload(month?: string | null) {
     cash_flow: cashFlow(current, rows),
     categories: CATEGORIES,
     rules: store().transactionRules(),
+    recurring: detectRecurring(rows),
     accounts: store().financialAccounts().map((account) => ({ id: account.id, name: account.name })),
   };
 }

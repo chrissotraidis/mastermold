@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { TransactionRow, TransactionRuleRow } from "@/src/db/store";
-import type { CashFlowMonth, Category } from "@/src/db/transactions";
+import type { CashFlowMonth, Category, RecurringItem } from "@/src/db/transactions";
 
 export type TransactionsData = {
   month: string;
@@ -18,6 +18,7 @@ export type TransactionsData = {
   cash_flow: CashFlowMonth;
   categories: Category[];
   rules: TransactionRuleRow[];
+  recurring: RecurringItem[];
   accounts: Array<{ id: string; name: string }>;
 };
 
@@ -249,6 +250,34 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                           <span className="block h-full rounded-full bg-violet" style={{ width: `${maxSpend ? (row.total / maxSpend) * 100 : 0}%` }} />
                         </span>
                       </button>
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+
+              <Panel aria-labelledby="recurring-title">
+                <PanelHeader
+                  titleId="recurring-title"
+                  title="Recurring"
+                  description={data.recurring.length ? `${money(Math.abs(data.recurring.filter((item) => item.typical_amount < 0 && item.frequency === "monthly").reduce((total, item) => total + item.typical_amount, 0)))} a month in regular bills` : "Bills and subscriptions show up here after they repeat."}
+                />
+                <ul className="grid gap-1 p-3 pt-3" data-testid="recurring-list">
+                  {data.recurring.length === 0 ? <li className="px-2 text-sm text-on-surface-variant">Nothing repeats yet. Import two or three months to find them.</li> : null}
+                  {data.recurring.map((item) => (
+                    <li key={item.merchant} className="flex items-center justify-between gap-3 rounded-xl px-2 py-2">
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-on-surface">{item.merchant}</span>
+                        <span className="block text-xs text-outline">
+                          {item.frequency} · next {dayLabel(item.next_date)}
+                          {item.amount_changed ? ` · last was ${money(Math.abs(item.last_amount))}` : ""}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 flex-col items-end gap-1">
+                        <span className={cn("mm-num text-sm font-semibold", item.typical_amount > 0 ? "text-engine" : "text-on-surface")}>{item.typical_amount > 0 ? "+" : ""}{money(Math.abs(item.typical_amount))}</span>
+                        <span className={cn("rounded-full px-1.5 text-[10px] font-semibold", RECURRING_TONE[item.status])}>
+                          {RECURRING_LABEL[item.status]}
+                        </span>
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -600,3 +629,17 @@ function CategoryOptions({ categories }: { categories: Category[] }) {
     </>
   );
 }
+
+const RECURRING_LABEL: Record<RecurringItem["status"], string> = {
+  paid: "Paid",
+  changed: "Paid, new amount",
+  upcoming: "Upcoming",
+  missed: "Missed",
+};
+
+const RECURRING_TONE: Record<RecurringItem["status"], string> = {
+  paid: "bg-engine/15 text-engine",
+  changed: "bg-caution/15 text-caution",
+  upcoming: "bg-violet/15 text-violet",
+  missed: "bg-critical/15 text-critical",
+};

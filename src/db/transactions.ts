@@ -411,3 +411,95 @@ function round(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+// --- recurring ----------------------------------------------------------------
+
+export type RecurringFrequency = "weekly" | "biweekly" | "monthly" | "yearly";
+export type RecurringStatus = "paid" | "changed" | "upcoming" | "missed";
+
+export type RecurringItem = {
+  merchant: string;
+  category_id: string | null;
+  frequency: RecurringFrequency;
+  typical_amount: number; // signed, like transactions
+  last_date: string;
+  next_date: string;
+  occurrences: number;
+  status: RecurringStatus;
+  last_amount: number;
+  /** The latest charge differs from the usual amount by more than 10%. */
+  amount_changed: boolean;
+};
+
+const FREQUENCIES: Array<{ id: RecurringFrequency; days: number; tolerance: number }> = [
+  { id: "weekly", days: 7, tolerance: 2 },
+  { id: "biweekly", days: 14, tolerance: 3 },
+  { id: "monthly", days: 30.4, tolerance: 5 },
+  { id: "yearly", days: 365, tolerance: 15 },
+];
+
+const DAY = 86_400_000;
+
+function toDay(date: string) {
+  return Date.parse(`${date}T00:00:00Z`);
+}
+
+function addDays(date: string, days: number) {
+  return new Date(toDay(date) + Math.round(days) * DAY).toISOString().slice(0, 10);
+}
+
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * Find repeating merchants the way Monarch suggests recurring bills: the same
+ * merchant on a steady rhythm with similar amounts. Needs 3 occurrences (2 for
+ * yearly). Transfers and hidden rows are ignored.
+ */
+export function detectRecurring(rows = store().transactions(), today = new Date().toISOString().slice(0, 10)): RecurringItem[] {
+  const byMerchant = new Map<string, TransactionRow[]>();
+  for (const tx of rows) {
+    if (tx.hidden || categoryById(tx.category_id)?.type === "transfer") continue;
+    const key = tx.merchant.trim().toLowerCase();
+    byMerchant.set(key, [...(byMerchant.get(key) ?? []), tx]);
+  }
+  const items: RecurringItem[] = [];
+  for (const group of byMerchant.values()) {
+    const sorted = [...group].sort((a, b) => a.date.localeCompare(b.date));
+    if (sorted.length < 2) continue;
+    const gaps = sorted.slice(1).map((tx, index) => (toDay(tx.date) - toDay(sorted[index].date)) / DAY);
+    const gap = median(gaps);
+    const frequency = FREQUENCIES.find((f) => Math.abs(gap - f.days) <= f.tolerance && gaps.every((g) => Math.abs(g - f.days) <= f.tolerance * 2));
+    if (!frequency) continue;
+    if (sorted.length < (frequency.id === "yearly" ? 2 : 3)) continue;
+    const amounts = sorted.map((tx) => tx.amount);
+    const typical = median(amounts);
+    // Amounts must mostly agree (within 20%) or it is shopping, not a bill.
+    if (amounts.filter((amount) => Math.abs(amount - typical) <= Math.abs(typical) * 0.2).length < amounts.length - 1) continue;
+    const last = sorted[sorted.length - 1];
+    const next = addDays(last.date, frequency.days);
+    const changed = Math.abs(last.amount - typical) > Math.abs(typical) * 0.1;
+    const status: RecurringStatus =
+      toDay(today) - toDay(last.date) < (frequency.days / 2) * DAY
+        ? changed ? "changed" : "paid"
+        : toDay(today) > toDay(next) + frequency.tolerance * DAY
+          ? "missed"
+          : "upcoming";
+    items.push({
+      merchant: last.merchant,
+      category_id: last.category_id,
+      frequency: frequency.id,
+      typical_amount: round(typical),
+      last_date: last.date,
+      next_date: next,
+      occurrences: sorted.length,
+      status,
+      last_amount: last.amount,
+      amount_changed: changed,
+    });
+  }
+  return items.sort((a, b) => a.next_date.localeCompare(b.next_date));
+}
+

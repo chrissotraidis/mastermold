@@ -11,6 +11,7 @@ import {
   cashFlow,
   cleanMerchant,
   deleteRule,
+  detectRecurring,
   importTransactions,
   parseTransactionCsv,
   previewRule,
@@ -154,3 +155,38 @@ describe("json-file backend (what the dev server uses)", () => {
     }
   });
 });
+
+describe("recurring", () => {
+  const monthly = (merchant: string, amounts: number[], dates: string[]) =>
+    dates.map((date, index) => addManualTransaction({ date, amount: amounts[index], description: merchant, category_id: "streaming" }));
+
+  test("GIVEN three monthly charges THEN it is found, with the next date and paid status", () => {
+    monthly("Netflix", [-15.99, -15.99, -15.99], ["2026-07-10", "2026-08-10", "2026-09-10"]);
+    const [item] = detectRecurring(undefined, "2026-09-15");
+    expect(item).toMatchObject({ merchant: "Netflix", frequency: "monthly", typical_amount: -15.99, status: "paid", occurrences: 3 });
+    expect(item.next_date).toBe("2026-10-10");
+  });
+
+  test("GIVEN the next charge has not arrived THEN it is upcoming, then missed once well past due", () => {
+    monthly("Gym", [-40, -40, -40], ["2026-06-01", "2026-07-01", "2026-08-01"]);
+    expect(detectRecurring(undefined, "2026-08-25")[0].status).toBe("upcoming");
+    expect(detectRecurring(undefined, "2026-09-12")[0].status).toBe("missed");
+  });
+
+  test("GIVEN the latest charge differs by more than 10% THEN it is flagged changed", () => {
+    monthly("Spotify", [-10.99, -10.99, -12.99], ["2026-07-05", "2026-08-05", "2026-09-05"]);
+    expect(detectRecurring(undefined, "2026-09-06")[0].status).toBe("changed");
+    expect(detectRecurring(undefined, "2026-09-25")[0]).toMatchObject({ status: "upcoming", amount_changed: true, last_amount: -12.99 });
+  });
+
+  test("GIVEN irregular shopping THEN nothing is called recurring", () => {
+    monthly("Amazon", [-12, -230, -48], ["2026-07-03", "2026-08-19", "2026-09-02"]);
+    expect(detectRecurring(undefined, "2026-09-10")).toEqual([]);
+  });
+
+  test("GIVEN two yearly charges THEN a yearly bill is found", () => {
+    monthly("Domain renewal", [-20, -20], ["2025-03-01", "2026-03-01"]);
+    expect(detectRecurring(undefined, "2026-09-10")[0]).toMatchObject({ frequency: "yearly", next_date: "2027-03-01" });
+  });
+});
+

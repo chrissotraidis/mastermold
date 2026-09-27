@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { TransactionsHub } from "@/components/transactions/transactions-hub";
 import { store } from "@/src/db/store";
-import { CATEGORIES, cashFlow, transactionMonths } from "@/src/db/transactions";
+import { CATEGORIES, cashFlow, detectRecurring, transactionMonths } from "@/src/db/transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,7 @@ export default function TransactionsPage() {
           cash_flow: cashFlow(month, rows),
           categories: CATEGORIES,
           rules: store().transactionRules(),
+          recurring: detectRecurring(rows),
           accounts: store().financialAccounts().map((account) => ({ id: account.id, name: account.name })),
         }}
       />
