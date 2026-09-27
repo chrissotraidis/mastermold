@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./app-test";
 import { ORIGIN } from "./helpers";
 
 const headers = { "content-type": "application/json", origin: ORIGIN };

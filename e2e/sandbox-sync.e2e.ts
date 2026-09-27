@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./app-test";
 import { resetMoney } from "./helpers";
 
 test.describe("Sandbox bank sync (made-up data, no network)", () => {

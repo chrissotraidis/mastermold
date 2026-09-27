@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./app-test";
 import { join } from "node:path";
 import { importCsv, resetMoney } from "./helpers";
 

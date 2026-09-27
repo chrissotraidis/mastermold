@@ -155,7 +155,7 @@ export function BudgetHub({ initial }: { initial: BudgetData }) {
               setNewAmount("");
             }}
           >
-            <div className="grid flex-1 gap-1 text-xs font-semibold text-on-surface-variant">
+            <div className="grid min-w-40 flex-1 basis-40 gap-1 text-xs font-semibold text-on-surface-variant">
               <label htmlFor="budget-new-category">Category</label>
               <select id="budget-new-category" value={newCategory} onChange={(event) => setNewCategory(event.target.value)} className={cn(field, "w-full")}>
                 <option value="">Choose…</option>

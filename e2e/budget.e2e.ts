@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./app-test";
 import { importCsv, resetMoney, threeMonthsCsv } from "./helpers";
 
 test.describe("Budget, end to end with real clicks", () => {
@@ -50,6 +50,8 @@ test.describe("Budget, end to end with real clicks", () => {
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.getByTestId("budget-group-non_monthly")).toContainText("Gifts");
     await expect(page.getByTestId("budget-summary")).toContainText("$75.00");
+    // With a plan on the page the form sits in a half-width card; the category picker must stay readable.
+    const box = await page.getByLabel("Category", { exact: true }).boundingBox();
+    expect(box!.width).toBeGreaterThanOrEqual(150);
   });
 });
-

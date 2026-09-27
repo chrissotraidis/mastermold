@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./app-test";
 import { importCsv, resetMoney, threeMonthsCsv } from "./helpers";
 
 test.describe("Phone layout", () => {
