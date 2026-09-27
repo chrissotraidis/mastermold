@@ -383,7 +383,7 @@ function keyOf(column: string) {
   return column.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 }
 
-function toNumber(value: unknown): number | null {
+export function toNumber(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -406,14 +406,14 @@ function toAssetClass(value: unknown, symbol: string): AssetClass {
   return "equity";
 }
 
-function detectDelimiter(text: string) {
+export function detectDelimiter(text: string) {
   const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
   const counts: Array<[string, number]> = [",", "\t", ";", "|"].map((delimiter) => [delimiter, firstLine.split(delimiter).length - 1]);
   counts.sort((a, b) => b[1] - a[1]);
   return counts[0][1] > 0 ? counts[0][0] : ",";
 }
 
-function parseDelimited(text: string, delimiter: string): string[][] {
+export function parseDelimited(text: string, delimiter: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";

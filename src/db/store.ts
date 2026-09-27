@@ -59,6 +59,48 @@ export type ManualHoldingRow = {
  * with no holdings (checking, a mortgage, a house) carry their own balance.
  * Liabilities store a positive balance and subtract from net worth.
  */
+/** One money movement. Negative amount = money out, positive = money in. */
+export type TransactionRow = {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  /** Raw statement text as the bank sent it; rules can match on it. */
+  original_description: string;
+  /** Cleaned merchant name shown in the UI. */
+  merchant: string;
+  category_id: string | null;
+  account_id: string | null;
+  notes: string;
+  tags: string[];
+  hidden: boolean;
+  needs_review: boolean;
+  source: "manual" | "csv" | "plaid";
+  import_batch_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TransactionRuleRow = {
+  id: string;
+  order: number;
+  enabled: boolean;
+  conditions: {
+    merchant?: { op: "equals" | "contains"; value: string };
+    original_description?: { op: "equals" | "contains"; value: string };
+    amount?: { op: "equals" | "above" | "below" | "between"; value: number; value2?: number };
+    direction?: "income" | "expense";
+    account_id?: string;
+  };
+  actions: {
+    rename_merchant?: string;
+    set_category_id?: string;
+    add_tags?: string[];
+    hide?: boolean;
+    needs_review?: boolean;
+  };
+  created_at: string;
+};
+
 export type FinancialAccountRow = {
   id: string;
   name: string;
@@ -176,6 +218,11 @@ export interface PersistAdapter {
   financialAccounts(): FinancialAccountRow[];
   upsertFinancialAccount(account: FinancialAccountRow): void;
   deleteFinancialAccount(id: string): void;
+  transactions(): TransactionRow[];
+  upsertTransactions(rows: TransactionRow[]): void;
+  deleteTransactions(ids: string[]): void;
+  transactionRules(): TransactionRuleRow[];
+  replaceTransactionRules(rows: TransactionRuleRow[]): void;
   netWorthHistory(): NetWorthHistoryRow[];
   upsertNetWorthPoint(point: NetWorthHistoryRow): void;
   importedHoldings(): ImportedHoldingRow[];
@@ -211,6 +258,8 @@ type StoreSnapshot = {
   round_scores: RoundScore[];
   manual_holdings: ManualHoldingRow[];
   financial_accounts: FinancialAccountRow[];
+  transactions: TransactionRow[];
+  transaction_rules: TransactionRuleRow[];
   net_worth_history: NetWorthHistoryRow[];
   imported_holdings: ImportedHoldingRow[];
   position_policies: PositionPolicyRow[];
@@ -236,6 +285,8 @@ const emptySnapshot = (): StoreSnapshot => ({
   round_scores: [],
   manual_holdings: [],
   financial_accounts: [],
+  transactions: [],
+  transaction_rules: [],
   net_worth_history: [],
   imported_holdings: [],
   position_policies: [],
@@ -335,6 +386,17 @@ class SqliteAdapter implements PersistAdapter {
       CREATE TABLE IF NOT EXISTS financial_accounts (
         id TEXT PRIMARY KEY,
         updated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS transactions (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+      CREATE TABLE IF NOT EXISTS transaction_rules (
+        id TEXT PRIMARY KEY,
+        sort_order INTEGER NOT NULL,
         data TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS net_worth_history (
@@ -538,6 +600,51 @@ class SqliteAdapter implements PersistAdapter {
 
   deleteFinancialAccount(id: string): void {
     this.db.query("DELETE FROM financial_accounts WHERE id = ?").run(id);
+  }
+
+  transactions(): TransactionRow[] {
+    return this.db
+      .query("SELECT data FROM transactions ORDER BY date DESC, id ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as TransactionRow);
+  }
+
+  upsertTransactions(rows: TransactionRow[]): void {
+    if (rows.length === 0) return;
+    const insert = this.db.query("INSERT OR REPLACE INTO transactions (id, date, data) VALUES (?, ?, ?)");
+    this.db.run("BEGIN");
+    try {
+      for (const row of rows) insert.run(row.id, row.date, JSON.stringify(row));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
+  }
+
+  deleteTransactions(ids: string[]): void {
+    const remove = this.db.query("DELETE FROM transactions WHERE id = ?");
+    for (const id of ids) remove.run(id);
+  }
+
+  transactionRules(): TransactionRuleRow[] {
+    return this.db
+      .query("SELECT data FROM transaction_rules ORDER BY sort_order ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as TransactionRuleRow);
+  }
+
+  replaceTransactionRules(rows: TransactionRuleRow[]): void {
+    this.db.run("BEGIN");
+    try {
+      this.db.run("DELETE FROM transaction_rules");
+      const insert = this.db.query("INSERT INTO transaction_rules (id, sort_order, data) VALUES (?, ?, ?)");
+      for (const row of rows) insert.run(row.id, row.order, JSON.stringify(row));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
   }
 
   netWorthHistory(): NetWorthHistoryRow[] {
@@ -796,6 +903,8 @@ class MemoryAdapter implements PersistAdapter {
   private roundScoreRows: RoundScore[] = [];
   private manualHoldingRows: ManualHoldingRow[] = [];
   private financialAccountRows: FinancialAccountRow[] = [];
+  private transactionRows: TransactionRow[] = [];
+  private transactionRuleRows: TransactionRuleRow[] = [];
   private netWorthRows: NetWorthHistoryRow[] = [];
   private importedHoldingRows: ImportedHoldingRow[] = [];
   private positionPolicyRows: PositionPolicyRow[] = [];
@@ -864,6 +973,23 @@ class MemoryAdapter implements PersistAdapter {
   }
   deleteFinancialAccount(id: string) {
     this.financialAccountRows = this.financialAccountRows.filter((item) => item.id !== id);
+  }
+  transactions() {
+    return sortTransactions(this.transactionRows);
+  }
+  upsertTransactions(rows: TransactionRow[]) {
+    const ids = new Set(rows.map((row) => row.id));
+    this.transactionRows = [...this.transactionRows.filter((row) => !ids.has(row.id)), ...rows];
+  }
+  deleteTransactions(ids: string[]) {
+    const drop = new Set(ids);
+    this.transactionRows = this.transactionRows.filter((row) => !drop.has(row.id));
+  }
+  transactionRules() {
+    return [...this.transactionRuleRows].sort((a, b) => a.order - b.order);
+  }
+  replaceTransactionRules(rows: TransactionRuleRow[]) {
+    this.transactionRuleRows = [...rows];
   }
   netWorthHistory() {
     return [...this.netWorthRows].sort((a, b) => a.date.localeCompare(b.date));
@@ -1056,6 +1182,30 @@ class JsonFileAdapter implements PersistAdapter {
     snapshot.financial_accounts = snapshot.financial_accounts.filter((item) => item.id !== id);
     this.write(snapshot);
   }
+  transactions() {
+    return sortTransactions(this.read().transactions);
+  }
+  upsertTransactions(rows: TransactionRow[]) {
+    if (rows.length === 0) return;
+    const snapshot = this.read();
+    const ids = new Set(rows.map((row) => row.id));
+    snapshot.transactions = [...snapshot.transactions.filter((row) => !ids.has(row.id)), ...rows];
+    this.write(snapshot);
+  }
+  deleteTransactions(ids: string[]) {
+    const snapshot = this.read();
+    const drop = new Set(ids);
+    snapshot.transactions = snapshot.transactions.filter((row) => !drop.has(row.id));
+    this.write(snapshot);
+  }
+  transactionRules() {
+    return [...this.read().transaction_rules].sort((a, b) => a.order - b.order);
+  }
+  replaceTransactionRules(rows: TransactionRuleRow[]) {
+    const snapshot = this.read();
+    snapshot.transaction_rules = [...rows];
+    this.write(snapshot);
+  }
   netWorthHistory() {
     return [...this.read().net_worth_history].sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -1200,6 +1350,8 @@ class JsonFileAdapter implements PersistAdapter {
         round_scores: Array.isArray(parsed.round_scores) ? parsed.round_scores : [],
         manual_holdings: Array.isArray(parsed.manual_holdings) ? parsed.manual_holdings : [],
         financial_accounts: Array.isArray(parsed.financial_accounts) ? parsed.financial_accounts : [],
+        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+        transaction_rules: Array.isArray(parsed.transaction_rules) ? parsed.transaction_rules : [],
         net_worth_history: Array.isArray(parsed.net_worth_history) ? parsed.net_worth_history : [],
         imported_holdings: Array.isArray(parsed.imported_holdings) ? parsed.imported_holdings : [],
         position_policies: Array.isArray(parsed.position_policies) ? parsed.position_policies : [],
@@ -1294,4 +1446,8 @@ export function store(): PersistAdapter {
 /** Test seam: drop the cached adapter so the next store() rebuilds (e.g. reopen a db file). */
 export function __resetStoreForTests(): void {
   cached = null;
+}
+
+function sortTransactions(rows: TransactionRow[]): TransactionRow[] {
+  return [...rows].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
 }
