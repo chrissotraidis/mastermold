@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -76,6 +76,22 @@ const MasterMoldHead3D = dynamic(() => import("@/components/master-mold-head-3d"
   ssr: false,
 });
 
+// Some browsers expose WebGL but refuse a context (headless, locked-down or
+// low-power devices); three.js then throws on every page. Probe once, release
+// the probe context, and keep the static face when it fails.
+let webglProbe: boolean | null = null;
+function canUseWebGL(): boolean {
+  if (webglProbe !== null) return webglProbe;
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2") ?? document.createElement("canvas").getContext("webgl");
+    webglProbe = Boolean(gl);
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  } catch {
+    webglProbe = false;
+  }
+  return webglProbe;
+}
+
 export function SentinelFace({
   state = "idle",
   className,
@@ -99,6 +115,8 @@ export function SentinelFace({
   // The face reacts to being hovered directly; parents with a larger hit area
   // (e.g. the chat launcher button) can also force it via the `hovered` prop.
   const [selfHover, setSelfHover] = useState(false);
+  const [webgl, setWebgl] = useState(false);
+  useEffect(() => setWebgl(canUseWebGL()), []);
 
   return (
     <div
@@ -117,9 +135,11 @@ export function SentinelFace({
       >
         <StaticFace />
       </div>
-      <div className="absolute inset-0 opacity-0 transition-opacity duration-500 [&:has(canvas)]:opacity-100">
-        <MasterMoldHead3D state={state} speaking={speaking} hovered={hovered || selfHover} fallback={null} detail={detail} />
-      </div>
+      {webgl ? (
+        <div className="absolute inset-0 opacity-0 transition-opacity duration-500 [&:has(canvas)]:opacity-100">
+          <MasterMoldHead3D state={state} speaking={speaking} hovered={hovered || selfHover} fallback={null} detail={detail} />
+        </div>
+      ) : null}
     </div>
   );
 }
