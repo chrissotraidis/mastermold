@@ -49,3 +49,8 @@ reports/private/
 # Local reference material (design mockups, integration plans, upstream clones)
 ref/
 .scratch/
+
+# Playwright output
+test-results/
+playwright-report/
+blob-report/

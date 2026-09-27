@@ -155,19 +155,19 @@ export function BudgetHub({ initial }: { initial: BudgetData }) {
               setNewAmount("");
             }}
           >
-            <label className="grid flex-1 gap-1 text-xs font-semibold text-on-surface-variant">
-              Category
-              <select value={newCategory} onChange={(event) => setNewCategory(event.target.value)} className={cn(field, "w-full")}>
+            <div className="grid flex-1 gap-1 text-xs font-semibold text-on-surface-variant">
+              <label htmlFor="budget-new-category">Category</label>
+              <select id="budget-new-category" value={newCategory} onChange={(event) => setNewCategory(event.target.value)} className={cn(field, "w-full")}>
                 <option value="">Choose…</option>
                 {available.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
-            </label>
-            <label className="grid gap-1 text-xs font-semibold text-on-surface-variant">
-              Group
-              <select value={newGroup} onChange={(event) => setNewGroup(event.target.value as BudgetGroup)} className={field}>
+            </div>
+            <div className="grid gap-1 text-xs font-semibold text-on-surface-variant">
+              <label htmlFor="budget-new-group">Group</label>
+              <select id="budget-new-group" value={newGroup} onChange={(event) => setNewGroup(event.target.value as BudgetGroup)} className={field}>
                 {data.groups.map((group) => <option key={group.id} value={group.id}>{group.label}</option>)}
               </select>
-            </label>
+            </div>
             <label className="grid w-28 gap-1 text-xs font-semibold text-on-surface-variant">
               Per month
               <input inputMode="decimal" value={newAmount} onChange={(event) => setNewAmount(event.target.value)} placeholder="0" className={cn(field, "w-full")} />
