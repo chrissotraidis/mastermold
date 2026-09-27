@@ -39,6 +39,7 @@ import {
   toneFor,
 } from "@/lib/money-format";
 import { cn } from "@/lib/utils";
+import { historyRange, RANGES, totalGain, type Range } from "@/lib/performance";
 import type { MoneyAccount, MoneyHolding, MoneySummary } from "@/src/db/money";
 import { AccountSheet } from "./account-sheet";
 import { HoldingSheet } from "./holding-sheet";
@@ -78,6 +79,9 @@ export function PortfolioHub({
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
   const [allocationMode, setAllocationMode] = useState<AllocationMode>("class");
+  const [range, setRange] = useState<Range>("ALL");
+  const rangeView = useMemo(() => historyRange(summary.history, range), [summary.history, range]);
+  const gain = useMemo(() => totalGain(summary.holdings), [summary.holdings]);
   const [filter, setFilter] = useState<Filter>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "value", dir: -1 });
@@ -290,17 +294,50 @@ export function PortfolioHub({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
         <Panel className="lg:col-span-7">
-          <PanelHeader title="Net worth" description="Assets minus debts. A point is saved each day the book changes or is priced." />
+          <PanelHeader
+            title="Net worth"
+            description={
+              rangeView.change ? (
+                <span data-testid="range-change">
+                  <span className={cn("mm-num font-semibold", toneFor(rangeView.change.value))}>
+                    {formatSignedMoney(rangeView.change.value)}
+                    {rangeView.change.pct === null ? "" : ` (${formatSignedPct(rangeView.change.pct)})`}
+                  </span>{" "}
+                  {range === "ALL" ? "since the first point" : `over ${range === "YTD" ? "this year" : range}`}
+                </span>
+              ) : (
+                "Assets minus debts. A point is saved each day the book changes or is priced."
+              )
+            }
+            action={
+              summary.history.length >= 2 ? (
+                <Segmented label="Net worth range" value={range} onChange={setRange} options={RANGES.map((value) => ({ value, label: value === "ALL" ? "All" : value }))} />
+              ) : null
+            }
+          />
           <div className="p-5 pt-3">
-            {summary.history.length >= 2 ? (
+            {rangeView.points.length >= 2 ? (
               <AreaChart
                 ariaLabel="Net worth history"
-                points={summary.history.map((point) => ({ label: formatDay(point.date), value: point.value }))}
+                points={rangeView.points.map((point) => ({ label: formatDay(point.date), value: point.value }))}
                 format={(value) => formatMoney(value)}
               />
+            ) : summary.history.length >= 2 ? (
+              <EmptyState title="Not enough history in this range" description="Pick a longer range; the line fills in as days are saved." />
             ) : (
               <EmptyState title="History starts today" description="Come back tomorrow, or refresh prices, and this line starts drawing itself." />
             )}
+            {gain.known ? (
+              <p className="mt-3 text-xs text-outline" data-testid="total-gain">
+                Unrealized gain{" "}
+                <span className={cn("mm-num font-semibold", toneFor(gain.gain))}>
+                  {formatSignedMoney(gain.gain)}
+                  {gain.pct === null ? "" : ` (${formatSignedPct(gain.pct)})`}
+                </span>{" "}
+                on {gain.known} holding{gain.known === 1 ? "" : "s"} with a cost basis
+                {gain.unknown ? ` · ${gain.unknown} without one` : ""}
+              </p>
+            ) : null}
           </div>
         </Panel>
         <Panel className="lg:col-span-5">
