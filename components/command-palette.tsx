@@ -8,6 +8,7 @@ import {
   CornerDownLeft,
   Hexagon,
   LineChart,
+  ArrowLeftRight,
   NotebookPen,
   Plus,
   Radar,
@@ -86,6 +87,7 @@ export function CommandPalette({ pageContext }: { pageContext: ChatPageContext }
     () => [
       { id: "today", label: "Today", group: "Go to", icon: Hexagon, run: go("/") },
       { id: "portfolio", label: "Portfolio", group: "Go to", icon: LineChart, keywords: "net worth holdings accounts money", run: go("/portfolio") },
+      { id: "transactions", label: "Transactions", group: "Go to", icon: ArrowLeftRight, keywords: "spending cash flow budget categories rules bank csv", run: go("/transactions") },
       { id: "journal", label: "Journal", group: "Go to", icon: NotebookPen, keywords: "calls decisions notes", run: go("/journal") },
       { id: "activity", label: "Activity", group: "Go to", icon: Bell, keywords: "alerts inbox", run: go("/activity") },
       { id: "web3", label: "Web3 lab", group: "Go to", icon: Bot, keywords: "autopilot solana bot research", run: go("/trading") },
@@ -96,6 +98,7 @@ export function CommandPalette({ pageContext }: { pageContext: ChatPageContext }
       { id: "review", label: "What works today", group: "Go to", icon: ShieldCheck, keywords: "status truth limits review", run: go("/review") },
       { id: "add-holding", label: "Add a holding", group: "Do", icon: Plus, keywords: "stock crypto cash", run: go("/portfolio?action=add-holding#add-holdings") },
       { id: "import-holdings", label: "Import holdings (JSON or CSV)", group: "Do", icon: Plus, keywords: "manual_holdings book csv upload", run: go("/portfolio?action=import-holdings") },
+      { id: "import-transactions", label: "Import bank transactions (CSV)", group: "Do", icon: ArrowLeftRight, keywords: "spending statement csv bank card", run: go("/transactions?action=import") },
       { id: "add-account", label: "Add an account or debt", group: "Do", icon: Plus, keywords: "bank card loan mortgage property", run: go("/portfolio?action=add-account") },
       { id: "record-call", label: "Record a call", group: "Do", icon: NotebookPen, keywords: "journal decision", run: go("/journal#record-call") },
       { id: "run-scan", label: "Refresh today's read", group: "Do", icon: RefreshCw, keywords: "scan refresh", run: go("/?action=run-scan#run-scan") },

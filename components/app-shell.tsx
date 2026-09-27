@@ -10,6 +10,7 @@ import {
   Hexagon,
   Info,
   LineChart,
+  ArrowLeftRight,
   Loader2,
   NotebookPen,
   Power,
@@ -65,13 +66,14 @@ type ShellCommandStatus = {
 const NAV: NavItem[] = [
   { href: "/", label: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", icon: LineChart, zone: "observe" },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight, zone: "observe" },
   { href: "/journal", label: "Journal", icon: NotebookPen, zone: "observe" },
   { href: "/trading", label: "Web3 lab", icon: Bot, zone: "research" },
   { href: "/polymarket", label: "Polymarket lab", icon: Radar, zone: "research" },
   { href: "/settings", label: "Settings", icon: Settings, zone: "system" },
 ];
 
-const WARM_ROUTES = ["/", "/portfolio", "/journal", "/trading", "/polymarket", "/settings", "/chat"] as const;
+const WARM_ROUTES = ["/", "/portfolio", "/transactions", "/journal", "/trading", "/polymarket", "/settings", "/chat"] as const;
 
 const ZONE_ACCENT: Record<Zone, string> = {
   observe: "text-outline",
@@ -898,6 +900,7 @@ function SideRail() {
 const MOBILE: Array<NavItem & { shortLabel: string }> = [
   { href: "/", label: "Today", shortLabel: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: LineChart, zone: "observe" },
+  { href: "/transactions", label: "Transactions", shortLabel: "Spending", icon: ArrowLeftRight, zone: "observe" },
   { href: "/journal", label: "Journal", shortLabel: "Journal", icon: NotebookPen, zone: "observe" },
   { href: "/settings", label: "Settings", shortLabel: "Settings", icon: Settings, zone: "system" },
 ];
