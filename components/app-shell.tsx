@@ -11,6 +11,7 @@ import {
   Info,
   LineChart,
   ArrowLeftRight,
+  PiggyBank,
   Loader2,
   NotebookPen,
   Power,
@@ -67,13 +68,14 @@ const NAV: NavItem[] = [
   { href: "/", label: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", icon: LineChart, zone: "observe" },
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRight, zone: "observe" },
+  { href: "/budget", label: "Budget", icon: PiggyBank, zone: "observe" },
   { href: "/journal", label: "Journal", icon: NotebookPen, zone: "observe" },
   { href: "/trading", label: "Web3 lab", icon: Bot, zone: "research" },
   { href: "/polymarket", label: "Polymarket lab", icon: Radar, zone: "research" },
   { href: "/settings", label: "Settings", icon: Settings, zone: "system" },
 ];
 
-const WARM_ROUTES = ["/", "/portfolio", "/transactions", "/journal", "/trading", "/polymarket", "/settings", "/chat"] as const;
+const WARM_ROUTES = ["/", "/portfolio", "/transactions", "/budget", "/journal", "/trading", "/polymarket", "/settings", "/chat"] as const;
 
 const ZONE_ACCENT: Record<Zone, string> = {
   observe: "text-outline",
