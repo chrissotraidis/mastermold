@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/ui/panel";
+import { isBill } from "@/lib/bills";
 import { budgetMonth } from "@/src/db/budgets";
 import { store } from "@/src/db/store";
 import { cashFlow, detectRecurring } from "@/src/db/transactions";
@@ -22,7 +23,7 @@ export function TodayMoney({ today = new Date().toISOString().slice(0, 10) }: { 
   const spent = planned > 0 ? budget.spent_total : flow.expenses;
   const pct = planned > 0 ? Math.min(100, Math.round((spent / planned) * 100)) : 0;
   const bills = detectRecurring(rows, today)
-    .filter((item) => item.typical_amount < 0 && item.next_date >= today)
+    .filter((item) => isBill(item) && item.next_date >= today)
     .sort((a, b) => a.next_date.localeCompare(b.next_date))
     .slice(0, 3);
   const recent = [...rows].filter((tx) => !tx.hidden).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
@@ -58,7 +59,7 @@ export function TodayMoney({ today = new Date().toISOString().slice(0, 10) }: { 
         <div className="grid content-start gap-2">
           <span className="text-xs text-outline">Next bills</span>
           {bills.length ? (
-            <ul className="grid gap-1.5 text-sm">
+            <ul className="grid gap-1.5 text-sm" data-testid="today-bills">
               {bills.map((bill) => (
                 <li key={bill.merchant} className="flex justify-between gap-3">
                   <span className="truncate text-on-surface">{bill.merchant}</span>

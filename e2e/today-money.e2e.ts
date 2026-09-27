@@ -19,7 +19,11 @@ test.describe("Today money panel (Monarch-style dashboard)", () => {
     const panel = page.getByTestId("today-money");
     await expect(panel).toContainText("Spent of budget");
     await expect(panel.getByRole("progressbar", { name: "Budget used" })).toBeVisible();
-    await expect(panel).toContainText("Netflix.com");
+    const bills = panel.getByTestId("today-bills");
+    await expect(bills).toContainText("Netflix.com");
+    await expect(bills).toContainText("Rent Payment");
+    // Groceries repeat every month but are everyday spending, not a bill.
+    await expect(bills).not.toContainText("Whole Foods");
     await expect(panel).toContainText("Income $5,000.00");
     await panel.getByRole("link", { name: /Spent of budget/ }).click();
     await page.waitForURL("**/budget");

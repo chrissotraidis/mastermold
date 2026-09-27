@@ -9,6 +9,7 @@ import { StatTile } from "@/components/ui/stat";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toast";
+import { isBill } from "@/lib/bills";
 import { cn } from "@/lib/utils";
 import type { TransactionRow, TransactionRuleRow } from "@/src/db/store";
 import type { CashFlowMonth, Category, RecurringItem } from "@/src/db/transactions";
@@ -304,7 +305,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                 <PanelHeader
                   titleId="recurring-title"
                   title="Recurring"
-                  description={data.recurring.length ? `${money(Math.abs(data.recurring.filter((item) => item.typical_amount < 0 && item.frequency === "monthly").reduce((total, item) => total + item.typical_amount, 0)))} a month in regular bills` : "Bills and subscriptions show up here after they repeat."}
+                  description={data.recurring.length ? `${money(Math.abs(data.recurring.filter((item) => isBill(item) && item.frequency === "monthly").reduce((total, item) => total + item.typical_amount, 0)))} a month in regular bills` : "Bills and subscriptions show up here after they repeat."}
                 />
                 <ul className="grid gap-1 p-3 pt-3" data-testid="recurring-list">
                   {data.recurring.length === 0 ? <li className="px-2 text-sm text-on-surface-variant">Nothing repeats yet. Import two or three months to find them.</li> : null}
