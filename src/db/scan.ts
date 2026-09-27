@@ -574,5 +574,7 @@ export function getScanStatusLine(): string {
     }
     return `Market read from ${age}.`;
   }
-  return "Showing sample data. Add holdings on Portfolio to make it yours.";
+  // This line is about the market read, not the holdings book: it stays true
+  // after holdings are added, so it must not tell the user to add them.
+  return "No market read yet. Refresh on Today to pull one.";
 }

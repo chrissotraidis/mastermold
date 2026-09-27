@@ -86,10 +86,15 @@ worth range.
   the API's invalidation never reached the page. The cache now lives on
   globalThis. Caught by the new `e2e/holdings.e2e.ts` (add, gain, edit + undo,
   remove + undo).
+- Importing a manual_holdings book into an empty portfolio offered no Undo
+  (undo was only shown when there were earlier rows). Whole-book imports are now
+  always undoable. The header chip also said "Showing sample data. Add holdings…"
+  after holdings existed; it describes the market read and now says so. Caught
+  by `e2e/import-book.e2e.ts`.
 
 ## Last run
 
-2026-09-27: 27 passed (22 desktop, 5 phone), 43 s.
+2026-09-27: 28 passed (23 desktop, 5 phone), 45 s.
 
 ## iPhone and iPad simulators (2026-09-27)
 

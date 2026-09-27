@@ -24,7 +24,8 @@ export function toastWithUndo(
   toast({
     title,
     description,
-    action: rows.length
+    // A whole-book import is undoable even from an empty book (undo restores "nothing").
+    action: rows.length || mode === "book"
       ? {
           label: "Undo",
           onAction: async () => {
