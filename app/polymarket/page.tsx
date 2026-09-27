@@ -11,7 +11,7 @@ export default function PolymarketPage() {
           <p className="mm-eyebrow">Research lab · separate lane</p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Polymarket lab</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
-            Research on edges that don&apos;t need to out-predict the market. Nothing here places orders.
+            A prediction-market bot that paper trades with pretend money. Real orders are not built.
           </p>
         </header>
         <PolymarketPanel />

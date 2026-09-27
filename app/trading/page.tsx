@@ -12,7 +12,7 @@ export default function TradingPage() {
           <p className="mm-eyebrow">Research lab · separate lane</p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Web3 lab</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-on-surface-variant">
-            Paper research on Solana trading, kept apart from your portfolio. Live money stays locked.
+            A Solana trading bot that paper trades with pretend money, kept apart from your portfolio. Live money stays locked.
           </p>
         </header>
 

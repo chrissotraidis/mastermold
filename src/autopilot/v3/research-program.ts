@@ -39,7 +39,7 @@ export function buildWeb3ResearchProgram(input: { snapshots: CandidateSnapshotRo
 
   return {
     summary:
-      "No Web3 strategy has made money yet. The lab keeps the one signal that pointed the right way (cusum_tb), scores it on the trades it would really make, and measures costs instead of guessing them.",
+      "The bot paper traded for weeks. Its main strategy made 43 round trips and ended slightly down, and three other signals turned out backwards. New entries are paused while the lab tests the one signal that held up (cusum_tb) on its real trades, after costs.",
     daemon: input.daemon,
     decision_doc: "docs/research-2026-09/STRATEGY-DECISION.md",
     experiments: [

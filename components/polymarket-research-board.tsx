@@ -53,7 +53,7 @@ export function ResearchBoard({
           <FlaskConical aria-hidden="true" className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="research-program-title" className="font-display text-base font-semibold text-on-surface">Research program</h2>
+          <h2 id="research-program-title" className="font-display text-base font-semibold text-on-surface">What happened, and what we test now</h2>
           <p className="mt-1 text-sm leading-6 text-on-surface-variant">{program.summary}</p>
           <p className="mt-2 flex flex-wrap gap-1.5">
             {statusCounts(program).map(([key, count]) => (
@@ -85,7 +85,7 @@ export function ResearchBoard({
           aria-expanded={showRetired}
           className="flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left text-sm font-semibold text-on-surface hover:bg-surface-high/30"
         >
-          Retired strategies and why
+          What we tried and why it stopped
           <span className="flex items-center gap-2 text-xs font-normal text-outline">
             {program.retired.length} retired
             <ChevronDown aria-hidden="true" className={cn("size-4 transition", showRetired && "rotate-180")} />
