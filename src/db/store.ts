@@ -101,6 +101,19 @@ export type TransactionRuleRow = {
   created_at: string;
 };
 
+/** One budgeted category (Monarch-style Fixed / Non-monthly / Flex). */
+export type BudgetLineRow = {
+  category_id: string;
+  group: "fixed" | "non_monthly" | "flex";
+  /** Planned spend per month, as a positive number. */
+  amount: number;
+  rollover: boolean;
+  /** First month (YYYY-MM) the rollover counts from. */
+  rollover_start_month: string | null;
+  rollover_start_balance: number;
+  updated_at: string;
+};
+
 export type FinancialAccountRow = {
   id: string;
   name: string;
@@ -223,6 +236,8 @@ export interface PersistAdapter {
   deleteTransactions(ids: string[]): void;
   transactionRules(): TransactionRuleRow[];
   replaceTransactionRules(rows: TransactionRuleRow[]): void;
+  budgetLines(): BudgetLineRow[];
+  replaceBudgetLines(rows: BudgetLineRow[]): void;
   netWorthHistory(): NetWorthHistoryRow[];
   upsertNetWorthPoint(point: NetWorthHistoryRow): void;
   importedHoldings(): ImportedHoldingRow[];
@@ -260,6 +275,7 @@ type StoreSnapshot = {
   financial_accounts: FinancialAccountRow[];
   transactions: TransactionRow[];
   transaction_rules: TransactionRuleRow[];
+  budget_lines: BudgetLineRow[];
   net_worth_history: NetWorthHistoryRow[];
   imported_holdings: ImportedHoldingRow[];
   position_policies: PositionPolicyRow[];
@@ -287,6 +303,7 @@ const emptySnapshot = (): StoreSnapshot => ({
   financial_accounts: [],
   transactions: [],
   transaction_rules: [],
+  budget_lines: [],
   net_worth_history: [],
   imported_holdings: [],
   position_policies: [],
@@ -394,6 +411,10 @@ class SqliteAdapter implements PersistAdapter {
         data TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+      CREATE TABLE IF NOT EXISTS budget_lines (
+        category_id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS transaction_rules (
         id TEXT PRIMARY KEY,
         sort_order INTEGER NOT NULL,
@@ -632,6 +653,26 @@ class SqliteAdapter implements PersistAdapter {
       .query("SELECT data FROM transaction_rules ORDER BY sort_order ASC")
       .all()
       .map((row) => JSON.parse((row as { data: string }).data) as TransactionRuleRow);
+  }
+
+  budgetLines(): BudgetLineRow[] {
+    return this.db
+      .query("SELECT data FROM budget_lines ORDER BY category_id ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as BudgetLineRow);
+  }
+
+  replaceBudgetLines(rows: BudgetLineRow[]): void {
+    this.db.run("BEGIN");
+    try {
+      this.db.run("DELETE FROM budget_lines");
+      const insert = this.db.query("INSERT INTO budget_lines (category_id, data) VALUES (?, ?)");
+      for (const row of rows) insert.run(row.category_id, JSON.stringify(row));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
   }
 
   replaceTransactionRules(rows: TransactionRuleRow[]): void {
@@ -905,6 +946,7 @@ class MemoryAdapter implements PersistAdapter {
   private financialAccountRows: FinancialAccountRow[] = [];
   private transactionRows: TransactionRow[] = [];
   private transactionRuleRows: TransactionRuleRow[] = [];
+  private budgetLineRows: BudgetLineRow[] = [];
   private netWorthRows: NetWorthHistoryRow[] = [];
   private importedHoldingRows: ImportedHoldingRow[] = [];
   private positionPolicyRows: PositionPolicyRow[] = [];
@@ -990,6 +1032,12 @@ class MemoryAdapter implements PersistAdapter {
   }
   replaceTransactionRules(rows: TransactionRuleRow[]) {
     this.transactionRuleRows = [...rows];
+  }
+  budgetLines() {
+    return [...this.budgetLineRows];
+  }
+  replaceBudgetLines(rows: BudgetLineRow[]) {
+    this.budgetLineRows = [...rows];
   }
   netWorthHistory() {
     return [...this.netWorthRows].sort((a, b) => a.date.localeCompare(b.date));
@@ -1206,6 +1254,14 @@ class JsonFileAdapter implements PersistAdapter {
     snapshot.transaction_rules = [...rows];
     this.write(snapshot);
   }
+  budgetLines() {
+    return [...this.read().budget_lines];
+  }
+  replaceBudgetLines(rows: BudgetLineRow[]) {
+    const snapshot = this.read();
+    snapshot.budget_lines = [...rows];
+    this.write(snapshot);
+  }
   netWorthHistory() {
     return [...this.read().net_worth_history].sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -1352,6 +1408,7 @@ class JsonFileAdapter implements PersistAdapter {
         financial_accounts: Array.isArray(parsed.financial_accounts) ? parsed.financial_accounts : [],
         transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
         transaction_rules: Array.isArray(parsed.transaction_rules) ? parsed.transaction_rules : [],
+        budget_lines: Array.isArray(parsed.budget_lines) ? parsed.budget_lines : [],
         net_worth_history: Array.isArray(parsed.net_worth_history) ? parsed.net_worth_history : [],
         imported_holdings: Array.isArray(parsed.imported_holdings) ? parsed.imported_holdings : [],
         position_policies: Array.isArray(parsed.position_policies) ? parsed.position_policies : [],
