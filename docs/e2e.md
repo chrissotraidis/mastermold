@@ -61,10 +61,16 @@ worth range.
   blank avatar. The face now probes WebGL once and keeps the static face.
 - The Portfolio net worth tile cut its value off ("$67,2…") and the allocation
   legend squeezed its labels to nothing; both fixed.
+- Intermittent: right after a page loads, React briefly keeps the streamed page
+  in a hidden `div#S:n` before swapping it in, so strict locators saw every
+  element twice. `e2e/app-test.ts` makes `page.goto` wait for the swap; all
+  specs import `test` from it.
+- The Budget "Add a category" picker shrank to "Choc…" once a plan was on the
+  page; it now keeps a minimum width.
 
 ## Last run
 
-2026-09-27: 21 passed (16 desktop, 5 phone), 66 s.
+2026-09-27: 22 passed (17 desktop, 5 phone), 48 s, twice in a row.
 
 ## iPhone and iPad simulators (2026-09-27)
 
