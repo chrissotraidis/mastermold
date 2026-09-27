@@ -64,4 +64,23 @@ worth range.
 
 ## Last run
 
-2026-09-27: 15 passed (12 desktop, 3 phone), 32 s.
+2026-09-27: 19 passed (14 desktop, 5 phone), 43 s.
+
+## iPhone and iPad simulators (2026-09-27)
+
+Checked in Safari on the iPhone 17 Pro and iPad Air 11-inch (M4) simulators
+(iOS/iPadOS 26.5), loading the dev server at 127.0.0.1:4002. These stand in for
+the physical devices, which were not available.
+
+- The 3D sentinel head renders with real WebGL on both; the first dev-mode load
+  takes about 20 seconds while three.js compiles, with the static face shown
+  until then.
+- Welcome → "Look around with sample data first" dismisses onboarding on both.
+- Transactions, Budget and Portfolio lay out without sideways scroll. The iPad
+  uses the icon rail; the iPhone uses the bottom tab bar.
+- Fixed from this pass: Budget had no tab on phones (the Spending tab now covers
+  Transactions and Budget, and Transactions has a Budget button), and the
+  Portfolio "Net worth" label was cut off to "NET WOR…" by its sparkline.
+- Not bugs: a freshly booted simulator showed a blank Safari page once until a
+  reload, and Device Hub taps land about 70 px above the aimed point, which
+  sent two taps to the Welcome page's "Log your first call" step.

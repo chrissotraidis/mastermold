@@ -916,7 +916,8 @@ function MobileNav() {
     >
       {MOBILE.map((item) => {
         const Icon = item.icon;
-        const active = isActivePath(pathname, item.href);
+        // One Spending tab on phones covers Transactions and Budget (Monarch groups them too).
+        const active = isActivePath(pathname, item.href) || (item.href === "/transactions" && isActivePath(pathname, "/budget"));
         return (
           <IntentPrefetchLink
             key={item.href}

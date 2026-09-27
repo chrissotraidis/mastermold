@@ -25,4 +25,19 @@ test.describe("Phone layout", () => {
       }
     });
   }
+
+  test("Budget is reachable from Spending and keeps that tab lit", async ({ page }) => {
+    await page.goto("/transactions");
+    await page.getByRole("link", { name: "Budget", exact: true }).first().tap();
+    await page.waitForURL("**/budget");
+    await expect(page.getByRole("navigation", { name: "Mobile primary" }).getByRole("link", { name: "Transactions" })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("stat tile labels are not cut off on a phone", async ({ page }) => {
+    await page.goto("/portfolio");
+    const clipped = await page.getByTestId("money-stats").locator(".mm-eyebrow").evaluateAll((els) =>
+      els.filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent),
+    );
+    expect(clipped).toEqual([]);
+  });
 });

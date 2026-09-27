@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { EyeOff, Eye, FileUp, Plus, Search, Sparkles, Trash2, Wand2 } from "lucide-react";
+import Link from "next/link";
+import { EyeOff, Eye, FileUp, PiggyBank, Plus, Search, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { Sheet } from "@/components/ui/sheet";
 import { StatTile } from "@/components/ui/stat";
@@ -128,6 +129,9 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/budget" className={ghostButton}>
+            <PiggyBank aria-hidden="true" className="size-4" /> Budget
+          </Link>
           <button type="button" className={ghostButton} onClick={() => setAddOpen(true)}>
             <Plus aria-hidden="true" className="size-4" /> Add
           </button>
