@@ -102,7 +102,12 @@ export type PortfolioImportIssue = {
 
 const assetClassOrder: AssetClass[] = ["equity", "crypto", "defi", "cash"];
 const PORTFOLIO_CACHE_TTL_MS = 5_000;
-const portfolioCache = new Map<string, { expiresAt: number; value: PortfolioJson }>();
+// On globalThis because Next bundles pages and API routes separately in production:
+// a module-level Map meant an edit through /api/money cleared only the API copy,
+// and the page kept rendering the old book for up to 5 s (new holdings did not
+// appear after saving).
+const cacheHolder = globalThis as unknown as { __mastermoldPortfolioCache?: Map<string, { expiresAt: number; value: PortfolioJson }> };
+const portfolioCache = (cacheHolder.__mastermoldPortfolioCache ??= new Map());
 
 export function getPortfolio(asOf: AsOfFilter | null = null): PortfolioJson {
   const cacheKey = portfolioCacheKey(asOf);

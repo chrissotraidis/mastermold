@@ -80,10 +80,16 @@ worth range.
 - Re-check pass: a unit contract test still pinned the old Monarch header
   classes (missed because only the last line of test output was read); fixed,
   and the pass/fail counts are now checked explicitly.
+- A new holding did not appear after "Add holding" until a manual reload (and
+  edits and undo were stale the same way). Next bundles pages and API routes
+  separately in production, so each had its own 5-second portfolio cache and
+  the API's invalidation never reached the page. The cache now lives on
+  globalThis. Caught by the new `e2e/holdings.e2e.ts` (add, gain, edit + undo,
+  remove + undo).
 
 ## Last run
 
-2026-09-27: 26 passed (21 desktop, 5 phone), 37 s.
+2026-09-27: 27 passed (22 desktop, 5 phone), 43 s.
 
 ## iPhone and iPad simulators (2026-09-27)
 
