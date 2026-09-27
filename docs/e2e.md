@@ -75,6 +75,11 @@ worth range.
 - Settings status tiles cut their values ("Sample d…", "Saved 2026-…") and the
   Monarch buttons overlapped the "Monarch MCP" title; actions now sit under the
   text and the header wraps. Groceries and dining no longer count as bills.
+- A fixed bill paid exactly on plan showed a yellow warning bar and "$0.00
+  left"; it now reads "paid" in green. Budget month pills scroll on phones.
+- Re-check pass: a unit contract test still pinned the old Monarch header
+  classes (missed because only the last line of test output was read); fixed,
+  and the pass/fail counts are now checked explicitly.
 
 ## Last run
 
