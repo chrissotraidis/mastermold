@@ -18,6 +18,8 @@ test.describe("Budget, end to end with real clicks", () => {
     const flex = page.getByTestId("budget-group-flex");
     await expect(fixed).toContainText("Rent");
     await expect(fixed).toContainText("Streaming");
+    // Rent paid exactly on plan reads "paid" (green), not "$0.00 left" in warning yellow.
+    await expect(fixed).toContainText("$2,100 of $2,100 · paid");
     await expect(flex).toContainText("Groceries");
     await expect(flex).toContainText("Restaurants");
 

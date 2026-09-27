@@ -110,7 +110,7 @@ export function GoalsPanel() {
             {data.candidates.map((tx) => (
               <li key={tx.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl px-2 py-2 text-sm">
                 <span className="min-w-0 truncate text-on-surface">
-                  {tx.merchant} <span className="text-xs text-outline">· {tx.date}</span>
+                  {tx.merchant} <span className="text-xs text-outline">· {new Date(`${tx.date}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</span>
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="mm-num font-semibold text-on-surface">{money(Math.abs(tx.amount))}</span>
@@ -230,4 +230,3 @@ function monthLabel(month: string) {
   const [year, m] = month.split("-").map(Number);
   return new Date(Date.UTC(year, m - 1, 1)).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
 }
-

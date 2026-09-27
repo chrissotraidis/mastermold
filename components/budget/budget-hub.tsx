@@ -71,7 +71,7 @@ export function BudgetHub({ initial }: { initial: BudgetData }) {
             Plan spending in three groups. Spending comes from your <Link href="/transactions" className="font-semibold text-violet hover:text-violet-soft">Transactions</Link>; hidden rows and transfers never count.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Month">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:shrink-0" role="group" aria-label="Month">
           {data.months.slice(0, 6).map((month) => (
             <button
               key={month}
@@ -210,6 +210,8 @@ function BudgetLineRow({ line, pending, onSave, onRemove }: {
   const available = line.planned + line.carried_in;
   const pct = available > 0 ? Math.min(100, (line.spent / available) * 100) : line.spent > 0 ? 100 : 0;
   const over = line.remaining < 0;
+  // A fixed bill paid in full is on plan, not a warning.
+  const paid = !over && line.group === "fixed" && available > 0 && line.remaining === 0;
   return (
     <li className="grid gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-3">
       <div className="min-w-0">
@@ -224,11 +226,11 @@ function BudgetLineRow({ line, pending, onSave, onRemove }: {
           </span>
           <span className="mm-num shrink-0 text-xs text-on-surface-variant">
             {money(line.spent)} of {money(available)} ·{" "}
-            <span className={cn("font-semibold", over ? "text-critical" : "text-engine")}>{over ? `${money(-line.remaining)} over` : `${money(line.remaining)} left`}</span>
+            <span className={cn("font-semibold", over ? "text-critical" : "text-engine")}>{over ? `${money(-line.remaining)} over` : paid ? "paid" : `${money(line.remaining)} left`}</span>
           </span>
         </div>
         <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
-          <span className={cn("block h-full rounded-full", over ? "bg-critical" : pct > 85 ? "bg-caution" : "bg-violet")} style={{ width: `${pct}%` }} />
+          <span className={cn("block h-full rounded-full", over ? "bg-critical" : paid ? "bg-engine" : pct > 85 ? "bg-caution" : "bg-violet")} style={{ width: `${pct}%` }} />
         </span>
       </div>
       <div className="flex items-center justify-end gap-1">
@@ -270,4 +272,3 @@ function monthLabel(month: string) {
   const [year, m] = month.split("-").map(Number);
   return new Date(Date.UTC(year, m - 1, 1)).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
 }
-

@@ -230,7 +230,7 @@ export function DonutChart({
                 )}
               >
                 <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate text-on-surface">{slice.label}</span>
+                <span className="line-clamp-2 min-w-0 flex-1 leading-tight text-on-surface">{slice.label}</span>
                 <span className="flex shrink-0 flex-col items-end leading-tight">
                   <span className="mm-num text-on-surface-variant">{format(slice.value)}</span>
                   <span className="mm-num text-[11px] text-outline">{pct.toFixed(1)}%</span>
