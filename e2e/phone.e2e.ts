@@ -39,5 +39,11 @@ test.describe("Phone layout", () => {
       els.filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent),
     );
     expect(clipped).toEqual([]);
+    // Header actions fit one row, and panel titles keep room when an action sits beside them.
+    const refresh = await page.getByRole("button", { name: "Refresh prices" }).boundingBox();
+    const add = await page.getByRole("link", { name: "Add holding" }).boundingBox();
+    expect(Math.abs(refresh!.y - add!.y)).toBeLessThan(4);
+    const title = await page.getByRole("heading", { name: "Net worth", exact: true }).boundingBox();
+    expect(title!.width).toBeGreaterThanOrEqual(150);
   });
 });

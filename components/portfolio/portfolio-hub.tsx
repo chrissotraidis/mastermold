@@ -235,8 +235,8 @@ export function PortfolioHub({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {refreshing ? <Loader2 aria-label="Updating" className="size-4 animate-spin text-outline" /> : null}
-          <Button variant="outline" onClick={refreshPrices} disabled={pricing || editableCount === 0} title="Pull a current price for every holding">
-            <RefreshCw className={cn(pricing && "animate-spin")} /> {pricing ? "Pricing…" : "Refresh prices"}
+          <Button variant="outline" onClick={refreshPrices} disabled={pricing || editableCount === 0} title="Pull a current price for every holding" aria-label="Refresh prices">
+            <RefreshCw className={cn(pricing && "animate-spin")} /> <span className="hidden sm:inline">{pricing ? "Pricing…" : "Refresh prices"}</span>
           </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <FileUp /> Import
@@ -631,6 +631,9 @@ export function PortfolioHub({
                 <span className="mr-3 inline-flex items-center gap-1"><FreshDot freshness="live" /> current price</span>
                 <span className="mr-3 inline-flex items-center gap-1"><FreshDot freshness="stale" /> older than a day</span>
                 <span className="inline-flex items-center gap-1"><FreshDot freshness="typed" /> typed in</span>
+                {summary.holdings.some((holding) => holding.freshness === "sample") ? (
+                  <span className="ml-3 inline-flex items-center gap-1"><FreshDot freshness="sample" /> sample</span>
+                ) : null}
                 <span className="ml-3 hidden md:inline">Double-click an amount or price to edit it.</span>
               </p>
             </>

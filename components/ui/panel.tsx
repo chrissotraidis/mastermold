@@ -31,7 +31,8 @@ export function PanelHeader({
 }) {
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-3 px-5 pt-5", className)}>
-      <div className="min-w-0 flex-1">
+      {/* basis-48: on narrow screens the action wraps below instead of squeezing the title. */}
+      <div className="min-w-0 flex-1 basis-48">
         {eyebrow ? <p className="mm-eyebrow mb-1">{eyebrow}</p> : null}
         <h2 id={titleId} className="font-display text-base font-semibold tracking-tight text-on-surface">
           {title}
