@@ -90,7 +90,7 @@ describe("Portfolio Brain product UI contracts", () => {
     expect(monarchPanel).toContain("It cannot place Robinhood trades, change Monarch data, sign transactions, or move funds.");
     expect(monarchPanel).toContain("Master Mold requests read-only snapshot access and never calls write or trading tools.");
     // Compact redesign: one status line + collapsed details.
-    expect(monarchPanel).toContain("flex min-w-0 flex-1 flex-col gap-3 px-3 py-2.5 sm:flex-row");
+    expect(monarchPanel).toContain("flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 px-3 py-2.5");
     expect(monarchPanel).toContain("Connection details");
     expect(localCommands).toContain("Portfolio check:");
     expect(localCommands).toContain("Source:");
