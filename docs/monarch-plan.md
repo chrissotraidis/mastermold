@@ -22,6 +22,9 @@ source. See [monarch-research.md](monarch-research.md).
 - [x] 2. Rules engine
 - [x] 3. Transactions page with CSV import and hand entry
 - [x] 4. Cash flow (on the Transactions page)
-- [ ] 5. Recurring bills
-- [ ] 6–9
+- [x] 5. Recurring bills (panel on Transactions)
+- [x] 6. Budgets with rollovers (/budget)
+- [ ] 7. Goals
+- [ ] 8. Account exclusions + investment performance
+- [ ] 9. Live sync (waiting on a Plaid account)
 
