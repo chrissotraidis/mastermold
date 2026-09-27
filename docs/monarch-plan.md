@@ -24,7 +24,10 @@ source. See [monarch-research.md](monarch-research.md).
 - [x] 4. Cash flow (on the Transactions page)
 - [x] 5. Recurring bills (panel on Transactions)
 - [x] 6. Budgets with rollovers (/budget)
-- [ ] 7. Goals
-- [ ] 8. Account exclusions + investment performance
-- [ ] 9. Live sync (waiting on a Plaid account)
-
+- [x] 7. Goals (panel on /budget; `src/db/goals.ts`)
+- [x] 8. Account exclusions (net worth, cash flow, budgets) + Portfolio range change and total unrealized gain (`lib/performance.ts`)
+- [ ] 9. Live sync (waiting on a Plaid account). Done so far: `src/db/bank-sync.ts` models Plaid's
+  `/transactions/sync` (added / modified / removed pages, positive = money out, rows keyed by
+  `transaction_id`, pending skipped, user edits kept) with a sandbox provider of made-up rows
+  behind the "Run sandbox sync" button. Still to build once the account exists: the Plaid
+  adapter, Link, access-token storage in `.data` only, a saved cursor, and a daily run.

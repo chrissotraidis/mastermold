@@ -74,7 +74,9 @@ export type TransactionRow = {
   tags: string[];
   hidden: boolean;
   needs_review: boolean;
-  source: "manual" | "csv" | "plaid";
+  source: "manual" | "csv" | "plaid" | "sandbox";
+  /** Provider's own id (Plaid transaction_id); a re-sync updates instead of duplicating. */
+  external_id?: string | null;
   /** Contribution toward a savings goal (Monarch links these by rule or by hand). */
   goal_id?: string | null;
   import_batch_id: string | null;

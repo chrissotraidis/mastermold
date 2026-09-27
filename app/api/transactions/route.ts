@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { runSync, sandboxProvider } from "@/src/db/bank-sync";
 import { store } from "@/src/db/store";
 import {
   CATEGORIES,
@@ -83,6 +84,11 @@ export async function POST(request: Request) {
       case "undo_import":
         undoImport(String(body?.batch_id ?? ""));
         break;
+      case "sandbox_sync": {
+        // Made-up data only: no bank, no network, no keys (see src/db/bank-sync.ts).
+        const result = await runSync(sandboxProvider());
+        return NextResponse.json({ ...payload(month), sync_result: result });
+      }
       case "preview_rule":
         return NextResponse.json({ matches: previewRule(body?.rule as NewRule) });
       case "add_rule": {
@@ -100,4 +106,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Request failed." }, { status: 422 });
   }
 }
-

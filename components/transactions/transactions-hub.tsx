@@ -198,6 +198,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                         <span className="flex items-center gap-2">
                           <span className="truncate text-sm font-semibold text-on-surface">{tx.merchant}</span>
                           {tx.needs_review ? <span className="rounded-full bg-violet/15 px-1.5 text-[10px] font-semibold text-violet">new</span> : null}
+                          {tx.source === "sandbox" ? <span className="rounded-full bg-caution/15 px-1.5 text-[10px] font-semibold text-caution">sandbox</span> : null}
                         </span>
                         <span className="block truncate text-xs text-outline" title={tx.original_description}>
                           <span className="xl:hidden">{dayLabel(tx.date)} · </span>
@@ -359,6 +360,25 @@ function ImportSheet({ open, onClose, accounts, post, onImported }: {
       setBusy(false);
     }
   };
+  const doSandboxSync = async () => {
+    setBusy(true);
+    try {
+      const next = await post({ action: "sandbox_sync" });
+      onImported(next);
+      const { added, updated, removed, batch_id } = next.sync_result;
+      toast({
+        title: `Sandbox sync: ${added} new`,
+        description: updated || removed ? `${updated} updated · ${removed} removed` : "Made-up rows, marked Sandbox.",
+        action: added ? { label: "Undo", onAction: () => void post({ action: "undo_import", batch_id }).then(onImported) } : undefined,
+      });
+      reset();
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sandbox sync failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Sheet
@@ -427,6 +447,10 @@ function ImportSheet({ open, onClose, accounts, post, onImported }: {
             ))}
           </div>
         ) : null}
+        <div className="flex flex-col gap-2 border-t border-outline-variant/40 pt-4 text-sm sm:flex-row sm:items-center sm:justify-between" data-testid="sandbox-sync">
+          <p className="text-xs leading-5 text-outline">No bank is connected yet. Try the sync flow with a made-up checking account; rows are marked Sandbox and Undo removes them.</p>
+          <button type="button" className={ghostButton} disabled={busy} onClick={() => void doSandboxSync()}>Run sandbox sync</button>
+        </div>
       </div>
     </Sheet>
   );

@@ -34,8 +34,20 @@ Budget (`e2e/budget.e2e.ts`):
   "Budget it" puts it back; the edited plan survives a reload.
 - The Add a category form adds Gifts to Non-monthly.
 
-Phone (`e2e/phone.e2e.ts`): no sideways scroll on /transactions or /budget,
-and tapping opens the importer and builds a budget.
+Goals (`e2e/goals.e2e.ts`): create a goal with a starting balance, link a
+transfer from the suggestions, edit the target, and delete it.
+
+Accounts (`e2e/accounts.e2e.ts`): add a bank account with Net worth unticked;
+it is listed with "Not in net worth" and the total does not move; ticking it
+again adds exactly its balance.
+
+Sandbox sync (`e2e/sandbox-sync.e2e.ts`): Run sandbox sync adds 5 rows marked
+Sandbox (the pending charge and the removed charge never appear); running it
+again adds 0; Undo in the toast removes the batch.
+
+Phone (`e2e/phone.e2e.ts`): no sideways scroll on /transactions, /budget or
+/portfolio; tapping opens the importer, builds a budget, and switches the net
+worth range.
 
 ## Bugs this found
 
@@ -44,8 +56,12 @@ and tapping opens the importer and builds a budget.
   `htmlFor`/`id` labels (caught by `getByLabel("Category", { exact: true })`).
 - Earlier "clicks don't register" reports came from the agent's in-app browser
   tool, not the app: real Playwright mouse clicks work on every control above.
+- Browsers that expose WebGL but cannot create a context (headless Chromium,
+  some locked-down devices) threw a three.js error on every page and showed a
+  blank avatar. The face now probes WebGL once and keeps the static face.
+- The Portfolio net worth tile cut its value off ("$67,2…") and the allocation
+  legend squeezed its labels to nothing; both fixed.
 
 ## Last run
 
-2026-09-27: 10 passed (8 desktop, 2 phone), 17 s.
-
+2026-09-27: 15 passed (12 desktop, 3 phone), 32 s.

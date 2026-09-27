@@ -201,7 +201,7 @@ export type TransactionInput = {
   notes?: string;
 };
 
-function buildTransaction(input: TransactionInput, source: TransactionRow["source"], batch: string | null, now: string): TransactionRow {
+export function buildTransaction(input: TransactionInput, source: TransactionRow["source"], batch: string | null, now: string): TransactionRow {
   const original = input.description.trim();
   const base: TransactionRow = {
     id: `tx_${randomUUID()}`,
