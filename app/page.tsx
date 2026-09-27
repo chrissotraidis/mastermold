@@ -36,6 +36,7 @@ import { getPortfolio } from "@/src/db/portfolio";
 import { getMoneySummary } from "@/src/db/money";
 import { getStartedProgress } from "@/src/db/get-started";
 import { GetStartedChecklist } from "@/components/get-started-checklist";
+import { TodayMoney } from "@/components/today-money";
 import {
   getPortfolioRecommendations,
   type PortfolioRecommendation,
@@ -145,6 +146,8 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             onboarding ? <GetStartedChecklist progress={onboarding} /> : null
           )}
         </div>
+
+        {asOf ? null : <TodayMoney />}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
           <Panel className="min-w-0 overflow-hidden lg:col-span-7" aria-labelledby="today-plays-title">
