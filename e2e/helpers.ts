@@ -10,6 +10,8 @@ export async function resetMoney(request: APIRequestContext) {
   if (tx.transactions.length) {
     await request.post("/api/transactions", { headers, data: { action: "delete", ids: tx.transactions.map((row: { id: string }) => row.id) } });
   }
+  const goals = await (await request.get("/api/goals")).json();
+  for (const goal of goals.goals) await request.post("/api/goals", { headers, data: { action: "delete", id: goal.id } });
   const budget = await (await request.get("/api/budget")).json();
   for (const group of budget.budget.groups) {
     for (const line of group.lines) await request.post("/api/budget", { headers, data: { action: "remove_line", category_id: line.category_id } });

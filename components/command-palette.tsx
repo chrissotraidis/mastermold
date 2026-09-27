@@ -89,6 +89,7 @@ export function CommandPalette({ pageContext }: { pageContext: ChatPageContext }
       { id: "today", label: "Today", group: "Go to", icon: Hexagon, run: go("/") },
       { id: "portfolio", label: "Portfolio", group: "Go to", icon: LineChart, keywords: "net worth holdings accounts money", run: go("/portfolio") },
       { id: "transactions", label: "Transactions", group: "Go to", icon: ArrowLeftRight, keywords: "spending cash flow budget categories rules bank csv", run: go("/transactions") },
+      { id: "goals", label: "Savings goals", group: "Go to", icon: PiggyBank, keywords: "goal target save emergency fund", run: go("/budget#goals") },
       { id: "budget", label: "Budget", group: "Go to", icon: PiggyBank, keywords: "plan rollover flex fixed spending limit", run: go("/budget") },
       { id: "journal", label: "Journal", group: "Go to", icon: NotebookPen, keywords: "calls decisions notes", run: go("/journal") },
       { id: "activity", label: "Activity", group: "Go to", icon: Bell, keywords: "alerts inbox", run: go("/activity") },
