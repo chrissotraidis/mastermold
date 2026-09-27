@@ -67,10 +67,15 @@ worth range.
   specs import `test` from it.
 - The Budget "Add a category" picker shrank to "Choc…" once a plan was on the
   page; it now keeps a minimum width.
+- Transaction rows cut merchant names to three letters ("Am…") on desktop; the
+  date column moved under the name and the category picker narrowed.
+- The unit tests left one temp folder per test behind (35,000 folders, 2 GB,
+  enough to fill this Mac's disk). Each run now uses one folder that is removed
+  at the end, and the e2e server clears earlier runs' folders on start.
 
 ## Last run
 
-2026-09-27: 22 passed (17 desktop, 5 phone), 48 s, twice in a row.
+2026-09-27: 24 passed (19 desktop, 5 phone), 34 s.
 
 ## iPhone and iPad simulators (2026-09-27)
 

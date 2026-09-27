@@ -1,29 +1,14 @@
 import { AppShell } from "@/components/app-shell";
 import { TransactionsHub } from "@/components/transactions/transactions-hub";
-import { store } from "@/src/db/store";
-import { CATEGORIES, cashFlow, detectRecurring, transactionMonths } from "@/src/db/transactions";
+import { transactionsPayload } from "@/src/db/transactions-view";
 
 export const dynamic = "force-dynamic";
 
 export default function TransactionsPage() {
-  const rows = store().transactions();
-  const months = transactionMonths(rows);
-  const month = months[0] ?? new Date().toISOString().slice(0, 7);
+  const initial = transactionsPayload();
   return (
-    <AppShell dataMode={rows.length > 0 ? "Your entries" : "Sample data"}>
-      <TransactionsHub
-        initial={{
-          month,
-          months,
-          transactions: rows,
-          cash_flow: cashFlow(month, rows),
-          categories: CATEGORIES,
-          rules: store().transactionRules(),
-          recurring: detectRecurring(rows),
-          accounts: store().financialAccounts().map((account) => ({ id: account.id, name: account.name })),
-        }}
-      />
+    <AppShell dataMode={initial.transactions.length > 0 ? "Your entries" : "Sample data"}>
+      <TransactionsHub initial={initial} />
     </AppShell>
   );
 }
-

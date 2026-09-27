@@ -1,19 +1,15 @@
 import { NextResponse } from "next/server";
 import { runSync, sandboxProvider } from "@/src/db/bank-sync";
-import { store } from "@/src/db/store";
+import { transactionsPayload } from "@/src/db/transactions-view";
 import {
-  CATEGORIES,
   addManualTransaction,
   addRule,
-  cashFlow,
-  detectRecurring,
   deleteRule,
   deleteTransactions,
   importTransactions,
   parseTransactionCsv,
   previewRule,
   previewTransactionImport,
-  transactionMonths,
   undoImport,
   updateTransaction,
   type NewRule,
@@ -22,22 +18,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** Everything the Transactions page needs in one read. */
-function payload(month?: string | null) {
-  const rows = store().transactions();
-  const months = transactionMonths(rows);
-  const current = month && /^\d{4}-\d{2}$/.test(month) ? month : months[0] ?? new Date().toISOString().slice(0, 7);
-  return {
-    month: current,
-    months,
-    transactions: rows,
-    cash_flow: cashFlow(current, rows),
-    categories: CATEGORIES,
-    rules: store().transactionRules(),
-    recurring: detectRecurring(rows),
-    accounts: store().financialAccounts().map((account) => ({ id: account.id, name: account.name })),
-  };
-}
+const payload = transactionsPayload;
 
 export async function GET(request: Request) {
   return NextResponse.json(payload(new URL(request.url).searchParams.get("month")));

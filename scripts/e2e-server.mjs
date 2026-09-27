@@ -4,10 +4,14 @@
  * Model keys are blanked: e2e must never spend or call a provider.
  */
 import { spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// Playwright may stop this server before the exit hook runs, so clear earlier runs' folders first.
+for (const name of readdirSync(tmpdir())) {
+  if (name.startsWith("mm-e2e-")) rmSync(join(tmpdir(), name), { recursive: true, force: true });
+}
 const dir = mkdtempSync(join(tmpdir(), "mm-e2e-"));
 const env = {
   ...process.env,
@@ -36,5 +40,7 @@ const env = {
 console.log(`[e2e] data dir ${dir}`);
 const child = spawn("node", ["--experimental-sqlite", "--disable-warning=ExperimentalWarning", ".next/standalone/server.js"], { env, stdio: "inherit" });
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
-child.on("exit", (code) => process.exit(code ?? 0));
-
+child.on("exit", (code) => {
+  rmSync(dir, { recursive: true, force: true });
+  process.exit(code ?? 0);
+});

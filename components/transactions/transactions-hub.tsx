@@ -12,10 +12,12 @@ import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { TransactionRow, TransactionRuleRow } from "@/src/db/store";
 import type { CashFlowMonth, Category, RecurringItem } from "@/src/db/transactions";
+import type { CashFlowPoint } from "@/src/db/transactions-view";
 
 export type TransactionsData = {
   month: string;
   months: string[];
+  history: CashFlowPoint[];
   transactions: TransactionRow[];
   cash_flow: CashFlowMonth;
   categories: Category[];
@@ -171,22 +173,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
         </Panel>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Month">
-            {data.months.slice(0, 12).map((month) => (
-              <button
-                key={month}
-                type="button"
-                onClick={() => selectMonth(month)}
-                aria-pressed={month === data.month}
-                className={cn(
-                  "min-h-9 rounded-full border px-3 text-xs font-semibold transition",
-                  month === data.month ? "border-violet bg-violet text-void" : "border-outline-variant/60 text-on-surface-variant hover:text-on-surface",
-                )}
-              >
-                {monthLabel(month)}
-              </button>
-            ))}
-          </div>
+          <CashFlowBars history={data.history} selected={data.month} onSelect={selectMonth} />
 
           <section aria-label="Cash flow" className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="cash-flow">
             <StatTile label="Income" value={money(flow.income)} deltaTone="up" />
@@ -223,8 +210,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                   <li className="p-6 text-center text-sm text-on-surface-variant">Nothing matches these filters.</li>
                 ) : (
                   visible.map((tx) => (
-                    <li key={tx.id} className={cn("grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-3 py-3 xl:grid-cols-[4rem_minmax(0,1fr)_11rem_6.5rem_auto]", tx.hidden && "opacity-50")}>
-                      <span className="mm-num hidden text-xs text-outline xl:block">{dayLabel(tx.date)}</span>
+                    <li key={tx.id} className={cn("grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_9.5rem_6rem_auto]", tx.hidden && "opacity-50")}>
                       <span className="min-w-0">
                         <span className="flex items-center gap-2">
                           <span className="truncate text-sm font-semibold text-on-surface">{tx.merchant}</span>
@@ -232,7 +218,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                           {tx.source === "sandbox" ? <span className="rounded-full bg-caution/15 px-1.5 text-[10px] font-semibold text-caution">sandbox</span> : null}
                         </span>
                         <span className="block truncate text-xs text-outline" title={tx.original_description}>
-                          <span className="xl:hidden">{dayLabel(tx.date)} · </span>
+                          <span className="mm-num">{dayLabel(tx.date)}</span> ·{" "}
                           {tx.original_description}
                           {tx.account_id ? ` · ${accountName.get(tx.account_id) ?? "account"}` : ""}
                         </span>
@@ -754,3 +740,40 @@ const RECURRING_TONE: Record<RecurringItem["status"], string> = {
   upcoming: "bg-violet/15 text-violet",
   missed: "bg-critical/15 text-critical",
 };
+
+/** Monarch's cash flow view: income and spending per month; tap a month to open it. */
+function CashFlowBars({ history, selected, onSelect }: { history: CashFlowPoint[]; selected: string; onSelect: (month: string) => void }) {
+  const max = Math.max(1, ...history.flatMap((point) => [point.income, point.expenses]));
+  return (
+    <Panel aria-labelledby="cash-flow-bars-title" data-testid="cash-flow-bars">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-4">
+        <h2 id="cash-flow-bars-title" className="font-display text-base font-semibold text-on-surface">Cash flow</h2>
+        <p className="flex items-center gap-3 text-xs text-outline">
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2 rounded-full bg-engine" /> Income</span>
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2 rounded-full bg-violet" /> Spending</span>
+        </p>
+      </div>
+      <div className="flex items-end gap-1 overflow-x-auto px-3 pb-3 pt-3" role="group" aria-label="Month">
+        {history.map((point) => {
+          const active = point.month === selected;
+          return (
+            <button
+              key={point.month}
+              type="button"
+              onClick={() => onSelect(point.month)}
+              aria-pressed={active}
+              aria-label={`${monthLabel(point.month)}: income ${money(point.income)}, spending ${money(point.expenses)}`}
+              className={cn("flex min-w-12 flex-1 flex-col items-center gap-1.5 rounded-xl px-1 pb-1.5 pt-2 transition", active ? "bg-violet/10 ring-1 ring-violet/40" : "hover:bg-surface-high/60")}
+            >
+              <span className="flex h-28 items-end gap-1" aria-hidden="true">
+                <span className="w-2.5 rounded-t bg-engine/80 sm:w-3.5" style={{ height: `${Math.max(2, (point.income / max) * 100)}%` }} />
+                <span className="w-2.5 rounded-t bg-violet sm:w-3.5" style={{ height: `${Math.max(2, (point.expenses / max) * 100)}%` }} />
+              </span>
+              <span className={cn("text-[11px] font-semibold", active ? "text-violet" : "text-outline")}>{monthLabel(point.month).replace(/ \d{4}$/, "")}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
