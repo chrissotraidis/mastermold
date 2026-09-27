@@ -1,0 +1,4 @@
+Date,Description,Original Description,Amount,Transaction Type,Category,Account Name,Labels,Notes
+9/01/2026,Sample Employer,SAMPLE EMPLOYER DIRECT DEP,4200.00,credit,Paycheck,Sample Checking,,
+9/03/2026,Sample Grocer,SAMPLE GROCER #0001,76.43,debit,Groceries,Sample Card,,
+9/10/2026,Sample Gym,SAMPLE GYM MONTHLY,45.00,debit,Gym,Sample Card,,monthly dues

@@ -66,17 +66,19 @@ export async function POST(request: Request) {
         deleteTransactions(Array.isArray(body?.ids) ? (body.ids as unknown[]).map(String) : []);
         break;
       case "import_preview": {
-        const parsed = parseTransactionCsv(String(body?.csv ?? ""), { flipSign: body?.flip_sign === true });
+        const parsed = parseTransactionCsv(String(body?.csv ?? ""), { flipSign: typeof body?.flip_sign === "boolean" ? body.flip_sign : undefined });
         const accountId = typeof body?.account_id === "string" && body.account_id ? body.account_id : null;
         return NextResponse.json({
           preview: previewTransactionImport(parsed, accountId),
           columns: parsed.columns,
+          format: parsed.format,
+          flipped: parsed.flipped,
           issues: parsed.issues.slice(0, 20),
           sample: parsed.rows.slice(0, 5),
         });
       }
       case "import": {
-        const parsed = parseTransactionCsv(String(body?.csv ?? ""), { flipSign: body?.flip_sign === true });
+        const parsed = parseTransactionCsv(String(body?.csv ?? ""), { flipSign: typeof body?.flip_sign === "boolean" ? body.flip_sign : undefined });
         const accountId = typeof body?.account_id === "string" && body.account_id ? body.account_id : null;
         const result = importTransactions(parsed, accountId);
         return NextResponse.json({ ...payload(month), result });

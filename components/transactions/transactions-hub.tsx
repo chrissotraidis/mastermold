@@ -23,11 +23,23 @@ export type TransactionsData = {
 };
 
 type ImportPreview = {
-  preview: { new_count: number; duplicate_count: number; issue_count: number };
+  preview: { new_count: number; duplicate_count: number; issue_count: number; categorized_count: number; unmatched_accounts: string[] };
   columns: Record<string, string | null>;
+  format: { id: string; label: string; note?: string };
+  flipped: boolean;
   issues: Array<{ line: number; reason: string }>;
   sample: Array<{ date: string; amount: number; description: string }>;
 };
+
+const CSV_SAMPLES = [
+  { id: "chase-checking", label: "Chase checking" },
+  { id: "chase-card", label: "Chase card" },
+  { id: "amex", label: "American Express" },
+  { id: "capital-one", label: "Capital One" },
+  { id: "discover", label: "Discover" },
+  { id: "mint", label: "Mint export" },
+  { id: "monarch", label: "Monarch export" },
+];
 
 const field = "min-h-11 w-full rounded-xl border border-outline-variant/60 bg-surface-lowest/70 px-3 text-sm text-on-surface placeholder:text-outline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet sm:min-h-10";
 const ghostButton = "inline-flex min-h-11 items-center gap-2 rounded-xl border border-outline-variant/60 px-3 text-sm font-semibold text-on-surface transition hover:border-violet/50 disabled:opacity-50 sm:min-h-10";
@@ -327,16 +339,17 @@ function ImportSheet({ open, onClose, accounts, post, onImported }: {
 }) {
   const [csv, setCsv] = useState("");
   const [accountId, setAccountId] = useState("");
-  const [flip, setFlip] = useState(false);
+  // null = let the importer decide from the recognized format.
+  const [flip, setFlip] = useState<boolean | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const reset = () => { setCsv(""); setPreview(null); setError(""); setFlip(false); };
+  const reset = () => { setCsv(""); setPreview(null); setError(""); setFlip(null); };
   const doPreview = async (text = csv, flipSign = flip) => {
     setError("");
     try {
-      setPreview(await post({ action: "import_preview", csv: text, account_id: accountId, flip_sign: flipSign }));
+      setPreview(await post({ action: "import_preview", csv: text, account_id: accountId, flip_sign: flipSign ?? undefined }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Preview failed.");
     }
@@ -344,7 +357,7 @@ function ImportSheet({ open, onClose, accounts, post, onImported }: {
   const doImport = async () => {
     setBusy(true);
     try {
-      const next = await post({ action: "import", csv, account_id: accountId, flip_sign: flip });
+      const next = await post({ action: "import", csv, account_id: accountId, flip_sign: flip ?? undefined });
       onImported(next);
       const { imported, duplicates, batch_id } = next.result;
       toast({
@@ -407,13 +420,33 @@ function ImportSheet({ open, onClose, accounts, post, onImported }: {
               if (!file) return;
               const text = await file.text();
               setCsv(text);
-              void doPreview(text);
+              setFlip(null);
+              void doPreview(text, null);
             }}
           />
         </label>
+        <p className="-mt-2 flex flex-wrap items-center gap-2 text-xs text-outline">
+          <label htmlFor="csv-sample">No file handy? Load a made-up sample:</label>
+          <select
+            id="csv-sample"
+            value=""
+            className="min-h-8 rounded-lg border border-outline-variant/60 bg-surface-lowest/70 px-2 text-xs text-on-surface"
+            onChange={async (event) => {
+              const name = event.target.value;
+              if (!name) return;
+              const text = await (await fetch(`/samples/${name}.csv`)).text();
+              setCsv(text);
+              setFlip(null);
+              void doPreview(text, null);
+            }}
+          >
+            <option value="">Choose a bank…</option>
+            {CSV_SAMPLES.map((sample) => <option key={sample.id} value={sample.id}>{sample.label}</option>)}
+          </select>
+        </p>
         <label className="grid gap-1 text-sm font-semibold text-on-surface">
           Or paste it
-          <textarea value={csv} onChange={(event) => { setCsv(event.target.value); setPreview(null); }} rows={6} placeholder={"Date,Description,Amount\n09/02/2026,BLUE BOTTLE COFFEE,-6.50"} className="w-full rounded-xl border border-outline-variant/60 bg-surface-lowest/70 p-3 font-mono text-xs text-on-surface placeholder:text-outline" />
+          <textarea value={csv} onChange={(event) => { setCsv(event.target.value); setPreview(null); setFlip(null); }} rows={6} placeholder={"Date,Description,Amount\n09/02/2026,BLUE BOTTLE COFFEE,-6.50"} className="w-full rounded-xl border border-outline-variant/60 bg-surface-lowest/70 p-3 font-mono text-xs text-on-surface placeholder:text-outline" />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1 text-sm font-semibold text-on-surface">
@@ -424,13 +457,21 @@ function ImportSheet({ open, onClose, accounts, post, onImported }: {
             </select>
           </label>
           <label className="flex items-center gap-2 self-end text-sm text-on-surface-variant">
-            <input type="checkbox" checked={flip} onChange={(event) => { setFlip(event.target.checked); if (csv.trim()) void doPreview(csv, event.target.checked); }} className="size-4 accent-[#f2559f]" />
+            <input type="checkbox" checked={flip ?? preview?.flipped ?? false} onChange={(event) => { setFlip(event.target.checked); if (csv.trim()) void doPreview(csv, event.target.checked); }} className="size-4 accent-[#f2559f]" />
             Purchases show as positive (most card exports)
           </label>
         </div>
         {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
         {preview ? (
           <div className="grid gap-2 rounded-xl border border-outline-variant/50 p-3 text-sm" data-testid="import-preview">
+            <p className="text-xs text-outline" data-testid="import-format">
+              {preview.format.id === "generic" ? "Read as a plain bank CSV." : `Recognized: ${preview.format.label}.`}
+              {preview.format.note && flip === null ? ` ${preview.format.note}` : ""}
+              {preview.preview.categorized_count ? ` ${preview.preview.categorized_count} rows keep their category.` : ""}
+            </p>
+            {preview.preview.unmatched_accounts.length ? (
+              <p className="text-xs text-caution">No account named {preview.preview.unmatched_accounts.join(", ")} yet; those rows import without an account.</p>
+            ) : null}
             <p className="text-on-surface">
               <span className="font-semibold">{preview.preview.new_count} new</span>
               {preview.preview.duplicate_count ? ` · ${preview.preview.duplicate_count} already imported` : ""}

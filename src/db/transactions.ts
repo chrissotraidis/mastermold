@@ -252,60 +252,133 @@ export function deleteTransactions(ids: string[]) {
 
 // --- CSV import ---------------------------------------------------------------
 
-export type ParsedTransaction = { date: string; amount: number; description: string; line: number };
-export type ParsedTransactions = { rows: ParsedTransaction[]; issues: Array<{ line: number; reason: string }>; columns: Record<string, string | null> };
+export type ParsedTransaction = {
+  date: string;
+  amount: number;
+  /** Raw statement text; duplicate protection and rules match on it. */
+  description: string;
+  line: number;
+  merchant?: string;
+  category_id?: string | null;
+  /** Account name from multi-account exports (Monarch, Mint). */
+  account_name?: string;
+  notes?: string;
+};
+export type CsvFormat = { id: string; label: string; flip: boolean; note?: string };
+export type ParsedTransactions = {
+  rows: ParsedTransaction[];
+  issues: Array<{ line: number; reason: string }>;
+  columns: Record<string, string | null>;
+  format: CsvFormat;
+  /** Whether amounts were sign-flipped (purchases became negative). */
+  flipped: boolean;
+};
 
+// First name wins, so "original statement" beats "description" and
+// "description" beats Chase's "details" column (which only says DEBIT/CREDIT).
 const HEADERS = {
-  date: ["date", "transaction date", "posted date", "post date", "posting date", "trans date"],
-  description: ["description", "merchant", "name", "payee", "memo", "details", "original description"],
+  date: ["date", "transaction date", "trans. date", "trans date", "posting date", "posted date", "post date"],
+  description: ["original statement", "original description", "description", "name", "payee", "memo"],
+  merchant: ["merchant"],
   amount: ["amount", "transaction amount", "value"],
   debit: ["debit", "withdrawal", "withdrawals", "money out", "outflow"],
   credit: ["credit", "deposit", "deposits", "money in", "inflow"],
+  type: ["transaction type"],
+  category: ["category"],
+  account: ["account", "account name"],
+  notes: ["notes"],
 };
 
+/** Known exports by their header set. Only the sign convention differs in practice. */
+const FORMATS: Array<CsvFormat & { match: (h: Set<string>) => boolean }> = [
+  { id: "monarch", label: "Monarch export", flip: false, match: (h) => h.has("merchant") && h.has("original statement") },
+  { id: "mint", label: "Mint export", flip: false, note: "Amounts are positive; Transaction Type decides the sign.", match: (h) => h.has("original description") && h.has("transaction type") },
+  { id: "chase-checking", label: "Chase checking", flip: false, match: (h) => h.has("details") && h.has("posting date") },
+  { id: "chase-card", label: "Chase card", flip: false, match: (h) => h.has("transaction date") && h.has("post date") && h.has("memo") },
+  { id: "capital-one", label: "Capital One", flip: false, match: (h) => h.has("card no.") && h.has("debit") && h.has("credit") },
+  { id: "discover", label: "Discover", flip: true, note: "Purchases are positive in this export, so signs were flipped.", match: (h) => h.has("trans. date") && h.has("post date") },
+  { id: "amex", label: "American Express", flip: true, note: "Charges are positive in this export, so signs were flipped.", match: (h) => h.has("card member") || h.has("appears on your statement as") },
+];
+const GENERIC: CsvFormat = { id: "generic", label: "Bank CSV", flip: false };
+
+const CATEGORY_ALIASES: Record<string, string> = {
+  "food & drink": "restaurants", "fast food": "restaurants", "dining": "restaurants", "restaurants & bars": "restaurants",
+  "coffee shop": "coffee-shops", "gas & fuel": "gas", "gasoline": "gas", "auto & transport": "auto", "auto payment": "auto",
+  "taxi": "rideshare", "ride share": "rideshare", "bills & utilities": "utilities", "mobile phone": "phone", "television": "streaming",
+  "health & wellness": "medical", "doctor": "medical", "gym": "fitness", "health & fitness": "fitness", "travel & vacation": "travel",
+  "air travel": "travel", "hotel": "travel", "paycheck": "paychecks", "income": "other-income", "payment": "credit-card-payment",
+  "credit card payment": "credit-card-payment", "transfer": "transfer", "gifts & donations": "gifts", "charity": "gifts",
+  "personal care": "personal", "bank fees": "fees", "fees & adjustments": "fees", "service fee": "fees", "home": "home-improvement",
+};
+
+/** Map an export's category text to ours; unknown names fall back to keyword guesses. */
+export function categoryFromExport(name: string): string | null {
+  const key = name.trim().toLowerCase();
+  if (!key) return null;
+  const direct = CATEGORIES.find((category) => category.name.toLowerCase() === key);
+  return direct?.id ?? CATEGORY_ALIASES[key] ?? null;
+}
+
 /**
- * Parse a bank or card CSV. Handles one signed Amount column or separate
- * Debit/Credit columns, and MM/DD/YYYY or YYYY-MM-DD dates. Never writes.
- * `flipSign` is for card exports where purchases are positive.
+ * Parse a bank or card CSV. Recognizes common exports (Chase, Amex, Capital
+ * One, Discover, Mint, Monarch) by their headers and fixes the sign; otherwise
+ * handles one signed Amount column or Debit/Credit columns. Never writes.
+ * `flipSign` overrides the detected sign convention when given.
  */
 export function parseTransactionCsv(text: string, options: { flipSign?: boolean } = {}): ParsedTransactions {
   const table = parseDelimited(text, detectDelimiter(text)).filter((cells) => cells.some((cell) => cell.trim() !== ""));
-  if (table.length === 0) return { rows: [], issues: [], columns: {} };
+  if (table.length === 0) return { rows: [], issues: [], columns: {}, format: GENERIC, flipped: Boolean(options.flipSign) };
   const header = table[0].map((cell) => cell.trim().toLowerCase());
+  const headerSet = new Set(header);
+  const format = FORMATS.find((candidate) => candidate.match(headerSet)) ?? GENERIC;
+  const flipped = options.flipSign ?? format.flip;
   const find = (names: string[]) => {
-    const index = header.findIndex((cell) => names.includes(cell));
-    return index >= 0 ? index : null;
+    for (const name of names) {
+      const index = header.indexOf(name);
+      if (index >= 0) return index;
+    }
+    return null;
   };
-  const cols = {
-    date: find(HEADERS.date),
-    description: find(HEADERS.description),
-    amount: find(HEADERS.amount),
-    debit: find(HEADERS.debit),
-    credit: find(HEADERS.credit),
-  };
-  const columns = Object.fromEntries(Object.entries(cols).map(([key, index]) => [key, index === null ? null : table[0][index]]));
+  const cols = Object.fromEntries(Object.entries(HEADERS).map(([key, names]) => [key, find(names)])) as Record<keyof typeof HEADERS, number | null>;
+  const columns = Object.fromEntries(
+    (["date", "description", "amount", "debit", "credit"] as const).map((key) => [key, cols[key] === null ? null : table[0][cols[key]!]]),
+  );
+  const result = { format: { id: format.id, label: format.label, flip: format.flip, note: format.note }, flipped };
   const issues: ParsedTransactions["issues"] = [];
   if (cols.date === null || cols.description === null || (cols.amount === null && cols.debit === null && cols.credit === null)) {
-    return { rows: [], issues: [{ line: 1, reason: "Needs Date, Description and Amount (or Debit/Credit) columns." }], columns };
+    return { rows: [], issues: [{ line: 1, reason: "Needs Date, Description and Amount (or Debit/Credit) columns." }], columns, ...result };
   }
+  const cell = (cells: string[], index: number | null) => (index === null ? "" : (cells[index] ?? "").trim());
   const rows: ParsedTransaction[] = [];
   table.slice(1).forEach((cells, index) => {
     const line = index + 2;
-    const date = normalizeDate(cells[cols.date!] ?? "");
-    const description = (cells[cols.description!] ?? "").trim();
+    const date = normalizeDate(cell(cells, cols.date));
+    const description = cell(cells, cols.description);
     let amount: number | null = null;
-    if (cols.amount !== null) amount = toNumber(cells[cols.amount] ?? "");
-    else {
-      const debit = cols.debit !== null ? toNumber(cells[cols.debit] ?? "") : null;
-      const credit = cols.credit !== null ? toNumber(cells[cols.credit] ?? "") : null;
+    if (cols.amount !== null) {
+      amount = toNumber(cell(cells, cols.amount));
+      const type = cell(cells, cols.type).toLowerCase();
+      if (amount !== null && (type === "debit" || type === "credit")) amount = type === "debit" ? -Math.abs(amount) : Math.abs(amount);
+    } else {
+      const debit = cols.debit !== null ? toNumber(cell(cells, cols.debit)) : null;
+      const credit = cols.credit !== null ? toNumber(cell(cells, cols.credit)) : null;
       if (debit !== null || credit !== null) amount = (credit ?? 0) - Math.abs(debit ?? 0);
     }
     if (!date) return issues.push({ line, reason: "Unreadable date." });
     if (!description) return issues.push({ line, reason: "Missing description." });
     if (amount === null || amount === 0) return issues.push({ line, reason: "Missing or zero amount." });
-    rows.push({ date, description, amount: options.flipSign ? -amount : amount, line });
+    const row: ParsedTransaction = { date, description, amount: flipped ? -amount : amount, line };
+    const merchant = cell(cells, cols.merchant) || (format.id === "mint" ? cell(cells, header.indexOf("description")) : "");
+    if (merchant && merchant !== description) row.merchant = merchant;
+    const category = categoryFromExport(cell(cells, cols.category));
+    if (category) row.category_id = category;
+    const account = cell(cells, cols.account);
+    if (account) row.account_name = account;
+    const notes = cell(cells, cols.notes);
+    if (notes) row.notes = notes;
+    rows.push(row);
   });
-  return { rows, issues, columns };
+  return { rows, issues, columns, ...result };
 }
 
 function normalizeDate(raw: string): string | null {
@@ -330,26 +403,52 @@ function fingerprint(tx: { date: string; amount: number; original_description: s
   return [tx.date, Math.round(tx.amount * 100), tx.original_description.trim().toLowerCase(), tx.account_id ?? ""].join("|");
 }
 
+/** Chosen account wins; otherwise a multi-account export's Account column is matched by name. */
+function rowAccount(row: ParsedTransaction, accountId: string | null, byName: Map<string, string>) {
+  return accountId ?? (row.account_name ? byName.get(row.account_name.toLowerCase()) ?? null : null);
+}
+
+function accountsByName() {
+  return new Map(store().financialAccounts().map((account) => [account.name.toLowerCase(), account.id]));
+}
+
 export function previewTransactionImport(parsed: ParsedTransactions, accountId: string | null) {
   const seen = new Set(store().transactions().map(fingerprint));
-  const fresh = parsed.rows.filter((row) => !seen.has(fingerprint({ ...row, original_description: row.description, account_id: accountId })));
-  return { new_count: fresh.length, duplicate_count: parsed.rows.length - fresh.length, issue_count: parsed.issues.length };
+  const byName = accountsByName();
+  const fresh = parsed.rows.filter((row) => !seen.has(fingerprint({ ...row, original_description: row.description, account_id: rowAccount(row, accountId, byName) })));
+  const names = [...new Set(parsed.rows.map((row) => row.account_name).filter((name): name is string => Boolean(name)))];
+  return {
+    new_count: fresh.length,
+    duplicate_count: parsed.rows.length - fresh.length,
+    issue_count: parsed.issues.length,
+    categorized_count: parsed.rows.filter((row) => row.category_id).length,
+    unmatched_accounts: accountId ? [] : names.filter((name) => !byName.has(name.toLowerCase())),
+  };
 }
 
 export function importTransactions(parsed: ParsedTransactions, accountId: string | null, now = new Date()) {
   const seen = new Set(store().transactions().map(fingerprint));
+  const byName = accountsByName();
   const batch = `import_${randomUUID()}`;
   const stamp = now.toISOString();
   const rows: TransactionRow[] = [];
   let duplicates = 0;
   for (const row of parsed.rows) {
-    const key = fingerprint({ ...row, original_description: row.description, account_id: accountId });
+    const account = rowAccount(row, accountId, byName);
+    const key = fingerprint({ ...row, original_description: row.description, account_id: account });
     if (seen.has(key)) {
       duplicates += 1;
       continue;
     }
     seen.add(key);
-    rows.push(buildTransaction({ date: row.date, amount: row.amount, description: row.description, account_id: accountId }, "csv", batch, stamp));
+    rows.push(
+      buildTransaction(
+        { date: row.date, amount: row.amount, description: row.description, merchant: row.merchant, category_id: row.category_id, account_id: account, notes: row.notes },
+        "csv",
+        batch,
+        stamp,
+      ),
+    );
   }
   store().upsertTransactions(rows);
   return { batch_id: batch, imported: rows.length, duplicates };
