@@ -5,7 +5,7 @@
  * basis, and price freshness are optional fields on the same rows.
  */
 import { getPortfolio, invalidatePortfolioCache, type AssetClass, type PortfolioHoldingJson, type PortfolioJson } from "./portfolio";
-import { store, type FinancialAccountRow, type ManualHoldingRow, type NetWorthHistoryRow } from "./store";
+import { store, type AccountExclusions, type FinancialAccountRow, type ManualHoldingRow, type NetWorthHistoryRow } from "./store";
 import { ACCOUNT_TYPES } from "@/lib/money-accounts";
 
 export { ACCOUNT_TYPES };
@@ -107,16 +107,20 @@ export function getMoneySummary(portfolio: PortfolioJson = getPortfolio(), now =
     };
   });
 
-  const holdingsValue = roundMoney(holdings.reduce((sum, holding) => sum + holding.market_value, 0));
+  // Accounts switched out of net worth stay listed but leave every total.
+  const outOfNetWorth = new Set(accounts.filter((account) => account.exclude?.net_worth).map((account) => account.id));
+  const counted = holdings.filter((holding) => !holding.account_id || !outOfNetWorth.has(holding.account_id));
+  const countedAccounts = moneyAccounts.filter((account) => !outOfNetWorth.has(account.id));
+  const holdingsValue = roundMoney(counted.reduce((sum, holding) => sum + holding.market_value, 0));
   const accountBalances = roundMoney(
-    moneyAccounts.filter((account) => account.kind === "asset").reduce((sum, account) => sum + account.balance, 0),
+    countedAccounts.filter((account) => account.kind === "asset").reduce((sum, account) => sum + account.balance, 0),
   );
   const liabilities = roundMoney(
-    moneyAccounts.filter((account) => account.kind === "liability").reduce((sum, account) => sum + account.value, 0),
+    countedAccounts.filter((account) => account.kind === "liability").reduce((sum, account) => sum + account.value, 0),
   );
   const assets = roundMoney(holdingsValue + accountBalances);
-  const cashHoldings = holdings.filter((holding) => holding.asset_class === "cash").reduce((sum, holding) => sum + holding.market_value, 0);
-  const cashAccounts = moneyAccounts
+  const cashHoldings = counted.filter((holding) => holding.asset_class === "cash").reduce((sum, holding) => sum + holding.market_value, 0);
+  const cashAccounts = countedAccounts
     .filter((account) => account.kind === "asset" && (account.type === "bank" || account.type === "cash"))
     .reduce((sum, account) => sum + account.balance, 0);
   const assignedIds = new Set(moneyAccounts.map((account) => account.id));
@@ -193,7 +197,13 @@ export type AccountInput = {
   currency?: string;
   balance?: number;
   notes?: string;
+  exclude?: AccountExclusions;
 };
+
+function parseExclusions(value: unknown): AccountExclusions {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return { net_worth: raw.net_worth === true, cash_flow: raw.cash_flow === true, budget: raw.budget === true };
+}
 
 export function parseAccountInput(body: unknown): { ok: true; input: AccountInput } | { ok: false; error: string } {
   const raw = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
@@ -212,6 +222,7 @@ export function parseAccountInput(body: unknown): { ok: true; input: AccountInpu
       currency: (text(raw.currency, 3) || "USD").toUpperCase(),
       balance,
       notes: text(raw.notes, 400),
+      exclude: parseExclusions(raw.exclude),
     },
   };
 }
@@ -227,6 +238,7 @@ export function createAccount(input: AccountInput, now = new Date()): FinancialA
     currency: input.currency ?? "USD",
     balance: roundMoney(Math.abs(input.balance ?? 0)),
     notes: input.notes ?? "",
+    exclude: input.exclude ?? {},
     created_at: now.toISOString(),
     updated_at: now.toISOString(),
   };
@@ -248,6 +260,7 @@ export function updateAccount(id: string, input: Partial<AccountInput>, now = ne
     currency: input.currency ?? existing.currency,
     balance: input.balance === undefined ? existing.balance : roundMoney(Math.abs(input.balance)),
     notes: input.notes ?? existing.notes,
+    exclude: input.exclude ?? existing.exclude ?? {},
     updated_at: now.toISOString(),
   };
   store().upsertFinancialAccount(row);

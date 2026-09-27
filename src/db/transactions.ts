@@ -373,8 +373,15 @@ export type CashFlowMonth = {
 };
 
 /** Income − expenses, excluding hidden rows and transfer categories (Monarch rule). */
+/** Drops transactions from accounts switched out of cash flow or budgets. */
+export function withoutExcluded(rows: TransactionRow[], from: "cash_flow" | "budget", accounts = store().financialAccounts()): TransactionRow[] {
+  const excluded = new Set(accounts.filter((account) => account.exclude?.[from]).map((account) => account.id));
+  if (!excluded.size) return rows;
+  return rows.filter((tx) => !tx.account_id || !excluded.has(tx.account_id));
+}
+
 export function cashFlow(month: string, rows = store().transactions()): CashFlowMonth {
-  const counted = rows.filter((tx) => tx.date.startsWith(month) && !tx.hidden && categoryById(tx.category_id)?.type !== "transfer");
+  const counted = withoutExcluded(rows, "cash_flow").filter((tx) => tx.date.startsWith(month) && !tx.hidden && categoryById(tx.category_id)?.type !== "transfer");
   const income = sum(counted.filter((tx) => categoryById(tx.category_id)?.type === "income" || (!categoryById(tx.category_id) && tx.amount > 0)).map((tx) => tx.amount));
   const expenseRows = counted.filter((tx) => categoryById(tx.category_id)?.type === "expense" || (!categoryById(tx.category_id) && tx.amount < 0));
   const expenses = -sum(expenseRows.map((tx) => tx.amount));
@@ -506,4 +513,3 @@ export function detectRecurring(rows = store().transactions(), today = new Date(
   }
   return items.sort((a, b) => a.next_date.localeCompare(b.next_date));
 }
-

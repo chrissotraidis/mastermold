@@ -389,6 +389,7 @@ export function PortfolioHub({
                 </span>
                 <span className="text-[11px] text-outline">
                   {account.holding_count ? `${account.holding_count} holdings` : liability ? "Owed" : "Balance"}
+                  {account.exclude?.net_worth ? " · Not in net worth" : account.exclude?.cash_flow || account.exclude?.budget ? " · Partly excluded" : ""}
                 </span>
               </button>
             );

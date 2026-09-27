@@ -11,6 +11,14 @@ import { cn } from "@/lib/utils";
 import { Field, fieldClass } from "./fields";
 import { moneyRequest, toastError } from "./money-api";
 
+type Exclusions = { net_worth?: boolean; cash_flow?: boolean; budget?: boolean };
+
+const COUNTED_IN: Array<{ key: keyof Exclusions; label: string }> = [
+  { key: "net_worth", label: "Net worth" },
+  { key: "cash_flow", label: "Cash flow" },
+  { key: "budget", label: "Budgets" },
+];
+
 export function AccountSheet({
   open,
   account,
@@ -27,6 +35,7 @@ export function AccountSheet({
   const [type, setType] = useState<AccountTypeValue>("brokerage");
   const [balance, setBalance] = useState("");
   const [notes, setNotes] = useState("");
+  const [exclude, setExclude] = useState<Exclusions>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -36,6 +45,7 @@ export function AccountSheet({
     setType((account?.type as AccountTypeValue) ?? "brokerage");
     setBalance(account ? String(account.balance || "") : "");
     setNotes(account?.notes ?? "");
+    setExclude(account?.exclude ?? {});
   }, [open, account]);
 
   const kind = ACCOUNT_TYPES.find((item) => item.value === type)?.kind ?? "asset";
@@ -44,7 +54,7 @@ export function AccountSheet({
   async function save() {
     setBusy(true);
     try {
-      const body = { name, institution, type, balance: balance === "" ? 0 : Number(balance.replace(/[$,]/g, "")), notes };
+      const body = { name, institution, type, balance: balance === "" ? 0 : Number(balance.replace(/[$,]/g, "")), notes, exclude };
       if (account) await moneyRequest(`/api/money/accounts/${account.id}`, { method: "PATCH", body });
       else await moneyRequest("/api/money/accounts", { method: "POST", body });
       toast({ title: account ? "Account updated" : "Account added", description: name });
@@ -132,6 +142,23 @@ export function AccountSheet({
         <Field label="Notes" hint="Optional">
           <textarea className={cn(fieldClass, "min-h-20 py-2 sm:min-h-20")} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </Field>
+        <fieldset className="grid gap-2">
+          <legend className="mb-2 text-xs font-semibold text-on-surface-variant">Count this account in</legend>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {COUNTED_IN.map((option) => (
+              <label key={option.key} className="inline-flex min-h-9 items-center gap-2 text-sm text-on-surface">
+                <input
+                  type="checkbox"
+                  checked={!exclude[option.key]}
+                  onChange={(event) => setExclude((current) => ({ ...current, [option.key]: !event.target.checked }))}
+                  className="size-4 accent-[#f2559f]"
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+          <p className="text-[11px] text-outline">Untick for accounts you track but don't count, like a business card or a parent's account.</p>
+        </fieldset>
       </div>
     </Sheet>
   );

@@ -129,6 +129,8 @@ export type BudgetLineRow = {
   updated_at: string;
 };
 
+export type AccountExclusions = { net_worth?: boolean; cash_flow?: boolean; budget?: boolean };
+
 export type FinancialAccountRow = {
   id: string;
   name: string;
@@ -151,6 +153,8 @@ export type FinancialAccountRow = {
   /** Used when the account has no holdings (bank, loan, property). */
   balance: number;
   notes: string;
+  /** Monarch-style switches: leave this account out of these totals. */
+  exclude?: AccountExclusions;
   created_at: string;
   updated_at: string;
 };

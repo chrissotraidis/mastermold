@@ -6,7 +6,7 @@
  * See docs/monarch-research.md.
  */
 import { store, type BudgetLineRow, type TransactionRow } from "./store";
-import { CATEGORIES, categoryById } from "./transactions";
+import { CATEGORIES, categoryById, withoutExcluded } from "./transactions";
 
 export type BudgetGroup = BudgetLineRow["group"];
 
@@ -63,7 +63,8 @@ export function spentIn(categoryId: string, month: string, rows: TransactionRow[
   );
 }
 
-export function budgetMonth(month: string, rows = store().transactions(), lines = store().budgetLines()): BudgetMonth {
+export function budgetMonth(month: string, allRows = store().transactions(), lines = store().budgetLines()): BudgetMonth {
+  const rows = withoutExcluded(allRows, "budget");
   const views: BudgetLineView[] = lines.map((line) => {
     const spent = spentIn(line.category_id, month, rows);
     let carried = 0;
@@ -151,4 +152,3 @@ export function suggestBudget(month: string, rows = store().transactions()) {
     .filter((row) => row.average > 0)
     .sort((a, b) => b.average - a.average);
 }
-
