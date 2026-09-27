@@ -124,7 +124,7 @@ export function MonarchMcpPanel({ initialState, config }: MonarchMcpPanelProps) 
 
   return (
     <section aria-labelledby="monarch-mcp-title" className="rounded-md border border-outline-variant/25">
-      <div className="flex min-w-0 flex-1 flex-col gap-3 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <Dot tone={statusTone} />
           <h3 id="monarch-mcp-title" className="shrink-0 text-sm font-semibold text-on-surface">

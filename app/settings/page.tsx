@@ -182,7 +182,7 @@ export default async function SettingsPage() {
                     </Link>
                     . Imports are snapshots only, not automatic brokerage trading.
                   </p>
-                  <div id="portfolio-connections" className="mt-3 grid scroll-mt-24 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
+                  <div id="portfolio-connections" className="mt-3 grid scroll-mt-24 items-start gap-3 lg:grid-cols-2 [&>*]:min-w-0">
                     <MonarchMcpPanel initialState={portfolioBrain} config={monarchConfig} />
                     <div className="grid content-start gap-3">
                       <PortfolioImportStatusCard portfolio={portfolio} />
@@ -383,7 +383,7 @@ function StatusCard({
   action: { href: string; label: string };
 }) {
   return (
-    <div className="mm-panel flex min-w-0 flex-wrap items-start gap-3 p-4 sm:flex-nowrap">
+    <div className="mm-panel flex min-w-0 items-start gap-3 p-4">
       <span
         className={cn(
           "flex size-10 shrink-0 items-center justify-center rounded-xl",
@@ -392,17 +392,18 @@ function StatusCard({
       >
         <Icon aria-hidden="true" className="size-5" />
       </span>
-      <div className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-auto">
+      {/* The action sits under the text so the value keeps the full width. */}
+      <div className="min-w-0 flex-1">
         <p className="mm-eyebrow">{title}</p>
         <p className="mt-0.5 truncate font-display text-base font-semibold text-on-surface">{value}</p>
         <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-outline">{detail}</p>
+        <Link
+          href={action.href}
+          className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-outline-variant/60 px-3 text-xs font-semibold text-on-surface transition hover:border-violet/50 hover:text-violet sm:min-h-9"
+        >
+          {action.label}
+        </Link>
       </div>
-      <Link
-        href={action.href}
-        className="ml-[3.25rem] inline-flex min-h-11 shrink-0 items-center rounded-xl border border-outline-variant/60 px-3 text-xs font-semibold text-on-surface transition hover:border-violet/50 hover:text-violet sm:ml-0 sm:min-h-9"
-      >
-        {action.label}
-      </Link>
     </div>
   );
 }

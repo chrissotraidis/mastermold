@@ -72,10 +72,13 @@ worth range.
 - The unit tests left one temp folder per test behind (35,000 folders, 2 GB,
   enough to fill this Mac's disk). Each run now uses one folder that is removed
   at the end, and the e2e server clears earlier runs' folders on start.
+- Settings status tiles cut their values ("Sample d…", "Saved 2026-…") and the
+  Monarch buttons overlapped the "Monarch MCP" title; actions now sit under the
+  text and the header wraps. Groceries and dining no longer count as bills.
 
 ## Last run
 
-2026-09-27: 24 passed (19 desktop, 5 phone), 34 s.
+2026-09-27: 25 passed (20 desktop, 5 phone), 50 s.
 
 ## iPhone and iPad simulators (2026-09-27)
 
