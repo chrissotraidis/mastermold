@@ -75,6 +75,8 @@ export type TransactionRow = {
   hidden: boolean;
   needs_review: boolean;
   source: "manual" | "csv" | "plaid";
+  /** Contribution toward a savings goal (Monarch links these by rule or by hand). */
+  goal_id?: string | null;
   import_batch_id: string | null;
   created_at: string;
   updated_at: string;
@@ -97,8 +99,21 @@ export type TransactionRuleRow = {
     add_tags?: string[];
     hide?: boolean;
     needs_review?: boolean;
+    /** Monarch requires an account condition on goal-linking rules. */
+    link_goal_id?: string;
   };
   created_at: string;
+};
+
+export type GoalRow = {
+  id: string;
+  name: string;
+  target_amount: number;
+  target_date: string | null; // YYYY-MM-DD
+  account_id: string | null;
+  starting_balance: number;
+  created_at: string;
+  updated_at: string;
 };
 
 /** One budgeted category (Monarch-style Fixed / Non-monthly / Flex). */
@@ -238,6 +253,8 @@ export interface PersistAdapter {
   replaceTransactionRules(rows: TransactionRuleRow[]): void;
   budgetLines(): BudgetLineRow[];
   replaceBudgetLines(rows: BudgetLineRow[]): void;
+  goals(): GoalRow[];
+  replaceGoals(rows: GoalRow[]): void;
   netWorthHistory(): NetWorthHistoryRow[];
   upsertNetWorthPoint(point: NetWorthHistoryRow): void;
   importedHoldings(): ImportedHoldingRow[];
@@ -276,6 +293,7 @@ type StoreSnapshot = {
   transactions: TransactionRow[];
   transaction_rules: TransactionRuleRow[];
   budget_lines: BudgetLineRow[];
+  goals: GoalRow[];
   net_worth_history: NetWorthHistoryRow[];
   imported_holdings: ImportedHoldingRow[];
   position_policies: PositionPolicyRow[];
@@ -304,6 +322,7 @@ const emptySnapshot = (): StoreSnapshot => ({
   transactions: [],
   transaction_rules: [],
   budget_lines: [],
+  goals: [],
   net_worth_history: [],
   imported_holdings: [],
   position_policies: [],
@@ -411,6 +430,10 @@ class SqliteAdapter implements PersistAdapter {
         data TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+      CREATE TABLE IF NOT EXISTS goals (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS budget_lines (
         category_id TEXT PRIMARY KEY,
         data TEXT NOT NULL
@@ -668,6 +691,27 @@ class SqliteAdapter implements PersistAdapter {
       this.db.run("DELETE FROM budget_lines");
       const insert = this.db.query("INSERT INTO budget_lines (category_id, data) VALUES (?, ?)");
       for (const row of rows) insert.run(row.category_id, JSON.stringify(row));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
+  }
+
+  goals(): GoalRow[] {
+    return this.db
+      .query("SELECT data FROM goals")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as GoalRow)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }
+
+  replaceGoals(rows: GoalRow[]): void {
+    this.db.run("BEGIN");
+    try {
+      this.db.run("DELETE FROM goals");
+      const insert = this.db.query("INSERT INTO goals (id, data) VALUES (?, ?)");
+      for (const row of rows) insert.run(row.id, JSON.stringify(row));
       this.db.run("COMMIT");
     } catch (error) {
       this.db.run("ROLLBACK");
@@ -947,6 +991,7 @@ class MemoryAdapter implements PersistAdapter {
   private transactionRows: TransactionRow[] = [];
   private transactionRuleRows: TransactionRuleRow[] = [];
   private budgetLineRows: BudgetLineRow[] = [];
+  private goalRows: GoalRow[] = [];
   private netWorthRows: NetWorthHistoryRow[] = [];
   private importedHoldingRows: ImportedHoldingRow[] = [];
   private positionPolicyRows: PositionPolicyRow[] = [];
@@ -1038,6 +1083,12 @@ class MemoryAdapter implements PersistAdapter {
   }
   replaceBudgetLines(rows: BudgetLineRow[]) {
     this.budgetLineRows = [...rows];
+  }
+  goals() {
+    return [...this.goalRows];
+  }
+  replaceGoals(rows: GoalRow[]) {
+    this.goalRows = [...rows];
   }
   netWorthHistory() {
     return [...this.netWorthRows].sort((a, b) => a.date.localeCompare(b.date));
@@ -1262,6 +1313,14 @@ class JsonFileAdapter implements PersistAdapter {
     snapshot.budget_lines = [...rows];
     this.write(snapshot);
   }
+  goals() {
+    return [...this.read().goals];
+  }
+  replaceGoals(rows: GoalRow[]) {
+    const snapshot = this.read();
+    snapshot.goals = [...rows];
+    this.write(snapshot);
+  }
   netWorthHistory() {
     return [...this.read().net_worth_history].sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -1409,6 +1468,7 @@ class JsonFileAdapter implements PersistAdapter {
         transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
         transaction_rules: Array.isArray(parsed.transaction_rules) ? parsed.transaction_rules : [],
         budget_lines: Array.isArray(parsed.budget_lines) ? parsed.budget_lines : [],
+        goals: Array.isArray(parsed.goals) ? parsed.goals : [],
         net_worth_history: Array.isArray(parsed.net_worth_history) ? parsed.net_worth_history : [],
         imported_holdings: Array.isArray(parsed.imported_holdings) ? parsed.imported_holdings : [],
         position_policies: Array.isArray(parsed.position_policies) ? parsed.position_policies : [],

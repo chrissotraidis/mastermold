@@ -133,6 +133,7 @@ export function applyRules(tx: TransactionRow, rules: TransactionRuleRow[]): Tra
     if (a.add_tags) next.tags = [...new Set([...next.tags, ...a.add_tags])];
     if (a.hide !== undefined) next.hidden = a.hide;
     if (a.needs_review !== undefined) next.needs_review = a.needs_review;
+    if (a.link_goal_id && rule.conditions.account_id) next.goal_id = a.link_goal_id;
   }
   return next;
 }
@@ -156,6 +157,9 @@ export function addRule(input: NewRule, options: { applyToPast?: boolean; now?: 
   };
   if (!Object.values(rule.conditions).some((value) => value !== undefined && value !== "")) {
     throw new Error("A rule needs at least one condition.");
+  }
+  if (rule.actions.link_goal_id && !rule.conditions.account_id) {
+    throw new Error("A rule that links to a goal needs an account condition.");
   }
   const rules = [rule, ...existing].map((row, index) => ({ ...row, order: index }));
   store().replaceTransactionRules(rules);
@@ -229,7 +233,7 @@ export function addManualTransaction(input: TransactionInput, now = new Date()):
   return row;
 }
 
-export type TransactionPatch = Partial<Pick<TransactionRow, "merchant" | "category_id" | "notes" | "hidden" | "needs_review" | "tags" | "account_id">>;
+export type TransactionPatch = Partial<Pick<TransactionRow, "merchant" | "category_id" | "notes" | "hidden" | "needs_review" | "tags" | "account_id" | "goal_id">>;
 
 export function updateTransaction(id: string, patch: TransactionPatch, now = new Date()): TransactionRow {
   const current = store().transactions().find((tx) => tx.id === id);
