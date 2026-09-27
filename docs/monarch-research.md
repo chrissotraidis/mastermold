@@ -22,9 +22,14 @@ categorized **transaction**.
   ([Hiding an account](https://help.monarchmoney.com/hc/en-us/articles/4407859794580-Hiding-an-account)).
 - Forecasting projects net worth separately from the live chart
   ([Forecasting](https://help.monarch.com/hc/en-us/articles/48344305092244-Forecasting-in-Monarch)).
-- Sync providers and refresh cadence: **unverified** in this pass (searches
-  returned no usable page). Our expectation: daily aggregator refresh, not
-  streaming.
+- Sync goes through Plaid, MX, or Finicity; a failing connection can switch
+  provider, fall back to a manual account, or use CSV import
+  ([Getting Started](https://help.monarchmoney.com/hc/en-us/articles/360048393272-Getting-Started-Guide);
+  [Connection statuses](https://help.monarchmoney.com/hc/en-us/articles/13227606293908)).
+- Accounts refresh about every 24 hours in the cloud; Settings → Institutions →
+  Refresh All forces an update
+  ([Monarch blog](https://partners.monarchmoney.com/blog/force-refresh-accounts-multi-factor-authentication)).
+  Target for Master Mold: a daily sync plus a manual refresh button.
 
 ## Transactions, categories and rules
 
@@ -101,9 +106,11 @@ categorized **transaction**.
 
 ## Reports and overall UX
 
-- Reports (spending by category/merchant over time): **unverified** in this
-  pass. The public site describes charts of spending and net worth, but no
-  help page was retrieved.
+- Reports: spending by category, merchant, or account, plus an income → spending
+  Sankey, with date ranges, filters, and click-through to the underlying
+  transactions ([Tracking and reports](https://www.monarchmoney.com/features/tracking)).
+  CSV-imported rows count as long as expenses are negative
+  ([CSV import](https://help.monarchmoney.com/hc/en-us/articles/4409682789908-Import-data-manually-from-banks-or-other-finance-apps)).
 - Overall UX pattern visible across the pages above: one review queue for new
   transactions, edits that can become rules, and planning views that are pure
   sums over categorized transactions.
