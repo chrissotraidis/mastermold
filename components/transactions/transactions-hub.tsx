@@ -5,7 +5,6 @@ import Link from "next/link";
 import { EyeOff, Eye, FileUp, PiggyBank, Plus, Search, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { Sheet } from "@/components/ui/sheet";
-import { StatTile } from "@/components/ui/stat";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Segmented } from "@/components/ui/segmented";
 import { toast } from "@/components/ui/toast";
@@ -105,7 +104,8 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
 
   const categoryName = useMemo(() => new Map(data.categories.map((category) => [category.id, category.name])), [data.categories]);
   const accountName = useMemo(() => new Map(data.accounts.map((account) => [account.id, account.name])), [data.accounts]);
-  const reviewCount = data.transactions.filter((tx) => tx.needs_review).length;
+  // Same month as the list the button filters.
+  const reviewCount = data.transactions.filter((tx) => tx.needs_review && tx.date.startsWith(data.month)).length;
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -174,14 +174,17 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
         </Panel>
       ) : (
         <>
-          <CashFlowBars history={data.history} selected={data.month} onSelect={selectMonth} />
-
-          <section aria-label="Cash flow" className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="cash-flow">
-            <StatTile label="Income" value={money(flow.income)} deltaTone="up" />
-            <StatTile label="Spending" value={money(flow.expenses)} />
-            <StatTile emphasis label="Saved" value={money(flow.savings)} deltaTone={flow.savings >= 0 ? "up" : "down"} />
-            <StatTile label="Savings rate" value={flow.savings_rate === null ? "—" : `${flow.savings_rate}%`} />
-          </section>
+          <CashFlowBars
+            history={data.history}
+            selected={data.month}
+            onSelect={selectMonth}
+            totals={[
+              { label: "Income", value: money(flow.income), tone: "text-engine" },
+              { label: "Spending", value: money(flow.expenses), tone: "text-on-surface" },
+              { label: "Saved", value: money(flow.savings), tone: flow.savings >= 0 ? "text-engine" : "text-critical" },
+              { label: "Rate", value: flow.savings_rate === null ? "—" : `${flow.savings_rate}%`, tone: "text-on-surface" },
+            ]}
+          />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
             <Panel className="lg:col-span-8" aria-labelledby="tx-list-title">
@@ -190,12 +193,12 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                 title={`${visible.length} transaction${visible.length === 1 ? "" : "s"}`}
               />
               <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
-                <label className="relative min-w-[12rem] flex-1">
+                <label className="relative min-w-full flex-1 sm:min-w-[12rem]">
                   <span className="sr-only">Search transactions</span>
                   <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-outline" />
                   <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search merchant or note" className={cn(field, "pl-9")} />
                 </label>
-                <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={cn(field, "w-auto")}>
+                <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={cn(field, "w-auto flex-1 sm:flex-none")}>
                   <option value="">All categories</option>
                   {data.categories.map((category) => (
                     <option key={category.id} value={category.id}>{category.name}</option>
@@ -214,7 +217,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                       <span className="min-w-0">
                         <span className="flex items-center gap-2">
                           <span className="truncate text-sm font-semibold text-on-surface">{tx.merchant}</span>
-                          {tx.needs_review ? <span className="rounded-full bg-violet/15 px-1.5 text-[10px] font-semibold text-violet">new</span> : null}
+                          {tx.needs_review ? <span className="size-1.5 shrink-0 rounded-full bg-violet" title="New, not reviewed yet" aria-label="new" /> : null}
                           {tx.source === "sandbox" ? <span className="rounded-full bg-caution/15 px-1.5 text-[10px] font-semibold text-caution">sandbox</span> : null}
                         </span>
                         <span className="block truncate text-xs text-outline" title={tx.original_description}>
@@ -229,7 +232,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                         value={tx.category_id ?? ""}
                         disabled={pending}
                         onChange={(event) => run({ action: "update", id: tx.id, patch: { category_id: event.target.value } })}
-                        className={cn(field, "row-start-2 xl:row-start-auto")}
+                        className={cn(field, "row-start-2 min-h-9 w-auto max-w-full justify-self-start rounded-full py-0 pr-8 text-xs xl:row-start-auto xl:min-h-10 xl:w-full xl:rounded-xl xl:text-sm")}
                       >
                         <CategoryOptions categories={data.categories} />
                       </select>
@@ -743,7 +746,13 @@ const RECURRING_TONE: Record<RecurringItem["status"], string> = {
 };
 
 /** Monarch's cash flow view: income and spending per month; tap a month to open it. */
-function CashFlowBars({ history, selected, onSelect }: { history: CashFlowPoint[]; selected: string; onSelect: (month: string) => void }) {
+function CashFlowBars({ history, selected, onSelect, totals }: {
+  history: CashFlowPoint[];
+  selected: string;
+  onSelect: (month: string) => void;
+  /** The selected month's figures, one row under the bars (Monarch's cash flow summary). */
+  totals: Array<{ label: string; value: string; tone: string }>;
+}) {
   const max = Math.max(1, ...history.flatMap((point) => [point.income, point.expenses]));
   return (
     <Panel aria-labelledby="cash-flow-bars-title" data-testid="cash-flow-bars">
@@ -775,6 +784,14 @@ function CashFlowBars({ history, selected, onSelect }: { history: CashFlowPoint[
           );
         })}
       </div>
+      <dl className="grid grid-cols-4 gap-2 border-t border-outline-variant/30 px-5 py-3" data-testid="cash-flow" aria-label="Cash flow">
+        {totals.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <dt className="text-[11px] text-outline">{item.label}</dt>
+            <dd className={cn("mm-num truncate text-sm font-semibold sm:text-lg", item.tone)}>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
     </Panel>
   );
 }

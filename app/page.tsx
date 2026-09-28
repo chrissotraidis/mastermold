@@ -275,7 +275,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             #today-chat links landing sensibly. */}
         <span id="today-chat" aria-hidden="true" className="block" />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant/40 pt-4">
+        <div className="hidden flex-wrap items-center justify-between gap-3 border-t border-outline-variant/40 pt-4 sm:flex">
           <p className="text-xs leading-5 text-outline">{trackRecordLine ?? "Calls you save are graded against the price three days later."}</p>
           <TodayMemoryRefresh compact />
         </div>

@@ -77,37 +77,32 @@ export default function ReviewPage() {
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
               <h2 id="capability-truth" className="font-display text-xl font-semibold text-on-surface">By feature</h2>
-              <p className="text-sm text-on-surface-variant">Review credentials never include private keys, seed phrases, or wallet authority.</p>
+              <p className="text-xs text-outline">Review credentials never include private keys, seed phrases, or wallet authority.</p>
             </div>
             <Link href="/settings#health" className="text-sm font-semibold text-violet hover:text-tertiary">Live system health</Link>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          {/* One row per feature: status at a glance, the proof one tap away. */}
+          <ul className="mm-panel divide-y divide-outline-variant/30 overflow-hidden">
             {reviewCapabilitySections.map((section) => (
-              <Card key={section.id} className="border-outline-variant/30">
-                <CardHeader className="space-y-2 p-4 pb-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle as="h3" className="text-base">{section.title}</CardTitle>
-                    <Badge variant="outline">{statusLabel[section.status]}</Badge>
+              <li key={section.id}>
+                <details className="group">
+                  <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-2.5 marker:hidden [&::-webkit-details-marker]:hidden">
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-on-surface">{section.title}</span>
+                    <Badge variant="outline" className="shrink-0">{statusLabel[section.status]}</Badge>
+                    <span aria-hidden="true" className="shrink-0 text-xs text-outline transition group-open:rotate-90">›</span>
+                  </summary>
+                  <div className="space-y-2 px-4 pb-4 text-sm leading-5 text-on-surface-variant">
+                    <p>{section.summary}</p>
+                    <ul className="list-disc space-y-1 pl-5">
+                      {section.items.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                    <p className="text-xs text-outline"><span className="font-semibold">Review access:</span> {section.reviewCredential}</p>
+                    <p className="text-xs text-outline">Where: {section.userVisibleSurface} · Evidence: {section.evidenceEndpoint}</p>
                   </div>
-                  <p className="text-sm leading-5 text-on-surface-variant">{section.summary}</p>
-                </CardHeader>
-                <CardContent className="p-4 pt-1 text-sm leading-5 text-on-surface-variant">
-                  <details className="group">
-                    <summary className="flex min-h-11 cursor-pointer list-none items-center text-xs font-semibold text-violet marker:hidden [&::-webkit-details-marker]:hidden">
-                      Details <span aria-hidden="true" className="ml-1 transition group-open:rotate-90">›</span>
-                    </summary>
-                    <div className="space-y-2">
-                      <p><span className="font-semibold text-on-surface">Review access:</span> {section.reviewCredential}</p>
-                      <ul className="list-disc space-y-1 pl-5">
-                        {section.items.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
-                      </ul>
-                      <p className="text-xs text-outline">Where: {section.userVisibleSurface} · Evidence: {section.evidenceEndpoint}</p>
-                    </div>
-                  </details>
-                </CardContent>
-              </Card>
+                </details>
+              </li>
             ))}
-          </div>
+          </ul>
         </section>
 
         <section aria-labelledby="lab-internals" className="space-y-3">
