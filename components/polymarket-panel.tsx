@@ -104,7 +104,8 @@ export function PolymarketPanel() {
                   <Badge variant="outline" className="border-violet/30 text-violet">Exploration entries</Badge>
                 ) : null}
               </div>
-              <p className={cn("mt-1 text-[11px] leading-4", data.paper_authority.available ? "text-on-surface-variant" : "text-caution")}>{data.paper_authority.detail}</p>
+              {/* Locked: the research summary below already says why. */}
+              {data.paper_authority.available ? <p className="mt-1 text-[11px] leading-4 text-on-surface-variant">{data.paper_authority.detail}</p> : null}
               <p className="mt-1 text-[11px] text-outline">
                 Market read {formatRelative(data.market_read.fetched_at)} · Last cycle {data.state.last_cycle_at ? formatRelative(data.state.last_cycle_at) : "not run"}
               </p>
@@ -122,7 +123,7 @@ export function PolymarketPanel() {
                 onClick={() => control({ action: "set_mode", mode: armed ? "off" : "paper" })}
               >
                 {armed ? <Square /> : paperAuthority ? <Play /> : <LockKeyhole />}
-                {armed ? "Stop paper bot" : paperAuthority ? "Arm promoted paper bot" : "Paper locked: no strategy promoted"}
+                {armed ? "Stop paper bot" : paperAuthority ? "Arm promoted paper bot" : "Paper locked"}
               </Button>
             )}
             <Button variant="outline" disabled={pending || !armed || !canControl} onClick={() => control({ action: "run_cycle" })}>

@@ -268,9 +268,11 @@ export function PortfolioHub({
         </Panel>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="money-stats">
+      {/* Phones: net worth across the top, the other three as one compact row. */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4" data-testid="money-stats">
         <StatTile
           emphasis
+          className="col-span-3 lg:col-span-1"
           label="Net worth"
           value={formatMoney(summary.net_worth)}
           trend={summary.history.map((point) => point.value)}

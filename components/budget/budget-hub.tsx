@@ -87,7 +87,7 @@ export function BudgetHub({ initial }: { initial: BudgetData }) {
       </header>
 
       <section aria-label="Budget summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="budget-summary">
-        <StatTile label="Income" value={money(data.income)} hint={monthLabel(data.month)} />
+        <StatTile label="Income" value={money(data.income)} />
         <StatTile label="Planned" value={money(budget.planned_total)} hint={data.income > 0 ? `${Math.round((budget.planned_total / data.income) * 100)}% of income` : "no income yet"} />
         <StatTile label="Spent" value={money(budget.spent_total)} />
         {hasLines ? (
@@ -126,7 +126,7 @@ export function BudgetHub({ initial }: { initial: BudgetData }) {
             <PanelHeader
               titleId={`budget-${group.id}`}
               title={group.label}
-              description={meta.hint}
+              description={<span className="hidden sm:inline">{meta.hint}</span>}
               action={
                 <span className="mm-num text-right text-sm">
                   <span className={cn("font-semibold", group.remaining >= 0 ? "text-engine" : "text-critical")}>{money(group.remaining)}</span>

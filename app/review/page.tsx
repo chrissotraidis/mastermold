@@ -203,7 +203,16 @@ export default function ReviewPage() {
           </LabSection>
         </section>
 
-        <ReviewerEvidencePanel />
+        {/* Reviewer tooling, not status: folded so the page leads with what works. */}
+        <details className="group mm-panel overflow-hidden">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold text-on-surface marker:hidden [&::-webkit-details-marker]:hidden">
+            Walkthrough checks for reviewers
+            <span aria-hidden="true" className="text-xs text-outline transition group-open:rotate-90">›</span>
+          </summary>
+          <div className="p-3 pt-0">
+            <ReviewerEvidencePanel />
+          </div>
+        </details>
       </main>
     </AppShell>
   );

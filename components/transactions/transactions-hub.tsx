@@ -198,7 +198,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                   <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-outline" />
                   <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search merchant or note" className={cn(field, "pl-9")} />
                 </label>
-                <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={cn(field, "w-auto flex-1 sm:flex-none")}>
+                <select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={cn(field, "w-auto min-w-0 flex-1 sm:flex-none")}>
                   <option value="">All categories</option>
                   {data.categories.map((category) => (
                     <option key={category.id} value={category.id}>{category.name}</option>

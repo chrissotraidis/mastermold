@@ -34,7 +34,7 @@ export function StatTile({
   emphasis?: boolean;
 }) {
   return (
-    <div className={cn("mm-panel flex min-w-0 flex-col gap-2 p-4", emphasis && "border-violet/35", className)}>
+    <div className={cn("mm-panel flex min-w-0 flex-col gap-2 p-3 sm:p-4", emphasis && "border-violet/35", className)}>
       <div className="flex min-w-0 items-center justify-between gap-3">
         <p className="mm-eyebrow truncate">{label}</p>
         {trend && trend.length > 1 ? (
@@ -45,7 +45,7 @@ export function StatTile({
         <p
           className={cn(
             "mm-num min-w-0 truncate font-display font-semibold tracking-tight text-on-surface",
-            emphasis ? "text-3xl" : "text-2xl",
+            emphasis ? "text-3xl" : "text-xl sm:text-2xl",
           )}
         >
           {value}

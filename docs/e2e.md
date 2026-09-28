@@ -132,3 +132,23 @@ the physical devices, which were not available.
   grid, tabs fade at the edge when they scroll, and the labs have a
   Web3 | Polymarket switch.
 - Tests: `e2e/phone.e2e.ts` covers More, the lab switch, and Hide amounts.
+
+## Less-text pass (2026-09-28)
+
+Measured with a phone crawl of 11 pages (visible words in the main area,
+dropdown options excluded; seeded sample data):
+
+| Page | Before | After |
+|---|---|---|
+| What works today | 348 | 127 |
+| Today | 283 | 188 |
+| Settings | 252 | 176 |
+| Journal | 231 | 196 |
+| Web3 lab | 234 | 199 |
+| Polymarket lab | 291 | 246 |
+
+"Before" counted dropdown options too, so Transactions and Budget are not
+comparable; both lost their repeated statement text, stat hints and group
+explanations on phones. Transactions now keeps the month's totals inside the
+cash flow card, and Portfolio shows net worth full width with Assets, Debts and
+Prices as one compact row.
