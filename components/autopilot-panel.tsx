@@ -539,7 +539,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
               <p className="mt-0.5 text-[11px] text-outline">Five isolated $1,000 books · $25 entry cap · no live route</p>
             </div>
             <span className="text-[10px] font-semibold uppercase tracking-widest text-outline">
-              {data.experiments.summaries.filter((row) => !row.paused).length} running
+              {data.experiments.summaries.filter((row) => !row.paused).length} {state.daemon === "offline" ? "ready" : "running"}
             </span>
           </div>
           <div className="mt-2 grid gap-1.5">
@@ -552,7 +552,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-xs font-semibold text-on-surface">{experiment.name}</span>
                     <span className={`shrink-0 text-[10px] font-semibold uppercase ${experiment.paused ? "text-caution" : "text-engine"}`}>
-                      {experiment.paused ? "paused" : "running"}
+                      {experiment.paused ? "paused" : state.daemon === "offline" ? "ready" : "running"}
                     </span>
                   </div>
                   <p className="truncate text-[10px] text-outline">{experiment.confidence} · {experiment.open_positions} open</p>
