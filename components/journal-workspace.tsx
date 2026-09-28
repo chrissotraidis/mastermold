@@ -396,7 +396,7 @@ function TrackRecordSection({ tiers, provenance }: { tiers: JournalTrackRecordTi
       <PanelHeader
         titleId="track-record-title"
         title="Review scores"
-        description={`${closedCount} closed calls, grouped by how confident you were.`}
+        description={`${closedCount} closed calls by confidence.`}
         action={<ProvenanceChip label={provenance.label} title={provenance.source} />}
       />
       <div className="grid gap-3 p-5 pt-4">
@@ -420,8 +420,8 @@ function TrackRecordSection({ tiers, provenance }: { tiers: JournalTrackRecordTi
         </div>
         <p className="text-xs leading-5 text-outline">
           {isSample
-            ? "Seeded and locally saved calls. Use this to check the scoring workflow; it is not evidence that future calls will work."
-            : "Compares higher-scored saved calls with later results. Useful for review, not proof that future calls will work."}
+            ? "Sample calls. Not evidence that future calls will work."
+            : "For review only. Not proof that future calls will work."}
         </p>
       </div>
     </Panel>
@@ -498,8 +498,7 @@ function EntryList({
 
       {sample ? (
         <p className="rounded-xl border border-violet/30 bg-violet/[0.06] px-4 py-3 text-xs leading-5 text-on-surface-variant" data-testid="journal-sample-note">
-          <span className="font-semibold text-on-surface">These calls are samples.</span> They show how scoring works. Your first
-          logged call replaces them, and every number on this page becomes yours.
+          <span className="font-semibold text-on-surface">Sample calls.</span> Your first logged call replaces them.
         </p>
       ) : null}
 
@@ -765,7 +764,7 @@ function StrategyBeliefSection({ journal }: { journal: JournalWorkspaceData }) {
       <PanelHeader
         titleId="strategy-beliefs-title"
         title="Lessons learned"
-        description="Updates only after several consistent outcomes, never from one result."
+        description="Changes only after several outcomes agree."
       />
       <div className="grid gap-3 p-5 pt-3">
         <p className="mm-num text-sm text-on-surface-variant">

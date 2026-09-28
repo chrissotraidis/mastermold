@@ -176,11 +176,11 @@ export default async function SettingsPage() {
                 <SettingsPanel id="connections" title="Connections" status={connectionsStatus}>
                   <span id="investment-awareness" aria-hidden="true" className="block scroll-mt-24" />
                   <p className="text-xs leading-5 text-outline">
-                    Read-only portfolio sources. The fastest setup is importing your book on{" "}
+                    Read-only portfolio sources. Fastest:{" "}
                     <Link href="/portfolio?action=import-holdings" className="text-violet hover:text-violet-soft">
-                      Portfolio
+                      import your book
                     </Link>
-                    . Imports are snapshots only, not automatic brokerage trading.
+                    .
                   </p>
                   <div id="portfolio-connections" className="mt-3 grid scroll-mt-24 items-start gap-3 lg:grid-cols-2 [&>*]:min-w-0">
                     <MonarchMcpPanel initialState={portfolioBrain} config={monarchConfig} />
@@ -469,6 +469,8 @@ function PortfolioImportStatusCard({ portfolio }: { portfolio: ReturnType<typeof
     : hasImportIssues
       ? "The latest import checked an account but could not add every holding. Open the issue list before relying on the total."
       : "No account holdings imported yet. Check account access, then press Import holdings.";
+  // Nothing imported and nothing wrong: the card would only repeat the empty state.
+  if (!hasImportedHoldings && !hasImportIssues) return null;
 
   return (
     <div className="rounded-xl border border-outline-variant/50 px-3 py-2">
@@ -564,32 +566,17 @@ function SafetyLimitsSettingsCard({
 
 function DataPrivacyCard() {
   const items = [
-    {
-      label: "Stays in this browser",
-      detail:
-        "Profile preferences persist in this browser. Integration credentials stay only in the current tab, are never exported, and are sent only when you press a test, import, or live-chat action.",
-    },
-    {
-      label: "Sent to this local app",
-      detail:
-        "Connection tests, holdings imports, live chat, manual holdings, paper trades, and journal saves go through this local app server so the UI can update.",
-    },
-    {
-      label: "Can leave this app",
-      detail:
-        "Only the action you choose can contact an outside service: account test/import sends that service's fields, and live chat sends the question plus visible app context to the selected chat service.",
-    },
-    {
-      label: "Never sent by this app",
-      detail: "Advisory, portfolio, and Settings actions never place orders or ask for wallet keys. The separate Autopilot signer can use only an environment-provisioned wallet after its runtime gates pass.",
-    },
+    { label: "Stays on this device", detail: "Preferences, and keys you type (this tab only, never exported)." },
+    { label: "Goes to your Master Mold server", detail: "Holdings, transactions, journal, tests and imports. Nothing else sees them." },
+    { label: "Can leave", detail: "Only an action you choose can contact an outside service: an account test or import, or chat (live chat sends the question plus visible app context to the selected chat service)." },
+    { label: "Never", detail: "No orders and no wallet keys from here. The separate Web3 bot signs only with a server wallet, after its gates pass." },
   ];
 
   return (
     <div id="data-privacy" className="scroll-mt-24 rounded-xl border border-outline-variant/50">
       <p className="flex min-h-11 items-center justify-between gap-3 px-3 py-2">
         <span className="text-sm font-semibold text-on-surface">Data privacy</span>
-        <span className="text-xs text-outline">What stays local, what can leave</span>
+        
       </p>
       <div className="grid gap-3 border-t border-outline-variant/40 px-3 py-3 sm:grid-cols-2">
         {items.map((item) => (

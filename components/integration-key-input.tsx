@@ -296,11 +296,8 @@ export function IntegrationKeyInput({
         </a>
       ) : null}
       <p className="text-xs leading-5 text-outline">
-        {permissionScope} These entries stay only in this browser tab and are sent through
-        the local app only when you press a test or import action. Closing the tab clears them.{" "}
-        {service === "live_chat"
-          ? "Live chat sends the question plus visible app context to the selected chat service."
-          : "Importing copies holdings into Portfolio and still cannot trade."}
+        {permissionScope} Kept in this tab only; closing it clears them.{" "}
+        {service === "live_chat" ? "Chat sends your question and page context to the chosen service." : null}
       </p>
     </div>
   );

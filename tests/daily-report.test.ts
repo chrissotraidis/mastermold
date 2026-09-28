@@ -379,7 +379,7 @@ describe("today's plays", () => {
     const todayPage = readFileSync(join(process.cwd(), "app/page.tsx"), "utf8");
     expect(todayPage).toContain("Decision inbox");
     expect(todayPage).toContain('data-testid="today-play"');
-    expect(todayPage).toContain("What to look at first, from your holdings");
+    expect(todayPage).toContain("What to look at first. Suggestions only.");
     expect(todayPage).toContain("horizon: {play.horizon} · confidence: {play.confidence}");
     // The decision inbox renders above the prose brief.
     expect(todayPage.indexOf('aria-labelledby="today-plays-title"')).toBeLessThan(

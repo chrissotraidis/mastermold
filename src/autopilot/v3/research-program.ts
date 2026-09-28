@@ -39,7 +39,7 @@ export function buildWeb3ResearchProgram(input: { snapshots: CandidateSnapshotRo
 
   return {
     summary:
-      "The bot paper traded for weeks. Its main strategy made 43 round trips and ended slightly down, and three other signals turned out backwards. New entries are paused while the lab tests the one signal that held up (cusum_tb) on its real trades, after costs.",
+      "Paper trading ended slightly down. New entries are paused while the one signal that held up (cusum_tb) is tested after costs.",
     daemon: input.daemon,
     decision_doc: "docs/research-2026-09/STRATEGY-DECISION.md",
     experiments: [

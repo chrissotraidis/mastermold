@@ -58,7 +58,7 @@ export function GoalsPanel() {
       <PanelHeader
         titleId="goals-title"
         title="Savings goals"
-        description="Track progress toward a target. Link the transfers that fund it; goals never move money."
+        description="Link the transfers that fund each goal."
         action={
           <button type="button" className={ghostButton} onClick={() => setEditing("new")}>
             <Plus aria-hidden="true" className="size-4" /> New goal
@@ -67,7 +67,7 @@ export function GoalsPanel() {
       />
       <div className="grid gap-3 p-5 pt-4 md:grid-cols-2">
         {data.goals.length === 0 ? (
-          <p className="text-sm text-on-surface-variant md:col-span-2">No goals yet. An emergency fund or a trip is a good first one.</p>
+          <p className="text-sm text-on-surface-variant md:col-span-2">No goals yet. Try an emergency fund.</p>
         ) : null}
         {data.goals.map((goal) => (
           <article key={goal.id} className="grid gap-2 rounded-2xl border border-outline-variant/50 p-4" data-testid="goal-card">

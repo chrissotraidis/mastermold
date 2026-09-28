@@ -155,18 +155,18 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
               titleId="today-plays-title"
               eyebrow={
                 hasPersonalPortfolio
-                  ? `01 · ${decisionPlays[0]?.source === "llm" ? "Model-written, validated" : "Rules from your data"}`
-                  : "01 · Demo on sample holdings"
+                  ? decisionPlays[0]?.source === "llm" ? "Model-written, validated" : "From your data"
+                  : "Sample holdings"
               }
               title="Decision inbox"
-              description="What to look at first, from your holdings and today’s prices. Suggestions only."
+              description="What to look at first. Suggestions only."
             />
             <div className="p-3 pt-4">
               {decisionPlays.length === 0 && extraRecommendations.length === 0 ? (
                 <EmptyState
                   icon={Inbox}
                   title="Nothing needs a decision right now."
-                  description={report ? "The latest read found nothing to act on." : "No decision inbox is saved yet. Refresh the daily read to build it from your holdings and today\u2019s moves."}
+                  description={report ? "The latest read found nothing to act on." : "Refresh today to build it."}
                 />
               ) : (
                 <div className="grid grid-cols-1 gap-1 [&>*]:min-w-0">
@@ -196,7 +196,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
           <div className="grid grid-cols-1 content-start gap-6 lg:col-span-5 [&>*]:min-w-0">
             <Panel aria-labelledby="today-brief-title">
-              <PanelHeader titleId="today-brief-title" eyebrow="02 · Market read" title="Markets" />
+              <PanelHeader titleId="today-brief-title" eyebrow="Market read" title="Markets" />
               <div className="space-y-4 p-5 pt-3">
                 {report ? (
                   <>
@@ -233,7 +233,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
                   </>
                 ) : (
                   <p className="text-sm leading-6 text-on-surface-variant">
-                    No report saved yet for today. Refresh to read the portfolio and market now.
+                    No read yet today.
                   </p>
                 )}
               </div>
@@ -242,7 +242,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
             <Panel aria-labelledby="today-changes-title">
               <PanelHeader
                 titleId="today-changes-title"
-                eyebrow="03 · Activity"
+                eyebrow="Activity"
                 title="What changed"
                 action={
                   <Link href="/activity" className="inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-violet hover:text-violet-soft">
@@ -307,7 +307,7 @@ function PlayLine({ play, reportId, canSaveCall, initialResponse, brief, extraWh
     return true;
   });
   return (
-    <details className="group min-w-0 mm-row open:bg-surface-high/40" data-testid="today-play" open={Boolean(brief) || undefined}>
+    <details className="group min-w-0 mm-row open:bg-surface-high/40" data-testid="today-play">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2.5 marker:hidden [&::-webkit-details-marker]:hidden">
         <Badge variant={playActionVariant(play.action)} className="shrink-0 uppercase tracking-wide">
           {play.action}

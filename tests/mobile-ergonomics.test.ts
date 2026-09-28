@@ -460,8 +460,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(journal).toContain('{entry.result.call_was_right ? "Right" : "Missed"}');
     // Sample-vs-saved honesty stays in the Review scores panel.
     expect(journal).toContain('const isSample = provenance.label === "Sample data";');
-    expect(journal).toContain("Seeded and locally saved calls. Use this to check the scoring workflow; it is not evidence that future calls will work.");
-    expect(journal).toContain("Compares higher-scored saved calls with later results. Useful for review, not proof that future calls will work.");
+    expect(journal).toContain("Sample calls. Not evidence that future calls will work.");
+    expect(journal).toContain("For review only. Not proof that future calls will work.");
     expect(journalPage).not.toMatch(/CalibrationCurve|calibration-title/i);
     expect(journalPage).not.toMatch(/Score accuracy|Confidence accuracy|higher-confidence|actually been right more often/i);
     expect(journal).toContain("aria-expanded={showDetails}");
@@ -484,8 +484,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(journal).toContain("line-clamp-2 block text-sm font-medium leading-5");
     expect(journal).toContain("formatCompactTierResultCount(tier)");
     expect(journal).toContain("{entries.length} saved");
-    expect(journal).toContain("Seeded and locally saved calls. Use this to check the scoring workflow; it is not evidence that future calls will work.");
-    expect(journal).toContain("Compares higher-scored saved calls with later results. Useful for review, not proof that future calls will work.");
+    expect(journal).toContain("Sample calls. Not evidence that future calls will work.");
+    expect(journal).toContain("For review only. Not proof that future calls will work.");
     expect(journal).toContain("formatCompactTierResultCount(tier)");
     expect(journal).toContain('return tier.resolved_count === 0 ? "No closed" : `${tier.wins}/${tier.resolved_count} right`;');
     expect(journal).toContain('`${value.toFixed(1)}/10`');
@@ -815,7 +815,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(today).toContain('data-testid="today-movers"');
     expect(today).toContain('row.daily_move_pct !== null && row.status === "refreshed"');
     // Empty states say plainly when nothing is saved or pending.
-    expect(today).toContain("No report saved yet for today. Refresh to read the portfolio and market now.");
+    expect(today).toContain("No read yet today.");
     expect(today).toContain("Nothing needs a decision right now.");
     expect(today).toContain("No unreviewed activity.");
     // The page label only claims a personal portfolio when provenance is personal.
@@ -921,10 +921,10 @@ describe("mobile ergonomics source contracts", () => {
     expect(settingsPage).toContain("Technical details");
     expect(settingsPage.indexOf("Technical details")).toBeGreaterThan(settingsPage.indexOf('id="autopilot"'));
     expect(settingsPage).toContain("<details");
-    expect(settingsPage).toContain("Stays in this browser");
-    expect(settingsPage).toContain("Sent to this local app");
-    expect(settingsPage).toContain("Can leave this app");
-    expect(settingsPage).toContain("Never sent by this app");
+    expect(settingsPage).toContain("Stays on this device");
+    expect(settingsPage).toContain("Goes to your Master Mold server");
+    expect(settingsPage).toContain("Can leave");
+    expect(settingsPage).toContain('label: "Never"');
     expect(settingsPage).toContain("No account holdings imported yet. Check account access, then press Import holdings.");
     expect(settingsPage).not.toMatch(/SettingsWeb3CredentialConsole|first funded canary|credential wall|receipt wall/i);
     expect(input).toContain("Import holdings");
@@ -943,12 +943,12 @@ describe("mobile ergonomics source contracts", () => {
     const imports = source("src/db/portfolio-imports.ts");
 
     expect(settingsPage).toContain("Read-only portfolio sources.");
-    expect(settingsPage).toContain("The fastest setup is importing your book on");
-    expect(settingsPage).toContain("Stays in this browser");
-    expect(settingsPage).toContain("Sent to this local app");
-    expect(settingsPage).toContain("Can leave this app");
-    expect(settingsPage).toContain("Never sent by this app");
-    expect(settingsPage).toContain("Only the action you choose can contact an outside service");
+    expect(settingsPage).toContain("Read-only portfolio sources. Fastest:");
+    expect(settingsPage).toContain("Stays on this device");
+    expect(settingsPage).toContain("Goes to your Master Mold server");
+    expect(settingsPage).toContain("Can leave");
+    expect(settingsPage).toContain('label: "Never"');
+    expect(settingsPage).toContain("Only an action you choose can contact an outside service");
     expect(settingsPage).toContain("live chat sends the question plus visible app context");
     expect(settingsPage).toContain("selected chat service");
     expect(settingsPage).not.toContain("selected chat provider");
@@ -959,7 +959,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(integrations).toContain("Brokerages via SnapTrade");
     expect(integrations).toContain("Coinbase read-only");
     expect(integrations).toContain("Web3 wallets via Zerion");
-    expect(settingsPage).toContain("Advisory, portfolio, and Settings actions never place orders or ask for wallet keys. The separate Autopilot signer can use only an environment-provisioned wallet after its runtime gates pass.");
+    expect(settingsPage).toContain("No orders and no wallet keys from here.");
     expect(settingsPage).not.toMatch(/SettingsWeb3CredentialConsole|credential wall|receipt wall/i);
     expect(input).toContain("Import holdings");
     expect(input).toContain("Test read-only access");

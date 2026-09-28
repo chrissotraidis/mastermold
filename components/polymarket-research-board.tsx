@@ -49,11 +49,11 @@ export function ResearchBoard({
   return (
     <section aria-labelledby="research-program-title" className="grid gap-4">
       <Panel className="flex flex-col gap-4 border-violet/30 p-5 sm:flex-row sm:items-center">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-violet/15 text-violet ring-1 ring-violet/30">
+        <span className="hidden size-11 sm:flex shrink-0 items-center justify-center rounded-full bg-violet/15 text-violet ring-1 ring-violet/30">
           <FlaskConical aria-hidden="true" className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="research-program-title" className="font-display text-base font-semibold text-on-surface">What happened, and what we test now</h2>
+          <h2 id="research-program-title" className="font-display text-base font-semibold text-on-surface">Where it stands</h2>
           <p className="mt-1 text-sm leading-6 text-on-surface-variant">{program.summary}</p>
           <p className="mt-2 flex flex-wrap gap-1.5">
             {statusCounts(program).map(([key, count]) => (
@@ -62,9 +62,8 @@ export function ResearchBoard({
               </Badge>
             ))}
           </p>
-          <p className="mt-1 text-xs text-outline">
-            {statusLine ?? `Last research cycle ${lastCycleAt ? new Date(lastCycleAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "not run"} · paper mode off · live orders locked`} · decision record:{" "}
-            <code className="text-[11px]">{program.decision_doc}</code>
+          <p className="mt-1 text-xs text-outline" title={`Decision record: ${program.decision_doc}`}>
+            {statusLine ?? `Last cycle ${lastCycleAt ? new Date(lastCycleAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "not run"} · paper off · live locked`}
           </p>
         </div>
         <Button variant="outline" disabled={pending || !canControl} onClick={onRunResearch} title={runTitle}>

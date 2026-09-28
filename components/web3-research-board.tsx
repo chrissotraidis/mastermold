@@ -28,7 +28,7 @@ export function Web3ResearchBoard() {
       lastCycleAt={null}
       runLabel="Sample costs"
       runTitle="Reads the public Jito tip floor and SOL price. Sends no transaction."
-      statusLine={`Bot ${program.daemon === "offline" ? "not running" : program.daemon} · paper mode off · live money locked`}
+      statusLine={`Bot ${program.daemon === "offline" ? "off" : program.daemon} · paper off · live locked`}
       onRunResearch={() =>
         startTransition(async () => {
           const response = await fetch("/api/autopilot/research", {

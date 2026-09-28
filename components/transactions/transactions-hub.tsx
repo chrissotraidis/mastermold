@@ -179,8 +179,8 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
           <section aria-label="Cash flow" className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="cash-flow">
             <StatTile label="Income" value={money(flow.income)} deltaTone="up" />
             <StatTile label="Spending" value={money(flow.expenses)} />
-            <StatTile emphasis label="Saved" value={money(flow.savings)} deltaTone={flow.savings >= 0 ? "up" : "down"} hint={monthLabel(data.month)} />
-            <StatTile label="Savings rate" value={flow.savings_rate === null ? "—" : `${flow.savings_rate}%`} hint="saved ÷ income" />
+            <StatTile emphasis label="Saved" value={money(flow.savings)} deltaTone={flow.savings >= 0 ? "up" : "down"} />
+            <StatTile label="Savings rate" value={flow.savings_rate === null ? "—" : `${flow.savings_rate}%`} />
           </section>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
@@ -188,7 +188,6 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
               <PanelHeader
                 titleId="tx-list-title"
                 title={`${visible.length} transaction${visible.length === 1 ? "" : "s"}`}
-                description="Change a category inline. Transfers and hidden rows never count toward cash flow."
               />
               <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
                 <label className="relative min-w-[12rem] flex-1">
@@ -219,8 +218,9 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                           {tx.source === "sandbox" ? <span className="rounded-full bg-caution/15 px-1.5 text-[10px] font-semibold text-caution">sandbox</span> : null}
                         </span>
                         <span className="block truncate text-xs text-outline" title={tx.original_description}>
-                          <span className="mm-num">{dayLabel(tx.date)}</span> ·{" "}
-                          {tx.original_description}
+                          <span className="mm-num">{dayLabel(tx.date)}</span>
+                          {/* The raw statement text repeats the merchant; desktop only. */}
+                          <span className="hidden xl:inline"> · {tx.original_description}</span>
                           {tx.account_id ? ` · ${accountName.get(tx.account_id) ?? "account"}` : ""}
                         </span>
                       </span>
@@ -330,7 +330,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
               </Panel>
 
               <Panel aria-labelledby="rules-title">
-                <PanelHeader titleId="rules-title" title="Rules" description="Run top to bottom on every import. Make one from any transaction with the wand." />
+                <PanelHeader titleId="rules-title" title="Rules" description="Applied to every import, top to bottom." />
                 <ul className="grid gap-2 p-5 pt-3">
                   {data.rules.length === 0 ? <li className="text-sm text-on-surface-variant">No rules yet.</li> : null}
                   {data.rules.map((rule) => (
@@ -522,7 +522,7 @@ function ImportSheet({ open, onClose, accounts, post, onImported }: {
           </div>
         ) : null}
         <div className="flex flex-col gap-2 border-t border-outline-variant/40 pt-4 text-sm sm:flex-row sm:items-center sm:justify-between" data-testid="sandbox-sync">
-          <p className="text-xs leading-5 text-outline">No bank is connected yet. Try the sync flow with a made-up checking account; rows are marked Sandbox and Undo removes them.</p>
+          <p className="text-xs leading-5 text-outline">No bank connected. Try sync with made-up data (undoable).</p>
           <button type="button" className={ghostButton} disabled={busy} onClick={() => void doSandboxSync()}>Run sandbox sync</button>
         </div>
       </div>

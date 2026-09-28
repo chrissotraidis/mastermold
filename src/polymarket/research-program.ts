@@ -140,7 +140,7 @@ export function buildPolymarketResearchProgram(input: {
 
   return {
     summary:
-      "The paper bot traded 24-hour momentum for 173 round trips and lost money, and the AI forecaster scored worse than the market. Paper entries are paused until a strategy passes its test. The lab now looks for edges that do not depend on out-guessing the market.",
+      "Momentum lost money and the AI forecaster lost to the market. Entries are paused while the lab tests edges that don't need to out-guess it.",
     experiments,
     retired: [
       { name: "24-hour momentum", reason: "Lost money over 173 paper trips, and prices moved against it at every horizon." },
