@@ -15,7 +15,7 @@ export function GetStartedChecklist({ progress, className }: { progress: GetStar
             Make Master Mold yours
           </h2>
         </div>
-        <p className="text-xs text-outline">Until step 1 is done, every page shows sample data.</p>
+        <p className="hidden text-xs text-outline sm:block">Until step 1 is done, every page shows sample data.</p>
       </div>
       <ol className="grid gap-2 p-3 sm:grid-cols-3">
         {progress.steps.map((step, index) => {
@@ -25,7 +25,8 @@ export function GetStartedChecklist({ progress, className }: { progress: GetStar
               <Link
                 href={step.href}
                 className={cn(
-                  "group flex h-full min-h-11 flex-col gap-2 rounded-xl border p-4 transition",
+                  // Phones: one tappable row per step; the detail shows from sm up.
+                  "group flex h-full min-h-12 items-center gap-2 rounded-xl border px-3 py-2.5 transition sm:flex-col sm:items-stretch sm:p-4",
                   step.done
                     ? "border-engine/25 bg-engine/[0.04]"
                     : isNext
@@ -48,10 +49,10 @@ export function GetStartedChecklist({ progress, className }: { progress: GetStar
                   </span>
                   <span className="sr-only">{step.done ? "(done)" : "(to do)"}</span>
                 </span>
-                <span className="text-xs leading-5 text-on-surface-variant">{step.detail}</span>
+                <span className="hidden text-xs leading-5 text-on-surface-variant sm:block">{step.detail}</span>
                 {step.done ? null : (
-                  <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-violet group-hover:text-violet-soft">
-                    {step.cta} <ArrowRight aria-hidden="true" className="size-3" />
+                  <span className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-violet group-hover:text-violet-soft sm:ml-0 sm:mt-auto">
+                    <span className="hidden sm:inline">{step.cta}</span> <ArrowRight aria-hidden="true" className="size-4 sm:size-3" />
                   </span>
                 )}
               </Link>

@@ -305,7 +305,7 @@ describe("mobile ergonomics source contracts", () => {
 
     expect(profileSettings).toContain("Profile settings live in this browser");
     expect(profileSettings).toContain("<summary className=\"flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 marker:hidden [&::-webkit-details-marker]:hidden\">");
-    expect(settingsPage).toContain("Choose what to connect. Nothing here places trades, signs transactions, or moves funds.");
+    expect(settingsPage).toContain("Read-only. Nothing here can move money.");
     expect(settingsPage).toContain('label="Settings sections"');
     expect(settingsPage).toContain('id="connections"');
     expect(settingsPage).toContain('id="profile"');
@@ -364,7 +364,7 @@ describe("mobile ergonomics source contracts", () => {
     expect(appShell).toContain('aria-label="Mobile primary"');
     expect(appShell).toContain("fixed bottom-3 left-1/2");
     expect(appShell).toContain("w-[calc(100%-1.5rem)] -translate-x-1/2");
-    expect(appShell).toContain("relative flex min-h-11 min-w-0 flex-1 flex-col");
+    expect(appShell).toContain("relative flex min-h-12 min-w-0 flex-1 flex-col");
     // The face still navigates home, while the sticky wordmark opens Master
     // Mold at every breakpoint without relying on an overlapping launcher.
     expect(appShell).toContain('aria-label="Go to Today (home)"');
@@ -893,7 +893,7 @@ describe("mobile ergonomics source contracts", () => {
     const integrations = source("src/db/integrations.ts");
     const imports = source("src/db/portfolio-imports.ts");
 
-    expect(settingsPage).toContain("Choose what to connect. Nothing here places trades, signs transactions, or moves funds.");
+    expect(settingsPage).toContain("Read-only. Nothing here can move money.");
     expect(settingsPage).toContain('label="Settings sections"');
     expect(settingsPage).toContain('id="connections"');
     expect(settingsPage).toContain('id="profile"');

@@ -67,7 +67,7 @@ export function BudgetHub({ initial }: { initial: BudgetData }) {
         <div className="min-w-0">
           <p className="mm-eyebrow">A plan for this month</p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Budget</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">
+          <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-on-surface-variant sm:block">
             Plan spending in three groups. Spending comes from your <Link href="/transactions" className="font-semibold text-violet hover:text-violet-soft">Transactions</Link>; hidden rows and transfers never count.
           </p>
         </div>

@@ -58,8 +58,9 @@ export function DailyReportRefreshButton({
         type="button"
         onClick={refresh}
         disabled={running}
+        aria-label={running ? "Refreshing today" : "Refresh today"}
         className={cn(
-          "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition sm:min-h-9",
+          "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition sm:min-h-9 sm:px-4",
           variant === "primary"
             ? "bg-violet text-void hover:bg-violet/90 disabled:opacity-80"
             : "border border-outline-variant/70 bg-surface-low/60 text-on-surface hover:border-violet/45 hover:bg-surface-high/60 disabled:opacity-70",
@@ -70,7 +71,7 @@ export function DailyReportRefreshButton({
         ) : (
           <RefreshCw aria-hidden="true" className="size-4" />
         )}
-        {running ? "Refreshing today…" : "Refresh today"}
+        <span className="hidden sm:inline">{running ? "Refreshing today…" : "Refresh today"}</span>
       </button>
       {message ? (
         <p

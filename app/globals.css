@@ -240,3 +240,10 @@ body > div,
 [role="img"]:has(canvas) .mm-ph {
   opacity: 0;
 }
+
+/* Hide amounts (privacy toggle): blur every figure until tapped off. */
+.mm-private .mm-num,
+.mm-private [data-private] {
+  filter: blur(7px);
+  user-select: none;
+}

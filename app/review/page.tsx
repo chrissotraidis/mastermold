@@ -62,7 +62,7 @@ export default function ReviewPage() {
         <header className="space-y-2">
           <p className="mm-eyebrow">Honest status</p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">What works today</h1>
-          <p className="max-w-3xl text-sm leading-6 text-on-surface-variant">
+          <p className="hidden max-w-3xl text-sm leading-6 text-on-surface-variant sm:block">
             What is real, what runs on sample data, what needs a key, and what is not built yet. Paper results and replay results are evidence—not claims of future profit.
           </p>
           <p className="flex flex-wrap gap-1.5">

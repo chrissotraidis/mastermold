@@ -1092,7 +1092,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
           {/* "Running" only when the bot is ticking; unpaused experiments do nothing while it is off. */}
           <StripStat
             label="Experiments"
-            value={state.daemon === "offline" ? `${running} of ${experimentCount} ready · bot off` : `${running} of ${experimentCount} running`}
+            value={state.daemon === "offline" ? `${running} of ${experimentCount} ready` : `${running} of ${experimentCount} running`}
           />
         </dl>
       </div>

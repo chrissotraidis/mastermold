@@ -67,7 +67,7 @@ export function Tabs({ items, label, className }: { items: TabItem[]; label: str
         role="tablist"
         aria-label={label}
         onKeyDown={onKeyDown}
-        className="flex min-w-0 gap-1 overflow-x-auto border-b border-outline-variant/50 [scrollbar-width:none]"
+        className="flex min-w-0 gap-1 overflow-x-auto border-b border-outline-variant/50 [mask-image:linear-gradient(to_right,black_85%,transparent)] [scrollbar-width:none] sm:[mask-image:none]"
       >
         {items.map((item) => {
           const selected = item.id === active;

@@ -142,8 +142,8 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
         <div className="min-w-0">
           <p className="mm-eyebrow">Where your money went</p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Transactions</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">
-            Import a bank or card CSV, fix categories once, and let rules handle the rest. Stored only on this computer.
+          <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-on-surface-variant sm:block">
+            Import a bank or card CSV, fix categories once, and let rules handle the rest. Stored only on this device.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -164,13 +164,13 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
           <EmptyState
             icon={FileUp}
             title="No transactions yet"
-            description="Download a CSV from your bank or card website (usually under Activity → Download) and import it here. Duplicates are skipped, and every import can be undone."
+            description="Export a CSV from your bank or card and import it. Every import can be undone."
+            action={
+              <button type="button" className={primaryButton} onClick={() => setImportOpen(true)}>
+                <FileUp aria-hidden="true" className="size-4" /> Import your first CSV
+              </button>
+            }
           />
-          <div className="flex justify-center pb-5">
-            <button type="button" className={primaryButton} onClick={() => setImportOpen(true)}>
-              <FileUp aria-hidden="true" className="size-4" /> Import your first CSV
-            </button>
-          </div>
         </Panel>
       ) : (
         <>

@@ -10,6 +10,9 @@ import {
   Hexagon,
   Info,
   LineChart,
+  LayoutGrid,
+  MessageSquare,
+  ClipboardCheck,
   ArrowLeftRight,
   PiggyBank,
   Loader2,
@@ -44,6 +47,8 @@ import {
 import { SentinelFace, type SystemState } from "@/components/sentinel-face";
 import { CommandPalette, openCommandPalette } from "@/components/command-palette";
 import { Toaster } from "@/components/ui/toast";
+import { Sheet } from "@/components/ui/sheet";
+import { PrivacyToggle } from "@/components/privacy-toggle";
 import { useOptionalProfile } from "@/components/profile-provider";
 import { useFaceActivity } from "@/components/face-activity";
 import type { ProductProvenanceLabel } from "@/lib/provenance-copy";
@@ -635,6 +640,7 @@ function TopBar({
             ) : null}
           </div>
         ) : null}
+        <PrivacyToggle />
         <AlertInboxDrawer />
         {ready ? (
           <Link
@@ -898,52 +904,111 @@ function SideRail() {
   );
 }
 
-// Same vocabulary as the desktop rail — one name per destination everywhere.
-const MOBILE: Array<NavItem & { shortLabel: string }> = [
+// Phone tab bar: the four places used most, plus More for everything else
+// (Monarch keeps five tabs and a More sheet the same way).
+const MOBILE: Array<NavItem & { shortLabel: string; also?: string[] }> = [
   { href: "/", label: "Today", shortLabel: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: LineChart, zone: "observe" },
-  { href: "/transactions", label: "Transactions", shortLabel: "Spending", icon: ArrowLeftRight, zone: "observe" },
-  { href: "/journal", label: "Journal", shortLabel: "Journal", icon: NotebookPen, zone: "observe" },
-  { href: "/settings", label: "Settings", shortLabel: "Settings", icon: Settings, zone: "system" },
+  { href: "/transactions", label: "Transactions", shortLabel: "Spending", icon: ArrowLeftRight, zone: "observe", also: ["/budget"] },
+  { href: "/trading", label: "Research labs", shortLabel: "Labs", icon: Bot, zone: "research", also: ["/polymarket", "/executor", "/paper"] },
+];
+
+const MORE_GROUPS: Array<{ label: string; items: Array<{ href: string; label: string; icon: LucideIcon; hint: string }> }> = [
+  {
+    label: "Money",
+    items: [
+      { href: "/portfolio", label: "Portfolio", icon: LineChart, hint: "Net worth and holdings" },
+      { href: "/transactions", label: "Transactions", icon: ArrowLeftRight, hint: "Spending and cash flow" },
+      { href: "/budget", label: "Budget", icon: PiggyBank, hint: "Plans and goals" },
+      { href: "/journal", label: "Journal", icon: NotebookPen, hint: "Calls, graded later" },
+    ],
+  },
+  {
+    label: "Research labs",
+    items: [
+      { href: "/trading", label: "Web3 lab", icon: Bot, hint: "Paper only" },
+      { href: "/polymarket", label: "Polymarket lab", icon: Radar, hint: "Paper only" },
+    ],
+  },
+  {
+    label: "Master Mold",
+    items: [
+      { href: "/chat", label: "Chat", icon: MessageSquare, hint: "Ask about your money" },
+      { href: "/settings", label: "Settings", icon: Settings, hint: "Connections and privacy" },
+      { href: "/review", label: "What works today", icon: ClipboardCheck, hint: "Built, sample, or missing" },
+    ],
+  },
 ];
 
 function MobileNav() {
   const pathname = usePathname() || "/";
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => setMoreOpen(false), [pathname]);
+  const tabActive = (item: (typeof MOBILE)[number]) => isActivePath(pathname, item.href) || (item.also ?? []).some((href) => isActivePath(pathname, href));
+  const moreActive = !MOBILE.some(tabActive);
+  const tabClass = (active: boolean) =>
+    cn(
+      "relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 transition-colors",
+      active ? "bg-violet/15 text-violet" : "text-on-surface-variant active:bg-surface-high/35",
+    );
   return (
-    <nav
-      aria-label="Mobile primary"
-      className="fixed bottom-3 left-1/2 z-50 flex w-[calc(100%-1.5rem)] -translate-x-1/2 items-center justify-around rounded-2xl border border-outline-variant/60 bg-surface-dim/85 px-1 py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom)/2)] shadow-2xl shadow-void/50 backdrop-blur-2xl md:hidden"
-    >
-      {MOBILE.map((item) => {
-        const Icon = item.icon;
-        // One Spending tab on phones covers Transactions and Budget (Monarch groups them too).
-        const active = isActivePath(pathname, item.href) || (item.href === "/transactions" && isActivePath(pathname, "/budget"));
-        return (
-          <IntentPrefetchLink
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            aria-label={item.label}
-            className={cn(
-              "relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 transition-colors",
-              active ? "bg-violet/15 text-violet" : "text-on-surface-variant active:bg-surface-high/35",
-            )}
-          >
-            <NavPendingState>
-              {(pending) =>
-                pending ? (
-                  <Loader2 className="size-5 animate-spin text-violet" />
-                ) : (
-                  <Icon className="size-5" />
-                )
-              }
-            </NavPendingState>
-            <span className="max-w-full truncate text-[10px] font-medium">{item.shortLabel}</span>
-            <NavPendingBar />
-          </IntentPrefetchLink>
-        );
-      })}
-    </nav>
+    <>
+      <nav
+        aria-label="Mobile primary"
+        className="fixed bottom-3 left-1/2 z-50 flex w-[calc(100%-1.5rem)] -translate-x-1/2 items-center justify-around rounded-2xl border border-outline-variant/60 bg-surface-dim/90 px-1 py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom)/2)] shadow-2xl shadow-void/50 backdrop-blur-2xl md:hidden"
+      >
+        {MOBILE.map((item) => {
+          const Icon = item.icon;
+          const active = tabActive(item);
+          return (
+            <IntentPrefetchLink key={item.href} href={item.href} aria-current={active ? "page" : undefined} aria-label={item.label} className={tabClass(active)}>
+              <NavPendingState>
+                {(pending) => (pending ? <Loader2 className="size-5 animate-spin text-violet" /> : <Icon className="size-5" />)}
+              </NavPendingState>
+              <span className="max-w-full truncate text-[10px] font-medium">{item.shortLabel}</span>
+              <NavPendingBar />
+            </IntentPrefetchLink>
+          );
+        })}
+        <button type="button" onClick={() => setMoreOpen(true)} aria-haspopup="dialog" aria-current={moreActive ? "page" : undefined} className={tabClass(moreActive)}>
+          <LayoutGrid className="size-5" />
+          <span className="text-[10px] font-medium">More</span>
+        </button>
+      </nav>
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Everything">
+        <div className="grid gap-5" data-testid="more-sheet">
+          {MORE_GROUPS.map((group) => (
+            <section key={group.label} aria-label={group.label}>
+              <p className="mm-eyebrow mb-2">{group.label}</p>
+              <ul className="grid grid-cols-2 gap-2">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActivePath(pathname, item.href);
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={() => setMoreOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "flex min-h-16 flex-col justify-center gap-1 rounded-2xl border px-3 py-2.5 transition",
+                          active ? "border-violet/50 bg-violet/10" : "border-outline-variant/50 active:bg-surface-high/40",
+                        )}
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+                          <Icon aria-hidden="true" className="size-4 text-violet" /> {item.label}
+                        </span>
+                        <span className="truncate text-[11px] text-outline">{item.hint}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </Sheet>
+    </>
   );
 }
 

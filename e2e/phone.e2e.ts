@@ -47,3 +47,32 @@ test.describe("Phone layout", () => {
     expect(title!.width).toBeGreaterThanOrEqual(150);
   });
 });
+
+test.describe("Phone navigation and privacy", () => {
+  test("More reaches every page; Labs switches between the two labs", async ({ page }) => {
+    await page.goto("/");
+    const nav = page.getByRole("navigation", { name: "Mobile primary" });
+    for (const [label, path] of [["Budget", "/budget"], ["Polymarket lab", "/polymarket"], ["Settings", "/settings"], ["Journal", "/journal"]]) {
+      await nav.getByRole("button", { name: "More" }).tap();
+      await page.getByTestId("more-sheet").getByRole("link", { name: new RegExp(`^${label}`) }).tap();
+      await page.waitForURL(`**${path}`);
+    }
+    await nav.getByRole("link", { name: "Research labs" }).tap();
+    await page.waitForURL("**/trading");
+    await page.getByRole("navigation", { name: "Research labs" }).getByRole("link", { name: "Polymarket" }).tap();
+    await page.waitForURL("**/polymarket");
+    await expect(nav.getByRole("link", { name: "Research labs" })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("Hide amounts blurs figures and survives a reload", async ({ page }) => {
+    await page.goto("/portfolio");
+    await page.getByRole("button", { name: "Hide amounts" }).tap();
+    const blur = () => page.getByTestId("money-stats").locator(".mm-num").first().evaluate((el) => getComputedStyle(el).filter);
+    expect(await blur()).toContain("blur");
+    await page.reload();
+    await page.waitForFunction(() => document.documentElement.classList.contains("mm-private"));
+    expect(await blur()).toContain("blur");
+    await page.getByRole("button", { name: "Show amounts" }).tap();
+    expect(await blur()).toBe("none");
+  });
+});

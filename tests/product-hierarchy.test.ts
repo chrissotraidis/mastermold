@@ -7,16 +7,18 @@ import { join } from "node:path";
 const source = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 describe("product hierarchy truthfulness", () => {
-  test("keeps the mobile primary loop focused on Today, Portfolio, Journal, and Settings", () => {
+  test("phone tabs cover money first, labs as one Labs tab, and everything else under More", () => {
     const shell = source("components/app-shell.tsx");
-    const mobile = shell.slice(shell.indexOf("const MOBILE"), shell.indexOf("function MobileNav"));
+    const mobile = shell.slice(shell.indexOf("const MOBILE"), shell.indexOf("const MORE_GROUPS"));
+    const more = shell.slice(shell.indexOf("const MORE_GROUPS"), shell.indexOf("function MobileNav"));
 
     expect(mobile).toContain('href: "/"');
     expect(mobile).toContain('href: "/portfolio"');
-    expect(mobile).toContain('href: "/journal"');
-    expect(mobile).toContain('href: "/settings"');
-    expect(mobile).not.toContain('href: "/trading"');
-    expect(mobile).not.toContain('href: "/polymarket"');
+    expect(mobile).toContain('href: "/transactions"');
+    // The labs share one tab labeled as research, never as a money destination.
+    expect(mobile).toContain('label: "Research labs"');
+    for (const href of ["/budget", "/journal", "/trading", "/polymarket", "/chat", "/settings"]) expect(more).toContain(`href: "${href}"`);
+    expect(more).toContain('label: "Research labs"');
   });
 
   test("labels autonomous trading surfaces as separate research labs with Settings entry points", () => {

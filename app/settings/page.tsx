@@ -99,13 +99,13 @@ export default async function SettingsPage() {
     <AppShell dataMode={publicProvenanceLabel}>
       <div className="grid w-full grid-cols-1 gap-6 [&>*]:min-w-0">
         <header>
-          <p className="mm-eyebrow">Choose what to connect. Nothing here places trades, signs transactions, or moves funds.</p>
+          <p className="mm-eyebrow">Read-only. Nothing here can move money.</p>
           <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Settings</h1>
         </header>
 
         <section
           aria-label="Status overview"
-          className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3 [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto"
+          className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-3"
         >
           <StatusCard
             icon={Wallet}
@@ -383,10 +383,10 @@ function StatusCard({
   action: { href: string; label: string };
 }) {
   return (
-    <div className="mm-panel flex min-w-0 items-start gap-3 p-4">
+    <div className="mm-panel flex min-w-0 items-start gap-3 p-3 sm:p-4">
       <span
         className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-xl",
+          "hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex",
           tone === "ok" ? "bg-engine/10 text-engine" : tone === "watch" ? "bg-caution/10 text-caution" : "bg-surface-high/70 text-outline",
         )}
       >
@@ -396,10 +396,10 @@ function StatusCard({
       <div className="min-w-0 flex-1">
         <p className="mm-eyebrow">{title}</p>
         <p className="mt-0.5 truncate font-display text-base font-semibold text-on-surface">{value}</p>
-        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-outline">{detail}</p>
+        <p className="mt-0.5 hidden text-xs leading-5 text-outline line-clamp-2 sm:block">{detail}</p>
         <Link
           href={action.href}
-          className="mt-2 inline-flex min-h-11 items-center rounded-xl border border-outline-variant/60 px-3 text-xs font-semibold text-on-surface transition hover:border-violet/50 hover:text-violet sm:min-h-9"
+          className="mt-2 inline-flex min-h-10 max-w-full items-center truncate rounded-xl border border-outline-variant/60 px-3 text-xs font-semibold text-on-surface transition hover:border-violet/50 hover:text-violet sm:min-h-9"
         >
           {action.label}
         </Link>

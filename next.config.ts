@@ -6,6 +6,8 @@ const scriptSource = process.env.NODE_ENV === "development"
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // The dev "N" badge sat on top of the phone tab bar.
+  devIndicators: false,
   async headers() {
     return [
       {

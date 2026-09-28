@@ -260,7 +260,7 @@ export function PortfolioHub({
           <p className="min-w-0 flex-1 text-sm leading-6 text-on-surface-variant">
             <span className="font-display text-base font-semibold text-on-surface">You’re looking at sample data.</span>
             <br />
-            Import your book (the manual_holdings JSON works as-is) or add holdings and accounts to see your real net worth.
+            Import your book or add holdings to see your real net worth.
           </p>
           <Button onClick={() => setImportOpen(true)}>
             <FileUp /> Import my book

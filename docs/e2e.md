@@ -98,7 +98,7 @@ worth range.
 
 ## Last run
 
-2026-09-27: 30 passed (25 desktop, 5 phone), 43 s.
+2026-09-28: 32 passed (25 desktop, 7 phone), 49 s.
 
 ## iPhone and iPad simulators (2026-09-27)
 
@@ -118,3 +118,17 @@ the physical devices, which were not available.
 - Not bugs: a freshly booted simulator showed a blank Safari page once until a
   reload, and Device Hub taps land about 70 px above the aimed point, which
   sent two taps to the Welcome page's "Log your first call" step.
+
+## Mobile pass (2026-09-28)
+
+- Phone tab bar: Today, Portfolio, Spending (Transactions + Budget), Labs (both
+  labs), and More, a sheet with every destination grouped as Money, Research labs,
+  and Master Mold. Journal, Budget, Chat and Settings were unreachable from the
+  old bar. The dev "N" badge no longer covers the first tab.
+- Hide amounts (eye button in the top bar) blurs every figure; the choice stays
+  on the device across reloads.
+- Page intros are desktop-only; phones show the eyebrow and title. Today's
+  checklist is one row per step, Refresh is an icon, Settings status is a 2x3
+  grid, tabs fade at the edge when they scroll, and the labs have a
+  Web3 | Polymarket switch.
+- Tests: `e2e/phone.e2e.ts` covers More, the lab switch, and Hide amounts.
