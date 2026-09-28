@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { IntegrationKeyInput } from "@/components/integration-key-input";
 import { MonarchMcpPanel } from "@/components/monarch-mcp-panel";
+import { OpenOnAction } from "@/components/open-on-action";
 import { NotificationTestButton } from "@/components/notification-test-button";
 import { ProfileSettings } from "@/components/profile-settings";
 import { Badge } from "@/components/ui/badge";
@@ -430,10 +431,11 @@ function ConnectionChecks({
   // One status row per provider; the key-entry form only appears on demand.
   return (
     <div className="divide-y divide-outline-variant/15 rounded-xl border border-outline-variant/50">
+      <OpenOnAction />
       {integrations.map((integration, index) => (
-        // The primary provider stays open so routed command actions
-        // (action=test-portfolio-connection) land on a visible form.
-        <details key={integration.id} className="group" open={index === 0}>
+        // Collapsed by default; OpenOnAction opens the primary provider when a
+        // routed command (action=test-portfolio-connection) needs its form.
+        <details key={integration.id} className="group" data-open-on-action={index === 0 ? "" : undefined}>
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 marker:hidden [&::-webkit-details-marker]:hidden">
             <span className="min-w-0 flex-1 truncate text-sm font-semibold text-on-surface">
               {integration.display_name}

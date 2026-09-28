@@ -214,7 +214,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                   <li className="p-6 text-center text-sm text-on-surface-variant">Nothing matches these filters.</li>
                 ) : (
                   visible.map((tx) => (
-                    <li key={tx.id} className={cn("grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1.5 px-2 py-2.5 sm:px-3 xl:grid-cols-[minmax(0,1fr)_10rem_6.5rem_auto]", tx.hidden && "opacity-50")}>
+                    <li key={tx.id} className={cn("grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 px-2 py-2.5 sm:px-3 xl:grid-cols-[minmax(0,1fr)_10rem_6.5rem_auto]", tx.hidden && "opacity-50")}>
                       <button type="button" onClick={() => setEditing(tx)} aria-label={`Edit ${tx.merchant}`} className="min-w-0 text-left">
                         <span className="flex items-center gap-2">
                           <span className="truncate text-sm font-semibold text-on-surface">{tx.merchant}</span>
@@ -224,6 +224,8 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                         </span>
                         <span className="block truncate text-xs text-outline" title={tx.original_description}>
                           <span className="mm-num">{dayLabel(tx.date)}</span>
+                          {/* Phones: category as text here; the picker lives in the sheet. */}
+                          <span className="xl:hidden"> · {categoryName.get(tx.category_id ?? "") ?? "Uncategorized"}</span>
                           {/* The raw statement text repeats the merchant; desktop only. */}
                           <span className="hidden xl:inline"> · {tx.original_description}</span>
                           {tx.account_id ? ` · ${accountName.get(tx.account_id) ?? "account"}` : ""}
@@ -234,7 +236,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                         value={tx.category_id ?? ""}
                         disabled={pending}
                         onChange={(event) => run({ action: "update", id: tx.id, patch: { category_id: event.target.value } })}
-                        className={cn(field, "col-span-3 row-start-2 min-h-8 w-auto max-w-full justify-self-start rounded-full py-0 pr-8 text-xs xl:col-span-1 xl:row-start-auto xl:min-h-9")}
+                        className={cn(field, "hidden min-h-9 w-full rounded-xl py-0 text-xs xl:block")}
                       >
                         <CategoryOptions categories={data.categories} />
                       </select>
