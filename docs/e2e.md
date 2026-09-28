@@ -152,3 +152,19 @@ comparable; both lost their repeated statement text, stat hints and group
 explanations on phones. Transactions now keeps the month's totals inside the
 cash flow card, and Portfolio shows net worth full width with Assets, Debts and
 Prices as one compact row.
+
+## Tap-to-edit pass (2026-09-28)
+
+- Transactions: rows are one line (merchant, date · category, amount, chevron).
+  On desktop a category chip stays inline; on phones the category is text.
+  Tapping a row opens an edit sheet with name, category, account, notes, Make
+  a rule, Hide/Show in totals, and Delete. The three icon buttons per row are gone.
+- Budget: each line is a tappable bar; the sheet holds the monthly plan,
+  rollover, and Remove. The per-row input and icons are gone.
+- Settings: connection cards fold until a command routes to them
+  (`?action=test-portfolio-connection` still opens the form). Monarch buttons
+  wrap on phones instead of running off-screen.
+- Chat intro and Journal tile hints shortened.
+- Tests: `e2e/transactions.e2e.ts` and `e2e/budget.e2e.ts` drive the sheets;
+  `e2e/settings.e2e.ts` checks folding; `e2e/phone.e2e.ts` checks no button
+  leaves the screen on Settings.

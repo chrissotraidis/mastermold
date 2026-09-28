@@ -334,7 +334,7 @@ describe("mobile ergonomics source contracts", () => {
     const globalAssistant = source("components/global-assistant.tsx");
 
     expect(chatPage).toContain(
-      "Ask about your money, a holding, or what to do next.",
+      "It explains and opens pages for you. It never trades.",
     );
     expect(chatPage).toContain("parseAsOf(params?.as_of ?? null)");
     expect(chatPage).not.toContain("getChatPrompts");

@@ -191,7 +191,7 @@ export function JournalWorkspace({
   return (
     <div className="grid w-full min-w-0 grid-cols-1 gap-6 [&>*]:min-w-0" data-journal-task-first>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Open calls" value={String(openCount)} hint="waiting for their time frame" />
+        <StatTile label="Open calls" value={String(openCount)} hint="not due yet" />
         <button type="button" onClick={() => setFilter("due")} className="text-left" aria-label="Show calls due to score">
           <StatTile
             label="Due to score"
@@ -205,9 +205,9 @@ export function JournalWorkspace({
         <StatTile
           label="Hit rate"
           value={scored.length ? `${Math.round((rightCount / scored.length) * 100)}%` : "—"}
-          hint={`${rightCount} of ${scored.length} scored calls right`}
+          hint={`${rightCount} of ${scored.length} right`}
         />
-        <StatTile label="Reasoning score" value={avgThinking === null ? "—" : `${avgThinking.toFixed(1)}/10`} hint="your 1–10 review of the thinking" />
+        <StatTile label="Reasoning score" value={avgThinking === null ? "—" : `${avgThinking.toFixed(1)}/10`} hint="self-review, 1–10" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 [&>*]:min-w-0">
