@@ -76,3 +76,10 @@ test.describe("Phone navigation and privacy", () => {
     expect(await blur()).toBe("none");
   });
 });
+
+test("Settings on a phone keeps every button inside the screen", async ({ page }) => {
+  await page.goto("/settings");
+  const width = await page.evaluate(() => window.innerWidth);
+  const outside = await page.getByRole("button").evaluateAll((els, w) => els.filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > w + 1; }).map((el) => el.textContent?.trim().slice(0, 30)), width);
+  expect(outside).toEqual([]);
+});

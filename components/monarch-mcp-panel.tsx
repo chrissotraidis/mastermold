@@ -132,7 +132,7 @@ export function MonarchMcpPanel({ initialState, config }: MonarchMcpPanelProps) 
           </h3>
           <p className="min-w-0 truncate text-sm text-on-surface-variant">· {statusLine}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <Button
             type="button"
             onClick={testConnection}
