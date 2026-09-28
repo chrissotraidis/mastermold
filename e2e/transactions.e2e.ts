@@ -55,14 +55,25 @@ test.describe("Transactions, end to end with real clicks", () => {
     await page.goto("/transactions");
 
     await page.getByLabel("Category for Shell Oil").selectOption("parking");
-    await page.getByRole("button", { name: "Hide Blue Bottle Coffee" }).click();
+    const dialog = page.getByRole("dialog");
+    await page.getByRole("button", { name: "Edit Blue Bottle Coffee" }).click();
+    await dialog.getByRole("button", { name: "Hide from totals" }).click();
     await expect(page.getByTestId("cash-flow")).toContainText("$184.59");
-    await page.getByRole("button", { name: "Delete Netflix.com" }).click();
+    await page.getByRole("button", { name: "Edit Netflix.com" }).click();
+    await dialog.getByRole("button", { name: "Delete" }).click();
     await expect(page.getByText("Transaction deleted")).toBeVisible();
+    // Rename and add a note from the sheet.
+    await page.getByRole("button", { name: "Edit Whole Foods Market" }).click();
+    await dialog.getByLabel("Name").fill("Whole Foods");
+    await dialog.getByLabel("Notes").fill("weekly shop");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByRole("button", { name: "Edit Whole Foods", exact: true })).toBeVisible();
 
     await page.reload();
     await expect(page.getByLabel("Category for Shell Oil")).toHaveValue("parking");
-    await expect(page.getByRole("button", { name: "Show Blue Bottle Coffee" })).toBeVisible();
+    await page.getByRole("button", { name: "Edit Blue Bottle Coffee" }).click();
+    await expect(dialog.getByRole("button", { name: "Show in totals" })).toBeVisible();
+    await page.keyboard.press("Escape");
     await expect(page.getByText("Netflix.com")).toHaveCount(0);
     await expect(page.getByTestId("cash-flow")).toContainText("$168.60");
   });
@@ -71,8 +82,9 @@ test.describe("Transactions, end to end with real clicks", () => {
     const fs = await import("node:fs");
     await importCsv(request, fs.readFileSync(BANK_CSV, "utf8"));
     await page.goto("/transactions");
-    await page.getByRole("button", { name: "Make a rule from Netflix.com" }).click();
     const dialog = page.getByRole("dialog");
+    await page.getByRole("button", { name: "Edit Netflix.com" }).click();
+    await dialog.getByRole("button", { name: "Make a rule" }).click();
     await dialog.getByLabel("When the merchant contains").fill("netflix");
     await dialog.getByLabel("Rename it to").fill("Netflix");
     await dialog.getByRole("button", { name: "Preview matches" }).click();
@@ -96,4 +108,3 @@ test.describe("Transactions, end to end with real clicks", () => {
     await expect(page.getByLabel("Category for Farmers market")).toHaveValue("groceries");
   });
 });
-

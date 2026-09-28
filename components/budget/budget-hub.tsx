@@ -6,6 +6,7 @@ import { PiggyBank, Plus, Repeat, Trash2, Wand2 } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { StatTile } from "@/components/ui/stat";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Sheet } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import type { BudgetGroup, BudgetLineView, BudgetMonth } from "@/src/db/budgets";
@@ -200,22 +201,31 @@ export function BudgetHub({ initial }: { initial: BudgetData }) {
   );
 }
 
+/** One line per category: tap it to change the plan, rollover, or remove it. */
 function BudgetLineRow({ line, pending, onSave, onRemove }: {
   line: BudgetLineView;
   pending: boolean;
   onSave: (body: Record<string, unknown>) => void;
   onRemove: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(line.planned));
+  const [rollover, setRollover] = useState(line.rollover);
   const available = line.planned + line.carried_in;
   const pct = available > 0 ? Math.min(100, (line.spent / available) * 100) : line.spent > 0 ? 100 : 0;
   const over = line.remaining < 0;
   // A fixed bill paid in full is on plan, not a warning.
   const paid = !over && line.group === "fixed" && available > 0 && line.remaining === 0;
+  const openSheet = () => {
+    setAmount(String(line.planned));
+    setRollover(line.rollover);
+    setOpen(true);
+  };
+  const dirty = Number(amount) !== line.planned || rollover !== line.rollover;
   return (
-    <li className="grid gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-3">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+    <li>
+      <button type="button" onClick={openSheet} aria-label={`Edit ${line.name}`} className="block w-full px-3 py-3 text-left transition hover:bg-surface-high/30">
+        <span className="flex items-baseline justify-between gap-x-3">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-semibold text-on-surface">{line.name}</span>
             {line.rollover ? (
@@ -228,38 +238,49 @@ function BudgetLineRow({ line, pending, onSave, onRemove }: {
             {money(line.spent)} of {money(available)} ·{" "}
             <span className={cn("font-semibold", over ? "text-critical" : "text-engine")}>{over ? `${money(-line.remaining)} over` : paid ? "paid" : `${money(line.remaining)} left`}</span>
           </span>
-        </div>
+        </span>
         <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
           <span className={cn("block h-full rounded-full", over ? "bg-critical" : paid ? "bg-engine" : pct > 85 ? "bg-caution" : "bg-violet")} style={{ width: `${pct}%` }} />
         </span>
-      </div>
-      <div className="flex items-center justify-end gap-1">
-        <label className="sr-only" htmlFor={`plan-${line.category_id}`}>Monthly plan for {line.name}</label>
-        <input
-          id={`plan-${line.category_id}`}
-          inputMode="decimal"
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          onBlur={() => {
-            if (Number(amount) !== line.planned && Number(amount) >= 0) onSave({ amount: Number(amount) });
-          }}
-          className={cn(field, "mm-num w-24 text-right")}
-        />
-        <button
-          type="button"
-          aria-pressed={line.rollover}
-          aria-label={line.rollover ? `Turn off rollover for ${line.name}` : `Turn on rollover for ${line.name}`}
-          title="Rollover: carry unused money into next month"
-          disabled={pending}
-          onClick={() => onSave({ amount: line.planned, rollover: !line.rollover })}
-          className={cn("grid size-11 place-items-center rounded-xl transition sm:size-9", line.rollover ? "bg-violet/15 text-violet" : "text-outline hover:bg-surface-high hover:text-on-surface")}
-        >
-          <Repeat className="size-4" />
-        </button>
-        <button type="button" aria-label={`Remove ${line.name} from the budget`} title="Remove" disabled={pending} onClick={onRemove} className="grid size-11 place-items-center rounded-xl text-outline transition hover:bg-surface-high hover:text-on-surface sm:size-9">
-          <Trash2 className="size-4" />
-        </button>
-      </div>
+      </button>
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={line.name}
+        description={`${money(line.spent)} spent this month`}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button type="button" className={cn(ghostButton, "text-critical")} disabled={pending} onClick={() => { setOpen(false); onRemove(); }}>
+              <Trash2 aria-hidden="true" className="size-4" /> Remove
+            </button>
+            <div className="flex gap-2">
+              <button type="button" className={ghostButton} onClick={() => setOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                className={primaryButton}
+                disabled={pending || !dirty || !(Number(amount) >= 0) || amount === ""}
+                onClick={() => { onSave({ amount: Number(amount), rollover }); setOpen(false); }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="grid gap-4">
+          <label className="grid gap-1 text-sm font-semibold text-on-surface">
+            Monthly plan for {line.name}
+            <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} className={cn(field, "mm-num")} autoFocus />
+          </label>
+          <label className="flex items-center gap-3 text-sm text-on-surface">
+            <input type="checkbox" checked={rollover} onChange={(event) => setRollover(event.target.checked)} className="size-4 accent-[#f2559f]" />
+            <span>
+              <span className="block font-semibold">Rollover</span>
+              <span className="block text-xs text-on-surface-variant">Unused money carries into next month.</span>
+            </span>
+          </label>
+        </div>
+      </Sheet>
     </li>
   );
 }

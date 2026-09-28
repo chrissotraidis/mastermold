@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { EyeOff, Eye, FileUp, PiggyBank, Plus, Search, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { ChevronRight, EyeOff, Eye, FileUp, PiggyBank, Plus, Search, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { Sheet } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -59,6 +59,7 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [ruleFor, setRuleFor] = useState<TransactionRow | null>(null);
+  const [editing, setEditing] = useState<TransactionRow | null>(null);
 
   // /transactions?action=import (command palette, Today) opens the importer.
   useEffect(() => {
@@ -213,12 +214,13 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                   <li className="p-6 text-center text-sm text-on-surface-variant">Nothing matches these filters.</li>
                 ) : (
                   visible.map((tx) => (
-                    <li key={tx.id} className={cn("grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-3 py-3 xl:grid-cols-[minmax(0,1fr)_9.5rem_6rem_auto]", tx.hidden && "opacity-50")}>
-                      <span className="min-w-0">
+                    <li key={tx.id} className={cn("grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-1.5 px-2 py-2.5 sm:px-3 xl:grid-cols-[minmax(0,1fr)_10rem_6.5rem_auto]", tx.hidden && "opacity-50")}>
+                      <button type="button" onClick={() => setEditing(tx)} aria-label={`Edit ${tx.merchant}`} className="min-w-0 text-left">
                         <span className="flex items-center gap-2">
                           <span className="truncate text-sm font-semibold text-on-surface">{tx.merchant}</span>
                           {tx.needs_review ? <span className="size-1.5 shrink-0 rounded-full bg-violet" title="New, not reviewed yet" aria-label="new" /> : null}
                           {tx.source === "sandbox" ? <span className="rounded-full bg-caution/15 px-1.5 text-[10px] font-semibold text-caution">sandbox</span> : null}
+                          {tx.hidden ? <EyeOff aria-label="hidden" className="size-3 shrink-0 text-outline" /> : null}
                         </span>
                         <span className="block truncate text-xs text-outline" title={tx.original_description}>
                           <span className="mm-num">{dayLabel(tx.date)}</span>
@@ -226,30 +228,22 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                           <span className="hidden xl:inline"> · {tx.original_description}</span>
                           {tx.account_id ? ` · ${accountName.get(tx.account_id) ?? "account"}` : ""}
                         </span>
-                      </span>
+                      </button>
                       <select
                         aria-label={`Category for ${tx.merchant}`}
                         value={tx.category_id ?? ""}
                         disabled={pending}
                         onChange={(event) => run({ action: "update", id: tx.id, patch: { category_id: event.target.value } })}
-                        className={cn(field, "row-start-2 min-h-9 w-auto max-w-full justify-self-start rounded-full py-0 pr-8 text-xs xl:row-start-auto xl:min-h-10 xl:w-full xl:rounded-xl xl:text-sm")}
+                        className={cn(field, "col-span-3 row-start-2 min-h-8 w-auto max-w-full justify-self-start rounded-full py-0 pr-8 text-xs xl:col-span-1 xl:row-start-auto xl:min-h-9")}
                       >
                         <CategoryOptions categories={data.categories} />
                       </select>
-                      <span className={cn("mm-num col-start-2 row-start-1 text-right text-sm font-semibold xl:col-start-auto xl:row-start-auto", tx.amount > 0 ? "text-engine" : "text-on-surface")}>
+                      <span className={cn("mm-num text-right text-sm font-semibold", tx.amount > 0 ? "text-engine" : "text-on-surface")}>
                         {tx.amount > 0 ? "+" : "−"}{money(Math.abs(tx.amount))}
                       </span>
-                      <span className="row-start-2 flex justify-end gap-1 xl:row-start-auto">
-                        <IconButton label={`Make a rule from ${tx.merchant}`} onClick={() => setRuleFor(tx)}>
-                          <Wand2 className="size-4" />
-                        </IconButton>
-                        <IconButton label={tx.hidden ? `Show ${tx.merchant}` : `Hide ${tx.merchant}`} onClick={() => run({ action: "update", id: tx.id, patch: { hidden: !tx.hidden } })}>
-                          {tx.hidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-                        </IconButton>
-                        <IconButton label={`Delete ${tx.merchant}`} onClick={() => run({ action: "delete", ids: [tx.id] }, "Transaction deleted")}>
-                          <Trash2 className="size-4" />
-                        </IconButton>
-                      </span>
+                      <button type="button" onClick={() => setEditing(tx)} tabIndex={-1} aria-hidden="true" className="grid size-8 place-items-center rounded-lg text-outline hover:bg-surface-high hover:text-on-surface">
+                        <ChevronRight className="size-4" />
+                      </button>
                     </li>
                   ))
                 )}
@@ -339,9 +333,9 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
                   {data.rules.map((rule) => (
                     <li key={rule.id} className="flex items-start justify-between gap-2 rounded-xl border border-outline-variant/40 px-3 py-2 text-xs leading-5">
                       <span className="min-w-0 text-on-surface-variant">{describeRule(rule, categoryName)}</span>
-                      <IconButton label="Delete rule" onClick={() => run({ action: "delete_rule", id: rule.id }, "Rule deleted")}>
+                      <button type="button" aria-label="Delete rule" title="Delete rule" onClick={() => run({ action: "delete_rule", id: rule.id }, "Rule deleted")} className="grid size-9 shrink-0 place-items-center rounded-lg text-outline transition hover:bg-surface-high hover:text-on-surface">
                         <Trash2 className="size-4" />
-                      </IconButton>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -353,16 +347,92 @@ export function TransactionsHub({ initial }: { initial: TransactionsData }) {
 
       <ImportSheet open={importOpen} onClose={() => setImportOpen(false)} accounts={data.accounts} post={post} onImported={(next) => setData(next)} />
       <AddSheet open={addOpen} onClose={() => setAddOpen(false)} categories={data.categories} accounts={data.accounts} onSubmit={(body) => { run({ action: "add", ...body }, "Transaction added"); setAddOpen(false); }} />
+      <TransactionSheet
+        tx={editing}
+        categories={data.categories}
+        accounts={data.accounts}
+        onClose={() => setEditing(null)}
+        onRule={(tx) => { setEditing(null); setRuleFor(tx); }}
+        onSave={(id, patch) => run({ action: "update", id, patch })}
+        onDelete={(id) => { setEditing(null); run({ action: "delete", ids: [id] }, "Transaction deleted"); }}
+      />
       <RuleSheet tx={ruleFor} onClose={() => setRuleFor(null)} categories={data.categories} post={post} onSaved={(next, updated) => { setData(next); toast({ title: "Rule saved", description: `Applied to ${updated} past transaction${updated === 1 ? "" : "s"}.` }); }} />
     </div>
   );
 }
 
-function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+/** Everything about one transaction: name, category, account, notes, and the rarer actions. */
+function TransactionSheet({ tx, categories, accounts, onClose, onRule, onSave, onDelete }: {
+  tx: TransactionRow | null;
+  categories: Category[];
+  accounts: Array<{ id: string; name: string }>;
+  onClose: () => void;
+  onRule: (tx: TransactionRow) => void;
+  onSave: (id: string, patch: Record<string, unknown>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [merchant, setMerchant] = useState("");
+  const [notes, setNotes] = useState("");
+  useEffect(() => {
+    setMerchant(tx?.merchant ?? "");
+    setNotes(tx?.notes ?? "");
+  }, [tx]);
+  if (!tx) return null;
+  const dirty = merchant.trim() !== tx.merchant || notes !== tx.notes;
   return (
-    <button type="button" aria-label={label} title={label} onClick={onClick} className="grid size-11 place-items-center rounded-xl text-outline transition hover:bg-surface-high hover:text-on-surface sm:size-9">
-      {children}
-    </button>
+    <Sheet
+      open
+      onClose={onClose}
+      title={tx.merchant}
+      description={`${dayLabel(tx.date)} · ${tx.amount > 0 ? "+" : "−"}${money(Math.abs(tx.amount))}${tx.original_description !== tx.merchant ? ` · ${tx.original_description}` : ""}`}
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button type="button" className={cn(ghostButton, "text-critical")} onClick={() => onDelete(tx.id)}>
+            <Trash2 aria-hidden="true" className="size-4" /> Delete
+          </button>
+          <div className="flex gap-2">
+            <button type="button" className={ghostButton} onClick={onClose}>Close</button>
+            <button type="button" className={primaryButton} disabled={!dirty || !merchant.trim()} onClick={() => { onSave(tx.id, { merchant: merchant.trim(), notes }); onClose(); }}>
+              Save
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div className="grid gap-4">
+        <label className="grid gap-1 text-sm font-semibold text-on-surface">
+          Name
+          <input value={merchant} onChange={(event) => setMerchant(event.target.value)} className={field} />
+        </label>
+        <label className="grid gap-1 text-sm font-semibold text-on-surface">
+          Category
+          <select value={tx.category_id ?? ""} onChange={(event) => onSave(tx.id, { category_id: event.target.value })} className={field}>
+            <CategoryOptions categories={categories} />
+          </select>
+        </label>
+        {accounts.length ? (
+          <label className="grid gap-1 text-sm font-semibold text-on-surface">
+            Account
+            <select value={tx.account_id ?? ""} onChange={(event) => onSave(tx.id, { account_id: event.target.value || null })} className={field}>
+              <option value="">No account</option>
+              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+            </select>
+          </label>
+        ) : null}
+        <label className="grid gap-1 text-sm font-semibold text-on-surface">
+          Notes
+          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} className={cn(field, "min-h-16 py-2")} />
+        </label>
+        <div className="flex flex-wrap gap-2 border-t border-outline-variant/40 pt-4">
+          <button type="button" className={ghostButton} onClick={() => onRule(tx)}>
+            <Wand2 aria-hidden="true" className="size-4" /> Make a rule
+          </button>
+          <button type="button" className={ghostButton} onClick={() => { onSave(tx.id, { hidden: !tx.hidden }); onClose(); }}>
+            {tx.hidden ? <Eye aria-hidden="true" className="size-4" /> : <EyeOff aria-hidden="true" className="size-4" />} {tx.hidden ? "Show in totals" : "Hide from totals"}
+          </button>
+        </div>
+      </div>
+    </Sheet>
   );
 }
 

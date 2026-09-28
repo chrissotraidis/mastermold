@@ -943,7 +943,6 @@ const MORE_GROUPS: Array<{ label: string; items: Array<{ href: string; label: st
 function MobileNav() {
   const pathname = usePathname() || "/";
   const [moreOpen, setMoreOpen] = useState(false);
-  useEffect(() => setMoreOpen(false), [pathname]);
   const tabActive = (item: (typeof MOBILE)[number]) => isActivePath(pathname, item.href) || (item.also ?? []).some((href) => isActivePath(pathname, href));
   const moreActive = !MOBILE.some(tabActive);
   const tabClass = (active: boolean) =>
