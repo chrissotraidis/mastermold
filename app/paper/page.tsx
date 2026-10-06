@@ -49,12 +49,12 @@ export default async function PaperPage({ searchParams }: PaperPageProps) {
   const publicProvenanceLabel = productProvenanceLabel(paper.provenance.label);
   return (
     <AppShell dataMode={publicProvenanceLabel}>
-      <div className="mx-auto max-w-5xl">
+      <div className="w-full">
         <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-display text-lg font-semibold text-on-surface">Simulator</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Paper trading</h1>
             <p className="mt-0.5 text-xs text-outline">
-              Test calls with simulator dollars before risking anything.{" "}
+              Try a call with pretend money, then see how it scored once the week closes.{" "}
               <a href="/journal" className="text-violet hover:text-tertiary">
                 Back to Journal →
               </a>
@@ -64,7 +64,7 @@ export default async function PaperPage({ searchParams }: PaperPageProps) {
             href="#paper-trade-form"
             className="inline-flex min-h-11 items-center justify-center rounded-md bg-violet px-3 text-xs font-semibold text-void transition hover:bg-violet/90 sm:min-h-8"
           >
-            New test
+            Start a paper test
           </a>
         </header>
 

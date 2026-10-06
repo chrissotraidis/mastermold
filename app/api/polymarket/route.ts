@@ -18,6 +18,7 @@ import {
 } from "@/src/polymarket/store";
 import { fetchPolymarketWeatherReport, type PolymarketWeatherReport } from "@/src/polymarket/weather";
 import { runPolymarketWalletCycle, safePolymarketWalletReport, type WalletIntelligenceReport } from "@/src/polymarket/wallets";
+import { buildPolymarketResearchProgram, type ResearchProgram } from "@/src/polymarket/research-program";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export type PolymarketApiPayload = {
   brain: PolymarketBrainReport;
   analyst: AnalystReport;
   wallets: WalletIntelligenceReport;
+  research_program: ResearchProgram;
   control_access: {
     available: boolean;
     scope: "loopback-only";
@@ -253,6 +255,8 @@ async function payload(request: Request): Promise<PolymarketApiPayload> {
     return { ...position, current_price: currentPrice, value_usd: value, pnl_usd: value - position.stake_usd };
   });
   const brain = safePolymarketBrainReport();
+  const analyst = safePolymarketAnalystReport();
+  const wallets = safePolymarketWalletReport();
 
   return {
     state: store.state(),
@@ -262,8 +266,9 @@ async function payload(request: Request): Promise<PolymarketApiPayload> {
     paper_authority: evaluatePolymarketPaperAuthority(brain),
     strategy_catalog: POLYMARKET_STRATEGY_CATALOG,
     weather,
-    analyst: safePolymarketAnalystReport(),
-    wallets: safePolymarketWalletReport(),
+    analyst,
+    wallets,
+    research_program: buildPolymarketResearchProgram({ brain, analyst, wallets, markets: snapshot.markets }),
     equity_curve: buildEquityCurve(store.trades(200)),
     trades: store.trades(50),
     activity: store.activity(50),

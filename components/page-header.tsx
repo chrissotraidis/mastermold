@@ -30,11 +30,11 @@ export function PageHeader({
   back?: boolean;
 }) {
   return (
-    <div className="mb-4">
+    <div className="mb-6">
       {back ? (
         <Link
           href="/"
-          className="mb-1 hidden min-h-11 items-center gap-1.5 rounded-md pr-3 text-xs text-outline transition-colors hover:text-violet sm:inline-flex"
+          className="mb-1 hidden min-h-11 items-center gap-1.5 rounded-md pr-3 text-xs text-outline transition-colors hover:text-violet sm:inline-flex md:hidden"
         >
           <ArrowLeft className="size-3.5" />
           Today
@@ -43,13 +43,13 @@ export function PageHeader({
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-lg font-semibold tracking-tight text-on-surface">
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-on-surface sm:text-[1.75rem]">
               {title}
             </h1>
             {provenance ? <ProvenanceChip label={provenance} /> : null}
           </div>
           {subtitle ? (
-            <p className="mt-0.5 max-w-2xl break-words text-xs leading-5 text-on-surface-variant">{subtitle}</p>
+            <p className="mt-1 max-w-2xl break-words text-sm leading-6 text-on-surface-variant">{subtitle}</p>
           ) : null}
         </div>
         {right ? <div className="shrink-0">{right}</div> : null}

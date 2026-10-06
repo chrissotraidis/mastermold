@@ -1,0 +1,295 @@
+"use client";
+
+import { useCallback, useState, useTransition } from "react";
+import Link from "next/link";
+import { PiggyBank, Plus, Repeat, Trash2, Wand2 } from "lucide-react";
+import { Panel, PanelHeader } from "@/components/ui/panel";
+import { StatTile } from "@/components/ui/stat";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Sheet } from "@/components/ui/sheet";
+import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
+import type { BudgetGroup, BudgetLineView, BudgetMonth } from "@/src/db/budgets";
+import type { Category } from "@/src/db/transactions";
+
+export type BudgetData = {
+  month: string;
+  months: string[];
+  groups: Array<{ id: BudgetGroup; label: string; hint: string }>;
+  budget: BudgetMonth;
+  income: number;
+  suggestions: Array<{ category_id: string; name: string; average: number; group: BudgetGroup }>;
+  categories: Category[];
+};
+
+const field = "min-h-11 rounded-xl border border-outline-variant/60 bg-surface-lowest/70 px-3 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet sm:min-h-10";
+const primaryButton = "inline-flex min-h-11 items-center gap-2 rounded-xl bg-violet px-4 text-sm font-semibold text-void shadow-glow transition hover:bg-violet/90 disabled:opacity-50 sm:min-h-10";
+const ghostButton = "inline-flex min-h-11 items-center gap-2 rounded-xl border border-outline-variant/60 px-3 text-sm font-semibold text-on-surface transition hover:border-violet/50 disabled:opacity-50 sm:min-h-10";
+
+export function BudgetHub({ initial }: { initial: BudgetData }) {
+  const [data, setData] = useState(initial);
+  const [pending, startTransition] = useTransition();
+  const [newCategory, setNewCategory] = useState("");
+  const [newGroup, setNewGroup] = useState<BudgetGroup>("flex");
+  const [newAmount, setNewAmount] = useState("");
+
+  const post = useCallback((body: Record<string, unknown>, success?: string) => {
+    startTransition(async () => {
+      const response = await fetch("/api/budget", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ month: data.month, ...body }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        toast({ title: "Couldn't save", description: json.error, tone: "error" });
+        return;
+      }
+      setData(json);
+      if (success) toast({ title: success });
+    });
+  }, [data.month]);
+
+  const selectMonth = (month: string) =>
+    startTransition(async () => {
+      const response = await fetch(`/api/budget?month=${month}`, { cache: "no-store" });
+      if (response.ok) setData(await response.json());
+    });
+
+  const { budget } = data;
+  const hasLines = budget.groups.some((group) => group.lines.length > 0);
+  const left = budget.planned_total - budget.spent_total;
+  const budgeted = new Set(budget.groups.flatMap((group) => group.lines.map((line) => line.category_id)));
+  const available = data.categories.filter((category) => !budgeted.has(category.id));
+
+  return (
+    <div className="grid w-full grid-cols-1 gap-6 [&>*]:min-w-0">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="mm-eyebrow">A plan for this month</p>
+          <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Budget</h1>
+          <p className="mt-1 hidden max-w-2xl text-sm leading-6 text-on-surface-variant sm:block">
+            Plan spending in three groups. Spending comes from your <Link href="/transactions" className="font-semibold text-violet hover:text-violet-soft">Transactions</Link>; hidden rows and transfers never count.
+          </p>
+        </div>
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:shrink-0" role="group" aria-label="Month">
+          {data.months.slice(0, 6).map((month) => (
+            <button
+              key={month}
+              type="button"
+              onClick={() => selectMonth(month)}
+              aria-pressed={month === data.month}
+              className={cn("min-h-9 rounded-full border px-3 text-xs font-semibold transition", month === data.month ? "border-outline bg-surface-highest text-on-surface" : "border-outline-variant/60 text-on-surface-variant hover:text-on-surface")}
+            >
+              {monthLabel(month)}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <section aria-label="Budget summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="budget-summary">
+        <StatTile label="Income" value={money(data.income)} />
+        <StatTile label="Planned" value={money(budget.planned_total)} hint={data.income > 0 ? `${Math.round((budget.planned_total / data.income) * 100)}% of income` : "no income yet"} />
+        <StatTile label="Spent" value={money(budget.spent_total)} />
+        {hasLines ? (
+          <StatTile emphasis label="Left to spend" value={money(left)} deltaTone={left >= 0 ? "up" : "down"} hint={left >= 0 ? "under plan" : "over plan"} />
+        ) : (
+          <StatTile emphasis label="Left to spend" value="—" hint="set a budget first" />
+        )}
+      </section>
+
+      {!hasLines ? (
+        <Panel className="p-2">
+          <EmptyState
+            icon={PiggyBank}
+            title="No budget yet"
+            description={
+              data.suggestions.length
+                ? `Start from what you actually spent: ${data.suggestions.length} categories averaged over your last months. You can change every number after.`
+                : "Import a few months of transactions first, or add categories one at a time below."
+            }
+          />
+          {data.suggestions.length ? (
+            <div className="flex justify-center pb-5">
+              <button type="button" className={primaryButton} disabled={pending} onClick={() => post({ action: "apply_suggestions" }, "Budget created from your spending")}>
+                <Wand2 aria-hidden="true" className="size-4" /> Start from my spending
+              </button>
+            </div>
+          ) : null}
+        </Panel>
+      ) : null}
+
+      {budget.groups.map((group) => {
+        const meta = data.groups.find((item) => item.id === group.id)!;
+        if (group.lines.length === 0) return null;
+        return (
+          <Panel key={group.id} aria-labelledby={`budget-${group.id}`} data-testid={`budget-group-${group.id}`}>
+            <PanelHeader
+              titleId={`budget-${group.id}`}
+              title={group.label}
+              description={<span className="hidden sm:inline">{meta.hint}</span>}
+              action={
+                <span className="mm-num text-right text-sm">
+                  <span className={cn("font-semibold", group.remaining >= 0 ? "text-engine" : "text-critical")}>{money(group.remaining)}</span>
+                  <span className="text-outline"> left of {money(group.planned)}</span>
+                </span>
+              }
+            />
+            <ul className="divide-y divide-outline-variant/30 p-2">
+              {group.lines.map((line) => (
+                <BudgetLineRow key={line.category_id} line={line} pending={pending} onSave={(body) => post({ action: "set_line", category_id: line.category_id, group: line.group, ...body })} onRemove={() => post({ action: "remove_line", category_id: line.category_id }, `${line.name} removed`)} />
+              ))}
+            </ul>
+          </Panel>
+        );
+      })}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
+        <Panel aria-labelledby="budget-add-title">
+          <PanelHeader titleId="budget-add-title" title="Add a category" description="Pick a group; you can move it later." />
+          <form
+            className="flex flex-wrap items-end gap-2 p-5 pt-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              post({ action: "set_line", category_id: newCategory, group: newGroup, amount: Number(newAmount) }, "Added to budget");
+              setNewCategory("");
+              setNewAmount("");
+            }}
+          >
+            <div className="grid min-w-40 flex-1 basis-40 gap-1 text-xs font-semibold text-on-surface-variant">
+              <label htmlFor="budget-new-category">Category</label>
+              <select id="budget-new-category" value={newCategory} onChange={(event) => setNewCategory(event.target.value)} className={cn(field, "w-full")}>
+                <option value="">Choose…</option>
+                {available.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </div>
+            <div className="grid gap-1 text-xs font-semibold text-on-surface-variant">
+              <label htmlFor="budget-new-group">Group</label>
+              <select id="budget-new-group" value={newGroup} onChange={(event) => setNewGroup(event.target.value as BudgetGroup)} className={field}>
+                {data.groups.map((group) => <option key={group.id} value={group.id}>{group.label}</option>)}
+              </select>
+            </div>
+            <label className="grid w-28 gap-1 text-xs font-semibold text-on-surface-variant">
+              Per month
+              <input inputMode="decimal" value={newAmount} onChange={(event) => setNewAmount(event.target.value)} placeholder="0" className={cn(field, "w-full")} />
+            </label>
+            <button type="submit" className={ghostButton} disabled={pending || !newCategory || !(Number(newAmount) >= 0) || newAmount === ""}>
+              <Plus aria-hidden="true" className="size-4" /> Add
+            </button>
+          </form>
+        </Panel>
+
+        <Panel aria-labelledby="budget-unbudgeted-title">
+          <PanelHeader titleId="budget-unbudgeted-title" title="Not in the budget" description="Spending this month in categories without a plan." />
+          <ul className="grid gap-1 p-3 pt-3" data-testid="budget-unbudgeted">
+            {budget.unbudgeted.length === 0 ? <li className="px-2 text-sm text-on-surface-variant">Everything you spent on is budgeted.</li> : null}
+            {budget.unbudgeted.map((row) => (
+              <li key={row.category_id} className="flex items-center justify-between gap-3 rounded-xl px-2 py-2 text-sm">
+                <span className="text-on-surface">{row.name}</span>
+                <span className="flex items-center gap-2">
+                  <span className="mm-num font-semibold text-on-surface">{money(row.spent)}</span>
+                  <button type="button" className="min-h-9 rounded-lg px-2 text-xs font-semibold text-violet hover:bg-violet/10" onClick={() => post({ action: "set_line", category_id: row.category_id, group: "flex", amount: Math.ceil(row.spent / 5) * 5 }, `${row.name} added to Flex`)}>
+                    Budget it
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+/** One line per category: tap it to change the plan, rollover, or remove it. */
+function BudgetLineRow({ line, pending, onSave, onRemove }: {
+  line: BudgetLineView;
+  pending: boolean;
+  onSave: (body: Record<string, unknown>) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(String(line.planned));
+  const [rollover, setRollover] = useState(line.rollover);
+  const available = line.planned + line.carried_in;
+  const pct = available > 0 ? Math.min(100, (line.spent / available) * 100) : line.spent > 0 ? 100 : 0;
+  const over = line.remaining < 0;
+  // A fixed bill paid in full is on plan, not a warning.
+  const paid = !over && line.group === "fixed" && available > 0 && line.remaining === 0;
+  const openSheet = () => {
+    setAmount(String(line.planned));
+    setRollover(line.rollover);
+    setOpen(true);
+  };
+  const dirty = Number(amount) !== line.planned || rollover !== line.rollover;
+  return (
+    <li>
+      <button type="button" onClick={openSheet} aria-label={`Edit ${line.name}`} className="block w-full px-3 py-3 text-left transition hover:bg-surface-high/30">
+        <span className="flex items-baseline justify-between gap-x-3">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-semibold text-on-surface">{line.name}</span>
+            {line.rollover ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet/15 px-1.5 text-[10px] font-semibold text-violet" title="Unused money carries into next month">
+                <Repeat aria-hidden="true" className="size-3" /> {line.carried_in >= 0 ? "+" : "−"}{money(Math.abs(line.carried_in))} carried
+              </span>
+            ) : null}
+          </span>
+          <span className="mm-num shrink-0 text-xs text-on-surface-variant">
+            {money(line.spent)} of {money(available)} ·{" "}
+            <span className={cn("font-semibold", over ? "text-critical" : "text-engine")}>{over ? `${money(-line.remaining)} over` : paid ? "paid" : `${money(line.remaining)} left`}</span>
+          </span>
+        </span>
+        <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-surface-high" aria-hidden="true">
+          <span className={cn("block h-full rounded-full", over ? "bg-critical" : paid ? "bg-engine" : pct > 85 ? "bg-caution" : "bg-violet")} style={{ width: `${pct}%` }} />
+        </span>
+      </button>
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={line.name}
+        description={`${money(line.spent)} spent this month`}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button type="button" className={cn(ghostButton, "text-critical")} disabled={pending} onClick={() => { setOpen(false); onRemove(); }}>
+              <Trash2 aria-hidden="true" className="size-4" /> Remove
+            </button>
+            <div className="flex gap-2">
+              <button type="button" className={ghostButton} onClick={() => setOpen(false)}>Cancel</button>
+              <button
+                type="button"
+                className={primaryButton}
+                disabled={pending || !dirty || !(Number(amount) >= 0) || amount === ""}
+                onClick={() => { onSave({ amount: Number(amount), rollover }); setOpen(false); }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="grid gap-4">
+          <label className="grid gap-1 text-sm font-semibold text-on-surface">
+            Monthly plan for {line.name}
+            <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} className={cn(field, "mm-num")} autoFocus />
+          </label>
+          <label className="flex items-center gap-3 text-sm text-on-surface">
+            <input type="checkbox" checked={rollover} onChange={(event) => setRollover(event.target.checked)} className="size-4 accent-[#f2559f]" />
+            <span>
+              <span className="block font-semibold">Rollover</span>
+              <span className="block text-xs text-on-surface-variant">Unused money carries into next month.</span>
+            </span>
+          </label>
+        </div>
+      </Sheet>
+    </li>
+  );
+}
+
+function money(value: number) {
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: Math.abs(value) >= 1000 ? 0 : 2 });
+}
+
+function monthLabel(month: string) {
+  const [year, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, m - 1, 1)).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}

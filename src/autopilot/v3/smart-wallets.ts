@@ -271,9 +271,11 @@ export function walletReportCards(
 }
 
 export const COPY_MIN_LIQUIDITY_USD = 150_000;
-/** Conservative gross-return map from distinct-wallet conviction (research:
- * copiers realize ~3%/trade from strong originators; we start well under). */
-export const COPY_BPS_PER_WALLET = 90;
+/** Expected gross return per distinct copied wallet. Zero since 2026-09-26
+ * (W4): the old 90bp came from a literature prior, not from our own forward
+ * results, so copy candidates are observed and graded but never ranked as
+ * positive-EV until wallets chosen before a date earn it after that date. */
+export const COPY_BPS_PER_WALLET = 0;
 export const COPY_MAX_EXPECTED_BPS = 270;
 
 export function copyWalletsEnabledIn(regime: MarketRegime): boolean {

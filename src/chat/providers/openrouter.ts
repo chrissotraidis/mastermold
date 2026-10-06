@@ -9,7 +9,12 @@ import {
   providerErrorResponse,
   streamServerSentEvents,
 } from "@/src/chat/streaming";
-import { llmProviderDisplayName, llmRequestHeaders, type LlmEndpoint } from "@/src/llm/completion";
+import {
+  llmProviderDisplayName,
+  llmReasoningPayload,
+  llmRequestHeaders,
+  type LlmEndpoint,
+} from "@/src/llm/completion";
 
 /**
  * Streams from any OpenAI-compatible chat endpoint. OpenCode Go and OpenRouter
@@ -34,6 +39,7 @@ export async function streamCompatResponse(
         max_tokens: budget?.maxResponseTokens ?? defaultMaxResponseTokens(),
         stream: true,
         temperature: 0.2,
+        ...llmReasoningPayload(endpoint),
         messages: [
           {
             role: "system",

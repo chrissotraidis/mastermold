@@ -162,10 +162,10 @@ export function playTrackRecord(input: { graded: GradedPlay[]; pending: number }
 export function describeTrackRecord(record: PlayTrackRecord): string | null {
   if (record.graded === 0 && record.pending === 0) return null;
   if (record.graded === 0) {
-    return `${record.pending} directional call${record.pending === 1 ? "" : "s"} awaiting the ${GRADE_MIN_HORIZON_DAYS}-day grade.`;
+    return `${record.pending} past suggestion${record.pending === 1 ? "" : "s"} will be checked against the price ${GRADE_MIN_HORIZON_DAYS} days later.`;
   }
-  const scored = `${record.right}/${record.right + record.wrong} directional calls right over ${GRADE_MIN_HORIZON_DAYS}+ days`;
+  const scored = `${record.right} of ${record.right + record.wrong} past suggestions were right ${GRADE_MIN_HORIZON_DAYS}+ days later`;
   const flatNote = record.flat > 0 ? `, ${record.flat} flat` : "";
-  const pendingNote = record.pending > 0 ? ` · ${record.pending} awaiting grade` : "";
-  return `Track record: ${scored}${flatNote}${pendingNote}.`;
+  const pendingNote = record.pending > 0 ? ` · ${record.pending} still waiting` : "";
+  return `Master Mold’s record: ${scored}${flatNote}${pendingNote}.`;
 }

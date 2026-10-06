@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,17 +39,31 @@ export function DailyReportRefreshButton({
     }
   }, [router]);
 
+  // Command routes ("Run scan", palette "Refresh today's read") land here as
+  // /?action=run-scan. Run once, then drop the param so reloads stay quiet.
+  const handledAction = useRef(false);
+  useEffect(() => {
+    if (handledAction.current) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("action") !== "run-scan") return;
+    handledAction.current = true;
+    url.searchParams.delete("action");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    void refresh();
+  }, [refresh]);
+
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
+    <div id="run-scan" className={cn("flex scroll-mt-24 flex-col gap-1.5", className)}>
       <button
         type="button"
         onClick={refresh}
         disabled={running}
+        aria-label={running ? "Refreshing today" : "Refresh today"}
         className={cn(
-          "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-semibold transition sm:min-h-8",
+          "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold transition sm:min-h-9 sm:px-4",
           variant === "primary"
             ? "bg-violet text-void hover:bg-violet/90 disabled:opacity-80"
-            : "border border-outline-variant/50 bg-surface-high/40 text-on-surface hover:bg-surface-high/70 disabled:opacity-70",
+            : "border border-outline-variant/70 bg-surface-low/60 text-on-surface hover:border-violet/45 hover:bg-surface-high/60 disabled:opacity-70",
         )}
       >
         {running ? (
@@ -57,7 +71,7 @@ export function DailyReportRefreshButton({
         ) : (
           <RefreshCw aria-hidden="true" className="size-4" />
         )}
-        {running ? "Refreshing today…" : "Refresh today"}
+        <span className="hidden sm:inline">{running ? "Refreshing today…" : "Refresh today"}</span>
       </button>
       {message ? (
         <p

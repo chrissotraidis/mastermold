@@ -7,6 +7,7 @@ import { autopilotStore } from "@/src/autopilot/store";
 import { parseAsOf, type AsOfFilter } from "@/src/db/bitemporal";
 import { getBriefingCardById, getBriefingCards } from "@/src/db/briefing";
 import { getJournal } from "@/src/db/journal";
+import { getPortfolio } from "@/src/db/portfolio";
 
 export const dynamic = "force-dynamic";
 
@@ -35,38 +36,37 @@ export default async function JournalPage({ searchParams }: JournalPageProps) {
   const preparedDraft = topIdeaDraft(parsedAsOf.ok ? parsedAsOf.asOf : null, params?.action);
   const initialDraft = draftFromParams(params) ?? preparedDraft?.draft;
   const systemEntries = systemJournalEntries();
+  const holdingSymbols = getPortfolio().holdings.map((holding) => holding.symbol);
 
   return (
     <AppShell dataMode={publicProvenanceLabel}>
-      <div className="mx-auto w-full min-w-0 max-w-4xl overflow-hidden">
-        <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="font-display text-lg font-semibold text-on-surface">Journal</h1>
-            <p className="mt-0.5 text-xs text-outline">
-              Your calls and Master Mold&apos;s own lessons — every entry says who wrote it.{" "}
-              <a href="/paper" className="text-violet hover:text-tertiary">
-                Test a call in the simulator →
-              </a>
-            </p>
+      <div className="grid w-full min-w-0 grid-cols-1 gap-6">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="mm-eyebrow">Calls, written before the outcome</p>
+            <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Journal</h1>
+            <ol className="mt-3 hidden max-w-3xl gap-2 text-xs leading-5 text-on-surface-variant sm:grid sm:grid-cols-3" aria-label="How the journal works">
+              <li className="flex gap-2 rounded-xl border border-outline-variant/40 px-3 py-2"><span className="mm-num font-semibold text-violet">1</span> Log a call: what you think, how sure (1–10), and the time frame.</li>
+              <li className="flex gap-2 rounded-xl border border-outline-variant/40 px-3 py-2"><span className="mm-num font-semibold text-violet">2</span> When the time frame ends it comes due.</li>
+              <li className="flex gap-2 rounded-xl border border-outline-variant/40 px-3 py-2"><span className="mm-num font-semibold text-violet">3</span> Score it: right or wrong, and how good the reasoning was.</li>
+            </ol>
           </div>
           <a
-            href="#record-call"
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-violet px-3 text-xs font-semibold text-void transition hover:bg-violet/90 sm:min-h-8"
+            href="/paper"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-outline-variant/70 bg-surface-low/60 px-4 text-sm font-semibold text-on-surface transition hover:border-violet/45 sm:min-h-9"
           >
-            <span className="sm:hidden">Record</span>
-            <span className="hidden sm:inline">Record a call</span>
+            Practice in paper trading →
           </a>
         </header>
 
-        <div className="space-y-4 sm:space-y-6">
-          <JournalWorkspace
-            initialJournal={publicJournal}
-            initialDraft={initialDraft}
-            initialDraftReason={preparedDraft?.reason}
-            focusedEntryId={params?.entry}
-            systemEntries={systemEntries}
-          />
-        </div>
+        <JournalWorkspace
+          initialJournal={publicJournal}
+          initialDraft={initialDraft}
+          initialDraftReason={preparedDraft?.reason}
+          focusedEntryId={params?.entry}
+          systemEntries={systemEntries}
+          holdingSymbols={holdingSymbols}
+        />
       </div>
     </AppShell>
   );

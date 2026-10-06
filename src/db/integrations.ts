@@ -1,5 +1,6 @@
 import { demoDatabase } from "./seed-data";
 import type { IntegrationStatus } from "./schema";
+import { llmProvider, llmProviderChain, llmProviderDisplayName } from "@/src/llm/completion";
 
 export type IntegrationStatusJson = IntegrationStatus & {
   display_name: string;
@@ -80,6 +81,7 @@ const serviceDisplay: Record<
         placeholder: "Chat provider",
         required: true,
         options: [
+          { value: "server", label: "Server default" },
           { value: "openrouter", label: "OpenRouter" },
           { value: "openai", label: "OpenAI" },
           { value: "anthropic", label: "Anthropic" },
@@ -101,7 +103,7 @@ export function getIntegrationStatuses(): IntegrationStatusJson[] {
   return demoDatabase.integrationStatuses.map((status) => {
     const runtimeStatus =
       status.service === "llm" && hasServerChatKey()
-        ? { ...status, status: "connected" as const, detail: "Live chat can use the configured server provider key." }
+        ? { ...status, status: "connected" as const, detail: `Live chat can use the configured server provider key.${serverChatLine()}` }
         : { ...status, detail: disconnectedDetail[status.service] ?? status.detail };
 
     return { ...runtimeStatus, ...serviceDisplay[status.service] };
@@ -109,5 +111,14 @@ export function getIntegrationStatuses(): IntegrationStatusJson[] {
 }
 
 function hasServerChatKey(): boolean {
-  return Boolean(process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+  return Boolean(llmProvider() || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+}
+
+/** Names the endpoint chat actually uses, so Settings matches the router. */
+function serverChatLine(): string {
+  const chain = llmProviderChain();
+  if (chain.length === 0) return "";
+  const [primary, fallback] = chain;
+  const lead = ` Server chat uses ${llmProviderDisplayName(primary.label)} (${primary.model})`;
+  return fallback ? `${lead}, with ${llmProviderDisplayName(fallback.label)} as fallback.` : `${lead}.`;
 }

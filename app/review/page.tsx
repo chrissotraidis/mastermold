@@ -58,48 +58,59 @@ export default function ReviewPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto grid w-full max-w-5xl gap-4">
+      <main className="grid w-full gap-6">
         <header className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-2xl font-semibold text-on-surface">Build truth and review readiness</h1>
-            <Badge variant="outline">Local build</Badge>
-          </div>
-          <p className="max-w-3xl text-sm leading-6 text-on-surface-variant">
-            This is the app-visible truth surface: what works, what is seeded or local, what needs credentials,
-            and what is still missing. Paper results and replay results are evidence—not claims of future profit.
+          <p className="mm-eyebrow">Honest status</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">What works today</h1>
+          <p className="hidden max-w-3xl text-sm leading-6 text-on-surface-variant sm:block">
+            What is real, what runs on sample data, what needs a key, and what is not built yet. Paper results and replay results are evidence—not claims of future profit.
+          </p>
+          <p className="flex flex-wrap gap-1.5">
+            {statusCounts().map(([status, count]) => (
+              <Badge key={status} variant="outline">
+                {count} {statusLabel[status].toLowerCase()}
+              </Badge>
+            ))}
           </p>
         </header>
-
-        <Card className="border-sky-400/25 bg-sky-400/[0.035]">
-          <CardHeader className="p-5 pb-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle as="h2" className="text-lg">Polymarket weather research truth</CardTitle>
-              <Badge variant="outline" className="border-violet/30 text-violet">Shadow only</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-3 p-5 pt-2 text-sm leading-6 text-on-surface-variant md:grid-cols-2">
+        <section aria-labelledby="capability-truth" className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <p className="font-semibold text-on-surface">What is working</p>
-              <p>Immutable local snapshots store audited rules, station metadata, forecast members, source hashes, observations, and market resolutions. Historical resolutions are backfilled only when one final winning bucket is unambiguous.</p>
+              <h2 id="capability-truth" className="font-display text-xl font-semibold text-on-surface">By feature</h2>
+              <p className="text-xs text-outline">Review credentials never include private keys, seed phrases, or wallet authority.</p>
             </div>
-            <div>
-              <p className="font-semibold text-on-surface">What is not proven</p>
-              <p>Current ensemble captures lack a stable issuance identifier and are excluded from calibration. No historical forecast is reconstructed from outcomes, and no station-observation backfill is presented as settlement truth.</p>
-            </div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-outline-variant/30 p-3 md:col-span-2 md:grid-cols-6">
-              <dt>Rule snapshots</dt><dd className="font-semibold text-on-surface">{weather.counts.rule_snapshots}</dd>
-              <dt>Forecast runs</dt><dd className="font-semibold text-on-surface">{weather.counts.forecast_runs}</dd>
-              <dt>Qualified runs</dt><dd className="font-semibold text-on-surface">{weather.counts.complete_forecast_runs}</dd>
-              <dt>Resolutions</dt><dd className="font-semibold text-on-surface">{weather.counts.resolutions}</dd>
-              <dt>Held-out cases</dt><dd className="font-semibold text-on-surface">{weather.counts.heldout_cases}</dd>
-              <dt>Evidence gate</dt><dd className="font-semibold text-on-surface">{weather.evidence_gate.passed ? "Passed; not promoted" : "Insufficient"}</dd>
-            </dl>
-            <p className="md:col-span-2">
-              {weather.detail} The evaluator uses only prior cases for each held-out date and compares station/kind climatology, raw ensemble frequency, and a simple EMOS calibration with Brier and CRPS scores. This database cannot enable paper or live execution.
-            </p>
-          </CardContent>
-        </Card>
+            <Link href="/settings#health" className="text-sm font-semibold text-violet hover:text-tertiary">Live system health</Link>
+          </div>
+          {/* One row per feature: status at a glance, the proof one tap away. */}
+          <ul className="mm-panel divide-y divide-outline-variant/30 overflow-hidden">
+            {reviewCapabilitySections.map((section) => (
+              <li key={section.id}>
+                <details className="group">
+                  <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-2.5 marker:hidden [&::-webkit-details-marker]:hidden">
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-on-surface">{section.title}</span>
+                    <Badge variant="outline" className="shrink-0">{statusLabel[section.status]}</Badge>
+                    <span aria-hidden="true" className="shrink-0 text-xs text-outline transition group-open:rotate-90">›</span>
+                  </summary>
+                  <div className="space-y-2 px-4 pb-4 text-sm leading-5 text-on-surface-variant">
+                    <p>{section.summary}</p>
+                    <ul className="list-disc space-y-1 pl-5">
+                      {section.items.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
+                    </ul>
+                    <p className="text-xs text-outline"><span className="font-semibold">Review access:</span> {section.reviewCredential}</p>
+                    <p className="text-xs text-outline">Where: {section.userVisibleSurface} · Evidence: {section.evidenceEndpoint}</p>
+                  </div>
+                </details>
+              </li>
+            ))}
+          </ul>
+        </section>
 
+        <section aria-labelledby="lab-internals" className="space-y-3">
+          <div>
+            <h2 id="lab-internals" className="font-display text-xl font-semibold text-on-surface">Research lab internals</h2>
+            <p className="text-sm text-on-surface-variant">Technical evidence for the Web3 and Polymarket labs. Nothing here can place a trade.</p>
+          </div>
+          <LabSection title="Web3 strategy and ML status">
         <Card className="border-caution/35 bg-caution/[0.045]">
           <CardHeader className="p-5 pb-2">
             <CardTitle as="h2" className="text-lg">Strategy expansion status</CardTitle>
@@ -157,38 +168,70 @@ export default function ReviewPage() {
           </CardContent>
         </Card>
 
-        <section aria-labelledby="capability-truth" className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 id="capability-truth" className="font-display text-xl font-semibold text-on-surface">Capability truth</h2>
-              <p className="text-sm text-on-surface-variant">Review credentials never include private keys, seed phrases, or wallet authority.</p>
+          </LabSection>
+          <LabSection title="Polymarket weather research">
+        <Card className="border-sky-400/25 bg-sky-400/[0.035]">
+          <CardHeader className="p-5 pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle as="h2" className="text-lg">Polymarket weather research truth</CardTitle>
+              <Badge variant="outline" className="border-violet/30 text-violet">Shadow only</Badge>
             </div>
-            <Link href="/settings#health" className="text-sm font-semibold text-violet hover:text-tertiary">Open live system health</Link>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {reviewCapabilitySections.map((section) => (
-              <Card key={section.id} className="border-outline-variant/30">
-                <CardHeader className="space-y-2 p-4 pb-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle as="h3" className="text-base">{section.title}</CardTitle>
-                    <Badge variant="outline">{statusLabel[section.status]}</Badge>
-                  </div>
-                  <p className="text-sm leading-5 text-on-surface-variant">{section.summary}</p>
-                </CardHeader>
-                <CardContent className="space-y-2 p-4 pt-1 text-sm leading-5 text-on-surface-variant">
-                  <p><span className="font-semibold text-on-surface">Review access:</span> {section.reviewCredential}</p>
-                  <ul className="list-disc space-y-1 pl-5">
-                    {section.items.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
-                  </ul>
-                  <p className="text-xs text-outline">Surface: {section.userVisibleSurface} · Evidence: {section.evidenceEndpoint}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-5 pt-2 text-sm leading-6 text-on-surface-variant md:grid-cols-2">
+            <div>
+              <p className="font-semibold text-on-surface">What is working</p>
+              <p>Immutable local snapshots store audited rules, station metadata, forecast members, source hashes, observations, and market resolutions. Historical resolutions are backfilled only when one final winning bucket is unambiguous.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-on-surface">What is not proven</p>
+              <p>Current ensemble captures lack a stable issuance identifier and are excluded from calibration. No historical forecast is reconstructed from outcomes, and no station-observation backfill is presented as settlement truth.</p>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-outline-variant/30 p-3 md:col-span-2 md:grid-cols-6">
+              <dt>Rule snapshots</dt><dd className="font-semibold text-on-surface">{weather.counts.rule_snapshots}</dd>
+              <dt>Forecast runs</dt><dd className="font-semibold text-on-surface">{weather.counts.forecast_runs}</dd>
+              <dt>Qualified runs</dt><dd className="font-semibold text-on-surface">{weather.counts.complete_forecast_runs}</dd>
+              <dt>Resolutions</dt><dd className="font-semibold text-on-surface">{weather.counts.resolutions}</dd>
+              <dt>Held-out cases</dt><dd className="font-semibold text-on-surface">{weather.counts.heldout_cases}</dd>
+              <dt>Evidence gate</dt><dd className="font-semibold text-on-surface">{weather.evidence_gate.passed ? "Passed; not promoted" : "Insufficient"}</dd>
+            </dl>
+            <p className="md:col-span-2">
+              {weather.detail} The evaluator uses only prior cases for each held-out date and compares station/kind climatology, raw ensemble frequency, and a simple EMOS calibration with Brier and CRPS scores. This database cannot enable paper or live execution.
+            </p>
+          </CardContent>
+        </Card>
+
+          </LabSection>
         </section>
 
-        <ReviewerEvidencePanel />
+        {/* Reviewer tooling, not status: folded so the page leads with what works. */}
+        <details className="group mm-panel overflow-hidden">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold text-on-surface marker:hidden [&::-webkit-details-marker]:hidden">
+            Walkthrough checks for reviewers
+            <span aria-hidden="true" className="text-xs text-outline transition group-open:rotate-90">›</span>
+          </summary>
+          <div className="p-3 pt-0">
+            <ReviewerEvidencePanel />
+          </div>
+        </details>
       </main>
     </AppShell>
+  );
+}
+
+function statusCounts() {
+  const counts = new Map<keyof typeof statusLabel, number>();
+  for (const section of reviewCapabilitySections) counts.set(section.status, (counts.get(section.status) ?? 0) + 1);
+  return [...counts.entries()];
+}
+
+function LabSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details className="group mm-panel overflow-hidden">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 text-sm font-semibold text-on-surface marker:hidden hover:bg-surface-high/30 [&::-webkit-details-marker]:hidden">
+        {title}
+        <span aria-hidden="true" className="text-outline transition group-open:rotate-90">›</span>
+      </summary>
+      <div className="border-t border-outline-variant/40 p-2">{children}</div>
+    </details>
   );
 }

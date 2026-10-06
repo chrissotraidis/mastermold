@@ -3,6 +3,7 @@ import { demoDatabase } from "./seed-data";
 import { replaceImportedHoldings, type PortfolioJson } from "./portfolio";
 import { recordProductMetric } from "./metrics";
 import type { ImportedHoldingRow } from "./store";
+import { roundPrice } from "./price";
 
 export type PortfolioImportService = ImportedHoldingRow["service"];
 
@@ -234,7 +235,7 @@ function coinbaseBalanceToRow(
       asset_class: assetClassForSymbol(symbol, stringAt(balance, "asset.type") === "fiat" ? "cash" : "crypto"),
       venue: "Coinbase",
       quantity,
-      price: roundMoney(price),
+      price: roundPrice(price),
       cost_basis: roundMoney(firstNumber(usdValue, quantity * price)),
       daily_change_pct: dailyChangePctForSymbol(symbol),
       imported_at: importedAt,
@@ -313,7 +314,7 @@ function snapTradePositionToRow(
     asset_class: assetClassForSymbol(symbol, "equity"),
     venue: stringAt(account, "institution_name") || "SnapTrade",
     quantity,
-    price: roundMoney(unitPrice),
+    price: roundPrice(unitPrice),
     cost_basis: paidAmount,
     daily_change_pct: dailyChangePctForSymbol(symbol),
     imported_at: importedAt,
@@ -362,7 +363,7 @@ function zerionPositionToRow(
           "On-chain",
         ) || "On-chain",
       quantity,
-      price: roundMoney(price),
+      price: roundPrice(price),
       cost_basis: roundMoney(marketValue || quantity * price),
       daily_change_pct: roundPct(numberAt(position, "attributes.changes.percent_1d")),
       imported_at: importedAt,

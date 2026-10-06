@@ -202,13 +202,13 @@ function PaperTradeForm({
     >
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 p-3 text-on-surface marker:hidden sm:min-h-14 sm:p-5 [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
-          <span className="block text-sm font-semibold">Test a paper trade</span>
+          <span className="block text-sm font-semibold">New paper test</span>
           <span className="mt-0.5 block line-clamp-1 text-xs leading-5 text-outline sm:mt-1 sm:text-sm sm:leading-6">
             Choose the asset, direction, amount, and reason only when you are ready to test. Nothing here places a real trade.
           </span>
         </span>
         <span className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border border-violet/35 px-3 text-xs font-semibold text-violet sm:text-sm">
-          {open ? "Close" : "Open"}
+          {open ? "Hide form" : "Start a test"}
         </span>
       </summary>
       <CardContent className="border-t border-outline-variant/25 p-4 pt-4 sm:p-5">
@@ -247,7 +247,7 @@ function PaperTradeForm({
                     className={cn(
                       "relative flex min-h-11 cursor-pointer items-center justify-center overflow-hidden rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-violet",
                       direction === item.value
-                        ? "border-violet bg-violet text-void"
+                        ? "border-violet/70 bg-violet/15 text-on-surface"
                         : "border-outline-variant/50 bg-surface-dim/70 text-on-surface-variant hover:bg-surface-high/60",
                     )}
                   >
@@ -377,7 +377,7 @@ function PaperAccountPanel({ wallet }: { wallet: PaperWorkspaceData["wallet"] })
       </h2>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 sm:hidden">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-outline">
+          <p className="text-[11px] font-medium text-outline">
             Paper account
           </p>
           <p className="mt-0.5 font-display text-lg font-semibold leading-none text-on-surface">
@@ -498,7 +498,7 @@ function RoundScorePanel({
           Latest closed test
         </h2>
         <p className={compact ? "sr-only" : "mt-1 hidden text-sm leading-6 text-outline sm:block"}>
-          What happened after the close date, translated into plain review scores.
+          Scored after the close date: call quality, timing and risk spread are each out of 10, and the overall result adds them up (out of 30).
         </p>
       </div>
       <Card className="border-outline-variant/40 bg-surface-high/30">

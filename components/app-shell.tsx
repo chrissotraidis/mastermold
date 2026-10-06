@@ -10,13 +10,20 @@ import {
   Hexagon,
   Info,
   LineChart,
+  LayoutGrid,
+  MessageSquare,
+  ClipboardCheck,
+  ArrowLeftRight,
+  PiggyBank,
   Loader2,
   NotebookPen,
   Power,
   Radar,
   Send,
+  Search,
   Settings,
   ShieldAlert,
+  ShieldCheck,
   UserRound,
   X,
   type LucideIcon,
@@ -38,6 +45,10 @@ import {
   type MasterMoldCommandHandoff,
 } from "@/lib/master-mold-command-handoff";
 import { SentinelFace, type SystemState } from "@/components/sentinel-face";
+import { CommandPalette, openCommandPalette } from "@/components/command-palette";
+import { Toaster } from "@/components/ui/toast";
+import { Sheet } from "@/components/ui/sheet";
+import { PrivacyToggle } from "@/components/privacy-toggle";
 import { useOptionalProfile } from "@/components/profile-provider";
 import { useFaceActivity } from "@/components/face-activity";
 import type { ProductProvenanceLabel } from "@/lib/provenance-copy";
@@ -61,13 +72,15 @@ type ShellCommandStatus = {
 const NAV: NavItem[] = [
   { href: "/", label: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", icon: LineChart, zone: "observe" },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight, zone: "observe" },
+  { href: "/budget", label: "Budget", icon: PiggyBank, zone: "observe" },
   { href: "/journal", label: "Journal", icon: NotebookPen, zone: "observe" },
   { href: "/trading", label: "Web3 lab", icon: Bot, zone: "research" },
   { href: "/polymarket", label: "Polymarket lab", icon: Radar, zone: "research" },
   { href: "/settings", label: "Settings", icon: Settings, zone: "system" },
 ];
 
-const WARM_ROUTES = ["/", "/portfolio", "/journal", "/trading", "/polymarket", "/settings", "/chat"] as const;
+const WARM_ROUTES = ["/", "/portfolio", "/transactions", "/budget", "/journal", "/trading", "/polymarket", "/settings", "/chat"] as const;
 
 const ZONE_ACCENT: Record<Zone, string> = {
   observe: "text-outline",
@@ -223,12 +236,14 @@ export function AppShell({
         onDismiss={dismissCommandHandoff}
       />
       <SideRail />
-      <main className="mx-auto w-full max-w-deck px-margin-mobile pb-[calc(7rem+env(safe-area-inset-bottom))] pt-20 md:pl-16 md:pr-margin-desktop md:pb-12">
+      <main className="mx-auto w-full max-w-[88rem] animate-mm-enter px-margin-mobile pb-[calc(7rem+env(safe-area-inset-bottom))] pt-20 md:pl-24 md:pr-8 md:pb-12 lg:pl-[17rem] xl:pr-16">
         {children}
-        <p className="mt-12 text-center text-xs leading-5 text-outline">
-          Advisory by default — live execution requires an explicit operator action and passing evidence gates.
+        <p className="mt-12 text-center text-[11px] leading-5 text-outline lg:hidden">
+          Master Mold advises. It never moves your money, and live trading stays locked.
         </p>
       </main>
+      <CommandPalette pageContext={pageContextForShellPath(pathname)} />
+      <Toaster />
       <MobileNav />
       <GlobalAssistant />
       {killOpen ? (
@@ -375,7 +390,7 @@ function labelAppShellCommandAction(action: string) {
 
 function TopBarFallback({ dataMode }: { dataMode: DataModeLabel }) {
   const isLive = dataMode === "Saved read" || dataMode === "Live DEX read" || dataMode === "Live market read";
-  const isPersonal = dataMode === "Manual portfolio" || dataMode === "Imported portfolio";
+  const isPersonal = dataMode === "Manual portfolio" || dataMode === "Imported portfolio" || dataMode === "Your entries";
   const label = dataMode === "Live DEX read" ? "Live DEX" : dataMode === "Live market read" ? "Live market" : dataMode === "Imported portfolio" ? "Imported" : dataMode;
 
   return (
@@ -424,9 +439,9 @@ function TopBar({
   const isEngine = dataMode === "Saved read";
   const isLiveDex = dataMode === "Live DEX read";
   const isLiveMarket = dataMode === "Live market read";
-  const isManual = dataMode === "Manual portfolio";
+  const isManual = dataMode === "Manual portfolio" || dataMode === "Your entries";
   const isImported = dataMode === "Imported portfolio";
-  const dataModeLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX" : isLiveMarket ? "Live market" : isManual ? "Manual portfolio" : isImported ? "Imported" : "Sample";
+  const dataModeLabel = isEngine ? "Saved read" : isLiveDex ? "Live DEX" : isLiveMarket ? "Live market" : isManual ? dataMode : isImported ? "Imported" : "Sample";
   const firstName = profile?.name.trim().split(/\s+/)[0] ?? "";
   // The command bar duplicates the hero console on the deck and the chat page itself.
   const showCommandBar = pathname !== "/" && pathname !== "/chat";
@@ -482,7 +497,7 @@ function TopBar({
   }, [commandActionPrefetchKey, router]);
 
   return (
-    <header className="fixed top-0 left-0 z-50 flex h-14 w-full items-center justify-between border-b border-outline-variant/25 bg-surface-dim/85 px-margin-mobile backdrop-blur-xl md:px-margin-desktop">
+    <header className="fixed top-0 left-0 z-50 flex h-14 w-full items-center justify-between border-b border-outline-variant/40 bg-void/70 px-margin-mobile backdrop-blur-2xl md:px-5">
       <div className="flex min-w-0 items-center gap-3">
         {isChatPage ? (
           <div className="relative size-10 shrink-0" aria-hidden="true">
@@ -502,7 +517,7 @@ function TopBar({
         <button
           type="button"
           onClick={() => openMasterMoldChat(undefined, pageContext)}
-          className="flex min-h-11 shrink-0 items-center whitespace-nowrap font-display text-base font-bold tracking-tight text-violet transition hover:text-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+          className="flex min-h-11 shrink-0 items-center whitespace-nowrap font-display text-base font-bold tracking-tight text-on-surface transition hover:text-violet focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
           aria-label="Ask Master Mold from the top bar"
           title="Ask Master Mold"
         >
@@ -510,7 +525,7 @@ function TopBar({
         </button>
         <span
           className={cn(
-            "hidden items-center gap-1.5 rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-wide sm:inline-flex",
+            "hidden items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium leading-none sm:inline-flex",
             isEngine || isLiveDex || isLiveMarket ? "text-engine" : isManual || isImported ? "text-violet" : "text-demo",
             isEngine || isLiveDex || isLiveMarket ? "border-engine/25 bg-engine/10" : isManual || isImported ? "border-violet/25 bg-violet/10" : "border-demo/25 bg-demo/10",
           )}
@@ -532,7 +547,7 @@ function TopBar({
               }}
               data-testid="topbar-command"
             >
-              <div className="flex min-h-10 items-center gap-2 rounded-md border border-violet/25 bg-surface-low/75 px-2 py-1 shadow-sm shadow-void/10 transition-colors focus-within:border-violet/60 focus-within:ring-2 focus-within:ring-violet/20">
+              <div className="flex min-h-10 items-center gap-2 rounded-full border border-outline-variant/70 bg-surface-low/70 py-1 pl-3 pr-1 transition-colors focus-within:border-violet/60 focus-within:ring-2 focus-within:ring-violet/20">
                 <Bot aria-hidden="true" className="size-4 shrink-0 text-violet" />
                 <input
                   value={q}
@@ -553,7 +568,7 @@ function TopBar({
                 <button
                   type="submit"
                   aria-label="Send to Master Mold"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-md bg-violet text-void transition hover:bg-violet/90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-violet text-void shadow-glow transition hover:bg-violet/90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet"
                 >
                   <Send aria-hidden="true" className="size-4" />
                 </button>
@@ -562,7 +577,7 @@ function TopBar({
             {commandStatus || readyCommandAction || visibleCommandActions.length > 0 ? (
               <div
                 className={cn(
-                  "absolute right-0 top-[calc(100%+0.45rem)] z-[70] w-[22rem] gap-2 rounded-md border border-violet/30 bg-surface-low/95 p-2 shadow-xl shadow-void/30 backdrop-blur",
+                  "absolute right-0 top-[calc(100%+0.45rem)] z-[70] w-[22rem] gap-2 rounded-2xl border border-outline-variant/70 bg-surface-low/95 p-2 shadow-2xl shadow-void/40 backdrop-blur-xl",
                   commandStatus || trimmedCommand ? "grid" : "hidden group-focus-within:grid",
                 )}
                 aria-label="Ready Master Mold routes"
@@ -625,12 +640,13 @@ function TopBar({
             ) : null}
           </div>
         ) : null}
+        <PrivacyToggle />
         <AlertInboxDrawer />
         {ready ? (
           <Link
             href={profile ? "/settings" : "/settings#profile"}
             title={profile ? "Profile & settings" : "Create local profile preferences"}
-            className="hidden min-h-10 items-center gap-2 rounded-md border border-outline-variant/25 bg-void/35 px-2.5 py-1 text-sm transition-colors hover:border-violet/45 hover:text-violet sm:flex"
+            className="hidden min-h-10 items-center gap-2 rounded-full border border-outline-variant/60 bg-surface-low/60 px-3 py-1 text-sm transition-colors hover:border-violet/45 hover:text-violet sm:flex"
           >
             <UserRound aria-hidden="true" className="size-4 text-outline" />
             <span className="max-w-28 truncate text-on-surface-variant">
@@ -746,6 +762,24 @@ function pageContextForShellPath(pathname: string, route = pathname): ChatPageCo
     };
   }
 
+  if (pathname.startsWith("/transactions")) {
+    return {
+      surface: "Transactions",
+      route,
+      summary:
+        "The user is looking at imported bank and card transactions, categories, rules, hidden rows, and monthly cash flow. Everything is stored locally.",
+    };
+  }
+
+  if (pathname.startsWith("/budget")) {
+    return {
+      surface: "Budget",
+      route,
+      summary:
+        "The user is looking at this month's budget: income, planned spending by group, what is left to spend, uncategorized spending, and savings goals.",
+    };
+  }
+
   if (pathname.startsWith("/journal")) {
     return {
       surface: "Decision journal",
@@ -794,116 +828,211 @@ function ScanStatusLine() {
   if (!line) return null;
   const compactLine = compactScanStatusLine(line);
   return (
-    <span className="hidden max-w-[11rem] truncate rounded-full border border-outline-variant/25 bg-void/25 px-2 py-1 text-xs leading-none text-outline lg:inline xl:max-w-[14rem]">
+    <span
+      title={line}
+      className="hidden max-w-[11rem] truncate rounded-full border border-outline-variant/25 bg-void/25 px-2 py-1 text-xs leading-none text-outline lg:inline xl:max-w-[14rem]"
+    >
       {compactLine}
     </span>
   );
 }
 
 function compactScanStatusLine(line: string) {
+  // The full sentence lives in the chip's tooltip; the chip itself stays short
+  // enough to read without truncating mid-word.
   return line
+    .replace(/^No market read yet\..*$/i, "No market read yet")
+    .replace(/^Last scan attempt failed; showing the read from\s+/i, "Scan failed · read ")
     .replace(/^Market read from\s+/i, "Market read ")
     .replace(/\s+days?\s+ago\.?$/i, "d ago")
     .replace(/\s+hours?\s+ago\.?$/i, "h ago")
     .replace(/\s+minutes?\s+ago\.?$/i, "m ago");
 }
 
+const NAV_GROUPS: Array<{ label: string; zones: Zone[] }> = [
+  { label: "Money", zones: ["advise", "observe"] },
+  { label: "Research labs", zones: ["research"] },
+  { label: "System", zones: ["system"] },
+];
+
 function SideRail() {
   const pathname = usePathname() || "/";
   return (
     <nav
       aria-label="Primary"
-      className="fixed left-0 top-0 z-40 hidden h-full w-14 flex-col border-r border-outline-variant/30 bg-surface-low/60 pt-20 pb-20 backdrop-blur-md md:flex"
+      className="fixed left-0 top-0 z-40 hidden h-full w-16 flex-col border-r border-outline-variant/40 bg-surface-lowest/70 pb-4 pt-20 backdrop-blur-xl md:flex lg:w-60"
     >
-      <div className="flex flex-1 flex-col gap-1 px-1.5">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const active = isActivePath(pathname, item.href);
-          return (
-            <IntentPrefetchLink
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              aria-label={item.label}
-              title={item.label}
-              className={cn(
-                "relative flex h-11 items-center justify-center overflow-hidden rounded-md transition-colors",
-                active
-                  ? "bg-violet/10 text-violet"
-                  : "hover:bg-surface-high/35",
-              )}
-            >
-              <NavPendingState>
-                {(pending) => (
-                  <>
-                    <span className="flex size-11 shrink-0 items-center justify-center">
-                      {pending ? (
-                        <Loader2 className="size-5 animate-spin text-violet" />
-                      ) : (
-                        <Icon className={cn("size-5", active ? "text-violet" : ZONE_ACCENT[item.zone])} />
-                      )}
-                    </span>
-                    <span className="sr-only">
-                      {item.label}
-                    </span>
-                  </>
-                )}
-              </NavPendingState>
-              {active ? <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-violet" aria-hidden="true" /> : null}
-              <NavPendingBar />
-            </IntentPrefetchLink>
-          );
-        })}
+      <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-2 lg:px-3">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="flex flex-col gap-0.5">
+            <p className="mm-eyebrow hidden px-3 pb-1 lg:block">{group.label}</p>
+            {NAV.filter((item) => group.zones.includes(item.zone)).map((item) => {
+              const Icon = item.icon;
+              const active = isActivePath(pathname, item.href);
+              return (
+                <IntentPrefetchLink
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={item.label}
+                  title={item.label}
+                  className={cn(
+                    "group relative flex h-11 items-center justify-center gap-3 overflow-hidden rounded-xl text-sm font-medium transition-colors lg:justify-start lg:px-3",
+                    active
+                      ? "bg-violet/15 text-on-surface"
+                      : "text-on-surface-variant hover:bg-surface-high/50 hover:text-on-surface",
+                  )}
+                >
+                  <NavPendingState>
+                    {(pending) => (
+                      <>
+                        <span className="flex size-6 shrink-0 items-center justify-center">
+                          {pending ? (
+                            <Loader2 className="size-[18px] animate-spin text-violet" />
+                          ) : (
+                            <Icon className={cn("size-[18px]", active ? "text-violet" : "text-outline group-hover:text-on-surface-variant")} />
+                          )}
+                        </span>
+                        <span className="sr-only lg:not-sr-only lg:truncate">{item.label}</span>
+                      </>
+                    )}
+                  </NavPendingState>
+                  {active ? <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full bg-violet shadow-glow" aria-hidden="true" /> : null}
+                  <NavPendingBar />
+                </IntentPrefetchLink>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col gap-2 px-2 pt-3 lg:px-3">
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          aria-label="Search or run a command"
+          title="Search or run a command (⌘K)"
+          className="flex h-11 items-center justify-center gap-3 rounded-xl border border-outline-variant/60 bg-surface-low/60 text-sm text-on-surface-variant transition-colors hover:border-violet/45 hover:text-on-surface lg:justify-start lg:px-3"
+        >
+          <Search aria-hidden="true" className="size-4 shrink-0 text-outline" />
+          <span className="hidden flex-1 text-left lg:inline">Search</span>
+          <kbd className="hidden rounded-md border border-outline-variant/70 px-1.5 font-mono text-[10px] text-outline lg:inline">⌘K</kbd>
+        </button>
+        <Link
+          href="/settings#health"
+          className="hidden items-start gap-2 rounded-xl px-3 py-2 text-[11px] leading-4 text-outline transition-colors hover:text-on-surface-variant lg:flex"
+        >
+          <ShieldCheck aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-engine" />
+          <span>Master Mold advises. It never moves your money, and live trading stays locked.</span>
+        </Link>
       </div>
     </nav>
   );
 }
 
-// Same vocabulary as the desktop rail — one name per destination everywhere.
-const MOBILE: Array<NavItem & { shortLabel: string }> = [
+// Phone tab bar: the four places used most, plus More for everything else
+// (Monarch keeps five tabs and a More sheet the same way).
+const MOBILE: Array<NavItem & { shortLabel: string; also?: string[] }> = [
   { href: "/", label: "Today", shortLabel: "Today", icon: Hexagon, zone: "advise" },
   { href: "/portfolio", label: "Portfolio", shortLabel: "Portfolio", icon: LineChart, zone: "observe" },
-  { href: "/journal", label: "Journal", shortLabel: "Journal", icon: NotebookPen, zone: "observe" },
-  { href: "/settings", label: "Settings", shortLabel: "Settings", icon: Settings, zone: "system" },
+  { href: "/transactions", label: "Transactions", shortLabel: "Spending", icon: ArrowLeftRight, zone: "observe", also: ["/budget"] },
+  { href: "/trading", label: "Research labs", shortLabel: "Labs", icon: Bot, zone: "research", also: ["/polymarket", "/executor", "/paper"] },
+];
+
+const MORE_GROUPS: Array<{ label: string; items: Array<{ href: string; label: string; icon: LucideIcon; hint: string }> }> = [
+  {
+    label: "Money",
+    items: [
+      { href: "/portfolio", label: "Portfolio", icon: LineChart, hint: "Net worth and holdings" },
+      { href: "/transactions", label: "Transactions", icon: ArrowLeftRight, hint: "Spending and cash flow" },
+      { href: "/budget", label: "Budget", icon: PiggyBank, hint: "Plans and goals" },
+      { href: "/journal", label: "Journal", icon: NotebookPen, hint: "Calls, graded later" },
+    ],
+  },
+  {
+    label: "Research labs",
+    items: [
+      { href: "/trading", label: "Web3 lab", icon: Bot, hint: "Paper only" },
+      { href: "/polymarket", label: "Polymarket lab", icon: Radar, hint: "Paper only" },
+    ],
+  },
+  {
+    label: "Master Mold",
+    items: [
+      { href: "/chat", label: "Chat", icon: MessageSquare, hint: "Ask about your money" },
+      { href: "/settings", label: "Settings", icon: Settings, hint: "Connections and privacy" },
+      { href: "/review", label: "What works today", icon: ClipboardCheck, hint: "Built, sample, or missing" },
+    ],
+  },
 ];
 
 function MobileNav() {
   const pathname = usePathname() || "/";
+  const [moreOpen, setMoreOpen] = useState(false);
+  const tabActive = (item: (typeof MOBILE)[number]) => isActivePath(pathname, item.href) || (item.also ?? []).some((href) => isActivePath(pathname, href));
+  const moreActive = !MOBILE.some(tabActive);
+  const tabClass = (active: boolean) =>
+    cn(
+      "relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 transition-colors",
+      active ? "bg-violet/15 text-violet" : "text-on-surface-variant active:bg-surface-high/35",
+    );
   return (
-    <nav
-      aria-label="Mobile primary"
-      className="fixed bottom-3 left-1/2 z-50 flex w-[calc(100%-1.5rem)] -translate-x-1/2 items-center justify-around rounded-md border border-violet/15 bg-surface-low/80 px-1 py-0.5 shadow-lg shadow-void/25 backdrop-blur-2xl md:hidden"
-    >
-      {MOBILE.map((item) => {
-        const Icon = item.icon;
-        const active = isActivePath(pathname, item.href);
-        return (
-          <IntentPrefetchLink
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            aria-label={item.label}
-            className={cn(
-              "relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-0.5 transition-colors",
-              active ? "text-violet" : "text-on-surface-variant active:bg-surface-high/35",
-            )}
-          >
-            <NavPendingState>
-              {(pending) =>
-                pending ? (
-                  <Loader2 className="size-5 animate-spin text-violet" />
-                ) : (
-                  <Icon className="size-5" />
-                )
-              }
-            </NavPendingState>
-            {active ? <span className="absolute top-1 h-0.5 w-6 rounded-full bg-violet/70" aria-hidden="true" /> : null}
-            <span className="max-w-full truncate font-mono text-[9px] uppercase tracking-wide">{item.shortLabel}</span>
-            <NavPendingBar />
-          </IntentPrefetchLink>
-        );
-      })}
-    </nav>
+    <>
+      <nav
+        aria-label="Mobile primary"
+        className="fixed bottom-3 left-1/2 z-50 flex w-[calc(100%-1.5rem)] -translate-x-1/2 items-center justify-around rounded-2xl border border-outline-variant/60 bg-surface-dim/90 px-1 py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom)/2)] shadow-2xl shadow-void/50 backdrop-blur-2xl md:hidden"
+      >
+        {MOBILE.map((item) => {
+          const Icon = item.icon;
+          const active = tabActive(item);
+          return (
+            <IntentPrefetchLink key={item.href} href={item.href} aria-current={active ? "page" : undefined} aria-label={item.label} className={tabClass(active)}>
+              <NavPendingState>
+                {(pending) => (pending ? <Loader2 className="size-5 animate-spin text-violet" /> : <Icon className="size-5" />)}
+              </NavPendingState>
+              <span className="max-w-full truncate text-[10px] font-medium">{item.shortLabel}</span>
+              <NavPendingBar />
+            </IntentPrefetchLink>
+          );
+        })}
+        <button type="button" onClick={() => setMoreOpen(true)} aria-haspopup="dialog" aria-current={moreActive ? "page" : undefined} className={tabClass(moreActive)}>
+          <LayoutGrid className="size-5" />
+          <span className="text-[10px] font-medium">More</span>
+        </button>
+      </nav>
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Everything">
+        <div className="grid gap-5" data-testid="more-sheet">
+          {MORE_GROUPS.map((group) => (
+            <section key={group.label} aria-label={group.label}>
+              <p className="mm-eyebrow mb-2">{group.label}</p>
+              <ul className="grid grid-cols-2 gap-2">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActivePath(pathname, item.href);
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={() => setMoreOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "flex min-h-16 flex-col justify-center gap-1 rounded-2xl border px-3 py-2.5 transition",
+                          active ? "border-violet/50 bg-violet/10" : "border-outline-variant/50 active:bg-surface-high/40",
+                        )}
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+                          <Icon aria-hidden="true" className="size-4 text-violet" /> {item.label}
+                        </span>
+                        <span className="truncate text-[11px] text-outline">{item.hint}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </Sheet>
+    </>
   );
 }
 
@@ -994,7 +1123,7 @@ export function FirstRunBanner() {
     <div className="mb-gutter flex items-start gap-3 border border-outline-variant/40 bg-surface-dim/50 p-4 chamfer-sm backdrop-blur-sm inner-glow">
       <Info className="mt-0.5 size-4 shrink-0 text-violet" />
       <p className="text-sm leading-6 text-on-surface-variant">
-        <strong className="text-on-surface">Advisory by default.</strong> Portfolio actions never trade.
+        <strong className="text-on-surface">Advice only.</strong> Portfolio actions never trade.
         Autonomous lanes are separate; current authority and evidence gates are visible in their control rooms.
       </p>
       <Link

@@ -45,6 +45,129 @@ export type ManualHoldingRow = {
   daily_change_pct: number;
   created_at: string;
   updated_at: string;
+  /** Optional account link; missing on rows entered before accounts existed. */
+  account_id?: string | null;
+  /** When the price was last refreshed from a quote source (null = typed in). */
+  price_as_of?: string | null;
+  price_source?: string | null;
+  /** False when cost_basis was defaulted from quantity × price, not entered. */
+  cost_basis_known?: boolean;
+};
+
+/**
+ * An account in the money map. Holdings point at it by account_id; accounts
+ * with no holdings (checking, a mortgage, a house) carry their own balance.
+ * Liabilities store a positive balance and subtract from net worth.
+ */
+/** One money movement. Negative amount = money out, positive = money in. */
+export type TransactionRow = {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  /** Raw statement text as the bank sent it; rules can match on it. */
+  original_description: string;
+  /** Cleaned merchant name shown in the UI. */
+  merchant: string;
+  category_id: string | null;
+  account_id: string | null;
+  notes: string;
+  tags: string[];
+  hidden: boolean;
+  needs_review: boolean;
+  source: "manual" | "csv" | "plaid" | "sandbox";
+  /** Provider's own id (Plaid transaction_id); a re-sync updates instead of duplicating. */
+  external_id?: string | null;
+  /** Contribution toward a savings goal (Monarch links these by rule or by hand). */
+  goal_id?: string | null;
+  import_batch_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TransactionRuleRow = {
+  id: string;
+  order: number;
+  enabled: boolean;
+  conditions: {
+    merchant?: { op: "equals" | "contains"; value: string };
+    original_description?: { op: "equals" | "contains"; value: string };
+    amount?: { op: "equals" | "above" | "below" | "between"; value: number; value2?: number };
+    direction?: "income" | "expense";
+    account_id?: string;
+  };
+  actions: {
+    rename_merchant?: string;
+    set_category_id?: string;
+    add_tags?: string[];
+    hide?: boolean;
+    needs_review?: boolean;
+    /** Monarch requires an account condition on goal-linking rules. */
+    link_goal_id?: string;
+  };
+  created_at: string;
+};
+
+export type GoalRow = {
+  id: string;
+  name: string;
+  target_amount: number;
+  target_date: string | null; // YYYY-MM-DD
+  account_id: string | null;
+  starting_balance: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** One budgeted category (Monarch-style Fixed / Non-monthly / Flex). */
+export type BudgetLineRow = {
+  category_id: string;
+  group: "fixed" | "non_monthly" | "flex";
+  /** Planned spend per month, as a positive number. */
+  amount: number;
+  rollover: boolean;
+  /** First month (YYYY-MM) the rollover counts from. */
+  rollover_start_month: string | null;
+  rollover_start_balance: number;
+  updated_at: string;
+};
+
+export type AccountExclusions = { net_worth?: boolean; cash_flow?: boolean; budget?: boolean };
+
+export type FinancialAccountRow = {
+  id: string;
+  name: string;
+  institution: string;
+  type:
+    | "brokerage"
+    | "retirement"
+    | "crypto_exchange"
+    | "wallet"
+    | "bank"
+    | "cash"
+    | "credit_card"
+    | "loan"
+    | "mortgage"
+    | "property"
+    | "vehicle"
+    | "other";
+  kind: "asset" | "liability";
+  currency: string;
+  /** Used when the account has no holdings (bank, loan, property). */
+  balance: number;
+  notes: string;
+  /** Monarch-style switches: leave this account out of these totals. */
+  exclude?: AccountExclusions;
+  created_at: string;
+  updated_at: string;
+};
+
+/** One saved net-worth point per day. */
+export type NetWorthHistoryRow = {
+  date: string;
+  assets: number;
+  liabilities: number;
+  net_worth: number;
+  recorded_at: string;
 };
 
 export type ImportedHoldingRow = {
@@ -124,6 +247,22 @@ export interface PersistAdapter {
   manualHoldings(): ManualHoldingRow[];
   upsertManualHolding(holding: ManualHoldingRow): void;
   deleteManualHolding(id: string): void;
+  /** Replace every manual holding in one write (imports, bulk edits, undo). */
+  replaceManualHoldings(holdings: ManualHoldingRow[]): void;
+  financialAccounts(): FinancialAccountRow[];
+  upsertFinancialAccount(account: FinancialAccountRow): void;
+  deleteFinancialAccount(id: string): void;
+  transactions(): TransactionRow[];
+  upsertTransactions(rows: TransactionRow[]): void;
+  deleteTransactions(ids: string[]): void;
+  transactionRules(): TransactionRuleRow[];
+  replaceTransactionRules(rows: TransactionRuleRow[]): void;
+  budgetLines(): BudgetLineRow[];
+  replaceBudgetLines(rows: BudgetLineRow[]): void;
+  goals(): GoalRow[];
+  replaceGoals(rows: GoalRow[]): void;
+  netWorthHistory(): NetWorthHistoryRow[];
+  upsertNetWorthPoint(point: NetWorthHistoryRow): void;
   importedHoldings(): ImportedHoldingRow[];
   replaceImportedHoldings(service: ImportedHoldingRow["service"], holdings: ImportedHoldingRow[]): void;
   positionPolicies(): PositionPolicyRow[];
@@ -156,6 +295,12 @@ type StoreSnapshot = {
   paper_rounds: PaperTradingRound[];
   round_scores: RoundScore[];
   manual_holdings: ManualHoldingRow[];
+  financial_accounts: FinancialAccountRow[];
+  transactions: TransactionRow[];
+  transaction_rules: TransactionRuleRow[];
+  budget_lines: BudgetLineRow[];
+  goals: GoalRow[];
+  net_worth_history: NetWorthHistoryRow[];
   imported_holdings: ImportedHoldingRow[];
   position_policies: PositionPolicyRow[];
   alerts: Record<string, AlertStateRow>;
@@ -179,6 +324,12 @@ const emptySnapshot = (): StoreSnapshot => ({
   paper_rounds: [],
   round_scores: [],
   manual_holdings: [],
+  financial_accounts: [],
+  transactions: [],
+  transaction_rules: [],
+  budget_lines: [],
+  goals: [],
+  net_worth_history: [],
   imported_holdings: [],
   position_policies: [],
   alerts: {},
@@ -272,6 +423,34 @@ class SqliteAdapter implements PersistAdapter {
         id TEXT PRIMARY KEY,
         symbol TEXT NOT NULL,
         updated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS financial_accounts (
+        id TEXT PRIMARY KEY,
+        updated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS transactions (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+      CREATE TABLE IF NOT EXISTS goals (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS budget_lines (
+        category_id TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS transaction_rules (
+        id TEXT PRIMARY KEY,
+        sort_order INTEGER NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS net_worth_history (
+        date TEXT PRIMARY KEY,
         data TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS imported_holdings (
@@ -441,6 +620,133 @@ class SqliteAdapter implements PersistAdapter {
 
   deleteManualHolding(id: string): void {
     this.db.query("DELETE FROM manual_holdings WHERE id = ?").run(id);
+  }
+
+  replaceManualHoldings(holdings: ManualHoldingRow[]): void {
+    this.db.run("BEGIN");
+    try {
+      this.db.run("DELETE FROM manual_holdings");
+      const insert = this.db.query("INSERT OR REPLACE INTO manual_holdings (id, symbol, updated_at, data) VALUES (?, ?, ?, ?)");
+      for (const holding of holdings) insert.run(holding.id, holding.symbol, holding.updated_at, JSON.stringify(holding));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
+  }
+
+  financialAccounts(): FinancialAccountRow[] {
+    return this.db
+      .query("SELECT data FROM financial_accounts ORDER BY updated_at ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as FinancialAccountRow);
+  }
+
+  upsertFinancialAccount(account: FinancialAccountRow): void {
+    this.db
+      .query("INSERT OR REPLACE INTO financial_accounts (id, updated_at, data) VALUES (?, ?, ?)")
+      .run(account.id, account.updated_at, JSON.stringify(account));
+  }
+
+  deleteFinancialAccount(id: string): void {
+    this.db.query("DELETE FROM financial_accounts WHERE id = ?").run(id);
+  }
+
+  transactions(): TransactionRow[] {
+    return this.db
+      .query("SELECT data FROM transactions ORDER BY date DESC, id ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as TransactionRow);
+  }
+
+  upsertTransactions(rows: TransactionRow[]): void {
+    if (rows.length === 0) return;
+    const insert = this.db.query("INSERT OR REPLACE INTO transactions (id, date, data) VALUES (?, ?, ?)");
+    this.db.run("BEGIN");
+    try {
+      for (const row of rows) insert.run(row.id, row.date, JSON.stringify(row));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
+  }
+
+  deleteTransactions(ids: string[]): void {
+    const remove = this.db.query("DELETE FROM transactions WHERE id = ?");
+    for (const id of ids) remove.run(id);
+  }
+
+  transactionRules(): TransactionRuleRow[] {
+    return this.db
+      .query("SELECT data FROM transaction_rules ORDER BY sort_order ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as TransactionRuleRow);
+  }
+
+  budgetLines(): BudgetLineRow[] {
+    return this.db
+      .query("SELECT data FROM budget_lines ORDER BY category_id ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as BudgetLineRow);
+  }
+
+  replaceBudgetLines(rows: BudgetLineRow[]): void {
+    this.db.run("BEGIN");
+    try {
+      this.db.run("DELETE FROM budget_lines");
+      const insert = this.db.query("INSERT INTO budget_lines (category_id, data) VALUES (?, ?)");
+      for (const row of rows) insert.run(row.category_id, JSON.stringify(row));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
+  }
+
+  goals(): GoalRow[] {
+    return this.db
+      .query("SELECT data FROM goals")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as GoalRow)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }
+
+  replaceGoals(rows: GoalRow[]): void {
+    this.db.run("BEGIN");
+    try {
+      this.db.run("DELETE FROM goals");
+      const insert = this.db.query("INSERT INTO goals (id, data) VALUES (?, ?)");
+      for (const row of rows) insert.run(row.id, JSON.stringify(row));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
+  }
+
+  replaceTransactionRules(rows: TransactionRuleRow[]): void {
+    this.db.run("BEGIN");
+    try {
+      this.db.run("DELETE FROM transaction_rules");
+      const insert = this.db.query("INSERT INTO transaction_rules (id, sort_order, data) VALUES (?, ?, ?)");
+      for (const row of rows) insert.run(row.id, row.order, JSON.stringify(row));
+      this.db.run("COMMIT");
+    } catch (error) {
+      this.db.run("ROLLBACK");
+      throw error;
+    }
+  }
+
+  netWorthHistory(): NetWorthHistoryRow[] {
+    return this.db
+      .query("SELECT data FROM net_worth_history ORDER BY date ASC")
+      .all()
+      .map((row) => JSON.parse((row as { data: string }).data) as NetWorthHistoryRow);
+  }
+
+  upsertNetWorthPoint(point: NetWorthHistoryRow): void {
+    this.db.query("INSERT OR REPLACE INTO net_worth_history (date, data) VALUES (?, ?)").run(point.date, JSON.stringify(point));
   }
 
   importedHoldings(): ImportedHoldingRow[] {
@@ -687,6 +993,12 @@ class MemoryAdapter implements PersistAdapter {
   private paperRoundRows: PaperTradingRound[] = [];
   private roundScoreRows: RoundScore[] = [];
   private manualHoldingRows: ManualHoldingRow[] = [];
+  private financialAccountRows: FinancialAccountRow[] = [];
+  private transactionRows: TransactionRow[] = [];
+  private transactionRuleRows: TransactionRuleRow[] = [];
+  private budgetLineRows: BudgetLineRow[] = [];
+  private goalRows: GoalRow[] = [];
+  private netWorthRows: NetWorthHistoryRow[] = [];
   private importedHoldingRows: ImportedHoldingRow[] = [];
   private positionPolicyRows: PositionPolicyRow[] = [];
   private alerts = new Map<string, AlertStateRow>();
@@ -741,6 +1053,55 @@ class MemoryAdapter implements PersistAdapter {
   }
   deleteManualHolding(id: string) {
     this.manualHoldingRows = this.manualHoldingRows.filter((item) => item.id !== id);
+  }
+  replaceManualHoldings(holdings: ManualHoldingRow[]) {
+    this.manualHoldingRows = [...holdings];
+  }
+  financialAccounts() {
+    return [...this.financialAccountRows];
+  }
+  upsertFinancialAccount(account: FinancialAccountRow) {
+    this.financialAccountRows = this.financialAccountRows.filter((item) => item.id !== account.id);
+    this.financialAccountRows.push(account);
+  }
+  deleteFinancialAccount(id: string) {
+    this.financialAccountRows = this.financialAccountRows.filter((item) => item.id !== id);
+  }
+  transactions() {
+    return sortTransactions(this.transactionRows);
+  }
+  upsertTransactions(rows: TransactionRow[]) {
+    const ids = new Set(rows.map((row) => row.id));
+    this.transactionRows = [...this.transactionRows.filter((row) => !ids.has(row.id)), ...rows];
+  }
+  deleteTransactions(ids: string[]) {
+    const drop = new Set(ids);
+    this.transactionRows = this.transactionRows.filter((row) => !drop.has(row.id));
+  }
+  transactionRules() {
+    return [...this.transactionRuleRows].sort((a, b) => a.order - b.order);
+  }
+  replaceTransactionRules(rows: TransactionRuleRow[]) {
+    this.transactionRuleRows = [...rows];
+  }
+  budgetLines() {
+    return [...this.budgetLineRows];
+  }
+  replaceBudgetLines(rows: BudgetLineRow[]) {
+    this.budgetLineRows = [...rows];
+  }
+  goals() {
+    return [...this.goalRows];
+  }
+  replaceGoals(rows: GoalRow[]) {
+    this.goalRows = [...rows];
+  }
+  netWorthHistory() {
+    return [...this.netWorthRows].sort((a, b) => a.date.localeCompare(b.date));
+  }
+  upsertNetWorthPoint(point: NetWorthHistoryRow) {
+    this.netWorthRows = this.netWorthRows.filter((item) => item.date !== point.date);
+    this.netWorthRows.push(point);
   }
   importedHoldings() {
     return [...this.importedHoldingRows];
@@ -907,6 +1268,74 @@ class JsonFileAdapter implements PersistAdapter {
     snapshot.manual_holdings.push(holding);
     this.write(snapshot);
   }
+  replaceManualHoldings(holdings: ManualHoldingRow[]) {
+    const snapshot = this.read();
+    snapshot.manual_holdings = [...holdings];
+    this.write(snapshot);
+  }
+  financialAccounts() {
+    return [...this.read().financial_accounts];
+  }
+  upsertFinancialAccount(account: FinancialAccountRow) {
+    const snapshot = this.read();
+    snapshot.financial_accounts = snapshot.financial_accounts.filter((item) => item.id !== account.id);
+    snapshot.financial_accounts.push(account);
+    this.write(snapshot);
+  }
+  deleteFinancialAccount(id: string) {
+    const snapshot = this.read();
+    snapshot.financial_accounts = snapshot.financial_accounts.filter((item) => item.id !== id);
+    this.write(snapshot);
+  }
+  transactions() {
+    return sortTransactions(this.read().transactions);
+  }
+  upsertTransactions(rows: TransactionRow[]) {
+    if (rows.length === 0) return;
+    const snapshot = this.read();
+    const ids = new Set(rows.map((row) => row.id));
+    snapshot.transactions = [...snapshot.transactions.filter((row) => !ids.has(row.id)), ...rows];
+    this.write(snapshot);
+  }
+  deleteTransactions(ids: string[]) {
+    const snapshot = this.read();
+    const drop = new Set(ids);
+    snapshot.transactions = snapshot.transactions.filter((row) => !drop.has(row.id));
+    this.write(snapshot);
+  }
+  transactionRules() {
+    return [...this.read().transaction_rules].sort((a, b) => a.order - b.order);
+  }
+  replaceTransactionRules(rows: TransactionRuleRow[]) {
+    const snapshot = this.read();
+    snapshot.transaction_rules = [...rows];
+    this.write(snapshot);
+  }
+  budgetLines() {
+    return [...this.read().budget_lines];
+  }
+  replaceBudgetLines(rows: BudgetLineRow[]) {
+    const snapshot = this.read();
+    snapshot.budget_lines = [...rows];
+    this.write(snapshot);
+  }
+  goals() {
+    return [...this.read().goals];
+  }
+  replaceGoals(rows: GoalRow[]) {
+    const snapshot = this.read();
+    snapshot.goals = [...rows];
+    this.write(snapshot);
+  }
+  netWorthHistory() {
+    return [...this.read().net_worth_history].sort((a, b) => a.date.localeCompare(b.date));
+  }
+  upsertNetWorthPoint(point: NetWorthHistoryRow) {
+    const snapshot = this.read();
+    snapshot.net_worth_history = snapshot.net_worth_history.filter((item) => item.date !== point.date);
+    snapshot.net_worth_history.push(point);
+    this.write(snapshot);
+  }
   deleteManualHolding(id: string) {
     const snapshot = this.read();
     snapshot.manual_holdings = snapshot.manual_holdings.filter((item) => item.id !== id);
@@ -1041,6 +1470,12 @@ class JsonFileAdapter implements PersistAdapter {
         paper_rounds: Array.isArray(parsed.paper_rounds) ? parsed.paper_rounds : [],
         round_scores: Array.isArray(parsed.round_scores) ? parsed.round_scores : [],
         manual_holdings: Array.isArray(parsed.manual_holdings) ? parsed.manual_holdings : [],
+        financial_accounts: Array.isArray(parsed.financial_accounts) ? parsed.financial_accounts : [],
+        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+        transaction_rules: Array.isArray(parsed.transaction_rules) ? parsed.transaction_rules : [],
+        budget_lines: Array.isArray(parsed.budget_lines) ? parsed.budget_lines : [],
+        goals: Array.isArray(parsed.goals) ? parsed.goals : [],
+        net_worth_history: Array.isArray(parsed.net_worth_history) ? parsed.net_worth_history : [],
         imported_holdings: Array.isArray(parsed.imported_holdings) ? parsed.imported_holdings : [],
         position_policies: Array.isArray(parsed.position_policies) ? parsed.position_policies : [],
         alerts: parsed.alerts && typeof parsed.alerts === "object" ? parsed.alerts : {},
@@ -1082,8 +1517,32 @@ class JsonFileAdapter implements PersistAdapter {
 
 let cached: PersistAdapter | null = null;
 
+/**
+ * One book for every runtime. The Next server runs on Node, which has no
+ * bun:sqlite, so it can only use the JSON file; Bun scripts and the daemon
+ * used to open the SQLite file instead and silently saw a different (often
+ * empty) portfolio. Rule: if the JSON book exists, or nothing exists yet,
+ * everyone uses JSON. SQLite is kept only for a store that already lives
+ * there alone. MASTERMOLD_STORE=json|sqlite forces a backend.
+ */
+export function resolveStoreBackend(
+  path: string,
+  sqliteAvailable: boolean,
+  forced: string | undefined = process.env.MASTERMOLD_STORE,
+  exists: (file: string) => boolean = existsSync,
+): "sqlite" | "json-file" | "memory" {
+  if (path === ":memory:") return sqliteAvailable ? "sqlite" : "memory";
+  if (forced === "json") return "json-file";
+  if (forced === "sqlite" && sqliteAvailable) return "sqlite";
+  if (exists(`${path}.json`)) return "json-file";
+  if (sqliteAvailable && exists(path)) return "sqlite";
+  return "json-file";
+}
+
 function build(): PersistAdapter {
   const sqlite = loadSqlite();
+  const backend = resolveStoreBackend(dbPath(), Boolean(sqlite));
+  if (backend === "json-file") return new JsonFileAdapter(`${dbPath()}.json`);
   if (sqlite) {
     try {
       const path = dbPath();
@@ -1110,4 +1569,8 @@ export function store(): PersistAdapter {
 /** Test seam: drop the cached adapter so the next store() rebuilds (e.g. reopen a db file). */
 export function __resetStoreForTests(): void {
   cached = null;
+}
+
+function sortTransactions(rows: TransactionRow[]): TransactionRow[] {
+  return [...rows].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
 }

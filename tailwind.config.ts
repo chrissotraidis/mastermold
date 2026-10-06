@@ -51,32 +51,39 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
 
-        // --- Sentinel direct tokens (Industrial Glassmorphism) ---
-        // Palette 2026-07-05: classic Sentinel identity — deep magenta/crimson
-        // helmet primary, gold crest accents, silver-gray neutrals over the void.
-        void: "#0f090b",
+        // --- Direct tokens ("Quiet instrument", docs/DESIGN.md) ---
+        // Graphite neutrals so the one magenta signal and the state colors
+        // carry meaning. Gold stays for the Sentinel crest only.
+        void: "#0a090b",
         surface: {
-          DEFAULT: "#211318",
-          dim: "#1f1116",
-          lowest: "#1c0e13",
-          low: "#2a1c21",
-          container: "#2e2025",
-          high: "#382b30",
-          highest: "#44363b",
+          DEFAULT: "#151417",
+          dim: "#111013",
+          lowest: "#0e0d10",
+          low: "#19181c",
+          container: "#1f1d22",
+          high: "#28262c",
+          highest: "#343138",
         },
-        panel: "#1f1116",
-        "on-surface": "#f5e5eb",
-        "on-surface-variant": "#d2c9cc",
+        panel: "#131215",
+        "on-surface": "#f3f1f4",
+        "on-surface-variant": "#c2bec6",
         outline: {
-          DEFAULT: "#9c9296",
-          variant: "#50484b",
+          DEFAULT: "#8d8892",
+          variant: "#37343b",
         },
         // Legacy token name kept so hundreds of `*-violet` classes keep working;
-        // the VALUES are now the Sentinel helmet magenta family.
+        // the VALUES are the Master Mold magenta family (2026-09 overhaul).
         violet: {
-          DEFAULT: "#f5adc8",
-          dim: "#d65c87",
-          deep: "#8e2e52",
+          DEFAULT: "#f2559f",
+          soft: "#ff9cc9",
+          dim: "#c62f7a",
+          deep: "#6f1743",
+        },
+        magenta: {
+          DEFAULT: "#f2559f",
+          soft: "#ff9cc9",
+          dim: "#c62f7a",
+          deep: "#6f1743",
         },
         tertiary: {
           DEFAULT: "#e4cb8b", // gold crest highlight
@@ -104,6 +111,32 @@ const config: Config = {
         body: ["var(--font-body)", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+      },
+      boxShadow: {
+        panel: "inset 0 1px 0 hsl(0 0% 100% / 0.035), 0 1px 2px rgb(0 0 0 / 0.35)",
+        // Primary buttons: a crisp top highlight instead of a pink halo.
+        glow: "inset 0 1px 0 hsl(0 0% 100% / 0.22), 0 1px 2px rgb(0 0 0 / 0.4)",
+      },
+      keyframes: {
+        "mm-enter": {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "mm-sheet-in": {
+          from: { transform: "translateX(100%)" },
+          to: { transform: "translateX(0)" },
+        },
+        "mm-sheet-up": {
+          from: { transform: "translateY(100%)" },
+          to: { transform: "translateY(0)" },
+        },
+        "mm-fade": { from: { opacity: "0" }, to: { opacity: "1" } },
+      },
+      animation: {
+        "mm-enter": "mm-enter 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "mm-sheet-in": "mm-sheet-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "mm-sheet-up": "mm-sheet-up 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        "mm-fade": "mm-fade 180ms ease-out both",
       },
       letterSpacing: {
         // Design pass: near-normal tracking so uppercase labels read as quiet

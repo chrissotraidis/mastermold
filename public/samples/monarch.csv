@@ -1,0 +1,5 @@
+Date,Merchant,Category,Account,Original Statement,Notes,Amount,Tags
+2026-09-01,Sample Employer,Paychecks,Sample Checking,SAMPLE EMPLOYER PAYROLL,,4200.00,
+2026-09-04,Sample Grocer,Groceries,Sample Card,SAMPLE GROCER #0001,,-76.43,
+2026-09-06,Sample Cafe,Coffee Shops,Sample Card,SAMPLE CAFE 00,,-5.40,
+2026-09-18,Sample Pharmacy,Pharmacy,Sample Card,SAMPLE PHARMACY #00,refill,-12.99,

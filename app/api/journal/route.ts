@@ -42,6 +42,11 @@ export async function POST(
     return NextResponse.json({ error: "Expected JSON body" }, { status: 400 });
   }
 
+  // Valid JSON can still be null or a bare value; only objects carry fields.
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Expected JSON body" }, { status: 400 });
+  }
+
   const normalized = normalizeDecisionInput(body);
 
   if (normalized.errors.length > 0) {

@@ -175,6 +175,8 @@ export type AnalystReport = {
   categories: Record<AnalystCategory, AnalystCategorySummary>;
   edge_buckets: AnalystEdgeBucket[];
   gate: { target_resolved: number; detail: string };
+  /** Offline fit: does the model's deviation from the market carry information? */
+  shrinkage: Record<AnalystCategory, AnalystShrinkageFit>;
 };
 
 /** One-shot completion — injected so tests never touch the network. */
@@ -673,6 +675,9 @@ class PolymarketAnalystStore {
     const virtualRows = this.db.prepare(
       "SELECT category, probability, yes_ask, no_ask, winning_outcome_index FROM polymarket_analyst_forecasts WHERE status = 'resolved'",
     ).all() as AnalystVirtualBetInput[];
+    const shrinkRows = this.db.prepare(
+      "SELECT ts, question, category, yes_price, probability, winning_outcome_index FROM polymarket_analyst_forecasts WHERE status = 'resolved'",
+    ).all() as AnalystShrinkageInput[];
     const news = categories.news;
     return {
       enabled,
@@ -688,6 +693,10 @@ class PolymarketAnalystStore {
       recent_forecasts: recent,
       categories,
       edge_buckets: computeAnalystEdgeBuckets(virtualRows),
+      shrinkage: {
+        news: computeAnalystShrinkage(shrinkRows, "news"),
+        heartbeat: computeAnalystShrinkage(shrinkRows, "heartbeat"),
+      },
       gate: {
         target_resolved: 40,
         detail: `Live-money discussion requires >= 40 resolved NEWS forecasts (${news.resolved_count} so far), news-market model Brier <= news-market market Brier (now ${fmt(news.mean_brier_model)} vs ${fmt(news.mean_brier_market)}), and positive realized analyst paper P&L. Heartbeat forecasts (${categories.heartbeat.resolved_count} resolved) verify the pipeline but do not gate.`,
@@ -733,6 +742,7 @@ export function safePolymarketAnalystReport(): AnalystReport {
       },
       edge_buckets: [],
       gate: { target_resolved: 40, detail: "Analyst store is unavailable." },
+      shrinkage: { news: computeAnalystShrinkage([], "news"), heartbeat: computeAnalystShrinkage([], "heartbeat") },
     };
   }
 }
@@ -1006,4 +1016,91 @@ function round4(value: number | null): number | null {
 export function __resetPolymarketAnalystStoreForTests() {
   singleton = null;
   singletonPath = "";
+}
+
+/* ------------------------------------------------------------------ */
+/* Shrinkage fit (docs/research-2026-09/llm-forecasting.md, P6).       */
+/* ------------------------------------------------------------------ */
+
+export type AnalystShrinkageInput = Pick<AnalystForecastRow, "ts" | "question" | "category" | "yes_price" | "probability" | "winning_outcome_index">;
+
+export type AnalystShrinkageFit = {
+  status: "insufficient" | "adds_information" | "no_information";
+  train_n: number;
+  test_clusters: number;
+  /** Weight on the model's deviation from the market: p = market + w·(model − market). */
+  w: number | null;
+  w_lower_95: number | null;
+  w_upper_95: number | null;
+  test_brier_market: number | null;
+  test_brier_shrunk: number | null;
+  detail: string;
+};
+
+const SHRINK_MIN_TEST_CLUSTERS = 20;
+
+/**
+ * Fit how far the model should move from the market on the earlier 60% of
+ * resolved forecasts, then check it on the later 40%. The interval for w is a
+ * bootstrap over event clusters in the held-out period. If it includes zero,
+ * the model adds nothing the market did not already know.
+ */
+export function computeAnalystShrinkage(rows: AnalystShrinkageInput[], category: AnalystCategory, draws = 1000): AnalystShrinkageFit {
+  const usable = rows
+    .filter((row) => row.category === category && (row.winning_outcome_index === 0 || row.winning_outcome_index === 1))
+    .sort((a, b) => a.ts.localeCompare(b.ts))
+    .map((row) => ({
+      market: row.yes_price,
+      deviation: row.probability - row.yes_price,
+      outcome: row.winning_outcome_index === 0 ? 1 : 0,
+      cluster: analystEventClusterKey(row.question),
+    }));
+  const cut = Math.floor(usable.length * 0.6);
+  const train = usable.slice(0, cut);
+  const test = usable.slice(cut);
+  const fitW = (sample: typeof usable) => {
+    const numerator = sample.reduce((sum, row) => sum + row.deviation * (row.outcome - row.market), 0);
+    const denominator = sample.reduce((sum, row) => sum + row.deviation * row.deviation, 0);
+    return denominator > 0 ? Math.max(0, Math.min(1, numerator / denominator)) : 0;
+  };
+  const clusters = [...test.reduce((map, row) => map.set(row.cluster, [...(map.get(row.cluster) ?? []), row]), new Map<string, typeof usable>()).values()];
+  if (train.length < 20 || clusters.length < SHRINK_MIN_TEST_CLUSTERS) {
+    return {
+      status: "insufficient", train_n: train.length, test_clusters: clusters.length, w: null, w_lower_95: null, w_upper_95: null,
+      test_brier_market: null, test_brier_shrunk: null,
+      detail: `Needs ≥20 earlier forecasts and ≥${SHRINK_MIN_TEST_CLUSTERS} held-out event clusters (have ${train.length} and ${clusters.length}).`,
+    };
+  }
+  const w = fitW(train);
+  const brier = (sample: typeof usable, weight: number) =>
+    sample.reduce((sum, row) => sum + (row.market + weight * row.deviation - row.outcome) ** 2, 0) / sample.length;
+  let seed = 7_654_321;
+  const random = () => {
+    seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+    return seed / 2_147_483_648;
+  };
+  const samples: number[] = [];
+  for (let draw = 0; draw < draws; draw += 1) {
+    const sample: typeof usable = [];
+    for (let index = 0; index < clusters.length; index += 1) sample.push(...clusters[Math.floor(random() * clusters.length)]);
+    samples.push(fitW(sample));
+  }
+  samples.sort((a, b) => a - b);
+  const lower = samples[Math.floor(draws * 0.025)];
+  const upper = samples[Math.floor(draws * 0.975)];
+  const round = (value: number) => Math.round(value * 1e4) / 1e4;
+  const addsInformation = lower > 0;
+  return {
+    status: addsInformation ? "adds_information" : "no_information",
+    train_n: train.length,
+    test_clusters: clusters.length,
+    w: round(w),
+    w_lower_95: round(lower),
+    w_upper_95: round(upper),
+    test_brier_market: round(brier(test, 0)),
+    test_brier_shrunk: round(brier(test, w)),
+    detail: addsInformation
+      ? `The model's deviation from the market carries information (held-out w interval ${lower.toFixed(2)}–${upper.toFixed(2)}). Next step: the no-search 5-sample ensemble, shrunk by w.`
+      : `Held-out w interval ${lower.toFixed(2)}–${upper.toFixed(2)} includes zero: the model adds nothing the market price did not already know. Stop spending on this category.`,
+  };
 }

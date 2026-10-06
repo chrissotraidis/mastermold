@@ -7,11 +7,11 @@
     "node": ">=22.5"
   },
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 4002",
+    "dev": "node scripts/check-node.mjs && NODE_OPTIONS='--experimental-sqlite --disable-warning=ExperimentalWarning' next dev --hostname 127.0.0.1 --port 4002",
     "up": "bin/up",
     "build": "next build",
     "postbuild": "node scripts/prepare-standalone.mjs && node scripts/release-artifact-audit.mjs",
-    "start": "HOSTNAME=${HOSTNAME:-127.0.0.1} PORT=${PORT:-4002} node .next/standalone/server.js",
+    "start": "node scripts/check-node.mjs && HOSTNAME=${HOSTNAME:-127.0.0.1} PORT=${PORT:-4002} node --experimental-sqlite --disable-warning=ExperimentalWarning .next/standalone/server.js",
     "seed": "bun run scripts/seed.ts",
     "typecheck": "tsc --noEmit",
     "smoke:app": "node scripts/runtime-smoke.mjs",
@@ -19,6 +19,7 @@
     "privacy:audit": "node scripts/privacy-audit.mjs",
     "artifact:audit": "node scripts/release-artifact-audit.mjs",
     "test": "bun run typecheck && bun test tests",
+    "e2e": "npm run build && playwright test",
     "daily": "bin/daily-run",
     "autopilot": "bin/autopilot-daemon",
     "paper:check": "bun run scripts/paper-evidence-check.ts",
@@ -45,24 +46,22 @@
     "hyparquet-compressors": "1.1.1",
     "lightweight-charts": "^5.2.0",
     "lucide-react": "latest",
-    "next": "^16.2.12",
+    "next": "^16.3.8",
     "react": "latest",
     "react-dom": "latest",
     "tailwind-merge": "^2.5.4",
-    "tailwindcss-animate": "^1.0.7",
     "three": "^0.185.1",
     "zod": "^4.4.3"
   },
   "overrides": {
     "postcss": "8.5.25",
-    "jayson": {
-      "uuid": "11.1.1"
-    },
-    "sharp": "0.35.3",
-    "fast-uri": "4.1.2",
+    "jayson": "5.0.0",
+    "sharp": "0.35.5",
+    "fast-uri": "4.2.1",
     "@hono/node-server": "2.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "1.58",
     "@types/bun": "^1.3.14",
     "@types/node": "latest",
     "@types/react": "latest",
@@ -72,6 +71,7 @@
     "bun": "^1.3.14",
     "postcss": "8.5.25",
     "tailwindcss": "^3.4.14",
+    "tailwindcss-animate": "^1.0.7",
     "typescript": "latest"
   }
 }

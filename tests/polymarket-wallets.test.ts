@@ -9,6 +9,9 @@ import {
   selectNewSignalTrades,
   walletFollowDecision,
   walletFollowFeeUsd,
+  walletFollowVerdict,
+  pickWalletControl,
+  type WalletFollowRow,
   walletFollowPnlUsd,
   walletPriceBand,
   walletSignalKind,
@@ -274,8 +277,12 @@ describe("computeWalletEvidence", () => {
 describe("wallet follow arm", () => {
   test("fee model: rate × min(p, 1−p) × shares", () => {
     // $5 at 45¢ = 11.11 shares; 1000bps × 0.45 × 11.11 ≈ $0.50
-    expect(walletFollowFeeUsd(5, 0.45, 1_000)).toBeCloseTo(0.5, 2);
+    // Documented formula: shares × rate × p × (1 − p). $5 at 50¢ = 10 shares;
+    // sports rate 0.05 (stored as 500 bps of the rate) → $0.125.
+    expect(walletFollowFeeUsd(5, 0.5, 500)).toBeCloseTo(0.13, 2);
     expect(walletFollowFeeUsd(5, 0.45, 0)).toBe(0);
+    // Unknown schedule is charged at the highest category rate, never zero.
+    expect(walletFollowFeeUsd(5, 0.5, null)).toBeCloseTo(0.18, 2);
   });
 
   test("net P&L subtracts the fee on wins and adds it to losses", () => {
@@ -301,5 +308,81 @@ describe("wallet follow arm", () => {
     expect(walletFollowDecision({ ...base, ourAsk: null }).follow).toBe(false);
     expect(walletFollowDecision({ ...base, openFollowMarketIds: new Set(["m1"]) }).follow).toBe(false);
     expect(walletFollowDecision({ ...base, openCount: WALLET_FOLLOW_MAX_OPEN }).follow).toBe(false);
+  });
+});
+
+describe("wallet follow-arm v2 verdict and control", () => {
+  const row = (over: Partial<WalletFollowRow>): WalletFollowRow => ({
+    id: Math.random().toString(36),
+    opened_at: "2026-09-05T12:00:00Z",
+    signal_id: "s",
+    wallet: "w1",
+    market_id: "m",
+    condition_id: "c",
+    question: "Will Team A win on 2026-09-06?",
+    slug: "team-a",
+    kind: "match_winner",
+    outcome_index: 0,
+    outcome: "Yes",
+    entry_ask: 0.5,
+    stake_usd: 5,
+    taker_fee_bps: 500,
+    status: "resolved",
+    winning_outcome_index: 0,
+    resolved_at: "2026-09-06T20:00:00Z",
+    won: 1,
+    fee_usd: 0.13,
+    pnl_usd: 4.87,
+    arm: "follow",
+    ...over,
+  });
+
+  function book(pairs: number, weekends: number, followWin: (index: number) => boolean, controlWin: (index: number) => boolean, walletOf = (index: number) => `w${index % 25}`) {
+    const rows: WalletFollowRow[] = [];
+    for (let index = 0; index < pairs; index += 1) {
+      const day = new Date(Date.UTC(2026, 6, 4 + (index % weekends) * 7)).toISOString();
+      const fw = followWin(index);
+      const cw = controlWin(index);
+      rows.push(row({ signal_id: `s${index}`, market_id: `m${index}`, wallet: walletOf(index), resolved_at: day, won: fw ? 1 : 0, pnl_usd: fw ? 4.87 : -5.13 }));
+      rows.push(row({ signal_id: `s${index}`, market_id: `c${index}`, wallet: "control", arm: "control", resolved_at: day, won: cw ? 1 : 0, pnl_usd: cw ? 4.87 : -5.13 }));
+    }
+    return rows;
+  }
+
+  test("GIVEN fewer than 300 markets or 6 weekends THEN the verdict is insufficient, however good it looks", () => {
+    const verdict = walletFollowVerdict(book(120, 8, () => true, () => false), 200);
+    expect(verdict.status).toBe("insufficient");
+    expect(verdict.diff_per_dollar).toBeGreaterThan(1.5);
+  });
+
+  test("GIVEN follows that only match the no-signal control THEN the verdict fails", () => {
+    const verdict = walletFollowVerdict(book(320, 7, (i) => i % 2 === 0, (i) => i % 2 === 0), 200);
+    expect(verdict.status).toBe("fail");
+    expect(verdict.diff_per_dollar).toBeCloseTo(0, 3);
+  });
+
+  test("GIVEN follows that beat the control across many wallets THEN it passes; GIVEN the edge lives in two wallets THEN it fails", () => {
+    expect(walletFollowVerdict(book(320, 7, (i) => i % 5 !== 0, (i) => i % 2 === 0), 200).status).toBe("pass");
+    const concentrated = book(320, 7, (i) => (i % 25 < 2 ? true : i % 2 === 0), (i) => i % 2 === 0, (i) => (i % 25 < 2 ? `star${i % 2}` : `w${i % 25}`));
+    const verdict = walletFollowVerdict(concentrated, 200);
+    expect(verdict.diff_without_top_wallets).toBeLessThanOrEqual(0.01);
+    expect(verdict.status).toBe("fail");
+  });
+
+  test("GIVEN candidate markets THEN the control is same-kind, in band, and never a signaled or held market", () => {
+    const market = (id: string, question: string, prices: [number, number]) => ({
+      id, condition_id: id, question, slug: id, end_date: null, outcomes: ["Yes", "No"], outcome_prices: prices,
+      token_ids: [`${id}-y`, `${id}-n`], liquidity_usd: 50_000, volume_24h_usd: 1_000, price_change_24h: 0,
+      accepting_orders: true, order_book_enabled: true, neg_risk: false, fees_enabled: false, minimum_order_size: 5,
+    });
+    const candidates = [
+      market("signaled", "Will Team B win on 2026-09-06?", [0.52, 0.48]),
+      market("news", "Will the Fed cut rates in October?", [0.5, 0.5]),
+      market("far", "Will Team C win on 2026-09-06?", [0.2, 0.8]),
+      market("good", "Will Team D win on 2026-09-06?", [0.61, 0.39]),
+    ];
+    const choice = pickWalletControl(candidates, { kind: "match_winner", targetAsk: 0.55, excludeMarketIds: new Set(["signaled"]) });
+    expect(choice?.market.id).toBe("good");
+    expect(choice?.outcome_index).toBe(0);
   });
 });

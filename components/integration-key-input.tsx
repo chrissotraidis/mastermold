@@ -202,7 +202,7 @@ export function IntegrationKeyInput({
       <div className="grid gap-3">
         {fields.map((field) => (
           <div key={field.name} className="space-y-2">
-            <Label htmlFor={`${baseId}-${field.name}`} className="text-xs font-semibold uppercase text-outline">
+            <Label htmlFor={`${baseId}-${field.name}`} className="text-xs font-medium text-outline">
               {field.label}
             </Label>
             {field.type === "select" ? (
@@ -296,11 +296,8 @@ export function IntegrationKeyInput({
         </a>
       ) : null}
       <p className="text-xs leading-5 text-outline">
-        {permissionScope} These entries stay only in this browser tab and are sent through
-        the local app only when you press a test or import action. Closing the tab clears them.{" "}
-        {service === "live_chat"
-          ? "Live chat sends the question plus visible app context to the selected chat service."
-          : "Importing copies holdings into Portfolio and still cannot trade."}
+        {permissionScope} Kept in this tab only; closing it clears them.{" "}
+        {service === "live_chat" ? "Chat sends your question and page context to the chosen service." : null}
       </p>
     </div>
   );
@@ -326,6 +323,9 @@ function commandHashForGroup(commandGroup: "portfolio" | "chat") {
 }
 
 function liveChatCopy(provider: string | undefined) {
+  if (!provider || provider === "server") {
+    return "Tests the server's own provider chain (OpenCode Go first, OpenRouter as fallback). No key needed here.";
+  }
   const name =
     provider === "openai" ? "OpenAI" :
     provider === "anthropic" ? "Anthropic" :

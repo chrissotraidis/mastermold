@@ -61,7 +61,7 @@ export function AsOfReplayControl({ activeAsOf, apiPath }: AsOfReplayControlProp
         {activeLabel ? (
           <span className="min-w-0 break-words font-mono text-xs text-violet">Viewing {activeLabel}</span>
         ) : (
-          <span className="text-xs text-outline">Optional timeline check</span>
+          <span className="text-xs text-outline">See what Master Mold knew on an earlier date</span>
         )}
       </summary>
       <form className="grid gap-3 border-t border-outline-variant/30 p-4 sm:grid-cols-[minmax(14rem,1fr)_auto_auto] sm:items-end" onSubmit={submitReplay}>

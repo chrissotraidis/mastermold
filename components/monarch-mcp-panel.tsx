@@ -124,7 +124,7 @@ export function MonarchMcpPanel({ initialState, config }: MonarchMcpPanelProps) 
 
   return (
     <section aria-labelledby="monarch-mcp-title" className="rounded-md border border-outline-variant/25">
-      <div className="flex min-w-0 flex-1 flex-col gap-3 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <Dot tone={statusTone} />
           <h3 id="monarch-mcp-title" className="shrink-0 text-sm font-semibold text-on-surface">
@@ -132,7 +132,7 @@ export function MonarchMcpPanel({ initialState, config }: MonarchMcpPanelProps) 
           </h3>
           <p className="min-w-0 truncate text-sm text-on-surface-variant">· {statusLine}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <Button
             type="button"
             onClick={testConnection}
@@ -142,7 +142,7 @@ export function MonarchMcpPanel({ initialState, config }: MonarchMcpPanelProps) 
             data-action-state={testState}
           >
             {testState === "running" ? <Loader2 aria-hidden="true" className="animate-spin" /> : <PlugZap aria-hidden="true" />}
-            Test MCP connection
+            Test Monarch connection
           </Button>
           <Button
             type="button"
@@ -293,7 +293,7 @@ function buildChecklist({
     if (snapshotToolReady) return `Covered by snapshot tool ${config.snapshot_tool}.`;
     if (tools.length > 0 && tools.includes(toolName)) return `Found ${toolName}.`;
     if (tools.length > 0) return `Missing ${toolName}.`;
-    return `Required tool: ${toolName}. Run Test MCP connection after OAuth is complete.`;
+    return `Required tool: ${toolName}. Run Test Monarch connection after sign-in is complete.`;
   };
   const oauthState = config.fixture_configured || testState === "passed"
     ? "pass" as const

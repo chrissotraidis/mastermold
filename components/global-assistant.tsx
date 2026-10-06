@@ -111,7 +111,9 @@ export function GlobalAssistant() {
           onPointerEnter={() => setLauncherHovered(true)}
           onPointerLeave={() => setLauncherHovered(false)}
           className={cn(
-            "fixed bottom-4 right-4 z-[70] hidden min-h-12 max-w-[calc(100vw-2rem)] items-center justify-start gap-2 rounded-full border border-violet/35 bg-surface-high/95 py-1 pl-1 pr-3 shadow-xl shadow-void/25 ring-1 ring-violet/15 transition hover:border-violet hover:bg-surface-highest active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet xl:flex",
+            // Face-only at rest so it sits in the page margin instead of over
+            // content; the label slides out on hover or keyboard focus.
+            "group fixed bottom-4 right-4 z-[70] hidden min-h-12 max-w-[calc(100vw-2rem)] items-center justify-start rounded-full border border-outline-variant/70 bg-surface-high/95 p-0 shadow-lg shadow-void/40 transition-all hover:border-violet/60 hover:bg-surface-highest hover:pr-3 focus-visible:pr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet active:scale-[0.98] xl:flex",
           )}
           aria-label="Open Master Mold chat"
           data-testid="global-assistant-open"
@@ -119,7 +121,7 @@ export function GlobalAssistant() {
           <span className="size-12 shrink-0">
             <SentinelFace state="idle" hovered={launcherHovered} />
           </span>
-          <span className="flex min-w-0 items-center gap-1.5 text-left text-sm font-semibold leading-tight text-on-surface">
+          <span className="flex max-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-left text-sm font-semibold leading-tight text-on-surface opacity-0 transition-all group-hover:ml-1 group-hover:max-w-[10rem] group-hover:opacity-100 group-focus-visible:ml-1 group-focus-visible:max-w-[10rem] group-focus-visible:opacity-100">
             <MessageCircle aria-hidden="true" className="size-3.5 text-violet" />
             Ask Master Mold
           </span>
@@ -544,6 +546,24 @@ function pageContextForPath(pathname: string, route = pathname): ChatPageContext
       route,
       summary:
         "The user is looking at one saved market idea with why it matters, bull and bear cases, time horizon, confidence, journal draft, and paper-trade options.",
+    };
+  }
+
+  if (pathname.startsWith("/transactions")) {
+    return {
+      surface: "Transactions",
+      route,
+      summary:
+        "The user is looking at imported bank and card transactions, categories, rules, hidden rows, and monthly cash flow. Everything is stored locally.",
+    };
+  }
+
+  if (pathname.startsWith("/budget")) {
+    return {
+      surface: "Budget",
+      route,
+      summary:
+        "The user is looking at this month's budget: income, planned spending by group, what is left to spend, uncategorized spending, and savings goals.",
     };
   }
 

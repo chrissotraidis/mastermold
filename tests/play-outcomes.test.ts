@@ -131,9 +131,9 @@ describe("playTrackRecord + describeTrackRecord", () => {
     expect(record.hit_rate).toBe(0.5);
     expect(record.pending).toBe(1); // MSFT too young
     const line = describeTrackRecord(record);
-    expect(line).toContain("1/2 directional calls right");
+    expect(line).toContain("1 of 2 past suggestions were right");
     expect(line).toContain("1 flat");
-    expect(line).toContain("1 awaiting grade");
+    expect(line).toContain("1 still waiting");
   });
 
   test("GIVEN nothing gradable and nothing pending THEN silence, not noise", () => {

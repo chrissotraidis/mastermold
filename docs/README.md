@@ -9,6 +9,7 @@ generated review artifacts here.
 - [Polymarket and Web3 research, August 2026](POLYMARKET-WEB3-RESEARCH-2026-08.md) — primary-source research, implemented decisions, and explicit non-claims
 - [PolySniper capability audit](POLYSNIPER-CAPABILITY-MATRIX.md) — intended-vs-built strategy matrix, exact paper contract, weather shadow method, and promotion gates
 - [Architecture](ARCHITECTURE.md)
+- [Design thesis: Quiet instrument](DESIGN.md) — graphite surfaces, one magenta signal, color only for state
 - [Privacy](PRIVACY.md)
 - [Security](SECURITY.md)
 - [Deployment](DEPLOYMENT.md)

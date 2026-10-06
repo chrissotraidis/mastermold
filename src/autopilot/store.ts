@@ -1340,6 +1340,26 @@ export class AutopilotStore {
     });
   }
 
+  /** Record a cusum_tb snapshot's 24h barrier outcome (W1). No-op if id absent. */
+  setBarrierOutcome(id: string, barrierBps: number | null): void {
+    this.transaction(() => {
+      const found = this.db
+        .prepare("SELECT data FROM candidate_snapshots WHERE id = ?")
+        .get(id) as { data: string } | null | undefined;
+      if (!found) return;
+      const next = { ...(JSON.parse(found.data) as CandidateSnapshotRow), barrier_24h_bps: barrierBps };
+      this.db.prepare("UPDATE candidate_snapshots SET data = ? WHERE id = ?").run(JSON.stringify(next), id);
+    });
+  }
+
+  /** cusum_tb snapshots at least `ageMs` old whose barrier outcome is still unknown. */
+  cusumSnapshotsAwaitingBarrier(ageMs: number, nowMs: number = Date.now()): CandidateSnapshotRow[] {
+    const cutoff = nowMs - ageMs;
+    return this.allRows<CandidateSnapshotRow>("candidate_snapshots").filter(
+      (row) => row.strategy_id === "cusum_tb" && row.barrier_24h_bps === undefined && Date.parse(row.ts) <= cutoff,
+    );
+  }
+
   // --- SQLite plumbing ----------------------------------------------------------
 
   private inTransaction = false;

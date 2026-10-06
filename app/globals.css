@@ -3,37 +3,36 @@
 @tailwind utilities;
 
 /*
- * Master Mold "Sentinel" design system — Industrial Glassmorphism.
- * Void background, magenta helmet cognition, gold crest accents,
- * chamfered armored panels, inner glows.
+ * Master Mold design system: "Quiet instrument" (see docs/DESIGN.md).
+ * Graphite surfaces, one magenta signal, numbers first, color only for state.
  */
 
 @layer base {
   :root,
   .dark {
-    --background: 338 28% 5%; /* Void #0f090b */
-    --foreground: 338 43% 93%; /* on-surface #f5e5eb */
-    --card: 338 28% 9%; /* panel #1f1116 */
-    --card-foreground: 338 43% 93%;
-    --popover: 338 25% 10%; /* surface #211318 */
-    --popover-foreground: 338 43% 93%;
-    --primary: 338 78% 82%; /* Sentinel helmet magenta #f5adc8 */
-    --primary-foreground: 338 60% 14%; /* deep crimson-plum */
-    --secondary: 338 14% 19%; /* surface-container-high */
-    --secondary-foreground: 338 43% 93%;
-    --muted: 338 17% 15%; /* surface-container */
-    --muted-foreground: 338 9% 80%; /* on-surface-variant */
-    --accent: 338 14% 19%;
-    --accent-foreground: 338 43% 93%;
-    --destructive: 351 95% 71%; /* critical rose */
-    --destructive-foreground: 338 60% 10%;
-    --border: 338 6% 30%; /* outline-variant */
-    --input: 338 6% 30%;
-    --ring: 338 78% 82%;
-    --radius: 0.25rem;
-    --font-body: Inter, ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
-    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --background: 280 9% 4%; /* Graphite void #0a090b */
+    --foreground: 285 10% 95%; /* on-surface #f3f1f4 */
+    --card: 270 6% 8%; /* panel #131215 */
+    --card-foreground: 285 10% 95%;
+    --popover: 270 6% 9%;
+    --popover-foreground: 285 10% 95%;
+    --primary: 331 85% 64%; /* Master Mold magenta #f2559f */
+    --primary-foreground: 330 70% 8%;
+    --secondary: 270 5% 15%;
+    --secondary-foreground: 285 10% 95%;
+    --muted: 270 5% 12%;
+    --muted-foreground: 270 5% 76%;
+    --accent: 270 5% 15%;
+    --accent-foreground: 285 10% 95%;
+    --destructive: 351 95% 71%;
+    --destructive-foreground: 330 60% 8%;
+    --border: 270 5% 21%;
+    --input: 270 5% 21%;
+    --ring: 331 85% 64%;
+    --radius: 0.75rem;
+    --font-body: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-display: var(--font-space-grotesk), "Space Grotesk", var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 }
 
@@ -68,9 +67,8 @@ body > div,
     overflow-x: hidden;
     width: 100%;
     font-feature-settings: "rlig" 1, "calt" 1;
-    background-image:
-      radial-gradient(ellipse 80% 60% at 50% -10%, hsl(338 55% 13% / 0.55), transparent 70%),
-      radial-gradient(ellipse 50% 40% at 100% 100%, hsl(43 55% 12% / 0.25), transparent 70%);
+    /* One faint magenta signal at the top edge; everything else is graphite. */
+    background-image: radial-gradient(ellipse 60% 38% at 50% -14%, hsl(331 70% 32% / 0.16), transparent 72%);
     background-attachment: fixed;
   }
   section,
@@ -93,23 +91,23 @@ body > div,
     display: none;
   }
   ::selection {
-    background: hsl(338 55% 30%);
-    color: hsl(338 43% 93%);
+    background: hsl(331 70% 38%);
+    color: hsl(330 45% 97%);
   }
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: hsl(338 30% 8%);
+    background: hsl(270 6% 6%);
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(338 14% 22%);
+    background: hsl(270 5% 22%);
     border-radius: 9999px;
-    border: 2px solid hsl(338 30% 8%);
+    border: 2px solid hsl(270 6% 6%);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(338 40% 40%);
+    background: hsl(270 5% 34%);
   }
 }
 
@@ -119,10 +117,10 @@ body > div,
      working, but they now resolve to a calm modern surface language:
      plain rounded corners, hairline borders, flat background. */
   .chamfer {
-    border-radius: 0.5rem;
+    border-radius: 1rem;
   }
   .chamfer-sm {
-    border-radius: 0.375rem;
+    border-radius: 0.625rem;
   }
   .hex-clip {
     clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
@@ -131,10 +129,50 @@ body > div,
     background-image: none;
   }
   .inner-glow {
-    box-shadow: inset 0 0 0 1px rgba(245, 173, 200, 0.08);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04), 0 1px 2px rgb(0 0 0 / 0.4);
   }
   .inner-glow-strong {
-    box-shadow: inset 0 0 0 1px rgba(245, 173, 200, 0.16);
+    box-shadow: inset 0 0 0 1px hsl(331 70% 70% / 0.16), 0 1px 2px rgb(0 0 0 / 0.4);
+  }
+  /* Shared surface language: one flat graphite panel, one raised row, one
+     magenta focus edge. Depth comes from surface steps and hairlines, not glow. */
+  .mm-panel {
+    border: 1px solid hsl(270 6% 19%);
+    background: linear-gradient(180deg, hsl(270 6% 9.5%), hsl(270 6% 7.5%));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.035), 0 1px 2px rgb(0 0 0 / 0.35);
+    border-radius: 1rem;
+  }
+  .mm-panel-interactive {
+    transition: border-color 160ms ease, transform 160ms ease, background-color 160ms ease;
+  }
+  .mm-panel-interactive:hover {
+    border-color: hsl(331 70% 60% / 0.4);
+  }
+  .mm-row {
+    border-radius: 0.75rem;
+    transition: background-color 140ms ease;
+  }
+  .mm-row:hover {
+    background-color: hsl(270 6% 15% / 0.7);
+  }
+  /* Labels whisper: sentence case, body face, muted. Mono is for figures. */
+  .mm-eyebrow {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.1rem;
+    color: hsl(270 5% 62%);
+  }
+  .mm-num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "ss01" 1;
+  }
+  .mm-gradient-text {
+    background: linear-gradient(100deg, #ffd1e6 0%, #f2559f 45%, #e4cb8b 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
   .scanline-bg {
     max-width: 100vw;
@@ -198,4 +236,11 @@ body > div,
    placeholder underlay fades out so nothing peeks around the head. */
 [role="img"]:has(canvas) .mm-ph {
   opacity: 0;
+}
+
+/* Hide amounts (privacy toggle): blur every figure until tapped off. */
+.mm-private .mm-num,
+.mm-private [data-private] {
+  filter: blur(7px);
+  user-select: none;
 }

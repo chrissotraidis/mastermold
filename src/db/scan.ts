@@ -574,6 +574,7 @@ export function getScanStatusLine(): string {
     }
     return `Market read from ${age}.`;
   }
-  if (lastAttempt?.status === "failed") return "Last scan attempt failed; showing sample data.";
-  return "No market scan saved yet.";
+  // This line is about the market read, not the holdings book: it stays true
+  // after holdings are added, so it must not tell the user to add them.
+  return "No market read yet. Refresh on Today to pull one.";
 }

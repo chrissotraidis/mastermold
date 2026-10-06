@@ -76,6 +76,7 @@ import { cexGapObservations, describeCexGapSummary, summarizeCexGaps, type CexVe
 import { fetchCoinbaseTicker, fetchKrakenTickers, probeCexListing } from "./v3/cex-gap-fetch";
 import { evaluateV3Demotion, evaluateV3Promotion, isPaperCopilotCandidate, paperPromotionSnapshots } from "./v3/promotion";
 import { evaluateV3Shadow, labelDueCandidates, recordV3Shadow, SHADOW_MIN_LIQUIDITY_USD } from "./v3/shadow";
+import { labelDueBarrierOutcomes } from "./v3/cusum-barrier";
 import type { CandidateSignal, ExecutionCost } from "./v3/signal";
 import { toExpectedValue } from "./v3/signal";
 import { passesEvGate } from "./v3/ev-gate";
@@ -1481,6 +1482,8 @@ async function tick(context: TickContext): Promise<void> {
       // Backfill forward labels on snapshots old enough to observe, from the
       // PERSISTED minute bars — labels survive daemon restarts now.
       labelDueCandidates(store, priceSeriesFromHistory(history), nowMs);
+      // W1: cusum_tb's traded outcome is a 24h barrier; score that, not 2h.
+      labelDueBarrierOutcomes(store, priceSeriesFromHistory(history), nowMs);
 
       // Every strategy owns its calibration and promotion state; pooled
       // history can never promote a new module.

@@ -5,6 +5,7 @@ import { recordProductMetric } from "./metrics";
 import type { MarketMemoryFact } from "./schema";
 import { store } from "./store";
 import { llmCompletionText, llmProvider } from "@/src/llm/completion";
+import { roundPrice } from "./price";
 
 export type DailyReportSymbolStatus =
   | "refreshed"
@@ -181,8 +182,8 @@ export async function runDailyReportRefresh(input: {
   const portfolio = getPortfolio();
   const symbols = reportSymbols(portfolio.holdings);
   const fetcher = input.quoteFetcher ?? fetchYahooChartQuote;
-  const rows = await Promise.all(
-    symbols.map((symbol) => refreshSymbol(symbol, portfolio.holdings, createdAt, fetcher)),
+  const rows = await mapWithConcurrency(symbols, REPORT_FETCH_CONCURRENCY, (symbol) =>
+    refreshSymbol(symbol, portfolio.holdings, createdAt, fetcher),
   );
 
   const report = buildDailyReport({
@@ -207,7 +208,10 @@ export async function runDailyReportRefresh(input: {
     input.playsCompletion === undefined ? defaultPlaysCompletion() : input.playsCompletion;
   // The model may rewrite a rules-backed decision, but it may not manufacture
   // activity on a day when the deterministic pass found nothing actionable.
-  if (playsCompletion && report.plays.length > 0) {
+  // Nor does it write advice about demo holdings: sample rows keep the rules
+  // plays (clearly labeled on Today) and spend no model call.
+  const personalPortfolio = portfolio.provenance.label !== "Demo data";
+  if (playsCompletion && report.plays.length > 0 && personalPortfolio) {
     const llmPlays = await tryLlmPlays(report, portfolio.holdings, playsCompletion);
     if (llmPlays) report.plays = llmPlays;
   }
@@ -471,7 +475,7 @@ async function refreshSymbol(
   }
 }
 
-async function fetchYahooChartQuote(yfSymbol: string): Promise<MarketQuoteResult> {
+export async function fetchYahooChartQuote(yfSymbol: string): Promise<MarketQuoteResult> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}?range=45d&interval=1d`;
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
@@ -535,7 +539,7 @@ function fallbackRow(input: {
     asset_class: input.assetClass,
     status: input.status,
     source: input.status === "unsupported" ? "unsupported" : "portfolio-snapshot",
-    latest_close: snapshotPrice ? roundMoney(snapshotPrice) : null,
+    latest_close: snapshotPrice ? roundPrice(snapshotPrice) : null,
     previous_close: null,
     daily_move_pct: input.holding?.daily_change_pct ?? null,
     volume: null,
@@ -550,7 +554,27 @@ function reportSymbols(holdings: PortfolioHoldingJson[]) {
   const symbols = new Set<string>();
   for (const holding of holdings) symbols.add(holding.symbol);
   for (const asset of demoDatabase.assets) symbols.add(asset.symbol);
-  return [...symbols].filter((symbol) => symbol !== "USD").slice(0, 12);
+  // Every holding, not a top-12 sample: the old cap meant most of a 76-row
+  // book never reached the decision inbox. Cash has no market quote.
+  const cash = new Set(holdings.filter((holding) => holding.asset_class === "cash").map((holding) => holding.symbol));
+  return [...symbols].filter((symbol) => symbol !== "USD" && !cash.has(symbol)).slice(0, REPORT_SYMBOL_CAP);
+}
+
+const REPORT_SYMBOL_CAP = 150;
+const REPORT_FETCH_CONCURRENCY = 8;
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, run: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await run(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 function yfSymbolFor(symbol: string, assetClass: AssetClass): string | null {

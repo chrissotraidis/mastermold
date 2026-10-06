@@ -16,6 +16,7 @@
  * - No real money, no order routing. This is research state under .data only.
  */
 
+import { feeRateBps, parseFeeSchedule } from "./fees";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -23,7 +24,7 @@ import { tmpdir } from "node:os";
 import { notifyOperator } from "../autopilot/notify";
 import type { SqliteDatabase } from "../autopilot/sqlite";
 import { ANALYST_CLASSIFIER_VERSION, classifyAnalystMarket, type AnalystCategory } from "./analyst";
-import { fetchPolymarketResolutions } from "./markets";
+import { fetchPolymarketFastResolvers, fetchPolymarketResolutions, type PolymarketMarket } from "./markets";
 import { fetchPolymarketOrderBooks, summarizePolymarketBook } from "./orderbook";
 import { openPolymarketSqlite } from "./sqlite";
 
@@ -220,6 +221,8 @@ export type WalletFollowRow = {
   won: 0 | 1 | null;
   fee_usd: number;
   pnl_usd: number | null;
+  /** "follow" copies a wallet; "control" buys a comparable market no followed wallet touched. */
+  arm?: "follow" | "control";
 };
 
 export type WalletFollowSummary = {
@@ -231,6 +234,7 @@ export type WalletFollowSummary = {
   realized_pnl_usd: number;
   fee_usd: number;
   policy: string;
+  verdict: WalletFollowVerdict;
 };
 
 export type WalletIntelligenceReport = {
@@ -415,10 +419,15 @@ export function computeWalletEvidence(rows: WalletSignalRow[]): WalletEvidenceCe
 /** Modeled taker fee for a paper follow, charged at entry win or lose —
  * Polymarket's documented CLOB formula: rate × min(p, 1−p) × shares. The bps
  * is stored on the row so P&L can be recomputed if the fee model is wrong. */
-export function walletFollowFeeUsd(stakeUsd: number, ask: number, takerFeeBps: number): number {
-  if (ask <= 0 || ask >= 1) return 0;
+export function walletFollowFeeUsd(stakeUsd: number, ask: number, feeRateBps: number | null): number {
+  // Documented Polymarket taker fee: shares × rate × p × (1 − p). The rate
+  // comes from the market's feeSchedule (stored as bps of the rate: 0.05 →
+  // 500). Unknown schedules (null or the stored -1) are charged at the highest
+  // current category rate (crypto, 0.07) so paper P&L is never flattered.
+  if (!(ask > 0) || !(ask < 1)) return 0;
   const shares = stakeUsd / ask;
-  return round2((takerFeeBps / 10_000) * Math.min(ask, 1 - ask) * shares);
+  const rate = feeRateBps === null || feeRateBps < 0 ? 0.07 : feeRateBps / 10_000;
+  return round2(shares * rate * ask * (1 - ask));
 }
 
 /** Net paper P&L for a resolved follow: win pays shares×(1−ask) − fee, a
@@ -531,7 +540,8 @@ type GammaMarketLite = {
   closed: boolean;
   outcomes: string[];
   token_ids: string[];
-  taker_fee_bps: number;
+  /** Fee rate in bps of the rate (0.05 → 500); null = schedule unknown. */
+  taker_fee_bps: number | null;
 };
 
 /** Signals arrive keyed by conditionId; grading and fusion need the Gamma
@@ -558,7 +568,7 @@ async function fetchGammaByConditionIds(conditionIds: string[]): Promise<Map<str
       closed: raw.closed === true,
       outcomes: parseJsonStringArray(raw.outcomes),
       token_ids: parseJsonStringArray(raw.clobTokenIds),
-      taker_fee_bps: typeof raw.takerBaseFee === "number" && Number.isFinite(raw.takerBaseFee) ? raw.takerBaseFee : 0,
+      taker_fee_bps: feeRateBps(parseFeeSchedule(raw)),
     });
   }
   return out;
@@ -658,6 +668,12 @@ class PolymarketWalletStore {
       CREATE INDEX IF NOT EXISTS idx_polymarket_wallet_follows_status
         ON polymarket_wallet_follows(status, opened_at DESC);
     `);
+    // v2 (2026-09): follows and their no-signal controls share one table.
+    try {
+      this.db.exec("ALTER TABLE polymarket_wallet_follows ADD COLUMN arm TEXT NOT NULL DEFAULT 'follow'");
+    } catch {
+      // Column already exists.
+    }
     // Reclassify stored signals whenever the shared classifier changes, so
     // category-scoped stats (news_expectancy, discovery, fusion) reflect one
     // taxonomy. kind/band evidence derives from question text at read time
@@ -785,13 +801,22 @@ class PolymarketWalletStore {
       INSERT INTO polymarket_wallet_follows (
         id, opened_at, signal_id, wallet, market_id, condition_id, question, slug, kind,
         outcome_index, outcome, entry_ask, stake_usd, taker_fee_bps, status,
-        winning_outcome_index, resolved_at, won, fee_usd, pnl_usd
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        winning_outcome_index, resolved_at, won, fee_usd, pnl_usd, arm
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       row.id, row.opened_at, row.signal_id, row.wallet, row.market_id, row.condition_id, row.question,
       row.slug, row.kind, row.outcome_index, row.outcome, row.entry_ask, row.stake_usd, row.taker_fee_bps,
-      row.status, row.winning_outcome_index, row.resolved_at, row.won, row.fee_usd, row.pnl_usd,
+      row.status, row.winning_outcome_index, row.resolved_at, row.won, row.fee_usd, row.pnl_usd, row.arm ?? "follow",
     );
+  }
+
+  allFollows(): WalletFollowRow[] {
+    return this.db.prepare("SELECT * FROM polymarket_wallet_follows ORDER BY opened_at ASC").all() as WalletFollowRow[];
+  }
+
+  signaledMarketIds(): Set<string> {
+    const rows = this.db.prepare("SELECT DISTINCT market_id FROM polymarket_wallet_signals").all() as Array<{ market_id: string }>;
+    return new Set(rows.map((row) => row.market_id));
   }
 
   openFollows(): WalletFollowRow[] {
@@ -827,7 +852,7 @@ class PolymarketWalletStore {
         COALESCE(SUM(stake_usd), 0) AS staked_usd,
         COALESCE(SUM(CASE WHEN status != 'pending' THEN pnl_usd END), 0) AS realized_pnl_usd,
         COALESCE(SUM(fee_usd), 0) AS fee_usd
-      FROM polymarket_wallet_follows
+      FROM polymarket_wallet_follows WHERE COALESCE(arm, 'follow') = 'follow'
     `).get() as { open_n: number | null; resolved_n: number | null; wins: number | null; staked_usd: number; realized_pnl_usd: number; fee_usd: number };
     return {
       enabled,
@@ -837,7 +862,8 @@ class PolymarketWalletStore {
       staked_usd: round2(row.staked_usd),
       realized_pnl_usd: round2(row.realized_pnl_usd),
       fee_usd: round2(row.fee_usd),
-      policy: `Paper-follows ${WALLET_FOLLOW_KINDS.join("/")} signals at our detected ask within ${WALLET_FOLLOW_BAND[0]}-${WALLET_FOLLOW_BAND[1]}, $${WALLET_FOLLOW_STAKE_USD} stake, max ${WALLET_FOLLOW_MAX_OPEN} open, one per market, taker fees modeled at entry. Band derived in-sample 2026-08-10; forward results are the out-of-sample test.`,
+      policy: `Paper-follows ${WALLET_FOLLOW_KINDS.join("/")} signals at our detected ask within ${WALLET_FOLLOW_BAND[0]}-${WALLET_FOLLOW_BAND[1]}, $${WALLET_FOLLOW_STAKE_USD} stake, max ${WALLET_FOLLOW_MAX_OPEN} open, one per market, documented taker fees modeled at entry. Every follow records a no-signal control in the same kind and band, so the verdict compares follow minus control.`,
+      verdict: walletFollowVerdict(this.allFollows()),
     };
   }
 }
@@ -1041,7 +1067,7 @@ async function captureWalletSignals(store: ReturnType<typeof polymarketWalletSto
     });
     if (decision.follow && ourAsk !== null) {
       const fee = walletFollowFeeUsd(WALLET_FOLLOW_STAKE_USD, ourAsk, market.taker_fee_bps);
-      store.insertFollow({
+      const followRow: WalletFollowRow = {
         id: randomUUID(),
         opened_at: new Date(nowMs).toISOString(),
         signal_id: signalId,
@@ -1055,14 +1081,21 @@ async function captureWalletSignals(store: ReturnType<typeof polymarketWalletSto
         outcome: market.outcomes[outcomeIndex] ?? trade.outcome,
         entry_ask: ourAsk,
         stake_usd: WALLET_FOLLOW_STAKE_USD,
-        taker_fee_bps: market.taker_fee_bps,
+        // -1 records "schedule unknown" in the integer column.
+        taker_fee_bps: market.taker_fee_bps ?? -1,
         status: "pending",
         winning_outcome_index: null,
         resolved_at: null,
         won: null,
         fee_usd: fee,
         pnl_usd: null,
-      });
+        arm: "follow",
+      };
+      store.insertFollow(followRow);
+      // The no-signal control is what lets the verdict separate wallet skill
+      // from a price-band effect. Best-effort: a missing control just leaves
+      // this follow unpaired.
+      await recordWalletControl(store, followRow, nowMs).catch(() => undefined);
       notifyOperator(
         "entry",
         `Wallet follow (paper): ${market.outcomes[outcomeIndex]} $${WALLET_FOLLOW_STAKE_USD} at ${(ourAsk * 100).toFixed(0)}¢ behind ${shortAddress(wallet.address)} · ${truncate(market.question, 80)}`,
@@ -1185,12 +1218,12 @@ export function safePolymarketWalletReport(): WalletIntelligenceReport {
     expectancy: { resolved_n: 0, wins: 0, avg_pnl_our_per_dollar: null, avg_pnl_their_per_dollar: null, avg_lag_seconds: null },
     news_expectancy: { resolved_n: 0, wins: 0, avg_pnl_our_per_dollar: null, avg_pnl_their_per_dollar: null, avg_lag_seconds: null },
     evidence: [],
-    follow: { enabled: polymarketWalletFollowEnabled(), open_n: 0, resolved_n: 0, wins: 0, staked_usd: 0, realized_pnl_usd: 0, fee_usd: 0, policy: "" },
+    follow: { enabled: polymarketWalletFollowEnabled(), open_n: 0, resolved_n: 0, wins: 0, staked_usd: 0, realized_pnl_usd: 0, fee_usd: 0, policy: "", verdict: walletFollowVerdict([]) },
     followed: [],
     recent_signals: [],
     last_cycle_at: null,
     last_discovery_at: null,
-    verdict_gate: "Followed wallets must show positive lag-adjusted expectancy (our ask, not their fill) on signals recorded after selection before wallet evidence earns any capital weight.",
+    verdict_gate: "Pre-registered 2026-09-26: at least 300 resolved follow markets across 6 weekends; follow minus no-signal control must have a market-clustered 95% lower bound above zero and stay positive without the two most-followed wallets.",
   };
   if (!empty.enabled) return empty;
   try {
@@ -1255,4 +1288,171 @@ function round4(value: number | null): number | null {
 export function __resetPolymarketWalletStoreForTests() {
   singleton = null;
   singletonPath = "";
+}
+
+/* ------------------------------------------------------------------ */
+/* Follow-arm v2: no-signal control + pre-registered verdict gate.     */
+/* ------------------------------------------------------------------ */
+
+/** Pre-registered 2026-09-26 (docs/research-2026-09/STRATEGY-DECISION.md). */
+export const WALLET_FOLLOW_GATE = { min_markets: 300, min_weekends: 6, bootstrap_draws: 1000 } as const;
+
+export type WalletFollowVerdict = {
+  status: "insufficient" | "pass" | "fail";
+  follow_markets: number;
+  paired: number;
+  weekends: number;
+  follow_ev_per_dollar: number | null;
+  control_ev_per_dollar: number | null;
+  diff_per_dollar: number | null;
+  diff_lower_95: number | null;
+  diff_without_top_wallets: number | null;
+  detail: string;
+};
+
+/**
+ * Follow minus control, per dollar, over pairs where both legs resolved.
+ * The interval is a bootstrap clustered by the followed market (one match
+ * counts once), and the edge must survive removing the two most-followed
+ * wallets. A pass needs the pre-registered sample first.
+ */
+export function walletFollowVerdict(rows: WalletFollowRow[], draws: number = WALLET_FOLLOW_GATE.bootstrap_draws): WalletFollowVerdict {
+  const settled = rows.filter((row) => row.status !== "pending" && row.pnl_usd !== null && row.stake_usd > 0);
+  const follows = settled.filter((row) => (row.arm ?? "follow") === "follow");
+  const controls = new Map(settled.filter((row) => row.arm === "control").map((row) => [row.signal_id, row]));
+  const returnOf = (row: WalletFollowRow) => (row.pnl_usd as number) / row.stake_usd;
+  const pairs = follows
+    .map((follow) => ({ follow, control: controls.get(follow.signal_id) }))
+    .filter((pair): pair is { follow: WalletFollowRow; control: WalletFollowRow } => Boolean(pair.control));
+  const markets = new Set(follows.map((row) => row.market_id)).size;
+  const weekends = new Set(follows.map((row) => isoWeek(row.resolved_at ?? row.opened_at))).size;
+  const mean = (values: number[]) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null);
+
+  // Collapse to one difference per followed market (clustering).
+  const byMarket = new Map<string, { diffs: number[]; wallet: string }>();
+  for (const pair of pairs) {
+    const entry = byMarket.get(pair.follow.market_id) ?? { diffs: [], wallet: pair.follow.wallet };
+    entry.diffs.push(returnOf(pair.follow) - returnOf(pair.control));
+    byMarket.set(pair.follow.market_id, entry);
+  }
+  const clusters = [...byMarket.values()].map((entry) => ({ diff: mean(entry.diffs) as number, wallet: entry.wallet }));
+  const diff = mean(clusters.map((cluster) => cluster.diff));
+
+  let lower: number | null = null;
+  if (clusters.length >= 2) {
+    let seed = 1_234_567;
+    const random = () => {
+      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return seed / 2_147_483_648;
+    };
+    const samples: number[] = [];
+    for (let draw = 0; draw < draws; draw += 1) {
+      let total = 0;
+      for (let index = 0; index < clusters.length; index += 1) total += clusters[Math.floor(random() * clusters.length)].diff;
+      samples.push(total / clusters.length);
+    }
+    samples.sort((a, b) => a - b);
+    lower = samples[Math.floor(draws * 0.025)];
+  }
+
+  const walletCounts = new Map<string, number>();
+  for (const cluster of clusters) walletCounts.set(cluster.wallet, (walletCounts.get(cluster.wallet) ?? 0) + 1);
+  const topWallets = new Set([...walletCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([wallet]) => wallet));
+  const robust = mean(clusters.filter((cluster) => !topWallets.has(cluster.wallet)).map((cluster) => cluster.diff));
+
+  const enough = markets >= WALLET_FOLLOW_GATE.min_markets && weekends >= WALLET_FOLLOW_GATE.min_weekends;
+  const status: WalletFollowVerdict["status"] = !enough
+    ? "insufficient"
+    : lower !== null && lower > 0 && robust !== null && robust > 0
+      ? "pass"
+      : "fail";
+  const round = (value: number | null) => (value === null ? null : Math.round(value * 1000) / 1000);
+  return {
+    status,
+    follow_markets: markets,
+    paired: pairs.length,
+    weekends,
+    follow_ev_per_dollar: round(mean(follows.map(returnOf))),
+    control_ev_per_dollar: round(mean([...controls.values()].map(returnOf))),
+    diff_per_dollar: round(diff),
+    diff_lower_95: round(lower),
+    diff_without_top_wallets: round(robust),
+    detail:
+      status === "insufficient"
+        ? `${markets}/${WALLET_FOLLOW_GATE.min_markets} resolved markets across ${weekends}/${WALLET_FOLLOW_GATE.min_weekends} weekends. No verdict until both minimums are met.`
+        : status === "pass"
+          ? "Follows beat the no-signal control with a clustered lower bound above zero, and still do without the top two wallets."
+          : "Follows did not beat the no-signal control once clustered by market and checked without the top two wallets.",
+  };
+}
+
+function isoWeek(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  const day = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - day + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((date.getTime() - firstThursday.getTime()) / 86_400_000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${date.getUTCFullYear()}-W${week}`;
+}
+
+export type WalletControlChoice = { market: PolymarketMarket; outcome_index: number; indicative_price: number };
+
+/**
+ * Pick the comparable no-signal market for a follow: same kind, binary, open,
+ * no followed-wallet signal, not already held, with an outcome priced in the
+ * follow band closest to the follow's entry. Deterministic given inputs.
+ */
+export function pickWalletControl(
+  candidates: PolymarketMarket[],
+  input: { kind: WalletSignalKind; targetAsk: number; excludeMarketIds: Set<string> },
+): WalletControlChoice | null {
+  let best: WalletControlChoice | null = null;
+  for (const market of candidates) {
+    if (input.excludeMarketIds.has(market.id) || market.token_ids.length !== 2 || !market.accepting_orders) continue;
+    if (walletSignalKind(market.question, classifyAnalystMarket(market.question, market.slug)) !== input.kind) continue;
+    market.outcome_prices.forEach((price, index) => {
+      if (price < WALLET_FOLLOW_BAND[0] || price > WALLET_FOLLOW_BAND[1]) return;
+      if (!best || Math.abs(price - input.targetAsk) < Math.abs(best.indicative_price - input.targetAsk)) {
+        best = { market, outcome_index: index, indicative_price: price };
+      }
+    });
+  }
+  return best;
+}
+
+async function recordWalletControl(store: PolymarketWalletStore, follow: WalletFollowRow, nowMs: number) {
+  const candidates = await fetchPolymarketFastResolvers(48 * 3_600_000).catch(() => [] as PolymarketMarket[]);
+  const exclude = new Set([...store.signaledMarketIds(), ...store.openFollows().map((row) => row.market_id)]);
+  const choice = pickWalletControl(candidates, { kind: follow.kind, targetAsk: follow.entry_ask, excludeMarketIds: exclude });
+  if (!choice) return;
+  const token = choice.market.token_ids[choice.outcome_index];
+  const books = await fetchPolymarketOrderBooks([token], false).catch(() => new Map());
+  const book = books.get(token);
+  const ask = book ? summarizePolymarketBook(book).best_ask : null;
+  if (ask === null || ask < WALLET_FOLLOW_BAND[0] || ask > WALLET_FOLLOW_BAND[1]) return;
+  const feeBps = feeRateBps(choice.market.fee_schedule ?? { rate: choice.market.fees_enabled ? null : 0 });
+  store.insertFollow({
+    id: randomUUID(),
+    opened_at: new Date(nowMs).toISOString(),
+    signal_id: follow.signal_id,
+    wallet: "control",
+    market_id: choice.market.id,
+    condition_id: choice.market.condition_id,
+    question: choice.market.question,
+    slug: choice.market.slug,
+    kind: follow.kind,
+    outcome_index: choice.outcome_index,
+    outcome: choice.market.outcomes[choice.outcome_index] ?? "",
+    entry_ask: ask,
+    stake_usd: follow.stake_usd,
+    taker_fee_bps: feeBps ?? -1,
+    status: "pending",
+    winning_outcome_index: null,
+    resolved_at: null,
+    won: null,
+    fee_usd: walletFollowFeeUsd(follow.stake_usd, ask, feeBps),
+    pnl_usd: null,
+    arm: "control",
+  });
 }

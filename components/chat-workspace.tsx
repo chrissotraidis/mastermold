@@ -89,7 +89,7 @@ const defaultPrompts: ChatPrompt[] = [
 const commandPrompts: ChatPrompt[] = [
   {
     id: "command-run-scan",
-    label: "Run scan",
+    label: "Refresh today",
     prompt: "Run today's scan.",
     reference: "Today",
   },
@@ -101,7 +101,7 @@ const commandPrompts: ChatPrompt[] = [
   },
   {
     id: "command-test-trade",
-    label: "Test trade",
+    label: "Paper test",
     prompt: "Run paper test.",
     reference: "Trade",
   },
@@ -113,7 +113,7 @@ const commandPrompts: ChatPrompt[] = [
   },
   {
     id: "command-save-context",
-    label: "Save context",
+    label: "Update chat memory",
     prompt: "Save context for chat.",
     reference: "Today",
   },
@@ -137,13 +137,13 @@ const commandPrompts: ChatPrompt[] = [
   },
   {
     id: "command-trade",
-    label: "Trade",
+    label: "Web3 lab",
     prompt: "Check Trade.",
     reference: "Trade",
   },
   {
     id: "command-paper",
-    label: "Paper",
+    label: "Paper trading",
     prompt: "Prepare paper trade.",
     reference: "Paper trading",
   },
@@ -155,7 +155,7 @@ const commandPrompts: ChatPrompt[] = [
   },
   {
     id: "command-settings",
-    label: "Setup",
+    label: "Settings",
     prompt: "Check setup.",
     reference: "Settings",
   },
@@ -418,6 +418,8 @@ export function ChatWorkspace({
     }
     return undefined;
   }, [messages]);
+  // On phones the shortcut shelf starts folded so the conversation stays in view.
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const quickCommands = useMemo(
     () => commandPrompts.filter(
       (command) => !prompts.some((prompt) => prompt.id === command.id || prompt.label === command.label),
@@ -499,7 +501,8 @@ export function ChatWorkspace({
           onSubmit={submitMessage}
           data-testid="chat-composer"
         >
-          {isEmpty && showEmptyPrompts ? (
+          {/* With the composer on top, the starters show once, in the empty thread below. */}
+          {isEmpty && showEmptyPrompts && composerPlacement === "bottom" ? (
             <PromptRail
               prompts={prompts}
               compact={compact && composerPlacement === "bottom"}
@@ -566,7 +569,15 @@ export function ChatWorkspace({
       {showCommandShelf ? (
         <div className={cn("rounded-lg border border-outline-variant/35 bg-surface-high/25 p-3", compact && "p-2.5")}>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-telemetry text-outline">Ask Master Mold</p>
+            <button
+              type="button"
+              onClick={() => setShortcutsOpen((value) => !value)}
+              aria-expanded={shortcutsOpen}
+              className="flex min-h-11 items-center gap-1.5 text-xs font-semibold uppercase tracking-telemetry text-outline md:pointer-events-none md:min-h-0"
+            >
+              Shortcuts
+              <span aria-hidden="true" className={cn("transition md:hidden", shortcutsOpen && "rotate-90")}>›</span>
+            </button>
             {!isEmpty ? (
               <button
                 type="button"
@@ -578,7 +589,7 @@ export function ChatWorkspace({
               </button>
             ) : null}
           </div>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className={cn("mt-2 flex-wrap gap-2 md:flex", shortcutsOpen || compact ? "flex" : "hidden")}>
             {(compact ? quickCommands.slice(0, 4) : quickCommands).map((prompt) => (
               <CommandButton
                 key={prompt.id}

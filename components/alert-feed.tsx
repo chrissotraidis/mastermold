@@ -520,7 +520,7 @@ function AlertRow({
                   className={cn(alertActionClass, "border-engine/35 text-engine hover:bg-engine/10")}
                 >
                   <BookPlus aria-hidden="true" className="size-3.5" />
-                  To journal
+                  Save to Journal
                 </button>
                 <Link
                   href={buildAlertPaperHref(alert)}
@@ -529,7 +529,7 @@ function AlertRow({
                   className={cn(alertActionClass, "border-caution/35 text-caution hover:bg-caution/10")}
                 >
                   <Wallet aria-hidden="true" className="size-3.5" />
-                  Test trade
+                  Paper test
                 </Link>
                 <button
                   type="button"
@@ -618,7 +618,7 @@ function ActivityFilterControls({
       className={cn(
         "min-h-11 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet sm:h-8 sm:min-h-8",
         filter === item
-          ? "bg-violet text-void"
+          ? "bg-surface-highest text-on-surface shadow-sm ring-1 ring-inset ring-white/5"
           : "text-on-surface-variant hover:bg-surface-high/45 hover:text-on-surface",
       )}
     >

@@ -41,8 +41,7 @@ export function TodayDecisionControls({
 
   return (
     <div className="mt-3 border-t border-outline-variant/20 pt-3">
-      <p className="text-xs font-semibold text-on-surface">Your response</p>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         <ResponseButton label="Save call" active={response?.response === "save"} disabled={!canSaveCall || isPending || savedCallLocked} onClick={() => record("save")} />
         <ResponseButton label="Watch" active={response?.response === "watch"} disabled={isPending || savedCallLocked} onClick={() => record("watch")} />
         <ResponseButton label="Pass" active={response?.response === "pass"} disabled={isPending || savedCallLocked} onClick={() => record("pass")} />
@@ -53,12 +52,12 @@ export function TodayDecisionControls({
           : response?.response === "save"
             ? <>Saved before the outcome. <Link href="/journal" className="font-semibold text-violet hover:text-tertiary">Open Journal</Link></>
             : response?.response === "watch"
-              ? "Watch recorded. You can change it to Pass or Save call while this report is current."
+              ? "Watching. You can change this today."
               : response?.response === "pass"
-                ? "Pass recorded. You can change it while this report is current; an unchanged passed idea stays out of the next inbox."
+                ? "Passed. It stays out of the next inbox unless it changes."
                 : !canSaveCall
-                  ? "Watch or pass is available now. Add a fresh personal portfolio before saving a scored call."
-                  : "Save a call before acting elsewhere, or record watch/pass so the inbox has an outcome."}
+                  ? "Save needs your own holdings."
+                  : "Save sends it to Journal to be graded."}
       </p>
     </div>
   );

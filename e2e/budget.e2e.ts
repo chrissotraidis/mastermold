@@ -1,0 +1,64 @@
+import { expect, test } from "./app-test";
+import { importCsv, resetMoney, threeMonthsCsv } from "./helpers";
+
+test.describe("Budget, end to end with real clicks", () => {
+  test.beforeEach(async ({ request }) => {
+    await resetMoney(request);
+    await importCsv(request, threeMonthsCsv().csv);
+  });
+
+  test("start from past spending, edit a plan, roll over, remove and re-add", async ({ page }) => {
+    await page.goto("/budget");
+    await expect(page.getByText("No budget yet")).toBeVisible();
+    await expect(page.getByTestId("budget-summary")).toContainText("set a budget first");
+
+    await page.getByRole("button", { name: "Start from my spending" }).click();
+    await expect(page.getByText("Budget created from your spending")).toBeVisible();
+    const fixed = page.getByTestId("budget-group-fixed");
+    const flex = page.getByTestId("budget-group-flex");
+    await expect(fixed).toContainText("Rent");
+    await expect(fixed).toContainText("Streaming");
+    // Rent paid exactly on plan reads "paid" (green), not "$0.00 left" in warning yellow.
+    await expect(fixed).toContainText("$2,100 of $2,100 · paid");
+    await expect(flex).toContainText("Groceries");
+    await expect(flex).toContainText("Restaurants");
+
+    // Groceries averaged $410 → plan $410; this month spent $430.
+    const dialog = page.getByRole("dialog");
+    await flex.getByRole("button", { name: "Edit Groceries" }).click();
+    const plan = dialog.getByLabel("Monthly plan for Groceries");
+    await expect(plan).toHaveValue("410");
+    await plan.fill("500");
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(flex).toContainText("$430.00 of $500.00 · $70.00 left");
+
+    await flex.getByRole("button", { name: "Edit Restaurants" }).click();
+    await dialog.getByLabel("Rollover").check();
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(flex).toContainText("carried");
+
+    await flex.getByRole("button", { name: "Edit Restaurants" }).click();
+    await dialog.getByRole("button", { name: "Remove" }).click();
+    const unbudgeted = page.getByTestId("budget-unbudgeted");
+    await expect(unbudgeted).toContainText("Restaurants");
+    await unbudgeted.getByRole("button", { name: "Budget it" }).click();
+    await expect(flex).toContainText("Restaurants");
+
+    await page.reload();
+    await flex.getByRole("button", { name: "Edit Groceries" }).click();
+    await expect(dialog.getByLabel("Monthly plan for Groceries")).toHaveValue("500");
+  });
+
+  test("add a category from the form", async ({ page }) => {
+    await page.goto("/budget");
+    await page.getByLabel("Category", { exact: true }).selectOption("gifts");
+    await page.getByLabel("Group", { exact: true }).selectOption("non_monthly");
+    await page.getByLabel("Per month").fill("75");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByTestId("budget-group-non_monthly")).toContainText("Gifts");
+    await expect(page.getByTestId("budget-summary")).toContainText("$75.00");
+    // With a plan on the page the form sits in a half-width card; the category picker must stay readable.
+    const box = await page.getByLabel("Category", { exact: true }).boundingBox();
+    expect(box!.width).toBeGreaterThanOrEqual(150);
+  });
+});

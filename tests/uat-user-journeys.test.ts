@@ -870,7 +870,7 @@ describe("UAT user journeys over seeded data", () => {
       const integrations = await responseJson<Array<{ service: string; status: string; detail: string }>>(getStatusRoute());
       expect(integrations.find((integration) => integration.service === "live_chat")).toMatchObject({
         status: "Connected",
-        detail: "Live chat can use the configured server provider key.",
+        detail: expect.stringContaining("Live chat can use the configured server provider key."),
       });
     } finally {
       restoreEnv("OPENROUTER_API_KEY", originalOpenRouterKey);

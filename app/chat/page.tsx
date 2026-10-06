@@ -21,7 +21,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       <div className="mx-auto max-w-4xl">
         <PageHeader
           title="Ask Master Mold"
-          subtitle="Ask Master Mold to open routes, check status, pull context, or explain what to do next. It answers; it does not execute."
+          subtitle="It explains and opens pages for you. It never trades."
         />
         <div id="ask-master-mold" className="scroll-mt-24">
           <ChatWorkspace

@@ -318,6 +318,22 @@ describe("today's plays", () => {
     expect(getLatestDailyReport()?.plays.every((play) => play.source === "llm")).toBe(true);
   });
 
+  test("GIVEN only demo holdings WHEN the report runs with an LLM key THEN no model call is made and rules plays stay", async () => {
+    let calls = 0;
+    const result = await runDailyReportRefresh({
+      now: new Date("2026-07-01T14:00:00.000Z"),
+      quoteFetcher: playQuotes(),
+      playsCompletion: async () => {
+        calls += 1;
+        return "{}";
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.detail);
+    expect(calls).toBe(0);
+    expect(result.report.plays.every((play) => play.source !== "llm")).toBe(true);
+  });
+
   test("GIVEN the LLM returns garbage or invented symbols WHEN plays are validated THEN the rules plays stay canonical", async () => {
     seedPortfolio();
     for (const badOutput of [
@@ -363,7 +379,7 @@ describe("today's plays", () => {
     const todayPage = readFileSync(join(process.cwd(), "app/page.tsx"), "utf8");
     expect(todayPage).toContain("Decision inbox");
     expect(todayPage).toContain('data-testid="today-play"');
-    expect(todayPage).toContain("One to three decisions, ranked from the latest saved inputs.");
+    expect(todayPage).toContain("What to look at first. Suggestions only.");
     expect(todayPage).toContain("horizon: {play.horizon} · confidence: {play.confidence}");
     // The decision inbox renders above the prose brief.
     expect(todayPage.indexOf('aria-labelledby="today-plays-title"')).toBeLessThan(
@@ -544,8 +560,8 @@ describe("simple daily auto-refresh", () => {
     const settingsPage = readFileSync(join(process.cwd(), "app/settings/page.tsx"), "utf8");
     const dailyReport = readFileSync(join(process.cwd(), "src/db/daily-report.ts"), "utf8");
 
-    expect(reviewPage).toContain("Build truth and review readiness");
-    expect(reviewPage).toContain("Capability truth");
+    expect(reviewPage).toContain("What works today");
+    expect(reviewPage).toContain("By feature");
     // The simple app-load check: Settings itself triggers the auto-refresh.
     expect(settingsPage).toContain("ensureDailyReportAutoRefresh");
     expect(settingsPage).toContain("getDailyReportAutoRefreshStatus");

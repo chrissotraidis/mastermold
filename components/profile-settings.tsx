@@ -176,7 +176,7 @@ export function ProfileSettings() {
             <div className="space-y-1.5">
               <Label
                 htmlFor="profile-name"
-                className="text-xs font-semibold uppercase tracking-telemetry text-outline"
+                className="text-xs font-medium text-outline"
               >
                 Name
               </Label>
@@ -343,7 +343,7 @@ function Segmented<T extends string>({
             className={cn(
               "min-h-11 rounded-md border px-3 py-1.5 text-center text-xs font-medium leading-5 transition-colors sm:min-h-8",
               value === option
-                ? "border-violet bg-violet text-void"
+                ? "border-violet/70 bg-violet/15 text-on-surface"
                 : "border-outline-variant/50 bg-surface-dim/70 text-on-surface-variant hover:bg-surface-high/60",
             )}
           >

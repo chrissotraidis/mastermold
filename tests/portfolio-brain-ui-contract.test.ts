@@ -9,27 +9,25 @@ function source(path: string) {
 }
 
 describe("Portfolio Brain product UI contracts", () => {
-  test("GIVEN Portfolio Brain v1 WHEN Portfolio renders THEN the source, sync, accounts, and exposures are visible", () => {
-    // Redesign: the source banner, account groups, exposure summary, and analysis
-    // drawer collapsed into a header source line plus one dense holdings table.
-    // Monarch sync moved into the Settings Monarch MCP panel.
+  test("GIVEN the money hub WHEN Portfolio renders THEN source, accounts, allocation, and holdings are visible", () => {
+    // 2026-09 hub rewrite: net worth = assets − debts, account cards, an
+    // interactive allocation donut that filters the holdings table, and a
+    // collapsible position-rules panel below. Monarch sync lives in Settings.
     const portfolioPage = source("app/portfolio/page.tsx");
+    const hub = source("components/portfolio/portfolio-hub.tsx");
     const monarchPanel = source("components/monarch-mcp-panel.tsx");
 
     expect(portfolioPage).toContain("function sourceLine");
-    expect(portfolioPage).toContain("manual holdings · local only");
-    expect(portfolioPage).toContain("imported holdings · read-only snapshot");
-    expect(portfolioPage).toContain("Sample data until you add holdings");
-    expect(portfolioPage).toContain("{rows.length} positions");
-    expect(portfolioPage).toContain("{holding.weight_pct.toFixed(1)}%");
-    expect(portfolioPage).toContain('href="#position-policies"');
-    expect(portfolioPage).toContain("<PositionPoliciesPanel");
-    expect(portfolioPage).toContain("<PortfolioCharts allocation={portfolio.allocation}");
-    expect(portfolioPage).toContain('id="add-holdings"');
-    expect(portfolioPage).toContain("<ManualHoldingsPanel holdings={portfolio.manual_holdings} />");
-    expect(portfolioPage).toContain("Connections (Monarch, brokerages, wallets) live in");
-    expect(portfolioPage.indexOf('id="holdings-title"')).toBeLessThan(portfolioPage.indexOf('id="position-policies"'));
-    expect(portfolioPage.indexOf('id="position-policies"')).toBeLessThan(portfolioPage.indexOf('id="add-holdings"'));
+    expect(portfolioPage).toContain("getMoneySummary(portfolio)");
+    expect(portfolioPage).toContain("<PortfolioHub");
+    expect(hub).toContain('label="Net worth"');
+    expect(hub).toContain('label="Debts"');
+    expect(hub).toContain('id="accounts-title"');
+    expect(hub).toContain("<DonutChart");
+    expect(hub).toContain("onPick={(key) => setFilter(");
+    expect(hub).toContain('id="holdings-title"');
+    expect(hub).toContain("<ImportSheet");
+    expect(portfolioPage.indexOf("<PortfolioHub")).toBeLessThan(portfolioPage.indexOf('id="position-policies"'));
     expect(monarchPanel).toContain('fetch("/api/portfolio-brain/monarch/sync", { method: "POST" })');
     expect(monarchPanel).toContain("Sync Monarch now");
   });
@@ -52,7 +50,7 @@ describe("Portfolio Brain product UI contracts", () => {
     const tradingPage = source("app/trading/page.tsx");
     const appShell = source("components/app-shell.tsx");
 
-    expect(appShell).toContain("Advisory by default — live execution requires an explicit operator action and passing evidence gates.");
+    expect(appShell).toContain("Master Mold advises. It never moves your money, and live trading stays locked.");
     expect(tradingPage).toContain("Live money stays locked.");
     expect(tradingPage).not.toMatch(/Monarch|SnapTrade|Coinbase|Robinhood|brokerage/i);
   });
@@ -92,7 +90,7 @@ describe("Portfolio Brain product UI contracts", () => {
     expect(monarchPanel).toContain("It cannot place Robinhood trades, change Monarch data, sign transactions, or move funds.");
     expect(monarchPanel).toContain("Master Mold requests read-only snapshot access and never calls write or trading tools.");
     // Compact redesign: one status line + collapsed details.
-    expect(monarchPanel).toContain("flex min-w-0 flex-1 flex-col gap-3 px-3 py-2.5 sm:flex-row");
+    expect(monarchPanel).toContain("flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 px-3 py-2.5");
     expect(monarchPanel).toContain("Connection details");
     expect(localCommands).toContain("Portfolio check:");
     expect(localCommands).toContain("Source:");

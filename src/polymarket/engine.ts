@@ -18,6 +18,7 @@ import { validatePolymarketPaperEntry } from "./policy";
 import { polymarketStore, type PolymarketPaperPosition } from "./store";
 import { startOrUpdatePolymarketStream } from "./stream";
 import { buildPolymarketBrainCandidates, type PolymarketStrategyId } from "./strategies";
+import { scanNegRiskBaskets } from "./structural";
 
 const ENTRY_MAX_SPREAD_BPS = 500;
 
@@ -112,6 +113,17 @@ export async function runPolymarketBrainCycle(trigger: "scheduled" | "manual" = 
     const books = await fetchPolymarketOrderBooks(tokenIds, true);
     const labeled = brain.labelDue(books);
     const candidates = buildPolymarketBrainCandidates(researchMarkets, books);
+    // Structural research: read the busiest negative-risk events in full.
+    try {
+      const negRiskEvents = snapshot.markets
+        .filter((market) => market.neg_risk && market.event_id)
+        .sort((a, b) => b.volume_24h_usd - a.volume_24h_usd)
+        .map((market) => market.event_id as string);
+      const structural = await scanNegRiskBaskets(negRiskEvents, 3);
+      candidates.push(...structural.candidates);
+    } catch {
+      // Structural scan is best-effort; the rest of the cycle stands.
+    }
     brain.recordCycle({
       source: `${snapshot.source}+clob-books`,
       markets: researchMarkets,

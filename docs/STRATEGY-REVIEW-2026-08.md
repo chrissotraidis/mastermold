@@ -4,13 +4,13 @@ Written 2026-08-01, before the planned system expansion (prediction-market
 venue, broader scope). This is the honest record of what the current strategy
 did and did not do, so the rebuild starts from evidence instead of memory.
 All numbers are paper-mode results from the live daemon's own stores; the
-snapshot date is 2026-08-01 and the paper book started at $1,000 with a $25
-per-trade cap.
+snapshot date is 2026-08-01 and trades used a $25 per-trade cap. Dollar
+results stay in the private session log; this record keeps the shape.
 
 ## Verdict up front
 
 The current v2 trend-pullback book has **no demonstrated edge**. Equity after
-three weeks of realized round trips is $999.27 — net **-$4.97** across 43
+three weeks of realized round trips was slightly **below** its starting book across 43
 completed trades. The infrastructure around the strategy (risk caps,
 kill-switch, shadow evaluation, promotion gates, honest cost model) worked as
 designed; the entry/exit logic it was protecting did not make money. No
@@ -24,23 +24,21 @@ money?" and the answer for this version is no.
 |---|---|
 | Round trips with realized P&L | 43 |
 | Win rate | 37% (16/43) |
-| Net P&L | -$4.97 |
-| Average win | +$0.27 |
-| Average loss | -$0.34 |
-| Book equity | $999.27 (from $1,000) |
+| Net P&L | Negative, well under 1% of the book |
+| Average win vs loss | Wins smaller than losses |
 
 Exit-reason breakdown (the story is here):
 
 | Exit | Trips | Net P&L |
 |---|---|---|
-| Hard stops (-1.2% legacy, up to -3.0% dynamic) | 18 | **-$8.24** |
-| Take profits (2R target, +2.4% to +6.4%) | 6 | +$3.03 |
-| Armed trails | 15 | +$0.30 |
-| Time stops (24h) | 4 | -$0.08 |
+| Hard stops (-1.2% legacy, up to -3.0% dynamic) | 18 | **Largest loss, bigger than the whole net loss** |
+| Take profits (2R target, +2.4% to +6.4%) | 6 | Positive |
+| Armed trails | 15 | About flat |
+| Time stops (24h) | 4 | About flat |
 
 The nightly analyst memo (2026-08-01) on the most recent window: 17 round
 trips, 52.9% win rate, expectancy +0.11bp — statistically zero. One meme-tier
-asset (ANSEM) carried the window at +$1.38 while every major (SOL, WBTC,
+asset (ANSEM) carried the window while every major (SOL, WBTC,
 WETH) lost.
 
 ## Shadow-signal calibration (the v3 lane's own scorecard)
@@ -82,8 +80,8 @@ earned promotion in three weeks of continuous shadow evaluation.
 
 1. **Stop geometry eats the payoff math.** The design assumes 2R winners, but
    the -1.2% legacy hard stop is inside crypto intraday noise: 18 hard stops
-   produced -$8.24, more than the entire net loss. Winners averaging +$0.27
-   against losers averaging -$0.34 at a 37% win rate is negative expectancy by
+   lost more than the entire net loss. Winners smaller than losers at a
+   37% win rate is negative expectancy by
    construction — the 2R target is rarely reached before the stop fires.
 2. **Trend gates starve the book.** Six ANDed entry gates on time-based
    sampling generate few trades in quiet regimes (16+ skips for missing the

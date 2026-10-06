@@ -43,7 +43,7 @@ export function AlertStatButton({
     <OpenAlertsAction className="group block w-full border border-outline-variant/40 bg-surface-high/30 p-3 text-left chamfer-sm transition-colors hover:border-violet/50 hover:bg-surface-high/55">
       <div className="flex items-center gap-2">
         <AlertTriangle className={cn("size-4", toneClass)} aria-hidden="true" />
-        <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">{label}</p>
+        <p className="text-[11px] font-medium text-outline">{label}</p>
       </div>
       <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-on-surface">{value}</p>
       <p className="mt-1 line-clamp-2 text-xs leading-5 text-outline">{detail}</p>

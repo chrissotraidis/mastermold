@@ -6,6 +6,7 @@ import {
   buildAnalystForecastPrompt,
   classifyAnalystMarket,
   computeAnalystEdgeBuckets,
+  computeAnalystShrinkage,
   decideAnalystBet,
   formatAnalystTrackRecord,
   parseAnalystForecast,
@@ -300,5 +301,42 @@ describe("buildAnalystForecastPrompt", () => {
     });
     expect(prompt).toContain("Your recent track record on this venue:");
     expect(formatAnalystTrackRecord({ resolved_count: 0, mean_brier_model: null, mean_brier_market: null, recent: [] })).toBeUndefined();
+  });
+});
+
+describe("analyst shrinkage fit", () => {
+  const rows = (n: number, signal: number) => {
+    const out = [];
+    let seed = 42;
+    const random = () => {
+      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return seed / 2_147_483_648;
+    };
+    for (let index = 0; index < n; index += 1) {
+      const market = 0.3 + random() * 0.4;
+      const truth = Math.min(0.97, Math.max(0.03, market + (random() - 0.5) * 0.4));
+      const outcome = random() < truth ? 0 : 1; // winning index 0 = YES
+      // The model sees the truth with weight `signal`, otherwise noise.
+      const probability = Math.min(0.99, Math.max(0.01, market + signal * (truth - market) + (1 - signal) * (random() - 0.5) * 0.4));
+      out.push({ ts: new Date(Date.UTC(2026, 7, 1) + index * 3_600_000).toISOString(), question: `Event number ${String.fromCharCode(97 + (index % 26))}${Math.floor(index / 26)} happens?`, category: "news" as const, yes_price: market, probability, winning_outcome_index: outcome });
+    }
+    return out;
+  };
+
+  test("GIVEN too few resolved forecasts THEN the fit reports insufficient", () => {
+    expect(computeAnalystShrinkage(rows(15, 1), "news").status).toBe("insufficient");
+  });
+
+  test("GIVEN a model that is pure noise around the market THEN w's interval includes zero", () => {
+    const fit = computeAnalystShrinkage(rows(600, 0), "news", 300);
+    expect(fit.status).toBe("no_information");
+    expect(fit.w_lower_95).toBe(0);
+  });
+
+  test("GIVEN a model that sees real information THEN w is positive and shrinking beats the market held out", () => {
+    const fit = computeAnalystShrinkage(rows(600, 1), "news", 300);
+    expect(fit.status).toBe("adds_information");
+    expect(fit.w!).toBeGreaterThan(0.3);
+    expect(fit.test_brier_shrunk!).toBeLessThan(fit.test_brier_market!);
   });
 });

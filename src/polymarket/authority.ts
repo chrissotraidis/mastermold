@@ -72,11 +72,22 @@ export function evaluatePolymarketPaperAuthority(
     strategy_id: null,
     entry_strategies: [],
     detail: momentum
-      ? `Momentum remains shadow-only: ${momentum.promotion_detail}`
-      : "All strategies remain shadow-only until a forward-label promotion gate is measured and passed.",
+      ? momentumPlainDetail(momentum)
+      : "Paper entries stay paused until a strategy passes its test.",
   };
 }
 
 export function strategyName(value: PolymarketStrategyId): string {
   return value.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
+/** The paused-lane line in words: how the best candidate is really doing. */
+function momentumPlainDetail(momentum: { labels_1h: number; mean_1h_bps: number | null; hit_rate_1h: number | null }): string {
+  if (momentum.labels_1h < 20 || momentum.mean_1h_bps === null) {
+    return `Paper entries paused. Momentum, the best candidate, has only ${momentum.labels_1h} checked signals so far.`;
+  }
+  const pct = (momentum.mean_1h_bps / 100).toFixed(1);
+  const direction = momentum.mean_1h_bps < 0 ? "lost" : "gained";
+  const wins = momentum.hit_rate_1h === null ? "" : `, winning ${Math.round(momentum.hit_rate_1h * 100)}% of the time`;
+  return `Paper entries paused. Momentum, the best candidate, ${direction} ${pct.replace("-", "")}% on average an hour after each signal (${momentum.labels_1h} checked${wins}).`;
 }

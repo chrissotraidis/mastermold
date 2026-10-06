@@ -29,9 +29,9 @@ export default async function ActivityPage({ searchParams }: ActivityPageProps) 
 
   return (
     <AppShell dataMode={publicDataMode}>
-      <div className="mx-auto w-full max-w-6xl space-y-4">
+      <div className="w-full space-y-6">
         <header>
-          <h1 className="font-display text-lg font-semibold text-on-surface">Activity</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-on-surface sm:text-4xl">Activity</h1>
           <p className="mt-0.5 text-xs text-outline">
             {active > 0
               ? `${active} item${active === 1 ? "" : "s"} to review. `
