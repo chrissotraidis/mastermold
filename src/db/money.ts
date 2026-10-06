@@ -7,6 +7,7 @@
 import { getPortfolio, invalidatePortfolioCache, type AssetClass, type PortfolioHoldingJson, type PortfolioJson } from "./portfolio";
 import { store, type AccountExclusions, type FinancialAccountRow, type ManualHoldingRow, type NetWorthHistoryRow } from "./store";
 import { ACCOUNT_TYPES } from "@/lib/money-accounts";
+import { roundPrice } from "./price";
 
 export { ACCOUNT_TYPES };
 
@@ -454,10 +455,7 @@ export function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-export function roundPrice(value: number) {
-  if (value >= 1) return Math.round(value * 100) / 100;
-  return Math.round(value * 1e8) / 1e8;
-}
+export { roundPrice };
 
 export function roundQuantity(value: number) {
   return Math.round(value * 1e8) / 1e8;

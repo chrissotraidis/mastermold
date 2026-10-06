@@ -24,7 +24,7 @@ export function PaperLoadingState() {
     >
       <div className="min-w-0 space-y-4">
         <div className="hidden rounded-md border border-violet/30 bg-violet/[0.045] p-4 sm:block sm:p-5">
-          <p className="text-xs font-medium uppercase tracking-telemetry text-outline">Next paper action</p>
+          <p className="text-xs font-medium text-outline">Next paper action</p>
           <h2 className="mt-1 text-lg font-semibold leading-tight text-on-surface sm:text-xl">
             Ask Master Mold while Paper opens.
           </h2>
@@ -82,7 +82,7 @@ export function PaperLoadingState() {
 function MetricSkeleton({ label }: { label: string }) {
   return (
     <div className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-3">
-      <p className="text-xs uppercase tracking-telemetry text-outline">{label}</p>
+      <p className="text-xs text-outline">{label}</p>
       <div className="mt-2 h-6 w-20 animate-pulse rounded bg-surface-highest/50" aria-hidden="true" />
       <div className="mt-2 h-3 w-full animate-pulse rounded bg-surface-highest/35" aria-hidden="true" />
     </div>

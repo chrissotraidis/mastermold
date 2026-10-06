@@ -123,7 +123,7 @@ export default async function BriefingDetailPage({ params }: BriefingDetailPageP
           className="grid gap-3 rounded-md border border-violet/25 bg-violet/[0.06] p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-center"
         >
           <div className="min-w-0">
-            <p className="font-mono text-[11px] uppercase tracking-telemetry text-violet">Start here</p>
+            <p className="text-xs font-medium text-violet">Start here</p>
             <h2 id="decision-check-title" className="mt-1 font-display text-lg font-semibold leading-6 text-on-surface">
               {briefingDecisionTitle(card.conviction)}
             </h2>

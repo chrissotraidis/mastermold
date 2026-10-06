@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 
 /** Dark status/address bar on mobile, matching the Void background. */
 export const viewport: Viewport = {
-  themeColor: "#09060a",
+  themeColor: "#0a090b",
 };
 
 export default function RootLayout({

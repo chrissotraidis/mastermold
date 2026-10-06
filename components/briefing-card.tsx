@@ -76,7 +76,7 @@ export function DailyBriefingCard({
               </h3>
             </Link>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              <span className="font-mono text-[11px] uppercase tracking-telemetry text-violet">Why it matters</span>{" "}
+              <span className="text-xs font-medium text-violet">Why it matters</span>{" "}
               {relevance}
             </p>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
@@ -134,7 +134,7 @@ export function DailyBriefingCard({
                 {confidence}
                 <span className="text-lg text-outline">/10</span>
               </p>
-              <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Confidence</p>
+              <p className="text-[11px] font-medium text-outline">Confidence</p>
             </div>
           </div>
         </div>

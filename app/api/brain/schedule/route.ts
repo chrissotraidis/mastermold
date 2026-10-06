@@ -6,7 +6,9 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const body = (await request.json().catch(() => ({}))) as {
+  const parsed: unknown = await request.json().catch(() => null);
+  // null or a bare JSON value means "no options", same as an unreadable body.
+  const body = (parsed && typeof parsed === "object" ? parsed : {}) as {
     enabled?: unknown;
     force?: unknown;
     trigger?: unknown;

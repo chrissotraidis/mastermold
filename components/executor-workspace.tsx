@@ -108,7 +108,7 @@ export function ExecutorWorkspace({ executor }: ExecutorWorkspaceProps) {
                     <CardHeader className="space-y-3 p-5">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="text-xs font-semibold uppercase text-outline">
+                          <p className="text-xs font-medium text-outline">
                             {strategy.venue}
                           </p>
                           <CardTitle className="mt-1 text-xl text-on-surface">
@@ -342,7 +342,7 @@ function FieldBlock({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-outline-variant/40 bg-surface-dim/50 p-3">
-      <p className="text-xs font-semibold uppercase text-outline">{label}</p>
+      <p className="text-xs font-medium text-outline">{label}</p>
       <p className="mt-1 font-mono text-lg text-on-surface">{value}</p>
     </div>
   );

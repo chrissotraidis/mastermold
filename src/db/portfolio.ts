@@ -3,6 +3,7 @@ import { isKnownBy, latestKnowledgeTime, type AsOfFilter } from "./bitemporal";
 import type { Asset, PriceBar } from "./schema";
 import { store, type ImportedHoldingRow, type ManualHoldingRow } from "./store";
 import { getLatestPortfolioBrainSnapshot, portfolioBrainHoldingsForPortfolio, type PortfolioBrainSnapshot } from "./portfolio-brain";
+import { roundPrice } from "./price";
 
 export type AssetClass = Asset["asset_class"] | "cash";
 
@@ -395,7 +396,7 @@ export function addManualHolding(input: ManualHoldingInput): PortfolioHoldingJso
     asset_class: input.asset_class,
     venue: input.venue.trim() || "Manual",
     quantity: roundQuantity(input.quantity),
-    price: roundMoney(input.price),
+    price: roundPrice(input.price),
     cost_basis: roundMoney(input.cost_basis ?? input.quantity * input.price),
     daily_change_pct: roundPct(input.daily_change_pct ?? 0),
     created_at: now,

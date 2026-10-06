@@ -15,6 +15,13 @@ export async function POST(request: Request) {
   if (!assetClasses.includes(assetClass)) return NextResponse.json({ error: "Choose an asset class." }, { status: 422 });
   if (!Number.isFinite(quantity) || quantity <= 0) return NextResponse.json({ error: "Amount must be more than zero." }, { status: 422 });
   if (!Number.isFinite(price) || price <= 0) return NextResponse.json({ error: "Price must be more than zero." }, { status: 422 });
+  // Validate everything before writing: a rejected cost basis used to leave the
+  // holding saved, so retrying after the error created a duplicate.
+  const extra = parseHoldingPatch({
+    account_id: body?.account_id ?? undefined,
+    cost_basis: body?.cost_basis === undefined || body?.cost_basis === "" ? null : body.cost_basis,
+  });
+  if (!extra.ok) return NextResponse.json({ error: extra.error }, { status: 422 });
   const created = addManualHolding({
     symbol,
     asset_name: typeof body?.asset_name === "string" ? body.asset_name : "",
@@ -23,11 +30,6 @@ export async function POST(request: Request) {
     quantity,
     price,
   });
-  const extra = parseHoldingPatch({
-    account_id: body?.account_id ?? undefined,
-    cost_basis: body?.cost_basis === undefined || body?.cost_basis === "" ? null : body.cost_basis,
-  });
-  if (!extra.ok) return NextResponse.json({ error: extra.error }, { status: 422 });
   const result = updateHolding(created.id, extra.patch);
   return NextResponse.json({ holding: result?.after ?? null });
 }

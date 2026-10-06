@@ -236,7 +236,7 @@ export function AppShell({
         onDismiss={dismissCommandHandoff}
       />
       <SideRail />
-      <main className="mx-auto w-full max-w-[88rem] animate-mm-enter px-margin-mobile pb-[calc(7rem+env(safe-area-inset-bottom))] pt-20 md:pl-24 md:pr-8 md:pb-12 lg:pl-[17rem] xl:pr-12">
+      <main className="mx-auto w-full max-w-[88rem] animate-mm-enter px-margin-mobile pb-[calc(7rem+env(safe-area-inset-bottom))] pt-20 md:pl-24 md:pr-8 md:pb-12 lg:pl-[17rem] xl:pr-16">
         {children}
         <p className="mt-12 text-center text-[11px] leading-5 text-outline lg:hidden">
           Master Mold advises. It never moves your money, and live trading stays locked.
@@ -525,7 +525,7 @@ function TopBar({
         </button>
         <span
           className={cn(
-            "hidden items-center gap-1.5 rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-wide sm:inline-flex",
+            "hidden items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-medium leading-none sm:inline-flex",
             isEngine || isLiveDex || isLiveMarket ? "text-engine" : isManual || isImported ? "text-violet" : "text-demo",
             isEngine || isLiveDex || isLiveMarket ? "border-engine/25 bg-engine/10" : isManual || isImported ? "border-violet/25 bg-violet/10" : "border-demo/25 bg-demo/10",
           )}
@@ -762,6 +762,24 @@ function pageContextForShellPath(pathname: string, route = pathname): ChatPageCo
     };
   }
 
+  if (pathname.startsWith("/transactions")) {
+    return {
+      surface: "Transactions",
+      route,
+      summary:
+        "The user is looking at imported bank and card transactions, categories, rules, hidden rows, and monthly cash flow. Everything is stored locally.",
+    };
+  }
+
+  if (pathname.startsWith("/budget")) {
+    return {
+      surface: "Budget",
+      route,
+      summary:
+        "The user is looking at this month's budget: income, planned spending by group, what is left to spend, uncategorized spending, and savings goals.",
+    };
+  }
+
   if (pathname.startsWith("/journal")) {
     return {
       surface: "Decision journal",
@@ -810,14 +828,21 @@ function ScanStatusLine() {
   if (!line) return null;
   const compactLine = compactScanStatusLine(line);
   return (
-    <span className="hidden max-w-[11rem] truncate rounded-full border border-outline-variant/25 bg-void/25 px-2 py-1 text-xs leading-none text-outline lg:inline xl:max-w-[14rem]">
+    <span
+      title={line}
+      className="hidden max-w-[11rem] truncate rounded-full border border-outline-variant/25 bg-void/25 px-2 py-1 text-xs leading-none text-outline lg:inline xl:max-w-[14rem]"
+    >
       {compactLine}
     </span>
   );
 }
 
 function compactScanStatusLine(line: string) {
+  // The full sentence lives in the chip's tooltip; the chip itself stays short
+  // enough to read without truncating mid-word.
   return line
+    .replace(/^No market read yet\..*$/i, "No market read yet")
+    .replace(/^Last scan attempt failed; showing the read from\s+/i, "Scan failed · read ")
     .replace(/^Market read from\s+/i, "Market read ")
     .replace(/\s+days?\s+ago\.?$/i, "d ago")
     .replace(/\s+hours?\s+ago\.?$/i, "h ago")

@@ -20,6 +20,16 @@ export const dynamic = "force-dynamic";
 
 const payload = transactionsPayload;
 
+/**
+ * After an import, show a month that actually contains the new rows: importing
+ * last month's statement used to report success and then show an empty month.
+ */
+function monthShowing(requested: string | null, dates: string[]): string | null {
+  const months = [...new Set(dates.map((date) => date.slice(0, 7)).filter((m) => /^\d{4}-\d{2}$/.test(m)))].sort();
+  if (months.length === 0 || (requested && months.includes(requested))) return requested;
+  return months[months.length - 1];
+}
+
 export async function GET(request: Request) {
   return NextResponse.json(payload(new URL(request.url).searchParams.get("month")));
 }
@@ -30,8 +40,8 @@ export async function POST(request: Request) {
   const month = typeof body?.month === "string" ? body.month : null;
   try {
     switch (action) {
-      case "add":
-        addManualTransaction({
+      case "add": {
+        const added = addManualTransaction({
           date: String(body?.date ?? ""),
           amount: Number(body?.amount),
           description: String(body?.description ?? ""),
@@ -39,7 +49,8 @@ export async function POST(request: Request) {
           account_id: typeof body?.account_id === "string" && body.account_id ? body.account_id : null,
           notes: typeof body?.notes === "string" ? body.notes : "",
         });
-        break;
+        return NextResponse.json(payload(monthShowing(month, [added.date])));
+      }
       case "update":
         updateTransaction(String(body?.id ?? ""), (body?.patch ?? {}) as TransactionPatch);
         break;
@@ -62,7 +73,7 @@ export async function POST(request: Request) {
         const parsed = parseTransactionCsv(String(body?.csv ?? ""), { flipSign: typeof body?.flip_sign === "boolean" ? body.flip_sign : undefined });
         const accountId = typeof body?.account_id === "string" && body.account_id ? body.account_id : null;
         const result = importTransactions(parsed, accountId);
-        return NextResponse.json({ ...payload(month), result });
+        return NextResponse.json({ ...payload(monthShowing(month, parsed.rows.map((row) => row.date))), result });
       }
       case "undo_import":
         undoImport(String(body?.batch_id ?? ""));

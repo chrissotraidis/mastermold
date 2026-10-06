@@ -15,10 +15,10 @@ const toneStroke: Record<Tone, string> = {
 function scalePoints(values: number[], width: number, height: number, pad = 2) {
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const span = max - min || 1;
+  const span = max - min;
   return values.map((value, index) => {
     const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
-    const y = pad + (1 - (value - min) / span) * (height - pad * 2);
+    const y = span === 0 ? height / 2 : pad + (1 - (value - min) / span) * (height - pad * 2);
     return [x, y] as const;
   });
 }
@@ -119,12 +119,12 @@ export function AreaChart({
           </linearGradient>
         </defs>
         {[0.25, 0.5, 0.75].map((f) => (
-          <line key={f} x1="0" x2={width} y1={height * f} y2={height * f} stroke="hsl(326 20% 30% / 0.35)" strokeDasharray="3 5" vectorEffect="non-scaling-stroke" />
+          <line key={f} x1="0" x2={width} y1={height * f} y2={height * f} stroke="hsl(270 5% 30% / 0.35)" strokeDasharray="3 5" vectorEffect="non-scaling-stroke" />
         ))}
         <path d={area} fill={`url(#area-${id})`} />
         <path d={line} fill="none" stroke={toneStroke[tone]} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-        <line x1={cx} x2={cx} y1="0" y2={height} stroke="hsl(330 60% 80% / 0.25)" vectorEffect="non-scaling-stroke" />
-        <circle cx={cx} cy={cy} r="4.5" fill="#09060a" stroke={toneStroke[tone]} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        <line x1={cx} x2={cx} y1="0" y2={height} stroke="hsl(270 10% 80% / 0.22)" vectorEffect="non-scaling-stroke" />
+        <circle cx={cx} cy={cy} r="4.5" fill="#0a090b" stroke={toneStroke[tone]} strokeWidth="2" vectorEffect="non-scaling-stroke" />
       </svg>
       <div className="mt-1 flex justify-between text-[11px] text-outline">
         <span>{points[0].label}</span>

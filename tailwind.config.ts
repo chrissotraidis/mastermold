@@ -51,25 +51,25 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
 
-        // --- Sentinel direct tokens (Industrial Glassmorphism) ---
-        // Palette 2026-07-05: classic Sentinel identity — deep magenta/crimson
-        // helmet primary, gold crest accents, silver-gray neutrals over the void.
-        void: "#09060a",
+        // --- Direct tokens ("Quiet instrument", docs/DESIGN.md) ---
+        // Graphite neutrals so the one magenta signal and the state colors
+        // carry meaning. Gold stays for the Sentinel crest only.
+        void: "#0a090b",
         surface: {
-          DEFAULT: "#181016",
-          dim: "#130c11",
-          lowest: "#0f0a0e",
-          low: "#1d1319",
-          container: "#23171e",
-          high: "#2e2029",
-          highest: "#3b2a34",
+          DEFAULT: "#151417",
+          dim: "#111013",
+          lowest: "#0e0d10",
+          low: "#19181c",
+          container: "#1f1d22",
+          high: "#28262c",
+          highest: "#343138",
         },
-        panel: "#140d12",
-        "on-surface": "#f8edf2",
-        "on-surface-variant": "#cdbdc6",
+        panel: "#131215",
+        "on-surface": "#f3f1f4",
+        "on-surface-variant": "#c2bec6",
         outline: {
-          DEFAULT: "#978591",
-          variant: "#43333d",
+          DEFAULT: "#8d8892",
+          variant: "#37343b",
         },
         // Legacy token name kept so hundreds of `*-violet` classes keep working;
         // the VALUES are the Master Mold magenta family (2026-09 overhaul).
@@ -113,8 +113,9 @@ const config: Config = {
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       boxShadow: {
-        panel: "inset 0 1px 0 hsl(330 80% 85% / 0.05), 0 18px 40px -24px rgb(0 0 0 / 0.75)",
-        glow: "0 0 0 1px hsl(330 86% 64% / 0.35), 0 10px 30px -10px hsl(330 86% 55% / 0.45)",
+        panel: "inset 0 1px 0 hsl(0 0% 100% / 0.035), 0 1px 2px rgb(0 0 0 / 0.35)",
+        // Primary buttons: a crisp top highlight instead of a pink halo.
+        glow: "inset 0 1px 0 hsl(0 0% 100% / 0.22), 0 1px 2px rgb(0 0 0 / 0.4)",
       },
       keyframes: {
         "mm-enter": {

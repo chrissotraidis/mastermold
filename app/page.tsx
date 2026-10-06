@@ -391,9 +391,12 @@ function AlertLine({ alert }: { alert: AlertJson }) {
 function briefProse(report: DailyReport) {
   const focus = report.focus.summary?.trim() ?? "";
   // The why bullets often restate the summary; keep only the ones that add anything.
+  const restated = (line: string) =>
+    focus.includes(line.slice(0, 24)) ||
+    ["of the visible portfolio", "recent volume"].some((fact) => line.includes(fact) && focus.includes(fact));
   const why = report.focus.why
     .filter(Boolean)
-    .filter((line) => !focus.includes(line.slice(0, 24)))
+    .filter((line) => !restated(line))
     .join(" ");
   return [focus, why].filter(Boolean).join(" ") || "Nothing urgent in the latest read.";
 }

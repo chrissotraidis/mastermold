@@ -13,7 +13,7 @@ export function ProfileGreeting() {
   if (!ready || !firstName) return null;
 
   return (
-    <p className="mb-1 font-mono text-[11px] uppercase tracking-telemetry text-violet">
+    <p className="mb-1 text-xs font-medium text-violet">
       Welcome back, {firstName}
     </p>
   );

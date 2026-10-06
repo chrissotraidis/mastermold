@@ -24,7 +24,7 @@ export function JournalLoadingState() {
     >
       <div className="min-w-0 space-y-4">
         <div className="hidden rounded-md border border-violet/30 bg-violet/[0.045] p-4 sm:block sm:p-5">
-          <p className="text-xs font-medium uppercase tracking-telemetry text-outline">Next journal action</p>
+          <p className="text-xs font-medium text-outline">Next journal action</p>
           <h2 className="mt-1 text-lg font-semibold leading-tight text-on-surface sm:text-xl">
             Ask Master Mold while Journal opens.
           </h2>

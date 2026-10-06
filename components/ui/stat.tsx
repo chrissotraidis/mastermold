@@ -37,7 +37,7 @@ export function StatTile({
     <div className={cn("mm-panel flex min-w-0 flex-col gap-2 p-3 sm:p-4", emphasis && "border-violet/35", className)}>
       <div className="flex min-w-0 items-center justify-between gap-3">
         <p className="mm-eyebrow truncate">{label}</p>
-        {trend && trend.length > 1 ? (
+        {trend && trend.length > 1 && trend.some((point) => point !== trend[0]) ? (
           <Sparkline values={trend} tone={deltaTone === "down" ? "down" : deltaTone === "up" ? "up" : "magenta"} className="h-6 w-10 shrink-0 sm:w-16" />
         ) : null}
       </div>

@@ -100,7 +100,7 @@ export function WelcomeFlow() {
               <span aria-hidden="true" className="absolute inset-[14%] rounded-full bg-violet/25 blur-3xl" />
               <SentinelFace state="idle" detail="hero" />
             </div>
-            <p className="font-mono text-[11px] uppercase tracking-telemetry text-violet">
+            <p className="text-xs font-medium text-violet">
               Your local money hub
             </p>
             <h1 className="mt-2 font-display text-2xl font-semibold text-on-surface sm:text-3xl">
@@ -312,7 +312,7 @@ function SegmentedField<T extends string>({
             className={cn(
               "min-h-11 rounded-md border px-3 py-2 text-center text-sm font-medium leading-5 transition-colors",
               value === option
-                ? "border-violet bg-violet text-void"
+                ? "border-violet/70 bg-violet/15 text-on-surface"
                 : "border-outline-variant/50 bg-surface-dim/70 text-on-surface-variant hover:bg-surface-high/60",
             )}
           >

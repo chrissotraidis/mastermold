@@ -19,7 +19,7 @@ export function RouteLoadingSkeleton() {
           aria-labelledby="route-loading-title"
         >
           <div className="border border-outline-variant/40 bg-panel/60 p-4 chamfer-sm sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-telemetry text-outline">Opening</p>
+            <p className="text-xs font-medium text-outline">Opening</p>
             <h1 id="route-loading-title" className="mt-2 font-display text-2xl font-semibold leading-tight text-on-surface sm:text-3xl">
               {loadingContext.surface}
             </h1>
@@ -39,7 +39,7 @@ export function RouteLoadingSkeleton() {
             </div>
           </div>
           <div className="border border-outline-variant/40 bg-surface-high/30 p-4 chamfer-sm">
-            <p className="text-xs font-semibold uppercase tracking-telemetry text-outline">Next action</p>
+            <p className="text-xs font-medium text-outline">Next action</p>
             <p className="mt-2 text-lg font-semibold leading-6 text-on-surface">
               Ask Master Mold what to check first.
             </p>

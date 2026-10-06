@@ -197,7 +197,7 @@ export function ReviewerEvidencePanel() {
             </ul>
           </div>
           <div className="rounded-md border border-outline-variant/40 bg-surface-high/30 p-3">
-            <p className="text-xs font-semibold uppercase text-outline">Checklist status</p>
+            <p className="text-xs font-medium text-outline">Checklist status</p>
             <p className="mt-1 font-semibold text-on-surface">
               {savedAt ? `Saved ${formatTime(savedAt)}` : "Not saved yet"}
             </p>

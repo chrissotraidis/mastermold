@@ -79,7 +79,7 @@ export function BudgetHub({ initial }: { initial: BudgetData }) {
               type="button"
               onClick={() => selectMonth(month)}
               aria-pressed={month === data.month}
-              className={cn("min-h-9 rounded-full border px-3 text-xs font-semibold transition", month === data.month ? "border-violet bg-violet text-void" : "border-outline-variant/60 text-on-surface-variant hover:text-on-surface")}
+              className={cn("min-h-9 rounded-full border px-3 text-xs font-semibold transition", month === data.month ? "border-outline bg-surface-highest text-on-surface" : "border-outline-variant/60 text-on-surface-variant hover:text-on-surface")}
             >
               {monthLabel(month)}
             </button>

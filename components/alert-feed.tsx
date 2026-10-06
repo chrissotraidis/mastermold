@@ -618,7 +618,7 @@ function ActivityFilterControls({
       className={cn(
         "min-h-11 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet sm:h-8 sm:min-h-8",
         filter === item
-          ? "bg-violet text-void"
+          ? "bg-surface-highest text-on-surface shadow-sm ring-1 ring-inset ring-white/5"
           : "text-on-surface-variant hover:bg-surface-high/45 hover:text-on-surface",
       )}
     >

@@ -5,6 +5,7 @@ import { recordProductMetric } from "./metrics";
 import type { MarketMemoryFact } from "./schema";
 import { store } from "./store";
 import { llmCompletionText, llmProvider } from "@/src/llm/completion";
+import { roundPrice } from "./price";
 
 export type DailyReportSymbolStatus =
   | "refreshed"
@@ -538,7 +539,7 @@ function fallbackRow(input: {
     asset_class: input.assetClass,
     status: input.status,
     source: input.status === "unsupported" ? "unsupported" : "portfolio-snapshot",
-    latest_close: snapshotPrice ? roundMoney(snapshotPrice) : null,
+    latest_close: snapshotPrice ? roundPrice(snapshotPrice) : null,
     previous_close: null,
     daily_move_pct: input.holding?.daily_change_pct ?? null,
     volume: null,

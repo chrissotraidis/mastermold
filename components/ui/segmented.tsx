@@ -29,7 +29,7 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             className={cn(
               "min-h-9 rounded-full px-3 text-xs font-semibold transition-colors sm:min-h-8",
-              active ? "bg-violet text-void shadow-glow" : "text-on-surface-variant hover:text-on-surface",
+              active ? "bg-surface-highest text-on-surface shadow-sm ring-1 ring-inset ring-white/5" : "text-on-surface-variant hover:text-on-surface",
             )}
           >
             {option.label}

@@ -3,32 +3,31 @@
 @tailwind utilities;
 
 /*
- * Master Mold "Sentinel" design system — Industrial Glassmorphism.
- * Void background, magenta helmet cognition, gold crest accents,
- * chamfered armored panels, inner glows.
+ * Master Mold design system: "Quiet instrument" (see docs/DESIGN.md).
+ * Graphite surfaces, one magenta signal, numbers first, color only for state.
  */
 
 @layer base {
   :root,
   .dark {
-    --background: 318 25% 3%; /* Void #09060a */
-    --foreground: 330 45% 95%; /* on-surface #f8edf2 */
-    --card: 322 21% 7%; /* panel #140d12 */
-    --card-foreground: 330 45% 95%;
-    --popover: 320 20% 8%;
-    --popover-foreground: 330 45% 95%;
+    --background: 280 9% 4%; /* Graphite void #0a090b */
+    --foreground: 285 10% 95%; /* on-surface #f3f1f4 */
+    --card: 270 6% 8%; /* panel #131215 */
+    --card-foreground: 285 10% 95%;
+    --popover: 270 6% 9%;
+    --popover-foreground: 285 10% 95%;
     --primary: 331 85% 64%; /* Master Mold magenta #f2559f */
     --primary-foreground: 330 70% 8%;
-    --secondary: 322 17% 15%;
-    --secondary-foreground: 330 45% 95%;
-    --muted: 322 17% 12%;
-    --muted-foreground: 326 12% 78%;
-    --accent: 322 17% 15%;
-    --accent-foreground: 330 45% 95%;
+    --secondary: 270 5% 15%;
+    --secondary-foreground: 285 10% 95%;
+    --muted: 270 5% 12%;
+    --muted-foreground: 270 5% 76%;
+    --accent: 270 5% 15%;
+    --accent-foreground: 285 10% 95%;
     --destructive: 351 95% 71%;
     --destructive-foreground: 330 60% 8%;
-    --border: 322 13% 23%;
-    --input: 322 13% 23%;
+    --border: 270 5% 21%;
+    --input: 270 5% 21%;
     --ring: 331 85% 64%;
     --radius: 0.75rem;
     --font-body: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
@@ -68,10 +67,8 @@ body > div,
     overflow-x: hidden;
     width: 100%;
     font-feature-settings: "rlig" 1, "calt" 1;
-    background-image:
-      radial-gradient(ellipse 70% 50% at 15% -10%, hsl(331 80% 22% / 0.45), transparent 70%),
-      radial-gradient(ellipse 60% 45% at 100% 0%, hsl(300 60% 16% / 0.30), transparent 70%),
-      radial-gradient(ellipse 50% 40% at 100% 100%, hsl(43 60% 14% / 0.18), transparent 70%);
+    /* One faint magenta signal at the top edge; everything else is graphite. */
+    background-image: radial-gradient(ellipse 60% 38% at 50% -14%, hsl(331 70% 32% / 0.16), transparent 72%);
     background-attachment: fixed;
   }
   section,
@@ -102,15 +99,15 @@ body > div,
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: hsl(338 30% 8%);
+    background: hsl(270 6% 6%);
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(338 14% 22%);
+    background: hsl(270 5% 22%);
     border-radius: 9999px;
-    border: 2px solid hsl(338 30% 8%);
+    border: 2px solid hsl(270 6% 6%);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(338 40% 40%);
+    background: hsl(270 5% 34%);
   }
 }
 
@@ -132,40 +129,40 @@ body > div,
     background-image: none;
   }
   .inner-glow {
-    box-shadow: inset 0 0 0 1px hsl(331 60% 70% / 0.08), 0 18px 40px -26px rgb(0 0 0 / 0.8);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04), 0 1px 2px rgb(0 0 0 / 0.4);
   }
   .inner-glow-strong {
-    box-shadow: inset 0 0 0 1px hsl(331 70% 70% / 0.18), 0 18px 40px -22px rgb(0 0 0 / 0.85);
+    box-shadow: inset 0 0 0 1px hsl(331 70% 70% / 0.16), 0 1px 2px rgb(0 0 0 / 0.4);
   }
-  /* Shared surface language (2026-09 overhaul): one glass panel, one raised
-     row, one magenta focus glow. Components in components/ui use these. */
+  /* Shared surface language: one flat graphite panel, one raised row, one
+     magenta focus edge. Depth comes from surface steps and hairlines, not glow. */
   .mm-panel {
-    border: 1px solid hsl(326 22% 22% / 0.7);
-    background:
-      linear-gradient(180deg, hsl(322 22% 10% / 0.92), hsl(320 22% 6.5% / 0.92));
-    box-shadow: inset 0 1px 0 hsl(330 80% 85% / 0.05), 0 18px 40px -24px rgb(0 0 0 / 0.75);
+    border: 1px solid hsl(270 6% 19%);
+    background: linear-gradient(180deg, hsl(270 6% 9.5%), hsl(270 6% 7.5%));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.035), 0 1px 2px rgb(0 0 0 / 0.35);
     border-radius: 1rem;
   }
   .mm-panel-interactive {
     transition: border-color 160ms ease, transform 160ms ease, background-color 160ms ease;
   }
   .mm-panel-interactive:hover {
-    border-color: hsl(331 70% 55% / 0.45);
+    border-color: hsl(331 70% 60% / 0.4);
   }
   .mm-row {
     border-radius: 0.75rem;
     transition: background-color 140ms ease;
   }
   .mm-row:hover {
-    background-color: hsl(326 25% 16% / 0.55);
+    background-color: hsl(270 6% 15% / 0.7);
   }
+  /* Labels whisper: sentence case, body face, muted. Mono is for figures. */
   .mm-eyebrow {
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: hsl(326 10% 60%);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.1rem;
+    color: hsl(270 5% 62%);
   }
   .mm-num {
     font-variant-numeric: tabular-nums;

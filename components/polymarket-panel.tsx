@@ -173,7 +173,7 @@ export function PolymarketPanel() {
       {data.positions.length > 0 ? (
         <Card className="border-outline-variant/30 bg-surface-low/70">
           <CardContent className="space-y-2 p-4">
-            <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Open paper positions</p>
+            <p className="text-[11px] font-medium text-outline">Open paper positions</p>
             {data.positions.map((position) => (
               <div key={position.id} className="flex flex-col gap-3 rounded-md border border-outline-variant/25 bg-void/20 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
@@ -382,7 +382,7 @@ function EquityCurve({ curve }: { curve: Array<{ ts: string; realized_pnl_usd: n
     return (
       <Card className="border-outline-variant/30 bg-surface-low/70">
         <CardContent className="p-4">
-          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Realized P&L curve</p>
+          <p className="text-[11px] font-medium text-outline">Realized P&L curve</p>
           <p className="mt-1 text-xs text-outline">
             {curve.length === 0 ? "No paper trades yet — the curve draws itself once the bot starts closing positions." : "Waiting for at least two closed trades to draw the curve."}
           </p>
@@ -408,7 +408,7 @@ function EquityCurve({ curve }: { curve: Array<{ ts: string; realized_pnl_usd: n
     <Card className="border-outline-variant/30 bg-surface-low/70">
       <CardContent className="p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="font-mono text-[10px] uppercase tracking-telemetry text-outline">Realized P&L curve · {closes.length} closes</p>
+          <p className="text-[11px] font-medium text-outline">Realized P&L curve · {closes.length} closes</p>
           <p className={cn("font-mono text-xs", last >= 0 ? "text-engine" : "text-critical")}>{last >= 0 ? "+" : ""}${last.toFixed(2)}</p>
         </div>
         <svg viewBox={`0 0 ${width} ${height}`} className="mt-2 h-[72px] w-full" preserveAspectRatio="none" role="img" aria-label="Cumulative realized paper P&L over closed trades">

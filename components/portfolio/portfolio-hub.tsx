@@ -277,7 +277,7 @@ export function PortfolioHub({
           value={formatMoney(summary.net_worth)}
           trend={summary.history.map((point) => point.value)}
           delta={`${formatSignedMoney(summary.daily_change_value)} (${formatSignedPct(summary.daily_change_pct)}) today`}
-          deltaTone={summary.daily_change_value >= 0 ? "up" : "down"}
+          deltaTone={summary.daily_change_value > 0 ? "up" : summary.daily_change_value < 0 ? "down" : "neutral"}
         />
         <StatTile label="Assets" value={formatMoney(summary.assets, { compact: true })} hint={`${summary.holdings.length} holdings · ${assetAccounts.length} accounts`} />
         <StatTile

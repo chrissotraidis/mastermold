@@ -520,7 +520,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
               ))}
             </div>
           ) : null}
-          <h3 className="mt-1 text-xs font-semibold uppercase tracking-telemetry text-outline">Paper equity</h3>
+          <h3 className="mt-1 text-xs font-medium text-outline">Paper equity</h3>
           <div className="mt-1">
             <EquitySparkline points={equity} />
           </div>
@@ -538,7 +538,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
               <h2 id="paper-experiments-title" className="text-xs font-semibold text-on-surface">Parallel paper experiments</h2>
               <p className="mt-0.5 text-[11px] text-outline">Five isolated $1,000 books · $25 entry cap · no live route</p>
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-outline">
+            <span className="text-[11px] font-medium text-outline">
               {data.experiments.summaries.filter((row) => !row.paused).length} {state.daemon === "offline" ? "ready" : "running"}
             </span>
           </div>
@@ -739,7 +739,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
       ) : (
         <div className="grid gap-x-4 gap-y-2 border-t border-outline-variant/20 px-3 py-2 sm:grid-cols-2">
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">
+            <h3 className="text-xs font-medium text-outline">
               Positions ({state.open_positions})
             </h3>
             {positions.length === 0 ? (
@@ -761,7 +761,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
             )}
           </div>
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Paper ledger</h3>
+            <h3 className="text-xs font-medium text-outline">Paper ledger</h3>
             {recentTrades.length === 0 ? (
               <p className="mt-1 text-xs leading-5 text-outline">No entries yet. Fills append here, never edit.</p>
             ) : (
@@ -788,7 +788,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
     <>
       {data.attribution || data.analyst ? (
         <div className="border-t border-outline-variant/20 px-3 py-2">
-          <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Learning</h3>
+          <h3 className="text-xs font-medium text-outline">Learning</h3>
           {data.attribution ? (
             <p className="mt-1 text-xs leading-5 text-on-surface-variant">
               {data.attribution.round_trips === 0 ? (
@@ -812,7 +812,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
           ) : null}
           {data.analyst ? (
             <>
-              <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-outline">
+              <p className="mt-1.5 text-xs font-medium text-outline">
                 Analyst review · {new Date(data.analyst.ts).toLocaleDateString()}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{data.analyst.memo}</p>
@@ -857,7 +857,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
               post({ action: "set_tier_b_denylist", denylist }, "Tier B denylist saved.");
             }}
           >
-            <label htmlFor="tier-b-denylist" className="text-[11px] font-semibold uppercase tracking-wide text-outline">
+            <label htmlFor="tier-b-denylist" className="text-xs font-medium text-outline">
               Operator denylist
             </label>
             <textarea
@@ -928,7 +928,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
 
           {(data.smart_wallets?.report_cards ?? []).length > 0 ? (
             <div className="mt-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-outline">
+              <p className="text-xs font-medium text-outline">
                 Report cards · graded by our own record of what happened 6h after each buy
               </p>
               <ul className="mt-1 divide-y divide-outline-variant/15">
@@ -971,7 +971,7 @@ export function AutopilotPanel({ research = null }: { research?: ReactNode } = {
 
           {data.smart_wallets?.suggestions && data.smart_wallets.suggestions.suggestions.length > 0 ? (
             <div className="mt-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-outline">
+              <p className="text-xs font-medium text-outline">
                 Discovered candidates ·{" "}
                 {data.smart_wallets.suggestions.source === "solanatracker"
                   ? "PnL leaderboard, trap-filtered"
@@ -1176,7 +1176,7 @@ function StrategyCard({ strategy }: { strategy: NonNullable<AutopilotApiPayload[
   return (
     <div className="border-t border-outline-variant/20 px-3 py-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">Strategy</h3>
+        <h3 className="text-xs font-medium text-outline">Strategy</h3>
         <span className="text-xs font-semibold text-on-surface">{strategy.name}</span>
         <span className="rounded-full border border-caution/35 px-2 py-0.5 text-[10px] font-semibold text-caution">Entries retired</span>
         {snapshot ? (
@@ -1225,13 +1225,13 @@ function StrategyCard({ strategy }: { strategy: NonNullable<AutopilotApiPayload[
 const daemonDotClass: Record<AutopilotStateView["daemon"], string> = {
   live: "bg-engine",
   stale: "bg-caution",
-  offline: "bg-critical",
+  offline: "bg-outline",
 };
 
 const daemonTextClass: Record<AutopilotStateView["daemon"], string> = {
   live: "text-engine",
   stale: "text-caution",
-  offline: "text-critical",
+  offline: "text-on-surface-variant",
 };
 
 /** Heartbeat readout: is the paper daemon process actually ticking? */
@@ -1400,7 +1400,7 @@ function CheckList({
   return (
     <section className="min-w-0">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-telemetry text-outline">
+        <h3 className="text-xs font-medium text-outline">
           {title} · {passed}/{checks.length}
         </h3>
         <span className={`text-xs font-semibold ${tone === "up" ? "text-engine" : "text-on-surface-variant"}`}>{status}</span>

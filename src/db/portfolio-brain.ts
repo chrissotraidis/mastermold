@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type { AssetClass, PortfolioHoldingJson } from "./portfolio";
 import { demoDatabase } from "./seed-data";
 import { store, type ImportedHoldingRow, type ManualHoldingRow, type PortfolioBrainSnapshotRow } from "./store";
+import { roundPrice } from "./price";
 
 export type PortfolioBrainSource = "monarch_mcp";
 export type PortfolioBrainScanSourceLabel = "Monarch MCP" | "Manual holdings" | "Imported holdings" | "Sample fallback";
@@ -541,7 +542,7 @@ function normalizeMonarchPayload(payload: MonarchRawPayload, syncedAt: string, a
       asset_class: normalizeAssetClass(stringField(object, ["asset_class", "type", "security_type", "kind"]), symbol),
       venue: stringField(object, ["venue", "exchange", "institution"]) ?? account?.institution ?? "Monarch",
       quantity,
-      price: roundMoney(price),
+      price: roundPrice(price),
       cost_basis: numberField(object, ["cost_basis", "basis", "total_cost"]) ?? roundMoney(quantity * price),
       market_value: roundMoney(marketValue),
       daily_change_pct: numberField(object, ["daily_change_pct", "day_change_pct", "change_percent"]) ?? 0,

@@ -202,7 +202,7 @@ export function IntegrationKeyInput({
       <div className="grid gap-3">
         {fields.map((field) => (
           <div key={field.name} className="space-y-2">
-            <Label htmlFor={`${baseId}-${field.name}`} className="text-xs font-semibold uppercase text-outline">
+            <Label htmlFor={`${baseId}-${field.name}`} className="text-xs font-medium text-outline">
               {field.label}
             </Label>
             {field.type === "select" ? (

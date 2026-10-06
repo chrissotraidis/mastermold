@@ -214,10 +214,10 @@ export function JournalWorkspace({
         <div className="grid min-w-0 grid-cols-1 content-start gap-6 lg:col-span-8 [&>*]:min-w-0">
           <Panel as="div" id="record-call" className="scroll-mt-24">
             <form onSubmit={submitDecision} noValidate className="grid gap-3 p-4 sm:p-5">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <BookPlus aria-hidden="true" className="size-4 text-violet" />
                 <p className="font-display text-sm font-semibold text-on-surface">Record a call</p>
-                <span className="text-xs text-outline">Save a new decision before the result is obvious.</span>
+                <span className="basis-full text-xs text-outline sm:basis-auto">Save a new decision before the result is obvious.</span>
               </div>
               {initialDraftReason ? (
                 <div data-testid="journal-prepared-draft" className="rounded-xl border border-violet/35 bg-violet/[0.07] p-3 text-sm leading-6 text-on-surface-variant">

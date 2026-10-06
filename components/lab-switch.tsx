@@ -20,7 +20,7 @@ export function LabSwitch({ current }: { current: "web3" | "polymarket" }) {
             aria-current={active ? "page" : undefined}
             className={cn(
               "inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition",
-              active ? "bg-violet text-void" : "text-on-surface-variant hover:text-on-surface",
+              active ? "bg-surface-highest text-on-surface shadow-sm ring-1 ring-inset ring-white/5" : "text-on-surface-variant hover:text-on-surface",
             )}
           >
             <Icon aria-hidden="true" className="size-3.5" /> {item.label}

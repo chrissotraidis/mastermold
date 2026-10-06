@@ -247,7 +247,7 @@ function PaperTradeForm({
                     className={cn(
                       "relative flex min-h-11 cursor-pointer items-center justify-center overflow-hidden rounded-md border px-3 py-2 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-violet",
                       direction === item.value
-                        ? "border-violet bg-violet text-void"
+                        ? "border-violet/70 bg-violet/15 text-on-surface"
                         : "border-outline-variant/50 bg-surface-dim/70 text-on-surface-variant hover:bg-surface-high/60",
                     )}
                   >
@@ -377,7 +377,7 @@ function PaperAccountPanel({ wallet }: { wallet: PaperWorkspaceData["wallet"] })
       </h2>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 sm:hidden">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-outline">
+          <p className="text-[11px] font-medium text-outline">
             Paper account
           </p>
           <p className="mt-0.5 font-display text-lg font-semibold leading-none text-on-surface">

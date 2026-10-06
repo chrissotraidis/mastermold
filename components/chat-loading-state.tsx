@@ -23,7 +23,7 @@ export function ChatLoadingState() {
       data-testid="chat-loading-state"
     >
       <div className="min-w-0 rounded-md border border-violet/30 bg-violet/[0.045] p-4 sm:p-5">
-        <p className="text-xs font-medium uppercase tracking-telemetry text-outline">Next chat action</p>
+        <p className="text-xs font-medium text-outline">Next chat action</p>
         <h2 className="mt-1 text-lg font-semibold leading-tight text-on-surface sm:text-xl">
           Ask Master Mold while chat opens.
         </h2>

@@ -24,6 +24,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Expected JSON body." }, { status: 400 });
   }
 
+  // Valid JSON can still be null or a bare value; only objects carry fields.
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Expected JSON body." }, { status: 400 });
+  }
+
   const report = getLatestDailyReport();
   if (!report || body.report_id !== report.id) {
     return NextResponse.json({ error: "Refresh Today before recording this response." }, { status: 409 });
