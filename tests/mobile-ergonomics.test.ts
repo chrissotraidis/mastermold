@@ -986,7 +986,8 @@ describe("mobile ergonomics source contracts", () => {
     expect(readme).toContain("synthetic sample data only");
     expect(readme).toContain("does not include a live portfolio");
     expect(readme).toContain("npm run privacy:audit");
-    expect(readme).toContain("A formal open-source license has not been");
+    expect(readme).toContain("Released under the [MIT License](LICENSE)");
+    expect(source("LICENSE")).toContain("MIT License");
     expect(reviewCapabilities).toContain("Long-horizon live/out-of-sample forward evaluation with external baselines");
     expect(readme).not.toMatch(/real ~?\$?\d{2,4}(?:[.,]\d+)?k\b|demo\.local|docs\/STATUS/i);
     expect(readme).not.toContain(["docs", "ref"].join("/"));

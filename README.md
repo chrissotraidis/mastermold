@@ -13,6 +13,7 @@
   <img alt="Solana paper trading first" src="https://img.shields.io/badge/Solana-paper%20first-9945FF?logo=solana&amp;logoColor=white">
   <img alt="Live trading locked by default" src="https://img.shields.io/badge/live%20trading-locked%20by%20default-FF453A">
   <img alt="Status: early technical release" src="https://img.shields.io/badge/status-early%20release-FFD60A">
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-30D158"></a>
   <a href="https://discord.gg/xwHfUD2bxW"><img alt="Join the community on Discord" src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&amp;logoColor=white"></a>
 </p>
 
@@ -77,11 +78,12 @@ Open `/review` in the app for the full, current breakdown.
 
 ## Get it running
 
-You need [Bun](https://bun.sh) and Node 22.5 or newer.
+You need [Bun](https://bun.sh) and Node 22.5 or newer. With nvm, `nvm use` picks the version from `.nvmrc`.
 
 ```bash
 git clone https://github.com/chrissotraidis/mastermold.git
 cd mastermold
+nvm use                 # optional, reads .nvmrc
 bun install
 bun run dev
 ```
@@ -168,8 +170,8 @@ Settings, then Notifications, shows live status and can send a test. See [Operat
 <details>
 <summary><strong>Can I use this code?</strong></summary>
 
-This is a public source release without a license yet. Until a `LICENSE` file is added, assume viewing
-and local evaluation only.
+Yes. Master Mold is released under the [MIT License](LICENSE): use, modify, and redistribute it, keeping
+the copyright notice.
 </details>
 
 ## Development
@@ -227,5 +229,4 @@ Master Mold is research and personal-finance software, not investment advice. Pa
 are evidence about the past, not a promise of future returns. Crypto and prediction markets can lose
 money quickly; only ever connect a spare wallet you can afford to lose.
 
-A formal open-source license has not been selected. Until a `LICENSE` file is added, do not assume
-redistribution, commercial-use, or reuse rights beyond viewing and local evaluation.
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Chris Sotraidis.
