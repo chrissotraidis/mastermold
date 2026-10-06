@@ -1,240 +1,231 @@
 # Master Mold
 
-![Master Mold banner](public/master-mold-banner.png)
+<p align="center">
+  <strong>A local-first money hub with a Solana trading bot that has to earn its way to live.</strong><br>
+  Net worth, holdings, budget, and a decision journal on your own machine, plus Web3 and Polymarket research labs
+  that paper trade against live markets behind hard caps, a kill switch, and an evidence gate.
+</p>
 
-Master Mold is a local-first AI investing console with a Solana/Web3 autopilot
-lane. It pairs portfolio review, daily briefings, journal, and chat with a bot
-cockpit that watches live Solana markets and proves itself in paper mode. The
-public repository ships with synthetic sample data only.
+<p align="center">
+  <img alt="Next.js 16 App Router" src="https://img.shields.io/badge/Next.js-16-111111?logo=nextdotjs">
+  <img alt="Node 22.5 or later" src="https://img.shields.io/badge/Node-22.5%2B-5FA04E?logo=nodedotjs&amp;logoColor=white">
+  <img alt="Local-first storage" src="https://img.shields.io/badge/data-local--first-8E8E93">
+  <img alt="Solana paper trading first" src="https://img.shields.io/badge/Solana-paper%20first-9945FF?logo=solana&amp;logoColor=white">
+  <img alt="Live trading locked by default" src="https://img.shields.io/badge/live%20trading-locked%20by%20default-FF453A">
+  <img alt="Status: early technical release" src="https://img.shields.io/badge/status-early%20release-FFD60A">
+  <a href="https://discord.gg/xwHfUD2bxW"><img alt="Join the community on Discord" src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&amp;logoColor=white"></a>
+</p>
 
-The draw is the paper-to-live path for autonomous Web3 trading: Master Mold
-tracks a liquid Solana universe, records the bot's decisions, rehearses Jupiter
-routes against live DEX quotes, and keeps any live swap behind local wallet
-provisioning, hard caps, a kill switch, and an evidence-based go-live gate.
-Today, both autonomous lanes start off and the public build is advisory by default. It never places
-brokerage trades, and Solana execution stays off unless a spare local wallet is
-deliberately provisioned and the go-live gate passes.
+![Master Mold's Today page on sample data, with the Sentinel head, a getting-started checklist, a decision inbox, and a compact market table](docs/images/mastermold-today.png)
 
-Master Mold does not include a live portfolio, brokerage account, wallet
-authority, or personal account history. If you connect your own accounts, add
-notes, or provision a Solana wallet locally, that state belongs in ignored
-storage such as `.data/`, `.env.local`, `engine/.env`, or another local-only
-workspace.
+*Today on the built-in sample data. Nothing here is a real account.*
 
-## What Ships
+**[What it is](#what-is-master-mold) · [Status](#current-status) · [Get it running](#get-it-running) ·
+[The labs](#the-research-labs) · [FAQ](#frequently-asked-questions) · [Discord](https://discord.gg/xwHfUD2bxW)**
 
-- A Next.js App Router app with `/api/health`, a review surface, and a local
-  dashboard for portfolio context.
-- Synthetic sample holdings and sample activity so the app can be reviewed
-  before any account is connected.
-- Read-only portfolio import surfaces for credentials you provide locally.
-- A Solana/Web3 Autopilot page for SOL, JUP, BONK, WIF, JTO, WETH, WBTC, RAY,
-  and PYTH, with live market watching, paper equity, decision logs, caps, a kill
-  switch, wallet readiness, and a go-live gate.
-- A separate Polymarket tab with live public market discovery, a momentum-only
-  local paper bot, simulator positions and P&L, and a locked live-order boundary.
-  Paper entries and exits walk displayed CLOB depth and fail closed when the
-  full simulated size is unavailable.
-  Its separate SQLite research brain samples executable CLOB quotes and depth,
-  tracks momentum, book-pressure, binary-parity, and maker-spread hypotheses,
-  labels execution-adjusted forward markouts, and grades selected probabilities
-  against decisive final outcomes with Brier scores. New hypotheses stay shadow-only
-  until a hard paper-candidate evidence gate passes; none can unlock live orders.
-  A station-matched weather lab displays raw ECMWF ensemble bucket probabilities
-  for upcoming daily-temperature events, but it has no paper or live authority.
-- Guarded Solana execution plumbing for the operator path: Jupiter quote/swap
-  building, local wallet signing from ignored environment variables, Solana RPC
-  resolution, and a Helius credit firewall.
-- Local stores under `.data/` for imported holdings, notes, reports, paper bot
-  state, and other user-created data.
+> [!IMPORTANT]
+> **Advice, not autopilot, by default.** Master Mold never places brokerage trades. Both bot lanes start
+> off. Paper mode needs a deliberate local action, and live Solana swaps stay locked unless you provision
+> a spare wallet yourself and the go-live gate passes.
+>
+> **Your data stays local.** The repository ships synthetic sample data only and does not include a live portfolio,
+> brokerage account, wallet authority, or account history. Anything you add lives in git-ignored storage on
+> your machine (`.data/`, `.env.local`, `engine/.env`).
+>
+> **AI disclosure:** Master Mold is developed with substantial AI assistance. The in-app
+> [What works today](#current-status) page records what is real, sample, credential-gated, or missing.
 
-The default bot mode is off. Paper mode requires an explicit local operator action, and live Solana execution is not the public default;
-it requires local wallet provisioning, passing go-live evidence, and deliberate
-operator action.
+## What's new
 
-## Privacy Boundary
+- **Quiet instrument redesign.** Graphite surfaces, one magenta signal, quiet labels, and color reserved
+  for state. The thesis lives in [docs/DESIGN.md](docs/DESIGN.md).
+- **Sub-cent prices are kept.** Tokens priced below a cent (meme coins, for example) used to save as `$0`
+  and drop out of net worth. Prices now keep their significant digits on every import path.
+- **Safer edge cases.** Adding a holding with a bad cost basis no longer saves a half-written duplicate,
+  malformed requests get a clear error instead of a crash, and `npm run dev` explains an old Node version
+  instead of failing with `bad option`.
 
-Tracked files are code, public docs, assets, tests, and synthetic sample data.
+## What is Master Mold?
 
-Ignored local files are where personal state belongs:
+Master Mold is two things that stay deliberately apart.
 
-- `.data/` for app databases, imported holdings, journals, reports, and bot state.
-- `.env.local` and `engine/.env` for local secrets.
-- `engine/out/` for generated engine output.
-- `artifacts/`, `screenshots/`, `reports/private/`, and `docs/private/` for local review material.
+**A money hub.** Today gives you a short daily read and a ranked decision inbox. Portfolio covers holdings,
+accounts, cash, debts, and property, so net worth is assets minus debts. Transactions and Budget handle
+spending, and the Journal records calls before the outcome so they can be graded later. A chat assistant
+explains any of it and can open pages for you. It never trades.
 
-The autopilot daemon snapshots `.data/` once a day to `~/.mastermold/backups`
-(outside the repo; override with `MASTERMOLD_BACKUP_DIR`, retention with
-`MASTERMOLD_BACKUP_KEEP`, default 60 snapshots). `npm run backup` takes today's
-snapshot on demand. Restoring is copying a snapshot's files back into `.data/`.
+**Research labs.** The Web3 lab runs a Solana bot over a liquid universe (SOL, JUP, BONK, WIF, JTO, WETH,
+WBTC, RAY, PYTH). It watches live DEX markets, rehearses Jupiter routes against real quotes, logs every
+decision, and proves itself in paper mode. The Polymarket lab samples executable order books, tests
+hypotheses in shadow mode, and grades forecasts against final outcomes. Neither lab touches your money.
 
-Before publishing, pushing, or preparing a release, run:
+![The Web3 lab with the bot off, paper equity not started, the go-live gate at zero of five checks, and four research experiments](docs/images/mastermold-web3-lab.png)
+
+## Current status
+
+| Area | State |
+| --- | --- |
+| Today, Portfolio, Transactions, Budget, Journal | Working on sample data or your local entries |
+| Holdings import | Working: `manual_holdings` JSON, CSV with column mapping, or one at a time, with preview and undo |
+| Chat | Working with an OpenCode Go or OpenRouter key; explains and navigates only |
+| Market read | Optional Python engine; the app runs without it |
+| Monarch Money import | Credential-gated through a local MCP server |
+| Web3 lab | Paper trading and research; live swaps locked behind wallet provisioning and the go-live gate |
+| Polymarket lab | Public market reads, paper simulator, shadow research; live orders are not built |
+
+Open `/review` in the app for the full, current breakdown.
+
+## Get it running
+
+You need [Bun](https://bun.sh) and Node 22.5 or newer.
 
 ```bash
-npm run privacy:audit
-```
-
-## Quick Start
-
-```bash
+git clone https://github.com/chrissotraidis/mastermold.git
+cd mastermold
 bun install
 bun run dev
 ```
 
-Open http://localhost:4002. Loopback access is treated as the local operator. The app pins port 4002 so the daily-run script,
-scheduler templates, and integration tests line up without configuration. The
-app starts in sample mode and runs without external accounts, API keys, or a
-wallet. Connecting accounts or preparing a Solana wallet is optional and must
-use local, ignored configuration only.
+Open http://localhost:4002. The first visit shows a short welcome; every page uses clearly labeled sample
+data until you add your own. No accounts, keys, or wallet are needed to look around.
 
-To run everything — web app plus the Solana paper-bot daemon, supervised and
-auto-restarted — use the one command:
+To run the web app and the Solana paper-bot daemon together, supervised and restarted on failure:
 
 ```bash
 npm run up
 ```
 
-The pieces are also available individually:
+### Make it yours
 
-```bash
-npm run autopilot   # the Solana paper-bot daemon (arm it from the Autopilot page)
-npm run daily       # one proactive daily read (the app also self-schedules a
-                    # morning read while the server is running)
-```
+1. **Add your money.** Portfolio, then Import, accepts the `manual_holdings` JSON book as-is, a CSV, or
+   one holding at a time.
+2. **Add accounts and debts.** Brokerages, wallets, banks, cards, loans, mortgages, and property.
+3. **Log your first call** in Journal before the outcome is known.
 
-Production-style `npm run start` requires Node 22.5 or newer; local development
-uses Bun's built-in SQLite support.
+## The research labs
 
-### First run
+The bot mode is off by default. Arm paper mode from the Web3 lab, then start the daemon with
+`npm run autopilot`. Live Solana execution additionally requires:
 
-The first visit opens a short welcome page with three steps, and Today keeps
-the same checklist until each one is done:
+- a spare wallet's key in `.env.local` (`AUTOPILOT_WALLET_SECRET`), never your primary wallet,
+- passing go-live evidence from the paper lane,
+- a deliberate operator action, with hard caps and a kill switch always available.
 
-1. **Add your money.** Portfolio → Import accepts the `manual_holdings` JSON
-   book as-is, a CSV with column mapping, or one holding at a time. Every
-   import shows a preview and can be undone.
-2. **Add accounts and debts.** Portfolio → Add account covers brokerages,
-   wallets, banks, cards, loans, mortgages and property, so net worth is
-   assets minus debts.
-3. **Log your first call** in Journal before the outcome is known; it is graded
-   later.
+The Polymarket lab has no live order path. New hypotheses stay shadow-only until a paper-candidate evidence
+gate passes. See [Polymarket and Web3 research](docs/POLYMARKET-WEB3-RESEARCH-2026-08.md) for the method
+and explicit non-claims.
 
-Until step 1 is done every page shows clearly labeled sample data. Your
-entries live only in the local, git-ignored `.data/` store. The Web3 and
-Polymarket labs are separate paper-research lanes and never touch your money.
+## Frequently asked questions
 
-## Optional Local Configuration
+<details>
+<summary><strong>Can Master Mold move my money?</strong></summary>
 
-Use `.env.local` for app settings and `engine/.env` for engine settings. Start
-from the example files and keep real values out of git.
+No brokerage trades, ever. The only execution path is the Solana lane, which starts off, needs a spare
+wallet you provision locally, and stays locked until the go-live gate passes and you act deliberately.
+</details>
 
-```bash
-cp .env.example .env.local
-cd engine && cp .env.example .env
-```
+<details>
+<summary><strong>Where is my data stored?</strong></summary>
 
-Common local paths:
+In git-ignored local storage: `.data/` for the app databases, journal, and bot state, and `.env.local` or
+`engine/.env` for secrets. The autopilot daemon snapshots `.data/` daily to `~/.mastermold/backups`
+(override with `MASTERMOLD_BACKUP_DIR`, retention with `MASTERMOLD_BACKUP_KEEP`, default 60).
+`npm run backup` takes a snapshot on demand; restoring is copying a snapshot back into `.data/`.
+</details>
 
-```bash
-MASTERMOLD_DB=.data/mastermold.db
-AUTOPILOT_DB=.data/autopilot.db.json
-POLYMARKET_DB=.data/polymarket.db.json
-POLYMARKET_BRAIN_DB=.data/polymarket-brain.db
-POLYMARKET_STREAM_ENABLED=1
-ENGINE_OUT_DIR=engine/out
-```
+<details>
+<summary><strong>Which AI providers does it use?</strong></summary>
 
-Non-streaming calls (Polymarket analyst, autopilot Analyst, brain, daily
-report) go through `src/llm/completion.ts`. Trust that module over older
-notes that name OpenRouter as the only provider.
+Non-streaming calls go through `src/llm/completion.ts`. Set `OPENCODE_GO_API_KEY` in `.env.local` for the
+primary (default model `deepseek-v4-flash`), with `OPENROUTER_API_KEY` as the fallback. If only OpenRouter
+is set, it becomes the primary. Chat can also use a provider picked in Settings, then falls back to a server
+`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`. With no key at all, the app still runs and the bot Analyst uses
+its rule-based review. Restart the server after changing keys.
+</details>
 
-- Primary: `OPENCODE_GO_API_KEY` in `.env.local`. Default model is
-  `deepseek-v4-flash`. Optional overrides are `LLM_MODEL` and
-  `LLM_COMPAT_BASE_URL`.
-- Fallback: `OPENROUTER_API_KEY`, used only when the primary call fails.
-  `OPENROUTER_MODEL` still selects that fallback model. Default is
-  `deepseek/deepseek-v4-flash`. Do not append `:online`. That web-search
-  plugin scored worse than the market prior and stays off.
-- If only `OPENROUTER_API_KEY` is set, OpenRouter becomes the primary.
-- Leave `POLYMARKET_ANALYST_MODEL` unset. Setting it overrides the shared
-  model. The old `deepseek/deepseek-v4-flash:online` value must not be copied
-  back. With no key at all, the autopilot Analyst falls back to its built-in
-  rule-based review.
+<details>
+<summary><strong>Do I need the Python engine?</strong></summary>
 
-Chat (`/api/chat`) uses a provider picked in Settings → Chat first (for
-example a browser-scoped Anthropic key). Otherwise it uses the same OpenCode
-Go / OpenRouter chain, and only falls back to a server `ANTHROPIC_API_KEY` or
-`OPENAI_API_KEY` when that chain has no key. Settings → Chat names the active
-provider and its "Server default" test runs one call through the chain.
-Restart the server after changing env keys.
+No. It adds richer daily market scans. Set it up once with
+`cd engine && uv venv && uv pip install -e .` and see [engine/README.md](engine/README.md).
+</details>
 
-The Python briefing engine is separate and still reads `engine/.env`. It is
-optional; to enable richer daily scans, set it up once with
-`cd engine && uv venv && uv pip install -e .` (see `engine/README.md`).
+<details>
+<summary><strong><code>npm run dev</code> says my Node is too old</strong></summary>
 
-Monarch Money import is available through a local MCP server: set
-`MONARCH_MCP_COMMAND` (stdio) or `MONARCH_MCP_URL` (HTTP) in `.env.local`.
+Master Mold uses Node's built-in SQLite store, which needs Node 22.5 or newer. Install a newer Node (for
+example `nvm install 22`) and run the command again.
+</details>
 
-Operator notifications (fills, halts, the daily Analyst review) are optional:
-set the `NOTIFY_*` values in `.env.local` and verify from Settings →
-Notifications, which shows live status and sends a test through the real
-path. See [Operations](docs/OPERATIONS.md) for the always-on runbook and
-[Backlog](docs/BACKLOG.md) for known gaps.
+<details>
+<summary><strong>How do I connect Monarch Money or notifications?</strong></summary>
 
-Optional Web3 settings are also local-only:
+Monarch import runs through a local MCP server: set `MONARCH_MCP_COMMAND` (stdio) or `MONARCH_MCP_URL`
+(HTTP) in `.env.local`. Notifications for fills, halts, and the daily review use the `NOTIFY_*` values;
+Settings, then Notifications, shows live status and can send a test. See [Operations](docs/OPERATIONS.md).
+</details>
 
-```bash
-SOLANA_RPC_URL=
-HELIUS_ENABLED=false
-HELIUS_API_KEY=
-AUTOPILOT_WALLET_SECRET=
-```
+<details>
+<summary><strong>Can I use this code?</strong></summary>
 
-`AUTOPILOT_WALLET_SECRET` is for a spare Solana wallet, never a primary wallet,
-and should stay out of git. Use the paper lane first; the live path is intended
-for reviewed canary execution after the bot has earned it.
+This is a public source release without a license yet. Until a `LICENSE` file is added, assume viewing
+and local evaluation only.
+</details>
 
 ## Development
 
 ```bash
+cp .env.example .env.local        # optional local settings
 bun run typecheck
 bun test tests
-npm run privacy:audit
-npm run smoke:app
+npm run privacy:audit             # run before any push or release
+npm run smoke:app                 # isolated server from the current build
+npm run e2e                       # browser tests on a throwaway store
 ```
 
-`npm run smoke:app` starts an isolated standalone server from the current build and never touches the real `.data/` store. `npm run ops:check` is the read-only check for an already running deployment.
+`npm run smoke:app` and `npm run e2e` never touch the real `.data/` store. `npm run ops:check` is the
+read-only check for an already running deployment.
 
-## Repository Map
+<details>
+<summary><strong>Repository map</strong></summary>
 
 ```text
-app/                 Next.js pages and API routes
-components/          UI components
-src/db/              Local app store, sample data, portfolio imports, reports
+app/                 Next.js pages and API routes (/api/health, /review)
+components/          UI, with shared primitives in components/ui
+src/db/              Local store, sample data, portfolio, money, imports, reports
 src/chat/            Chat providers, context, and bounded local actions
-src/autopilot/       Solana/Web3 paper bot, go-live gate, and executor logic
-src/polymarket/      Market reads, isolated paper simulator, and research brain
+src/autopilot/       Solana paper bot, go-live gate, and executor
+src/polymarket/      Market reads, paper simulator, and research brain
 src/helius/          Optional Helius/Solana RPC credit firewall
 engine/              Optional Python briefing engine
-public/              Public app assets
-scripts/             Local helper and verification scripts
+scripts/             Local helpers and verification
 tests/               Unit and source-contract tests
+e2e/                 Playwright browser tests
 docs/                Public documentation only
 ```
+</details>
+
+## Help and community
+
+Questions, bug reports, and ideas are welcome in the [Discord](https://discord.gg/xwHfUD2bxW) or as a
+[GitHub issue](https://github.com/chrissotraidis/mastermold/issues). Please never post private keys,
+seed phrases, API keys, or real account data.
 
 ## Documentation
 
 - [Docs index](docs/README.md)
+- [Design thesis](docs/DESIGN.md)
 - [Architecture](docs/ARCHITECTURE.md)
-- [Privacy](docs/PRIVACY.md)
-- [Security](docs/SECURITY.md)
-- [Deployment](docs/DEPLOYMENT.md)
+- [Privacy](docs/PRIVACY.md) and [Security](docs/SECURITY.md)
+- [Deployment](docs/DEPLOYMENT.md) and [Operations](docs/OPERATIONS.md)
 - [Polymarket and Web3 research](docs/POLYMARKET-WEB3-RESEARCH-2026-08.md)
-- [Operations](docs/OPERATIONS.md)
 - [Backlog](docs/BACKLOG.md)
 
-## License
+## Legal
 
-This is a public source release. A formal open-source license has not been
-selected yet; until a `LICENSE` file is added, do not assume redistribution,
-commercial-use, or reuse rights beyond viewing and local evaluation.
+Master Mold is research and personal-finance software, not investment advice. Paper and replay results
+are evidence about the past, not a promise of future returns. Crypto and prediction markets can lose
+money quickly; only ever connect a spare wallet you can afford to lose.
+
+A formal open-source license has not been selected. Until a `LICENSE` file is added, do not assume
+redistribution, commercial-use, or reuse rights beyond viewing and local evaluation.
