@@ -19,6 +19,7 @@ import {
 import { fetchPolymarketWeatherReport, type PolymarketWeatherReport } from "@/src/polymarket/weather";
 import { runPolymarketWalletCycle, safePolymarketWalletReport, type WalletIntelligenceReport } from "@/src/polymarket/wallets";
 import { buildPolymarketResearchProgram, type ResearchProgram } from "@/src/polymarket/research-program";
+import { safeForecastRevisionReport } from "@/src/polymarket/forecast-revision";
 
 export const dynamic = "force-dynamic";
 
@@ -268,7 +269,13 @@ async function payload(request: Request): Promise<PolymarketApiPayload> {
     weather,
     analyst,
     wallets,
-    research_program: buildPolymarketResearchProgram({ brain, analyst, wallets, markets: snapshot.markets }),
+    research_program: buildPolymarketResearchProgram({
+      brain,
+      analyst,
+      wallets,
+      markets: snapshot.markets,
+      forecastRevision: safeForecastRevisionReport(),
+    }),
     equity_curve: buildEquityCurve(store.trades(200)),
     trades: store.trades(50),
     activity: store.activity(50),

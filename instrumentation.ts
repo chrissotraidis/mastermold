@@ -11,6 +11,7 @@
 
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 const POLYMARKET_CHECK_EVERY_MS = 5 * 60 * 1000;
+const P7_CHECK_EVERY_MS = 2 * 60 * 1000;
 // The morning read fires after this LOCAL time. On a UTC-clocked VPS, set
 // MASTERMOLD_READ_AFTER (e.g. "12:15" for 7:15 ET) instead of changing the
 // system timezone. Malformed values fall back to the 7:15 default.
@@ -129,4 +130,25 @@ export async function register(): Promise<void> {
 
   setInterval(() => void checkPolymarket(), POLYMARKET_CHECK_EVERY_MS);
   setTimeout(() => void checkPolymarket(), 30_000);
+
+  // P7 forecast-revision lag runs on its own short clock: detection latency is
+  // the thing being measured, and lag snapshots are due 5/15/60 minutes after
+  // a revision. Shadow-only; it never places an order.
+  let p7Running = false;
+  const checkP7 = async () => {
+    if (p7Running) return;
+    p7Running = true;
+    try {
+      const { runForecastRevisionCycle } = await import("@/src/polymarket/forecast-revision");
+      const result = await runForecastRevisionCycle();
+      if (result.action === "captured") console.log("[mastermold] P7 forecast-revision:", result.detail);
+      if (result.action === "error") console.error("[mastermold] P7 forecast-revision failed:", result.detail);
+    } catch (error) {
+      console.error("[mastermold] P7 scheduler failed:", error);
+    } finally {
+      p7Running = false;
+    }
+  };
+  setInterval(() => void checkP7(), P7_CHECK_EVERY_MS);
+  setTimeout(() => void checkP7(), 45_000);
 }

@@ -70,6 +70,17 @@ lane. The plausible path is per-station bias correction learned from weeks of
 day-ahead archive, evaluated by the strict walk-forward gate below, against
 markets that carry taker fees and thin books. Nothing shorter is honest.
 
+## Resolution source change (noted 2026-10-11)
+
+By October 2026 Polymarket settled most daily-temperature events on NOAA's
+`weather.gov/wrh/timeseries?site=XXXX` pages, with Wunderground as the
+fallback, and US cities use two-degree Fahrenheit ranges. The parser had only
+accepted Wunderground links with "whole degrees Celsius" wording, so nearly every
+current event was marked unsupported and produced no forecast capture. It now
+reads the station from either source and audits Celsius single-degree events;
+Fahrenheit events stay unsupported here. P7
+([P7-FORECAST-REVISION](P7-FORECAST-REVISION.md)) handles both units.
+
 ## Offline evaluator
 
 Only complete forecast runs aligned to exact resolved temperatures enter the

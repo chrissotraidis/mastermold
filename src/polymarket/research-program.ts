@@ -6,6 +6,7 @@
  */
 import type { AnalystReport } from "./analyst";
 import type { PolymarketBrainReport } from "./brain";
+import { P7_GATE, P7_RULE, type ForecastRevisionReport, type P7Summary } from "./forecast-revision";
 import type { PolymarketMarket } from "./markets";
 import type { PolymarketStrategyId } from "./strategies";
 import { lastNegRiskScan } from "./structural";
@@ -37,6 +38,7 @@ export function buildPolymarketResearchProgram(input: {
   analyst: AnalystReport;
   wallets: WalletIntelligenceReport;
   markets: PolymarketMarket[];
+  forecastRevision: ForecastRevisionReport;
 }): ResearchProgram {
   const metric = (id: PolymarketStrategyId) => input.brain.strategies.find((row) => row.strategy_id === id);
   const brainRan = Boolean(input.brain.latest_cycle_at);
@@ -136,6 +138,7 @@ export function buildPolymarketResearchProgram(input: {
       gate: "Held-out news weight w with a 95% interval above zero; otherwise stop the analyst lane.",
       next: shrink.status === "adds_information" ? "Try the no-search 5-sample ensemble, shrunk by w." : "Keep :online off; no new model spend until this passes.",
     },
+    forecastRevisionExperiment(input.forecastRevision),
   ];
 
   return {
@@ -150,4 +153,58 @@ export function buildPolymarketResearchProgram(input: {
     ],
     decision_doc: "docs/research-2026-09/STRATEGY-DECISION.md",
   };
+}
+
+function forecastRevisionExperiment(p7: ForecastRevisionReport): ResearchExperiment {
+  const s = p7.summary;
+  const liveRuns = p7.runs.reduce((sum, run) => sum + run.live_runs, 0);
+  const skips = Object.entries(s.signal_skips).map(([reason, count]) => `${reason.replaceAll("_", " ")} ${count}`).join(", ");
+  const latency = p7.runs.filter((run) => run.detection_latency_min !== null).map((run) => `${run.label} ${run.detection_latency_min} min`).join(", ");
+  const evidence = !p7.enabled
+    ? ["P7 is off (POLYMARKET_P7=0)."]
+    : liveRuns === 0
+      ? ["Waiting for the first new model run; leave the scheduler on. No orders are placed."]
+      : [
+          `${liveRuns} live model runs read; ${s.signals} revisions ≥${P7_RULE.min_shift_c} °C, ${s.signals_filled} paper fills ($${P7_RULE.stake_usd} at the ask, ${P7_RULE.min_price * 100}–${P7_RULE.max_price * 100}¢), ${s.controls_filled} matched controls.`,
+          ...(skips ? [`Signals skipped: ${skips}.`] : []),
+          ...(lagLine(s) ? [lagLine(s)!] : []),
+          ...(pnlLine(s) ? [pnlLine(s)!] : []),
+          ...(latency ? [`Detection after Open-Meteo published: ${latency} (median).`] : []),
+        ];
+  if (p7.replay) {
+    const r = p7.replay.summary;
+    const before = r.lag.find((row) => row.offset_min === -60)?.signal_mean_cents;
+    evidence.push(
+      `Replay ${p7.replay.created_at.slice(0, 10)} (${p7.replay.params.days} days, ${p7.replay.params.events} markets, optimistic price-history fills): ${pnlLine(r) ?? "no graded fills"}${before == null ? "" : ` Price had already moved ${cents(before)} in the hour before entry.`}`,
+    );
+  } else {
+    evidence.push("No historical replay yet: run npm run p7:replay.");
+  }
+  if (p7.error) evidence.push(`Ledger error: ${p7.error}`);
+  return {
+    id: "P7",
+    name: "Weather forecast-revision lag",
+    question: "When a new ECMWF or GFS run moves tomorrow's station temperature by ≥0.5 °C, is the bucket one step toward it still cheap?",
+    status: !p7.enabled || liveRuns === 0 ? "idle" : s.gate.status,
+    evidence,
+    gate: `≥${P7_GATE.min_graded_signals} graded signal fills across ≥${P7_GATE.min_stations} stations and ≥${P7_GATE.min_days} UTC days; day-clustered 95% lower bound of signal − matched control > 0 after fees; signal net > 0, also without its two best stations.`,
+    next: s.gate.status === "pass"
+      ? "Review depth, settlement-source and maker-variant risks with a human before anything else."
+      : "Keep capturing; the replay can falsify early, but only live executable-ask fills can pass.",
+  };
+}
+
+function lagLine(s: P7Summary) {
+  const parts = s.lag.filter((row) => row.offset_min > 0 && row.signal_mean_cents !== null).map((row) =>
+    `+${row.offset_min}m ${cents(row.signal_mean_cents!)} vs control ${row.control_mean_cents === null ? "n/a" : cents(row.control_mean_cents)}`);
+  return parts.length ? `Target price move after entry (mean): ${parts.join("; ")}.` : null;
+}
+
+function pnlLine(s: P7Summary) {
+  if (s.pnl.signal_per_dollar === null) return null;
+  return `Net per $1 after fees: signal ${s.pnl.signal_per_dollar} vs control ${s.pnl.control_per_dollar ?? "n/a"} over ${s.graded_signals} graded fills (day-clustered lower bound ${s.pnl.diff_lower_95 ?? "n/a"}; without top two stations ${s.pnl.signal_without_top2_per_dollar ?? "n/a"}).`;
+}
+
+function cents(value: number) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}¢`;
 }

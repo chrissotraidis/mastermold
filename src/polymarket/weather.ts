@@ -151,12 +151,15 @@ export function parseWeatherEvent(value: unknown): PolymarketWeatherEvent | null
   const temperatureKind = lower.startsWith("highest temperature") ? "maximum" : lower.startsWith("lowest temperature") ? "minimum" : null;
   if (!temperatureKind) return null;
   const source = text(raw.resolutionSource) || extractUrl(description);
-  const stationCode = extractStationCode(source);
-  const wholeDegrees = /whole degrees celsius/i.test(description);
+  const stationCode = weatherStationCode(source);
   const bucketRows = markets.map(parseBucket).filter((bucket): bucket is PolymarketWeatherBucket => bucket !== null);
   if (bucketRows.length < 2) return null;
   const feesEnabled = markets.some((market) => market.feesEnabled === true || numeric(market.takerBaseFee) > 0 || Boolean(market.feeSchedule));
-  const auditable = Boolean(stationCode && /wunderground\.com/i.test(source) && wholeDegrees);
+  // Polymarket settles most daily-temperature events on NOAA's weather.gov
+  // timeseries (Wunderground is the fallback). This lane only models
+  // single-degree Celsius buckets; Fahrenheit 2-degree ranges stay unsupported.
+  const celsius = /degrees celsius/i.test(description) && bucketRows.every((bucket) => /°\s*C/i.test(bucket.label));
+  const auditable = Boolean(stationCode && /wunderground\.com|weather\.gov/i.test(source) && celsius);
 
   return {
     event_id: id,
@@ -172,8 +175,8 @@ export function parseWeatherEvent(value: unknown): PolymarketWeatherEvent | null
     fees_enabled: feesEnabled,
     rules_status: auditable ? "auditable" : "unsupported",
     rules_detail: auditable
-      ? `Whole-degree ${temperatureKind} at Wunderground station ${stationCode}; exact station coordinates still need to match the forecast grid.`
-      : "The current parser cannot prove a Wunderground ICAO station and whole-degree resolution rule, so no model probability is produced.",
+      ? `Whole-degree Celsius ${temperatureKind} at station ${stationCode} (${/weather\.gov/i.test(source) ? "NOAA" : "Wunderground"}); exact station coordinates still need to match the forecast grid.`
+      : "The current parser cannot prove a NOAA or Wunderground ICAO station with single-degree Celsius buckets, so no model probability is produced.",
     forecast_status: auditable ? "not-attempted" : "not-attempted",
     model: null,
     member_count: 0,
@@ -187,7 +190,7 @@ export function parseWeatherEvent(value: unknown): PolymarketWeatherEvent | null
  * at one aviationweather call per station per process lifetime. */
 const stationInfoCache = new Map<string, { latitude: number; longitude: number; name: string; elev: number | null }>();
 
-async function lookupStation(stationCode: string) {
+export async function lookupStation(stationCode: string) {
   const cached = stationInfoCache.get(stationCode);
   if (cached) return cached;
   const stationUrl = new URL("https://aviationweather.gov/api/data/stationinfo");
@@ -415,9 +418,11 @@ export function bucketContains(label: string, value: number): boolean {
   return rounded === threshold;
 }
 
-function extractStationCode(source: string) {
+/** ICAO code from a Wunderground history path (…/KORD) or a NOAA timeseries link (?site=klga). */
+export function weatherStationCode(source: string) {
   try {
-    const tail = new URL(source).pathname.split("/").filter(Boolean).at(-1) ?? "";
+    const url = new URL(source);
+    const tail = url.searchParams.get("site") ?? url.pathname.split("/").filter(Boolean).at(-1) ?? "";
     return /^[A-Z0-9]{4}$/i.test(tail) ? tail.toUpperCase() : null;
   } catch {
     return null;
