@@ -208,7 +208,7 @@ describe("P7 live cycle", () => {
     ask = 0.3;
     const second = await runForecastRevisionCycle(new Date("2026-10-10T19:06:00Z"));
     expect(second.action).toBe("error"); // only the GFS outage remains
-    const records = store.caseRecords();
+    const records = store.caseRecords(["ecmwf_ifs"]);
     expect(records.find((row) => row.arm === "signal")?.lag[5]).toBeCloseTo(0.1, 6);
 
     settled = true;
@@ -286,7 +286,7 @@ function syntheticCases(n: number, stations: number, days: number, signalPerDoll
   return Array.from({ length: n }, (_, index) => {
     const day = `2026-09-${String(1 + (index % days)).padStart(2, "0")}T10:00:00Z`;
     const noise = ((index % 3) - 1) * 0.02;
-    const base = { station_code: `S${index % stations}`, detected_at: day, status: "filled" as const, skip_reason: null, cost_usd: 25, fee_known: true, lag: {} };
+    const base = { model: "ecmwf_ifs", station_code: `S${index % stations}`, detected_at: day, status: "filled" as const, skip_reason: null, cost_usd: 25, fee_known: true, lag: {} };
     return [
       { ...base, id: `s${index}`, arm: "signal" as const, outcome: "won" as const, pnl_usd: 25 * (signalPerDollar + noise) },
       { ...base, id: `c${index}`, arm: "control" as const, outcome: "lost" as const, pnl_usd: 25 * controlPerDollar },

@@ -9,6 +9,7 @@ import { reviewCapabilitySections } from "@/src/product/capabilities";
 import { autopilotStore } from "@/src/autopilot/store";
 import { safeWeatherResearchReport } from "@/src/polymarket/weather-research";
 import { safeForecastRevisionReport } from "@/src/polymarket/forecast-revision";
+import { safeRawFeedReport } from "@/src/polymarket/raw-feed-revision";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default function ReviewPage() {
   const reality = strategyReality();
   const weather = safeWeatherResearchReport();
   const p7 = safeForecastRevisionReport();
+  const p8 = safeRawFeedReport();
   const mlEligible = reality.cusumSpanDays >= 28 && reality.latestModelPassed && reality.latestModelCompliant && reality.approvedModel === reality.latestModelId;
 
   return (
@@ -234,6 +236,43 @@ export default function ReviewPage() {
                 ? `Latest replay (${p7.replay.created_at.slice(0, 10)}, ${p7.replay.params.days} days, ${p7.replay.params.events} markets): signal ${p7.replay.summary.pnl.signal_per_dollar ?? "n/a"} vs control ${p7.replay.summary.pnl.control_per_dollar ?? "n/a"} per $1 after fees.`
                 : "No historical replay has been run (npm run p7:replay)."}
               {p7.error ? ` Ledger error: ${p7.error}` : ""}
+            </p>
+          </CardContent>
+        </Card>
+
+          </LabSection>
+          <LabSection title="P8 raw-feed head start">
+        <Card className="border-sky-400/25 bg-sky-400/[0.035]">
+          <CardHeader className="p-5 pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle as="h2" className="text-lg">Raw-feed head start truth</CardTitle>
+              <Badge variant="outline" className="border-violet/30 text-violet">{p8.enabled ? "Shadow only" : "Off"}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-5 pt-2 text-sm leading-6 text-on-surface-variant md:grid-cols-2">
+            <div>
+              <p className="font-semibold text-on-surface">What is working</p>
+              <p>Every minute P8 checks NOAA NOMADS for GFS 0.25° hours and ECMWF open data for 3-hourly max/min steps, decodes the 2 m temperature fields itself, and samples each market&apos;s station. When a station&apos;s whole local day has landed it applies P7&apos;s rule against the previous raw run, then records how many minutes earlier it had the revision than Open-Meteo and the target bucket&apos;s price at that later moment.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-on-surface">What is not proven</p>
+              <p>A run first seen after it was published only serves as the baseline. Raw values are the nearest 0.25° grid point, so they differ slightly from Open-Meteo&apos;s products. The producer-timing replay uses Open-Meteo values with producer timestamps and no book depth. Paper fills never reach an order route; live trading stays locked.</p>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-outline-variant/30 p-3 md:col-span-2 md:grid-cols-6">
+              <dt>Raw runs</dt><dd className="font-semibold text-on-surface">{p8.feeds.reduce((sum, feed) => sum + feed.live_runs, 0)}</dd>
+              <dt>Revisions</dt><dd className="font-semibold text-on-surface">{p8.summary.signals}</dd>
+              <dt>Paper fills</dt><dd className="font-semibold text-on-surface">{p8.summary.signals_filled}</dd>
+              <dt>Controls</dt><dd className="font-semibold text-on-surface">{p8.summary.controls_filled}</dd>
+              <dt>Head starts</dt><dd className="font-semibold text-on-surface">{p8.feeds.reduce((sum, feed) => sum + feed.head_start.compared, 0)}</dd>
+              <dt>Evidence gate</dt><dd className="font-semibold text-on-surface">{p8.summary.gate.status === "measuring" ? "Measuring" : p8.summary.gate.status === "pass" ? "Passed; not promoted" : "Failed"}</dd>
+            </dl>
+            <p className="md:col-span-2">
+              {p8.summary.gate.detail}{" "}
+              {p8.feeds.filter((feed) => feed.head_start.median_head_start_min !== null).map((feed) => `${feed.label}: median head start ${feed.head_start.median_head_start_min} min.`).join(" ")}{" "}
+              {p8.replay
+                ? `Latest producer-timing replay (${p8.replay.created_at.slice(0, 10)}, ${p8.replay.params.days} days): signal ${p8.replay.summary.pnl.signal_per_dollar ?? "n/a"} vs control ${p8.replay.summary.pnl.control_per_dollar ?? "n/a"} per $1 after fees.`
+                : "No producer-timing replay has been run (npm run p7:replay -- --timing raw)."}
+              {p8.error ? ` Ledger error: ${p8.error}` : ""}
             </p>
           </CardContent>
         </Card>

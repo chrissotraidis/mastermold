@@ -12,6 +12,7 @@
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 const POLYMARKET_CHECK_EVERY_MS = 5 * 60 * 1000;
 const P7_CHECK_EVERY_MS = 2 * 60 * 1000;
+const P8_CHECK_EVERY_MS = 60 * 1000;
 // The morning read fires after this LOCAL time. On a UTC-clocked VPS, set
 // MASTERMOLD_READ_AFTER (e.g. "12:15" for 7:15 ET) instead of changing the
 // system timezone. Malformed values fall back to the 7:15 default.
@@ -151,4 +152,24 @@ export async function register(): Promise<void> {
   };
   setInterval(() => void checkP7(), P7_CHECK_EVERY_MS);
   setTimeout(() => void checkP7(), 45_000);
+
+  // P8 raw-feed head start polls NOMADS GFS and ECMWF open data every minute so
+  // it sees each forecast hour as it lands. Shadow-only; it never places an order.
+  let p8Running = false;
+  const checkP8 = async () => {
+    if (p8Running) return;
+    p8Running = true;
+    try {
+      const { runRawFeedCycle } = await import("@/src/polymarket/raw-feed-revision");
+      const result = await runRawFeedCycle();
+      if (result.action === "captured") console.log("[mastermold] P8 raw-feed:", result.detail);
+      if (result.action === "error") console.error("[mastermold] P8 raw-feed failed:", result.detail);
+    } catch (error) {
+      console.error("[mastermold] P8 scheduler failed:", error);
+    } finally {
+      p8Running = false;
+    }
+  };
+  setInterval(() => void checkP8(), P8_CHECK_EVERY_MS);
+  setTimeout(() => void checkP8(), 60_000);
 }

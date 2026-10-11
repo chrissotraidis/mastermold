@@ -30,9 +30,9 @@ import {
   type P7CaseRecord,
   type P7Event,
   type P7Fill,
-  type P7ModelId,
   type P7ReplayParams,
   type P7ReplayRecord,
+  type P7ReplayTiming,
   type RunLocation,
 } from "./forecast-revision";
 
@@ -41,12 +41,26 @@ export type PricePoint = { t: number; p: number };
 /** Minutes between Open-Meteo availability and a polling bot acting on it. */
 export const REPLAY_DETECTION_LATENCY_MIN = 2;
 /** -60 is "moved in the hour before entry"; the rest are moves after entry. */
-export const REPLAY_OFFSETS_MIN = [-60, 5, 15, 60, 180];
+export const REPLAY_OFFSETS_MIN = [-60, 5, 15, 60, 120, 180];
 const PRICE_STALE_MIN = 180;
 const RUN_MS = 6 * 3_600_000;
 /** Stay under Open-Meteo's free 5,000 location-calls per hour, leaving room for live capture. */
 const OPEN_METEO_CALLS_PER_HOUR = 4_000;
 const OPEN_METEO_RETRY_WAITS_MS = [60_000, 120_000, 300_000, 600_000];
+
+type ReplaySpec = { id: string; label: string; delayHours: (initMs: number) => number; delayNote: number | string };
+
+/**
+ * Raw timing (P8): when the producers publish, measured 2026-10-10/11. NOMADS
+ * GFS posts tomorrow's hours by about 3 h 47 min after the run starts; ECMWF
+ * open data releases whole runs at about 7 h 34 min (00/12Z) and 6 h 27 min
+ * (06/18Z). Values come from Open-Meteo's archive of the closest product:
+ * ecmwf_ifs025 is the same open-data grid; ncep_gfs013 stands in for GFS 0.25°.
+ */
+const RAW_SPECS: ReplaySpec[] = [
+  { id: "ecmwf_ifs025", label: "ECMWF open data 0.25° (producer timing)", delayHours: (ms) => (new Date(ms).getUTCHours() % 12 === 0 ? 7.57 : 6.45), delayNote: "7.57 (00/12Z), 6.45 (06/18Z)" },
+  { id: "ncep_gfs013", label: "GFS (NOMADS timing)", delayHours: () => 3.8, delayNote: 3.8 },
+];
 
 /** Last price at or before atMs (no look-ahead); null if missing or stale. */
 export function priceAsOf(history: PricePoint[], atMs: number, staleMin = PRICE_STALE_MIN): number | null {
@@ -88,7 +102,8 @@ export function replayLag(history: PricePoint[], entryMs: number, entryPrice: nu
 export type ReplayOptions = {
   days?: number;
   maxEvents?: number;
-  models?: P7ModelId[];
+  models?: string[];
+  timing?: P7ReplayTiming;
   slippageCents?: number;
   now?: Date;
   log?: (line: string) => void;
@@ -96,11 +111,19 @@ export type ReplayOptions = {
 
 export async function runForecastRevisionReplay(options: ReplayOptions = {}): Promise<P7ReplayRecord> {
   const days = Math.max(1, Math.min(60, options.days ?? 7));
-  const models = options.models?.length ? options.models : P7_MODELS.map((model) => model.id);
+  const timing = options.timing ?? "open-meteo";
+  const store = forecastRevisionStore();
+  const allSpecs: ReplaySpec[] = timing === "raw"
+    ? RAW_SPECS
+    : P7_MODELS.map((model) => {
+        const delay = store.availabilityDelayHours(model.id) ?? model.default_delay_hours;
+        return { id: model.id, label: model.label, delayHours: () => delay, delayNote: delay };
+      });
+  const specs = options.models?.length ? allSpecs.filter((spec) => options.models!.includes(spec.id)) : allSpecs;
+  const models = specs.map((spec) => spec.id);
   const slippage = (options.slippageCents ?? 1) / 100;
   const now = options.now ?? new Date();
   const log = options.log ?? (() => {});
-  const store = forecastRevisionStore();
 
   const today = now.toISOString().slice(0, 10);
   const cutoff = new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10);
@@ -125,7 +148,7 @@ export async function runForecastRevisionReplay(options: ReplayOptions = {}): Pr
   };
 
   const cases: P7CaseRecord[] = [];
-  const delayHours: Record<string, number> = {};
+  const delayHours: Record<string, number | string> = {};
   const paceMs = Math.ceil((points.length / OPEN_METEO_CALLS_PER_HOUR) * 3_600_000);
   // Markets list a day or two ahead, so runs before that could never be traded.
   const dates = events.map((event) => Date.parse(`${event.target_date}T00:00:00Z`));
@@ -133,10 +156,9 @@ export async function runForecastRevisionReplay(options: ReplayOptions = {}): Pr
   for (let ms = Math.floor((Math.min(...dates) - 2 * 86_400_000) / RUN_MS) * RUN_MS; ms <= Math.max(...dates); ms += RUN_MS) initTimes.push(ms);
   const total = initTimes.length * models.length;
   log(`Rebuilding ${total} model runs, one every ${Math.round(paceMs / 1000)}s (~${Math.round((total * paceMs) / 60_000)} min), to respect Open-Meteo's free-tier limits.`);
-  for (const model of models) {
-    const spec = P7_MODELS.find((row) => row.id === model)!;
-    const delay = store.availabilityDelayHours(model) ?? spec.default_delay_hours;
-    delayHours[model] = delay;
+  for (const spec of specs) {
+    const model = spec.id;
+    delayHours[model] = spec.delayNote;
     const runs = new Map<number, Array<RunLocation | null>>();
     for (const ms of initTimes) {
       const started = Date.now();
@@ -148,7 +170,7 @@ export async function runForecastRevisionReplay(options: ReplayOptions = {}): Pr
       if (runs.size % 8 === 0) log(`${spec.label}: ${runs.size}/${initTimes.length} runs rebuilt.`);
       await new Promise((resolve) => setTimeout(resolve, Math.max(0, paceMs - (Date.now() - started))));
     }
-    log(`${spec.label}: ${runs.size}/${initTimes.length} runs rebuilt (availability assumed ${delay}h after start).`);
+    log(`${spec.label}: ${runs.size}/${initTimes.length} runs rebuilt (availability assumed ${spec.delayNote}h after start).`);
 
     const value = (ms: number, event: P7Event) => {
       const location = runs.get(ms)?.[codes.indexOf(event.station_code)];
@@ -158,7 +180,7 @@ export async function runForecastRevisionReplay(options: ReplayOptions = {}): Pr
     for (const ms of initTimes) {
       if (!runs.has(ms) || !runs.has(ms - RUN_MS)) continue;
       const initTime = runInitIso(ms);
-      const entryMs = ms + delay * 3_600_000 + REPLAY_DETECTION_LATENCY_MIN * 60_000;
+      const entryMs = ms + spec.delayHours(ms) * 3_600_000 + REPLAY_DETECTION_LATENCY_MIN * 60_000;
       const located = events.flatMap((event) => {
         const location = runs.get(ms)![codes.indexOf(event.station_code)];
         if (!location || !isDayAhead(event.target_date, entryMs, location.utc_offset_seconds)) return [];
@@ -197,6 +219,7 @@ export async function runForecastRevisionReplay(options: ReplayOptions = {}): Pr
 
   const summary = summarizeP7Cases(cases);
   const params: P7ReplayParams = {
+    timing,
     days,
     models,
     events: events.length,
@@ -233,6 +256,7 @@ function record(
   return {
     id,
     arm,
+    model: id.split(":")[1],
     station_code: event.station_code,
     detected_at: new Date(entryMs).toISOString(),
     status: fill.status,
