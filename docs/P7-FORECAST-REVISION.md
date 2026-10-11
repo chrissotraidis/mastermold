@@ -81,8 +81,6 @@ Passing earns a human review of depth, settlement-source risk (NOAA vs
 Wunderground fallback), the maker variant and legal eligibility. It grants no
 paper or live authority.
 
-## Known limits
-
 ## First replay (2026-10-11, settled markets 2026-10-03 to 2026-10-10)
 
 644 settled markets at 48 stations, both models, entries 2 minutes after
@@ -107,6 +105,8 @@ timing there is no lag to capture, and the rule loses money after costs. Live
 P7 keeps measuring real asks and detection latency. If an edge exists, it would
 have to come from data faster than Open-Meteo (raw ECMWF open data or NOAA NOMADS
 as each forecast hour lands). That would be a separate experiment.
+
+## Known limits
 
 - Hourly model output understates the true daily extreme; the bias is shared by
   consecutive runs, so it mostly cancels in the revision but not in the bucket
