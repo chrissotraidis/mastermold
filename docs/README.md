@@ -9,6 +9,7 @@ generated review artifacts here.
 - [Polymarket and Web3 research, August 2026](POLYMARKET-WEB3-RESEARCH-2026-08.md) — primary-source research, implemented decisions, and explicit non-claims
 - [PolySniper capability audit](POLYSNIPER-CAPABILITY-MATRIX.md) — intended-vs-built strategy matrix, exact paper contract, weather shadow method, and promotion gates
 - [P7 forecast-revision lag](P7-FORECAST-REVISION.md) — shadow test of buying the bucket a new ECMWF/GFS run moves toward, with matched controls, book-lag snapshots, a historical replay, and a pre-registered gate
+- [P8 raw-feed head start](P8-RAW-FEED-HEAD-START.md) — the same rule read straight from NOAA NOMADS and ECMWF open data as each forecast hour lands, measured against P7's Open-Meteo timing
 - [Architecture](ARCHITECTURE.md)
 - [Design thesis: Quiet instrument](DESIGN.md) — graphite surfaces, one magenta signal, color only for state
 - [Privacy](PRIVACY.md)

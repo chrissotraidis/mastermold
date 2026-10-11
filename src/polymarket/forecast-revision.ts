@@ -192,7 +192,7 @@ export function runInitIso(ms: number) {
   return new Date(ms).toISOString().slice(0, 16);
 }
 
-export async function fetchModelMeta(model: P7ModelId) {
+export async function fetchModelMeta(model: string) {
   const response = await fetch(`https://api.open-meteo.com/data/${model}/static/meta.json`, {
     cache: "no-store",
     headers: { Accept: "application/json", "User-Agent": USER_AGENT },
@@ -215,7 +215,7 @@ export async function fetchModelMeta(model: P7ModelId) {
  * callers that fetch many runs pass waits to retry on 429.
  */
 export async function fetchModelRun(
-  model: P7ModelId,
+  model: string,
   initMs: number,
   points: Array<{ latitude: number; longitude: number }>,
   retryWaitsMs: number[] = [],
@@ -317,6 +317,7 @@ export function settlePnl(won: boolean, shares: number, cost: number, fee: numbe
 export type P7CaseRecord = {
   id: string;
   arm: "signal" | "control";
+  model: string;
   station_code: string;
   detected_at: string;
   status: "filled" | "skipped";
@@ -572,8 +573,10 @@ export class ForecastRevisionStore {
     return rows.length;
   }
 
-  caseRecords(): P7CaseRecord[] {
-    const rows = this.db.prepare("SELECT * FROM p7_cases ORDER BY detected_at").all() as CaseRow[];
+  /** Case records for the given models (P7's Open-Meteo models and P8's raw feeds share this ledger). */
+  caseRecords(models: readonly string[]): P7CaseRecord[] {
+    const wanted = new Set(models);
+    const rows = (this.db.prepare("SELECT * FROM p7_cases ORDER BY detected_at").all() as CaseRow[]).filter((row) => wanted.has(row.model));
     const snapshots = this.db.prepare(
       "SELECT case_id, offset_min, midpoint FROM p7_snapshots WHERE status = 'taken'",
     ).all() as Array<{ case_id: string; offset_min: number; midpoint: number | null }>;
@@ -594,6 +597,7 @@ export class ForecastRevisionStore {
       return {
         id: row.id,
         arm: row.arm,
+        model: row.model,
         station_code: row.station_code,
         detected_at: row.detected_at,
         status: row.status,
@@ -638,9 +642,11 @@ export class ForecastRevisionStore {
     return id;
   }
 
-  latestReplay(): P7ReplayRecord | null {
-    const row = this.db.prepare("SELECT created_at, params_json, summary_json FROM p7_replays ORDER BY created_at DESC LIMIT 1").get() as
-      { created_at: string; params_json: string; summary_json: string } | undefined;
+  /** Latest replay for a timing; replays recorded before timing existed are Open-Meteo replays. */
+  latestReplay(timing: P7ReplayTiming = "open-meteo"): P7ReplayRecord | null {
+    const row = this.db.prepare(
+      "SELECT created_at, params_json, summary_json FROM p7_replays WHERE COALESCE(json_extract(params_json, '$.timing'), 'open-meteo') = ? ORDER BY created_at DESC LIMIT 1",
+    ).get(timing) as { created_at: string; params_json: string; summary_json: string } | undefined;
     if (!row) return null;
     try {
       return { created_at: row.created_at, params: JSON.parse(row.params_json), summary: JSON.parse(row.summary_json) };
@@ -650,7 +656,16 @@ export class ForecastRevisionStore {
   }
 }
 
-export type P7ReplayParams = { days: number; models: string[]; events: number; slippage_cents: number; delay_hours: Record<string, number>; note: string };
+export type P7ReplayTiming = "open-meteo" | "raw";
+export type P7ReplayParams = {
+  timing?: P7ReplayTiming;
+  days: number;
+  models: string[];
+  events: number;
+  slippage_cents: number;
+  delay_hours: Record<string, number | string>;
+  note: string;
+};
 export type P7ReplayRecord = { created_at: string; params: P7ReplayParams; summary: P7Summary };
 
 let singleton: ForecastRevisionStore | null = null;
@@ -684,11 +699,7 @@ export async function runForecastRevisionCycle(now = new Date()): Promise<P7Cycl
   if (!p7Enabled()) return { action: "idle", detail: "P7 is off (POLYMARKET_P7=0)." };
   try {
     const store = forecastRevisionStore();
-    await takeDueSnapshots(store, now);
-    if (now.getTime() - lastGradeAt > GRADE_EVERY_MS) {
-      await gradePending(store, now);
-      lastGradeAt = now.getTime();
-    }
+    await serviceP7Ledger(store, now);
     const details: string[] = [];
     const errors: string[] = [];
     let events: P7Event[] | null = null;
@@ -713,7 +724,16 @@ export async function runForecastRevisionCycle(now = new Date()): Promise<P7Cycl
   }
 }
 
-type Located = { event: P7Event; location: RunLocation; previous: number; current: number };
+/** Book snapshots that came due and (throttled) settlement grading, for every model in the ledger. */
+export async function serviceP7Ledger(store: ForecastRevisionStore, now: Date) {
+  await takeDueSnapshots(store, now);
+  if (now.getTime() - lastGradeAt > GRADE_EVERY_MS) {
+    lastGradeAt = now.getTime();
+    await gradePending(store, now);
+  }
+}
+
+export type RevisionRow = { event: P7Event; previous: number; current: number };
 
 async function processRun(store: ForecastRevisionStore, model: P7ModelId, initMs: number, availableMs: number, events: P7Event[], now: Date) {
   const initTime = runInitIso(initMs);
@@ -741,26 +761,42 @@ async function processRun(store: ForecastRevisionStore, model: P7ModelId, initMs
   }
   store.recordRun(model, initTime, new Date(availableMs).toISOString(), "live", detectedAt);
 
-  const located: Located[] = usable.flatMap((event) => {
+  const rows: RevisionRow[] = usable.flatMap((event) => {
     const location = run[codes.indexOf(event.station_code)];
     if (!location || !isDayAhead(event.target_date, now.getTime(), location.utc_offset_seconds)) return [];
     const previous = store.forecast(model, previousTime, event.station_code, event.target_date, event.kind);
     const current = store.forecast(model, initTime, event.station_code, event.target_date, event.kind);
-    return previous === null || current === null ? [] : [{ event, location, previous, current }];
+    return previous === null || current === null ? [] : [{ event, previous, current }];
   });
-  const signals = located.flatMap((row) => {
+  const result = await recordRevisionBatch(store, { model, initTime, detectedAt, availableAt: new Date(availableMs).toISOString(), rows });
+  return `${label} ${initTime}Z: ${rows.length} day-ahead events, ${result.signals} revisions, ${result.filled} paper fills, ${result.controls} matched controls.`;
+}
+
+/**
+ * Applies the frozen rule to events whose previous and current forecasts are
+ * known at one detection moment: signals get a paper fill at the live ask, each
+ * filled signal gets a matched control from the same batch, and every case gets
+ * book snapshots. Shared by P7 (Open-Meteo) and P8 (raw feeds).
+ */
+export async function recordRevisionBatch(
+  store: ForecastRevisionStore,
+  input: { model: string; initTime: string; detectedAt: string; availableAt: string | null; rows: RevisionRow[] },
+) {
+  const { model, initTime, detectedAt, availableAt, rows } = input;
+  const signals = rows.flatMap((row) => {
     const index = revisionTarget(row.event, row.previous, row.current);
     return index === null ? [] : [{ ...row, bucket: row.event.buckets[index] }];
   });
-  const controls = located.flatMap((row) => {
+  const controls = rows.flatMap((row) => {
     const index = controlTarget(row.event, row.previous, row.current, `${model}|${initTime}|${row.event.event_id}`);
     return index === null ? [] : [{ ...row, bucket: row.event.buckets[index] }];
   });
+  if (signals.length === 0) return { signals: 0, filled: 0, controls: 0 };
 
   const tokens = [...signals, ...controls].map((row) => row.bucket.yes_token_id).filter((token): token is string => Boolean(token));
   const books = await fetchBooks(tokens);
   const usedControls = new Set<string>();
-  const base = (row: Located & { bucket: P7Bucket }, arm: "signal" | "control", fill: P7Fill, pairedWith: string | null): P7NewCase => ({
+  const base = (row: RevisionRow & { bucket: P7Bucket }, arm: "signal" | "control", fill: P7Fill, pairedWith: string | null): P7NewCase => ({
     id: `${arm}:${model}:${initTime}:${row.event.event_id}`,
     arm,
     paired_with: pairedWith,
@@ -778,7 +814,7 @@ async function processRun(store: ForecastRevisionStore, model: P7ModelId, initMs
     target_label: row.bucket.label,
     target_token_id: row.bucket.yes_token_id,
     detected_at: detectedAt,
-    available_at: new Date(availableMs).toISOString(),
+    available_at: availableAt,
     status: fill.status,
     skip_reason: fill.status === "skipped" ? fill.reason : null,
     best_ask: fill.best_ask,
@@ -812,7 +848,7 @@ async function processRun(store: ForecastRevisionStore, model: P7ModelId, initMs
     }
     store.insertCase({ ...signalCase, paired_with: controlId }, book);
   }
-  return `${label} ${initTime}Z: ${located.length} day-ahead events, ${signals.length} revisions, ${filledSignals} paper fills, ${pairedControls} matched controls.`;
+  return { signals: signals.length, filled: filledSignals, controls: pairedControls };
 }
 
 function storeForecasts(store: ForecastRevisionStore, model: string, initTime: string, events: P7Event[], codes: string[], run: Array<RunLocation | null>) {
@@ -840,7 +876,7 @@ export async function locateStations(codes: string[]) {
   return found;
 }
 
-async function fetchBooks(tokens: string[]) {
+export async function fetchBooks(tokens: string[]) {
   const books = new Map<string, PolymarketOrderBook>();
   const unique = [...new Set(tokens)];
   for (let start = 0; start < unique.length; start += 50) {
@@ -907,8 +943,8 @@ export function safeForecastRevisionReport(): ForecastRevisionReport {
           detection_latency_min: store.detectionLatencyMinutes(model.id),
         };
       }),
-      summary: summarizeP7Cases(store.caseRecords()),
-      replay: store.latestReplay(),
+      summary: summarizeP7Cases(store.caseRecords(P7_MODELS.map((model) => model.id))),
+      replay: store.latestReplay("open-meteo"),
       error: null,
     };
   } catch (error) {

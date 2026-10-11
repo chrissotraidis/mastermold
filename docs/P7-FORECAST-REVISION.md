@@ -104,7 +104,8 @@ time Open-Meteo publishes, and the price does not move afterwards. At this
 timing there is no lag to capture, and the rule loses money after costs. Live
 P7 keeps measuring real asks and detection latency. If an edge exists, it would
 have to come from data faster than Open-Meteo (raw ECMWF open data or NOAA NOMADS
-as each forecast hour lands). That would be a separate experiment.
+as each forecast hour lands). That is experiment
+[P8](P8-RAW-FEED-HEAD-START.md).
 
 ## Known limits
 

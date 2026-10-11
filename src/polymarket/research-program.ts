@@ -8,6 +8,7 @@ import type { AnalystReport } from "./analyst";
 import type { PolymarketBrainReport } from "./brain";
 import { P7_GATE, P7_RULE, type ForecastRevisionReport, type P7Summary } from "./forecast-revision";
 import type { PolymarketMarket } from "./markets";
+import type { RawFeedReport } from "./raw-feed-revision";
 import type { PolymarketStrategyId } from "./strategies";
 import { lastNegRiskScan } from "./structural";
 import type { WalletIntelligenceReport } from "./wallets";
@@ -39,6 +40,7 @@ export function buildPolymarketResearchProgram(input: {
   wallets: WalletIntelligenceReport;
   markets: PolymarketMarket[];
   forecastRevision: ForecastRevisionReport;
+  rawFeeds: RawFeedReport;
 }): ResearchProgram {
   const metric = (id: PolymarketStrategyId) => input.brain.strategies.find((row) => row.strategy_id === id);
   const brainRan = Boolean(input.brain.latest_cycle_at);
@@ -139,6 +141,7 @@ export function buildPolymarketResearchProgram(input: {
       next: shrink.status === "adds_information" ? "Try the no-search 5-sample ensemble, shrunk by w." : "Keep :online off; no new model spend until this passes.",
     },
     forecastRevisionExperiment(input.forecastRevision),
+    rawFeedExperiment(input.rawFeeds),
   ];
 
   return {
@@ -198,6 +201,47 @@ function lagLine(s: P7Summary) {
   const parts = s.lag.filter((row) => row.offset_min > 0 && row.signal_mean_cents !== null).map((row) =>
     `+${row.offset_min}m ${cents(row.signal_mean_cents!)} vs control ${row.control_mean_cents === null ? "n/a" : cents(row.control_mean_cents)}`);
   return parts.length ? `Target price move after entry (mean): ${parts.join("; ")}.` : null;
+}
+
+function rawFeedExperiment(p8: RawFeedReport): ResearchExperiment {
+  const s = p8.summary;
+  const liveRuns = p8.feeds.reduce((sum, feed) => sum + feed.live_runs, 0);
+  const headStarts = p8.feeds.filter((feed) => feed.head_start.compared > 0).map((feed) => {
+    const h = feed.head_start;
+    const move = h.signal_move_cents === null ? "" : `; target moved ${cents(h.signal_move_cents)} vs control ${h.control_move_cents === null ? "n/a" : cents(h.control_move_cents)} before Open-Meteo caught up`;
+    return `${feed.label}: median head start ${h.median_head_start_min} min over Open-Meteo (raw first ${h.raw_first}, Open-Meteo first ${h.open_meteo_first})${move}.`;
+  });
+  const evidence = !p8.enabled
+    ? ["P8 is off (POLYMARKET_P8=0)."]
+    : liveRuns === 0
+      ? ["Waiting to watch a full run land on NOMADS or ECMWF open data; leave the scheduler on. No orders are placed."]
+      : [
+          `${liveRuns} raw runs watched as they landed; ${s.signals} revisions, ${s.signals_filled} paper fills, ${s.controls_filled} matched controls.`,
+          ...headStarts,
+          ...(lagLine(s) ? [lagLine(s)!] : []),
+          ...(pnlLine(s) ? [pnlLine(s)!] : []),
+        ];
+  if (p8.replay) {
+    const r = p8.replay.summary;
+    const at120 = r.lag.find((row) => row.offset_min === 120);
+    evidence.push(
+      `Producer-timing replay ${p8.replay.created_at.slice(0, 10)} (${p8.replay.params.days} days, ${p8.replay.params.events} markets, optimistic price-history fills): ${pnlLine(r) ?? "no graded fills"}${at120?.signal_mean_cents == null ? "" : ` Two hours after entry the target had moved ${cents(at120.signal_mean_cents)} vs control ${at120.control_mean_cents == null ? "n/a" : cents(at120.control_mean_cents)}.`}`,
+    );
+  } else {
+    evidence.push("No producer-timing replay yet: run npm run p7:replay -- --timing raw.");
+  }
+  if (p8.error) evidence.push(`Ledger error: ${p8.error}`);
+  return {
+    id: "P8",
+    name: "Raw-feed head start",
+    question: "Reading GFS from NOMADS and ECMWF open data as each forecast hour lands, does a revision trade before Open-Meteo publishes it, and does the market move in between?",
+    status: !p8.enabled || liveRuns === 0 ? "idle" : s.gate.status,
+    evidence,
+    gate: `Same as P7, on raw-feed fills: ≥${P7_GATE.min_graded_signals} graded signal fills across ≥${P7_GATE.min_stations} stations and ≥${P7_GATE.min_days} UTC days; day-clustered 95% lower bound of signal − matched control > 0 after fees; positive without the two best stations.`,
+    next: s.gate.status === "pass"
+      ? "Review fill depth at raw timing and the producer outage risk with a human before anything else."
+      : "Keep watching runs land; the head-start move shows whether speed alone is worth anything.",
+  };
 }
 
 function pnlLine(s: P7Summary) {
