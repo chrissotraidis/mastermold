@@ -86,6 +86,31 @@ The head-start comparison is descriptive: it explains a pass or a fail but is
 not itself a gate. Passing earns a human review of depth at raw timing,
 producer-outage handling and legal eligibility. It grants no authority.
 
+## First producer-timing replay (2026-10-11, settled markets 2026-10-04 to 2026-10-10)
+
+613 settled markets at 48 stations, entries at producer publication plus 2
+minutes, 1¢ slippage, optimistic price-history fills:
+
+| | Signal | Matched control |
+|---|---|---|
+| Paper fills (graded) | 1,744 | 1,744 |
+| Net per $1 after fees | −0.267 | −0.386 |
+| Mean price move, hour before entry | −0.12¢ | −0.14¢ |
+| Mean price move, +5 / +15 / +60 / +120 / +180 min | −0.05 / −0.02 / −0.01 / −0.11 / −0.13¢ | +0.06 / −0.09 / −0.20 / −0.31 / −0.26¢ |
+
+Signal − control was +0.12 per $1 (day-clustered 95% lower bound +0.05, 8 days),
+close to P7's Open-Meteo-timed replay (+0.10). Entering 1 h 45 min earlier on
+GFS did not change the picture: the target bucket's price does not rise during
+the head start, there is no move in the hour before entry either, and the rule
+loses about a quarter of each dollar after costs.
+
+Reading: the market has priced these revisions before even the public producer
+feeds publish them. That fits traders using sources earlier than the public
+files (licensed real-time ECMWF dissemination, other models, hourly station
+observations), or revisions that mostly converge on what those sources already
+showed. Live P8 keeps measuring real asks and the head start per run; nothing so
+far suggests that speed on public feeds is an edge.
+
 ## Known limits
 
 - Nearest 0.25° grid point, no elevation correction; consecutive runs share the
@@ -93,4 +118,3 @@ producer-outage handling and legal eligibility. It grants no authority.
 - ECMWF 3-hour windows can extend up to 3 hours past local midnight.
 - Detection is at most a minute behind each poll, plus download time.
 - NOMADS asks users to stay under about 120 requests a minute; P8 makes a few.
-
