@@ -83,6 +83,31 @@ paper or live authority.
 
 ## Known limits
 
+## First replay (2026-10-11, settled markets 2026-10-03 to 2026-10-10)
+
+644 settled markets at 48 stations, both models, entries 2 minutes after
+Open-Meteo availability, 1¢ slippage, optimistic price-history fills:
+
+| | Signal | Matched control |
+|---|---|---|
+| Paper fills (graded) | 1,982 | 1,982 |
+| Net per $1 after fees | −0.253 | −0.353 |
+| Mean price move, hour before entry | −0.07¢ | −0.27¢ |
+| Mean price move, +5 / +15 / +60 / +180 min | +0.01 / −0.01 / −0.11 / −0.35¢ | −0.05 / −0.08 / −0.16 / −0.34¢ |
+
+Signal − control was +0.10 per $1 (day-clustered 95% lower bound +0.019, 9
+days). The signal lost money on its own and still lost without its two best
+stations. 1,239 signals had no usable price yet (market not listed or no recent
+trade) and 180 were outside the band.
+
+Reading: a revision carries real information, since the bucket it points to
+beats a random adjacent bucket. But the market has already priced it by the
+time Open-Meteo publishes, and the price does not move afterwards. At this
+timing there is no lag to capture, and the rule loses money after costs. Live
+P7 keeps measuring real asks and detection latency. If an edge exists, it would
+have to come from data faster than Open-Meteo (raw ECMWF open data or NOAA NOMADS
+as each forecast hour lands). That would be a separate experiment.
+
 - Hourly model output understates the true daily extreme; the bias is shared by
   consecutive runs, so it mostly cancels in the revision but not in the bucket
   choice.
