@@ -16,7 +16,7 @@ export function PolymarketWeatherSection({ weather }: { weather: PolymarketWeath
       </summary>
       <div className="space-y-3 pb-3">
         <p className="text-xs leading-5 text-on-surface-variant">
-          Upcoming Polymarket daily-temperature buckets are matched to the event&apos;s stated Wunderground station; official station
+          Upcoming Polymarket daily-temperature buckets are matched to the event&apos;s stated NOAA or Wunderground station; official station
           coordinates feed raw ECMWF ensemble members. Nothing here can open a paper or live position. {weather.detail}
         </p>
         <section className="rounded-md border border-violet/20 bg-violet/[0.025] p-3" aria-label="Weather research evidence status">

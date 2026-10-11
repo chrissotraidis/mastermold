@@ -44,6 +44,7 @@ that do not require being smarter than the market, with accounting pessimistic e
 | P4 | Binary parity, fee-inclusive | Falsification control; expected to fail | Same as P3 |
 | P5 | Wallet follow-arm v2: frozen cohort + no-signal control arm + closing-price value | The one positive lead, but it cannot currently separate wallet skill from a price-band effect | ≥300 resolved markets, ≥6 weekends, ≥3 leagues; follow − control lower bound > 0; survives removing the top two wallets |
 | P6 | Analyst shrinkage fit on the 779 graded rows | Zero inference cost; tells us whether the model adds anything at all | Held-out news weight `w` with an interval excluding 0, else stop the analyst lane |
+| P7 | Weather forecast-revision lag (added 2026-10-11, [spec](../P7-FORECAST-REVISION.md)) | Tests a timing edge, not a better forecast: the market prices the forecast well, but may lag a new model run | ≥150 graded signal fills, ≥20 stations, ≥14 UTC days; day-clustered lower bound of signal − matched control > 0 after fees; positive without the top two stations |
 
 **Skip:** autonomous maker/rebate farming, in-play sports and 5/15-minute crypto, "Other" placeholder outcomes,
 taker-rebate tier chasing, post-game "arbs", longshot buying, a blanket buy-favorites rule, news-latency sniping,

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { reviewCapabilitySections } from "@/src/product/capabilities";
 import { autopilotStore } from "@/src/autopilot/store";
 import { safeWeatherResearchReport } from "@/src/polymarket/weather-research";
+import { safeForecastRevisionReport } from "@/src/polymarket/forecast-revision";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,7 @@ function strategyReality() {
 export default function ReviewPage() {
   const reality = strategyReality();
   const weather = safeWeatherResearchReport();
+  const p7 = safeForecastRevisionReport();
   const mlEligible = reality.cusumSpanDays >= 28 && reality.latestModelPassed && reality.latestModelCompliant && reality.approvedModel === reality.latestModelId;
 
   return (
@@ -196,6 +198,42 @@ export default function ReviewPage() {
             </dl>
             <p className="md:col-span-2">
               {weather.detail} The evaluator uses only prior cases for each held-out date and compares station/kind climatology, raw ensemble frequency, and a simple EMOS calibration with Brier and CRPS scores. This database cannot enable paper or live execution.
+            </p>
+          </CardContent>
+        </Card>
+
+          </LabSection>
+          <LabSection title="P7 weather forecast-revision lag">
+        <Card className="border-sky-400/25 bg-sky-400/[0.035]">
+          <CardHeader className="p-5 pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle as="h2" className="text-lg">Forecast-revision lag truth</CardTitle>
+              <Badge variant="outline" className="border-violet/30 text-violet">{p7.enabled ? "Shadow only" : "Off"}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 p-5 pt-2 text-sm leading-6 text-on-surface-variant md:grid-cols-2">
+            <div>
+              <p className="font-semibold text-on-surface">What is working</p>
+              <p>Each new ECMWF HRES and GFS run is read by its exact run time from Open-Meteo and compared with the run before it at the market&apos;s NOAA or Wunderground station. A move of 0.5 °C or more records a $25 paper fill at the live ask for the bucket one step toward the new forecast, a matched control from the same run, and order-book snapshots 5, 15, and 60 minutes later.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-on-surface">What is not proven</p>
+              <p>Paper fills live only in the P7 research ledger and never reach the paper account or an order route. The historical replay uses price history without book depth, so its fills are optimistic. A passed gate would only start a human review; live trading stays locked.</p>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border border-outline-variant/30 p-3 md:col-span-2 md:grid-cols-6">
+              <dt>Live runs</dt><dd className="font-semibold text-on-surface">{p7.runs.reduce((sum, run) => sum + run.live_runs, 0)}</dd>
+              <dt>Revisions</dt><dd className="font-semibold text-on-surface">{p7.summary.signals}</dd>
+              <dt>Paper fills</dt><dd className="font-semibold text-on-surface">{p7.summary.signals_filled}</dd>
+              <dt>Controls</dt><dd className="font-semibold text-on-surface">{p7.summary.controls_filled}</dd>
+              <dt>Graded</dt><dd className="font-semibold text-on-surface">{p7.summary.graded_signals}</dd>
+              <dt>Evidence gate</dt><dd className="font-semibold text-on-surface">{p7.summary.gate.status === "measuring" ? "Measuring" : p7.summary.gate.status === "pass" ? "Passed; not promoted" : "Failed"}</dd>
+            </dl>
+            <p className="md:col-span-2">
+              {p7.summary.gate.detail}{" "}
+              {p7.replay
+                ? `Latest replay (${p7.replay.created_at.slice(0, 10)}, ${p7.replay.params.days} days, ${p7.replay.params.events} markets): signal ${p7.replay.summary.pnl.signal_per_dollar ?? "n/a"} vs control ${p7.replay.summary.pnl.control_per_dollar ?? "n/a"} per $1 after fees.`
+                : "No historical replay has been run (npm run p7:replay)."}
+              {p7.error ? ` Ledger error: ${p7.error}` : ""}
             </p>
           </CardContent>
         </Card>
